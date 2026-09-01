@@ -1,3 +1,5 @@
+import sharp from "sharp"
+
 const DEFAULT_TIMEOUT_MS = 60000
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024
 
@@ -53,6 +55,24 @@ export async function resolveImageBuffer(image, options = {}) {
     throw error
   } finally {
     clearTimeout(timer)
+  }
+}
+
+export async function getImageBufferMetadata(imageBuffer) {
+  if (!Buffer.isBuffer(imageBuffer) || !imageBuffer.length) return null
+  try {
+    const metadata = await sharp(imageBuffer).metadata()
+    const width = Number(metadata.width) || 0
+    const height = Number(metadata.height) || 0
+    if (!width || !height) return null
+    return {
+      width,
+      height,
+      format: String(metadata.format || ""),
+      orientation: width === height ? "square" : (width < height ? "portrait" : "landscape")
+    }
+  } catch {
+    return null
   }
 }
 

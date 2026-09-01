@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto"
-import { enrichBilibiliMessageSegments, extractBilibiliShareFromSegment } from "../bilibiliMessage.js"
+import { enrichBilibiliMessageSegments, extractBilibiliShareFromSegment, extractBilibiliShareFromText } from "../bilibiliMessage.js"
 import { enrichDouyinMessageSegments, extractDouyinShareFromText } from "../douyinMessage.js"
+import { enrichYoutubeMessageSegments, extractYoutubeShareFromText } from "../youtubeMessage.js"
+import { enrichPixivMessageSegments, extractPixivShareFromText } from "../pixivMessage.js"
 import { createEventEnvelope, envelopeToRuntimeEvent, isEnvelopeFromBot } from "./eventEnvelope.js"
 import { AsyncSemaphore, KeyedSerialQueue } from "./keyedSerialQueue.js"
 
@@ -25,14 +27,32 @@ function findRawMedia(envelope = {}) {
     if (bilibili) return bilibili
     if (segment?.type === "douyin") return { ...segment }
   }
-  const bilibili = extractBilibiliShareFromSegment({ type: "json" }, envelope.rawMessage)
+  const bilibili = extractBilibiliShareFromSegment({ type: "json" }, envelope.rawMessage) || extractBilibiliShareFromText(envelope.rawMessage)
   if (bilibili) return bilibili
   return extractDouyinShareFromText(envelope.rawMessage)
+    || extractYoutubeShareFromText(envelope.rawMessage)
+    || extractPixivShareFromText(envelope.rawMessage)
 }
 
 function hasCollectibleImage(envelope = {}) {
   return Array.isArray(envelope.message)
     && envelope.message.some(segment => segment?.type === "image" && segment?.url)
+}
+
+function appendForwardContextSegment(message = [], context = {}) {
+  const text = String(context?.text || "").trim()
+  if (!text || !Array.isArray(message)) return message
+  if (message.some(segment => segment?.type === "forward_context")) return message
+  return [
+    ...message,
+    {
+      type: "forward_context",
+      text,
+      forward_ids: Array.isArray(context.forwardIds) ? context.forwardIds.map(String) : [],
+      media: Array.isArray(context.media) ? context.media : [],
+      forward_nodes: Array.isArray(context.forwardNodes) ? context.forwardNodes : []
+    }
+  ]
 }
 
 export class MessagePipeline {
@@ -50,7 +70,10 @@ export class MessagePipeline {
     concurrency = 8,
     emojiConcurrency = 2,
     enrichBilibili = enrichBilibiliMessageSegments,
-    enrichDouyin = enrichDouyinMessageSegments
+    enrichDouyin = enrichDouyinMessageSegments,
+    enrichYoutube = enrichYoutubeMessageSegments,
+    enrichPixiv = enrichPixivMessageSegments,
+    resolveForwardContext = null
   } = {}) {
     this.store = store
     this.recentManager = recentManager
@@ -66,6 +89,9 @@ export class MessagePipeline {
     this.leaseMs = Math.max(10000, Number(leaseMs) || DEFAULT_LEASE_MS)
     this.enrichBilibili = enrichBilibili
     this.enrichDouyin = enrichDouyin
+    this.enrichYoutube = enrichYoutube
+    this.enrichPixiv = enrichPixiv
+    this.resolveForwardContext = typeof resolveForwardContext === "function" ? resolveForwardContext : null
     this.runId = randomUUID()
     this.timers = new Map()
     this.stopped = false
@@ -145,6 +171,35 @@ export class MessagePipeline {
       message = await this.enrichDouyin(message, envelope.rawMessage)
     } catch (error) {
       this.logger?.warn?.(`[MessagePipeline] 抖音富化失败，保留已有消息 event=${envelope.eventId}: ${cleanError(error)}`)
+    }
+    try {
+      message = await this.enrichYoutube(message, envelope.rawMessage)
+    } catch (error) {
+      this.logger?.warn?.(`[MessagePipeline] YouTube 富化失败，保留已有消息 event=${envelope.eventId}: ${cleanError(error)}`)
+    }
+    try {
+      message = await this.enrichPixiv(message, envelope.rawMessage)
+    } catch (error) {
+      this.logger?.warn?.(`[MessagePipeline] Pixiv 富化失败，保留已有消息 event=${envelope.eventId}: ${cleanError(error)}`)
+    }
+    const hasForwardSegment = Array.isArray(envelope.message) && envelope.message.some(segment => segment?.type === "forward")
+    if (hasForwardSegment) {
+      this.logger?.info?.(`[MessagePipeline] 合并转发上下文探测 event=${envelope.eventId} resolver=${Boolean(this.resolveForwardContext)} cached=${Boolean(envelope.forwardContext)}`)
+    }
+    if (this.resolveForwardContext && !envelope.forwardContext) {
+      try {
+        const forwardContext = await this.resolveForwardContext(envelope)
+        if (forwardContext) {
+          envelope.forwardContext = forwardContext
+          message = appendForwardContextSegment(message, forwardContext)
+          this.logger?.info?.(`[MessagePipeline] 已展开合并转发 event=${envelope.eventId} nodes=${forwardContext.forwardIds?.length || 0} media=${forwardContext.media?.length || 0}`)
+        }
+      } catch (error) {
+        if (error?.code === "forward_context_unavailable") throw error
+        this.logger?.warn?.(`[MessagePipeline] 合并转发展开失败 event=${envelope.eventId}: ${cleanError(error)}`)
+      }
+    } else if (envelope.forwardContext) {
+      message = appendForwardContextSegment(message, envelope.forwardContext)
     }
     return Array.isArray(message) ? message : envelope.message
   }

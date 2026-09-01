@@ -55,7 +55,13 @@ export const AI_PROVIDER_DEFINITIONS = [
     modelField: "imageGenerationApiModel",
     keyField: "imageGenerationApiKey",
     priorityField: "imageGenerationPriority",
-    extraFields: [{ panelField: "size", legacyField: "imageGenerationSize" }],
+    extraFields: [
+      { panelField: "size", legacyField: "imageGenerationSize", label: "默认尺寸", placeholder: "未指定比例时使用，例如 1024x1024 或 2K" },
+      { panelField: "squareSize", legacyField: "imageGenerationSquareSize", label: "正方形尺寸", placeholder: "例如 1024x1024" },
+      { panelField: "portraitSize", legacyField: "imageGenerationPortraitSize", label: "竖版尺寸", placeholder: "例如 1024x1536" },
+      { panelField: "landscapeSize", legacyField: "imageGenerationLandscapeSize", label: "横版尺寸", placeholder: "例如 1536x1024" },
+      { panelField: "autoSize", legacyField: "imageGenerationAutoSize", label: "自动尺寸", placeholder: "图生图未指定比例时可填 auto；留空则不发送 size" }
+    ],
     legacyProviderFields: ["imageGenerationProviders", "imageGenerationCandidates", "imageGenerationFallbacks"],
     urlPlaceholder: "https://ark.cn-beijing.volces.com/api/v3/images/generations",
     modelPlaceholder: "doubao-seedream-5-0-260128",
@@ -69,6 +75,9 @@ export const AI_PROVIDER_DEFINITIONS = [
     modelField: "analysisApiModel",
     keyField: "analysisApiKey",
     priorityField: "analysisAiPriority",
+    extraFields: [
+      { panelField: "timeoutMs", legacyField: "timeoutMs", label: "单次超时（毫秒）", placeholder: "例如 45000" }
+    ],
     urlPlaceholder: "https://api.openai.com/v1/chat/completions",
     modelPlaceholder: "gemini-3-pro-preview",
     usageHint: "用于 googleImageAnalysisTool 识图、表情包系统 VLM 打标和内容审查"
@@ -157,7 +166,8 @@ export function normalizeProviderForPanel(provider = {}, definition) {
   };
 
   for (const extra of definition.extraFields || []) {
-    item[extra.panelField] = provider[extra.panelField] ?? provider[extra.legacyField] ?? "";
+    const value = provider[extra.panelField] ?? provider[extra.legacyField] ?? "";
+    if (hasText(value)) item[extra.panelField] = value;
   }
 
   return item;

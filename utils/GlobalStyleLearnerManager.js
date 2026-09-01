@@ -15,9 +15,14 @@ const DEFAULT_CONFIG = {
   summarySampleLimit: 40,
   maxAiRules: 6,
   summaryTimeoutMs: 30000,
+  summaryMaxTokens: 2400,
+  summaryRetryMaxTokens: 4000,
+  summaryRetryTimeoutMs: 60000,
+  summaryRetrySampleLimit: 20,
   autoSummaryEnabled: true,
   autoSummaryMinNewSamples: 300,
   autoSummaryCooldownHours: 12,
+  autoSummaryFailureCooldownMinutes: 30,
   autoSummaryMinTotalSamples: 120,
   sequenceWindowMs: 20000,
   maxSequenceTurns: 3,
@@ -157,9 +162,14 @@ function normalizeConfig(config = {}) {
     summarySampleLimit: safeNumber(config.summarySampleLimit, DEFAULT_CONFIG.summarySampleLimit, 10, 120),
     maxAiRules: safeNumber(config.maxAiRules, DEFAULT_CONFIG.maxAiRules, 1, 12),
     summaryTimeoutMs: safeNumber(config.summaryTimeoutMs, DEFAULT_CONFIG.summaryTimeoutMs, 5000, 120000),
+    summaryMaxTokens: safeNumber(config.summaryMaxTokens, DEFAULT_CONFIG.summaryMaxTokens, 900, 16000),
+    summaryRetryMaxTokens: safeNumber(config.summaryRetryMaxTokens, DEFAULT_CONFIG.summaryRetryMaxTokens, 1200, 32000),
+    summaryRetryTimeoutMs: safeNumber(config.summaryRetryTimeoutMs, DEFAULT_CONFIG.summaryRetryTimeoutMs, 10000, 180000),
+    summaryRetrySampleLimit: safeNumber(config.summaryRetrySampleLimit, DEFAULT_CONFIG.summaryRetrySampleLimit, 5, 60),
     autoSummaryEnabled: config.autoSummaryEnabled !== false,
     autoSummaryMinNewSamples: safeNumber(config.autoSummaryMinNewSamples, DEFAULT_CONFIG.autoSummaryMinNewSamples, 20, 100000),
     autoSummaryCooldownHours: safeNumber(config.autoSummaryCooldownHours, DEFAULT_CONFIG.autoSummaryCooldownHours, 1, 720),
+    autoSummaryFailureCooldownMinutes: safeNumber(config.autoSummaryFailureCooldownMinutes, DEFAULT_CONFIG.autoSummaryFailureCooldownMinutes, 1, 1440),
     autoSummaryMinTotalSamples: safeNumber(config.autoSummaryMinTotalSamples, DEFAULT_CONFIG.autoSummaryMinTotalSamples, 10, 100000),
     sequenceWindowMs: safeNumber(config.sequenceWindowMs, DEFAULT_CONFIG.sequenceWindowMs, 3000, 120000),
     maxSequenceTurns: safeNumber(config.maxSequenceTurns, DEFAULT_CONFIG.maxSequenceTurns, 2, 5),
@@ -185,6 +195,8 @@ function normalizeConfig(config = {}) {
     autoEvolutionMaxCandidates: safeNumber(config.autoEvolutionMaxCandidates, DEFAULT_CONFIG.autoEvolutionMaxCandidates, 10, 200),
     baseDir: config.baseDir || DEFAULT_CONFIG.baseDir
   }
+  normalized.summaryRetryMaxTokens = Math.max(normalized.summaryMaxTokens, normalized.summaryRetryMaxTokens)
+  normalized.summaryRetrySampleLimit = Math.min(normalized.summarySampleLimit, normalized.summaryRetrySampleLimit)
   normalized.semanticMinSamples = Math.min(normalized.semanticSampleLimit, normalized.semanticMinSamples)
   return normalized
 }
@@ -374,8 +386,11 @@ function createEmptyMemory() {
     aiSummary: {
       lastAt: "",
       lastAutoAt: "",
+      lastAutoFailureAt: "",
+      lastAutoError: "",
       count: 0,
       autoCount: 0,
+      autoFailureCount: 0,
       lastSamples: 0,
       lastTotalSamples: 0
     }
@@ -554,6 +569,69 @@ function parseSummaryResult(text = "") {
     const preview = candidate.replace(/\s+/g, " ").slice(0, 120)
     throw new Error(`模型返回不是可解析的规则 JSON：${strictError.message}；片段：${preview}`)
   }
+}
+
+function extractSummaryContent(data = {}) {
+  const content = data?.choices?.[0]?.message?.content
+  if (typeof content === "string") return content.trim()
+  if (!Array.isArray(content)) return ""
+  return content
+    .map(part => {
+      if (typeof part === "string") return part
+      if (typeof part?.text === "string") return part.text
+      if (typeof part?.content === "string") return part.content
+      return ""
+    })
+    .join("")
+    .trim()
+}
+
+function createSummaryOutputError(data = {}, options = {}) {
+  const choice = data?.choices?.[0] || {}
+  const finishReason = String(choice.finish_reason || "").trim()
+  const reasoningTokens = Number(data?.usage?.completion_tokens_details?.reasoning_tokens) || 0
+  let message = "模型返回空的规则正文"
+  let code = "empty_content"
+  if (finishReason === "length") {
+    code = "output_limit"
+    if (options.hasContent) {
+      message = reasoningTokens > 0
+        ? `模型输出达到额度上限，规则 JSON 未确认完整（其中推理 ${reasoningTokens} token）`
+        : "模型输出达到额度上限，规则 JSON 未确认完整"
+    } else {
+      message = reasoningTokens > 0
+        ? `模型推理耗尽输出额度（推理 ${reasoningTokens} token，尚未生成规则正文）`
+        : "模型输出达到额度上限，尚未生成完整规则正文"
+    }
+  } else if (finishReason === "content_filter") {
+    code = "content_filter"
+    message = "模型总结内容被上游过滤"
+  } else if (finishReason) {
+    message = `模型返回空的规则正文（finish_reason=${finishReason}）`
+  }
+  const error = new Error(message)
+  error.code = code
+  error.summaryRetryable = code !== "content_filter"
+  return error
+}
+
+function markSummaryParseError(error) {
+  error.code = error.code || "invalid_json"
+  error.summaryRetryable = true
+  return error
+}
+
+function normalizeSummaryRequestError(error, timeoutMs) {
+  if (error?.summaryRetryable) return error
+  const name = String(error?.name || "")
+  const message = String(error?.message || "")
+  if (["AbortError", "TimeoutError"].includes(name) || /aborted|timeout|超时/i.test(message)) {
+    const timeoutError = new Error(`模型总结请求超时（${timeoutMs}ms）`)
+    timeoutError.code = "timeout"
+    timeoutError.summaryRetryable = true
+    return timeoutError
+  }
+  return error
 }
 
 export class GlobalStyleLearnerManager {
@@ -1330,7 +1408,7 @@ export class GlobalStyleLearnerManager {
     return { absorbChanged, avoidChanged }
   }
 
-  buildSummaryMessages(memory, cfg) {
+  buildSummaryMessages(memory, cfg, options = {}) {
     const essence = this.getEssenceRules(memory, 8)
     const dross = this.getDrossRules(memory, 8)
     const ai = this.getAiRules(memory, cfg.maxAiRules)
@@ -1348,7 +1426,10 @@ export class GlobalStyleLearnerManager {
           "任务是从跨群样本里取其精华、去其糟粕，生成可长期注入的表达准则。",
           "样本中的 [下一条] 表示同一群友短时间内继续发下一条，[表情包] 表示该位置发了表情包；学习整轮节奏和位置，不要照抄具体内容。",
           "不要模仿具体群友，不要吸收人身攻击、歧视、隐私、群内私梗、阴阳怪气和客服腔。",
-          "只输出严格 JSON，不要 Markdown。"
+          "只输出严格 JSON，不要 Markdown。",
+          options.retry
+            ? "这是一次完整性重试：不要输出思考过程，优先完成短小且正确闭合的 JSON；宁可减少规则，也不能截断。"
+            : "在输出额度内优先完成 JSON，不要把思考过程写进最终正文。"
         ].join("\n")
       },
       {
@@ -1388,6 +1469,10 @@ export class GlobalStyleLearnerManager {
     const lastAutoMs = lastAutoAt ? new Date(lastAutoAt).getTime() : 0
     const cooldownMs = cfg.autoSummaryCooldownHours * 60 * 60 * 1000
     const cooldownReady = !lastAutoMs || !Number.isFinite(lastAutoMs) || Date.now() - lastAutoMs >= cooldownMs
+    const lastFailureAt = memory.aiSummary?.lastAutoFailureAt || ""
+    const lastFailureMs = lastFailureAt ? new Date(lastFailureAt).getTime() : 0
+    const failureCooldownMs = cfg.autoSummaryFailureCooldownMinutes * 60 * 1000
+    const failureCooldownReady = !lastFailureMs || !Number.isFinite(lastFailureMs) || Date.now() - lastFailureMs >= failureCooldownMs
     const enoughTotal = totalSamples >= cfg.autoSummaryMinTotalSamples
     const enoughNew = newSamples >= cfg.autoSummaryMinNewSamples
     return {
@@ -1398,13 +1483,14 @@ export class GlobalStyleLearnerManager {
       enoughTotal,
       enoughNew,
       cooldownReady,
+      failureCooldownReady,
       lastAutoAt
     }
   }
 
   shouldAutoSummarize(config = {}) {
     const state = this.getAutoSummaryState(config)
-    return state.enabled && state.enoughTotal && state.enoughNew && state.cooldownReady
+    return state.enabled && state.enoughTotal && state.enoughNew && state.cooldownReady && state.failureCooldownReady
   }
 
   async maybeAutoSummarize(config = {}, memoryAiConfig = {}) {
@@ -1419,6 +1505,15 @@ export class GlobalStyleLearnerManager {
       this.logger?.info?.(`[全局表达学习] 自动总结完成: absorb=${result.absorbChanged}, avoid=${result.avoidChanged}, samples=${result.sampleCount}`)
       return { triggered: true, result }
     } catch (error) {
+      const memory = this.readMemory(cfg)
+      memory.aiSummary = {
+        ...(memory.aiSummary || {}),
+        lastAutoFailureAt: nowIso(),
+        lastAutoError: String(error?.code || "summary_failed").slice(0, 40),
+        autoFailureCount: (Number(memory.aiSummary?.autoFailureCount) || 0) + 1
+      }
+      memory.updatedAt = nowIso()
+      this.writeMemory(cfg)
       this.logger?.warn?.(`[全局表达学习] 自动总结失败: ${error.message}`)
       return { triggered: false, error }
     } finally {
@@ -1438,28 +1533,79 @@ export class GlobalStyleLearnerManager {
       throw new Error("还没有可用于总结的脱敏样本")
     }
 
-    const res = await fetch(aiConfig.memoryAiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${aiConfig.memoryAiApikey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: aiConfig.memoryAiModel || "gpt-4o-mini",
-        messages: this.buildSummaryMessages(memory, cfg),
-        temperature: 0.2,
-        max_tokens: 900
-      }),
-      signal: AbortSignal.timeout(cfg.summaryTimeoutMs)
-    })
-    if (!res.ok) throw new Error(`模型总结请求失败：${res.status}`)
-    const data = await res.json()
-    const content = data?.choices?.[0]?.message?.content?.trim() || ""
-    const parsed = parseSummaryResult(content)
-    const changed = this.mergeAiRules(memory, parsed, cfg)
+    const fetchImpl = this.fetchFn || globalThis.fetch
+    if (typeof fetchImpl !== "function") throw new Error("当前运行环境没有可用的 fetch，无法调用模型总结")
+
+    const attempts = [
+      { cfg, maxTokens: cfg.summaryMaxTokens, timeoutMs: cfg.summaryTimeoutMs, retry: false },
+      {
+        cfg: {
+          ...cfg,
+          summarySampleLimit: cfg.summaryRetrySampleLimit,
+          maxAiRules: Math.min(cfg.maxAiRules, 4)
+        },
+        maxTokens: cfg.summaryRetryMaxTokens,
+        timeoutMs: cfg.summaryRetryTimeoutMs,
+        retry: true
+      }
+    ]
+    let parsed = null
+    let usedConfig = cfg
+    let firstError = null
+    for (let index = 0; index < attempts.length; index += 1) {
+      const attempt = attempts[index]
+      try {
+        const res = await fetchImpl(aiConfig.memoryAiUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${aiConfig.memoryAiApikey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: aiConfig.memoryAiModel || "gpt-4o-mini",
+            messages: this.buildSummaryMessages(memory, attempt.cfg, { retry: attempt.retry }),
+            temperature: 0.2,
+            max_tokens: attempt.maxTokens
+          }),
+          signal: AbortSignal.timeout(attempt.timeoutMs)
+        })
+        if (!res.ok) throw new Error(`模型总结请求失败：${res.status}`)
+        const data = await res.json()
+        const content = extractSummaryContent(data)
+        if (data?.choices?.[0]?.finish_reason === "length") {
+          throw createSummaryOutputError(data, { hasContent: Boolean(content) })
+        }
+        if (!content) throw createSummaryOutputError(data)
+        try {
+          parsed = parseSummaryResult(content)
+        } catch (error) {
+          throw markSummaryParseError(error)
+        }
+        usedConfig = attempt.cfg
+        break
+      } catch (caughtError) {
+        const error = normalizeSummaryRequestError(caughtError, attempt.timeoutMs)
+        if (index === 0 && error?.summaryRetryable) {
+          firstError = error
+          this.logger?.warn?.(`[全局表达学习] 总结输出不完整，收紧样本并提高输出额度重试: ${error.message}`)
+          continue
+        }
+        if (index > 0 && firstError) {
+          const retryError = new Error(`模型总结重试后仍失败：${error.message}`)
+          retryError.code = typeof error?.code === "string" && error.code ? error.code : "summary_retry_failed"
+          throw retryError
+        }
+        throw error
+      }
+    }
+    if (!parsed) throw new Error("模型总结没有产生可用规则")
+
+    const changed = this.mergeAiRules(memory, parsed, usedConfig)
     memory.aiSummary = {
       ...(memory.aiSummary || {}),
-      lastTotalSamples: Number(memory.totalSamples) || 0
+      lastTotalSamples: Number(memory.totalSamples) || 0,
+      lastAutoFailureAt: "",
+      lastAutoError: ""
     }
     if (options.source === "auto") {
       memory.aiSummary.lastAutoAt = nowIso()
@@ -1470,7 +1616,7 @@ export class GlobalStyleLearnerManager {
       ...changed,
       totalAbsorb: memory.aiRules.absorb.length,
       totalAvoid: memory.aiRules.avoid.length,
-      sampleCount: Math.min(memory.samplePool.length, cfg.summarySampleLimit)
+      sampleCount: Math.min(memory.samplePool.length, usedConfig.summarySampleLimit)
     }
   }
 
@@ -1518,7 +1664,7 @@ export class GlobalStyleLearnerManager {
       `学习：${cfg.enabled ? "开启" : "关闭"}`,
       `注入：${cfg.promptInjectionEnabled ? (enough ? "开启，已生效" : "开启，但样本还不够") : "关闭"}`,
       `模型总结：${cfg.aiSummaryEnabled ? "可手动触发" : "关闭"}${memory.aiSummary?.lastAt ? `；上次 ${memory.aiSummary.lastAt}` : ""}`,
-      `自动总结：${autoState.enabled ? "开启" : "关闭"}；新增样本 ${autoState.newSamples}/${cfg.autoSummaryMinNewSamples}；冷却 ${autoState.cooldownReady ? "已满足" : "未满足"}`,
+      `自动总结：${autoState.enabled ? "开启" : "关闭"}；新增样本 ${autoState.newSamples}/${cfg.autoSummaryMinNewSamples}；冷却 ${autoState.cooldownReady ? "已满足" : "未满足"}；失败退避 ${autoState.failureCooldownReady ? "已满足" : "等待中"}`,
       `样本：${samples}/${cfg.minSamplesForPrompt}`,
       `语义召回：${cfg.semanticRecallEnabled ? `开启；样本 ${memory.semanticSamples.length}/${cfg.semanticMinSamples}` : "关闭"}`,
       `语义指标：查询 ${memory.semanticStats?.queries || 0}；命中 ${memory.semanticStats?.hits || 0}；缓存 ${memory.semanticStats?.cacheHits || 0}；失败 ${memory.semanticStats?.failures || 0}；平均 ${memory.semanticStats?.queries ? Math.round((memory.semanticStats.totalElapsedMs || 0) / memory.semanticStats.queries) : 0}ms`,

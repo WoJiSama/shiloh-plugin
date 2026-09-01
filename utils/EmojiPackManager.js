@@ -4,6 +4,7 @@ import path from "path"
 import crypto from "crypto"
 import YAML from "yaml"
 import sharp from "sharp"
+import { resolveChatCompletionUrl } from "./chatCompletionUrl.js"
 import { buildEmojiCandidatePool, filterEmojiSelectionCriteriaToCatalog, normalizeEmojiSelectionCriteria, structuredEmojiRelevanceScore } from "./emojiSelection.js"
 
 const _path = process.cwd()
@@ -598,7 +599,7 @@ ${list}
 
 仅输出 JSON（不要 markdown 代码块）：{"index": <候选编号 0-${sample.length - 1}>, "reason": "简短理由"}`
 
-    const response = await fetch(cfg.toolsAiUrl, {
+    const response = await fetch(resolveChatCompletionUrl(cfg.toolsAiUrl), {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.toolsAiApikey}` },
       body: JSON.stringify({

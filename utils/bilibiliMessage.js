@@ -85,6 +85,44 @@ export function extractBilibiliEpisodeId(value = "") {
   return String(value || "").match(/\/bangumi\/play\/ep(\d+)/i)?.[1] || ""
 }
 
+export function extractBilibiliUrls(value = "") {
+  const text = decodeBilibiliCardEntities(value).replace(/\\\//g, "/")
+  const matches = text.match(/https?:\/\/(?:(?:b23\.tv\/[^\s，。！？；;）)\]}>]+)|(?:(?:(?:www|m)\.)?bilibili\.com\/(?:video\/BV[0-9A-Za-z]+|bangumi\/play\/ep\d+)[^\s，。！？；;）)\]}>]+))/gi) || []
+  return [...new Set(matches.map(normalizeUrl).filter(Boolean))]
+}
+
+function createBilibiliCard({
+  shortUrl = "",
+  title = "B站视频",
+  cardTitle = "哔哩哔哩",
+  coverUrl = "",
+  sharedBy = "",
+  sharedByQq = ""
+} = {}) {
+  const bvid = extractBilibiliBvid(shortUrl)
+  const epId = extractBilibiliEpisodeId(shortUrl)
+  return {
+    type: "bilibili",
+    platform: "bilibili",
+    title: compactText(title, 300),
+    card_title: compactText(cardTitle, 80),
+    short_url: shortUrl,
+    page_url: bvid ? `https://www.bilibili.com/video/${bvid}` : epId ? `https://www.bilibili.com/bangumi/play/ep${epId}` : shortUrl,
+    video_url: bvid ? `https://www.bilibili.com/video/${bvid}` : epId ? `https://www.bilibili.com/bangumi/play/ep${epId}` : shortUrl,
+    cover_url: coverUrl,
+    bvid,
+    ep_id: epId,
+    shared_by: compactText(sharedBy, 80),
+    shared_by_qq: sharedByQq ? String(sharedByQq) : "",
+    metadata_status: bvid || epId ? "identified" : "card"
+  }
+}
+
+export function extractBilibiliShareFromText(value = "") {
+  const shortUrl = extractBilibiliUrls(value)[0] || ""
+  return shortUrl ? createBilibiliCard({ shortUrl }) : null
+}
+
 export function extractBilibiliShare(payload = {}) {
   if (!payload || typeof payload !== "object") return null
   const serialized = JSON.stringify(payload)
@@ -95,30 +133,21 @@ export function extractBilibiliShare(payload = {}) {
   const shortUrl = normalizeUrl(detail.qqdocurl || findFirstUrl(payload, /(?:b23\.tv|bilibili\.com\/video\/BV)/i))
   const prompt = compactText(payload.prompt || "").replace(/^\[QQ小程序\]/i, "")
   const genericTitle = /^(?:哔哩哔哩|bilibili)$/i.test(String(detail.title || "").trim()) ? "" : detail.title
-  const title = compactText(detail.desc || genericTitle || prompt || "B站视频", 300)
+  const title = detail.desc || genericTitle || prompt || "B站视频"
   const coverUrl = normalizeUrl(detail.preview || detail.cover || detail.pic || "")
-  const bvid = extractBilibiliBvid(shortUrl || serialized)
-  const epId = extractBilibiliEpisodeId(shortUrl || serialized)
-
-  return {
-    type: "bilibili",
-    platform: "bilibili",
+  return createBilibiliCard({
+    shortUrl,
     title,
-    card_title: compactText(detail.title || "哔哩哔哩", 80),
-    short_url: shortUrl,
-    page_url: bvid ? `https://www.bilibili.com/video/${bvid}` : epId ? `https://www.bilibili.com/bangumi/play/ep${epId}` : shortUrl,
-    video_url: bvid ? `https://www.bilibili.com/video/${bvid}` : epId ? `https://www.bilibili.com/bangumi/play/ep${epId}` : shortUrl,
-    cover_url: coverUrl,
-    bvid,
-    ep_id: epId,
-    shared_by: compactText(detail.host?.nick || "", 80),
-    shared_by_qq: detail.host?.uin ? String(detail.host.uin) : "",
-    metadata_status: bvid || epId ? "identified" : "card"
-  }
+    cardTitle: detail.title || "哔哩哔哩",
+    coverUrl,
+    sharedBy: detail.host?.nick || "",
+    sharedByQq: detail.host?.uin || ""
+  })
 }
 
 export function extractBilibiliShareFromSegment(segment = {}, rawMessage = "") {
   if (segment?.type === "bilibili") return { ...segment }
+  if (segment?.type === "text") return extractBilibiliShareFromText(segment.text || segment.data?.text || "")
   if (segment?.type !== "json") return null
   return extractBilibiliShare(getSegmentPayload(segment) || getRawJsonPayload(rawMessage) || {})
 }
@@ -251,7 +280,7 @@ export async function enrichBilibiliMessageSegments(segments = [], rawMessage = 
     output.push(await enrichBilibiliShare(card, options))
   }
   if (!found) {
-    const card = extractBilibiliShare(getRawJsonPayload(rawMessage) || {})
+    const card = extractBilibiliShare(getRawJsonPayload(rawMessage) || {}) || extractBilibiliShareFromText(rawMessage)
     if (card) output.push(await enrichBilibiliShare(card, options))
   }
   return output

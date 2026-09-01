@@ -66,6 +66,12 @@ export default [
     bottomHelpMessage: "清理“很抱歉”“作为AI”“建议您”等表达"
   },
   {
+    field: "personaGuard.avoidUnpromptedIntimacy",
+    label: "避免主动亲密称谓",
+    component: "Switch",
+    bottomHelpMessage: "发送前移除机器人主动使用的宝宝、宝贝等亲密化接话"
+  },
+  {
     field: "personaGuard.rewriteHardRefusal",
     label: "软化强硬拒绝",
     component: "Switch",
@@ -149,6 +155,33 @@ export default [
     componentProps: { min: 5000, max: 120000, step: 5000, placeholder: "30000" }
   },
   {
+    field: "globalStyleLearning.summaryMaxTokens",
+    label: "总结首次输出额度",
+    component: "InputNumber",
+    componentProps: { min: 900, max: 16000, step: 100, placeholder: "2400" },
+    bottomHelpMessage: "推理模型的思考 token 也会占用此额度；输出不完整时会自动进入紧凑重试"
+  },
+  {
+    field: "globalStyleLearning.summaryRetryMaxTokens",
+    label: "总结重试输出额度",
+    component: "InputNumber",
+    componentProps: { min: 1200, max: 32000, step: 100, placeholder: "4000" }
+  },
+  {
+    field: "globalStyleLearning.summaryRetryTimeoutMs",
+    label: "总结重试超时毫秒",
+    component: "InputNumber",
+    componentProps: { min: 10000, max: 180000, step: 5000, placeholder: "60000" },
+    bottomHelpMessage: "重试会缩短样本和规则数，但为推理模型保留更长完成时间"
+  },
+  {
+    field: "globalStyleLearning.summaryRetrySampleLimit",
+    label: "总结重试样本数",
+    component: "InputNumber",
+    componentProps: { min: 5, max: 60, step: 5, placeholder: "20" },
+    bottomHelpMessage: "空正文或 JSON 截断时，缩短到该样本数后重试"
+  },
+  {
     field: "globalStyleLearning.autoSummaryEnabled",
     label: "启用自动总结",
     component: "Switch",
@@ -165,6 +198,13 @@ export default [
     label: "自动总结冷却小时",
     component: "InputNumber",
     componentProps: { min: 1, max: 720, step: 1, placeholder: "12" }
+  },
+  {
+    field: "globalStyleLearning.autoSummaryFailureCooldownMinutes",
+    label: "自动总结失败退避分钟",
+    component: "InputNumber",
+    componentProps: { min: 1, max: 1440, step: 5, placeholder: "30" },
+    bottomHelpMessage: "自动总结失败后暂缓再次调用；手动总结不受影响"
   },
   {
     field: "globalStyleLearning.autoSummaryMinTotalSamples",

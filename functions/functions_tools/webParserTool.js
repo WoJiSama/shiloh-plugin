@@ -1,4 +1,5 @@
 import { AbstractTool } from './AbstractTool.js';
+import { buildVisibleFailureDetail } from '../../utils/visibleFailure.js';
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url);
 const puppeteer = require('puppeteer');
@@ -380,7 +381,7 @@ export class WebParserTool extends AbstractTool {
       return result;
     } catch (error) {
       console.log('网页解析错误:', error);
-      return '网页解析失败，请稍后重试。';
+      return `网页解析失败：${buildVisibleFailureDetail(error)}`;
     }
   }
 }

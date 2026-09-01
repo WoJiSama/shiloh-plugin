@@ -1,6 +1,7 @@
 import { dependencies } from "../dependence/dependencies.js";
 import { removeToolPromptsFromMessages } from "../utils/textUtils.js"
 import { sanitizeJsonValue, sanitizeMessagesForJson } from "./unicodeText.js"
+import { resolveChatCompletionUrl } from "./chatCompletionUrl.js"
 import { resolveAgentBackend, shouldAcceptPlannerTextResponse, summarizeToolResultForAgent } from "./agentIntelligence.js"
 const { _path, fetch, fs, path } = dependencies;
 /**
@@ -13,7 +14,7 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
     const provider = config.providers?.toLowerCase();
 
     try {
-        let url, headers, finalRequestData;
+        let url, headers, finalRequestData, selectedTextBackend = null;
 
         const requestHasTools = Array.isArray(requestData?.tools) &&
             requestData.tools.length > 0 &&
@@ -21,7 +22,7 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
 
         if (config.useTools && requestHasTools) {
             // useTools 开启，先调用 OpenAI API
-            const openaiUrl = `${config.toolsAiConfig.toolsAiUrl}`;
+            const openaiUrl = resolveChatCompletionUrl(config.toolsAiConfig.toolsAiUrl);
             // 确保使用OpenAiModel的模型
             if (!config.toolsAiConfig.toolsAiApikey) return { error: "OpenAI Token 未配置" };
 
@@ -48,12 +49,14 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
 
                 if (!openaiResponse.ok) {
                     const errorText = await openaiResponse.text().catch(() => '无法读取错误内容');
-                    logger.error(`OpenAI API 请求失败：${openaiResponse.status} ${openaiResponse.statusText} - ${errorText}`);
-                    return { error: `OpenAI API 请求失败：${openaiResponse.status} ${openaiResponse.statusText} - ${errorText}` };
+                    const failure = `OpenAI API 请求失败：${openaiResponse.status} ${openaiResponse.statusText} - ${errorText}`;
+                    logger.error(failure);
+                    return await fallbackFromToolsBackend(requestData, config, toolContent, toolName, options, failure);
                 }
             } catch (openaiFetchError) {
+                const failure = `OpenAI API 请求失败：${openaiFetchError.message}`;
                 logger.error("OpenAI API 请求失败:", openaiFetchError);
-                return { error: `OpenAI API 请求失败：${openaiFetchError.message}` };
+                return await fallbackFromToolsBackend(requestData, config, toolContent, toolName, options, failure);
             }
 
             let openaiData;
@@ -77,11 +80,12 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
             }
 
             // 检查 OneAPI 配置
-            if (!config.chatAiConfig.chatApiUrl || !config.chatAiConfig.chatApiModel || !config.chatAiConfig.chatApiKey?.length) {
+            selectedTextBackend = resolveConfiguredChatBackend(config);
+            if (!selectedTextBackend.apiUrl || !selectedTextBackend.model || !selectedTextBackend.apiKey?.length) {
                 return { error: "OneAPI URL、模型或 API Key 未配置" };
             }
-            url = config.chatAiConfig.chatApiUrl.endsWith('completions') ? config.chatAiConfig.chatApiUrl : `${config.chatAiConfig.chatApiUrl}/v1/chat/completions`;
-            const oneApiKey = getChatApiKey(config.chatAiConfig.chatApiKey);
+            url = resolveChatCompletionUrl(selectedTextBackend.apiUrl);
+            const oneApiKey = getChatApiKey(selectedTextBackend.apiKey);
             headers = {
                 'Authorization': `Bearer ${oneApiKey}`,
                 'Content-Type': 'application/json'
@@ -109,7 +113,7 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
                 .filter(Boolean);
 
             finalRequestData = {
-                model: config.chatAiConfig.chatApiModel,
+                model: selectedTextBackend.model,
                 messages: convertToolMessagesForChat(requestData.messages, toolName),
                 stream: false
             };
@@ -118,11 +122,12 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
                 ? resolveConfiguredTaskBackend(config, options.taskBackend)
                 : options.forceChatBackend
                     ? resolveConfiguredChatBackend(config)
-                : resolveAgentBackend(config, requestData);
+                    : resolveAgentBackend(config, requestData);
+            selectedTextBackend = backend;
             if (!backend.apiUrl || !backend.model || !backend.apiKey?.length) {
                 return { error: "OneAPI URL、模型或 API Key 未配置" };
             }
-            url = backend.apiUrl.endsWith('completions') ? backend.apiUrl : `${String(backend.apiUrl).replace(/\/+$/, '')}/v1/chat/completions`;
+            url = resolveChatCompletionUrl(backend.apiUrl);
             const oneApiKey = getChatApiKey(backend.apiKey);
             headers = {
                 'Authorization': `Bearer ${oneApiKey}`,
@@ -178,12 +183,32 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
                     if (response.ok) return processResponse(await response.json())
                     errorText = await response.text().catch(() => '无法读取错误内容')
                 }
-                logger.error(`API 请求失败：${response.status} ${response.statusText} - ${errorText}`);
-                return { error: `API 请求失败：${response.status} ${response.statusText} - ${errorText}` };
+                const failure = `API 请求失败：${response.status} ${response.statusText} - ${errorText}`;
+                logger.error(failure);
+                const fallback = await fallbackFromTextBackend(
+                    requestData,
+                    config,
+                    toolContent,
+                    toolName,
+                    options,
+                    failure,
+                    selectedTextBackend
+                );
+                return fallback || { error: failure };
             }
         } catch (fetchError) {
+            const failure = `${provider || 'API'} 请求失败：${fetchError.message}`;
             console.error(`${provider || 'API'} 请求失败:`, fetchError);
-            return { error: `${provider || 'API'} 请求失败：${fetchError.message}` };
+            const fallback = await fallbackFromTextBackend(
+                requestData,
+                config,
+                toolContent,
+                toolName,
+                options,
+                failure,
+                selectedTextBackend
+            );
+            return fallback || { error: failure };
         }
 
         let responseData;
@@ -202,6 +227,64 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
     }
 }
 
+function canFallbackFromToolsBackend(requestData = {}) {
+    const toolChoice = requestData?.tool_choice;
+    // A forced tool is an execution contract. Falling back to text would make
+    // the bot look as though the tool had been executed when it was not.
+    if (toolChoice === "required" || toolChoice?.function?.name) return false;
+    return true;
+}
+
+async function fallbackFromToolsBackend(requestData, config, toolContent, toolName, options, failure) {
+    if (!canFallbackFromToolsBackend(requestData)) return { error: failure };
+
+    const candidates = resolveToolsBackendFallbacks(config);
+    let lastFailure = { error: failure };
+    for (const candidate of candidates) {
+        logger.warn(`[Agent路由] 工具模型不可用，当前请求不强制工具调用，降级到 ${candidate.label}: ${failure}`);
+        const response = await YTapi(requestData, {
+            ...config,
+            useTools: false,
+            chatAiConfig: candidate
+        }, toolContent, toolName, {
+            ...options,
+            forceChatBackend: true,
+            toolsBackendFallback: true,
+            textBackendFallback: true
+        });
+        if (response?.choices?.[0]?.message?.content) return response;
+        lastFailure = response?.error ? response : lastFailure;
+    }
+    return lastFailure;
+}
+
+function hasSameBackend(left = {}, right = {}) {
+    return String(left?.apiUrl || left?.chatApiUrl || "").replace(/\/+$/, "") === String(right?.apiUrl || right?.chatApiUrl || "").replace(/\/+$/, "") &&
+        String(left?.model || left?.chatApiModel || "") === String(right?.model || right?.chatApiModel || "");
+}
+
+async function fallbackFromTextBackend(requestData, config, toolContent, toolName, options, failure, selectedBackend) {
+    if (options.textBackendFallback || options.taskBackend) return null;
+
+    let lastFailure = null;
+    for (const candidate of resolveToolsBackendFallbacks(config)) {
+        if (hasSameBackend(candidate, selectedBackend)) continue;
+        logger.warn(`[Agent路由] 回答模型不可用，降级到 ${candidate.label}: ${failure}`);
+        const response = await YTapi(requestData, {
+            ...config,
+            useTools: false,
+            chatAiConfig: candidate
+        }, toolContent, toolName, {
+            ...options,
+            forceChatBackend: true,
+            textBackendFallback: true
+        });
+        if (response?.choices?.[0]?.message?.content) return response;
+        if (response?.error) lastFailure = response;
+    }
+    return lastFailure;
+}
+
 function resolveConfiguredChatBackend(config = {}) {
     const chat = config?.chatAiConfig || {}
     return {
@@ -210,6 +293,48 @@ function resolveConfiguredChatBackend(config = {}) {
         apiKey: chat.chatApiKey,
         label: "chat"
     }
+}
+
+function resolveToolsBackendFallbacks(config = {}) {
+    const chat = config?.chatAiConfig || {};
+    const track = config?.trackAiConfig || {};
+    const search = config?.searchAiConfig || {};
+    const memory = config?.memoryAiConfig || {};
+    const candidates = [
+        {
+            label: "聊天模型",
+            chatApiUrl: chat.chatApiUrl,
+            chatApiModel: chat.chatApiModel,
+            chatApiKey: chat.chatApiKey
+        },
+        {
+            label: "追踪回答模型",
+            chatApiUrl: track.trackAiUrl,
+            chatApiModel: track.trackAiModel,
+            chatApiKey: track.trackAiApikey
+        },
+        {
+            label: "检索回答模型",
+            chatApiUrl: search.searchApiUrl,
+            chatApiModel: search.searchApiModel,
+            chatApiKey: search.searchApiKey
+        },
+        {
+            // This remains text-only fallback. Explicit tool execution never
+            // reaches this path, so a text answer cannot impersonate a tool.
+            label: "记忆回答模型",
+            chatApiUrl: memory.memoryAiUrl,
+            chatApiModel: memory.memoryAiModel,
+            chatApiKey: memory.memoryAiApikey
+        }
+    ];
+    const seen = new Set();
+    return candidates.filter(candidate => {
+        const key = [candidate.chatApiUrl, candidate.chatApiModel, Array.isArray(candidate.chatApiKey) ? candidate.chatApiKey.join("|") : candidate.chatApiKey].join("\u0000");
+        if (!candidate.chatApiUrl || !candidate.chatApiModel || !candidate.chatApiKey?.length || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 
 function resolveConfiguredTaskBackend(config = {}, taskName = "") {
@@ -221,6 +346,7 @@ function resolveConfiguredTaskBackend(config = {}, taskName = "") {
             apiKey: task.apiKey,
             label: `task:${taskName}`,
             maxTokensField: task.maxTokensField,
+            maxOutputTokens: task.maxOutputTokens,
             reasoningEffort: task.reasoningEffort
         }
     }
@@ -235,7 +361,7 @@ function buildGenerationOptions(requestData = {}, options = {}, backend = {}) {
     }
     if (generation.temperature !== undefined) output.temperature = generation.temperature
     if (generation.topP !== undefined) output.top_p = generation.topP
-    const maxOutputTokens = Number(generation.maxOutputTokens)
+    const maxOutputTokens = Number(generation.maxOutputTokens ?? backend.maxOutputTokens)
     if (Number.isFinite(maxOutputTokens) && maxOutputTokens > 0) {
         const field = String(generation.maxTokensField || backend.maxTokensField || "max_tokens")
         if (["max_tokens", "max_completion_tokens"].includes(field)) output[field] = Math.floor(maxOutputTokens)

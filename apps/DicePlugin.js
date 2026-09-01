@@ -1,8 +1,9 @@
-import fs from "node:fs"
 import { diceManager } from "../utils/DiceManager.js"
 import { DiceRulePackManager, resolveDiceRuleImportSource } from "../utils/DiceRulePackManager.js"
 import { sendSmartReply } from "../utils/SmartReply.js"
 import { DICE_COMMAND_RULES, matchDiceCommand, stripDiceCommand } from "../utils/diceCommandPolicy.js"
+import { canManageGroupDice, executeDiceCommand, getCustomDiceCommandGate } from "../utils/diceCommandGateway.js"
+import { buildVisibleFailureDetail } from "../utils/visibleFailure.js"
 
 const diceRulePackManager = new DiceRulePackManager({ diceManager })
 
@@ -12,10 +13,6 @@ function parseRuleReference(value = "") {
   const version = match[2] === undefined ? 0 : Number(match[2])
   if (match[2] !== undefined && version < 1) return null
   return { id: match[1], version }
-}
-
-function canManageGroupRules(e) {
-  return Boolean(e?.isMaster || ["owner", "admin"].includes(e?.sender?.role))
 }
 
 export class DicePlugin extends plugin {
@@ -30,6 +27,18 @@ export class DicePlugin extends plugin {
         { reg: "^[.。][\\s\\S]+$", fnc: "customDiceRule", log: false }
       ]
     })
+    for (const commandName of new Set(DICE_COMMAND_RULES.map(rule => rule.fnc))) {
+      const handler = this[commandName]?.bind(this)
+      if (!handler) continue
+      this[commandName] = async e => await executeDiceCommand({
+        manager: diceManager,
+        e,
+        commandName,
+        work: () => handler(e),
+        reply: output => this.reply(e, output),
+        logger: globalThis.logger
+      })
+    }
   }
 
   strip(e, head) {
@@ -72,7 +81,8 @@ export class DicePlugin extends plugin {
       ".骰规则导出 <id[@版本]> / .骰规则回滚 <id> <版本>",
       ".骰规则删除 <id> 确认 / .骰规则恢复 <id>（主人）",
       "启用后发送 .规则前缀 查看包内命令。",
-      "团务固定命令：卡/设/查/删、权限、npc、群卡/群设/群查、团务、先攻、状态、物品、技能、审计。"
+      "团务固定命令：卡/设/查/删、权限、npc、群卡/群设/群查、战役、团务、先攻、状态、物品、技能、审计、投递。",
+      "战役可登记角色、管理章节和记录；团务可暂停、恢复、查看历史、创建快照与回退。"
     ].join("\n")
   }
 
@@ -105,25 +115,25 @@ export class DicePlugin extends plugin {
         return true
       }
       if (["列表", "list"].includes(action)) {
-        if (!canManageGroupRules(e)) throw new Error("只有主人或群管理员可以查看规则包列表")
+        if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以查看规则包列表")
         await this.reply(e, diceRulePackManager.listText(e.group_id), { kind: "diceLong" })
         return true
       }
       if (["预览", "preview"].includes(action)) {
-        if (!canManageGroupRules(e)) throw new Error("只有主人或群管理员可以预览规则包")
+        if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以预览规则包")
         if (!args) throw new Error("格式：.骰规则预览 <id>")
         await this.reply(e, diceRulePackManager.previewPackage(args), { kind: "diceLong" })
         return true
       }
       if (["查看", "view"].includes(action)) {
-        if (!canManageGroupRules(e)) throw new Error("只有主人或群管理员可以查看规则包")
+        if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以查看规则包")
         const ref = parseRuleReference(args)
         if (!ref) throw new Error("格式：.骰规则查看 <id[@版本]>")
         await this.reply(e, diceRulePackManager.describePackage(ref.id, ref.version), { kind: "diceLong" })
         return true
       }
       if (["启用", "enable"].includes(action)) {
-        if (!canManageGroupRules(e)) throw new Error("只有主人或群管理员可以在当前群启用规则包")
+        if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以在当前群启用规则包")
         const ref = parseRuleReference(args)
         if (!ref) throw new Error("格式：.骰规则启用 <id[@版本]>")
         const result = await diceRulePackManager.enableForGroup(e.group_id, ref.id, ref.version)
@@ -131,7 +141,7 @@ export class DicePlugin extends plugin {
         return true
       }
       if (["禁用", "disable"].includes(action)) {
-        if (!canManageGroupRules(e)) throw new Error("只有主人或群管理员可以在当前群禁用规则包")
+        if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以在当前群禁用规则包")
         const ref = parseRuleReference(args)
         if (!ref || ref.version) throw new Error("格式：.骰规则禁用 <id>")
         await diceRulePackManager.disableForGroup(e.group_id, ref.id)
@@ -147,17 +157,12 @@ export class DicePlugin extends plugin {
         return true
       }
       if (["导出", "export"].includes(action)) {
-        if (!canManageGroupRules(e)) throw new Error("只有主人或群管理员可以导出规则包")
+        if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以导出规则包")
         const ref = parseRuleReference(args)
         if (!ref) throw new Error("格式：.骰规则导出 <id[@版本]>")
         const exported = diceRulePackManager.getExportFile(ref.id, ref.version)
-        const target = e.group || e.friend
-        if (target?.sendFile) {
-          await target.sendFile(exported.file)
-          await this.reply(e, `已导出 ${ref.id}@${exported.record.version}。`)
-        } else {
-          await this.reply(e, fs.readFileSync(exported.file, "utf8").slice(0, 4500), { kind: "diceLong" })
-        }
+        await diceManager.sendCompleteFile(e, exported.file, { maxMb: config.logExportMaxMb })
+        await this.reply(e, `已导出完整 YAML 文件：${ref.id}@${exported.record.version}。`)
         return true
       }
       if (["恢复", "restore"].includes(action)) {
@@ -183,26 +188,50 @@ export class DicePlugin extends plugin {
       }
       throw new Error(`未知管理命令：${action}`)
     } catch (error) {
-      await this.reply(e, `骰规则操作失败：${error.message}`)
+      await this.reply(e, `骰规则操作失败：${buildVisibleFailureDetail(error)}`)
       return true
     }
   }
 
   async customDiceRule(e) {
-    if (!diceManager.getConfig().customRulesEnabled) return false
-    const result = await diceRulePackManager.handleDynamicCommand(e)
+    const gate = getCustomDiceCommandGate({ manager: diceManager, ruleManager: diceRulePackManager, e })
+    if (!gate.matched) return false
+    if (!gate.allowed) {
+      if (gate.response) await this.reply(e, gate.response)
+      return gate.consume
+    }
+    let result
+    try {
+      result = await diceRulePackManager.handleDynamicCommand(e)
+    } catch (error) {
+      globalThis.logger?.error?.(`[骰娘] 自定义规则命令执行失败: ${error.message}`)
+      await this.reply(e, `这条自定义骰娘命令没有执行成功：${buildVisibleFailureDetail(error)}\n规则状态不会按成功处理。`)
+      return true
+    }
     if (!result.matched) return false
     const failedRecipients = []
+    const deliveryOutcomes = []
     for (const message of result.privateMessages || []) {
       try {
         const friend = e?.bot?.pickFriend?.(message.userId) || globalThis.Bot?.pickFriend?.(message.userId)
         if (!friend?.sendMsg) throw new Error("无法取得私聊对象")
         await friend.sendMsg(message.text)
-      } catch {
+        if (message.deliveryId) deliveryOutcomes.push({ deliveryId: message.deliveryId, ok: true })
+      } catch (error) {
         failedRecipients.push(message.userId)
+        if (message.deliveryId) deliveryOutcomes.push({ deliveryId: message.deliveryId, ok: false, error: error.message })
       }
     }
-    const suffix = failedRecipients.length ? `\n私密结果未能发送给：${failedRecipients.join("、")}。请确认已添加机器人好友或允许临时会话。` : ""
+    if (deliveryOutcomes.length && result.packId) {
+      await diceRulePackManager.settlePrivateDeliveries(e.group_id, result.packId, deliveryOutcomes)
+        .catch(error => globalThis.logger?.error?.(`[骰规则] 私密投递状态持久化失败: ${error.message}`))
+    }
+    let suffix = failedRecipients.length ? `\n有 ${failedRecipients.length} 条私密结果未能发送，已保留待重试；GM 可使用规则包的「投递 重试」。` : ""
+    for (const update of result.groupCardUpdates || []) {
+      if (String(update.userId) !== String(e.user_id || "")) continue
+      const syncResult = await diceManager.syncAutoGroupCard(e, update.name)
+      if (/失败/.test(syncResult)) suffix += syncResult
+    }
     await this.reply(e, `${result.text}${suffix}`, { kind: "diceLong" })
     return true
   }
@@ -233,7 +262,7 @@ export class DicePlugin extends plugin {
   }
 
   async sn(e) {
-    await this.reply(e, await diceManager.handleSn(e, this.strip(e, "sn")))
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSn(e, this.strip(e, "sn"))))
     return true
   }
 
@@ -268,7 +297,7 @@ export class DicePlugin extends plugin {
   }
 
   async logExport(e) {
-    const result = await diceManager.exportLog(e)
+    const result = await diceManager.exportLog(e, this.strip(e, "log\\s*(export|get|导出|获取)"))
     if (result) await this.reply(e, result, { kind: "messageArchive" })
     return true
   }
@@ -281,7 +310,7 @@ export class DicePlugin extends plugin {
   }
 
   async initiativeRoll(e) {
-    await this.reply(e, diceManager.handleInitiativeRoll(e, this.strip(e, "ri")))
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleInitiativeRoll(e, this.strip(e, "ri"))))
     return true
   }
 
@@ -389,7 +418,7 @@ export class DicePlugin extends plugin {
   }
 
   async enCheck(e) {
-    await this.reply(e, diceManager.handleEn(e, this.strip(e, "en")))
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleEn(e, this.strip(e, "en"))))
     return true
   }
 

@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { compileImagePrompt } from '../utils/promptCompiler.js'
+import {
+  compileImagePrompt,
+  resolveImageContextMode,
+  selectLatestDrawContextLines,
+  selectMergedImagePromptTexts
+} from '../utils/promptCompiler.js'
 
 const AUTO_REWRITE_MARKERS = /安全改写|内容适配|服装安全适配|清爽夏装|全年龄|画面主体清晰|高质量|光影自然|含蓄表达/
 
@@ -92,4 +97,58 @@ test('preserves clothing and other sensitive wording without plugin-side repair'
     assert.ok(prompt.includes(userPrompt), userPrompt)
     assert.doesNotMatch(prompt, AUTO_REWRITE_MARKERS)
   }
+})
+
+test('separates quoted, source-content and previous-draw context modes', () => {
+  assert.equal(resolveImageContextMode('画一只下午晒太阳的猫'), 'none')
+  assert.equal(resolveImageContextMode('把上面的聊天画成四格漫画'), 'source')
+  assert.equal(resolveImageContextMode('继续上一张，换成下午'), 'draw')
+  assert.equal(resolveImageContextMode('画这个', '被回复消息里的角色设定'), 'quoted')
+})
+
+test('keeps relevant merged drawing supplements without carrying unrelated requests', () => {
+  assert.deepEqual(selectMergedImagePromptTexts([
+    '希洛帮我画一个白发少女',
+    '换成下午，比例9:16',
+    '对了，明天开会吗'
+  ]), [
+    '希洛帮我画一个白发少女',
+    '换成下午，比例9:16'
+  ])
+})
+
+test('does not let earlier unrelated merged chat override an explicit new draw request', () => {
+  assert.deepEqual(selectMergedImagePromptTexts([
+    '希洛，你觉得火锅好吃吗',
+    '希洛画一只在窗台晒太阳的白猫'
+  ]), ['希洛画一只在窗台晒太阳的白猫'])
+})
+
+test('keeps earlier merged source only when the user explicitly points to it', () => {
+  assert.deepEqual(selectMergedImagePromptTexts([
+    '角色设定是白发、金色眼睛、穿黑裙',
+    '希洛按上面的设定画出来'
+  ]), [
+    '角色设定是白发、金色眼睛、穿黑裙',
+    '希洛按上面的设定画出来'
+  ])
+})
+
+test('uses only the latest explicit draw request from one merged burst', () => {
+  assert.deepEqual(selectMergedImagePromptTexts([
+    '希洛画一只黑猫',
+    '希洛画一只白狗'
+  ]), ['希洛画一只白狗'])
+})
+
+test('continues only the latest draw thread instead of mixing older drawings', () => {
+  assert.deepEqual(selectLatestDrawContextLines([
+    { text: '希洛画一只黑猫', isDrawRequest: true },
+    { text: '我先画画看。', isDrawRequest: false },
+    { text: '希洛画一只白狗', isDrawRequest: true },
+    { text: '这张我继续画。', isDrawRequest: false }
+  ]), [
+    '希洛画一只白狗',
+    '这张我继续画。'
+  ])
 })

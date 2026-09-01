@@ -6,6 +6,7 @@ import { evaluateDiceRuleExpression } from "./DiceRuleExpression.js"
 import { DICE_RULE_MAX_PACKAGE_BYTES, validateDiceRulePack } from "./DiceRuleSchema.js"
 import { KeyedSerialQueue } from "./messagePipeline/keyedSerialQueue.js"
 import { withFileLock } from "./fileLock.js"
+import { secureDiceRandom } from "./diceRandom.js"
 import {
   actorStorageKey,
   createRuleRandom,
@@ -40,12 +41,15 @@ const BUILTIN_GROUP_CARD_ALIASES = new Set(["群卡", "groupcard"])
 const BUILTIN_GROUP_SET_ALIASES = new Set(["群设", "groupset"])
 const BUILTIN_GROUP_GET_ALIASES = new Set(["群查", "groupget"])
 const BUILTIN_SESSION_ALIASES = new Set(["团务", "session"])
+const BUILTIN_CAMPAIGN_ALIASES = new Set(["战役", "campaign", "群组"])
 const BUILTIN_INITIATIVE_ALIASES = new Set(["先攻", "init"])
 const BUILTIN_STATUS_ALIASES = new Set(["状态", "status"])
 const BUILTIN_ITEM_ALIASES = new Set(["物品", "item", "inventory"])
 const BUILTIN_ABILITY_ALIASES = new Set(["技能", "ability", "abilities", "spell"])
 const BUILTIN_AUDIT_ALIASES = new Set(["审计", "audit"])
+const BUILTIN_DELIVERY_ALIASES = new Set(["投递", "delivery"])
 const MAX_AUDIT_RECORDS = 200
+const MAX_PRIVATE_DELIVERIES = 100
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
@@ -99,6 +103,10 @@ function safeIndex(value) {
 
 function normalizeText(value = "") {
   return String(value ?? "").trim()
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value))
 }
 
 function normalizeCommandText(value = "") {
@@ -250,7 +258,7 @@ function validateFieldValue(value, definition, path) {
   return value
 }
 
-function drawTable(definition = {}, random = Math.random) {
+function drawTable(definition = {}, random = secureDiceRandom) {
   const entries = definition.entries || []
   const total = entries.reduce((sum, entry) => sum + Math.max(1, Number(entry.weight) || 1), 0)
   let cursor = Math.floor(random() * total)
@@ -660,6 +668,10 @@ export class DiceRulePackManager {
   async enableForGroup(groupId, id, version = 0) {
     const gid = String(groupId || "")
     if (!gid) throw new Error("只能在群聊中启用规则包")
+    const previewIndex = this.readIndex()
+    const preview = this.loadPack(id, version, previewIndex)
+    if (!preview) throw new Error(`没有找到规则包：${id}${version ? `@${version}` : ""}`)
+    this.preflightGroupMigration(gid, preview.pack)
     return await this.mutateIndex(index => {
       const loaded = this.loadPack(id, version, index)
       if (!loaded) throw new Error(`没有找到规则包：${id}${version ? `@${version}` : ""}`)
@@ -690,6 +702,25 @@ export class DiceRulePackManager {
 
   async rollbackForGroup(groupId, id, version) {
     return await this.enableForGroup(groupId, id, Number(version))
+  }
+
+  preflightGroupMigration(groupId, pack) {
+    const config = this.diceManager.getConfig()
+    const state = this.diceManager.readState(config)
+    const gid = String(groupId)
+    for (const user of Object.values(state.users || {})) {
+      for (const card of Object.values(user?.cards || {})) {
+        const root = card?.ruleData?.[pack.id]
+        const stored = root?._scopeVersion === 2 ? root.groups?.[gid] : root
+        if (stored) this.applyMigration(pack, stored, { card: card.name || "", nickname: card.name || "" })
+      }
+    }
+    const ruleState = state.groups?.[gid]?.diceRuleSessions?.[pack.id]
+    if (ruleState?.group) this.applyMigration(pack, ruleState.group, { card: "", nickname: "" }, { scope: "group" })
+    for (const npc of Object.values(ruleState?.npcs || {})) {
+      if (npc?.ruleData) this.applyMigration(pack, npc.ruleData, { card: npc.name || "", nickname: npc.name || "" })
+    }
+    return true
   }
 
   async archivePackage(id) {
@@ -874,28 +905,36 @@ export class DiceRulePackManager {
     return stored
   }
 
-  applyMigration(pack, stored, sender) {
+  applyMigration(pack, stored, sender, { scope = "character" } = {}) {
     const current = stored && typeof stored === "object" ? { ...stored, values: { ...(stored.values || {}) } } : { values: {} }
     const targetVersion = pack.compatibility?.package_version || "1.0.0"
-    const from = current._packageVersion
-    if (from && from !== targetVersion) {
-      const migration = (pack.compatibility?.migrations || []).find(item => item.from === from)
-      if (migration) {
-        for (const [oldId, newId] of Object.entries(migration.rename_fields || {})) {
+    let version = current._packageVersion
+    if (version && version !== targetVersion) {
+      const visited = new Set()
+      while (version !== targetVersion) {
+        if (visited.has(version)) throw new Error(`规则数据迁移存在循环：${[...visited, version].join(" -> ")}`)
+        visited.add(version)
+        const migration = (pack.compatibility?.migrations || []).find(item => item.from === version)
+        if (!migration) throw new Error(`规则数据仍是 ${version}，但 ${targetVersion} 没有从该版本出发的迁移；已停止访问，原数据未改写`)
+        const rename = scope === "group" ? migration.rename_group_fields : migration.rename_fields
+        const defaults = scope === "group" ? migration.add_group_defaults : migration.add_defaults
+        for (const [oldId, newId] of Object.entries(rename || {})) {
           if (Object.prototype.hasOwnProperty.call(current.values, oldId) && !Object.prototype.hasOwnProperty.call(current.values, newId)) current.values[newId] = current.values[oldId]
           delete current.values[oldId]
         }
-        for (const [id, value] of Object.entries(migration.add_defaults || {})) {
+        for (const [id, value] of Object.entries(defaults || {})) {
           if (!Object.prototype.hasOwnProperty.call(current.values, id)) current.values[id] = value
         }
+        version = migration.to || targetVersion
+        if (visited.size > 20) throw new Error("规则数据迁移步骤超过 20，已停止访问")
       }
     }
-    current.values = this.buildPersistentValues(pack, current, sender)
+    if (scope === "character") current.values = this.buildPersistentValues(pack, current, sender)
     current._packageVersion = targetVersion
     return current
   }
 
-  evaluate(source, context, pack, { allowDice = false, remainingDice = null, random = this.random || Math.random } = {}) {
+  evaluate(source, context, pack, { allowDice = false, remainingDice = null, random = this.random || secureDiceRandom } = {}) {
     return evaluateDiceRuleExpression(typeof source === "string" ? source : String(source), context, {
       diceSets: pack.dice_sets || {},
       rollStandard: expression => this.diceManager.rollExpression(expression, this.diceManager.getConfig(), random),
@@ -921,7 +960,7 @@ export class DiceRulePackManager {
           ? Object.getOwnPropertyDescriptor(target, key)
           : fields[key]?.formula !== undefined ? { enumerable: true, configurable: true, value: resolve(key) } : undefined
       })
-      const value = this.evaluate(definition.formula, { ...extraContext, attr, derived: proxy }, pack, { random: extraContext.__random || this.random || Math.random }).value
+      const value = this.evaluate(definition.formula, { ...extraContext, attr, derived: proxy }, pack, { random: extraContext.__random || this.random || secureDiceRandom }).value
       visiting.delete(id)
       derived[id] = validateFieldValue(value, definition, `derived.${id}`)
       return derived[id]
@@ -932,9 +971,7 @@ export class DiceRulePackManager {
 
   buildGroupStored(pack, ruleState, sender) {
     const definitions = pack.group?.fields || {}
-    const stored = ruleState.group && typeof ruleState.group === "object"
-      ? { ...ruleState.group, values: { ...(ruleState.group.values || {}) } }
-      : { values: {} }
+    const stored = this.applyMigration(pack, ruleState.group, sender, { scope: "group" })
     for (const [id, definition] of Object.entries(definitions)) {
       if (definition.formula !== undefined) continue
       if (definition.persistent === false) {
@@ -944,7 +981,6 @@ export class DiceRulePackManager {
         stored.values[id] = resolveDefaultValue(definition.default, sender)
       }
     }
-    stored._packageVersion = pack.compatibility?.package_version || "1.0.0"
     return stored
   }
 
@@ -991,9 +1027,20 @@ export class DiceRulePackManager {
       const user = this.diceManager.ensureUser(state, targetEvent)
       const card = user.cards[user.activeCard]
       card.ruleData ||= {}
+      const groupId = String(e?.group_id || "")
+      let root = card.ruleData[pack.id]
+      if (!root || root._scopeVersion !== 2) {
+        root = {
+          _scopeVersion: 2,
+          groups: root && typeof root === "object" ? { [groupId]: root } : {},
+          migratedAt: new Date().toISOString()
+        }
+        card.ruleData[pack.id] = root
+      }
+      root.groups ||= {}
       container = {
-        get ruleData() { return card.ruleData[pack.id] },
-        set ruleData(value) { card.ruleData[pack.id] = value }
+        get ruleData() { return root.groups[groupId] },
+        set ruleData(value) { root.groups[groupId] = value }
       }
       cardName = card.name || user.activeCard || actor.name || actor.id
     }
@@ -1265,7 +1312,7 @@ export class DiceRulePackManager {
           op: action.op,
           scope: action.scope || "actor",
           target: { kind: draft.actor.kind, id: draft.actor.id, name: draft.actor.name },
-          field: action.field || action.status || action.item,
+          field: action.field || action.status || action.item || action.ability,
           ...sanitizeAuditValue(change)
         })
         this.refreshRuleContext(pack, runtime, draft.group ? null : draft, options.status)
@@ -1381,6 +1428,12 @@ export class DiceRulePackManager {
     } catch {}
     if (!actor) actor = renderRuleTemplate(pack.identity?.fallback || "{sender.card}", identityContext, { strict: false }).trim()
     if (!actor) actor = actorDraft.actor.name || sender.nickname || String(e?.user_id || "调查员")
+    const groupCardUpdates = []
+    if (pack.identity?.sync_group_card === true && actorDraft.actor.self) {
+      const cardTemplate = pack.identity.group_card || pack.identity.display_name || "{sender.card}"
+      const cardName = sanitizeRuleOutput(renderRuleTemplate(cardTemplate, identityContext, { strict: false })).trim().slice(0, 60)
+      if (cardName) groupCardUpdates.push({ userId: String(e.user_id || ""), name: cardName })
+    }
     const outputContext = { ...context, actor, sender, command: { label: command.label || command.id }, message: "" }
     const template = branch?.output ?? command.output ?? pack.templates?.[command.template]
     const output = sanitizeRuleOutput(renderRuleTemplate(template, outputContext))
@@ -1393,9 +1446,10 @@ export class DiceRulePackManager {
     if (visibility !== "public") {
       const recipients = visibility === "private" ? [String(e.user_id || "")] : await getRuleGmRecipients(e, ruleState)
       if (!recipients.length) throw new Error("没有找到可接收私密结果的 GM 或管理员")
-      privateMessages = [...new Set(recipients)].map(userId => ({ userId, text: `【${pack.name}私密结果】\n${output}\n审计编号：${auditId}` }))
       const publicTemplate = command.public_output || "{actor}进行了一次暗骰，结果已发送给有权限的接收者。"
       text = sanitizeRuleOutput(renderRuleTemplate(publicTemplate, outputContext))
+      const queued = this.queuePrivateRuleResult(e, pack, ruleState, output, text, { recipients, auditId })
+      privateMessages = queued.privateMessages
     }
     for (const draft of entityDrafts.values()) {
       draft.stored.values = this.buildStoredValues(pack, draft.attr)
@@ -1435,7 +1489,7 @@ export class DiceRulePackManager {
       result: visibility === "public" ? context.result : "[private]",
       tags: Array.isArray(branch?.tags) ? [...branch.tags] : []
     }, state, config).catch(error => this.logger?.warn?.(`[骰规则] 写入团录失败: ${error.message}`))
-    return { text, privateMessages, auditId }
+    return { text, privateMessages, auditId, packId: pack.id, groupCardUpdates }
   }
 
   findField(pack, raw) {
@@ -1465,11 +1519,12 @@ export class DiceRulePackManager {
       const derived = this.computeDerived(pack, attr, { shared: ruleState.group?.values || {}, inventory: draft.inventory, session: ruleState.session })
       const rows = []
       for (const [id, definition] of Object.entries(fields)) {
-        if (definition.secret && !["gm", "admin", "master"].includes(permission)) continue
+        if (definition.secret) continue
         const value = definition.formula === undefined ? attr[id] : derived[id]
-        rows.push(`${definition.label || id}(${id})：${value ?? "未设置"}${definition.formula !== undefined ? " [派生]" : ""}${definition.secret ? " [仅GM]" : ""}`)
+        rows.push(`${definition.label || id}(${id})：${value ?? "未设置"}${definition.formula !== undefined ? " [派生]" : ""}`)
       }
-      return `${pack.name} / ${draft.actor.name}\n${rows.join("\n") || "暂无字段"}`
+      const secretCount = Object.values(fields).filter(definition => definition.secret).length
+      return `${pack.name} / ${draft.actor.name}\n${rows.join("\n") || "暂无公开字段"}${secretCount ? `\n${secretCount} 个秘密字段未在群内展示；GM 可用「查 字段」私聊查看。` : ""}`
     }
     if (operation === "get") {
       const found = this.findField(pack, parsed.rest)
@@ -1477,12 +1532,18 @@ export class DiceRulePackManager {
       const [id, definition] = found
       if (definition.secret && !["gm", "admin", "master"].includes(permission)) throw new Error(`字段 ${definition.label || id} 仅 GM 可见`)
       const value = definition.formula === undefined ? attr[id] : this.computeDerived(pack, attr, { shared: ruleState.group?.values || {}, inventory: draft.inventory, session: ruleState.session })[id]
+      if (definition.secret) {
+        const result = this.queuePrivateRuleResult(e, pack, ruleState, `${definition.label || id}(${id})=${value ?? "未设置"}`, `${draft.actor.name} 的秘密字段结果已私聊发送。`)
+        await this.diceManager.writeState(state, config)
+        return result
+      }
       return `${definition.label || id}(${id})=${value ?? "未设置"}`
     }
     if (operation === "set") {
       const source = parsed.rest
       const matcher = /([a-z][a-z0-9_]{0,47})\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/g
       const updates = []
+      let secretTouched = false
       let consumed = 0
       let match
       while ((match = matcher.exec(source))) {
@@ -1491,6 +1552,7 @@ export class DiceRulePackManager {
         const definition = fields[id]
         if (!definition) throw new Error(`未知字段：${id}`)
         if (definition.secret && !["gm", "admin", "master"].includes(permission)) throw new Error(`字段 ${definition.label || id} 仅 GM 可修改`)
+        if (definition.secret) secretTouched = true
         if (definition.formula !== undefined) throw new Error(`派生字段 ${id} 不能直接设置`)
         if (definition.persistent === false) throw new Error(`临时字段 ${id} 只能由规则命令在本次执行中修改`)
         const value = convertInputValue(match[2] ?? match[3] ?? match[4], definition, `attr.${id}`)
@@ -1503,8 +1565,13 @@ export class DiceRulePackManager {
       if (source.slice(consumed).trim()) throw new Error(`无法识别人物卡设置：${source.slice(consumed).trim()}`)
       draft.stored.values = this.buildStoredValues(pack, attr)
       draft.commit(draft.stored)
-      await this.diceManager.writeState(state, config)
-      return `已更新 ${draft.actor.name} 的 ${pack.name} 人物卡：${updates.join("，")}`
+      const result = secretTouched
+        ? this.queuePrivateRuleResult(e, pack, ruleState, `已更新 ${draft.actor.name} 的 ${pack.name} 人物卡：${updates.join("，")}`, `${draft.actor.name} 的秘密人物卡字段已更新，具体值已私聊发送。`)
+        : `已更新 ${draft.actor.name} 的 ${pack.name} 人物卡：${updates.join("，")}`
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "card_set", result, {
+        targets: [draft.actor],
+        actions: updates.map(update => ({ op: "set_field", target: draft.actor.id, field: update.split("=")[0], value: secretTouched ? "[private]" : update.split("=").slice(1).join("=") }))
+      })
     }
     if (operation === "clear") {
       const found = this.findField(pack, parsed.rest)
@@ -1517,8 +1584,13 @@ export class DiceRulePackManager {
       if (definition.default !== undefined) attr[id] = resolveDefaultValue(definition.default, { card: draft.actor.name, nickname: draft.actor.name })
       draft.stored.values = this.buildStoredValues(pack, attr)
       draft.commit(draft.stored)
-      await this.diceManager.writeState(state, config)
-      return `已清除 ${definition.label || id}，当前值为 ${attr[id] ?? "未设置"}`
+      const result = definition.secret
+        ? this.queuePrivateRuleResult(e, pack, ruleState, `已清除 ${definition.label || id}，当前值为 ${attr[id] ?? "未设置"}`, `${draft.actor.name} 的秘密字段已清除，当前值已私聊发送。`)
+        : `已清除 ${definition.label || id}，当前值为 ${attr[id] ?? "未设置"}`
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "card_clear", result, {
+        targets: [draft.actor],
+        actions: [{ op: "clear_field", target: draft.actor.id, field: id, value: definition.secret ? "[private]" : attr[id] }]
+      })
     }
     throw new Error("未知人物卡操作")
   }
@@ -1542,8 +1614,10 @@ export class DiceRulePackManager {
     if (actor.kind !== "member") throw new Error("只有群成员可以分配规则角色")
     if (role === "gm") ruleState.roles[actor.id] = "gm"
     else delete ruleState.roles[actor.id]
-    await this.diceManager.writeState(state, config)
-    return `已将 ${actor.name} 的规则角色设置为${roleLabel(role)}。`
+    const result = `已将 ${actor.name} 的规则角色设置为${roleLabel(role)}。`
+    return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "role_set", result, {
+      targets: [actor], actions: [{ op: "set_role", target: actor.id, value: role }]
+    })
   }
 
   async handleNpcOperation(e, pack, raw) {
@@ -1566,8 +1640,10 @@ export class DiceRulePackManager {
       ruleState.npcs[id] = { id, name: name.slice(0, 60), ruleData: null, createdAt: new Date().toISOString(), createdBy: String(e.user_id || "") }
       const draft = this.getEntityDraft(state, e, pack, ruleState, { kind: "npc", id, name, role: "npc", self: false })
       draft.commit(draft.stored)
-      await this.diceManager.writeState(state, config)
-      return `已创建 NPC：${id}（${name.slice(0, 60)}）`
+      const result = `已创建 NPC：${id}（${name.slice(0, 60)}）`
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "npc_create", result, {
+        targets: [{ kind: "npc", id, name: name.slice(0, 60) }], actions: [{ op: "create_npc", target: id }]
+      })
     }
     if (["delete", "del", "remove", "删除"].includes(action)) {
       const id = String(tokens.shift() || "").replace(/^npc:/i, "")
@@ -1576,8 +1652,10 @@ export class DiceRulePackManager {
       delete ruleState.npcs[id]
       ruleState.session.initiative = ruleState.session.initiative.filter(item => !(item.kind === "npc" && item.id === id))
       if (ruleState.session.current?.kind === "npc" && ruleState.session.current?.id === id) ruleState.session.current = null
-      await this.diceManager.writeState(state, config)
-      return `已删除 NPC：${name}`
+      const result = `已删除 NPC：${name}`
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "npc_delete", result, {
+        targets: [{ kind: "npc", id, name }], actions: [{ op: "delete_npc", target: id }]
+      })
     }
     if (["card", "卡"].includes(action)) return await this.handleCardOperation(e, pack, "card", `npc:${tokens.shift() || ""}`)
     if (["set", "设"].includes(action)) return await this.handleCardOperation(e, pack, "set", `npc:${tokens.shift() || ""} ${tokens.join(" ")}`)
@@ -1596,11 +1674,12 @@ export class DiceRulePackManager {
     const find = value => Object.entries(fields).find(([id, definition]) => id === normalizeText(value) || definition.label === normalizeText(value)) || null
     if (operation === "card") {
       const derived = this.computeDerived(pack, attr, { session: ruleState.session }, fields)
-      const rows = Object.entries(fields).filter(([, definition]) => !definition.secret || ["gm", "admin", "master"].includes(permission)).map(([id, definition]) => {
+      const rows = Object.entries(fields).filter(([, definition]) => !definition.secret).map(([id, definition]) => {
         const value = definition.formula === undefined ? attr[id] : derived[id]
-        return `${definition.label || id}(${id})：${value ?? "未设置"}${definition.formula !== undefined ? " [派生]" : ""}${definition.secret ? " [仅GM]" : ""}`
+        return `${definition.label || id}(${id})：${value ?? "未设置"}${definition.formula !== undefined ? " [派生]" : ""}`
       })
-      return `${pack.name} 群共享状态：\n${rows.join("\n") || "未定义共享字段"}`
+      const secretCount = Object.values(fields).filter(definition => definition.secret).length
+      return `${pack.name} 群共享状态：\n${rows.join("\n") || "未定义公开共享字段"}${secretCount ? `\n${secretCount} 个秘密群字段未在群内展示；GM 可用「群查 字段」私聊查看。` : ""}`
     }
     if (operation === "get") {
       const found = find(raw)
@@ -1608,18 +1687,25 @@ export class DiceRulePackManager {
       const [id, definition] = found
       if (definition.secret && !["gm", "admin", "master"].includes(permission)) throw new Error(`字段 ${definition.label || id} 仅 GM 可见`)
       const value = definition.formula === undefined ? attr[id] : this.computeDerived(pack, attr, { session: ruleState.session }, fields)[id]
+      if (definition.secret) {
+        const result = this.queuePrivateRuleResult(e, pack, ruleState, `${definition.label || id}(${id})=${value ?? "未设置"}`, "秘密群字段结果已私聊发送。")
+        await this.diceManager.writeState(state, config)
+        return result
+      }
       return `${definition.label || id}(${id})=${value ?? "未设置"}`
     }
     requireRulePermission(e, ruleState, "gm")
     const source = String(raw || "")
     const matcher = /([a-z][a-z0-9_]{0,47})\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+))/g
     const updates = []
+    let secretTouched = false
     let consumed = 0
     let match
     while ((match = matcher.exec(source))) {
       if (source.slice(consumed, match.index).trim()) throw new Error(`无法识别群字段设置：${source.slice(consumed, match.index).trim()}`)
       const definition = fields[match[1]]
       if (!definition || definition.formula !== undefined || definition.persistent === false) throw new Error(`群字段 ${match[1]} 不可直接设置`)
+      if (definition.secret) secretTouched = true
       const value = convertInputValue(match[2] ?? match[3] ?? match[4], definition, `shared.${match[1]}`)
       validateFieldValue(value, definition, `shared.${match[1]}`)
       attr[match[1]] = value
@@ -1628,8 +1714,12 @@ export class DiceRulePackManager {
     }
     if (!updates.length || source.slice(consumed).trim()) throw new Error("格式：群设 field=value；包含空格的值请加引号")
     ruleState.group = stored
-    await this.diceManager.writeState(state, config)
-    return `已更新群共享状态：${updates.join("，")}`
+    const result = secretTouched
+      ? this.queuePrivateRuleResult(e, pack, ruleState, `已更新群共享状态：${updates.join("，")}`, "秘密群共享字段已更新，具体值已私聊发送。")
+      : `已更新群共享状态：${updates.join("，")}`
+    return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "group_set", result, {
+      actions: updates.map(update => ({ op: "set_group_field", field: update.split("=")[0], value: secretTouched ? "[private]" : update.split("=").slice(1).join("=") }))
+    })
   }
 
   createLifecycleRuntime(state, e, pack, ruleState, actor, sharedGroupStored = null) {
@@ -1676,6 +1766,91 @@ export class DiceRulePackManager {
     if (ruleState.audit.length > MAX_AUDIT_RECORDS) ruleState.audit.splice(0, ruleState.audit.length - MAX_AUDIT_RECORDS)
   }
 
+  async finishDirectBuiltinMutation(e, pack, state, ruleState, command, result, { targets = [], actions = [] } = {}) {
+    const auditId = result?.auditId || newAuditId()
+    const visibility = result && typeof result === "object" && result.privateMessages?.length ? "private" : "public"
+    const publicText = sanitizeRuleOutput(typeof result === "object" ? result.text : result)
+    this.appendRuleAudit(ruleState, {
+      id: auditId,
+      at: new Date().toISOString(),
+      packId: pack.id,
+      packageVersion: pack.compatibility?.package_version || "1.0.0",
+      command,
+      visibility,
+      invoker: { id: String(e.user_id || ""), name: e?.sender?.card || e?.sender?.nickname || String(e.user_id || "") },
+      targets: sanitizeAuditValue(targets),
+      seed: "",
+      actions: sanitizeAuditValue(actions),
+      output: visibility === "public" ? publicText : "[private]"
+    })
+    const config = this.diceManager.getConfig()
+    await this.diceManager.writeState(state, config)
+    await this.diceManager.recordStructuredRuleEvent(e, { content: publicText, auditId, packId: pack.id, command, visibility }, state, config)
+      .catch(error => this.logger?.warn?.(`[骰规则] 写入团录失败: ${error.message}`))
+    if (result && typeof result === "object") return { ...result, auditId, packId: pack.id }
+    return publicText
+  }
+
+  queuePrivateRuleResult(e, pack, ruleState, privateText, publicText, { recipients = null, auditId = newAuditId() } = {}) {
+    const targets = [...new Set((recipients || [String(e.user_id || "")]).map(String).filter(Boolean))]
+    if (!targets.length) throw new Error("没有找到可接收私密结果的成员")
+    ruleState.privateDeliveries ||= []
+    const privateMessages = targets.map(userId => {
+      const deliveryId = `${auditId}:${userId}`
+      const message = {
+        deliveryId,
+        userId,
+        text: `【${pack.name}私密结果】\n${privateText}\n审计编号：${auditId}`,
+        createdAt: new Date().toISOString(),
+        attempts: 0,
+        lastError: ""
+      }
+      ruleState.privateDeliveries.push(message)
+      return { deliveryId, userId, text: message.text }
+    })
+    if (ruleState.privateDeliveries.length > MAX_PRIVATE_DELIVERIES) {
+      ruleState.privateDeliveries.splice(0, ruleState.privateDeliveries.length - MAX_PRIVATE_DELIVERIES)
+    }
+    return { text: sanitizeRuleOutput(publicText), privateMessages, auditId, packId: pack.id }
+  }
+
+  async settlePrivateDeliveries(groupId, packId, outcomes = []) {
+    if (!groupId || !packId || !outcomes.length) return
+    const config = this.diceManager.getConfig()
+    await this.diceManager.withStateTransaction(async () => {
+      const state = this.diceManager.readState(config)
+      const ruleState = state.groups?.[String(groupId)]?.diceRuleSessions?.[packId]
+      if (!ruleState?.privateDeliveries) return
+      const outcomeMap = new Map(outcomes.map(item => [item.deliveryId, item]))
+      ruleState.privateDeliveries = ruleState.privateDeliveries.filter(delivery => {
+        const outcome = outcomeMap.get(delivery.deliveryId)
+        if (!outcome) return true
+        if (outcome.ok) return false
+        delivery.attempts = (Number(delivery.attempts) || 0) + 1
+        delivery.lastAttemptAt = new Date().toISOString()
+        delivery.lastError = String(outcome.error || "私聊发送失败").slice(0, 200)
+        return true
+      })
+      await this.diceManager.writeState(state, config)
+    })
+  }
+
+  async handleDeliveryOperation(e, pack, raw) {
+    const config = this.diceManager.getConfig()
+    const state = this.diceManager.readState(config)
+    const ruleState = ensureRuleGroupState(state, e?.group_id, pack.id)
+    requireRulePermission(e, ruleState, "gm")
+    const action = String(parseQuotedTokens(raw).shift() || "status").toLowerCase()
+    const pending = ruleState.privateDeliveries || []
+    if (["status", "list", "状态", "列表"].includes(action)) return `待重试私密投递：${pending.length} 条。重试：.${pack.id} 投递 重试`
+    if (["retry", "重试"].includes(action)) {
+      if (!pending.length) return "当前没有待重试的私密结果。"
+      const privateMessages = pending.slice(0, 20).map(item => ({ deliveryId: item.deliveryId, userId: item.userId, text: item.text }))
+      return { text: `正在重试 ${privateMessages.length} 条私密结果；失败项会继续保留。`, privateMessages, packId: pack.id }
+    }
+    throw new Error("投递命令：投递 状态 / 投递 重试")
+  }
+
   async runRuleEvent(pack, eventName, runtime) {
     await this.applyActionList(pack, pack.events?.[eventName] || [], runtime)
   }
@@ -1718,11 +1893,11 @@ export class DiceRulePackManager {
     this.refreshRuleContext(pack, runtime)
   }
 
-  async finishBuiltinMutation(e, pack, state, ruleState, runtime, command, text) {
-    return await this.finishBuiltinBatch(e, pack, state, ruleState, [runtime], command, text)
+  async finishBuiltinMutation(e, pack, state, ruleState, runtime, command, text, options = {}) {
+    return await this.finishBuiltinBatch(e, pack, state, ruleState, [runtime], command, text, options)
   }
 
-  async finishBuiltinBatch(e, pack, state, ruleState, runtimes, command, text) {
+  async finishBuiltinBatch(e, pack, state, ruleState, runtimes, command, text, options = {}) {
     for (const runtime of runtimes) this.commitLifecycleRuntime(pack, runtime)
     const auditId = newAuditId()
     this.appendRuleAudit(ruleState, {
@@ -1740,9 +1915,125 @@ export class DiceRulePackManager {
     })
     const config = this.diceManager.getConfig()
     await this.diceManager.writeState(state, config)
-    await this.diceManager.recordStructuredRuleEvent(e, { content: text, auditId, packId: pack.id, command, visibility: "public" }, state, config)
+    await this.diceManager.recordStructuredRuleEvent(e, { content: text, auditId, packId: pack.id, command, visibility: "public" }, options.logState || state, config)
       .catch(error => this.logger?.warn?.(`[骰规则] 写入团录失败: ${error.message}`))
     return text
+  }
+
+  ensureActiveCampaign(e, pack, ruleState) {
+    ruleState.campaigns ||= {}
+    let id = ruleState.activeCampaignId
+    if (id && ruleState.campaigns[id]?.status !== "archived") return ruleState.campaigns[id]
+    id = "default"
+    ruleState.campaigns[id] ||= {
+      id,
+      name: `${pack.name} 默认战役`,
+      status: "active",
+      createdAt: new Date().toISOString(),
+      createdBy: String(e.user_id || ""),
+      members: {},
+      chapters: [],
+      records: [],
+      sessions: []
+    }
+    ruleState.activeCampaignId = id
+    return ruleState.campaigns[id]
+  }
+
+  formatCampaign(campaign) {
+    if (!campaign) return "当前没有选中的战役。"
+    const chapter = [...(campaign.chapters || [])].reverse().find(item => !item.endedAt)
+    return [
+      `战役：${campaign.name}（${campaign.id}）`,
+      `状态：${campaign.status || "active"}；当前章节：${chapter?.title || "无"}`,
+      `登记角色：${Object.keys(campaign.members || {}).length}；场次：${(campaign.sessions || []).length}；记录：${(campaign.records || []).length}`
+    ].join("\n")
+  }
+
+  async handleCampaignOperation(e, pack, raw) {
+    const config = this.diceManager.getConfig()
+    const state = this.diceManager.readState(config)
+    const ruleState = ensureRuleGroupState(state, e?.group_id, pack.id)
+    const tokens = parseQuotedTokens(raw)
+    const action = String(tokens.shift() || "status").toLowerCase()
+    if (["list", "列表"].includes(action)) {
+      const rows = Object.values(ruleState.campaigns || {}).map(item => `${item.id}：${item.name} [${item.status || "active"}]${ruleState.activeCampaignId === item.id ? " [当前]" : ""}`)
+      return `战役列表：\n${rows.join("\n") || "暂无；创建：战役 创建 <id> <名称>"}`
+    }
+    if (["status", "show", "状态", "查看"].includes(action)) return this.formatCampaign(ruleState.campaigns?.[ruleState.activeCampaignId])
+    if (["register", "join", "登记", "加入"].includes(action)) {
+      const campaign = this.ensureActiveCampaign(e, pack, ruleState)
+      const selector = tokens.shift() || "self"
+      const actor = await resolveRuleActor(e, selector, ruleState, ["self", "member"])
+      if (!actor.self) requireRulePermission(e, ruleState, "gm")
+      const character = tokens.join(" ").trim().slice(0, 80) || actor.name
+      campaign.members[actor.id] = { userId: actor.id, name: actor.name, character, joinedAt: new Date().toISOString() }
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "campaign_register", `已登记：${actor.name} → ${character}`, { targets: [actor], actions: [{ op: "register_character", target: actor.id, value: character }] })
+    }
+    requireRulePermission(e, ruleState, "gm")
+    if (["create", "new", "创建", "新建"].includes(action)) {
+      const id = String(tokens.shift() || "").toLowerCase()
+      const name = tokens.join(" ").trim()
+      if (!/^[a-z][a-z0-9_-]{1,47}$/.test(id)) throw new Error("战役 ID 必须以小写字母开头，只含小写字母、数字、下划线或连字符")
+      if (!name) throw new Error("格式：战役 创建 <id> <名称>")
+      if (ruleState.campaigns[id]) throw new Error(`战役已存在：${id}`)
+      ruleState.campaigns[id] = { id, name: name.slice(0, 80), status: "active", createdAt: new Date().toISOString(), createdBy: String(e.user_id || ""), members: {}, chapters: [], records: [], sessions: [] }
+      ruleState.activeCampaignId = id
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "campaign_create", `已创建并选中战役：${name.slice(0, 80)}（${id}）`, { actions: [{ op: "create_campaign", target: id }] })
+    }
+    if (["use", "select", "使用", "选择", "切换"].includes(action)) {
+      const id = String(tokens.shift() || "")
+      const campaign = ruleState.campaigns?.[id]
+      if (!campaign) throw new Error(`战役不存在：${id}`)
+      if (campaign.status === "archived") throw new Error(`战役 ${id} 已归档；请先恢复`)
+      if (ruleState.session.active) throw new Error("当前场次进行中，不能切换战役")
+      ruleState.activeCampaignId = id
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "campaign_select", `已切换到战役：${campaign.name}（${id}）`, { actions: [{ op: "select_campaign", target: id }] })
+    }
+    let campaign = this.ensureActiveCampaign(e, pack, ruleState)
+    if (["chapter", "章节"].includes(action)) {
+      const operation = String(tokens.shift() || "list").toLowerCase()
+      campaign.chapters ||= []
+      if (["list", "列表"].includes(operation)) return `章节：\n${campaign.chapters.map((item, index) => `${index + 1}. ${item.title}${item.endedAt ? " [已结束]" : " [进行中]"}`).join("\n") || "无"}`
+      if (["start", "new", "开始", "新建"].includes(operation)) {
+        if (campaign.chapters.some(item => !item.endedAt)) throw new Error("已有进行中的章节，请先结束")
+        const title = tokens.join(" ").trim().slice(0, 100)
+        if (!title) throw new Error("格式：战役 章节 开始 <标题>")
+        const chapter = { id: `chapter-${Date.now().toString(36)}`, title, startedAt: new Date().toISOString(), startedBy: String(e.user_id || ""), endedAt: "" }
+        campaign.chapters.push(chapter)
+        return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "campaign_chapter_start", `章节已开始：${title}`, { actions: [{ op: "start_chapter", target: chapter.id }] })
+      }
+      if (["end", "stop", "结束"].includes(operation)) {
+        const chapter = [...campaign.chapters].reverse().find(item => !item.endedAt)
+        if (!chapter) throw new Error("当前没有进行中的章节")
+        chapter.endedAt = new Date().toISOString()
+        return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "campaign_chapter_end", `章节已结束：${chapter.title}`, { actions: [{ op: "end_chapter", target: chapter.id }] })
+      }
+      throw new Error("章节命令：战役 章节 列表 / 开始 <标题> / 结束")
+    }
+    if (["record", "note", "记录", "线索", "手记"].includes(action)) {
+      const type = action === "线索" ? "clue" : action === "手记" ? "note" : String(tokens.shift() || "note").toLowerCase()
+      if (!new Set(["note", "clue", "file", "link"]).has(type)) throw new Error("记录类型支持 note、clue、file、link")
+      const content = tokens.join(" ").trim().slice(0, 1000)
+      if (!content) throw new Error("格式：战役 记录 <note|clue|file|link> <内容>")
+      const record = { id: `record-${Date.now().toString(36)}`, type, content, at: new Date().toISOString(), by: String(e.user_id || "") }
+      campaign.records ||= []
+      campaign.records.push(record)
+      if (campaign.records.length > 500) campaign.records.splice(0, campaign.records.length - 500)
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "campaign_record", `已记录${type === "clue" ? "线索" : type === "file" ? "文件" : type === "link" ? "链接" : "手记"}：${content}`, { actions: [{ op: "add_campaign_record", target: record.id, value: type }] })
+    }
+    if (["archive", "归档", "restore", "恢复"].includes(action)) {
+      const restore = ["restore", "恢复"].includes(action)
+      const targetId = String(tokens.shift() || campaign.id)
+      campaign = ruleState.campaigns?.[targetId]
+      if (!campaign) throw new Error(`战役不存在：${targetId}`)
+      if (!restore && ruleState.session.active) throw new Error("当前场次进行中，不能归档战役")
+      campaign.status = restore ? "active" : "archived"
+      if (!restore && ruleState.activeCampaignId === campaign.id) ruleState.activeCampaignId = ""
+      if (restore) ruleState.activeCampaignId = campaign.id
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, restore ? "campaign_restore" : "campaign_archive", `战役已${restore ? "恢复" : "归档"}：${campaign.name}`, { actions: [{ op: restore ? "restore_campaign" : "archive_campaign", target: campaign.id }] })
+    }
+    throw new Error("战役命令：列表 / 创建 <id> <名称> / 使用 <id> / 登记 <目标> [角色名] / 章节 / 记录 / 归档 / 恢复")
   }
 
   formatSessionStatus(ruleState) {
@@ -1750,11 +2041,58 @@ export class DiceRulePackManager {
     const current = session.current ? `${session.current.name}（${session.current.kind}:${session.current.id}）` : "无"
     return [
       `团务：${session.active ? "进行中" : "未开始"}`,
+      `战役：${session.campaignId || ruleState.activeCampaignId || "未选择"}；暂停：${session.paused ? "是" : "否"}`,
       `标题：${session.title || "未命名"}`,
       `轮次：${session.round || 0}；回合：${session.turn || 0}；阶段：${session.phase || "idle"}`,
       `当前行动者：${current}`,
-      `先攻项：${session.initiative.length}`
+      `先攻项：${session.initiative.length}；历史场次：${ruleState.sessions?.length || 0}；快照：${ruleState.snapshots?.length || 0}`
     ].join("\n")
+  }
+
+  createSessionSnapshot(state, e, pack, ruleState, name = "") {
+    const groupId = String(e.group_id)
+    const players = {}
+    for (const [userId, user] of Object.entries(state.users || {})) {
+      for (const [cardName, card] of Object.entries(user?.cards || {})) {
+        const root = card?.ruleData?.[pack.id]
+        const stored = root?._scopeVersion === 2 ? root.groups?.[groupId] : null
+        if (stored) players[`${userId}:${cardName}`] = cloneJson(stored)
+      }
+    }
+    return {
+      id: `snapshot-${Date.now().toString(36)}`,
+      name: String(name || "").trim().slice(0, 80) || `快照 ${new Date().toISOString().replace("T", " ").slice(0, 19)}`,
+      createdAt: new Date().toISOString(),
+      createdBy: String(e.user_id || ""),
+      group: cloneJson(ruleState.group || { values: {} }),
+      npcs: cloneJson(ruleState.npcs || {}),
+      session: cloneJson(ruleState.session || {}),
+      players
+    }
+  }
+
+  restoreSessionSnapshot(state, e, pack, ruleState, snapshot) {
+    const groupId = String(e.group_id)
+    ruleState.group = cloneJson(snapshot.group || { values: {} })
+    ruleState.npcs = cloneJson(snapshot.npcs || {})
+    ruleState.session = cloneJson(snapshot.session || {})
+    for (const user of Object.values(state.users || {})) {
+      for (const card of Object.values(user?.cards || {})) {
+        const root = card?.ruleData?.[pack.id]
+        if (root?._scopeVersion === 2 && root.groups) delete root.groups[groupId]
+      }
+    }
+    for (const [key, stored] of Object.entries(snapshot.players || {})) {
+      const split = key.indexOf(":")
+      const userId = key.slice(0, split)
+      const cardName = key.slice(split + 1)
+      const card = state.users?.[userId]?.cards?.[cardName]
+      if (!card) continue
+      card.ruleData ||= {}
+      card.ruleData[pack.id] ||= { _scopeVersion: 2, groups: {} }
+      card.ruleData[pack.id].groups ||= {}
+      card.ruleData[pack.id].groups[groupId] = cloneJson(stored)
+    }
   }
 
   async handleSessionOperation(e, pack, raw) {
@@ -1764,11 +2102,63 @@ export class DiceRulePackManager {
     const tokens = parseQuotedTokens(raw)
     const action = String(tokens.shift() || "status").toLowerCase()
     if (["status", "show", "状态", "查看"].includes(action)) return this.formatSessionStatus(ruleState)
+    if (["history", "历史", "场次"].includes(action)) {
+      const rows = [...(ruleState.sessions || [])].reverse().slice(0, 20).map((item, index) => `${index + 1}. ${item.title || "未命名"}｜${item.startedAt || ""} → ${item.endedAt || ""}｜战役 ${item.campaignId || "default"}`)
+      return `历史场次：\n${rows.join("\n") || "暂无"}`
+    }
     requireRulePermission(e, ruleState, "gm")
+    if (["pause", "暂停"].includes(action)) {
+      if (!ruleState.session.active) throw new Error("当前没有进行中的团务")
+      if (ruleState.session.paused) throw new Error("团务已经暂停")
+      ruleState.session.previousPhase = ruleState.session.phase || "setup"
+      ruleState.session.paused = true
+      ruleState.session.phase = "paused"
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "session_pause", `团务已暂停：${ruleState.session.title || "未命名"}`, { actions: [{ op: "pause_session" }] })
+    }
+    if (["resume", "恢复", "继续"].includes(action)) {
+      if (!ruleState.session.active || !ruleState.session.paused) throw new Error("当前没有暂停中的团务")
+      ruleState.session.paused = false
+      ruleState.session.phase = ruleState.session.previousPhase || (ruleState.session.current ? "turn_start" : "setup")
+      delete ruleState.session.previousPhase
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "session_resume", `团务已恢复：${ruleState.session.title || "未命名"}`, { actions: [{ op: "resume_session" }] })
+    }
+    if (["snapshot", "快照"].includes(action)) {
+      const snapshot = this.createSessionSnapshot(state, e, pack, ruleState, tokens.join(" "))
+      ruleState.snapshots ||= []
+      ruleState.snapshots.push(snapshot)
+      if (ruleState.snapshots.length > 10) ruleState.snapshots.splice(0, ruleState.snapshots.length - 10)
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "session_snapshot", `已创建团务快照：${snapshot.name}（${snapshot.id}）`, { actions: [{ op: "create_snapshot", target: snapshot.id }] })
+    }
+    if (["restore-snapshot", "回退", "恢复快照"].includes(action)) {
+      if (ruleState.session.active && !ruleState.session.paused) throw new Error("进行中的团务必须先暂停，才能回退快照")
+      const selector = String(tokens.shift() || "1")
+      const snapshots = [...(ruleState.snapshots || [])].reverse()
+      const snapshot = /^\d+$/.test(selector) ? snapshots[Number(selector) - 1] : snapshots.find(item => item.id === selector || item.name === selector)
+      if (!snapshot) throw new Error(`没有找到快照：${selector}`)
+      this.restoreSessionSnapshot(state, e, pack, ruleState, snapshot)
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "session_restore_snapshot", `已回退到团务快照：${snapshot.name}`, { actions: [{ op: "restore_snapshot", target: snapshot.id }] })
+    }
     const runtime = this.createLifecycleRuntime(state, e, pack, ruleState, selfActor(e))
     if (["start", "new", "开始", "新建"].includes(action)) {
       if (ruleState.session.active) throw new Error(`团务已经开始：${ruleState.session.title || "未命名"}`)
+      const campaign = this.ensureActiveCampaign(e, pack, ruleState)
+      const groupId = String(e.group_id)
+      const existingLog = state.groups?.[groupId]?.log
+      let logMessage = ""
+      if (existingLog?.active) {
+        ruleState.session.logOwned = false
+        ruleState.session.logFile = existingLog.file || ""
+        logMessage = `沿用已有团录：${existingLog.title || "未命名"}；结束团务时不会替你停止它。`
+      } else {
+        const preparedLog = this.diceManager.prepareStartLog(e, state, tokens.join(" ").trim() || pack.name, config, { authorized: true })
+        if (!preparedLog.changed) throw new Error(preparedLog.text)
+        ruleState.session.logOwned = true
+        ruleState.session.logFile = preparedLog.log?.file || ""
+        logMessage = "团录已开启，并与本次团务绑定。"
+      }
       ruleState.session.active = true
+      ruleState.session.campaignId = campaign.id
+      ruleState.session.paused = false
       ruleState.session.title = tokens.join(" ").trim().slice(0, 80) || `${pack.name}-${new Date().toISOString().slice(0, 10)}`
       ruleState.session.startedAt = new Date().toISOString()
       ruleState.session.startedBy = String(e.user_id || "")
@@ -1777,26 +2167,53 @@ export class DiceRulePackManager {
       ruleState.session.turn = 0
       ruleState.session.phase = "setup"
       ruleState.session.current = null
+      ruleState.session.initiative = []
       await this.runRuleEvent(pack, "session_start", runtime)
       const text = `团务已开始：${ruleState.session.title}`
       await this.finishBuiltinMutation(e, pack, state, ruleState, runtime, "session_start", text)
-      if (!this.diceManager.isLogActive(e.group_id, config)) await this.diceManager.startLog(e, ruleState.session.title)
-      return `${text}\n团录已开启。`
+      return `${text}\n${logMessage}`
     }
     if (["end", "stop", "结束", "停止"].includes(action)) {
       if (!ruleState.session.active) throw new Error("当前没有进行中的团务")
       await this.runRuleEvent(pack, "session_end", runtime)
       const title = ruleState.session.title || "未命名"
+      const ownedLog = ruleState.session.logOwned === true
+      const logSnapshot = state.groups?.[String(e.group_id)]?.log
+      let logState = null
+      let logMessage = "已有团录保持开启。"
+      if (ownedLog) {
+        const preparedLog = this.diceManager.prepareStopLog(e, state, config, { authorized: true })
+        if (!preparedLog.changed) throw new Error(`团务未结束：配套团录无法原子停止（${preparedLog.text}）`)
+        logState = { groups: { [String(e.group_id)]: { log: { ...logSnapshot, active: true } } } }
+        logMessage = "本次团务创建的团录已停止，可使用 .log export 导出。"
+      }
       ruleState.session.active = false
       ruleState.session.endedAt = new Date().toISOString()
       ruleState.session.phase = "ended"
       ruleState.session.current = null
+      ruleState.sessions ||= []
+      const sessionRecord = {
+        id: `session-${Date.now().toString(36)}`,
+        title,
+        campaignId: ruleState.session.campaignId || ruleState.activeCampaignId || "default",
+        startedAt: ruleState.session.startedAt || "",
+        endedAt: ruleState.session.endedAt,
+        startedBy: ruleState.session.startedBy || "",
+        logFile: ruleState.session.logFile || "",
+        initiative: [...(ruleState.session.initiative || [])]
+      }
+      ruleState.sessions.push(sessionRecord)
+      const campaign = ruleState.campaigns?.[sessionRecord.campaignId]
+      if (campaign) {
+        campaign.sessions ||= []
+        campaign.sessions.push(sessionRecord.id)
+      }
+      if (ruleState.sessions.length > 50) ruleState.sessions.splice(0, ruleState.sessions.length - 50)
       const text = `团务已结束：${title}`
-      await this.finishBuiltinMutation(e, pack, state, ruleState, runtime, "session_end", text)
-      if (this.diceManager.isLogActive(e.group_id, config)) await this.diceManager.stopLog(e)
-      return `${text}\n团录已停止，可使用 .log export 导出。`
+      await this.finishBuiltinMutation(e, pack, state, ruleState, runtime, "session_end", text, { logState })
+      return `${text}\n${logMessage}`
     }
-    throw new Error("团务命令：团务 状态 / 开始 [标题] / 结束")
+    throw new Error("团务命令：状态 / 开始 [标题] / 暂停 / 恢复 / 快照 [名称] / 回退 <序号|ID> / 历史 / 结束")
   }
 
   initiativeActor(entry) {
@@ -1850,35 +2267,44 @@ export class DiceRulePackManager {
       const index = ruleState.session.initiative.findIndex(old => old.kind === item.kind && String(old.id) === String(item.id))
       if (index >= 0) ruleState.session.initiative[index] = item
       else ruleState.session.initiative.push(item)
-      await this.diceManager.writeState(state, config)
-      return `已设置先攻：${actor.name} ${value}`
+      const result = `已设置先攻：${actor.name} ${value}`
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "initiative_set", result, {
+        targets: [actor], actions: [{ op: "set_initiative", target: actor.id, value }]
+      })
     }
     if (["remove", "delete", "del", "删除"].includes(action)) {
       const actor = await resolveRuleActor(e, tokens.shift(), ruleState, ["self", "member", "npc"])
+      if (ruleState.session.current?.kind === actor.kind && String(ruleState.session.current?.id) === String(actor.id)) {
+        throw new Error("当前行动者正在回合中，不能直接删除；请先执行下一回合或结束先攻")
+      }
       const before = ruleState.session.initiative.length
       ruleState.session.initiative = ruleState.session.initiative.filter(item => !(item.kind === actor.kind && String(item.id) === String(actor.id)))
       if (before === ruleState.session.initiative.length) throw new Error(`${actor.name} 不在先攻列表中`)
-      if (ruleState.session.current?.kind === actor.kind && String(ruleState.session.current?.id) === String(actor.id)) ruleState.session.current = null
-      await this.diceManager.writeState(state, config)
-      return `已从先攻列表移除：${actor.name}`
+      const result = `已从先攻列表移除：${actor.name}`
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "initiative_remove", result, {
+        targets: [actor], actions: [{ op: "remove_initiative", target: actor.id }]
+      })
     }
     if (["clear", "清空"].includes(action)) {
+      if (ruleState.session.current) throw new Error("战斗正在进行，不能直接清空先攻；请先结束先攻")
+      const removed = ruleState.session.initiative.map(item => ({ kind: item.kind, id: item.id, name: item.name }))
       ruleState.session.initiative = []
       ruleState.session.current = null
       ruleState.session.round = 0
       ruleState.session.turn = 0
       ruleState.session.phase = ruleState.session.active ? "setup" : "idle"
-      await this.diceManager.writeState(state, config)
-      return "先攻列表已清空。"
+      return await this.finishDirectBuiltinMutation(e, pack, state, ruleState, "initiative_clear", "先攻列表已清空。", {
+        targets: removed, actions: [{ op: "clear_initiative", count: removed.length }]
+      })
     }
     if (["start", "开始"].includes(action)) {
       if (!ruleState.session.initiative.length) throw new Error("先攻列表为空")
-      ruleState.session.initiative.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, "zh-CN"))
-      if (!ruleState.session.active) {
-        ruleState.session.active = true
-        ruleState.session.title ||= `${pack.name}-${new Date().toISOString().slice(0, 10)}`
-        ruleState.session.startedAt ||= new Date().toISOString()
+      if (!ruleState.session.active) throw new Error("正式团务尚未开始；请先执行「团务 开始 标题」")
+      if (ruleState.session.paused) throw new Error("团务已暂停；请先执行「团务 恢复」")
+      if (ruleState.session.current || ["turn_start", "turn_end", "round_start", "round_end"].includes(ruleState.session.phase)) {
+        throw new Error("战斗先攻已经开始，重复开始会重复结算生命周期；请使用「先攻 下一回合」或先结束")
       }
+      ruleState.session.initiative.sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, "zh-CN"))
       ruleState.session.round = 1
       ruleState.session.turn = 1
       ruleState.session.phase = "turn_start"
@@ -1896,6 +2322,7 @@ export class DiceRulePackManager {
     }
     if (["next", "下一位", "下一个", "下一回合"].includes(action)) {
       if (!ruleState.session.current || !ruleState.session.initiative.length) throw new Error("战斗尚未开始")
+      if (ruleState.session.paused) throw new Error("团务已暂停；请先执行「团务 恢复」")
       const shared = this.buildGroupStored(pack, ruleState, { card: e?.sender?.card || "", nickname: e?.sender?.nickname || "" })
       const runtimes = []
       const currentIndex = ruleState.session.initiative.findIndex(item => item.kind === ruleState.session.current.kind && String(item.id) === String(ruleState.session.current.id))
@@ -1929,8 +2356,8 @@ export class DiceRulePackManager {
     if (["end", "stop", "结束"].includes(action)) {
       ruleState.session.current = null
       ruleState.session.phase = ruleState.session.active ? "setup" : "idle"
-      await this.diceManager.writeState(state, config)
-      return "战斗先攻已结束，列表仍保留。"
+      const runtime = this.createLifecycleRuntime(state, e, pack, ruleState, selfActor(e))
+      return await this.finishBuiltinMutation(e, pack, state, ruleState, runtime, "initiative_end", "战斗先攻已结束，列表仍保留。")
     }
     throw new Error("先攻命令：先攻 列表 / 添加 <目标> <值> / 删除 <目标> / 开始 / 下一回合 / 结束 / 清空")
   }
@@ -2005,18 +2432,32 @@ export class DiceRulePackManager {
       const actor = await resolveRuleActor(e, tokens.shift() || "self", ruleState, ["self", "member", "npc"])
       return this.formatActorInventory(pack, this.getEntityDraft(state, e, pack, ruleState, actor))
     }
-    requireRulePermission(e, ruleState, "gm")
     const selector = tokens.shift()
     const item = tokens.shift()
     if (!selector || !pack.items?.[item]) throw new Error("请指定有效目标和物品 ID")
     const actor = await resolveRuleActor(e, selector, ruleState, ["self", "member", "npc"])
     const runtime = this.createLifecycleRuntime(state, e, pack, ruleState, actor)
-    const operation = { add: "add_item", 添加: "add_item", remove: "remove_item", delete: "remove_item", 删除: "remove_item", equip: "equip", 装备: "equip", unequip: "unequip", 卸下: "unequip" }[action]
-    if (!operation) throw new Error("物品命令：物品 列表 [目标] / 添加 <目标> <物品> [数量] / 删除 / 装备 / 卸下")
+    const operation = { add: "add_item", 添加: "add_item", remove: "remove_item", delete: "remove_item", 删除: "remove_item", equip: "equip", 装备: "equip", unequip: "unequip", 卸下: "unequip", use: "use_item", 使用: "use_item" }[action]
+    if (!operation) throw new Error("物品命令：物品 列表 [目标] / 添加 <目标> <物品> [数量] / 删除 / 装备 / 卸下 / 使用")
+    if (!actor.self || ["add_item", "remove_item"].includes(operation)) requireRulePermission(e, ruleState, "gm")
     const quantity = tokens[0] === undefined ? undefined : Number(tokens.shift())
     if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) throw new Error("数量必须是正整数")
-    await this.applyActionList(pack, [{ op: operation, item, ...(quantity === undefined ? {} : { quantity }) }], runtime)
-    const text = `${actor.name}：${operation === "add_item" ? "获得" : operation === "remove_item" ? "失去" : operation === "equip" ? "装备" : "卸下"} ${pack.items[item].label || item}${quantity ? ` x${quantity}` : ""}`
+    const definition = pack.items[item]
+    if (operation === "use_item") {
+      const current = runtime.actorDraft.stored.inventory?.[item]
+      if (!current || Number(current.quantity) < 1) throw new Error(`没有可使用的 ${definition.label || item}`)
+      if (definition.on_use?.length) await this.applyActionList(pack, definition.on_use, runtime)
+      if (definition.consumable === true) await this.applyActionList(pack, [{ op: "remove_item", item, quantity: 1 }], runtime)
+      runtime.auditActions.push({ op: "use_item", scope: "actor", target: sanitizeAuditValue(actor), field: item, before: current.quantity, after: definition.consumable === true ? current.quantity - 1 : current.quantity })
+    } else {
+      const beforeEquipped = runtime.actorDraft.stored.inventory?.[item]?.equipped === true
+      if (operation === "equip" && beforeEquipped) throw new Error(`${definition.label || item} 已经装备`)
+      if (operation === "unequip" && !beforeEquipped) throw new Error(`${definition.label || item} 尚未装备`)
+      await this.applyActionList(pack, [{ op: operation, item, ...(quantity === undefined ? {} : { quantity }) }], runtime)
+      const hook = operation === "equip" ? definition.on_equip : operation === "unequip" ? definition.on_unequip : null
+      if (hook?.length) await this.applyActionList(pack, hook, runtime)
+    }
+    const text = `${actor.name}：${operation === "add_item" ? "获得" : operation === "remove_item" ? "失去" : operation === "equip" ? "装备" : operation === "unequip" ? "卸下" : "使用"} ${definition.label || item}${quantity ? ` x${quantity}` : ""}`
     return await this.finishBuiltinMutation(e, pack, state, ruleState, runtime, `item_${operation}`, text)
   }
 
@@ -2058,6 +2499,7 @@ export class DiceRulePackManager {
     const rank = operation === "learn_ability" && tokens[0] !== undefined ? Number(tokens.shift()) : undefined
     if (rank !== undefined && (!Number.isInteger(rank) || rank < 1)) throw new Error("技能等级必须是正整数")
     await this.applyActionList(pack, [{ op: operation, ability, ...(rank === undefined ? {} : { rank }) }], runtime)
+    if (operation === "use_ability" && definition.on_use?.length) await this.applyActionList(pack, definition.on_use, runtime)
     const label = pack.abilities[ability].label || ability
     const verb = operation === "learn_ability" ? "学习" : operation === "forget_ability" ? "遗忘" : operation === "use_ability" ? "使用" : "重置"
     const text = `${actor.name}${verb}了${label}${rank ? `（等级 ${rank}）` : ""}。`
@@ -2093,7 +2535,8 @@ export class DiceRulePackManager {
         `${pack.name}（.${invocation.prefix}）`,
         ...pack.commands.map(command => `.${invocation.prefix} ${command.aliases[0]}${(command.arguments || []).map(arg => ` <${arg.label || arg.id}>`).join("")} - ${command.description || command.label || command.id}`),
         `人物卡：.${invocation.prefix} 卡 [目标] / 设 [目标] field=value / 查 [目标] field / 删 [目标] field`,
-        `团务：权限 / npc / 群卡 / 群设 / 群查 / 团务 / 先攻 / 状态 / 物品 / 技能 / 审计`
+        `团务：权限 / npc / 群卡 / 群设 / 群查 / 战役 / 团务 / 先攻 / 状态 / 物品 / 技能 / 审计 / 投递`,
+        `战役支持角色登记、章节和记录；团务支持暂停、恢复、历史、快照与回退。`
       ].join("\n")
     }
     const builtins = [
@@ -2109,12 +2552,14 @@ export class DiceRulePackManager {
       [BUILTIN_GROUP_CARD_ALIASES, raw => this.handleGroupFieldOperation(e, pack, "card", raw)],
       [BUILTIN_GROUP_SET_ALIASES, raw => this.handleGroupFieldOperation(e, pack, "set", raw)],
       [BUILTIN_GROUP_GET_ALIASES, raw => this.handleGroupFieldOperation(e, pack, "get", raw)],
+      [BUILTIN_CAMPAIGN_ALIASES, raw => this.handleCampaignOperation(e, pack, raw)],
       [BUILTIN_SESSION_ALIASES, raw => this.handleSessionOperation(e, pack, raw)],
       [BUILTIN_INITIATIVE_ALIASES, raw => this.handleInitiativeOperation(e, pack, raw)],
       [BUILTIN_STATUS_ALIASES, raw => this.handleStatusOperation(e, pack, raw)],
       [BUILTIN_ITEM_ALIASES, raw => this.handleItemOperation(e, pack, raw)],
       [BUILTIN_ABILITY_ALIASES, raw => this.handleAbilityOperation(e, pack, raw)],
-      [BUILTIN_AUDIT_ALIASES, raw => this.handleAuditOperation(e, pack, raw)]
+      [BUILTIN_AUDIT_ALIASES, raw => this.handleAuditOperation(e, pack, raw)],
+      [BUILTIN_DELIVERY_ALIASES, raw => this.handleDeliveryOperation(e, pack, raw)]
     ]
     for (const [aliases, handler] of serviceBuiltins) {
       const matched = matchTextAlias(rest, [...aliases])
@@ -2155,7 +2600,7 @@ export class DiceRulePackManager {
       return { matched: true, text: sanitizeRuleOutput(result) }
     } catch (error) {
       this.logger?.warn?.(`[骰规则] ${packSafe(invocation.pack?.id)} 执行失败: ${error.message}`)
-      return { matched: true, text: `这次规则执行失败：${error.message}。人物卡没有发生不完整写入。` }
+      return { matched: true, text: `这次规则执行失败：${error.message}。本次人物卡、群状态和团务变更都没有按成功提交。` }
     }
   }
 }

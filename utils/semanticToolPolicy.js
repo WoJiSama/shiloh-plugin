@@ -15,3 +15,7 @@ export function shouldRunSemanticToolPlanner({
     hasExplicitSearchRequest
   )
 }
+
+export function hasSemanticPlannerCandidate(candidates = []) {
+  return Array.isArray(candidates) && candidates.some(name => name && name !== "sendLocalEmojiTool")
+}

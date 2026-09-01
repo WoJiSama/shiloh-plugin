@@ -5,6 +5,7 @@ import { readFile, writeFile, access, mkdir } from 'fs/promises'
 import path from 'path'
 import fs from 'fs'
 import YAML from 'yaml'
+import { buildVisibleFailureDetail } from '../utils/visibleFailure.js'
 
 const _path = process.cwd()
 
@@ -119,7 +120,7 @@ export class KnowledgePlugin extends plugin {
       }
       await sendForward(e, msgs, '知识库添加')
     } catch (err) {
-      e.reply(`添加失败: ${err.message}`)
+      e.reply(`添加失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -145,7 +146,7 @@ export class KnowledgePlugin extends plugin {
       toDelete.forEach((item, i) => msgs.push(`${i + 1}. ${item.text}`))
       await sendForward(e, msgs, '知识库删除')
     } catch (err) {
-      e.reply(`删除失败: ${err.message}`)
+      e.reply(`删除失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -191,7 +192,7 @@ export class KnowledgePlugin extends plugin {
       const msgs = [`搜索关键词：${query}`, result.knowledgeContext]
       await sendForward(e, msgs, '知识库搜索')
     } catch (err) {
-      e.reply(`检索失败: ${err.message}`)
+      e.reply(`检索失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -213,7 +214,7 @@ export class KnowledgePlugin extends plugin {
       await writeFile(dbPath, '', 'utf-8')
       e.reply('知识库已清空')
     } catch (err) {
-      e.reply(`清空失败: ${err.message}`)
+      e.reply(`清空失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }

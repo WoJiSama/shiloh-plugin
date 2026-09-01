@@ -28,16 +28,42 @@ test("preserves structured tool outcomes and gives image-specific unavailable re
     result: JSON.stringify({ kind: "tool_outcome", status: "error", tool: "googleImageAnalysisTool", error: { code: "image_link_expired" } })
   }]
   assert.equal(classifyToolResult(timeout[0].result).kind, "error")
-  assert.match(buildUnavailableToolReply(timeout), /识图等了太久/)
+  assert.match(buildUnavailableToolReply(timeout), /看图等太久/)
   assert.match(buildUnavailableToolReply(expired), /重新发一次原图/)
+  assert.doesNotMatch(buildUnavailableToolReply(timeout), /Steam/i)
+})
+
+test("explains image provider HTTP failures without leaking an unrelated topic", () => {
+  const failure = status => [{
+    toolName: "googleImageAnalysisTool",
+    result: JSON.stringify({
+      kind: "tool_outcome",
+      status: "error",
+      tool: "googleImageAnalysisTool",
+      error: { code: "vision_http", status }
+    })
+  }]
+  assert.match(buildUnavailableToolReply(failure(401)), /授权没有通过/)
+  assert.match(buildUnavailableToolReply(failure(429)), /请求太多/)
+  assert.match(buildUnavailableToolReply(failure(503)), /临时出错/)
+  assert.doesNotMatch(buildUnavailableToolReply(failure(404)), /Steam|Minecraft/i)
 })
 
 test("forbids filling empty results from chat history", () => {
   const empty = [{ toolName: "googleImageAnalysisTool", result: "{}" }]
   assert.equal(hasUsableToolResult(empty), false)
-  assert.match(buildUnavailableToolReply(empty), /不会根据猜测/)
+  assert.match(buildUnavailableToolReply(empty), /不乱猜/)
   assert.match(buildToolGroundingInstruction(empty), /聊天历史.*绝不能/)
   assert.match(buildToolGroundingInstruction(empty), /googleImageAnalysisTool=empty/)
+})
+
+test("keeps generic tool failures honest without falling back to service-status wording", () => {
+  const failed = [{ toolName: "searchInformationTool", result: "查询失败: upstream timeout" }]
+  const missing = [{ toolName: "modrinthTool", result: "没有找到相关结果" }]
+  assert.match(buildUnavailableToolReply(failed), /没查成/)
+  assert.doesNotMatch(buildUnavailableToolReply(failed), /查询没有成功|可靠结果/)
+  assert.match(buildUnavailableToolReply(missing), /确实没找到/)
+  assert.doesNotMatch(buildUnavailableToolReply(missing), /现有结果里没有依据/)
 })
 
 test("allows mixed tool rounds to continue only from their usable results", () => {

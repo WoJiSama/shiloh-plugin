@@ -52,5 +52,5 @@ export function looksLikeImageAuthenticityRequest(text = "") {
 }
 
 export function buildMissingImageAnalysisReply() {
-  return "唔，我这边没看到图诶…你把图片发一下，或者引用那张图再叫我，我就认真看。没有图我怕乱讲嘛。"
+  return "这条消息里没有可看的图片。把图片发来，或者回复原图，我再按图说。"
 }

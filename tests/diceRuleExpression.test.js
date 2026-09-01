@@ -23,6 +23,17 @@ test("custom rule expressions respect precedence, references and short-circuit c
   assert.deepEqual(references.references, ["attr.a", "roll.check.total"])
 })
 
+test("expression fallback randomness does not depend on Math.random", () => {
+  const originalRandom = Math.random
+  try {
+    Math.random = () => { throw new Error("expression fallback must not use Math.random") }
+    const result = evaluateDiceRuleExpression("pool(1, 6, 4)")
+    assert.ok(result.value === 0 || result.value === 1)
+  } finally {
+    Math.random = originalRandom
+  }
+})
+
 test("custom dice are rolled once and retain a readable trace", () => {
   const result = evaluateDiceRuleExpression("dice('fate', 4) + 2", {}, {
     diceSets: { fate: { label: "Fate", faces: [-1, -1, 0, 0, 1, 1] } },
@@ -37,6 +48,19 @@ test("custom dice are rolled once and retain a readable trace", () => {
     random: () => 0,
     maxDiceCount: 4
   }), /正整数/)
+})
+
+test("success pools support explosion, reroll and failure cancellation with a bounded dice budget", () => {
+  const values = [0, 0.9, 0.7, 0, 0.8]
+  const result = evaluateDiceRuleExpression("pool(2, 10, 8, 10, 1, 1)", {}, {
+    random: () => values.shift() ?? 0.5,
+    maxDiceCount: 5
+  })
+  assert.equal(result.value, 3)
+  assert.equal(result.diceCount, 5)
+  assert.match(result.traces[0], /1→10/)
+  assert.equal(evaluateDiceRuleExpression("cancel(3, 1)", {}).value, 2)
+  assert.throws(() => evaluateDiceRuleExpression("explode(2, 10, 8, 10)", {}, { random: () => 0.99, maxDiceCount: 3 }), /骰子总数超过上限/)
 })
 
 test("expression sandbox rejects unknown references, blocked paths and unknown functions", () => {
@@ -141,9 +165,17 @@ test("schema enforces runtime, reserved commands, output fallback and configured
   const gmSecret = validateDiceRulePack({
     ...base,
     character: { fields: { note: { type: "string", default: "hidden", secret: true } } },
-    commands: [{ id: "check", aliases: ["check"], permission: "gm", output: "{attr.note}" }]
+    commands: [{ id: "check", aliases: ["check"], permission: "gm", visibility: "private", output: "{attr.note}" }]
   })
   assert.equal(gmSecret.ok, true, gmSecret.errors.join("; "))
+
+  const publicGmSecret = validateDiceRulePack({
+    ...base,
+    character: { fields: { note: { type: "string", default: "hidden", secret: true } } },
+    commands: [{ id: "check", aliases: ["check"], permission: "gm", visibility: "public", output: "{attr.note}" }]
+  })
+  assert.equal(publicGmSecret.ok, false)
+  assert.ok(publicGmSecret.errors.some(error => error.includes("不能公开输出") && error.includes("attr.note")))
 
   const derivedSecret = validateDiceRulePack({
     ...base,

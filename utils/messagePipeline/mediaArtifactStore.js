@@ -166,5 +166,14 @@ export function buildMediaArtifactKey(platform, identity = {}) {
     const awemeId = String(identity.aweme_id || identity.awemeId || "").trim()
     return awemeId ? `douyin:${awemeId}:lowest` : ""
   }
+  if (type === "youtube") {
+    const videoId = String(identity.video_id || identity.videoId || "").trim()
+    return videoId ? `youtube:${videoId}:lowest-mp4` : ""
+  }
+  if (type === "pixiv") {
+    const artworkId = String(identity.artwork_id || identity.artworkId || "").trim()
+    const page = Number(identity.page || 0)
+    return artworkId && Number.isInteger(page) && page >= 0 ? `pixiv:${artworkId}:p${page}:regular` : ""
+  }
   return ""
 }

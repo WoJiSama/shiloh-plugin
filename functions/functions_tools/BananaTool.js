@@ -12,6 +12,7 @@ import {
   generateImageEditWithFallbacks,
   generateImageWithFallbacks,
   matchesImageProvider,
+  normalizeImageProviderParameter,
   resolveRequestedImageProvider,
   resolveImageEditConfigs,
   resolveImageGenerationConfigs,
@@ -21,25 +22,19 @@ import {
   toImageGenerationUrl
 } from "../../utils/imageGenerationFallback.js";
 import { serializeMultipartFormData } from "../../utils/multipartFormData.js";
-import { formatMessageSendFailure, isMessageSendFailed, resolveImageBuffer } from "../../utils/reliableImageSender.js";
+import { formatMessageSendFailure, getImageBufferMetadata, isMessageSendFailed, resolveImageBuffer } from "../../utils/reliableImageSender.js";
 import { extractImageResult } from "../../utils/imageResult.js";
 import { buildImageFailureReply } from "../../utils/imageFailurePolicy.js";
+import {
+  applyImageAspectRatioToConfigs,
+  describeImageAspectRatioIntent,
+  resolveImageAspectRatioIntent
+} from "../../utils/imageAspectRatio.js";
+import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
 
 const { mimeTypes, FormData } = dependencies;
 const DEFAULT_CHAT_IMAGE_URL = 'https://api.openai.com/v1/chat/completions';
 const IMAGE_GENERATION_TIMEOUT_MS = 120000;
-const IMAGE_GENERATION_PROGRESS_MESSAGES = [
-  "这个画面有点怪可爱的，我先试着画画看…别笑我画歪啊。",
-  "唔，我大概有画面了，先让我折腾一下，画坏了不许立刻笑我。",
-  "这个点子还挺有意思的，我试试能不能画出那种感觉。",
-  "我先画画看，感觉会有点难，但应该能整出个像样的。"
-];
-const REFERENCE_IMAGE_PROGRESS_MESSAGES = [
-  "图和要求我都看到了，我先照着这个画，等我一下。",
-  "参考图收到啦，我先顺着这个感觉画，别急着催我哦。",
-  "嗯，图里的重点我看到了，我先按你的要求改成一张新的。",
-  "这几张我先对着看一下，然后照你说的画，稍等我一会儿。"
-];
 const IMAGE_GENERATION_DONE_MESSAGES = [
   "画出来啦，你先看看这版像不像你想的那种感觉。",
   "这张先给你看，我感觉还行，但细节可能有点跑。",
@@ -50,8 +45,26 @@ const DRAW_QUEUE_PREFIX = "ytbot:image_draw_queue:";
 const DRAW_JOB_TTL_SECONDS = 24 * 60 * 60;
 const imageGenerationScopes = new Map();
 
+function isReferenceGeneration(opts = {}) {
+  return ["member_avatar", "style_reference", "character_reference"].includes(
+    String(opts?.referencePurpose || "").trim().toLowerCase()
+  );
+}
+
+function isTransportDisplayName(name = "") {
+  return /^\s*\[(?:有人@我|回复|转发|引用)/.test(String(name || ""));
+}
+
+function imageResponseTimeoutError(timeoutMs, { completeResponse = false } = {}) {
+  const seconds = Math.max(1, Math.ceil(Number(timeoutMs) / 1000));
+  return new Error(`图片接口超过 ${seconds} 秒没有返回${completeResponse ? "完整响应" : "结果"}`);
+}
+
 export class BananaTool extends AbstractTool {
-  constructor() {
+  constructor({
+    progressFetchImpl = globalThis.fetch,
+    progressReplyFactory = generateContextualProgressReply
+  } = {}) {
     super();
     this.name = 'bananaTool';
     this.description = '根据提示词生成或编辑图片；可按用户明确指定的已配置图片渠道执行';
@@ -72,11 +85,21 @@ export class BananaTool extends AbstractTool {
         provider: {
           type: 'string',
           description: '仅当用户明确说“用/指定某个渠道或模型画”时填写其原始名称，例如 Grok；未指定时不要填写'
+        },
+        aspectRatio: {
+          type: 'string',
+          description: '用户明确要求的画面比例或方向，例如 9:16、16:9、1:1、portrait、landscape、square；不要把它当作精确像素尺寸'
+        },
+        progressText: {
+          type: 'string',
+          description: '可选：结合当前绘图要求生成一句自然开场；必须符合真实任务类型，不能把文生图说成看图或改图'
         }
       },
       required: ['prompt'],
       additionalProperties: false
     };
+    this.progressFetchImpl = progressFetchImpl;
+    this.progressReplyFactory = progressReplyFactory;
   }
 
   async func(opts, e) {
@@ -84,7 +107,13 @@ export class BananaTool extends AbstractTool {
     if (!prompt) return "错误：绘图提示词（prompt）不能为空。";
     const config = this.loadConfig();
     const requestedProvider = this.resolveRequestedProvider(config, opts, e);
-    const effectiveOpts = requestedProvider ? { ...opts, provider: requestedProvider } : opts;
+    const aspectRatioIntent = this.resolveAspectRatioIntent(opts, e);
+    const { provider: _untrustedProvider, ...baseOpts } = opts || {};
+    const effectiveOpts = {
+      ...baseOpts,
+      ...(requestedProvider ? { provider: requestedProvider } : {}),
+      ...(aspectRatioIntent ? { aspectRatio: aspectRatioIntent.raw || aspectRatioIntent.orientation } : {})
+    };
 
     const job = {
       id: this.createDrawJobId(e),
@@ -116,7 +145,6 @@ export class BananaTool extends AbstractTool {
 
   async runDrawJob(job) {
     if (!job.id) job.id = this.createDrawJobId(job.e);
-    await this.persistDrawJob(job);
     const queueState = this.getDrawQueueState(job.scopeKey);
     queueState.activeTask = {
       jobId: job.id,
@@ -126,6 +154,8 @@ export class BananaTool extends AbstractTool {
       messageId: job.messageId || "",
       startedAt: Date.now()
     };
+    // 先占位再持久化。runNextQueuedDraw 不等待本任务，恢复扫描必须马上看见它在运行。
+    await this.persistDrawJob(job);
     await this.updateDrawTaskStatus(job, "running", "图片正在生成中");
 
     try {
@@ -279,7 +309,9 @@ export class BananaTool extends AbstractTool {
       requesterId: record.requesterId || record.userId || e.user_id || "",
       messageId: record.messageId || "",
       queuedAt: record.queuedAt || Date.now(),
-      notifyFailure: Boolean(record.notifyFailure),
+      // The original Agent call is gone after a process restart, so a recovered
+      // job must deliver its own terminal failure instead of only writing status.
+      notifyFailure: true,
       skipProgressNotice: true,
       recovered: true
     };
@@ -467,11 +499,14 @@ export class BananaTool extends AbstractTool {
     // 处理图片
     const rawImageList = this.normalizeArray(rawImages);
     const hasReferenceImages = rawImageList.length > 0;
+    const referenceGeneration = hasReferenceImages && isReferenceGeneration(opts);
+    const operationLabel = referenceGeneration || !hasReferenceImages ? "图片生成" : "图片编辑";
     const images = await normalizeImageUrls(rawImageList);
     const requestedProvider = this.resolveRequestedProvider(config, opts, e);
     let imageGenerationConfigs = this.resolveImageGenerationConfigs(config);
     let imageEditConfigs = this.resolveImageEditConfigs(config);
     const finalPrompt = String(prompt || "").trim();
+    const aspectRatioIntent = this.resolveAspectRatioIntent(opts, e);
     const { imageEditApiUrl: apiUrl, imageEditApiKey: apiKey, imageEditApiModel: model } =
       config.imageEditAiConfig || {};
     const requestedChatEdit = Boolean(
@@ -496,25 +531,43 @@ export class BananaTool extends AbstractTool {
     } catch (error) {
       return { error: `图片生成失败: ${error.message}` };
     }
-    if (hasReferenceImages && !images.length) {
-      return { error: '图片编辑失败: 未检测到有效的图片链接' };
+    imageGenerationConfigs = applyImageAspectRatioToConfigs(imageGenerationConfigs, aspectRatioIntent, {
+      operation: "generate"
+    });
+    imageEditConfigs = applyImageAspectRatioToConfigs(imageEditConfigs, aspectRatioIntent, {
+      operation: "edit"
+    });
+    const activeConfigs = hasReferenceImages ? imageEditConfigs : imageGenerationConfigs;
+    if (activeConfigs.length) {
+      const sizes = activeConfigs.map(item => `${item.name || item.model}:${item.size || "provider-default"}`).join(",");
+      this.logInfo(`[图片比例] intent=${describeImageAspectRatioIntent(aspectRatioIntent)} operation=${hasReferenceImages ? "edit" : "generate"} sizes=${sizes}`);
     }
-    if (!options.skipProgressNotice) {
-      await this.sendProgress(e, this.getProgressMessage({ hasReferenceImages }));
+    if (hasReferenceImages && !images.length) {
+      return { error: `${operationLabel}失败: 未检测到有效的图片链接` };
     }
     if (!finalPrompt) return { error: '图片生成失败: 绘图提示词为空' };
+    let progressController = null;
+    if (!options.skipProgressNotice) {
+      progressController = new AbortController();
+      void Promise.resolve(this.sendProgress(e, {
+        config,
+        opts,
+        hasReferenceImages,
+        signal: progressController.signal
+      })).catch(error => this.logWarn(`[图片进度提示] 生成或发送异常: ${error?.message || error}`));
+    }
 
     try {
       if (!hasReferenceImages && imageGenerationConfigs.length) {
         const generatedImage = await this.generateImage(imageGenerationConfigs, finalPrompt);
-        await this.replyImageToRequester(e, generatedImage);
+        await this.replyImageToRequester(e, generatedImage, { aspectRatioIntent });
         return '图片生成成功';
       }
 
       if (hasReferenceImages && imageEditConfigs.length) {
         const editedImage = await this.generateImageEdit(imageEditConfigs, finalPrompt, images);
-        await this.replyImageToRequester(e, editedImage);
-        return '图片编辑成功';
+        await this.replyImageToRequester(e, editedImage, { aspectRatioIntent });
+        return referenceGeneration ? '图片生成成功' : '图片编辑成功';
       }
 
       const imgurls = await this.buildImageMessages(finalPrompt, images);
@@ -538,14 +591,20 @@ export class BananaTool extends AbstractTool {
       const processedUrl = this.extractImageUrl(imageUrl);
 
       if (processedUrl) {
-        await this.replyImageToRequester(e, processedUrl);
-        return '图片编辑成功';
+        await this.replyImageToRequester(e, processedUrl, { aspectRatioIntent });
+        return referenceGeneration ? '图片生成成功' : '图片编辑成功';
       }
-      return { error: '图片编辑失败' };
+      return { error: `${operationLabel}失败` };
     } catch (error) {
-      const operationLabel = hasReferenceImages ? '图片编辑' : '图片生成';
       console.error(`${operationLabel}失败`, error);
-      return { error: `${operationLabel}失败: ${error.message}` };
+      const detail = referenceGeneration
+        ? String(error?.message || error)
+            .replace(/^图片编辑失败[:：]\s*/i, "")
+            .replace(/图片编辑通道/g, "外观参考通道")
+        : error.message;
+      return { error: `${operationLabel}失败: ${detail}` };
+    } finally {
+      progressController?.abort?.();
     }
   }
 
@@ -557,12 +616,37 @@ export class BananaTool extends AbstractTool {
   }
 
   resolveRequestedProvider(config = {}, opts = {}, e = {}) {
-    const sourceText = [e?.msg, e?.raw_message, opts?.prompt].filter(Boolean).join("\n");
+    const directUserText = [e?.msg, e?.raw_message].filter(Boolean).join("\n");
+    const sourceText = directUserText || opts?.prompt || "";
     return resolveRequestedImageProvider(config, sourceText, opts?.provider);
   }
 
+  normalizeParameters(params = {}, context = {}) {
+    const normalized = super.normalizeParameters(params, context);
+    const directUserText = [
+      context?.userText,
+      context?.currentIntentText,
+      context?.event?.msg,
+      context?.event?.raw_message
+    ].filter(Boolean).join("\n");
+    const sourceText = directUserText || normalized.prompt || "";
+    let config = {};
+    try {
+      config = this.loadConfig();
+    } catch {}
+    return normalizeImageProviderParameter(normalized, config, sourceText);
+  }
+
+  resolveAspectRatioIntent(opts = {}, e = {}) {
+    const sourceText = [e?.msg, e?.raw_message, opts?.prompt].filter(Boolean).join("\n");
+    return resolveImageAspectRatioIntent(sourceText, opts?.aspectRatio);
+  }
+
   getRequesterDisplayName(e) {
-    return String(e?.sender?.card || e?.sender?.nickname || e?.nickname || e?.user_id || "别人")
+    const card = String(e?.sender?.card || "").trim();
+    const nickname = String(e?.sender?.nickname || e?.nickname || "").trim();
+    const displayName = !isTransportDisplayName(card) ? card : nickname;
+    return String(displayName || e?.user_id || "别人")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 24);
@@ -661,19 +745,20 @@ export class BananaTool extends AbstractTool {
 
   buildImageGenerationPayload(imageGenerationConfig, prompt, responseFormat = "") {
     if (/^grok-imagine-image(?:-edit)?$/i.test(String(imageGenerationConfig.model || "").trim())) {
-      return {
+      const payload = {
         model: imageGenerationConfig.model,
         prompt,
-        size: imageGenerationConfig.size,
         quality: imageGenerationConfig.quality || "high"
       };
+      if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size;
+      return payload;
     }
     const payload = {
       model: imageGenerationConfig.model,
       prompt,
-      n: 1,
-      size: imageGenerationConfig.size,
+      n: 1
     };
+    if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size;
     if (responseFormat) payload.response_format = responseFormat;
     return payload;
   }
@@ -769,9 +854,32 @@ export class BananaTool extends AbstractTool {
     return shouldRetryWithoutUrlResponseFormat(errorMessage);
   }
 
-  async sendProgress(e, message) {
+  resolveProgressContext(opts = {}, hasReferenceImages = false) {
+    const referencePurpose = String(opts?.referencePurpose || "").trim().toLowerCase();
+    const taskMode = hasReferenceImages ? "reference_generation" : "image_generation";
+    return {
+      taskType: referencePurpose === "member_avatar" ? "群友形象图片生成" : "图片生成",
+      taskMode,
+      stage: hasReferenceImages
+        ? "正在按用户描述生成一张新图，参考素材只用于外观或风格，尚未得到成图"
+        : "正在按用户描述生成一张新图，尚未得到成图"
+    };
+  }
+
+  async sendProgress(e, { config = {}, opts = {}, hasReferenceImages = false, signal } = {}) {
     try {
-      if (!e?.reply || !message) return false;
+      if (!e?.reply || signal?.aborted) return false;
+      const progress = this.resolveProgressContext(opts, hasReferenceImages);
+      const message = await this.progressReplyFactory({
+        config,
+        ...progress,
+        userText: e?.msg || e?.raw_message || opts?.prompt || "生成一张图片",
+        suggestedText: opts?.progressText,
+        agentContext: opts?.agentContext,
+        fetchImpl: this.progressFetchImpl,
+        signal
+      });
+      if (!message || signal?.aborted) return false;
       const guardedMessage = personaFeedbackManager.guardReply(message, pluginBridge.instance?.config?.personaGuard, {
         userText: e?.msg || "",
         botNames: [e?.bot?.nickname, pluginBridge.instance?.config?.persona?.name]
@@ -790,11 +898,6 @@ export class BananaTool extends AbstractTool {
     }
   }
 
-  getProgressMessage({ hasReferenceImages = false } = {}) {
-    const messages = hasReferenceImages ? REFERENCE_IMAGE_PROGRESS_MESSAGES : IMAGE_GENERATION_PROGRESS_MESSAGES;
-    return messages[Math.floor(Math.random() * messages.length)];
-  }
-
   getDoneMessage() {
     return IMAGE_GENERATION_DONE_MESSAGES[
       Math.floor(Math.random() * IMAGE_GENERATION_DONE_MESSAGES.length)
@@ -810,8 +913,14 @@ export class BananaTool extends AbstractTool {
     return { type: "at", qq: userId };
   }
 
-  async replyImageToRequester(e, image) {
+  async replyImageToRequester(e, image, context = {}) {
     const imageBuffer = await resolveImageBuffer(image);
+    const metadata = await getImageBufferMetadata(imageBuffer);
+    if (metadata?.width && metadata?.height) {
+      this.logInfo(`[图片产物] requested=${describeImageAspectRatioIntent(context.aspectRatioIntent)} actual=${metadata.width}x${metadata.height} format=${metadata.format || "unknown"}`);
+    } else {
+      this.logWarn("[图片产物] 无法读取实际宽高，将继续发送原始产物");
+    }
     const atSegment = this.buildRequesterAtSegment(e);
     const doneMessage = this.getDoneMessage();
     const attempts = [];
@@ -829,7 +938,7 @@ export class BananaTool extends AbstractTool {
         if (this.isReplySendFailed(replyResult)) {
           throw new Error(this.formatReplySendFailure(replyResult));
         }
-        return;
+        return metadata;
       } catch (error) {
         lastError = error;
         this.logWarn(`[图片发送] 发送尝试失败: ${error.message}`);
@@ -850,17 +959,47 @@ export class BananaTool extends AbstractTool {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(url, {
+      const response = await fetch(url, {
         ...options,
         signal: controller.signal
       });
+      const readText = response?.text;
+      if (typeof readText !== "function") {
+        clearTimeout(timer);
+        return response;
+      }
+
+      let timerCleared = false;
+      const clearTimer = () => {
+        if (timerCleared) return;
+        timerCleared = true;
+        clearTimeout(timer);
+      };
+      const readTimedText = async () => {
+        try {
+          return await readText.call(response);
+        } catch (error) {
+          if (controller.signal.aborted) throw imageResponseTimeoutError(timeoutMs, { completeResponse: true });
+          throw error;
+        } finally {
+          clearTimer();
+        }
+      };
+
+      // Keep the abort timer alive until the body is fully consumed. A provider can
+      // send response headers then stall forever while `response.text()` waits.
+      return new Proxy(response, {
+        get(target, property) {
+          if (property === "text") return readTimedText;
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+      });
     } catch (error) {
       if (error?.name === "AbortError") {
-        throw new Error(`图片接口超过 ${Math.round(timeoutMs / 1000)} 秒没有返回`);
+        throw imageResponseTimeoutError(timeoutMs);
       }
       throw error;
-    } finally {
-      clearTimeout(timer);
     }
   }
 

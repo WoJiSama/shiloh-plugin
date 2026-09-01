@@ -11,7 +11,7 @@ const EXPLICIT_EMOJI_REQUEST_PATTERNS = [
 ]
 
 const CASUAL_EMOJI_REACTION_PATTERNS = [
-  /笑死|笑不活|绷不住|蚌埠住|太逗|会谢|绝了|真行啊|还真敢|离谱|无语|好怪|尴尬|社死|破防|认怂|装无辜|害羞|得意|救命|乐死|乐疯|哈哈哈+|嘿嘿嘿+/i,
+  /笑死|笑不活|绷不住|蚌埠住|太逗|会谢|绝了|真行啊|还真敢|离谱|无语|好怪|尴尬|社死|破防|认怂|装无辜|害羞|得意|救命|乐死|乐疯|哈哈哈+|哈哈+|嘿嘿嘿+|卧槽|我超|666|寄了|急了|典中典|好好好/i,
   /不是吧|真的假的|逆天|我服了|什么鬼|看傻|傻眼|看懵|懵了/i,
   /困死|累死|不想动|烦死|气死|裂开|崩溃|委屈死/i,
   /脚趾.{0,12}(?:三室一厅|抠地)|可怜巴巴|好耶|太好了|牛啊|哼[，,。！？!?~～\s]/i,
@@ -19,6 +19,51 @@ const CASUAL_EMOJI_REACTION_PATTERNS = [
   /(?:^|[，,。！？!?~～\s])(?:摸摸|抱抱|贴贴)(?:我|你|他|她|一下|吧|嘛|呀|$|[，,。！？!?~～\s])/i,
   /(?:安慰一下我|哄哄我|哄我一下)/i,
   /(?:^|[，,。！!~～\s])啊[?？](?:$|[，,。！？!?~～\s])/i
+]
+
+// 这些短反应一张表情包就能完整表达。仅在已排除任务、提问和严肃内容后使用，
+// 避免表情包成为对正式消息的机械前缀或尾缀。
+const FORCED_REACTION_EMOJI_RULES = [
+  {
+    pattern: /笑死|笑不活|绷不住|蚌埠住|太逗|会谢|乐死|乐疯|哈哈+|嘿嘿+/i,
+    tags: ["笑死", "吐槽"],
+    useCases: ["接梗吐槽"]
+  },
+  {
+    pattern: /离谱|无语|逆天|我服了|什么鬼|看傻|傻眼|看懵|懵了|卧槽|我超|典中典/i,
+    tags: ["无语", "震惊", "吐槽"],
+    useCases: ["无言以对", "看到离谱"]
+  },
+  {
+    pattern: /尴尬|社死|脚趾.{0,12}(?:三室一厅|抠地)/i,
+    tags: ["尴尬", "无奈"],
+    useCases: ["场面尴尬"]
+  },
+  {
+    pattern: /破防|委屈死|可怜巴巴|装无辜/i,
+    tags: ["委屈", "破防", "无辜"],
+    useCases: ["委屈诉苦", "装可怜"]
+  },
+  {
+    pattern: /认怂|求饶|救命|寄了|急了/i,
+    tags: ["认怂", "无奈"],
+    useCases: ["认怂求饶"]
+  },
+  {
+    pattern: /困死|累死|不想动|烦死|气死|裂开|崩溃|摆烂/i,
+    tags: ["疲惫", "摆烂", "崩溃"],
+    useCases: ["累到躺平"]
+  },
+  {
+    pattern: /(?:^|[，,。！？!?~～\s])(?:摸摸|抱抱|贴贴)(?:我|你|他|她|一下|吧|嘛|呀|$|[，,。！？!?~～\s])|安慰一下我|哄哄我|哄我一下/i,
+    tags: ["安慰", "委屈"],
+    useCases: ["安慰对方", "接梗摸头"]
+  },
+  {
+    pattern: /好耶|太好了|牛啊|666|得意|好好好/i,
+    tags: ["开心", "得意"],
+    useCases: ["分享快乐", "被人夸奖"]
+  }
 ]
 
 const SERIOUS_OR_OPERATIONAL_PATTERNS = [
@@ -59,6 +104,17 @@ export function classifyEmojiToolExposure(text = "") {
 
 export function shouldExposeEmojiToolForMessage(text = "") {
   return classifyEmojiToolExposure(text) !== "none"
+}
+
+export function resolveForcedReactionEmoji(text = "") {
+  const content = normalizeEmojiIntentText(text)
+  if (classifyEmojiToolExposure(content) !== "casual_reaction") return null
+  const matched = FORCED_REACTION_EMOJI_RULES.find(rule => rule.pattern.test(content))
+  if (!matched) return null
+  return {
+    tags: [...matched.tags],
+    useCases: [...matched.useCases]
+  }
 }
 
 export function filterToolsForEmojiExposure(tools = [], text = "") {

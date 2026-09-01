@@ -3,6 +3,11 @@ import { TakeImages } from "../utils/fileUtils.js"
 import common from "../../../lib/common/common.js"
 import fs from "fs"
 import path from "path"
+import { buildVisibleFailureDetail } from "../utils/visibleFailure.js"
+
+function formatOperationFailure(error, fallback) {
+  return error ? buildVisibleFailureDetail(error, { fallback }) : fallback
+}
 
 async function fetchImageBuffer(url, timeoutMs = 15000) {
   const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
@@ -67,7 +72,7 @@ export class EmojiPackPlugin extends plugin {
         const item = items.find(i => i.hash === hash) || null
         results.push({ hash, item })
       } catch (err) {
-        results.push({ hash: null, item: null, error: err.message })
+        results.push({ hash: null, item: null, error: buildVisibleFailureDetail(err, { fallback: "图片下载或读取失败" }) })
       }
     }
     return { ok: true, results }
@@ -92,10 +97,10 @@ export class EmojiPackPlugin extends plugin {
       too_small: `图片尺寸过小 (${r.width}×${r.height}<96px)`,
       too_large_dim: `图片尺寸过大 (${r.width}×${r.height}>1500px)`,
       extreme_aspect: `极端纵横比 (${r.ratio})`,
-      metadata_failed: `图片解析失败: ${r.error || ""}`,
-      content_filtered: `内容审查拒绝: ${r.filterReason || ""}`,
-      content_filter_error: `内容审查异常: ${r.error || ""}`,
-      tag_failed: `VLM 打标失败: ${r.error || ""}`,
+      metadata_failed: `图片解析失败: ${formatOperationFailure(r.error, "无法读取图片内容")}`,
+      content_filtered: `内容审查拒绝: ${formatOperationFailure(r.filterReason, "未通过内容审查")}`,
+      content_filter_error: `内容审查异常: ${formatOperationFailure(r.error, "内容审查服务没有返回结果")}`,
+      tag_failed: `VLM 打标失败: ${formatOperationFailure(r.error, "打标服务没有返回结果")}`,
       tag_blacklist: `tag 命中黑名单 [${(r.hitTags || []).join(",")}]`,
       unsupported_format: "不支持的图片格式"
     }[r.reason] || `未知原因: ${r.reason}`)
@@ -117,7 +122,7 @@ export class EmojiPackPlugin extends plugin {
           results.push(`❌ ${rejectReasonText(result)}`)
         }
       } catch (err) {
-        results.push(`❌ 下载/处理失败: ${err.message}`)
+        results.push(`❌ 下载/处理失败: ${buildVisibleFailureDetail(err)}`)
       }
     }
 
@@ -198,7 +203,7 @@ export class EmojiPackPlugin extends plugin {
       if (prefix.length < 4) return e.reply("请提供至少 4 位的 hash 前缀")
       e.reply("正在重新打标...")
       const result = await emojiPackManager.retagByHashPrefix(prefix)
-      if (!result.updated) return e.reply(`打标失败: ${result.error || "未找到匹配的表情包"}`)
+      if (!result.updated) return e.reply(`打标失败: ${formatOperationFailure(result.error, "未找到匹配的表情包")}`)
       const tags = (result.item.tags || []).join(",") || "无标签"
       const useCases = (result.item.useCases || []).join(",") || "无场景"
       return e.reply(`已更新 ${result.item.hash.slice(0, 8)}\n标签: ${tags}\n场景: ${useCases}\n描述: ${result.item.description || "(无)"}`)
@@ -218,7 +223,7 @@ export class EmojiPackPlugin extends plugin {
         const useCaseInfo = (result.item?.useCases || []).join(",") || "无场景"
         lines.push(`✅ ${hash.slice(0, 8)}\n标签: ${tagInfo}\n场景: ${useCaseInfo}\n描述: ${result.item?.description || "(无)"}`)
       } else {
-        lines.push(`❌ 打标失败 ${hash.slice(0, 8)}: ${result.error || "未知"}`)
+        lines.push(`❌ 打标失败 ${hash.slice(0, 8)}: ${formatOperationFailure(result.error, "没有返回可用标签")}`)
       }
     }
     await sendForward(e, ["打标结果", ...lines], "表情包打标")
@@ -292,7 +297,7 @@ export class EmojiPackPlugin extends plugin {
       const item = items.find(i => i.hash.startsWith(prefix.toLowerCase()))
       if (!item) return e.reply(`未找到 hash 以 ${prefix} 开头的表情包`)
       const abs = emojiPackManager.getAbsoluteFilePath(item)
-      if (!fs.existsSync(abs)) return e.reply(`文件丢失: ${abs}`)
+      if (!fs.existsSync(abs)) return e.reply("对应的表情包文件已丢失")
       const tags = (item.tags || []).join(",") || "无标签"
       const useCases = (item.useCases || []).join(",") || "无场景"
       await e.reply([
@@ -366,7 +371,7 @@ export class EmojiPackPlugin extends plugin {
       ]
       e.reply(lines.join("\n"))
     } catch (err) {
-      e.reply(`巡检失败: ${err.message}`)
+      e.reply(`巡检失败: ${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -403,7 +408,7 @@ export class EmojiPackPlugin extends plugin {
       emojiPackManager.recentSendsByGroup.clear()
       return e.reply(`✅ 表情包库已清空（删除 ${deletedFiles} 张图片文件），下次收图按强化过滤入库`)
     } catch (err) {
-      return e.reply(`清空失败: ${err.message}`)
+      return e.reply(`清空失败: ${buildVisibleFailureDetail(err)}`)
     }
   }
 }

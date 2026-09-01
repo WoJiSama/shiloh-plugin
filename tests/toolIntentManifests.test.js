@@ -9,6 +9,7 @@ import {
 import {
   classifyEmojiToolExposure,
   filterToolsForEmojiExposure,
+  resolveForcedReactionEmoji,
   shouldExposeEmojiToolForMessage
 } from "../utils/emojiToolPolicy.js"
 
@@ -79,6 +80,20 @@ test("selects common tool manifests from natural language", () => {
     ),
     ["modrinthTool"]
   )
+  assert.deepEqual(
+    selectToolIntentCandidates(
+      "希洛告诉我mc排行榜前10的冒险模组",
+      ["modrinthTool", "searchInformationTool"]
+    ),
+    ["modrinthTool"]
+  )
+  assert.deepEqual(
+    selectToolIntentCandidates(
+      "希洛告诉我名字里面带有 nrg 的mc模组",
+      ["modrinthTool", "searchInformationTool"]
+    ),
+    ["modrinthTool"]
+  )
   assert.match(buildToolIntentDisclosure(["modrinthTool"]), /中文翻译（希洛）/)
   assert.deepEqual(
     selectToolIntentCandidates(
@@ -99,6 +114,27 @@ test("selects common tool manifests from natural language", () => {
 test("uses deterministic fast paths only when one safe tool has complete parameters", () => {
   assert.deepEqual(
     resolveDeterministicToolIntent(
+      "magnet:?xt=urn:btih:AF4B684892182408E4AE9DF0C8FFE9E49CCBF171",
+      ["torrentDownloadTool"]
+    ),
+    {
+      intent: "tool",
+      toolName: "torrentDownloadTool",
+      params: { magnet: "magnet:?xt=urn:btih:AF4B684892182408E4AE9DF0C8FFE9E49CCBF171" },
+      reason: "deterministic_manifest"
+    }
+  )
+  assert.deepEqual(
+    resolveDeterministicToolIntent("下载第2个, 3", ["torrentDownloadTool"]),
+    {
+      intent: "tool",
+      toolName: "torrentDownloadTool",
+      params: { selection: [2, 3] },
+      reason: "deterministic_manifest"
+    }
+  )
+  assert.deepEqual(
+    resolveDeterministicToolIntent(
       "查一下 Modrinth 1.21.1 Fabric 下载量前五的优化模组",
       ["modrinthTool", "searchInformationTool"]
     ),
@@ -106,6 +142,30 @@ test("uses deterministic fast paths only when one safe tool has complete paramet
       intent: "tool",
       toolName: "modrinthTool",
       params: { sort: "downloads", limit: 5, gameVersion: "1.21.1", loader: "fabric", category: "optimization", query: "" },
+      reason: "deterministic_manifest"
+    }
+  )
+  assert.deepEqual(
+    resolveDeterministicToolIntent(
+      "希洛告诉我mc排行榜前10的冒险模组",
+      ["modrinthTool", "searchInformationTool"]
+    ),
+    {
+      intent: "tool",
+      toolName: "modrinthTool",
+      params: { sort: "downloads", limit: 10, gameVersion: "", loader: "", category: "adventure", query: "" },
+      reason: "deterministic_manifest"
+    }
+  )
+  assert.deepEqual(
+    resolveDeterministicToolIntent(
+      "希洛告诉我名字里面带有 nrg 的mc模组",
+      ["modrinthTool", "searchInformationTool"]
+    ),
+    {
+      intent: "tool",
+      toolName: "modrinthTool",
+      params: { sort: "relevance", limit: 5, gameVersion: "", loader: "", category: "", query: "nrg" },
       reason: "deterministic_manifest"
     }
   )
@@ -218,6 +278,24 @@ test("casual emoji exposure only keeps sendLocalEmojiTool", () => {
     [tools[0]]
   )
   assert.deepEqual(filterToolsForEmojiExposure(tools, "普通聊天"), [tools[0]])
+})
+
+test("forces emoji-only replies for high-confidence short reactions", () => {
+  assert.deepEqual(resolveForcedReactionEmoji("绷不住了哈哈哈哈"), {
+    tags: ["笑死", "吐槽"],
+    useCases: ["接梗吐槽"]
+  })
+  assert.deepEqual(resolveForcedReactionEmoji("这也太离谱了"), {
+    tags: ["无语", "震惊", "吐槽"],
+    useCases: ["无言以对", "看到离谱"]
+  })
+  assert.deepEqual(resolveForcedReactionEmoji("抱抱我"), {
+    tags: ["安慰", "委屈"],
+    useCases: ["安慰对方", "接梗摸头"]
+  })
+  assert.equal(resolveForcedReactionEmoji("查一下这个离谱新闻"), null)
+  assert.equal(resolveForcedReactionEmoji("你觉得这个方案是不是很离谱"), null)
+  assert.equal(resolveForcedReactionEmoji("今天又下雨了"), null)
 })
 
 test("does not proactively expose emoji tool for serious or operational requests", () => {

@@ -9,10 +9,10 @@ import { buildAliasPrompt, buildEntityPrompt, buildGroupFactsPrompt, buildContex
 import { resolveMentions } from './memory/mentionResolver.js'
 import { Embeddings, cosineSimilarity } from './memory/embeddings.js'
 import { Reflector } from './memory/reflector.js'
-import { clamp, compactText, AUTHORITY_RANK } from './memory/constants.js'
+import { clamp, compactText, normalizeAlias, AUTHORITY_RANK } from './memory/constants.js'
 import { memStats } from './memory/stats.js'
 import { formatGroupWorkflowExecutionPrompt, selectRelevantGroupWorkflowRules } from './memory/groupWorkflow.js'
-import { findGroupKnowledgeDeletionCandidates, formatGroupKnowledgePrompt, parseSemanticGroupKnowledgeOutput, selectRelevantGroupKnowledge, shouldUseSemanticGroupKnowledgeExtraction } from './memory/groupKnowledge.js'
+import { describeGroupKnowledgeEntry, findGroupKnowledgeDeletionCandidates, formatGroupKnowledgePrompt, parseSemanticGroupMemoryOutput, selectRelevantGroupKnowledge } from './memory/groupKnowledge.js'
 
 const DAY_MS = 86400000
 
@@ -42,22 +42,57 @@ const DEFAULT_CONFIG = {
   maxGroupWorkflows: 50,
   workflowPromptMaxRules: 12,
   maxGroupKnowledge: 100,
-  knowledgePromptMaxEntries: 8
+  knowledgePromptMaxEntries: 8,
+  knowledgeDecisionTimeoutMs: 900,
+  knowledgeDecisionMaxTokens: 400,
+  knowledgeDecisionInlineWaitMs: 180
 }
 
 function nowMs() { return Date.now() }
 
-function membersFromContext(memberMap, text = '') {
+function membersFromContext(memberMap, { text = '', messageSegments = [], creatorQQ = '' } = {}) {
   if (!memberMap?.values) return []
   const query = String(text || '').toLowerCase()
+  const mentionedIds = new Set([String(creatorQQ || '')])
+  for (const segment of Array.isArray(messageSegments) ? messageSegments : []) {
+    if (segment?.type !== 'at') continue
+    const id = String(segment?.qq ?? segment?.user_id ?? segment?.data?.qq ?? segment?.data?.user_id ?? '').trim()
+    if (/^\d+$/.test(id)) mentionedIds.add(id)
+  }
   return Array.from(memberMap.values())
     .filter(member => member?.user_id)
     .filter(member => {
       const name = String(member.card || member.nickname || '').trim().toLowerCase()
-      return name.length >= 2 && query.includes(name)
+      return mentionedIds.has(String(member.user_id)) || (name.length >= 2 && query.includes(name))
     })
     .map(member => ({ userId: String(member.user_id), displayName: compactText(member.card || member.nickname || member.user_id, 80) }))
     .slice(0, 12)
+}
+
+function normalizeSharedKey(value = '') {
+  return String(value || '').toLowerCase().replace(/[\s，,。；;：:！!？?、@"“”']/g, '')
+}
+
+function uniqueNumericIds(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map(value => String(value || '').trim())
+    .filter(value => /^\d+$/.test(value)))]
+}
+
+function sameIdList(left = [], right = []) {
+  const a = uniqueNumericIds(left)
+  const b = uniqueNumericIds(right)
+  return a.length === b.length && a.every((value, index) => value === b[index])
+}
+
+function sharedRecordOwner(record = {}) {
+  return String(record?.createdBy || record?.by?.[0] || '').trim()
+}
+
+function mayChangeSharedRecord(record, requesterQQ, isGroupManager) {
+  const requester = String(requesterQQ || '').trim()
+  const owner = sharedRecordOwner(record)
+  return Boolean(isGroupManager || (requester && owner && requester === owner))
 }
 
 export class MemoryManager {
@@ -115,7 +150,7 @@ export class MemoryManager {
 
       for (const op of ops) {
         if (op.stream === 'alias') {
-          const res = upsertAlias(aliasDoc, { text: op.text, qq: op.qq, authority: op.authority, confidence: op.confidence, by: op.by, at: op.at })
+          const res = upsertAlias(aliasDoc, { text: op.text, qq: op.qq, authority: op.authority, confidence: op.confidence, by: op.by, createdBy: op.createdBy, sourceMessageId: op.sourceMessageId, proposalId: op.proposalId, at: op.at })
           if (res.changed) {
             aliasDoc = res.doc
             entities = this._ensureEntityAlias(entities, op)
@@ -353,7 +388,190 @@ export class MemoryManager {
     })
   }
 
-  // ---- 明确教学的群工作流（独立于普通事实，具备执行语义）----
+  // ---- 语义群记忆统一提交 ----
+  // 语义裁决只产出提案；这里才是唯一的共享状态写入口。一次队列内读取并写回三个
+  // 文档，确保 alias / knowledge / workflow 使用相同来源且不会发生跨文档的半覆盖。
+  async commitGroupMemoryDecision(groupId, decision = {}, context = {}) {
+    if (!this.config.enabled || !groupId) {
+      return { status: 'ignored', written: 0, knowledgeEntries: [], workflowRules: [], aliasMappings: [], rejected: [] }
+    }
+    const requesterQQ = String(context.requesterQQ || context.creatorQQ || '').trim()
+    const isGroupManager = context.isGroupManager === true
+    const sourceMessageId = String(context.sourceMessageId || '').trim()
+    const proposalId = compactText(context.proposalId || sourceMessageId || `proposal_${nowMs().toString(36)}_${Math.random().toString(36).slice(2, 8)}`, 120)
+    const at = Number(context.now) || nowMs()
+
+    return this.enqueueGroup(groupId, async () => {
+      const meta = await this.store.getMeta(groupId)
+      if (meta.disabled) {
+        return { status: 'ignored', written: 0, knowledgeEntries: [], workflowRules: [], aliasMappings: [], rejected: [{ reason: 'disabled' }] }
+      }
+
+      let [aliasDoc, knowledge, workflows] = await Promise.all([
+        this.store.getAlias(groupId),
+        this.store.getKnowledge(groupId),
+        this.store.getWorkflows(groupId)
+      ])
+      const nextKnowledge = Array.isArray(knowledge) ? [...knowledge] : []
+      const nextWorkflows = Array.isArray(workflows) ? [...workflows] : []
+      let nextAliasDoc = { ...(aliasDoc || {}) }
+      const knowledgeEntries = []
+      const workflowRules = []
+      const aliasMappings = []
+      const rejected = []
+      let knowledgeChanged = false
+      let workflowsChanged = false
+      let aliasesChanged = false
+
+      for (const raw of Array.isArray(decision?.knowledgeEntries) ? decision.knowledgeEntries : []) {
+        const kind = ['group_file', 'member_set', 'member_definition'].includes(raw?.kind) ? raw.kind : ''
+        const subject = compactText(raw?.subject, 80)
+        const subjectKey = compactText(raw?.subjectKey || normalizeSharedKey(subject), 120)
+        const targetUserIds = uniqueNumericIds(raw?.targetUserIds)
+        const resource = kind === 'group_file' && raw?.resource?.fileName
+          ? {
+              fileName: compactText(raw.resource.fileName, 180),
+              fileId: compactText(raw.resource.fileId, 180),
+              folderPath: compactText(raw.resource.folderPath, 240),
+              origin: compactText(raw.resource.origin, 40)
+            }
+          : null
+        if (!kind || !subject || !subjectKey || (kind === 'group_file' ? !resource : !targetUserIds.length)) {
+          rejected.push({ kind: 'knowledge', subject, reason: 'invalid' })
+          continue
+        }
+        const targetsById = new Map((Array.isArray(raw?.targets) ? raw.targets : []).map(item => [String(item?.userId || ''), item]))
+        const entry = {
+          id: '', kind, subject, subjectKey,
+          aliases: [...new Set((Array.isArray(raw?.aliases) ? raw.aliases : [subject]).map(value => compactText(value, 80)).filter(Boolean))],
+          ownerQQ: /^\d+$/.test(String(raw?.ownerQQ || '')) ? String(raw.ownerQQ) : '',
+          ownerDisplay: compactText(raw?.ownerDisplay, 80),
+          targetUserIds,
+          targets: targetUserIds.map(userId => ({ userId, displayName: compactText(targetsById.get(userId)?.displayName || userId, 80) })),
+          resource,
+          sourceText: compactText(raw?.sourceText || context.text, 300),
+          sourceMessageId,
+          proposalId,
+          createdBy: requesterQQ,
+          at,
+          updatedAt: at,
+          enabled: raw?.enabled !== false
+        }
+        const index = nextKnowledge.findIndex(item => item?.kind === kind && item?.subjectKey === subjectKey &&
+          (kind !== 'group_file' || String(item?.ownerQQ || '') === entry.ownerQQ))
+        if (index >= 0) {
+          const existing = nextKnowledge[index]
+          const sameTargets = sameIdList(existing?.targetUserIds, entry.targetUserIds)
+          const sameResource = kind !== 'group_file' || String(existing?.resource?.fileId || existing?.resource?.fileName || '') === String(entry.resource?.fileId || entry.resource?.fileName || '')
+          if (sameTargets && sameResource) {
+            knowledgeEntries.push(existing)
+            continue
+          }
+          if (!mayChangeSharedRecord(existing, requesterQQ, isGroupManager)) {
+            rejected.push({ kind: 'knowledge', subject, reason: 'conflict' })
+            continue
+          }
+          entry.id = String(existing.id || `knowledge_${nowMs().toString(36)}_${index}`)
+          entry.at = Number(existing.at) || entry.at
+          nextKnowledge[index] = entry
+        } else {
+          entry.id = `knowledge_${nowMs().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+          nextKnowledge.push(entry)
+        }
+        knowledgeChanged = true
+        knowledgeEntries.push(entry)
+      }
+
+      for (const raw of Array.isArray(decision?.workflowRules) ? decision.workflowRules : []) {
+        const condition = compactText(raw?.condition, 120)
+        const conditionKey = compactText(raw?.conditionKey || normalizeSharedKey(condition), 160)
+        const targetUserIds = uniqueNumericIds(raw?.targetUserIds)
+        if (!condition || !conditionKey || !targetUserIds.length || raw?.kind !== 'mention_members') {
+          rejected.push({ kind: 'workflow', condition, reason: 'invalid' })
+          continue
+        }
+        if (!isGroupManager) {
+          rejected.push({ kind: 'workflow', condition, reason: 'unauthorized' })
+          continue
+        }
+        const targetsById = new Map((Array.isArray(raw?.targets) ? raw.targets : []).map(item => [String(item?.userId || ''), item]))
+        const rule = {
+          id: '', kind: 'mention_members', condition, conditionKey, targetUserIds,
+          targets: targetUserIds.map(userId => ({ userId, displayName: compactText(targetsById.get(userId)?.displayName || userId, 80) })),
+          sourceText: compactText(raw?.sourceText || context.text, 300), sourceMessageId, proposalId,
+          createdBy: requesterQQ, at, updatedAt: at, enabled: raw?.enabled !== false
+        }
+        const index = nextWorkflows.findIndex(item => item?.kind === rule.kind && item?.conditionKey === rule.conditionKey)
+        if (index >= 0) {
+          const existing = nextWorkflows[index]
+          if (sameIdList(existing?.targetUserIds, rule.targetUserIds)) {
+            workflowRules.push(existing)
+            continue
+          }
+          // 管理员可更新任意工作流；普通成员在上面已经被拒绝。
+          rule.id = String(existing.id || `wf_${nowMs().toString(36)}_${index}`)
+          rule.at = Number(existing.at) || rule.at
+          nextWorkflows[index] = rule
+        } else {
+          rule.id = `wf_${nowMs().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+          nextWorkflows.push(rule)
+        }
+        workflowsChanged = true
+        workflowRules.push(rule)
+      }
+
+      for (const raw of Array.isArray(decision?.aliasMappings) ? decision.aliasMappings : []) {
+        const alias = compactText(raw?.alias, 64)
+        const targetQQ = String(raw?.targetUserId || raw?.targetQQ || '').trim()
+        const key = normalizeAlias(alias)
+        if (!alias || !key || !/^\d+$/.test(targetQQ)) {
+          rejected.push({ kind: 'alias', alias, reason: 'invalid' })
+          continue
+        }
+        const existing = nextAliasDoc[key]
+        if (existing && String(existing.qq || '') === targetQQ) {
+          aliasMappings.push({ alias, targetUserId: targetQQ, existing: true })
+          continue
+        }
+        if (existing && !mayChangeSharedRecord(existing, requesterQQ, isGroupManager)) {
+          rejected.push({ kind: 'alias', alias, reason: 'conflict' })
+          continue
+        }
+        const res = upsertAlias(nextAliasDoc, {
+          text: alias, qq: targetQQ, authority: 'teaching', confidence: 0.95,
+          by: [requesterQQ], createdBy: requesterQQ, sourceMessageId, proposalId, at
+        })
+        if (!res.changed) {
+          rejected.push({ kind: 'alias', alias, reason: 'protected' })
+          continue
+        }
+        nextAliasDoc = res.doc
+        aliasesChanged = true
+        aliasMappings.push({ alias, targetUserId: targetQQ })
+      }
+
+      if (knowledgeChanged) {
+        const max = Math.max(1, Number(this.config.maxGroupKnowledge) || 100)
+        nextKnowledge.sort((a, b) => Number(b.updatedAt || b.at || 0) - Number(a.updatedAt || a.at || 0))
+        await this.store.saveKnowledge(groupId, nextKnowledge.slice(0, max))
+      }
+      if (workflowsChanged) {
+        const max = Math.max(1, Number(this.config.maxGroupWorkflows) || 50)
+        nextWorkflows.sort((a, b) => Number(b.updatedAt || b.at || 0) - Number(a.updatedAt || a.at || 0))
+        await this.store.saveWorkflows(groupId, nextWorkflows.slice(0, max))
+      }
+      if (aliasesChanged) await this.store.saveAlias(groupId, nextAliasDoc)
+
+      const acceptedCount = knowledgeEntries.length + workflowRules.length + aliasMappings.length
+      return {
+        status: acceptedCount ? 'accepted' : (rejected.length ? 'rejected' : 'ignored'),
+        written: Number(knowledgeChanged) + Number(workflowsChanged) + Number(aliasesChanged),
+        knowledgeEntries, workflowRules, aliasMappings, rejected, proposalId, sourceMessageId
+      }
+    })
+  }
+
+  // ---- 明确教学的群工作流（兼容旧管理入口；新语义写入走 commitGroupMemoryDecision）----
   async upsertGroupWorkflowRules(groupId, rules = []) {
     if (!this.config.enabled || !Array.isArray(rules) || !rules.length) return { written: 0, rules: [] }
     return this.enqueueGroup(groupId, async () => {
@@ -383,6 +601,7 @@ export class MemoryManager {
           targetUserIds,
           targets,
           sourceText: compactText(raw?.sourceText, 300),
+          sourceMessageId: String(raw?.sourceMessageId || ''),
           createdBy: String(raw?.createdBy || ''),
           at: Number(raw?.at) || nowMs(),
           updatedAt: nowMs(),
@@ -455,6 +674,7 @@ export class MemoryManager {
           ownerDisplay: compactText(raw?.ownerDisplay, 80),
           targetUserIds, targets, resource,
           sourceText: compactText(raw?.sourceText, 300),
+          sourceMessageId: String(raw?.sourceMessageId || ''),
           createdBy: String(raw?.createdBy || ''),
           at: Number(raw?.at) || nowMs(), updatedAt: nowMs(), enabled: raw?.enabled !== false
         }
@@ -491,25 +711,37 @@ export class MemoryManager {
     return formatGroupKnowledgePrompt(relevant, { speakerQQ })
   }
 
-  async interpretExplicitGroupKnowledge(context = {}) {
-    if (!shouldUseSemanticGroupKnowledgeExtraction(context?.text) || !this.extractor.canUse()) return []
-    const members = membersFromContext(context.memberMap, context.text)
+  async interpretGroupKnowledgeInstruction(context = {}) {
+    if (!this.extractor.canUse()) return { status: 'unavailable', knowledgeEntries: [], workflowRules: [], aliasMappings: [] }
+    const members = membersFromContext(context.memberMap, context)
+    const files = (Array.isArray(context.fileAssets) ? context.fileAssets : [])
+      .map(asset => compactText(asset?.fileName || asset?.name || '', 180))
+      .filter(Boolean)
     const prompt = [
       `发言者：QQ:${context.creatorQQ || ''}，群名片：${context.creatorDisplay || '未知'}`,
       `机器人 QQ:${context.botId || ''}`,
       `原话：${compactText(context.text, 500)}`,
       `当前群成员候选：${members.map(member => `${member.displayName}(QQ:${member.userId})`).join('；') || '无'}`,
-      '只输出 JSON 数组。字段：kind(member_definition 或 member_set)、subject(去掉“我的/你的”等代词后的关系名)、owner(speaker/bot/QQ号/空)、targetNames(群成员显示名数组)。',
-      '“我/我的/本人”一定指发言者；“你/你的/希洛”一定指机器人。不要把代词原样放进 subject，不要编造成员。没有明确教学关系时输出 []。'
+      `当前消息可见群文件：${files.join('；') || '无'}`,
+      '你是群共享状态写入裁决器。先理解说话人此刻是否明确要求机器人保存可供以后回答或执行的稳定群内状态；只有明确要求保存时才输出条目，否则输出 []。',
+      '创作故事、给小说分配角色、跑团设定、临时任务、闲聊、解释内容、引用别人或机器人说过的话，都不是长期知识教学。即使原话里出现“记住了”，只要那是转述、引用或机器人回复，也输出 []。不要把角色列表或“甲和乙”合成一条关系。',
+      '若确实要求保存，把每个独立关系拆成一个原子条目。只输出 JSON 数组：别名字段 kind(alias)、alias、targetNames；成员关系字段 kind(member_definition/member_set)、subject、owner(speaker/bot/QQ号/空)、targetNames；群文件字段 kind(group_file)、subject、owner、resourceFileName；通知规则字段 kind(workflow)、condition、targetNames。targetNames 和 resourceFileName 必须逐字使用候选。',
+      '“我/我的/本人”指发言者；“你/你的/希洛”指机器人。不得编造成员、文件、关系或保存意图。'
     ].join('\n')
     try {
       const raw = await this.extractor._callChat([
-        { role: 'system', content: '你是群聊显式关系教学解析器，只输出严格 JSON 数组，不解释。' },
+        { role: 'system', content: '你是群知识语义裁决器，只输出严格 JSON 数组，不解释。' },
         { role: 'user', content: prompt }
-      ], 400)
-      return parseSemanticGroupKnowledgeOutput(raw, context)
+      ], Math.max(100, Number(this.config.knowledgeDecisionMaxTokens) || 400), {
+        timeoutMs: this.config.knowledgeDecisionTimeoutMs
+      })
+      const result = parseSemanticGroupMemoryOutput(raw, context)
+      return {
+        status: result.knowledgeEntries.length || result.workflowRules.length || result.aliasMappings.length ? 'accepted' : 'ignored',
+        ...result
+      }
     } catch {
-      return []
+      return { status: 'unavailable', knowledgeEntries: [], workflowRules: [], aliasMappings: [] }
     }
   }
 
@@ -653,9 +885,9 @@ export class MemoryManager {
   }
 
   // ---- 显式教学直喂别名表（替代旧 addGroupMemory(...,"member")）----
-  async addAliasMapping(groupId, { alias, targetQQ, by, confidence = 0.95 }) {
+  async addAliasMapping(groupId, { alias, targetQQ, by, createdBy = '', sourceMessageId = '', proposalId = '', confidence = 0.95 }) {
     if (!alias || !targetQQ) return { written: 0 }
-    return this.applyOps(groupId, [{ stream: 'alias', qq: String(targetQQ), text: compactText(alias, 64), authority: 'teaching', confidence: clamp(confidence), by: (by || []).map(String), at: nowMs() }])
+    return this.applyOps(groupId, [{ stream: 'alias', qq: String(targetQQ), text: compactText(alias, 64), authority: 'teaching', confidence: clamp(confidence), by: (by || []).map(String), createdBy: String(createdBy || by?.[0] || ''), sourceMessageId: String(sourceMessageId || ''), proposalId: String(proposalId || sourceMessageId || ''), at: nowMs() }])
   }
 
   // ---- config seed（identityBindings / userProfiles -> 实体）----
@@ -929,24 +1161,79 @@ export class MemoryManager {
     })
   }
 
-  async forgetGroupKnowledge({ groupId, requesterQQ, query } = {}) {
+  async forgetGroupKnowledge({ groupId, requesterQQ, requesterIsGroupManager = false, query } = {}) {
     const requester = String(requesterQQ || '').trim()
     const target = compactText(query, 180)
     if (!groupId || !requester || !target) return { deleted: false, reason: 'invalid-request' }
     return this.enqueueGroup(groupId, async () => {
-      const entries = await this.store.getKnowledge(groupId)
-      const candidates = findGroupKnowledgeDeletionCandidates(entries, {
+      const [entries, workflows, aliasDoc] = await Promise.all([
+        this.store.getKnowledge(groupId),
+        this.store.getWorkflows(groupId),
+        this.store.getAlias(groupId)
+      ])
+      const knowledgeCandidates = findGroupKnowledgeDeletionCandidates(entries, {
         query: target,
         speakerQQ: requester,
-        createdBy: requester
-      })
-      if (candidates.length === 0) return { deleted: false, reason: 'not-found' }
-      if (candidates.length > 1) return { deleted: false, reason: 'ambiguous', candidates }
-      const entry = candidates[0]
-      const next = entries.filter(item => String(item?.id || '') !== String(entry.id || ''))
-      if (next.length === entries.length) return { deleted: false, reason: 'not-found' }
-      await this.store.saveKnowledge(groupId, next)
-      return { deleted: true, entry }
+        createdBy: ''
+      }).filter(entry => mayChangeSharedRecord(entry, requester, requesterIsGroupManager))
+      const key = normalizeSharedKey(target)
+      const aliasCandidates = Object.entries(aliasDoc || {})
+        .filter(([aliasKey, value]) => normalizeSharedKey(value?.display || aliasKey) === key)
+        .filter(([, value]) => mayChangeSharedRecord(value, requester, requesterIsGroupManager))
+        .map(([aliasKey, value]) => ({ type: 'alias', aliasKey, value, sourceMessageId: String(value?.sourceMessageId || ''), proposalId: String(value?.proposalId || '') }))
+      const workflowCandidates = (Array.isArray(workflows) ? workflows : [])
+        .filter(rule => normalizeSharedKey(rule?.condition) === key)
+        .filter(rule => mayChangeSharedRecord(rule, requester, requesterIsGroupManager))
+        .map(rule => ({ type: 'workflow', rule, sourceMessageId: String(rule?.sourceMessageId || ''), proposalId: String(rule?.proposalId || '') }))
+      const candidates = [
+        ...knowledgeCandidates.map(entry => ({ type: 'knowledge', entry, sourceMessageId: String(entry?.sourceMessageId || ''), proposalId: String(entry?.proposalId || '') })),
+        ...aliasCandidates,
+        ...workflowCandidates
+      ]
+      // One semantic proposal may create several records. Treat those records as one
+      // deletion candidate so "forget X" removes the whole relationship atomically.
+      const distinct = new Map()
+      for (const candidate of candidates) {
+        const source = candidate.proposalId || candidate.sourceMessageId
+        const identity = source || `${candidate.type}:${candidate.entry?.id || candidate.rule?.id || candidate.aliasKey || ''}`
+        if (!distinct.has(identity)) distinct.set(identity, candidate)
+      }
+      const resolved = [...distinct.values()]
+      if (resolved.length === 0) return { deleted: false, reason: 'not-found' }
+      if (resolved.length > 1) {
+        const candidateDescriptions = resolved.map(item => item.entry
+          ? describeGroupKnowledgeEntry(item.entry)
+          : item.rule
+            ? `通知规则“${item.rule.condition}”`
+            : `别名“${item.value?.display || item.aliasKey}”`)
+        return { deleted: false, reason: 'ambiguous', candidates: resolved.map(item => item.entry || item.rule || item.value), candidateDescriptions }
+      }
+      const selected = resolved[0]
+      const sourceMessageId = selected.sourceMessageId
+      const proposalId = selected.proposalId || sourceMessageId
+      const removeBySource = record => proposalId && String(record?.proposalId || record?.sourceMessageId || '') === proposalId
+      const nextKnowledge = proposalId
+        ? entries.filter(entry => !removeBySource(entry))
+        : entries.filter(entry => String(entry?.id || '') !== String(selected.entry?.id || ''))
+      const nextWorkflows = proposalId
+        ? workflows.filter(rule => !removeBySource(rule))
+        : workflows.filter(rule => String(rule?.id || '') !== String(selected.rule?.id || ''))
+      const nextAliases = Object.fromEntries(Object.entries(aliasDoc || {}).filter(([aliasKey, value]) => {
+        if (proposalId) return !removeBySource(value)
+        return aliasKey !== selected.aliasKey
+      }))
+      await Promise.all([
+        nextKnowledge.length !== entries.length ? this.store.saveKnowledge(groupId, nextKnowledge) : Promise.resolve(),
+        nextWorkflows.length !== workflows.length ? this.store.saveWorkflows(groupId, nextWorkflows) : Promise.resolve(),
+        Object.keys(nextAliases).length !== Object.keys(aliasDoc || {}).length ? this.store.saveAlias(groupId, nextAliases) : Promise.resolve()
+      ])
+      const entry = selected.entry || null
+      const description = entry
+        ? describeGroupKnowledgeEntry(entry)
+        : selected.rule
+          ? `通知规则“${selected.rule.condition}”`
+          : `别名“${selected.value?.display || selected.aliasKey}”`
+      return { deleted: true, entry, description, sourceMessageId, proposalId }
     })
   }
 

@@ -147,6 +147,56 @@ function getRenderTheme(date = new Date()) {
 }
 
 const KEYWORDS = {
+  java: new Set([
+    "abstract",
+    "assert",
+    "boolean",
+    "break",
+    "byte",
+    "case",
+    "catch",
+    "char",
+    "class",
+    "continue",
+    "default",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "extends",
+    "final",
+    "finally",
+    "float",
+    "for",
+    "if",
+    "implements",
+    "import",
+    "instanceof",
+    "int",
+    "interface",
+    "long",
+    "new",
+    "package",
+    "private",
+    "protected",
+    "public",
+    "record",
+    "return",
+    "short",
+    "static",
+    "strictfp",
+    "super",
+    "switch",
+    "synchronized",
+    "this",
+    "throw",
+    "throws",
+    "transient",
+    "try",
+    "void",
+    "volatile",
+    "while"
+  ]),
   python: new Set([
     "and",
     "as",
@@ -319,6 +369,7 @@ function wrapText(text, maxUnits) {
 
 function normalizeLanguage(language = "") {
   const lang = String(language).trim().toLowerCase()
+  if (lang === "java") return "java"
   if (["py", "python3"].includes(lang)) return "python"
   if (["js", "jsx", "node", "mjs", "cjs"].includes(lang)) return "javascript"
   if (["ts", "tsx", "typescript"].includes(lang)) return "javascript"
@@ -506,7 +557,10 @@ function scoreCodeLanguage(lines, language) {
   const indentedLines = nonEmptyLines.filter(line => /^\s{2,}\S/.test(line)).length
   let score = 0
 
-  if (language === "python") {
+  if (language === "java") {
+    score += (text.match(/^\s*(?:@[\w.]+(?:\([^)]*\))?|public|protected|private|static|final|abstract|class|interface|enum|record|package|import|return|throw|new|if|else|for|while|switch|try|catch)\b/gm) || []).length * 2
+    score += (text.match(/[;{}]/g) || []).length
+  } else if (language === "python") {
     score += (text.match(/^\s*(def|class|import|from|for|if|elif|else|while|try|except|with|return|print|break|continue)\b/gm) || []).length * 2
     score += (text.match(/:\s*$/gm) || []).length
     score += indentedLines
@@ -528,10 +582,105 @@ function scoreCodeLanguage(lines, language) {
 }
 
 function inferCodeLanguage(lines) {
-  const candidates = ["python", "javascript", "json", "yaml", "bash"]
+  const candidates = ["java", "python", "javascript", "json", "yaml", "bash"]
   return candidates
     .map(language => ({ language, score: scoreCodeLanguage(lines, language) }))
     .sort((a, b) => b.score - a.score)[0]
+}
+
+const EXPLICIT_CODE_LANGUAGES = new Set([
+  "java",
+  "python",
+  "py",
+  "javascript",
+  "js",
+  "typescript",
+  "ts",
+  "json",
+  "yaml",
+  "yml",
+  "bash",
+  "sh"
+])
+
+function explicitCodeLanguageMarker(line = "") {
+  const marker = String(line || "")
+    .trim()
+    .replace(/^[\'\"`]+|[\'\"`]+$/g, "")
+    .toLowerCase()
+  if (!EXPLICIT_CODE_LANGUAGES.has(marker)) return ""
+  return normalizeLanguage(marker)
+}
+
+function looksLikeCodeLineForLanguage(line = "", language = "") {
+  const source = String(line || "").trim()
+  if (!source) return true
+  const lang = normalizeLanguage(language)
+
+  if (lang === "java") {
+    return /[;{}]|^@[\w.]+(?:\([^)]*\))?$|^(?:public|protected|private|static|final|abstract|class|interface|enum|record|package|import|return|throw|new|if|else|for|while|switch|case|try|catch)\b|^[A-Z][A-Z0-9_]*\s*\([^)]*\)\s*[,;]?$/.test(source)
+  }
+  if (lang === "python") return /[:#]|^(?:def|class|import|from|for|if|elif|else|while|try|except|with|return|print)\b/.test(source)
+  if (lang === "javascript") return /[;{}]|^(?:const|let|var|function|class|import|export|return|if|else|for|while|switch|try|catch)\b/.test(source)
+  if (lang === "json") return /^[\[{]}]|^[\"'][^\"']+[\"']\s*:/.test(source)
+  if (lang === "yaml") return /^[-\w.]+\s*:/.test(source)
+  if (lang === "bash") return /^(?:#!|cd|echo|export|grep|curl|wget|npm|pnpm|yarn|git|sudo|if|for|while)\b|\$\w+|&&|\|/.test(source)
+  return false
+}
+
+function normalizeImplicitCodeFences(text = "") {
+  const lines = String(text || "").replace(/\r\n/g, "\n").split("\n")
+  const normalized = []
+  let inFence = false
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
+    if (/^```\s*[^`]*$/.test(line)) {
+      inFence = !inFence
+      normalized.push(line)
+      continue
+    }
+    if (inFence) {
+      normalized.push(line)
+      continue
+    }
+
+    const language = explicitCodeLanguageMarker(line)
+    if (!language) {
+      normalized.push(line)
+      continue
+    }
+
+    const codeLines = []
+    let cursor = index + 1
+    while (cursor < lines.length) {
+      const candidate = lines[cursor]
+      if (!candidate.trim()) {
+        const next = lines[cursor + 1]
+        if (next !== undefined && looksLikeCodeLineForLanguage(next, language)) {
+          codeLines.push(candidate)
+          cursor++
+          continue
+        }
+        break
+      }
+      if (!looksLikeCodeLineForLanguage(candidate, language)) break
+      codeLines.push(candidate)
+      cursor++
+    }
+
+    if (!codeLines.some(codeLine => codeLine.trim())) {
+      normalized.push(line)
+      continue
+    }
+
+    normalized.push(`\`\`\`${language}`)
+    normalized.push(...codeLines)
+    normalized.push("```")
+    index = cursor - 1
+  }
+
+  return normalized.join("\n")
 }
 
 function looksLikeMarkdown(text) {
@@ -579,7 +728,7 @@ function getPlainCodeBlock(text) {
   const firstTextLineIndex = rawLines.findIndex(line => line.trim())
   const firstTextLine = rawLines[firstTextLineIndex]?.trim().toLowerCase()
 
-  if (firstTextLine && ["python", "py", "javascript", "js", "typescript", "ts", "json", "yaml", "yml", "bash", "sh"].includes(firstTextLine)) {
+  if (firstTextLine && EXPLICIT_CODE_LANGUAGES.has(firstTextLine)) {
     language = normalizeLanguage(firstTextLine)
     codeLines = rawLines.slice(firstTextLineIndex + 1)
   }
@@ -588,7 +737,7 @@ function getPlainCodeBlock(text) {
   language ||= inferred.language
 
   const joinedCode = codeLines.join("\n")
-  const hasKeywordLine = /^\s*(def|class|for|if|elif|else|while|return|import|from|print|break|continue|const|let|var|function|class|export|if|switch|try|catch)\b/m.test(joinedCode)
+  const hasKeywordLine = /^\s*(?:@[\w.]+(?:\([^)]*\))?|public|protected|private|static|final|abstract|class|interface|enum|record|package|import|return|throw|new|def|for|if|elif|else|while|from|print|break|continue|const|let|var|function|export|switch|try|catch)\b/m.test(joinedCode)
   const hasMultipleIndentedLines = codeLines.filter(line => /^\s{2,}\S/.test(line)).length >= 2
   const hasCodeOperator = /[A-Za-z_$][\w$.\[\]]*\s*(?:=|==|===|>|<|\+|-|\*|\/)/.test(joinedCode)
   const hasCodeBrackets = /[{}();]/.test(joinedCode)
@@ -605,6 +754,7 @@ export function shouldUseDocumentTemplateForTextImage(text = "") {
   const content = String(text || "")
   if (!content.trim()) return false
   if (/```[\s\S]*```/.test(content)) return true
+  if (normalizeImplicitCodeFences(content) !== content.replace(/\r\n/g, "\n")) return true
   if (looksLikeMarkdown(content)) return true
   return Boolean(getPlainCodeBlock(content))
 }
@@ -657,7 +807,8 @@ function flushMarkdownLines(blocks, lines) {
 }
 
 function parseMarkdown(text) {
-  const plainCodeBlock = getPlainCodeBlock(text)
+  const normalizedText = normalizeImplicitCodeFences(text)
+  const plainCodeBlock = getPlainCodeBlock(normalizedText)
   if (plainCodeBlock) return [plainCodeBlock]
 
   const blocks = []
@@ -666,7 +817,7 @@ function parseMarkdown(text) {
   let codeLanguage = ""
   let codeLines = []
 
-  for (const rawLine of String(text || "").split(/\r?\n/)) {
+  for (const rawLine of normalizedText.split(/\r?\n/)) {
     const fence = rawLine.match(/^```\s*([^`]*)$/)
     if (fence) {
       if (inCode) {
@@ -758,7 +909,8 @@ function renderHighlightedCodeHtml(line, language = "") {
     .join("") || " "
 }
 
-function markdownToDocumentHtml(text = "") {
+export function markdownToDocumentHtml(text = "") {
+  const normalizedText = normalizeImplicitCodeFences(text)
   const html = []
   const paragraphLines = []
   let inCode = false
@@ -795,7 +947,7 @@ function markdownToDocumentHtml(text = "") {
     codeLanguage = ""
   }
 
-  for (const rawLine of String(text || "").split(/\r?\n/)) {
+  for (const rawLine of normalizedText.split(/\r?\n/)) {
     const fence = rawLine.match(/^```\s*([^`]*)$/)
     if (fence) {
       if (inCode) {
@@ -840,6 +992,109 @@ function markdownToDocumentHtml(text = "") {
   if (inCode) flushCode()
   flushParagraph()
   return html.join("\n") || "<p></p>"
+}
+
+export function markdownToKnowledgeHtml(text = "") {
+  const normalizedText = normalizeImplicitCodeFences(text)
+  const html = []
+  const paragraphLines = []
+  let inCode = false
+  let codeLanguage = ""
+  let codeLines = []
+  let hasTitle = false
+  let hasLead = false
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return
+    const lines = paragraphLines.splice(0)
+      .map(line => line.trim())
+      .filter(Boolean)
+    if (!lines.length) return
+
+    const ordered = lines.every(line => /^\d+[.、]\s+\S/.test(line))
+    const unordered = lines.every(line => /^(?:[-*+•])\s+\S/.test(line))
+    const keyValue = lines.map(line => line.match(/^(?:[-*+•]\s+)?(?:\*\*)?([^:：*]{1,28})(?:\*\*)?\s*[：:]\s*(.+)$/))
+
+    if (ordered) {
+      html.push(`<ol class="knowledge-steps">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^\d+[.、]\s+/, ""))}</li>`).join("")}</ol>`)
+      return
+    }
+    if (unordered) {
+      html.push(`<ul class="knowledge-checklist">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^(?:[-*+•])\s+/, ""))}</li>`).join("")}</ul>`)
+      return
+    }
+    if (keyValue.every(Boolean) && keyValue.length >= 2) {
+      html.push(`<dl class="knowledge-facts">${keyValue.map(match => `<div><dt>${renderInlineMarkdownHtml(match[1].trim())}</dt><dd>${renderInlineMarkdownHtml(match[2].trim())}</dd></div>`).join("")}</dl>`)
+      return
+    }
+
+    const content = renderInlineMarkdownHtml(lines.join("\n")).replace(/\n+/g, "<br>")
+    const className = hasTitle && !hasLead ? "knowledge-lead" : "knowledge-paragraph"
+    html.push(`<p class="${className}">${content}</p>`)
+    hasLead ||= hasTitle
+  }
+
+  const flushCode = () => {
+    const language = normalizeLanguage(codeLanguage)
+    const label = language ? `<div class="code-label">${escapeXml(language)}</div>` : ""
+    const code = codeLines
+      .map(line => `<div class="code-line">${renderHighlightedCodeHtml(line, language)}</div>`)
+      .join("")
+    html.push(`<pre class="code-block">${label}<code>${code || '<div class="code-line"> </div>'}</code></pre>`)
+    codeLines = []
+    codeLanguage = ""
+  }
+
+  for (const rawLine of normalizedText.split(/\r?\n/)) {
+    const fence = rawLine.match(/^```\s*([^`]*)$/)
+    if (fence) {
+      if (inCode) {
+        flushCode()
+        inCode = false
+      } else {
+        flushParagraph()
+        codeLanguage = fence[1] || ""
+        inCode = true
+      }
+      continue
+    }
+    if (inCode) {
+      codeLines.push(rawLine)
+      continue
+    }
+    if (!rawLine.trim()) {
+      flushParagraph()
+      continue
+    }
+
+    const heading = rawLine.match(/^\s*(#{1,3})\s+(.+)$/)
+    if (heading) {
+      flushParagraph()
+      const level = heading[1].length
+      const title = renderInlineMarkdownHtml(heading[2].trim())
+      if (!hasTitle && level === 1) {
+        html.push(`<header class="knowledge-header"><div class="knowledge-kicker">知识说明</div><h1>${title}</h1></header>`)
+        hasTitle = true
+      } else if (level === 2) {
+        html.push(`<h2>${title}</h2>`)
+      } else {
+        html.push(`<h3>${title}</h3>`)
+      }
+      continue
+    }
+
+    const quote = rawLine.match(/^\s*>\s+(.+)$/)
+    if (quote) {
+      flushParagraph()
+      html.push(`<aside class="knowledge-note"><span>提示</span><p>${renderInlineMarkdownHtml(quote[1].trim())}</p></aside>`)
+      continue
+    }
+    paragraphLines.push(rawLine)
+  }
+
+  if (inCode) flushCode()
+  flushParagraph()
+  return html.join("\n") || '<p class="knowledge-paragraph"></p>'
 }
 
 function buildDocumentHtml(text = "") {
@@ -973,12 +1228,60 @@ function buildDocumentHtml(text = "") {
 </html>`
 }
 
+function buildKnowledgeHtml(text = "") {
+  const theme = getRenderTheme()
+  const accent = theme.mode === "night" ? "#7dd3fc" : "#2563eb"
+  const accentSoft = theme.mode === "night" ? "rgba(125, 211, 252, 0.12)" : "#e8f0ff"
+  const divider = theme.mode === "night" ? "#334155" : "#d7e0eb"
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: ${theme.pageBg}; color: ${theme.text}; }
+    body { width: 980px; padding: 20px; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; letter-spacing: 0; }
+    .knowledge { width: 940px; min-height: 1px; padding: 36px 42px 42px; background: ${theme.cardBg}; border: 1px solid ${theme.cardBorder}; border-top: 7px solid ${accent}; border-radius: 8px; box-shadow: ${theme.mode === "night" ? "0 16px 38px rgba(0,0,0,0.32)" : "0 12px 28px rgba(27,39,63,0.12)"}; }
+    .knowledge-header { margin: 0 0 24px; padding-bottom: 22px; border-bottom: 1px solid ${divider}; }
+    .knowledge-kicker { margin-bottom: 8px; color: ${accent}; font-size: 17px; font-weight: 800; line-height: 1; }
+    h1, h2, h3 { margin: 0; color: ${theme.text}; font-weight: 800; line-height: 1.32; letter-spacing: 0; }
+    h1 { font-size: 40px; }
+    h2 { margin-top: 32px; padding: 0 0 10px 16px; border-bottom: 1px solid ${divider}; border-left: 5px solid ${accent}; font-size: 30px; }
+    h3 { margin-top: 24px; color: ${theme.text}; font-size: 26px; }
+    .knowledge-lead, .knowledge-paragraph { margin: 0 0 18px; font-size: 25px; line-height: 1.7; overflow-wrap: anywhere; }
+    .knowledge-lead { padding: 18px 20px; background: ${accentSoft}; border-radius: 6px; font-weight: 600; }
+    .knowledge-steps, .knowledge-checklist { margin: 12px 0 22px; padding: 0; list-style: none; counter-reset: knowledge-step; }
+    .knowledge-steps li, .knowledge-checklist li { position: relative; min-height: 38px; margin: 0 0 12px; padding: 13px 16px 13px 58px; background: ${theme.quoteBg}; border-left: 3px solid ${accent}; border-radius: 5px; font-size: 24px; line-height: 1.58; overflow-wrap: anywhere; }
+    .knowledge-steps li::before { counter-increment: knowledge-step; content: counter(knowledge-step); position: absolute; left: 16px; top: 13px; width: 27px; height: 27px; border-radius: 50%; background: ${accent}; color: ${theme.mode === "night" ? "#082f49" : "#fff"}; text-align: center; font-size: 16px; font-weight: 800; line-height: 27px; }
+    .knowledge-checklist li::before { content: "✓"; position: absolute; left: 18px; top: 12px; color: ${accent}; font-size: 24px; font-weight: 800; }
+    .knowledge-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0 22px; }
+    .knowledge-facts div { padding: 14px 16px; background: ${theme.quoteBg}; border: 1px solid ${divider}; border-radius: 5px; }
+    .knowledge-facts dt { margin-bottom: 6px; color: ${theme.subtle}; font-size: 17px; font-weight: 700; }
+    .knowledge-facts dd { margin: 0; font-size: 23px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+    .knowledge-note { display: flex; gap: 13px; margin: 16px 0 22px; padding: 16px 18px; background: ${accentSoft}; border: 1px solid ${divider}; border-radius: 6px; }
+    .knowledge-note span { flex: 0 0 auto; color: ${accent}; font-size: 18px; font-weight: 800; line-height: 1.7; }
+    .knowledge-note p { margin: 0; font-size: 24px; line-height: 1.65; overflow-wrap: anywhere; }
+    strong { color: ${theme.text}; font-weight: 800; }
+    .inline-code { padding: 2px 7px; border-radius: 4px; background: ${theme.inlineBg}; color: ${theme.inlineText}; font-family: Consolas, "SFMono-Regular", Menlo, monospace; font-size: 0.88em; }
+    .code-block { position: relative; margin: 12px 0 22px; padding: 44px 20px 18px; overflow: hidden; border-radius: 6px; background: #111827; color: #e5e7eb; font-family: Consolas, "SFMono-Regular", Menlo, monospace; font-size: 20px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .code-label { position: absolute; top: 12px; left: 18px; color: #9ca3af; font-size: 15px; font-weight: 700; text-transform: uppercase; }
+    .code-line { min-height: 31px; }
+    .token.keyword { color: #c084fc; } .token.string { color: #86efac; } .token.number { color: #fbbf24; } .token.comment { color: #7dd3fc; } .token.literal { color: #f472b6; } .token.function { color: #93c5fd; } .token.operator { color: #f9a8d4; } .token.punctuation { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <main class="knowledge">${markdownToKnowledgeHtml(text)}</main>
+</body>
+</html>`
+}
+
 export class TextImageTool extends AbstractTool {
   constructor() {
     super()
     this.name = "textImageTool"
     this.description =
-      "把文字、Markdown 或代码内容渲染成图片并发送。普通短文本可以使用 QQ 聊天气泡样式；代码、Markdown、科普、讲解、推导、公式总结这类较长内容必须使用 document 文档卡片模板。只要用户要求写代码、给代码、实现算法、提供示例代码、编写 Markdown/MD 文档或输出较长结构化文本，都必须调用本工具，把完整内容作为 text 参数发送，不要直接在普通回复里发送代码或 Markdown 原文。也适用于文字可能被 QQ 群管家、其他 QQ 机器人、风控、敏感词检测撤回的场景。代码内容即使没有使用 ``` 包裹，也可以交给本工具自动识别并按代码块高亮渲染。调用后不要再重复发送原始文字。"
+      "把文字、Markdown 或代码内容渲染成图片并发送。普通短文本使用 QQ 聊天气泡；代码、Markdown 用 document 文档卡；科普、技术讲解、推导和入门路线用 knowledge 知识卡，它会把标题、结论、步骤、清单、提示和代码块排成易读的层级。用户明确要求纯文本、Markdown 原文或代码原文时不要擅自转图。"
     this.parameters = {
       type: "object",
       properties: {
@@ -996,8 +1299,8 @@ export class TextImageTool extends AbstractTool {
         },
         template: {
           type: "string",
-          enum: ["chat", "document"],
-          description: "渲染模板。chat 为普通短文本聊天气泡；document 为 HTML 文档卡片，代码、Markdown、长文本和讲解必须用 document"
+          enum: ["chat", "document", "knowledge"],
+          description: "渲染模板。chat 为普通短文本聊天气泡；document 为代码或 Markdown 文档卡；knowledge 为科普和技术讲解的结构化知识卡"
         }
       },
       required: ["text"],
@@ -1014,37 +1317,43 @@ export class TextImageTool extends AbstractTool {
 
     const rawTemplate = String(opts.template || "").trim()
     const shouldUseDocument = shouldUseDocumentTemplateForTextImage(text)
-    const template = shouldUseDocument || rawTemplate === "document" || rawTemplate === "html" || rawTemplate.startsWith("parchment")
-      ? "document"
-      : "chat"
-    const maxTextLength = template === "document" ? DOCUMENT_MAX_TEXT_LENGTH : CHAT_MAX_TEXT_LENGTH
+    const template = rawTemplate === "knowledge"
+      ? "knowledge"
+      : shouldUseDocument || rawTemplate === "document" || rawTemplate === "html" || rawTemplate.startsWith("parchment")
+        ? "document"
+        : "chat"
+    const maxTextLength = template === "chat" ? CHAT_MAX_TEXT_LENGTH : DOCUMENT_MAX_TEXT_LENGTH
     const safeText = safeTruncateUnicode(text, maxTextLength)
     const nickname = String(opts.nickname || "").trim()
     const avatarUrl = String(opts.avatarUrl || "").trim()
     let imagePath = ""
+    const startedAt = Date.now()
 
     try {
-      imagePath = template === "document"
-        ? await this.renderDocumentImage({ text: safeText })
+      imagePath = template === "document" || template === "knowledge"
+        ? await this.renderDocumentImage({ text: safeText, template })
         : await this.renderChatImage({
             text: safeText,
             nickname,
             avatarUrl
           })
 
+      const renderedAt = Date.now()
       await e.reply(segment.image(imagePath))
+      const sentAt = Date.now()
+      globalThis.logger?.info?.(`[textImageTool] timing template=${template} render=${renderedAt - startedAt}ms send=${sentAt - renderedAt}ms total=${sentAt - startedAt}ms`)
       return "已将文字、Markdown 或代码转为图片发送成功，不需要再重复发送原始内容，绝对不要以文本形式发送代码和markdown内容，会导致严重群内刷屏！！！。"
     } finally {
       if (imagePath) await deleteGeneratedFile(imagePath)
     }
   }
 
-  async renderDocumentImage({ text }) {
+  async renderDocumentImage({ text, template = "document" }) {
     const outputDir = path.join(process.cwd(), "resources", "bl-chat-plugin", "safe_text_images")
     await fs.promises.mkdir(outputDir, { recursive: true })
     const outputPath = path.join(
       outputDir,
-      `safe_text_document_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
+      `safe_text_${template}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
     )
 
     let page
@@ -1052,7 +1361,8 @@ export class TextImageTool extends AbstractTool {
       const browser = await getSharedBrowser()
       page = await browser.newPage()
       await page.setViewport({ width: 980, height: 1200, deviceScaleFactor: 2 })
-      await page.setContent(buildDocumentHtml(text), { waitUntil: "domcontentloaded", timeout: 60000 })
+      const html = template === "knowledge" ? buildKnowledgeHtml(text) : buildDocumentHtml(text)
+      await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 })
       const clip = await page.evaluate(() => {
         const body = document.body
         const height = Math.ceil(body.getBoundingClientRect().height)

@@ -4,6 +4,7 @@ import {
   generateImageEditWithFallbacks,
   generateImageWithFallbacks,
   isImageToolContractError,
+  normalizeImageProviderParameter,
   resolveRequestedImageProvider,
   resolveImageEditConfigs,
   resolveImageGenerationConfigs,
@@ -105,16 +106,23 @@ test('supports Guoba providers-only configuration', () => {
         {
           name: 'image2',
           apiUrl: 'https://api.openai.com/v1/images/generations',
-          model: 'gpt-image-2',
-          apiKey: 'image2-key',
-          size: '1024x1024',
-          priority: 1
+        model: 'gpt-image-2',
+        apiKey: 'image2-key',
+        size: '1024x1024',
+        squareSize: '1024x1024',
+        portraitSize: '1024x1536',
+        landscapeSize: '1536x1024',
+        priority: 1
         }
       ]
     }
   })
 
   assert.deepEqual(configs.map(item => item.name), ['image2', 'doubao'])
+  assert.deepEqual(
+    [configs[0].squareSize, configs[0].portraitSize, configs[0].landscapeSize],
+    ['1024x1024', '1024x1536', '1536x1024']
+  )
 })
 
 test('priority can promote any configured provider to first place', () => {
@@ -207,6 +215,51 @@ test('style wording alone does not lock an image provider', () => {
   }
   assert.equal(resolveRequestedImageProvider(config, '用 Grok 风格画一只猫'), '')
   assert.equal(resolveRequestedImageProvider(config, '参考 Grok 的画面风格生成'), '')
+})
+
+test('drops a planner-invented provider unless the user explicitly selected it', () => {
+  const config = {
+    imageGenerationAiConfig: {
+      providers: [
+        { name: 'Grok', apiUrl: 'https://grok.example/v1', model: 'grok-imagine', apiKey: 'grok-key' },
+        { name: 'Krill', apiUrl: 'https://krill.example/v1', model: 'gpt-image-2', apiKey: 'krill-key' }
+      ]
+    }
+  }
+
+  assert.equal(
+    resolveRequestedImageProvider(config, '希洛帮我去掉这个图手里的手机', 'gemini'),
+    ''
+  )
+  assert.equal(
+    resolveRequestedImageProvider(config, '希洛帮我用 Grok 去掉这个图手里的手机', 'gemini'),
+    'Grok'
+  )
+  assert.equal(
+    resolveRequestedImageProvider(config, '希洛帮我用 Gemini 去掉这个图手里的手机', 'gemini'),
+    'gemini'
+  )
+
+  assert.deepEqual(
+    normalizeImageProviderParameter(
+      { prompt: '去掉手机', images: ['image'], provider: 'gemini' },
+      config,
+      '希洛帮我去掉这个图手里的手机'
+    ),
+    { prompt: '去掉手机', images: ['image'] }
+  )
+  assert.deepEqual(
+    normalizeImageProviderParameter(
+      { prompt: '去掉手机', images: ['image'], provider: 'Grok' },
+      config,
+      '希洛帮我用 Grok 去掉这个图手里的手机'
+    ),
+    { prompt: '去掉手机', images: ['image'], provider: 'Grok' }
+  )
+  assert.equal(
+    resolveRequestedImageProvider(config, '不要用 Grok，改用 Krill 去掉手机', 'Grok'),
+    'Krill'
+  )
 })
 
 test('strict provider selection never falls back to a different name', () => {

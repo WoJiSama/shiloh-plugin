@@ -4,6 +4,8 @@ import {
   clearBilibiliMetadataCache,
   enrichBilibiliMessageSegments,
   extractBilibiliShareFromSegment,
+  extractBilibiliShareFromText,
+  extractBilibiliUrls,
   formatBilibiliHistoryLinks,
   formatBilibiliHistoryText,
   resolveBilibiliPlaybackResult,
@@ -46,6 +48,21 @@ test("recovers a Bilibili card from encoded raw CQ JSON when normalized segment 
 
   assert.equal(card.title, "听星野呜嘿伊呀8小时纯享")
   assert.equal(card.short_url, "https://b23.tv/JvNsiRF?share_source=qq")
+})
+
+test("recognizes a b23.tv link sent as plain text", () => {
+  const card = extractBilibiliShareFromText("看看这个 https://b23.tv/SqfuVXT ，挺有意思")
+
+  assert.equal(card.type, "bilibili")
+  assert.equal(card.short_url, "https://b23.tv/SqfuVXT")
+  assert.equal(card.metadata_status, "card")
+})
+
+test("keeps direct Bilibili video links alongside short links", () => {
+  assert.deepEqual(extractBilibiliUrls("https://b23.tv/SqfuVXT https://bilibili.com/video/BV1XAR5YzE9e?p=1"), [
+    "https://b23.tv/SqfuVXT",
+    "https://bilibili.com/video/BV1XAR5YzE9e?p=1"
+  ])
 })
 
 test("resolves short url and enriches stable Bilibili metadata", async () => {

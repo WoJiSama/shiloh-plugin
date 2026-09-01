@@ -114,6 +114,28 @@ export default [
     bottomHelpMessage: "写入记忆时两条 fact 的 embedding 余弦相似度 ≥ 该值视为同一事实(需开启语义召回)",
     componentProps: { min: 0, max: 1, step: 0.01, placeholder: "0.88" }
   },
+  { component: "Divider", label: "群知识语义裁决" },
+  {
+    field: "memorySystem.knowledgeDecisionTimeoutMs",
+    label: "群知识裁决总超时（毫秒）",
+    component: "InputNumber",
+    bottomHelpMessage: "由模型判断是否为明确长期群知识教学；在后台运行，超时仅跳过本次保存，不会阻塞正常回复",
+    componentProps: { min: 300, max: 8000, step: 100, placeholder: "900" }
+  },
+  {
+    field: "memorySystem.knowledgeDecisionInlineWaitMs",
+    label: "回复内确认等待（毫秒）",
+    component: "InputNumber",
+    bottomHelpMessage: "只在此短窗口内提交成功时才允许自然确认“记住了”；超出后聊天继续，结果仍在后台保存",
+    componentProps: { min: 0, max: 1000, step: 20, placeholder: "180" }
+  },
+  {
+    field: "memorySystem.knowledgeDecisionMaxTokens",
+    label: "群知识裁决输出上限",
+    component: "InputNumber",
+    bottomHelpMessage: "裁决器只输出短 JSON；较小的上限能减少额外延迟",
+    componentProps: { min: 100, max: 1000, step: 50, placeholder: "400" }
+  },
   { component: "Divider", label: "反思巩固（需 memoryAiConfig）" },
   {
     field: "memorySystem.reflectEntityThreshold",

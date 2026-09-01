@@ -46,6 +46,10 @@ function eventWithMembers(message, overrides = {}) {
   return event(message, { group: { getMemberMap: async () => members }, ...overrides })
 }
 
+function memberRuleData(state, userId, packId, groupId = "10001") {
+  return state.users[String(userId)].cards["默认"].ruleData[packId].groups[String(groupId)]
+}
+
 const statefulRule = `
 version: 1
 id: state-pack
@@ -242,7 +246,7 @@ test("import source accepts fenced YAML and archived packages keep character dat
   const archived = await runtime.manager.archivePackage("state-pack")
   assert.equal(archived.affectedGroups, 1)
   const state = runtime.diceManager.readState()
-  assert.equal(state.users["20002"].cards["默认"].ruleData["state-pack"].values.name, "归档角色")
+  assert.equal(memberRuleData(state, "20002", "state-pack").values.name, "归档角色")
   assert.ok(fs.readdirSync(path.join(runtime.manager.getRulesDir(), "archived")).some(name => name.startsWith("state-pack-")))
   const restored = await runtime.manager.restoreArchivedPackage("state-pack")
   assert.deepEqual(restored.versions, [1])
@@ -298,7 +302,7 @@ commands:
   const migrated = await runtime.manager.handleDynamicCommand(event(".migrate show"))
   assert.equal(migrated.text, "新值=9")
   const state = runtime.diceManager.readState()
-  const stored = state.users["20002"].cards["默认"].ruleData["migration-pack"]
+  const stored = memberRuleData(state, "20002", "migration-pack")
   assert.equal(stored.values.new_score, 9)
   assert.equal(Object.hasOwn(stored.values, "old_score"), false)
 })
@@ -374,7 +378,7 @@ commands:
   await runtime.manager.enableForGroup("10001", "transient-pack")
   assert.equal((await runtime.manager.handleDynamicCommand(event("。temp 脉冲"))).text, "pulse=1")
   assert.equal((await runtime.manager.handleDynamicCommand(event(".temp pulse"))).text, "pulse=1")
-  const stored = runtime.diceManager.readState().users["20002"].cards["默认"].ruleData["transient-pack"]
+  const stored = memberRuleData(runtime.diceManager.readState(), "20002", "transient-pack")
   assert.equal(Object.hasOwn(stored.values, "pulse"), false)
   assert.match((await runtime.manager.handleDynamicCommand(event(".temp 设 pulse=9"))).text, /临时字段/)
 })
@@ -488,7 +492,7 @@ test("V2 commands resolve declared member and NPC targets with runtime permissio
 
   const attackMember = await runtime.manager.handleDynamicCommand(eventWithMembers(".team 攻击 [CQ:at,qq=30003] 2"))
   assert.match(attackMember.text, /目标玩家.*HP=8/)
-  const targetState = runtime.diceManager.readState().users["30003"].cards["默认"].ruleData["team-pack"]
+  const targetState = memberRuleData(runtime.diceManager.readState(), "30003", "team-pack")
   assert.equal(targetState.values.hp, 8)
 
   const ordinaryTarget = eventWithMembers(".team 设 qq:20002 hp=1", {
@@ -610,6 +614,230 @@ test("V2 private and opposed commands produce structured audit without exposing 
   assert.equal(audit.at(-1).seed, "external")
 })
 
+test("V2 secret builtins use recoverable private delivery and never expose values in group text", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  await runtime.manager.stageImport(teamRule, "master")
+  await runtime.manager.confirmImport("team-pack", "master")
+  await runtime.manager.enableForGroup("10001", "team-pack")
+  const admin = eventWithMembers(".team 查 secret_note", { sender: { card: "主持人", nickname: "Keeper", role: "admin" }, user_id: "40004" })
+  const result = await runtime.manager.handleDynamicCommand(admin)
+  assert.match(result.text, /已私聊发送/)
+  assert.doesNotMatch(result.text, /hidden/)
+  assert.equal(result.privateMessages.length, 1)
+  assert.match(result.privateMessages[0].text, /secret_note\)=hidden/)
+  let ruleState = runtime.diceManager.readState().groups["10001"].diceRuleSessions["team-pack"]
+  assert.equal(ruleState.privateDeliveries.length, 1)
+  await runtime.manager.settlePrivateDeliveries("10001", "team-pack", [{ deliveryId: result.privateMessages[0].deliveryId, ok: false, error: "好友限制" }])
+  ruleState = runtime.diceManager.readState().groups["10001"].diceRuleSessions["team-pack"]
+  assert.equal(ruleState.privateDeliveries[0].attempts, 1)
+  const retry = await runtime.manager.handleDynamicCommand({ ...admin, msg: ".team 投递 重试" })
+  assert.equal(retry.privateMessages[0].deliveryId, result.privateMessages[0].deliveryId)
+  await runtime.manager.settlePrivateDeliveries("10001", "team-pack", [{ deliveryId: result.privateMessages[0].deliveryId, ok: true }])
+  assert.equal(runtime.diceManager.readState().groups["10001"].diceRuleSessions["team-pack"].privateDeliveries.length, 0)
+})
+
+test("V2 explicit targets and private GM recipients must still belong to the current group", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  await runtime.manager.stageImport(teamRule, "master")
+  await runtime.manager.confirmImport("team-pack", "master")
+  await runtime.manager.enableForGroup("10001", "team-pack")
+  const owner = message => eventWithMembers(message, { sender: { card: "群主", nickname: "Owner", role: "owner" }, user_id: "40004" })
+  assert.match((await runtime.manager.handleDynamicCommand(owner(".team 设 qq:99999 hp=1"))).text, /不在当前群/)
+  await runtime.manager.handleDynamicCommand(owner(".team 权限 设置 gm qq:30003"))
+
+  const currentMembers = new Map([
+    [20002, { user_id: 20002, card: "测试员", nickname: "Tester", role: "member" }],
+    [40004, { user_id: 40004, card: "群主", nickname: "Owner", role: "owner" }]
+  ])
+  const hidden = await runtime.manager.handleDynamicCommand(event(".team 暗骰", { group: { getMemberMap: async () => currentMembers } }))
+  assert.deepEqual(hidden.privateMessages.map(item => item.userId), ["40004"])
+})
+
+test("V2 sessions preserve manual logs and reject implicit or duplicate initiative starts", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  await runtime.manager.stageImport(teamRule, "master")
+  await runtime.manager.confirmImport("team-pack", "master")
+  await runtime.manager.enableForGroup("10001", "team-pack")
+  const gm = message => eventWithMembers(message, { sender: { card: "主持人", nickname: "Keeper", role: "admin" }, user_id: "40004" })
+
+  await runtime.manager.handleDynamicCommand(gm(".team 先攻 添加 self 10"))
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 先攻 开始"))).text, /正式团务尚未开始/)
+  assert.match(await runtime.diceManager.startLog(gm(""), "手工团录"), /已开启/)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 团务 开始 安全团"))).text, /沿用已有团录/)
+  await runtime.manager.handleDynamicCommand(gm(".team 先攻 添加 self 10"))
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 先攻 开始"))).text, /战斗开始/)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 先攻 开始"))).text, /重复开始会重复结算/)
+  await runtime.manager.handleDynamicCommand(gm(".team 先攻 结束"))
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 团务 结束"))).text, /保持开启/)
+  assert.equal(runtime.diceManager.isLogActive("10001"), true)
+  const ruleState = runtime.diceManager.readState().groups["10001"].diceRuleSessions["team-pack"]
+  assert.equal(ruleState.sessions.length, 1)
+  assert.equal(ruleState.session.logOwned, false)
+})
+
+test("V2 rollback refuses missing reverse migrations before changing the active version", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const v1 = `
+version: 1
+id: safe-rollback
+name: 安全回滚
+aliases: [saferoll]
+compatibility: { package_version: "1.0.0" }
+character:
+  fields:
+    score: { type: integer, default: 1 }
+commands:
+  - { id: show, aliases: [show], output: "score={attr.score}" }
+`
+  const v2 = `
+version: 1
+id: safe-rollback
+name: 安全回滚
+aliases: [saferoll]
+compatibility:
+  package_version: "2.0.0"
+  migrations:
+    - { from: "1.0.0", rename_fields: { score: points } }
+character:
+  fields:
+    points: { type: integer, default: 0 }
+commands:
+  - { id: show, aliases: [show], output: "points={attr.points}" }
+`
+  await runtime.manager.stageImport(v1, "master")
+  await runtime.manager.confirmImport("safe-rollback", "master")
+  await runtime.manager.enableForGroup("10001", "safe-rollback", 1)
+  await runtime.manager.handleDynamicCommand(event(".safe-rollback show"))
+  await runtime.manager.stageImport(v2, "master")
+  await runtime.manager.confirmImport("safe-rollback", "master")
+  await runtime.manager.enableForGroup("10001", "safe-rollback", 2)
+  await runtime.manager.handleDynamicCommand(event(".safe-rollback show"))
+  await assert.rejects(() => runtime.manager.rollbackForGroup("10001", "safe-rollback", 1), /没有从该版本出发的迁移/)
+  assert.equal(runtime.manager.readIndex().groups["10001"].active["safe-rollback"], 2)
+})
+
+test("V2 campaigns provide registration, chapters, records, pause, snapshots and session history", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  await runtime.manager.stageImport(teamRule, "master")
+  await runtime.manager.confirmImport("team-pack", "master")
+  await runtime.manager.enableForGroup("10001", "team-pack")
+  const gm = message => eventWithMembers(message, { sender: { card: "主持人", nickname: "Keeper", role: "admin" }, user_id: "40004" })
+
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 战役 创建 ark 魔法战役"))).text, /已创建并选中/)
+  assert.match((await runtime.manager.handleDynamicCommand(eventWithMembers(".team 战役 登记 self 调查员"))).text, /已登记.*调查员/)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 战役 登记 qq:30003 星术师"))).text, /星术师/)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 战役 章节 开始 序章"))).text, /章节已开始/)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 战役 记录 clue 古老钥匙"))).text, /已记录线索/)
+  await runtime.manager.handleDynamicCommand(gm(".team 团务 开始 第一场"))
+  await runtime.manager.handleDynamicCommand(gm(".team 团务 暂停"))
+  await runtime.manager.handleDynamicCommand(gm(".team 团务 快照 基线"))
+  await runtime.manager.handleDynamicCommand(gm(".team 群设 momentum=5"))
+  assert.equal(runtime.diceManager.readState().groups["10001"].diceRuleSessions["team-pack"].group.values.momentum, 5)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 团务 回退 1"))).text, /已回退/)
+  assert.equal(runtime.diceManager.readState().groups["10001"].diceRuleSessions["team-pack"].group.values.momentum, 0)
+  await runtime.manager.handleDynamicCommand(gm(".team 团务 恢复"))
+  await runtime.manager.handleDynamicCommand(gm(".team 团务 结束"))
+  await runtime.manager.handleDynamicCommand(gm(".team 战役 章节 结束"))
+
+  const state = runtime.diceManager.readState()
+  const ruleState = state.groups["10001"].diceRuleSessions["team-pack"]
+  assert.equal(ruleState.campaigns.ark.members["30003"].character, "星术师")
+  assert.equal(ruleState.campaigns.ark.records[0].type, "clue")
+  assert.equal(ruleState.campaigns.ark.sessions.length, 1)
+  assert.equal(ruleState.sessions.length, 1)
+  assert.match((await runtime.manager.handleDynamicCommand(gm(".team 团务 历史"))).text, /第一场/)
+})
+
+test("V2 item and ability definitions can execute atomic on-use and equipment effects", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const effects = `
+version: 1
+id: effect-pack
+name: 效果规则
+aliases: [fx]
+compatibility: { package_version: "1.0.0" }
+character:
+  fields:
+    hp: { type: integer, default: 5, min: 0, max: 20 }
+    mp: { type: integer, default: 3, min: 0, max: 10 }
+items:
+  potion:
+    label: 药水
+    consumable: true
+    on_use:
+      - { op: add, field: hp, value: 5 }
+      - { op: clamp, field: hp, min: 0, max: 20 }
+  sword:
+    label: 长剑
+    stackable: false
+    max_quantity: 1
+    slot: hand
+    on_equip:
+      - { op: add, field: hp, value: 2 }
+    on_unequip:
+      - { op: subtract, field: hp, value: 2 }
+abilities:
+  heal:
+    label: 治疗术
+    resource_field: mp
+    resource_cost: 1
+    on_use:
+      - { op: add, field: hp, value: 3 }
+      - { op: clamp, field: hp, min: 0, max: 20 }
+commands:
+  - { id: show, aliases: [show], output: "HP={attr.hp},MP={attr.mp}" }
+`
+  assert.equal((await runtime.manager.stageImport(effects, "master")).ok, true)
+  await runtime.manager.confirmImport("effect-pack", "master")
+  await runtime.manager.enableForGroup("10001", "effect-pack")
+  const admin = message => eventWithMembers(message, { sender: { card: "主持人", nickname: "Keeper", role: "admin" }, user_id: "40004" })
+  await runtime.manager.handleDynamicCommand(admin(".fx 物品 添加 qq:20002 potion 1"))
+  await runtime.manager.handleDynamicCommand(eventWithMembers(".fx 物品 使用 self potion"))
+  await runtime.manager.handleDynamicCommand(admin(".fx 物品 添加 qq:20002 sword 1"))
+  await runtime.manager.handleDynamicCommand(eventWithMembers(".fx 物品 装备 self sword"))
+  await runtime.manager.handleDynamicCommand(eventWithMembers(".fx 物品 卸下 self sword"))
+  await runtime.manager.handleDynamicCommand(admin(".fx 技能 学习 qq:20002 heal 1"))
+  await runtime.manager.handleDynamicCommand(eventWithMembers(".fx 技能 使用 heal"))
+  const stored = memberRuleData(runtime.diceManager.readState(), "20002", "effect-pack")
+  assert.equal(stored.values.hp, 13)
+  assert.equal(stored.values.mp, 2)
+  assert.equal(stored.inventory.potion, undefined)
+  assert.equal(stored.inventory.sword.equipped, false)
+  assert.equal(stored.abilities.heal.uses, 1)
+})
+
+test("V2 identity can request opt-in group-card synchronization without exposing a platform action in YAML", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const source = `
+version: 1
+id: identity-sync
+name: 名片同步
+aliases: [idsync]
+compatibility: { package_version: "1.0.0" }
+identity:
+  display_name: "{attr.name}"
+  group_card: "{attr.name}"
+  sync_group_card: true
+character:
+  fields:
+    name: { type: string, default: "{sender.card}" }
+commands:
+  - { id: show, aliases: [show], output: "角色={actor}" }
+`
+  assert.equal((await runtime.manager.stageImport(source, "master")).ok, true)
+  await runtime.manager.confirmImport("identity-sync", "master")
+  await runtime.manager.enableForGroup("10001", "identity-sync")
+  const result = await runtime.manager.handleDynamicCommand(event(".idsync show"))
+  assert.deepEqual(result.groupCardUpdates, [{ userId: "20002", name: "测试员" }])
+})
+
 test("V2 same-group concurrent commands remain serial and do not lose updates", async t => {
   const runtime = createRuntime({ random: () => 0.5 })
   t.after(runtime.cleanup)
@@ -626,7 +854,7 @@ test("V2 same-group concurrent commands remain serial and do not lose updates", 
   assert.equal(npc.ruleData.values.hp, 5)
 })
 
-test("V2 state transaction preserves same character updates from different groups", async t => {
+test("V2 state transaction isolates the same character between different groups", async t => {
   const runtime = createRuntime()
   t.after(runtime.cleanup)
   await runtime.manager.stageImport(teamRule, "master")
@@ -637,8 +865,9 @@ test("V2 state transaction preserves same character updates from different group
     runtime.manager.handleDynamicCommand(event(".team 自伤 2", { group_id: "10001" })),
     runtime.manager.handleDynamicCommand(event(".team 自伤 3", { group_id: "10002" }))
   ])
-  const stored = runtime.diceManager.readState().users["20002"].cards["默认"].ruleData["team-pack"]
-  assert.equal(stored.values.hp, 5)
+  const state = runtime.diceManager.readState()
+  assert.equal(memberRuleData(state, "20002", "team-pack", "10001").values.hp, 8)
+  assert.equal(memberRuleData(state, "20002", "team-pack", "10002").values.hp, 7)
 })
 
 test("V2 stale runtime locks are reclaimed and owned locks are released", async t => {

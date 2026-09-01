@@ -4,7 +4,11 @@ import { buildBilibiliArchiveRelaySegments, cleanupBilibiliArchiveRelayFiles } f
 import { enrichBilibiliShare, formatBilibiliHistoryLinks, formatBilibiliHistoryText } from "../bilibiliMessage.js"
 import { buildDouyinArchiveRelaySegments, cleanupDouyinArchiveRelayFiles } from "../douyinMediaRelay.js"
 import { enrichDouyinShare, formatDouyinHistoryLinks, formatDouyinHistoryText } from "../douyinMessage.js"
-import { inlineForwardVideoSegment } from "./deliveryGateway.js"
+import { buildYoutubeArchiveRelaySegments, cleanupYoutubeArchiveRelayFiles } from "../youtubeMediaRelay.js"
+import { enrichYoutubeShare, formatYoutubeHistoryLinks, formatYoutubeHistoryText } from "../youtubeMessage.js"
+import { buildPixivArchiveRelaySegments, cleanupPixivArchiveRelayFiles } from "../pixivMediaRelay.js"
+import { enrichPixivShare, formatPixivHistoryLinks, formatPixivHistoryText } from "../pixivMessage.js"
+import { inlineForwardLocalFileSegment, inlineForwardVideoSegment } from "./deliveryGateway.js"
 import { AsyncSemaphore, KeyedSerialQueue } from "./keyedSerialQueue.js"
 import { LeaseLostError, startLeaseHeartbeat } from "./leaseHeartbeat.js"
 
@@ -41,6 +45,13 @@ function deliveryIdFor({ platform, botId, groupId, messageId, eventId }) {
   return ["v1", platform || "media", botId || "bot", groupId || "group", messageId || eventId].join(":")
 }
 
+const PLATFORM_LABELS = Object.freeze({
+  bilibili: "B站视频搬一下",
+  douyin: "抖音视频搬一下",
+  youtube: "YouTube视频搬一下",
+  pixiv: "Pixiv作品解析"
+})
+
 export class MediaOutbox {
   constructor({
     store,
@@ -55,12 +66,18 @@ export class MediaOutbox {
     prepareConcurrency = DEFAULT_PREPARE_CONCURRENCY,
     enrichBilibili = enrichBilibiliShare,
     enrichDouyin = enrichDouyinShare,
+    enrichYoutube = enrichYoutubeShare,
+    enrichPixiv = enrichPixivShare,
     buildBilibili = buildBilibiliArchiveRelaySegments,
     buildDouyin = buildDouyinArchiveRelaySegments,
+    buildYoutube = buildYoutubeArchiveRelaySegments,
+    buildPixiv = buildPixivArchiveRelaySegments,
     autoBilibiliMemberAuth = false,
     getBilibiliAuthCookie = () => "",
     artifactStore = null,
-    sharedMedia = null
+    sharedMedia = null,
+    youtubeRelay = {},
+    pixivRelay = {}
   } = {}) {
     this.store = store
     this.gateway = gateway
@@ -74,12 +91,18 @@ export class MediaOutbox {
     this.prepareSemaphore = new AsyncSemaphore(prepareConcurrency)
     this.enrichBilibili = enrichBilibili
     this.enrichDouyin = enrichDouyin
+    this.enrichYoutube = enrichYoutube
+    this.enrichPixiv = enrichPixiv
     this.buildBilibili = buildBilibili
     this.buildDouyin = buildDouyin
+    this.buildYoutube = buildYoutube
+    this.buildPixiv = buildPixiv
     this.autoBilibiliMemberAuth = autoBilibiliMemberAuth === true
     this.getBilibiliAuthCookie = getBilibiliAuthCookie
     this.artifactStore = artifactStore
     this.sharedMedia = sharedMedia
+    this.youtubeRelay = youtubeRelay && typeof youtubeRelay === "object" ? youtubeRelay : {}
+    this.pixivRelay = pixivRelay && typeof pixivRelay === "object" ? pixivRelay : {}
     this.refreshPromises = new Map()
     this.preparedRelays = new Map()
     this.runId = randomUUID()
@@ -89,7 +112,8 @@ export class MediaOutbox {
 
   async enqueue({ envelope, media }) {
     if (!this.enabled) return null
-    if (!media || !envelope?.groupId || !["bilibili", "douyin"].includes(media.type)) return null
+    const adapter = this.platformAdapter(media?.type)
+    if (!media || !envelope?.groupId || !adapter?.enabled) return null
     const id = deliveryIdFor({
       platform: media.type,
       botId: envelope.botId,
@@ -167,14 +191,12 @@ export class MediaOutbox {
   }
 
   async refreshCard(job) {
-    const stableId = job.platform === "douyin"
-      ? job.media?.aweme_id
-      : job.media?.bvid || job.media?.short_url || job.media?.page_url
+    const adapter = this.platformAdapter(job.platform)
+    if (!adapter) return { ...job.media, type: job.platform }
+    const stableId = adapter.stableId(job.media)
     const key = stableId ? `${job.platform}:${stableId}` : ""
     if (key && this.refreshPromises.has(key)) return await this.refreshPromises.get(key)
-    const promise = job.platform === "douyin"
-      ? this.enrichDouyin({ ...job.media, type: "douyin" }, { cacheTtlMs: 0 })
-      : this.enrichBilibili({ ...job.media, type: "bilibili" })
+    const promise = adapter.enrich({ ...job.media, type: job.platform }, { cacheTtlMs: 0, ...adapter.enrichOptions })
     if (key) this.refreshPromises.set(key, promise)
     try {
       return await promise
@@ -184,27 +206,89 @@ export class MediaOutbox {
   }
 
   async buildRelay(job, card, onTiming) {
-    const options = { segmentApi, logger: this.logger, artifactStore: this.artifactStore, onTiming }
+    const adapter = this.platformAdapter(job.platform)
+    if (!adapter) return emptyRelay()
+    const options = { segmentApi, logger: this.logger, artifactStore: this.artifactStore, onTiming, ...adapter.relayOptions }
     if (job.platform === "bilibili" && this.autoBilibiliMemberAuth) {
       // 仅在 relay 识别出试看/登录限制后使用；普通自动搬运不会发送 Cookie。
       options.autoAuthRetryCookie = String(this.getBilibiliAuthCookie?.() || "")
     }
-    return job.platform === "douyin"
-      ? await this.buildDouyin(card, options)
-      : await this.buildBilibili(card, options)
+    return await adapter.build(card, options)
   }
 
   formatInfo(job, card) {
-    const isDouyin = job.platform === "douyin"
-    return `${isDouyin ? "抖音视频搬一下" : "B站视频搬一下"}：${isDouyin ? formatDouyinHistoryText(card) : formatBilibiliHistoryText(card)}\n${isDouyin ? formatDouyinHistoryLinks(card) : formatBilibiliHistoryLinks(card)}`
+    const adapter = this.platformAdapter(job.platform)
+    if (!adapter) return "媒体解析"
+    const links = adapter.formatLinks(card)
+    return `${PLATFORM_LABELS[job.platform] || "媒体解析"}：${adapter.formatText(card)}${links ? `\n${links}` : ""}`
   }
 
   async releaseRelay(job, relay = emptyRelay()) {
     await Promise.all((relay.artifactLeases || []).map(lease => lease?.release?.()))
     await Promise.all((relay.sharedMediaFiles || []).map(file => fs.promises.unlink(file).catch(() => {})))
-    await (job?.platform === "douyin"
-      ? cleanupDouyinArchiveRelayFiles(relay.tempFiles)
-      : cleanupBilibiliArchiveRelayFiles(relay.tempFiles))
+    const adapter = this.platformAdapter(job?.platform)
+    await adapter?.cleanup(relay.tempFiles)
+  }
+
+  platformAdapter(platform) {
+    const type = String(platform || "").toLowerCase()
+    const adapters = {
+      bilibili: {
+        stableId: card => card?.bvid || card?.ep_id || card?.short_url || card?.page_url,
+        enrich: this.enrichBilibili,
+        build: this.buildBilibili,
+        cleanup: cleanupBilibiliArchiveRelayFiles,
+        formatText: formatBilibiliHistoryText,
+        formatLinks: formatBilibiliHistoryLinks,
+        relayOptions: {},
+        enrichOptions: {},
+        enabled: true,
+        resolvedStatuses: ["resolved", "resolved_bangumi"]
+      },
+      douyin: {
+        stableId: card => card?.aweme_id || card?.short_url || card?.page_url,
+        enrich: this.enrichDouyin,
+        build: this.buildDouyin,
+        cleanup: cleanupDouyinArchiveRelayFiles,
+        formatText: formatDouyinHistoryText,
+        formatLinks: formatDouyinHistoryLinks,
+        relayOptions: {},
+        enrichOptions: {},
+        enabled: true,
+        resolvedStatuses: ["resolved"]
+      },
+      youtube: {
+        stableId: card => card?.video_id || card?.page_url || card?.short_url,
+        enrich: this.enrichYoutube,
+        build: this.buildYoutube,
+        cleanup: cleanupYoutubeArchiveRelayFiles,
+        formatText: formatYoutubeHistoryText,
+        formatLinks: formatYoutubeHistoryLinks,
+        relayOptions: { youtubeRelay: this.youtubeRelay },
+        enrichOptions: {
+          binary: this.youtubeRelay.binary,
+          timeoutMs: this.youtubeRelay.metadataTimeoutMs,
+          proxyUrl: this.youtubeRelay.proxyUrl,
+          cookieHeader: this.youtubeRelay.cookieHeader,
+          poToken: this.youtubeRelay.poToken
+        },
+        enabled: this.youtubeRelay.enabled !== false,
+        resolvedStatuses: ["resolved"]
+      },
+      pixiv: {
+        stableId: card => card?.artwork_id || card?.page_url || card?.short_url,
+        enrich: this.enrichPixiv,
+        build: this.buildPixiv,
+        cleanup: cleanupPixivArchiveRelayFiles,
+        formatText: formatPixivHistoryText,
+        formatLinks: formatPixivHistoryLinks,
+        relayOptions: { pixivRelay: this.pixivRelay },
+        enrichOptions: {},
+        enabled: this.pixivRelay.enabled !== false,
+        resolvedStatuses: ["resolved"]
+      }
+    }
+    return adapters[type] || null
   }
 
   async prepareRelay(job) {
@@ -343,17 +427,18 @@ export class MediaOutbox {
       for (const stage of ["refresh", "playback", "download"]) {
         timings[stage] += Math.max(0, Number(prepared.timings?.[stage]) || 0)
       }
+      const adapter = this.platformAdapter(job.platform)
       const relaySegments = Array.isArray(relay?.segments) ? relay.segments : []
       const videoSegments = relaySegments.filter(item => item?.type === "video")
       const nonVideoSegments = relaySegments.filter(item => item?.type !== "video")
       if (Array.isArray(relay?.qualityOptions) && relay.qualityOptions.length) {
         nonVideoSegments.push(`\n可选清晰度：${relay.qualityOptions.map(item => item.label).join("、")}`)
       }
-      if (relayBuildFailed) nonVideoSegments.push("\n（封面或视频资源暂时获取失败，已保留基本信息和页面）")
-      else if (card.metadata_status && !["resolved", "resolved_bangumi"].includes(card.metadata_status)) {
-        const reason = card.metadata_status === "bangumi_metadata_failed"
+      if (relayBuildFailed) nonVideoSegments.push("\n（媒体资源暂时获取失败，已保留基本信息和页面）")
+      else if (card.metadata_status && !adapter?.resolvedStatuses?.includes(card.metadata_status)) {
+        const reason = card.metadata_failure_reason || (card.metadata_status === "bangumi_metadata_failed"
           ? "已识别为B站番剧集，但番剧详情未返回可播放分集信息"
-          : "视频详情暂时未解析完成"
+          : job.platform === "pixiv" ? "Pixiv 作品详情暂时未解析完成" : "视频详情暂时未解析完成")
         nonVideoSegments.push(`\n（${reason}，已保留当前卡片信息和页面）`)
       }
       const videos = []
@@ -362,12 +447,21 @@ export class MediaOutbox {
         relay.sharedMediaFiles ||= []
         videos.push(await inlineForwardVideoSegment(video, { artifactStore: this.artifactStore, sharedMedia: this.sharedMedia, sharedMediaFiles: relay.sharedMediaFiles }))
       }
+      const inlineSegments = []
+      for (const item of nonVideoSegments) {
+        if (item?.type === "image") {
+          relay.sharedMediaFiles ||= []
+          inlineSegments.push(await inlineForwardLocalFileSegment(item, { artifactStore: this.artifactStore, sharedMedia: this.sharedMedia, sharedMediaFiles: relay.sharedMediaFiles }))
+        } else {
+          inlineSegments.push(item)
+        }
+      }
       timings.encode += Date.now() - encodeStartedAt
       const botRoot = globalThis.Bot
       const senderId = Number(job.botId || botRoot?.uin || 0) || 0
       const senderName = botRoot?.bots?.[String(job.botId)]?.nickname || botRoot?.nickname || "希洛"
       const nodes = [
-        { user_id: senderId, nickname: senderName, message: [this.formatInfo(job, card), ...nonVideoSegments] },
+        { user_id: senderId, nickname: senderName, message: [this.formatInfo(job, card), ...inlineSegments] },
         ...videos.map(video => ({ user_id: senderId, nickname: senderName, message: [video] }))
       ]
       await heartbeat.assertOwned()

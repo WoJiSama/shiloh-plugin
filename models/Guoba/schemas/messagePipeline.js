@@ -67,5 +67,20 @@ export default [
     component: "InputNumber",
     bottomHelpMessage: "超过此大小只共享 MP4，不在内存中保留 Base64",
     componentProps: { min: 0, max: 256, step: 16, placeholder: "64" }
+  },
+  { component: "SOFT_GROUP_BEGIN", label: "YouTube 自动搬运授权" },
+  {
+    field: "youtubeRelay.cookieHeader",
+    label: "YouTube 登录 Cookie",
+    component: "InputPassword",
+    bottomHelpMessage: "粘贴已登录 YouTube 浏览器请求中的完整 Cookie 值；用于受登录、会员或私享权限保护的视频",
+    componentProps: { placeholder: "未配置时匿名访问" }
+  },
+  {
+    field: "youtubeRelay.poToken",
+    label: "YouTube PO Token",
+    component: "InputPassword",
+    bottomHelpMessage: "可选；仅在 yt-dlp 报 YouTube 机器人校验时填写。保存后重启服务生效",
+    componentProps: { placeholder: "未配置时不传递 PO Token" }
   }
 ]

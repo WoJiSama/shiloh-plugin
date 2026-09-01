@@ -137,3 +137,13 @@ test("delivery gateway rejects missing receipts and does not retry uncertain tra
     error => error instanceof DeliveryError && error.uncertain && error.retryable === false
   )
 })
+
+test("delivery gateway emits the shared delivery receipt log", async () => {
+  const lines = []
+  const gateway = new DeliveryGateway({
+    botRoot: () => ({ bots: { "1": { sendApi: async () => ({ retcode: 0, data: { message_id: 123 } }) } } }),
+    logger: { info: line => lines.push(line), warn: line => lines.push(line) }
+  })
+  await gateway.sendGroupForward({ botId: "1", groupId: "2", nodes: [{ message: ["ok"] }] })
+  assert.ok(lines.some(line => line.includes("[Delivery] status=sent channel=group_forward group=2") && line.includes("message=123")))
+})

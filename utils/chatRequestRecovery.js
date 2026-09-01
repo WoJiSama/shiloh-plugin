@@ -37,7 +37,7 @@ export function classifyChatRequestFailure(response, { thrown = false } = {}) {
   if (status === 429 || /rate.?limit|too many requests|限流|请求过多|额度/i.test(text)) {
     return { kind: "rate_limit", message: text, retryable: true, status: status || 429 }
   }
-  if ((status && status >= 500) || /bad gateway|service unavailable|upstream|上游.*(?:失败|错误|不可用)/i.test(text)) {
+  if ((status && status >= 500) || /bad gateway|service unavailable|(?:servers?|service).{0,48}(?:overloaded|busy|at capacity)|overloaded|upstream|上游.*(?:失败|错误|不可用)|服务(?:当前|暂时)?繁忙|负载过高|服务过载/i.test(text)) {
     return { kind: "upstream", message: text, retryable: true, status }
   }
   if (TIMEOUT_PATTERN.test(text)) {

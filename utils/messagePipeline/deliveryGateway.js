@@ -1,6 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
+import { pathToFileURL } from "node:url"
+import { logDeliveryOutcome } from "../deliveryObservability.js"
 
 const FORWARD_MEDIA_TIMEOUT_MS = 15 * 60 * 1000
 const mediaTimeoutLeases = new WeakMap()
@@ -36,10 +38,10 @@ export function buildOneBotForwardNodes(nodes = []) {
   }))
 }
 
-export async function inlineForwardVideoSegment(video = {}, { artifactStore = null, sharedMedia = null, sharedMediaFiles = null } = {}) {
-  const data = video?.data && typeof video.data === "object" ? video.data : video
+export async function inlineForwardLocalFileSegment(segment = {}, { artifactStore = null, sharedMedia = null, sharedMediaFiles = null } = {}) {
+  const data = segment?.data && typeof segment.data === "object" ? segment.data : segment
   const file = data?.file || ""
-  if (!file || String(file).startsWith("base64://") || /^https?:\/\//i.test(String(file))) return video
+  if (!file || String(file).startsWith("base64://") || /^https?:\/\//i.test(String(file))) return segment
   if (sharedMedia?.hostDir && sharedMedia?.containerDir) {
     const hostDir = path.resolve(String(sharedMedia.hostDir))
     const containerDir = String(sharedMedia.containerDir).replace(/\/+$/, "")
@@ -50,14 +52,106 @@ export async function inlineForwardVideoSegment(video = {}, { artifactStore = nu
     await fs.promises.copyFile(file, target)
     if (Array.isArray(sharedMediaFiles)) sharedMediaFiles.push(target)
     const staged = `file://${containerDir}/${targetName}`
-    return video?.data ? { ...video, data: { ...video.data, file: staged } } : { ...video, file: staged }
+    return segment?.data ? { ...segment, data: { ...segment.data, file: staged } } : { ...segment, file: staged }
   }
   const base64File = artifactStore?.encodeFile
     ? await artifactStore.encodeFile(file)
     : `base64://${(await fs.promises.readFile(file)).toString("base64")}`
-  return video?.data
-    ? { ...video, data: { ...video.data, file: base64File } }
-    : { ...video, file: base64File }
+  return segment?.data
+    ? { ...segment, data: { ...segment.data, file: base64File } }
+    : { ...segment, file: base64File }
+}
+
+export async function inlineForwardVideoSegment(video = {}, options = {}) {
+  return await inlineForwardLocalFileSegment(video, options)
+}
+
+function deliveryFailure(result) {
+  if (!result || typeof result !== "object") return ""
+  if (result.status === "failed") return result.wording || result.msg || "适配器返回发送失败"
+  if (result.retcode !== undefined && result.retcode !== null && Number(result.retcode) !== 0) {
+    return result.wording || result.msg || `retcode=${result.retcode}`
+  }
+  return ""
+}
+
+function compactFileError(error) {
+  return String(error?.message || error || "文件发送失败")
+    .replace(/base64:\/\/[A-Za-z0-9+/=]+/g, "base64://[omitted]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240)
+}
+
+export async function sendCompleteLocalFile(e, filePath, {
+  fileName = path.basename(String(filePath || "")),
+  maxBytes = 100 * 1024 * 1024,
+  logger = globalThis.logger
+} = {}) {
+  const resolved = path.resolve(String(filePath || ""))
+  const stat = await fs.promises.stat(resolved)
+  if (!stat.isFile()) throw new DeliveryError("待发送内容不是普通文件", { retryable: false })
+  if (stat.size <= 0) throw new DeliveryError("待发送文件为空", { retryable: false })
+  if (stat.size > Math.max(1, Number(maxBytes) || 0)) {
+    throw new DeliveryError(`文件超过发送上限（${Math.ceil(stat.size / 1024 / 1024)}MB）`, { retryable: false })
+  }
+
+  const name = String(fileName || path.basename(resolved)).trim() || path.basename(resolved)
+  const bot = e?.bot || globalThis.Bot
+  const errors = []
+  const apiAction = e?.group_id ? "upload_group_file" : e?.user_id ? "upload_private_file" : ""
+  const apiTarget = e?.group_id
+    ? { group_id: Number(e.group_id) }
+    : e?.user_id
+      ? { user_id: Number(e.user_id) }
+      : null
+
+  if (apiAction && apiTarget && typeof bot?.sendApi === "function") {
+    try {
+      const encoded = `base64://${(await fs.promises.readFile(resolved)).toString("base64")}`
+      const result = await bot.sendApi(apiAction, { ...apiTarget, file: encoded, name })
+      const failure = deliveryFailure(result)
+      if (failure) throw new Error(failure)
+      logDeliveryOutcome(logger, {
+        status: "sent",
+        channel: e?.group_id ? "group_file" : "private_file",
+        groupId: e?.group_id,
+        messageId: result?.data?.message_id || result?.message_id || null,
+        parts: 1
+      })
+      return { channel: apiAction, fileName: name, size: stat.size, receipt: result }
+    } catch (error) {
+      errors.push(compactFileError(error))
+    }
+  }
+
+  const target = e?.group || e?.friend
+  if (typeof target?.sendFile === "function") {
+    try {
+      const result = await target.sendFile(pathToFileURL(resolved).href, name)
+      const failure = deliveryFailure(result)
+      if (failure) throw new Error(failure)
+      logDeliveryOutcome(logger, {
+        status: "sent",
+        channel: e?.group_id ? "group_file_fallback" : "private_file_fallback",
+        groupId: e?.group_id,
+        messageId: result?.data?.message_id || result?.message_id || null,
+        parts: 1
+      })
+      return { channel: "sendFile", fileName: name, size: stat.size, receipt: result }
+    } catch (error) {
+      errors.push(compactFileError(error))
+    }
+  }
+
+  const reason = errors.filter(Boolean).join("；") || "当前适配器没有可用的完整文件上传接口"
+  logDeliveryOutcome(logger, {
+    status: "failed",
+    channel: e?.group_id ? "group_file" : "private_file",
+    groupId: e?.group_id,
+    error: reason
+  })
+  throw new DeliveryError(reason, { retryable: true })
 }
 
 function compactReceipt(result) {
@@ -113,6 +207,7 @@ export class DeliveryGateway {
     const root = typeof this.botRoot === "function" ? this.botRoot() : this.botRoot
     const bot = this.resolveBot(botId)
     if (typeof bot?.sendApi !== "function") {
+      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: `missing_bot:${botId || "unknown"}` })
       throw new DeliveryError(`Bot ${botId || "unknown"} 当前没有可用的 OneBot sendApi`)
     }
     let result
@@ -122,12 +217,14 @@ export class DeliveryGateway {
         messages: buildOneBotForwardNodes(nodes)
       }))
     } catch (error) {
+      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error })
       throw new DeliveryError(error.message || "OneBot 调用异常", {
         retryable: false,
         uncertain: true
       })
     }
     if (!result || typeof result !== "object" || result.retcode === undefined || result.retcode === null) {
+      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: "missing_receipt" })
       throw new DeliveryError("OneBot 未返回可验证的发送回执", {
         retryable: false,
         uncertain: true
@@ -135,14 +232,24 @@ export class DeliveryGateway {
     }
     const retcode = Number(result.retcode)
     if (!Number.isFinite(retcode)) {
+      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: `invalid_retcode:${result.retcode}` })
       throw new DeliveryError(`OneBot 返回了非法 retcode: ${String(result.retcode).slice(0, 50)}`, {
         retryable: false,
         uncertain: true
       })
     }
     if (retcode !== 0) {
+      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: result?.wording || result?.msg || `retcode=${retcode}` })
       throw new DeliveryError(result?.wording || result?.msg || `OneBot retcode=${retcode}`, { retcode })
     }
-    return compactReceipt(result)
+    const receipt = compactReceipt(result)
+    logDeliveryOutcome(this.logger, {
+      status: "sent",
+      channel: "group_forward",
+      groupId,
+      messageId: receipt.messageId,
+      parts: Array.isArray(nodes) ? nodes.length : 1
+    })
+    return receipt
   }
 }

@@ -42,13 +42,9 @@ export function parseAndRoute(items, ctx = {}) {
     const refs = normalizeRefs(item.refs)
 
     if (route === 'explicit_teaching') {
-      const alias = compactText(item.alias, 64)
-      if (alias && item.targetQQ) {
-        ops.push({ stream: 'alias', qq: String(item.targetQQ), text: alias, authority: 'teaching', confidence, by: [String(ctx.speakerQQ || '')].filter(Boolean), at })
-      } else {
-        const text = compactText(item.content, 240)
-        if (text) ops.push({ stream: 'groupFact', authority: 'teaching', fact: makeFact({ text, tags: item.tags, refs, authority: 'teaching', confidence, at, eventAt }) })
-      }
+      // Shared aliases/definitions/workflows are committed only through the
+      // per-message group semantic decision. This background extractor must
+      // never create a second, untraceable shared-state write path.
       continue
     }
 
@@ -119,15 +115,16 @@ export class MemoryExtractor {
 
   // 可被测试覆写。加 AbortSignal.timeout（§0.5）+ 调用计数/耗时打点（§0.3/P1-4）；
   // 失败只 inc fail + logger.warn 状态码，绝不记 prompt/fact 全文（隐私）。
-  async _callChat(messages, maxTokens = 800) {
+  async _callChat(messages, maxTokens = 800, { timeoutMs = CHAT_TIMEOUT_MS } = {}) {
     const c = this.config.memoryAiConfig || {}
     const startedAt = Date.now()
+    const boundedTimeoutMs = Math.max(500, Math.min(CHAT_TIMEOUT_MS, Number(timeoutMs) || CHAT_TIMEOUT_MS))
     try {
       const res = await fetch(c.memoryAiUrl, {
         method: 'POST',
         headers: { Authorization: `Bearer ${c.memoryAiApikey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: c.memoryAiModel || 'gpt-4o-mini', messages, temperature: 0.2, max_tokens: maxTokens }),
-        signal: AbortSignal.timeout(CHAT_TIMEOUT_MS)
+        signal: AbortSignal.timeout(boundedTimeoutMs)
       })
       if (!res.ok) throw new Error(`记忆 AI 请求失败：${res.status}`)
       const data = await res.json()

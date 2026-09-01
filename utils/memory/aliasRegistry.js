@@ -6,8 +6,8 @@ function uniq(values = []) {
   return [...new Set((values || []).filter(Boolean).map(String))]
 }
 
-// doc: { [normAlias]: {qq, authority, confidence, at, by[], display} }
-// claim: {text, qq, authority, confidence, by[], at}
+// doc: { [normAlias]: {qq, authority, confidence, at, by[], createdBy, sourceMessageId, proposalId, display} }
+// claim: {text, qq, authority, confidence, by[], createdBy, sourceMessageId, proposalId, at}
 // 返回 {doc, changed}
 export function upsertAlias(doc, claim) {
   const key = normalizeAlias(claim.text)
@@ -21,6 +21,9 @@ export function upsertAlias(doc, claim) {
     confidence: clamp(claim.confidence ?? 0.7),
     at: Number(claim.at) || 0,
     by: uniq(claim.by),
+    createdBy: String(claim.createdBy || claim.by?.[0] || ''),
+    sourceMessageId: String(claim.sourceMessageId || ''),
+    proposalId: String(claim.proposalId || claim.sourceMessageId || ''),
     display: claim.text
   }
 
@@ -34,7 +37,10 @@ export function upsertAlias(doc, claim) {
       authority: incoming.authority && incoming.authority !== existing.authority
         ? pickStrongerAuthority(existing.authority, incoming.authority)
         : existing.authority,
-      display: incoming.display || existing.display
+      display: incoming.display || existing.display,
+      createdBy: existing.createdBy || incoming.createdBy || '',
+      sourceMessageId: incoming.sourceMessageId || existing.sourceMessageId || '',
+      proposalId: incoming.proposalId || existing.proposalId || ''
     }
     return { doc: next, changed: true }
   }

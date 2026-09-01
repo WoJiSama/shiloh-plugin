@@ -5,6 +5,8 @@ import { getMentionTargetId, replaceCqMentions } from "./mentionTargets.js"
 import { safeTruncateUnicode } from "./unicodeText.js"
 import { enrichBilibiliMessageSegments, formatBilibiliHistoryLinks, formatBilibiliHistoryText } from "./bilibiliMessage.js"
 import { enrichDouyinMessageSegments, formatDouyinHistoryLinks, formatDouyinHistoryText } from "./douyinMessage.js"
+import { enrichYoutubeMessageSegments, formatYoutubeHistoryLinks, formatYoutubeHistoryText } from "./youtubeMessage.js"
+import { enrichPixivMessageSegments, formatPixivHistoryLinks, formatPixivHistoryText } from "./pixivMessage.js"
 import { KeyedSerialQueue } from "./messagePipeline/keyedSerialQueue.js"
 
 const archiveWriteQueue = new KeyedSerialQueue()
@@ -62,6 +64,15 @@ function normalizeGroupAdmins(value) {
 function normalizeMessageSegments(message = [], storeMediaUrl = true) {
   if (!Array.isArray(message)) return []
   return message.map(seg => {
+    if (seg?.type === "forward_context") {
+      return {
+        type: "forward_context",
+        text: String(seg.text || ""),
+        forward_ids: Array.isArray(seg.forward_ids) ? seg.forward_ids.map(String) : [],
+        media: Array.isArray(seg.media) ? seg.media : [],
+        forward_nodes: Array.isArray(seg.forward_nodes) ? seg.forward_nodes : []
+      }
+    }
     if (seg?.type === "bilibili") {
       const next = { type: "bilibili", platform: "bilibili" }
       for (const key of ["title", "description", "bvid", "ep_id", "aid", "cid", "owner", "owner_mid", "duration", "page_count", "pages", "short_url", "page_url", "video_url", "cover_url", "stats", "shared_by", "shared_by_qq", "published_at", "metadata_status"]) {
@@ -78,6 +89,23 @@ function normalizeMessageSegments(message = [], storeMediaUrl = true) {
         next[key] = seg[key]
       }
       if (storeMediaUrl && !next.video_url && next.page_url) next.video_url = next.page_url
+      return next
+    }
+    if (seg?.type === "youtube") {
+      const next = { type: "youtube", platform: "youtube" }
+      for (const key of ["title", "description", "video_id", "channel", "channel_id", "duration", "short_url", "page_url", "video_url", "cover_url", "stats", "published_at", "upload_date", "age_limit", "availability", "is_live", "was_live", "metadata_status"]) {
+        if (seg[key] === undefined || (!storeMediaUrl && ["short_url", "page_url", "video_url", "cover_url"].includes(key))) continue
+        next[key] = seg[key]
+      }
+      if (storeMediaUrl && !next.video_url && next.page_url) next.video_url = next.page_url
+      return next
+    }
+    if (seg?.type === "pixiv") {
+      const next = { type: "pixiv", platform: "pixiv" }
+      for (const key of ["title", "description", "artwork_id", "author", "author_id", "tags", "page_count", "width", "height", "x_restrict", "sanity_level", "short_url", "page_url", "cover_url", "stats", "published_at", "metadata_status"]) {
+        if (seg[key] === undefined || (!storeMediaUrl && ["short_url", "page_url", "cover_url"].includes(key))) continue
+        next[key] = seg[key]
+      }
       return next
     }
     const next = { type: seg?.type || "unknown" }
@@ -166,7 +194,16 @@ function renderSegment(seg = {}) {
     const links = formatDouyinHistoryLinks(seg)
     return links ? `${formatDouyinHistoryText(seg)} [${links}]` : formatDouyinHistoryText(seg)
   }
+  if (type === "youtube") {
+    const links = formatYoutubeHistoryLinks(seg)
+    return links ? `${formatYoutubeHistoryText(seg)} [${links}]` : formatYoutubeHistoryText(seg)
+  }
+  if (type === "pixiv") {
+    const links = formatPixivHistoryLinks(seg)
+    return links ? `${formatPixivHistoryText(seg)} [${links}]` : formatPixivHistoryText(seg)
+  }
   if (type === "record") return "[语音]"
+  if (type === "forward_context") return `[合并转发记录]\n${decodeEntities(seg.text || "")}`.trim()
   if (type === "json" || type === "xml" || type === "markdown") return `[${type}消息]`
   if (type === "notice") return decodeEntities(seg.text || "[群通知]")
   return `[${type}消息]`
@@ -291,8 +328,14 @@ export class MessageArchiveManager {
     try {
       const enrichedMessage = Array.isArray(options.preEnrichedMessage)
         ? options.preEnrichedMessage
-        : await enrichDouyinMessageSegments(
-          await enrichBilibiliMessageSegments(e.message, e.raw_message || e.msg || ""),
+        : await enrichPixivMessageSegments(
+          await enrichYoutubeMessageSegments(
+            await enrichDouyinMessageSegments(
+              await enrichBilibiliMessageSegments(e.message, e.raw_message || e.msg || ""),
+              e.raw_message || e.msg || ""
+            ),
+            e.raw_message || e.msg || ""
+          ),
           e.raw_message || e.msg || ""
         )
       const record = this.buildRecord({ ...e, message: enrichedMessage }, cfg)

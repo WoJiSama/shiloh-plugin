@@ -84,6 +84,82 @@ export default [
     label: "紧凑任务模型"
   },
   {
+    field: "taskAiConfig.casual.apiUrl",
+    label: "短闲聊 API URL",
+    component: "Input",
+    bottomHelpMessage: "短、无工具、非复杂的闲聊使用；留空时回退主对话模型"
+  },
+  {
+    field: "taskAiConfig.casual.model",
+    label: "短闲聊模型",
+    component: "Input",
+    bottomHelpMessage: "建议使用低成本、响应快的模型；不复用对话追踪模型，除非你明确这样配置"
+  },
+  {
+    field: "taskAiConfig.casual.apiKey",
+    label: "短闲聊 API Key",
+    component: "InputPassword"
+  },
+  {
+    field: "taskAiConfig.casual.maxOutputTokens",
+    label: "短闲聊输出额度",
+    component: "InputNumber",
+    componentProps: { min: 80, max: 800, placeholder: "280" }
+  },
+  {
+    field: "taskAiConfig.casual.reasoningEffort",
+    label: "短闲聊推理强度",
+    component: "Input",
+    bottomHelpMessage: "后端支持时可填 low/none；留空不发送 reasoning_effort"
+  },
+  {
+    field: "taskAiConfig.progress.apiUrl",
+    label: "进度回复 API URL",
+    component: "Input",
+    bottomHelpMessage: "留空时优先复用跟踪模型，没有时再用聊天模型；配置后长任务的自然中途接话使用此后端"
+  },
+  {
+    field: "taskAiConfig.progress.model",
+    label: "进度回复模型",
+    component: "Input",
+    bottomHelpMessage: "建议使用响应快的小模型，不限制厂商或模型名称"
+  },
+  {
+    field: "taskAiConfig.progress.apiKey",
+    label: "进度回复 API Key",
+    component: "InputPassword"
+  },
+  {
+    field: "taskAiConfig.progress.maxTokensField",
+    label: "进度回复输出参数名",
+    component: "Select",
+    componentProps: {
+      options: [
+        { label: "max_tokens", value: "max_tokens" },
+        { label: "max_completion_tokens", value: "max_completion_tokens" }
+      ]
+    }
+  },
+  {
+    field: "taskAiConfig.progress.maxOutputTokens",
+    label: "进度回复输出额度",
+    component: "InputNumber",
+    componentProps: { min: 120, max: 800, placeholder: "400" },
+    bottomHelpMessage: "需要覆盖部分模型的内部推理消耗；最终可见回复仍会截到一小句"
+  },
+  {
+    field: "taskAiConfig.progress.reasoningEffort",
+    label: "进度回复推理强度",
+    component: "Input",
+    bottomHelpMessage: "后端支持时可填 low/none；留空不发送 reasoning_effort"
+  },
+  {
+    field: "taskAiConfig.progress.timeoutMs",
+    label: "进度回复模型超时（毫秒）",
+    component: "InputNumber",
+    componentProps: { min: 800, max: 15000, placeholder: "6000" }
+  },
+  {
     field: "taskAiConfig.translation.apiUrl",
     label: "翻译任务 API URL",
     component: "Input",

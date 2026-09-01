@@ -6,6 +6,7 @@ import { MediaArtifactStore } from "./mediaArtifactStore.js"
 import { MessagePipeline } from "./messagePipeline.js"
 import { getMissingRedisJobCapabilities, RedisJobStore } from "./redisJobStore.js"
 import { BilibiliAuthManager } from "../BilibiliAuthManager.js"
+import { collectForwardContext, extractForwardIdsFromSegments } from "../groupContextResolver.js"
 
 const RUNTIME_KEY = Symbol.for("bl-chat-plugin.message-pipeline.runtime")
 
@@ -38,6 +39,41 @@ function positiveNumber(value, fallback) {
 function nonnegativeNumber(value, fallback) {
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 ? number : fallback
+}
+
+async function resolvePipelineForwardContext(envelope = {}, bot = globalThis.Bot) {
+  const forwardIds = extractForwardIdsFromSegments(envelope.message)
+  if (!forwardIds.length || !envelope.groupId) return null
+  try {
+    const root = globalThis.Bot || bot
+    const group = root?.pickGroup?.(Number(envelope.groupId)) || root?.pickGroup?.(String(envelope.groupId))
+    if (!group?.getForwardMsg) throw new Error("OneBot group context is not ready")
+    const context = await collectForwardContext(group, envelope.message, {
+      maxDepth: 3,
+      maxLines: 80,
+      maxImages: 12,
+      maxText: 6000
+    })
+    // NapCat reconnecting can return an empty list before the OneBot action channel is ready.
+    // A forward record with no readable nodes is not useful context, so retry instead of
+    // permanently recording it as an empty forward.
+    if (!context.text && !(context.media || []).length) throw new Error("OneBot returned no forward nodes")
+    return {
+      forwardIds,
+      text: context.text,
+      media: (context.media || []).map(asset => ({
+        type: asset.type,
+        label: asset.label,
+        fileName: asset.fileName || "",
+        source: asset.source || ""
+      })),
+      forwardNodes: Array.isArray(context.forwardNodes) ? context.forwardNodes : []
+    }
+  } catch (cause) {
+    const error = new Error(`OneBot forward context is not ready: ${cause?.message || cause}`)
+    error.code = "forward_context_unavailable"
+    throw error
+  }
 }
 
 export function normalizeMessagePipelineConfig(value = {}) {
@@ -108,6 +144,8 @@ export function createMessagePipelineRuntime({
     autoBilibiliMemberAuth: pluginSettings.bilibiliQualityRelay?.autoUseAuthorizedForMemberOnly !== false,
     getBilibiliAuthCookie: () => new BilibiliAuthManager().cookie(),
     artifactStore,
+    youtubeRelay: pluginSettings.youtubeRelay || {},
+    pixivRelay: pluginSettings.pixivRelay || {},
     sharedMedia: config.mediaSharedHostDir && config.mediaSharedContainerDir
       ? { hostDir: config.mediaSharedHostDir, containerDir: config.mediaSharedContainerDir }
       : null
@@ -128,7 +166,8 @@ export function createMessagePipelineRuntime({
     maxAttempts: config.eventMaxAttempts,
     retryBaseMs: config.retryBaseSeconds * 1000,
     leaseMs: config.eventLeaseSeconds * 1000,
-    concurrency: config.eventConcurrency
+    concurrency: config.eventConcurrency,
+    resolveForwardContext: envelope => resolvePipelineForwardContext(envelope, bot)
   })
   return { config, pipeline, mediaOutbox, store: jobStore, gateway: deliveryGateway, artifactStore }
 }

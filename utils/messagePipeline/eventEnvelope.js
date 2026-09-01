@@ -101,6 +101,7 @@ export function envelopeToRuntimeEvent(envelope = {}, message = envelope.message
     raw_message: envelope.rawMessage || "",
     msg: envelope.rawMessage || "",
     message: copySerializable(Array.isArray(message) ? message : []),
+    forward_context: copySerializable(envelope.forwardContext || null),
     sender: copySerializable(envelope.sender || {}),
     source: copySerializable(envelope.source || null),
     operator_id: envelope.operatorId ? Number(envelope.operatorId) || envelope.operatorId : undefined,

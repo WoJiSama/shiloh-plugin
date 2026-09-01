@@ -1,6 +1,10 @@
 import assert from "node:assert/strict"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { test } from "node:test"
 import { MediaOutbox } from "../utils/messagePipeline/mediaOutbox.js"
+import { MediaArtifactStore } from "../utils/messagePipeline/mediaArtifactStore.js"
 import { RedisJobStore } from "../utils/messagePipeline/redisJobStore.js"
 import { createFakeRedis } from "./helpers/fakeRedis.js"
 
@@ -83,6 +87,82 @@ test("simultaneous deliveries share metadata refresh and persist stage timings",
     assert.ok(job.timings.refresh >= 9)
     assert.ok(job.timings.total >= job.timings.send)
   }
+})
+
+test("same video in different groups waits for one shared download before both send", async () => {
+  const store = new RedisJobStore({ redis: createFakeRedis() })
+  const artifactStore = new MediaArtifactStore({ ttlMs: 0, maxEncodedBytes: 1024 })
+  const sent = []
+  let downloads = 0
+  let startDownload
+  let finishDownload
+  const downloadStarted = new Promise(resolve => { startDownload = resolve })
+  const downloadFinished = new Promise(resolve => { finishDownload = resolve })
+  const outbox = new MediaOutbox({
+    store,
+    artifactStore,
+    prepareConcurrency: 2,
+    enrichBilibili: async card => card,
+    enrichDouyin: async card => card,
+    buildBilibili: async (card, { artifactStore: sharedStore, segmentApi }) => {
+      const lease = await sharedStore.acquire(`bilibili:${card.bvid}:1:qn6`, async () => {
+        downloads += 1
+        startDownload()
+        await downloadFinished
+        const filePath = path.join(os.tmpdir(), `shared-video-${Date.now()}.mp4`)
+        await fs.promises.writeFile(filePath, "shared video")
+        return filePath
+      })
+      return { segments: [segmentApi.video(lease.filePath)], tempFiles: [], artifactLeases: [lease] }
+    },
+    buildDouyin: async () => ({ segments: [], tempFiles: [], artifactLeases: [] }),
+    gateway: { sendGroupForward: async args => { sent.push(args); return { retcode: 0, messageId: sent.length } } },
+    logger: { info() {}, warn() {} }
+  })
+
+  await outbox.enqueue({ envelope: envelope(609235590, 41), media: { ...longBilibiliCard(), bvid: "BVSHAREDQUEUE" } })
+  await outbox.enqueue({ envelope: envelope(953676639, 42), media: { ...longBilibiliCard(), bvid: "BVSHAREDQUEUE" } })
+  await downloadStarted
+  await new Promise(resolve => setTimeout(resolve, 10))
+  assert.equal(downloads, 1)
+  assert.equal(sent.length, 0)
+
+  finishDownload()
+  for (let index = 0; index < 50 && sent.length < 2; index += 1) await new Promise(resolve => setTimeout(resolve, 10))
+  assert.deepEqual(sent.map(item => String(item.groupId)).sort(), ["609235590", "953676639"])
+  assert.equal(downloads, 1)
+  outbox.stop()
+})
+
+test("YouTube uses the shared platform adapter and reuses one media artifact across groups", async () => {
+  const store = new RedisJobStore({ redis: createFakeRedis() })
+  const artifactStore = new MediaArtifactStore({ ttlMs: 0, maxEncodedBytes: 1024 })
+  const sent = []
+  let downloads = 0
+  const outbox = new MediaOutbox({
+    store,
+    artifactStore,
+    enrichYoutube: async card => ({ ...card, metadata_status: "resolved" }),
+    buildYoutube: async (card, { artifactStore: sharedStore, segmentApi }) => {
+      const lease = await sharedStore.acquire(`youtube:${card.video_id}:lowest-mp4`, async () => {
+        downloads++
+        const filePath = path.join(os.tmpdir(), `youtube-shared-${Date.now()}.mp4`)
+        await fs.promises.writeFile(filePath, "video")
+        return filePath
+      })
+      return { segments: [segmentApi.video(lease.filePath)], artifactLeases: [lease], tempFiles: [] }
+    },
+    gateway: { sendGroupForward: async args => { sent.push(args); return { retcode: 0, messageId: sent.length } } },
+    logger: { info() {}, warn() {} }
+  })
+  outbox.stopped = true
+  const media = { type: "youtube", video_id: "shared-youtube", title: "same", duration: 10, page_url: "https://www.youtube.com/watch?v=shared-youtube" }
+  const left = await outbox.enqueue({ envelope: envelope(609235590, 51), media })
+  const right = await outbox.enqueue({ envelope: envelope(953676639, 52), media })
+  await Promise.all([outbox.process(left.id), outbox.process(right.id)])
+  assert.equal(downloads, 1)
+  assert.deepEqual(sent.map(item => String(item.groupId)).sort(), ["609235590", "953676639"])
+  assert.match(sent[0].nodes[0].message[0], /^YouTube视频搬一下：分享了《same》/)
 })
 
 test("same-group later media prepares while the prior delivery is still sending", async () => {

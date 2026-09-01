@@ -28,6 +28,25 @@ function startServer() {
   })
 }
 
+function startFailingToolsServer() {
+  const hits = { tools: 0, chat: 0 }
+  const server = http.createServer(async (req, res) => {
+    for await (const _chunk of req) {}
+    const isTools = req.url.startsWith('/tools/')
+    hits[isTools ? 'tools' : 'chat']++
+    if (isTools || req.url.startsWith('/bad/')) {
+      res.writeHead(401, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: { message: 'invalid token' } }))
+      return
+    }
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ choices: [{ message: { role: 'assistant', content: 'chat fallback answered' } }] }))
+  })
+  return new Promise(resolve => {
+    server.listen(0, '127.0.0.1', () => resolve({ server, hits, port: server.address().port }))
+  })
+}
+
 test('YTapi preserves planner text and adaptively routes complex no-tool replies', async t => {
   let YTapi
   try {
@@ -56,6 +75,14 @@ test('YTapi preserves planner text and adaptively routes complex no-tool replies
       chatApiUrl: `http://127.0.0.1:${port}/chat/chat/completions`,
       chatApiModel: 'flash-model',
       chatApiKey: ['fast-key']
+    },
+    taskAiConfig: {
+      casual: {
+        apiUrl: `http://127.0.0.1:${port}/chat/chat/completions`,
+        model: 'casual-model',
+        apiKey: 'casual-key',
+        maxOutputTokens: 280
+      }
     }
   }
 
@@ -84,6 +111,17 @@ test('YTapi preserves planner text and adaptively routes complex no-tool replies
   assert.equal(simple.choices[0].message.content, 'fast:flash-model')
   assert.deepEqual(hits, { tools: 2, chat: 1 })
 
+  const casual = await YTapi({
+    messages: [{ role: 'user', content: '希洛也是ai吗' }],
+    tool_choice: 'none'
+  }, config, undefined, undefined, {
+    taskBackend: 'casual',
+    routeLabel: '短闲聊模型'
+  })
+  assert.equal(casual.choices[0].message.content, 'fast:casual-model')
+  assert.deepEqual(hits, { tools: 2, chat: 2 })
+  assert.equal(bodies.at(-1).max_tokens, 280)
+
   const compact = await YTapi({
     messages: [
       { role: 'system', content: '只翻译 Modrinth 项目块。' },
@@ -97,7 +135,130 @@ test('YTapi preserves planner text and adaptively routes complex no-tool replies
     generation: { temperature: 0, maxOutputTokens: 1200 }
   })
   assert.equal(compact.choices[0].message.content, 'fast:flash-model')
-  assert.deepEqual(hits, { tools: 2, chat: 2 })
+  assert.deepEqual(hits, { tools: 2, chat: 3 })
   assert.equal(bodies.at(-1).temperature, 0)
   assert.equal(bodies.at(-1).max_tokens, 1200)
+})
+
+test('YTapi falls back to the chat backend when an optional tools planner is unauthorized', async t => {
+  let YTapi
+  try {
+    globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
+    ;({ YTapi } = await import('../utils/apiClient.js'))
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') {
+      t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
+      return
+    }
+    throw error
+  }
+
+  const { server, hits, port } = await startFailingToolsServer()
+  t.after(() => server.close())
+  const config = {
+    providers: 'oneapi',
+    useTools: true,
+    agentIntelligence: { enabled: true, complexModelRouting: true },
+    toolsAiConfig: {
+      toolsAiUrl: `http://127.0.0.1:${port}/tools/chat/completions`,
+      toolsAiModel: 'pro-model',
+      toolsAiApikey: 'bad-key'
+    },
+    chatAiConfig: {
+      chatApiUrl: `http://127.0.0.1:${port}/chat/chat/completions`,
+      chatApiModel: 'flash-model',
+      chatApiKey: 'chat-key'
+    }
+  }
+
+  const response = await YTapi({
+    messages: [{ role: 'user', content: '总结一下刚刚大家说了什么' }],
+    tools: [{ type: 'function', function: { name: 'chatHistoryTool', parameters: { type: 'object' } } }],
+    tool_choice: 'auto'
+  }, config)
+
+  assert.equal(response.choices[0].message.content, 'chat fallback answered')
+  assert.deepEqual(hits, { tools: 1, chat: 1 })
+})
+
+test('YTapi uses the configured lightweight backend after tools and chat credentials both fail', async t => {
+  let YTapi
+  try {
+    globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
+    ;({ YTapi } = await import('../utils/apiClient.js'))
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') {
+      t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
+      return
+    }
+    throw error
+  }
+
+  const { server, hits, port } = await startFailingToolsServer()
+  t.after(() => server.close())
+  const config = {
+    providers: 'oneapi',
+    useTools: true,
+    toolsAiConfig: {
+      toolsAiUrl: `http://127.0.0.1:${port}/tools/chat/completions`,
+      toolsAiModel: 'pro-model',
+      toolsAiApikey: 'bad-key'
+    },
+    chatAiConfig: {
+      chatApiUrl: `http://127.0.0.1:${port}/bad/chat/completions`,
+      chatApiModel: 'chat-model',
+      chatApiKey: 'also-bad'
+    },
+    trackAiConfig: {
+      trackAiUrl: `http://127.0.0.1:${port}/chat/chat/completions`,
+      trackAiModel: 'flash-model',
+      trackAiApikey: 'working-key'
+    }
+  }
+
+  const response = await YTapi({
+    messages: [{ role: 'user', content: '总结一下刚刚大家说了什么' }],
+    tools: [{ type: 'function', function: { name: 'chatHistoryTool', parameters: { type: 'object' } } }],
+    tool_choice: 'auto'
+  }, config)
+
+  assert.equal(response.choices[0].message.content, 'chat fallback answered')
+  assert.deepEqual(hits, { tools: 1, chat: 2 })
+})
+
+test('YTapi falls back from a plain chat request when the configured chat backend is unauthorized', async t => {
+  let YTapi
+  try {
+    globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
+    ;({ YTapi } = await import('../utils/apiClient.js'))
+  } catch (error) {
+    if (error?.code === 'ERR_MODULE_NOT_FOUND') {
+      t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
+      return
+    }
+    throw error
+  }
+
+  const { server, hits, port } = await startFailingToolsServer()
+  t.after(() => server.close())
+  const response = await YTapi({
+    messages: [{ role: 'user', content: '希洛你在吗' }],
+    tool_choice: 'none'
+  }, {
+    providers: 'oneapi',
+    useTools: true,
+    chatAiConfig: {
+      chatApiUrl: `http://127.0.0.1:${port}/bad/chat/completions`,
+      chatApiModel: 'chat-model',
+      chatApiKey: 'bad-key'
+    },
+    trackAiConfig: {
+      trackAiUrl: `http://127.0.0.1:${port}/chat/chat/completions`,
+      trackAiModel: 'track-model',
+      trackAiApikey: 'working-key'
+    }
+  })
+
+  assert.equal(response.choices[0].message.content, 'chat fallback answered')
+  assert.deepEqual(hits, { tools: 0, chat: 2 })
 })

@@ -1,8 +1,6 @@
 import { compactText } from './constants.js'
 
-const DEFINING_VERB = /(?:是|叫|算|作为|属于|负责)/u
 const FIRST_PERSON_POSSESSIVE = /(?:我的|我(?:在|群)?(?:里|中|里面)?的)/u
-const EXPLICIT_TEACHING_SIGNAL = /(?:记住|记一下|记着|记得|记好|记下来|定义|以后叫|你要知道)/u
 
 function normalizeKey(value = '') {
   return String(value || '').toLowerCase().replace(/[\s，,。；;：:！!？?、@"“”'']/g, '')
@@ -44,36 +42,6 @@ function membersFromMap(memberMap) {
   return memberMap?.values ? Array.from(memberMap.values()).filter(member => member?.user_id) : []
 }
 
-function mentionIds(segments = [], botId = '') {
-  const ids = []
-  for (const segment of Array.isArray(segments) ? segments : []) {
-    if (segment?.type !== 'at') continue
-    const value = segment?.qq ?? segment?.user_id ?? segment?.data?.qq ?? segment?.data?.user_id
-    const id = String(value || '').trim()
-    if (/^\d+$/.test(id) && id !== String(botId || '') && !ids.includes(id)) ids.push(id)
-  }
-  return ids
-}
-
-function resolveMemberTargets({ text = '', messageSegments = [], memberMap, botId = '' } = {}) {
-  const members = membersFromMap(memberMap)
-  const byId = new Map(members.map(member => [String(member.user_id), member]))
-  const ids = mentionIds(messageSegments, botId)
-  for (const match of String(text).matchAll(/(?:@QQ:|QQ[:：]?|@)(\d{5,12})/gi)) {
-    const id = String(match[1])
-    if (byId.has(id) && id !== String(botId || '') && !ids.includes(id)) ids.push(id)
-  }
-  const lowered = String(text).toLowerCase()
-  for (const member of members) {
-    const name = displayName(member)
-    if (name.length >= 2 && lowered.includes(name.toLowerCase())) {
-      const id = String(member.user_id)
-      if (id !== String(botId || '') && !ids.includes(id)) ids.push(id)
-    }
-  }
-  return ids.map(userId => ({ userId, displayName: displayName(byId.get(userId)) || userId }))
-}
-
 function normalizeFileAsset(asset = {}) {
   const fileName = compactText(asset?.fileName || asset?.name || '', 180)
   if (!fileName) return null
@@ -83,116 +51,6 @@ function normalizeFileAsset(asset = {}) {
     folderPath: compactText(asset?.folderPath || '', 240),
     origin: compactText(asset?.origin || 'message', 40)
   }
-}
-
-function fileReferenceFromText(text = '') {
-  const match = String(text).match(/群文件(?:里面|中的|里的|里|中)?\s*(?:的)?\s*["“]?([^，,。；;]+?)["”]?\s*(?:是|叫|算|作为)/u)
-  return compactText(match?.[1] || '', 180)
-}
-
-function resolveFileResource(text, fileAssets = []) {
-  const assets = fileAssets.map(normalizeFileAsset).filter(Boolean)
-  const referencedName = fileReferenceFromText(text)
-  if (referencedName) {
-    const exact = assets.find(asset => asset.fileName === referencedName)
-    return exact || { fileName: referencedName, fileId: '', folderPath: '', origin: 'named_group_file' }
-  }
-  const exact = assets.find(asset => String(text).includes(asset.fileName))
-  if (exact) return exact
-  return assets.length === 1 ? assets[0] : null
-}
-
-function extractDescriptor(text = '') {
-  const raw = String(text)
-  const action = raw.match(/(?:是|叫|算|作为)\s*(?:我|@QQ:\d+|[^，,。；;]{0,24})?(?:做的|制作的|画的|写的|负责的)\s*([^，,。；;！!？?]{1,48})/u)
-  const fallback = raw.match(/(?:是|叫|算|作为)\s*([^，,。；;！!？?]{1,48})/u)
-  const value = action?.[1] || fallback?.[1] || ''
-  return compactText(value
-    .replace(/^(?:我|他|她|它|@QQ:\d+)?(?:做的|制作的|画的|写的|负责的)?/u, '')
-    .replace(/^(?:一个|一份|那个|这个|群里的|群文件里的)/u, ''), 80)
-}
-
-function resolveOwner(text, creatorQQ, targets) {
-  if (/(?:是|叫|算|作为)\s*我(?:做|制作|画|写|负责)/u.test(text)) return String(creatorQQ || '')
-  const matched = String(text).match(/(?:是|叫|算|作为)\s*@QQ:(\d+)(?:做|制作|画|写|负责)/u)
-  if (matched?.[1]) return matched[1]
-  return targets.length === 1 && /(?:做|制作|画|写|负责)/u.test(text) ? targets[0].userId : ''
-}
-
-function buildFileKnowledge({ text, creatorQQ, targets, file, now }) {
-  const descriptor = extractDescriptor(text)
-  if (!file || !descriptor || !/(?:做|制作|画|写|负责|是|叫|算|作为)/u.test(text)) return null
-  const ownerQQ = resolveOwner(text, creatorQQ, targets)
-  if (!ownerQQ && !/(?:是|叫|算|作为)/u.test(text)) return null
-  return {
-    kind: 'group_file',
-    subject: descriptor,
-    subjectKey: normalizeKey(descriptor),
-    aliases: ownerQQ ? [`我的${descriptor}`, `${descriptor}`] : [descriptor],
-    ownerQQ,
-    targetUserIds: [],
-    targets: [],
-    resource: file,
-    sourceText: compactText(text, 300),
-    createdBy: String(creatorQQ || ''),
-    at: Number(now) || Date.now(),
-    enabled: true
-  }
-}
-
-function extractMemberSubject(text = '') {
-  const match = String(text).match(/(?:是|叫|算|作为|属于|负责)\s*([^，,。；;！!？?]{1,80})/u)
-  return compactText(match?.[1] || '', 80)
-    .replace(/(?:你|妳)?(?:记住|记一下|记着|记得|记好|记下来|知道).*/u, '')
-    .replace(/^(?:我们(?:的)?|群里(?:的)?|本群(?:的)?)/u, '')
-    .trim()
-}
-
-function resolveRelationshipOwner(subject = '', creatorQQ = '', botId = '') {
-  if (/^我的/u.test(subject)) return { ownerQQ: String(creatorQQ || ''), subject: subject.replace(/^我的/u, '') }
-  if (/^(?:你的|妳的|希洛的)/u.test(subject)) return { ownerQQ: String(botId || ''), subject: subject.replace(/^(?:你的|妳的|希洛的)/u, '') }
-  return { ownerQQ: '', subject }
-}
-
-function buildMemberKnowledge({ text, creatorQQ, creatorDisplay, botId, targets, now }) {
-  if (!targets.length || !DEFINING_VERB.test(text)) return null
-  const rawSubject = extractMemberSubject(text)
-  const relationship = resolveRelationshipOwner(rawSubject, creatorQQ, botId)
-  const subject = compactText(relationship.subject, 80)
-  if (!subject) return null
-  return {
-    kind: targets.length > 1 ? 'member_set' : 'member_definition',
-    subject,
-    subjectKey: normalizeKey(subject),
-    aliases: relationship.ownerQQ ? [`我的${subject}`, subject] : [subject],
-    ownerQQ: relationship.ownerQQ,
-    ownerDisplay: relationship.ownerQQ === String(creatorQQ || '') ? compactText(creatorDisplay, 80) : '',
-    targetUserIds: targets.map(item => item.userId),
-    targets,
-    resource: null,
-    sourceText: compactText(text, 300),
-    createdBy: String(creatorQQ || ''),
-    at: Number(now) || Date.now(),
-    enabled: true
-  }
-}
-
-export function extractExplicitGroupKnowledge({ text = '', messageSegments = [], memberMap, fileAssets = [], creatorQQ = '', creatorDisplay = '', botId = '', now = Date.now() } = {}) {
-  const normalized = String(text || '')
-    .replace(/\[CQ:at,[^\]]*(?:qq|user_id|id|uin)=(\d+)[^\]]*\]/g, ' @QQ:$1 ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (!normalized || !DEFINING_VERB.test(normalized)) return []
-  const targets = resolveMemberTargets({ text: normalized, messageSegments, memberMap, botId })
-  const file = resolveFileResource(normalized, fileAssets)
-  const fileEntry = buildFileKnowledge({ text: normalized, creatorQQ, targets, file, now })
-  if (fileEntry) return [fileEntry]
-  const memberEntry = buildMemberKnowledge({ text: normalized, creatorQQ, creatorDisplay, botId, targets, now })
-  return memberEntry ? [memberEntry] : []
-}
-
-export function shouldUseSemanticGroupKnowledgeExtraction(text = '') {
-  return EXPLICIT_TEACHING_SIGNAL.test(String(text || ''))
 }
 
 function parseJsonArray(raw = '') {
@@ -206,26 +64,128 @@ function parseJsonArray(raw = '') {
   }
 }
 
-// Model output is only a semantic interpretation. Targets are still resolved against the live member map.
+function resolveDeclaredMemberTargets(targetNames, memberMap, botId = '') {
+  const members = membersFromMap(memberMap)
+  const targetIds = []
+  for (const rawName of Array.isArray(targetNames) ? targetNames : []) {
+    const name = compactText(rawName, 80)
+    if (!name) continue
+    const key = normalizeKey(name)
+    const matches = members.filter(member => {
+      const memberId = String(member.user_id || '')
+      return memberId === name || normalizeKey(displayName(member)) === key
+    })
+    if (matches.length !== 1) return []
+    const memberId = String(matches[0].user_id)
+    if (!memberId || memberId === String(botId || '') || targetIds.includes(memberId)) continue
+    targetIds.push(memberId)
+  }
+  return targetIds.map(userId => {
+    const member = members.find(item => String(item.user_id) === userId)
+    return { userId, displayName: displayName(member) || userId }
+  })
+}
+
+function resolveDeclaredOwner(owner, context = {}) {
+  const value = String(owner || '').toLowerCase()
+  const ownerQQ = value === 'speaker'
+    ? String(context.creatorQQ || '')
+    : value === 'bot'
+      ? String(context.botId || '')
+      : /^\d+$/.test(value) ? value : ''
+  if (!ownerQQ) return ''
+  if (ownerQQ === String(context.creatorQQ || '') || ownerQQ === String(context.botId || '')) return ownerQQ
+  return membersFromMap(context.memberMap).some(member => String(member.user_id) === ownerQQ) ? ownerQQ : ''
+}
+
+function resolveDeclaredFile(fileName, fileAssets = []) {
+  const wanted = compactText(fileName, 180)
+  if (!wanted) return null
+  return fileAssets
+    .map(normalizeFileAsset)
+    .filter(Boolean)
+    .find(asset => asset.fileName === wanted) || null
+}
+
+// The model decides whether this message is a deliberate long-term teaching
+// request and splits it into atomic entries. Local code only verifies that a
+// declared member/file exists in the current group before storing it.
 export function parseSemanticGroupKnowledgeOutput(raw, context = {}) {
-  const entries = []
+  return parseSemanticGroupMemoryOutput(raw, context).knowledgeEntries
+}
+
+export function parseSemanticGroupMemoryOutput(raw, context = {}) {
+  const knowledgeEntries = []
+  const workflowRules = []
+  const aliasMappings = []
+  const seen = new Set()
   for (const item of parseJsonArray(raw)) {
     if (!item || typeof item !== 'object') continue
-    const kind = item.kind === 'member_set' ? 'member_set' : 'member_definition'
+    if (item.kind === 'alias') {
+      const alias = compactText(item.alias || item.subject, 64)
+      const targets = resolveDeclaredMemberTargets(item.targetNames, context.memberMap, context.botId)
+      if (alias && targets.length === 1) aliasMappings.push({ alias, targetUserId: targets[0].userId, targetDisplay: targets[0].displayName })
+      continue
+    }
+    if (item.kind === 'workflow') {
+      const condition = compactText(item.condition, 120)
+      const targets = resolveDeclaredMemberTargets(item.targetNames, context.memberMap, context.botId)
+      const key = `workflow:${normalizeKey(condition)}:${targets.map(target => target.userId).join(',')}`
+      if (!condition || !targets.length || seen.has(key)) continue
+      seen.add(key)
+      workflowRules.push({
+        kind: 'mention_members',
+        condition,
+        conditionKey: normalizeKey(condition),
+        targetUserIds: targets.map(target => target.userId),
+        targets,
+        sourceText: compactText(context.text, 300),
+        sourceMessageId: String(context.sourceMessageId || ''),
+        createdBy: String(context.creatorQQ || ''),
+        at: Number(context.now) || Date.now(),
+        enabled: true
+      })
+      continue
+    }
+    const entries = []
+    const kind = ['member_definition', 'member_set', 'group_file'].includes(item.kind)
+      ? item.kind
+      : 'member_definition'
     const subject = compactText(item.subject, 80)
     if (!subject) continue
-    const targetText = Array.isArray(item.targetNames) ? item.targetNames.join(' ') : String(item.targetName || item.target || '')
-    const targets = resolveMemberTargets({ text: targetText, memberMap: context.memberMap, botId: context.botId })
+    const ownerQQ = resolveDeclaredOwner(item.owner, context)
+    if (kind === 'group_file') {
+      const resource = resolveDeclaredFile(item.resourceFileName || item.fileName, context.fileAssets)
+      if (!resource) continue
+      const entry = {
+        kind,
+        subject,
+        subjectKey: normalizeKey(subject),
+        aliases: ownerQQ ? [`我的${subject}`, subject] : [subject],
+        ownerQQ,
+        ownerDisplay: ownerQQ === String(context.creatorQQ || '') ? compactText(context.creatorDisplay, 80) : '',
+        targetUserIds: [],
+        targets: [],
+        resource,
+        sourceText: compactText(context.text, 300),
+        createdBy: String(context.creatorQQ || ''),
+        at: Number(context.now) || Date.now(),
+        enabled: true,
+        sourceMessageId: String(context.sourceMessageId || '')
+      }
+      const key = `${entry.kind}:${entry.ownerQQ}:${entry.subjectKey}:${entry.targetUserIds.join(',')}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        knowledgeEntries.push(entry)
+      }
+      continue
+    }
+    const targetNames = Array.isArray(item.targetNames)
+      ? item.targetNames
+      : [item.targetName || item.target].filter(Boolean)
+    const targets = resolveDeclaredMemberTargets(targetNames, context.memberMap, context.botId)
     if (!targets.length) continue
-    const owner = String(item.owner || '').toLowerCase()
-    const ownerQQ = owner === 'speaker'
-      ? String(context.creatorQQ || '')
-      : owner === 'bot'
-        ? String(context.botId || '')
-        : /^\d+$/.test(owner) ? owner : ''
-    if (ownerQQ && ownerQQ !== String(context.creatorQQ || '') && ownerQQ !== String(context.botId || '') &&
-      !membersFromMap(context.memberMap).some(member => String(member.user_id) === ownerQQ)) continue
-    entries.push({
+    const entry = {
       kind: kind === 'member_set' || targets.length > 1 ? 'member_set' : 'member_definition',
       subject,
       subjectKey: normalizeKey(subject),
@@ -238,10 +198,16 @@ export function parseSemanticGroupKnowledgeOutput(raw, context = {}) {
       sourceText: compactText(context.text, 300),
       createdBy: String(context.creatorQQ || ''),
       at: Number(context.now) || Date.now(),
-      enabled: true
-    })
+      enabled: true,
+      sourceMessageId: String(context.sourceMessageId || '')
+    }
+    const key = `${entry.kind}:${entry.ownerQQ}:${entry.subjectKey}:${entry.targetUserIds.join(',')}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      knowledgeEntries.push(entry)
+    }
   }
-  return entries
+  return { knowledgeEntries, workflowRules, aliasMappings }
 }
 
 function hasOwnerSpecificQuery(text = '') {

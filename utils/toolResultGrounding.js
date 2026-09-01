@@ -55,18 +55,23 @@ export function buildUnavailableToolReply(results = []) {
   const imageFailure = classified.find(result => result.toolName === "googleImageAnalysisTool" && result.state.kind !== "success")
   if (imageFailure) {
     const code = String(imageFailure.state.parsed?.error?.code || "")
+    const status = Number(imageFailure.state.parsed?.error?.status || imageFailure.state.parsed?.evidence?.attempts?.at?.(-1)?.status || 0)
     if (code === "image_link_expired") return "图片我收到了，但这张图的下载链接已经过期了。你重新发一次原图，我再看。"
-    if (code === "image_download_failed") return "图片我收到了，但这次没能把原图读下来。我不会根据猜测分析 Steam 的报错。"
-    if (code === "vision_timeout") return "图片我收到了，但这次识图等了太久仍没返回结果。我先不根据猜测判断 Steam 的问题。"
-    return "图片我收到了，但这次识图没有拿到可用结果。我不会根据猜测判断 Steam 的问题。"
+    if (code === "image_download_failed") return "图片收到了，不过这次没能把原图读下来。我还没看到里面的内容，先不乱猜。"
+    if (code === "vision_timeout") return "图片收到了，不过这次看图等太久，最后没有读到内容。我先不乱猜图里的问题。"
+    if (code === "vision_http" && [401, 403].includes(status)) return "图片收到了，不过识图渠道的授权没有通过，所以我还没读到图里的内容。"
+    if (code === "vision_http" && status === 429) return "图片收到了，不过识图渠道现在请求太多，暂时没有返回内容。"
+    if (code === "vision_http" && status >= 500) return "图片收到了，不过识图渠道这次临时出错了，我还没读到图里的内容。"
+    if (code === "vision_http") return "图片收到了，不过识图渠道没有正常接住这次请求，我还没读到图里的内容。"
+    return "图片收到了，不过这次没有读到可用内容。我先不乱猜图里的问题。"
   }
   if (kinds.includes("not_found")) {
-    return "这次没有找到你要的内容。现有结果里没有依据，我不会拿旧聊天记录补答案。"
+    return "这轮我确实没找到能对上的内容，手里没依据，就不拿旧消息硬凑答案了。"
   }
   if (kinds.includes("error")) {
-    return "这次查询没有成功，我没拿到可靠结果。没查到就是没查到，我不会凭印象乱说。"
+    return "这次没查成，我手里没有能确定的东西，就不装作知道了。"
   }
-  return "这次没有返回可用内容，所以我现在不能确认。没拿到结果就是没拿到，我不猜。"
+  return "这次没拿到能确认的内容，我不想凭猜测回你。"
 }
 
 export function hasUsableToolResult(results = []) {

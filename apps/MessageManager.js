@@ -7,6 +7,9 @@ import { buildBilibiliArchiveRelaySegments, cleanupBilibiliArchiveRelayFiles } f
 import { getInstalledMessagePipeline } from '../utils/messagePipeline/runtime.js';
 import { BilibiliAuthManager } from '../utils/BilibiliAuthManager.js';
 import { enrichBilibiliShare, extractBilibiliBvid, extractBilibiliEpisodeId } from '../utils/bilibiliMessage.js';
+import { downloadOfficialMusicShare, extractNeteaseMusicShare, resolveNeteaseTextShare, scheduleMusicShareCleanup } from '../utils/musicShareRelay.js';
+import { sendCompleteLocalFile } from '../utils/messagePipeline/deliveryGateway.js';
+import { buildVisibleFailureDetail } from '../utils/visibleFailure.js';
 
 const BILIBILI_QUALITY_PRESETS = new Map([
     ['240P', 6], ['360P', 16], ['480P', 32], ['720P', 64], ['1080P', 80], ['1080P+', 112], ['4K', 120]
@@ -40,6 +43,71 @@ function parseBilibiliQualityRelayRequest(message = '') {
     } catch {
         return null;
     }
+}
+
+function getArchiveForwardSnapshots(record = {}) {
+    const context = Array.isArray(record.message)
+        ? record.message.find(segment => segment?.type === 'forward_context')
+        : null;
+    return Array.isArray(context?.forward_nodes) ? context.forward_nodes : [];
+}
+
+function getForwardSegmentId(segment = {}) {
+    return String(segment?.id || segment?.data?.id || segment?.resid || segment?.data?.resid || '').trim();
+}
+
+async function canReplayArchivedForward(group, id, cache) {
+    if (!group?.getForwardMsg || !id) return true;
+    if (cache.has(id)) return cache.get(id);
+    const available = await group.getForwardMsg(id)
+        .then(nodes => Array.isArray(nodes) ? nodes.length > 0 : Boolean(nodes))
+        .catch(() => false);
+    cache.set(id, available);
+    return available;
+}
+
+async function buildArchiveForwardReplayNodes(record = {}, group = null) {
+    const availability = new Map();
+    const expand = async sourceNodes => {
+        const output = [];
+        for (const node of Array.isArray(sourceNodes) ? sourceNodes : []) {
+            let message = Array.isArray(node?.message) ? [...node.message] : [];
+            const expiredChildren = [];
+            for (const nested of Array.isArray(node?.nested_forwards) ? node.nested_forwards : []) {
+                const id = String(nested?.id || '').trim();
+                if (!id) continue;
+                if (await canReplayArchivedForward(group, id, availability)) {
+                    if (!message.some(segment => getForwardSegmentId(segment) === id)) message.push({ type: 'forward', id });
+                    continue;
+                }
+                message = message.filter(segment => getForwardSegmentId(segment) !== id);
+                expiredChildren.push(...await expand(nested.nodes));
+            }
+            output.push({
+                user_id: node?.user_id || record.user_id || record.sender?.user_id || Bot.uin,
+                nickname: node?.nickname || '未知',
+                time: node?.time || undefined,
+                message: message.length ? message : ['[空消息]']
+            }, ...expiredChildren);
+        }
+        return output;
+    };
+    const nodes = [];
+    for (const root of getArchiveForwardSnapshots(record)) nodes.push(...await expand(root?.nodes));
+    return nodes;
+}
+
+function formatArchiveForwardHeader(record = {}) {
+    const time = String(record.time || '').replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
+    const name = record.sender?.card || record.sender?.nickname || String(record.user_id || '未知');
+    return `${time || '未知时间'} ${name}：转发的合并聊天记录`;
+}
+
+function formatMusicFileSize(size = 0) {
+    const bytes = Math.max(0, Number(size) || 0);
+    return bytes >= 1024 * 1024
+        ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.max(1, Math.ceil(bytes / 1024))} KB`;
 }
 
 function extractMentionedUserIds(e = {}, message = '') {
@@ -122,6 +190,8 @@ export class MessageRecordPlugin extends plugin {
                 { reg: '^[.。]B站授权(登录|状态|退出)\\s*$', fnc: 'bilibiliAuth', permission: 'master' },
                 { reg: '^[.。]高清搬运白名单(?:\\s+(添加|删除|查看))?\\s*.*$', fnc: 'manageBilibiliQualityWhitelist', permission: 'master' },
                 { reg: '^[.。]高清搬运(?:\\s+[\\s\\S]+)?$', fnc: 'relayBilibiliHighQuality' },
+                { reg: '^[.。]音乐提取\\s*$', fnc: 'relayQuotedMusic', permission: 'master' },
+                { reg: '^[\\s\\S]*$', fnc: 'relayGroupMusicShare' },
                 {
                     reg: '^#全局方案(添加|删除)(白名单群组|Gemini密钥|触发前缀|过滤消息|Gemini工具列表|OpenAI工具列表|OneAPI工具列表|OneAPI密钥|GrokSSO|WorkosCursorToken|Gemini代理列表).*$',
                     fnc: 'modifyArrayConfig',
@@ -134,6 +204,7 @@ export class MessageRecordPlugin extends plugin {
         this.messageManager = new MessageManager(readMessageCacheOptions());
         this.archiveManager = messageArchiveManager;
         this.bilibiliAuthManager = new BilibiliAuthManager();
+        this.relayedMusicMessageIds = new Set();
     }
 
     async bilibiliAuth(e) {
@@ -162,7 +233,7 @@ export class MessageRecordPlugin extends plugin {
                 } catch (error) { clearInterval(timer); logger.warn(`[B站授权] 轮询失败: ${error.message}`); }
             }, 3000);
             timer.unref?.();
-        } catch (error) { await e.reply(`B站授权登录未启动：${error.message}`); }
+        } catch (error) { await e.reply(`B站授权登录未启动：${buildVisibleFailureDetail(error)}`); }
         return true;
     }
 
@@ -176,7 +247,7 @@ export class MessageRecordPlugin extends plugin {
         const action = String(e.msg || '').match(/高清搬运白名单\s*(添加|删除|查看)?/)?.[1] || '查看';
         const config = await this.readConfig();
         if (!config) {
-            await e.reply('读取高清搬运白名单配置失败');
+            await e.reply(`读取高清搬运白名单配置失败：${buildVisibleFailureDetail(this.lastConfigError)}`);
             return true;
         }
         const settings = config.pluginSettings ||= {};
@@ -200,7 +271,7 @@ export class MessageRecordPlugin extends plugin {
         if (next.length) whitelist[groupId] = next;
         else delete whitelist[groupId];
         if (!await this.saveConfig(config)) {
-            await e.reply('保存高清搬运白名单配置失败');
+            await e.reply(`保存高清搬运白名单配置失败：${buildVisibleFailureDetail(this.lastConfigError)}`);
             return true;
         }
         await e.reply(`已${action}本群高清搬运白名单：${users.join('、')}`);
@@ -239,7 +310,14 @@ export class MessageRecordPlugin extends plugin {
             ep_id: extractBilibiliEpisodeId(request.url),
             title: 'B站视频'
         };
-        const card = await enrichBilibiliShare(initialCard, { timeoutMs: 10_000 });
+        let card;
+        try {
+            card = await enrichBilibiliShare(initialCard, { timeoutMs: 10_000 });
+        } catch (error) {
+            logger.warn(`[B站高清搬运] 视频信息解析失败: ${error.message}`);
+            await e.reply(`B站高清搬运没有拿到视频信息：${buildVisibleFailureDetail(error)}`);
+            return true;
+        }
         if (!card?.bvid && !card?.ep_id) {
             await e.reply('没有解析到可搬运的 B站视频或番剧集，请使用 b23.tv、BV 视频页或 ep 集链接。');
             return true;
@@ -259,7 +337,7 @@ export class MessageRecordPlugin extends plugin {
             });
             const hasVideo = relay.segments.some(item => item?.type === 'video');
             if (!hasVideo) {
-                await e.reply(`B站高清搬运未完成：${relay.failureReason || '播放资源或视频本体不可用'}。`);
+                await e.reply(`B站高清搬运未完成：${buildVisibleFailureDetail(relay.failureReason, { fallback: '没有拿到可下载的视频本体' })}。`);
                 return true;
             }
             const requested = formatBilibiliQuality(request.quality, relay.qualityOptions);
@@ -278,11 +356,130 @@ export class MessageRecordPlugin extends plugin {
             }
         } catch (error) {
             logger.warn(`[B站高清搬运] 请求失败: ${error.message}`);
-            await e.reply('B站高清搬运本次请求失败，未发送不完整视频。');
+            await e.reply(`B站高清搬运本次请求失败，未发送不完整视频。原因：${buildVisibleFailureDetail(error)}`);
         } finally {
             await cleanupBilibiliArchiveRelayFiles(relay?.tempFiles || []);
         }
         return true;
+    }
+
+    async relayQuotedMusic(e) {
+        const replyId = e.reply_id || e.source?.message_id || e.source?.seq;
+        if (!replyId) {
+            await e.reply('请引用一条网易云音乐卡片后发送 .音乐提取');
+            return true;
+        }
+
+        const bot = e.bot || Bot;
+        let source;
+        try {
+            const response = await bot.sendApi('get_msg', { message_id: replyId });
+            source = response?.data || response;
+        } catch (error) {
+            logger.warn(`[音乐提取] 读取引用消息失败: ${error.message}`);
+            await e.reply(`没有读取到被引用的音乐卡片：${buildVisibleFailureDetail(error)}`);
+            return true;
+        }
+
+        const share = extractNeteaseMusicShare(source) || await resolveNeteaseTextShare(source?.raw_message || source?.msg || '');
+        if (!share) {
+            await e.reply('引用消息不是可提取的网易云音乐卡片。');
+            return true;
+        }
+
+        await this.sendMusicShare(e, share, { notifyFailure: true });
+        return true;
+    }
+
+    async relayGroupMusicShare(e) {
+        if (!e.group_id || String(e.user_id || '') === String(e.self_id || '')) return false;
+        const messageId = String(e.message_id || '');
+        if (messageId && this.relayedMusicMessageIds.has(messageId)) return false;
+        const source = {
+            message: e.message,
+            raw_message: e.raw_message,
+            msg: e.msg
+        };
+        const share = extractNeteaseMusicShare(source) || await resolveNeteaseTextShare([e.msg, e.raw_message].filter(Boolean).join('\n'));
+        if (!share) return false;
+        if (messageId) {
+            this.relayedMusicMessageIds.add(messageId);
+            setTimeout(() => this.relayedMusicMessageIds.delete(messageId), 10 * 60 * 1000).unref?.();
+        }
+        await this.sendMusicShare(e, share, { notifyFailure: false });
+        return true;
+    }
+
+    async sendMusicShare(e, share, { notifyFailure = true } = {}) {
+        let audio;
+        try {
+            audio = await downloadOfficialMusicShare(share);
+        } catch (error) {
+            logger.warn(`[音乐提取] ${share.title} 下载或发送失败: ${error.message}`);
+            if (notifyFailure) {
+                await e.reply(`音乐提取失败：${buildVisibleFailureDetail(error)}`);
+            }
+            return;
+        }
+
+        const record = globalThis.segment?.record
+            ? globalThis.segment.record(audio.filePath)
+            : { type: 'record', data: { file: audio.filePath } };
+        try {
+            await sendCompleteLocalFile(e, audio.filePath, {
+                fileName: audio.fileName,
+                maxBytes: 20 * 1024 * 1024,
+                logger
+            });
+        } catch (error) {
+            logger.warn(`[音乐提取] ${share.title} 可下载文件发送失败: ${error.message}`);
+            try {
+                await e.reply(record);
+            } catch (recordError) {
+                logger.warn(`[音乐提取] ${share.title} 试听音频发送失败: ${recordError.message}`);
+            }
+            try {
+                await e.reply(`音乐已经提取出来了，但可下载文件发送失败：${buildVisibleFailureDetail(error)}`);
+            } finally {
+                scheduleMusicShareCleanup(audio.filePath);
+            }
+            return;
+        }
+
+        const sender = {
+            user_id: e.self_id || globalThis.Bot?.uin || e.user_id,
+            nickname: '希洛'
+        };
+        const intro = [
+            '网易云音乐',
+            `${share.title} - ${share.artist}`,
+            `可下载文件：${audio.fileName}`,
+            `文件大小：${formatMusicFileSize(audio.size)}`
+        ].join('\n');
+        try {
+            if (e.group?.makeForwardMsg) {
+                const forward = await e.group.makeForwardMsg([
+                    { ...sender, message: intro }
+                ]);
+                await e.reply(forward);
+            } else {
+                await e.reply(intro);
+            }
+        } catch (error) {
+            logger.warn(`[音乐提取] ${share.title} 信息合并转发失败: ${error.message}`);
+            try {
+                await e.reply(intro);
+            } catch (fallbackError) {
+                logger.warn(`[音乐提取] ${share.title} 信息文本发送失败: ${fallbackError.message}`);
+            }
+        }
+        try {
+            await e.reply(record);
+        } catch (error) {
+            logger.warn(`[音乐提取] ${share.title} 试听音频发送失败，完整文件已上传: ${error.message}`);
+        } finally {
+            scheduleMusicShareCleanup(audio.filePath);
+        }
     }
 
     parseArchiveSearch(msg = "", e = {}) {
@@ -387,7 +584,7 @@ export class MessageRecordPlugin extends plugin {
             await e.reply(lines.join('\n'));
         } catch (error) {
             logger.error(`[MessagePipeline] 状态查询失败: ${error.stack || error.message}`);
-            await e.reply(`消息管道状态查询失败：${error.message}`);
+            await e.reply(`消息管道状态查询失败：${buildVisibleFailureDetail(error)}`);
         }
         return true;
     }
@@ -398,10 +595,19 @@ export class MessageRecordPlugin extends plugin {
             : null;
     }
 
-    async buildArchiveForwardMessages(records = []) {
+    async buildArchiveForwardMessages(records = [], group = null) {
         const messages = [];
         const tempFiles = [];
         for (const record of records) {
+            const forwardNodes = await buildArchiveForwardReplayNodes(record, group);
+            if (forwardNodes.length) {
+                messages.push({
+                    user_id: record.user_id || record.sender?.user_id || Bot.uin,
+                    nickname: record.sender?.card || record.sender?.nickname || String(record.user_id || "未知"),
+                    message: [formatArchiveForwardHeader(record)]
+                }, ...forwardNodes);
+                continue;
+            }
             const message = [this.archiveManager.formatRecord(record, { compact: true })];
             const bilibili = this.getBilibiliSegment(record);
             if (bilibili) {
@@ -447,7 +653,7 @@ export class MessageRecordPlugin extends plugin {
                 `共 ${records.length} 条`
             ].filter(Boolean).join(" | ");
             logger.info(`[MessageArchive] ${title}`);
-            const { messages: forwardMsgs, tempFiles } = await this.buildArchiveForwardMessages(records);
+            const { messages: forwardMsgs, tempFiles } = await this.buildArchiveForwardMessages(records, e.group);
             try {
                 const summary = e.group?.makeForwardMsg
                     ? await e.group.makeForwardMsg(forwardMsgs)
@@ -458,7 +664,7 @@ export class MessageRecordPlugin extends plugin {
             }
         } catch (error) {
             logger.error(`[MessageArchive] 查询失败: ${error.stack || error.message}`);
-            await e.reply(`查询失败：${error.message}`);
+            await e.reply(`查询失败：${buildVisibleFailureDetail(error)}`);
         }
         return true;
     }
@@ -478,7 +684,7 @@ export class MessageRecordPlugin extends plugin {
         }
         const config = await this.readConfig();
         if (!config) {
-            await e.reply("读取配置失败");
+            await e.reply(`读取配置失败：${buildVisibleFailureDetail(this.lastConfigError)}`);
             return true;
         }
         const archive = config.pluginSettings.messageArchive ||= {};
@@ -500,7 +706,7 @@ export class MessageRecordPlugin extends plugin {
         if (await this.saveConfig(config)) {
             await e.reply(`已${action === "add" ? "添加" : "删除"}本群聊天记录管理员：${admins.join("、")}`);
         } else {
-            await e.reply("保存配置失败");
+            await e.reply(`保存配置失败：${buildVisibleFailureDetail(this.lastConfigError)}`);
         }
         return true;
     }
@@ -564,7 +770,7 @@ export class MessageRecordPlugin extends plugin {
 
         } catch (error) {
             logger.error(`获取消息记录失败: ${error}`);
-            await e.reply('获取消息记录失败，请查看控制台日志');
+            await e.reply(`获取消息记录失败：${buildVisibleFailureDetail(error)}`);
         }
     }
 
@@ -588,12 +794,12 @@ export class MessageRecordPlugin extends plugin {
             e.reply(`已清除${type === 'group' ? '群聊' : '私聊'}消息记录`);
         } catch (error) {
             logger.error(`清除消息记录失败: ${error}`);
-            e.reply('清除消息记录失败，请查看控制台日志');
+            e.reply(`清除消息记录失败：${buildVisibleFailureDetail(error)}`);
         }
     }
 
     async modifyArrayConfig(e) {
-        if (!this.e.isMaster) return false
+        if (!e.isMaster) return false
 
         const msg = e.msg
         const isAdd = msg.includes('添加')
@@ -616,7 +822,7 @@ export class MessageRecordPlugin extends plugin {
 
         const config = await this.readConfig()
         if (!config) {
-            e.reply('读取配置失败')
+            e.reply(`读取配置失败：${buildVisibleFailureDetail(this.lastConfigError)}`)
             return false
         }
 
@@ -640,20 +846,23 @@ export class MessageRecordPlugin extends plugin {
             if (await this.saveConfig(config)) {
                 e.reply(`批量${isAdd ? '添加' : '删除'}成功`)
             } else {
-                e.reply('保存配置失败')
+                e.reply(`保存配置失败：${buildVisibleFailureDetail(this.lastConfigError)}`)
             }
         } catch (error) {
             logger.error(`修改数组配置失败: ${error}`)
-            e.reply('操作失败')
+            e.reply(`操作失败：${buildVisibleFailureDetail(error)}`)
         }
     }
 
     async readConfig() {
         try {
             const file = fs.readFileSync(this.configPath, 'utf8')
-            return YAML.parse(file)
+            const config = YAML.parse(file)
+            this.lastConfigError = null
+            return config
         } catch (error) {
             logger.error(`读取配置文件失败: ${error}`)
+            this.lastConfigError = error
             return null
         }
     }
@@ -662,9 +871,11 @@ export class MessageRecordPlugin extends plugin {
         try {
             const yamlStr = YAML.stringify(config)
             fs.writeFileSync(this.configPath, yamlStr, 'utf8')
+            this.lastConfigError = null
             return true
         } catch (error) {
             logger.error(`保存配置文件失败: ${error}`)
+            this.lastConfigError = error
             return false
         }
     }

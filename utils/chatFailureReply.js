@@ -20,7 +20,9 @@ export function hasMeaningfulUserText(text = "") {
     .trim())
 }
 
-export function buildGenericChatFailureReply(userText = "", { isGreeting = false, failureKind = "unknown" } = {}) {
+export const buildVisibleChatFailureDetail = buildVisibleFailureDetail
+
+export function buildGenericChatFailureReply(userText = "", { isGreeting = false, failureKind = "unknown", failureDetail = "" } = {}) {
   if (isToneCorrectionMessage(userText)) {
     return "你说得对，刚才那几句有点顶着你说了，听着确实不舒服。我收一下。"
   }
@@ -28,16 +30,20 @@ export function buildGenericChatFailureReply(userText = "", { isGreeting = false
     return "这条消息里没有读到可处理的文字内容。你补一句具体要我做什么，我再处理。"
   }
   if (isGreeting) {
-    return "我在。你的消息已经收到了，只是这次回答服务没有正常返回。"
+    return `我在。这次回复没生成出来，消息本身没问题。${failureDetail ? ` 原因：${failureDetail}` : ""}`
   }
   if (failureKind === "rate_limit") {
-    return "你的问题我完整收到了，但回答服务现在请求过多，这次没能完成。原问题没有丢，我不会让你重复输入。"
+    return `这次请求被限流了，问题我看到了，但没能生成答案。${failureDetail ? ` 原因：${failureDetail}` : ""}`
   }
   if (failureKind === "timeout" || failureKind === "network") {
-    return "你的问题我完整收到了，但回答服务这次连接超时，没能完成回答。不是你这边消息的问题。"
+    return `这次回答超时了。消息没丢，不用重发。${failureDetail ? ` 原因：${failureDetail}` : ""}`
   }
   if (failureKind === "upstream") {
-    return "你的问题我完整收到了，但回答服务这次暂时不可用，没能完成回答。不是你这边消息的问题。"
+    return `回答服务现在有点忙，这次请求没等到结果。${failureDetail ? ` 原因：${failureDetail}` : ""}`
   }
-  return "你的问题我完整收到了，但回答服务这次请求失败，没能完成回答。不是你这边消息的问题。"
+  if (failureKind === "auth" || failureKind === "request") {
+    return `这次没能生成回答。消息本身没问题。原因：${failureDetail || "回答服务请求失败"}`
+  }
+  return `这次没能生成回答。你的消息没丢，也不用重发。${failureDetail ? ` 原因：${failureDetail}` : ""}`
 }
+import { buildVisibleFailureDetail } from "./visibleFailure.js"

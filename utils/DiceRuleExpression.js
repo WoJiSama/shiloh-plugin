@@ -255,6 +255,48 @@ function weightedFace(faces, random) {
   return normalized[normalized.length - 1]
 }
 
+function rollSuccessPool(name, args, node, state) {
+  const [countRaw, sidesRaw, targetRaw, explodeRaw = 0, rerollRaw = 0, botchRaw = 0] = args.map(value => safeNumber(value, node.pos, state.maxAbsValue))
+  const count = Math.trunc(countRaw)
+  const sides = Math.trunc(sidesRaw)
+  const target = Math.trunc(targetRaw)
+  const explodeAt = Math.trunc(explodeRaw)
+  const rerollBelow = Math.trunc(rerollRaw)
+  const botchAt = Math.trunc(botchRaw)
+  if (!Number.isInteger(countRaw) || count < 1) throw new DiceRuleExpressionError(`${name} 的骰子数量必须是正整数`, node.pos, "invalid_dice_count")
+  if (!Number.isInteger(sidesRaw) || sides < 2) throw new DiceRuleExpressionError(`${name} 的面数必须是至少 2 的整数`, node.pos, "invalid_dice_sides")
+  if (target < 1 || target > sides) throw new DiceRuleExpressionError(`${name} 的成功阈值必须在 1-${sides}`, node.pos, "invalid_pool_target")
+  if (explodeAt && (explodeAt < 2 || explodeAt > sides)) throw new DiceRuleExpressionError(`${name} 的爆骰阈值必须在 2-${sides}，或设为 0`, node.pos, "invalid_pool_explode")
+  if (rerollBelow && (rerollBelow < 1 || rerollBelow >= sides)) throw new DiceRuleExpressionError(`${name} 的重掷阈值必须在 1-${sides - 1}，或设为 0`, node.pos, "invalid_pool_reroll")
+  if (botchAt && (botchAt < 1 || botchAt >= target)) throw new DiceRuleExpressionError(`${name} 的抵消阈值必须小于成功阈值，或设为 0`, node.pos, "invalid_pool_botch")
+  const rolls = []
+  const queue = Array.from({ length: count }, () => ({ exploded: false }))
+  let successes = 0
+  let failures = 0
+  while (queue.length) {
+    queue.shift()
+    state.diceCount += 1
+    if (state.diceCount > state.maxDiceCount) throw new DiceRuleExpressionError(`骰子总数超过上限 ${state.maxDiceCount}`, node.pos, "too_many_dice")
+    let value = Math.floor(state.random() * sides) + 1
+    let rerolled = false
+    if (rerollBelow && value <= rerollBelow) {
+      state.diceCount += 1
+      if (state.diceCount > state.maxDiceCount) throw new DiceRuleExpressionError(`骰子总数超过上限 ${state.maxDiceCount}`, node.pos, "too_many_dice")
+      const before = value
+      value = Math.floor(state.random() * sides) + 1
+      rolls.push(`${before}→${value}`)
+      rerolled = true
+    }
+    if (!rerolled) rolls.push(String(value))
+    if (value >= target) successes += 1
+    if (botchAt && value <= botchAt) failures += 1
+    if (explodeAt && value >= explodeAt) queue.push({ exploded: true })
+  }
+  const net = Math.max(0, successes - failures)
+  state.traces.push(`${name}[${rolls.join(",")}]成功${successes}${botchAt ? `-抵消${failures}` : ""}=${net}`)
+  return net
+}
+
 function callBuiltin(name, args, node, state) {
   const numeric = () => args.map(value => safeNumber(value, node.pos, state.maxAbsValue))
   if (name === "min") return Math.min(...numeric())
@@ -277,6 +319,13 @@ function callBuiltin(name, args, node, state) {
   if (name === "if") return args[0] ? args[1] : args[2]
   if (name === "coalesce") return args[0] === null || args[0] === undefined ? args[1] : args[0]
   if (name === "len") return Array.from(String(args[0] ?? "")).length
+  if (name === "cancel") return Math.max(0, safeNumber(args[0], node.pos, state.maxAbsValue) - safeNumber(args[1], node.pos, state.maxAbsValue))
+  if (["successes", "explode", "reroll", "pool"].includes(name)) {
+    if (name === "successes") return rollSuccessPool(name, [args[0], args[1], args[2], 0, 0, 0], node, state)
+    if (name === "explode") return rollSuccessPool(name, [args[0], args[1], args[2], args[3], 0, 0], node, state)
+    if (name === "reroll") return rollSuccessPool(name, [args[0], args[1], args[2], 0, args[3], 0], node, state)
+    return rollSuccessPool(name, args, node, state)
+  }
   if (name === "dice") {
     const diceName = String(args[0] ?? "")
     const count = safeNumber(args[1], node.pos, state.maxAbsValue)
@@ -351,7 +400,7 @@ function evaluateNode(node, context, state) {
         return evaluateNode(node.arguments[1], context, state)
       }
     }
-    const expectedCounts = { min: [1, Infinity], max: [1, Infinity], clamp: [3, 3], abs: [1, 1], floor: [1, 1], ceil: [1, 1], round: [1, 1], sqrt: [1, 1], pow: [2, 2], len: [1, 1], dice: [2, 2] }
+    const expectedCounts = { min: [1, Infinity], max: [1, Infinity], clamp: [3, 3], abs: [1, 1], floor: [1, 1], ceil: [1, 1], round: [1, 1], sqrt: [1, 1], pow: [2, 2], len: [1, 1], dice: [2, 2], cancel: [2, 2], successes: [3, 3], explode: [4, 4], reroll: [4, 4], pool: [3, 6] }
     const range = expectedCounts[node.name]
     if (!range) throw new DiceRuleExpressionError(`不支持的函数 ${node.name}`, node.pos, "unknown_function")
     if (node.arguments.length < range[0] || node.arguments.length > range[1]) throw new DiceRuleExpressionError(`${node.name} 参数数量不正确`, node.pos, "invalid_argument_count")
@@ -366,7 +415,7 @@ export function evaluateDiceRuleExpression(sourceOrAst, context = {}, options = 
   const state = {
     diceSets: options.diceSets || {},
     rollStandard: options.rollStandard,
-    random: typeof options.random === "function" ? options.random : Math.random,
+    random: typeof options.random === "function" ? options.random : secureDiceRandom,
     maxDiceCount: Math.max(1, Number(options.maxDiceCount) || 100),
     maxAbsValue: Math.max(1, Number(options.maxAbsValue) || DEFAULT_MAX_ABS_VALUE),
     diceCount: 0,
@@ -376,3 +425,4 @@ export function evaluateDiceRuleExpression(sourceOrAst, context = {}, options = 
   if (typeof value === "number") safeNumber(value, ast.pos, state.maxAbsValue)
   return { value, traces: state.traces, diceCount: state.diceCount, ast }
 }
+import { secureDiceRandom } from "./diceRandom.js"

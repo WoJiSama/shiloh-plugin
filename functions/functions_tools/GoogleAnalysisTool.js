@@ -5,13 +5,10 @@ const { mimeTypes } = dependencies;
 import fs from "fs";
 import YAML from "yaml";
 import path from "path";
-const IMAGE_ANALYSIS_PROGRESS_MESSAGES = [
-    "收到，我看一下。",
-    "嗯嗯，我先看看这张图。",
-    "我看一下哦，等我盯两眼。",
-    "收到收到，我先帮你看看。"
-];
-const DEFAULT_ANALYSIS_TIMEOUT_MS = 25000;
+import { resolveChatCompletionUrl } from '../../utils/chatCompletionUrl.js';
+import { generateContextualProgressReply } from '../../utils/contextualProgressReply.js';
+import { personaFeedbackManager } from '../../utils/PersonaFeedbackManager.js';
+const DEFAULT_ANALYSIS_TIMEOUT_MS = 45000;
 
 function redactErrorMessage(error) {
     return String(error?.message || error || 'unknown error')
@@ -43,7 +40,12 @@ function dedupeImageUrls(urls = []) {
  * 图片处理工具类，用于处理用户的图片相关请求
  */
 export class GoogleImageAnalysisTool extends AbstractTool {
-    constructor({ fetchImpl = globalThis.fetch } = {}) {
+    constructor({
+        fetchImpl = globalThis.fetch,
+        progressFetchImpl = globalThis.fetch,
+        progressReplyFactory = generateContextualProgressReply,
+        imageLoader = getBase64Image
+    } = {}) {
         super();
         this.name = 'googleImageAnalysisTool';
         this.description = '进行图像分析, 当用户识别图片内容时使用此工具。支持多图片分析，可提取图片中的文字信息并进行理解分析。注意：所有图片URL必须保持完整原始形式，不得修改或简化URL参数。当用户要求查看QQ头像时（如"看下我的头像"、"看下他的头像"、"看下张三的头像"），使用头像URL格式：https://q1.qlogo.cn/g?b=qq&nk={QQ号}&s=640';
@@ -53,6 +55,10 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 prompt: {
                     type: 'string',
                     description: '用户的图片处理需求描述，如果为空则进行默认的图片分析',
+                },
+                progressText: {
+                    type: 'string',
+                    description: '可选：根据当前对话生成一句自然的识图接话，需要说清用户想看什么；不能只说“我先看看这张图”，也不能编造识别结果',
                 },
                 images: {
                     type: 'array',
@@ -78,6 +84,9 @@ export class GoogleImageAnalysisTool extends AbstractTool {
             additionalProperties: false
         };
         this.fetchImpl = fetchImpl;
+        this.progressFetchImpl = progressFetchImpl;
+        this.progressReplyFactory = progressReplyFactory;
+        this.imageLoader = imageLoader;
 
     }
 
@@ -192,6 +201,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
     }
 
     async func(opts, e) {
+        let progressController = null;
         try {
             // 配置路径
             // 配置路径
@@ -206,7 +216,12 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 return { error: '未检测到有效的图片链接' };
             }
 
-            await this.sendProgress(e);
+            progressController = new AbortController();
+            void this.sendProgress(e, {
+                config,
+                opts,
+                signal: progressController.signal
+            });
 
             // 处理所有图片URL
             const images = dedupeImageUrls(await normalizeImageUrls(rawImages));
@@ -216,16 +231,16 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 return { error: '未检测到有效的图片链接' };
             }
 
-            // 构建图片分析消息
-            let imgurls = [{
+            const instruction = {
                 "type": "text",
                 "text": prompt || '分析图片的大致情况，详细描述, 200字概括, 如果图片含有大量的文本信息，先提取，再理解分析'
-            }];
+            };
+            const imageContents = [];
 
             // 处理每张图片
             for (let url of images) {
                 const filetypes = "other.png";
-                const img_urls = await getBase64Image(url, filetypes);
+                const img_urls = await this.imageLoader(url, filetypes);
 
                 if (img_urls.includes("该图片链接已过期")) {
                     return { kind: 'tool_outcome', status: 'error', tool: this.name, error: { code: 'image_link_expired', message: '该图片下载链接已过期，请重新上传' } };
@@ -237,7 +252,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 const mimeType = mimeTypes.lookup(filetypes) || 'application/octet-stream';
                 const isImage = mimeType.startsWith('image/');
 
-                imgurls.push(isImage ? {
+                imageContents.push(isImage ? {
                     "type": "image_url",
                     "image_url": { url: img_urls }
                 } : {
@@ -246,46 +261,104 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 });
             }
 
-            const history = [{ role: "user", content: imgurls }];
             try {
                 const analysisConfig = config.analysisAiConfig || {};
                 const candidates = [analysisConfig, ...(Array.isArray(analysisConfig.providers) ? analysisConfig.providers : [])]
                     .map((item, index) => ({
-                        apiUrl: item.analysisApiUrl || item.apiUrl || 'https://api.openai.com/v1/chat/completions',
+                        apiUrl: resolveChatCompletionUrl(item.analysisApiUrl || item.apiUrl || 'https://api.openai.com/v1/chat/completions'),
                         apiKey: item.analysisApiKey || item.apiKey || '',
                         model: item.analysisApiModel || item.model || 'gemini-3-pro-image-preview',
                         timeoutMs: Math.max(3000, Number(item.timeoutMs || analysisConfig.timeoutMs) || DEFAULT_ANALYSIS_TIMEOUT_MS),
                         label: index === 0 ? 'primary' : `fallback_${index}`
                     }))
                     .filter((item, index, list) => item.apiKey && list.findIndex(other => `${other.apiUrl}:${other.model}` === `${item.apiUrl}:${item.model}`) === index);
-                const failures = [];
-                for (const candidate of candidates) {
-                    const controller = new AbortController();
-                    const timer = setTimeout(() => controller.abort(), candidate.timeoutMs);
-                    try {
-                        const response = await this.fetchImpl(candidate.apiUrl, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.apiKey}` },
-                            body: JSON.stringify({ model: candidate.model, messages: history }),
-                            signal: controller.signal
-                        });
-                        const raw = await response.text();
-                        if (!response.ok) throw Object.assign(new Error(`vision HTTP ${response.status}`), { code: 'vision_http' });
-                        let analysis;
-                        try { analysis = JSON.parse(raw); } catch { throw Object.assign(new Error('vision response is not JSON'), { code: 'vision_invalid_response' }); }
-                        const content = analysis?.choices?.[0]?.message?.content;
-                        if (!String(content || '').trim()) throw Object.assign(new Error('vision response has no content'), { code: 'vision_empty_response' });
-                        globalThis.logger?.info?.(`[图片识别] provider=${candidate.label} model=${candidate.model} images=${images.length} success`);
-                        return { analysis: content, evidence: { kind: 'tool_outcome', status: 'success', tool: this.name, imageCount: images.length, provider: candidate.label } };
-                    } catch (error) {
-                        const code = error?.name === 'AbortError' ? 'vision_timeout' : error?.code || 'vision_request_failed';
-                        failures.push({ provider: candidate.label, code });
-                        this.logWarn(`[图片识别] provider=${candidate.label} model=${candidate.model} code=${code} error=${redactErrorMessage(error)}`);
-                    } finally {
-                        clearTimeout(timer);
+                const requestAnalysis = async ({ content, imageCount, imageIndex }) => {
+                    const failures = [];
+                    for (const candidate of candidates) {
+                        const attemptStartedAt = Date.now();
+                        const controller = new AbortController();
+                        const timer = setTimeout(() => controller.abort(), candidate.timeoutMs);
+                        try {
+                            const response = await this.fetchImpl(candidate.apiUrl, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", Authorization: `Bearer ${candidate.apiKey}` },
+                                body: JSON.stringify({ model: candidate.model, messages: [{ role: "user", content }] }),
+                                signal: controller.signal
+                            });
+                            const raw = await response.text();
+                            if (!response.ok) throw Object.assign(new Error(`vision HTTP ${response.status}`), { code: 'vision_http', status: response.status });
+                            let analysis;
+                            try { analysis = JSON.parse(raw); } catch { throw Object.assign(new Error('vision response is not JSON'), { code: 'vision_invalid_response' }); }
+                            const result = analysis?.choices?.[0]?.message?.content;
+                            if (!String(result || '').trim()) throw Object.assign(new Error('vision response has no content'), { code: 'vision_empty_response' });
+                            globalThis.logger?.info?.(`[图片识别] provider=${candidate.label} model=${candidate.model} images=${imageCount} index=${imageIndex ?? 0} success`);
+                            return { analysis: String(result).trim(), provider: candidate.label, imageIndex, failures };
+                        } catch (error) {
+                            const code = error?.name === 'AbortError' ? 'vision_timeout' : error?.code || 'vision_request_failed';
+                            failures.push({
+                                provider: candidate.label,
+                                code,
+                                ...(Number.isFinite(Number(error?.status)) ? { status: Number(error.status) } : {}),
+                                elapsedMs: Date.now() - attemptStartedAt
+                            });
+                            this.logWarn(`[图片识别] provider=${candidate.label} model=${candidate.model} images=${imageCount} index=${imageIndex ?? 0} code=${code} error=${redactErrorMessage(error)}`);
+                        } finally {
+                            clearTimeout(timer);
+                        }
                     }
+                    return { imageIndex, failures };
+                };
+
+                // 一次请求塞入多张截图会显著放大视觉模型的排队与处理时间。
+                // 按原顺序并行逐张识别，允许其中一张失败而其余图片仍可交付事实结果。
+                const requests = imageContents.length > 1
+                    ? imageContents.map((image, index) => requestAnalysis({
+                        imageCount: 1,
+                        imageIndex: index + 1,
+                        content: [{
+                            ...instruction,
+                            text: `${instruction.text}\n当前是第 ${index + 1} 张，共 ${imageContents.length} 张。只描述这一张实际可见的信息。`
+                        }, image]
+                    }))
+                    : [requestAnalysis({ content: [instruction, imageContents[0]], imageCount: 1, imageIndex: 1 })];
+                const results = await Promise.all(requests);
+                const successful = results.filter(result => result.analysis);
+                const failures = results.flatMap(result => result.failures || []);
+                if (successful.length) {
+                    const failedImageIndexes = results.filter(result => !result.analysis).map(result => result.imageIndex);
+                    const analysis = imageContents.length > 1
+                        ? [
+                            ...successful.map(result => `【第${result.imageIndex}张】\n${result.analysis}`),
+                            ...(failedImageIndexes.length
+                                ? [`【识别状态】共 ${images.length} 张，已读到第 ${successful.map(result => result.imageIndex).join("、")} 张；第 ${failedImageIndexes.join("、")} 张本轮未读到内容。`]
+                                : [])
+                        ].join("\n\n")
+                        : successful[0].analysis;
+                    return {
+                        analysis,
+                        evidence: {
+                            kind: 'tool_outcome',
+                            status: 'success',
+                            tool: this.name,
+                            imageCount: images.length,
+                            analyzedImageIndexes: successful.map(result => result.imageIndex),
+                            ...(failedImageIndexes.length ? { partial: true, failedImageIndexes } : {}),
+                            providers: [...new Set(successful.map(result => result.provider))]
+                        }
+                    };
                 }
-                return { kind: 'tool_outcome', status: 'error', tool: this.name, error: { code: failures.at(-1)?.code || 'vision_unavailable', message: '图片识别没有返回可用内容' }, evidence: { imageCount: images.length, attempts: failures } };
+                const lastFailure = failures.at(-1) || {};
+                return {
+                    kind: 'tool_outcome',
+                    status: 'error',
+                    tool: this.name,
+                    error: {
+                        code: lastFailure.code || 'vision_unavailable',
+                        ...(lastFailure.status ? { status: lastFailure.status } : {}),
+                        message: '图片识别没有返回可用内容'
+                    },
+                    evidence: { imageCount: images.length, attempts: failures }
+                };
 
                 // const apiUrl = "https://api.pearktrue.cn/api/airecognizeimg/"
                 // const response = await fetch(apiUrl, {
@@ -310,10 +383,9 @@ export class GoogleImageAnalysisTool extends AbstractTool {
             console.error('图片分析过程发生错误:', error);
             return { error: `图片分析失败: ${error.message}` };
         }
-    }
-
-    getProgressMessage() {
-        return IMAGE_ANALYSIS_PROGRESS_MESSAGES[Math.floor(Math.random() * IMAGE_ANALYSIS_PROGRESS_MESSAGES.length)];
+        finally {
+            progressController?.abort?.();
+        }
     }
 
     logWarn(...args) {
@@ -321,12 +393,30 @@ export class GoogleImageAnalysisTool extends AbstractTool {
         else console.warn(...args);
     }
 
-    async sendProgress(e) {
-        if (!e?.reply) return;
+    async sendProgress(e, { config = {}, opts = {}, signal } = {}) {
+        if (!e?.reply || signal?.aborted) return false;
         try {
-            await e.reply(this.getProgressMessage());
+            const text = await this.progressReplyFactory({
+                config,
+                taskType: '图片识别',
+                userText: e?.msg || e?.raw_message || opts?.prompt || '识别这张图片',
+                stage: '已收到图片引用，正在读取并等待识别结果',
+                suggestedText: opts?.progressText,
+                agentContext: opts?.agentContext,
+                fetchImpl: this.progressFetchImpl,
+                signal
+            });
+            if (!text || signal?.aborted) return false;
+            const guardedText = personaFeedbackManager.guardReply(text, config?.personaGuard, {
+                userText: e?.msg || e?.raw_message || opts?.prompt || '',
+                botNames: [config?.persona?.name]
+            });
+            if (!guardedText) return false;
+            await e.reply(guardedText);
+            return true;
         } catch (error) {
             this.logWarn(`[图片分析] 发送进度提示失败: ${error.message}`);
+            return false;
         }
     }
 

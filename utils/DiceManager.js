@@ -4,6 +4,8 @@ import { createRequire } from "module"
 import { withFileLock } from "./fileLock.js"
 import { collectMentionTargetIds, getMentionTargetId, stripCqMentions } from "./mentionTargets.js"
 import { KeyedSerialQueue } from "./messagePipeline/keyedSerialQueue.js"
+import { canManageGroupDice, sanitizeDiceCommandError } from "./diceCommandGateway.js"
+import { secureDiceInt, secureDiceRandom } from "./diceRandom.js"
 
 const require = createRequire(import.meta.url)
 let yamlParser = null
@@ -21,6 +23,8 @@ const DEFAULT_CONFIG = {
   allowHiddenRoll: true,
   baseDir: "data/dice",
   logAiSilent: true,
+  logExportMaxMb: 8,
+  timeZone: "Asia/Shanghai",
   templates: {
     roll: "{name} 掷骰：{expr}={detail}={total}",
     check: "{name} 进行 {skill} 检定：{diceText}={roll}/{target} {level}",
@@ -105,6 +109,17 @@ function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
 }
 
+function normalizeStateShape(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("数据根节点不是对象")
+  if (data.users !== undefined && (!data.users || typeof data.users !== "object" || Array.isArray(data.users))) throw new Error("users 字段损坏")
+  if (data.groups !== undefined && (!data.groups || typeof data.groups !== "object" || Array.isArray(data.groups))) throw new Error("groups 字段损坏")
+  return { version: 1, ...data, users: data.users || {}, groups: data.groups || {} }
+}
+
+function readStateFile(file) {
+  return normalizeStateShape(JSON.parse(fs.readFileSync(file, "utf8")))
+}
+
 function safeNumber(value, fallback, min, max) {
   const num = Number(value)
   if (!Number.isFinite(num)) return fallback
@@ -112,7 +127,7 @@ function safeNumber(value, fallback, min, max) {
 }
 
 function rollInt(sides) {
-  return Math.floor(Math.random() * sides) + 1
+  return secureDiceInt(sides)
 }
 
 function renderTemplate(template, values = {}) {
@@ -193,8 +208,19 @@ function formatUpdates(updates = []) {
   return updates.map(([k, v]) => `${k}=${v}`).join("，")
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10)
+function todayKey(date = new Date(), timeZone = DEFAULT_CONFIG.timeZone) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date)
+    const get = type => parts.find(part => part.type === type)?.value
+    return `${get("year")}-${get("month")}-${get("day")}`
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
 }
 
 function normalizeDiceExpression(expr = "") {
@@ -213,10 +239,10 @@ function normalizeDiceExpression(expr = "") {
 }
 
 class DiceExpressionParser {
-  constructor(expr, config, random = Math.random) {
+  constructor(expr, config, random = secureDiceRandom) {
     this.expr = normalizeDiceExpression(expr)
     this.config = config
-    this.random = typeof random === "function" ? random : Math.random
+    this.random = typeof random === "function" ? random : secureDiceRandom
     this.pos = 0
     this.diceCount = 0
     this.detailParts = []
@@ -372,6 +398,7 @@ export class DiceManager {
       maxDiceCount: safeNumber(raw.maxDiceCount, DEFAULT_CONFIG.maxDiceCount, 1, 10000),
       maxDiceSides: safeNumber(raw.maxDiceSides, DEFAULT_CONFIG.maxDiceSides, 2, 100000000),
       maxRounds: safeNumber(raw.maxRounds, DEFAULT_CONFIG.maxRounds, 1, 1000),
+      logExportMaxMb: safeNumber(raw.logExportMaxMb, DEFAULT_CONFIG.logExportMaxMb, 1, 100),
       allowHiddenRoll: raw.allowHiddenRoll !== false
     }
   }
@@ -394,23 +421,44 @@ export class DiceManager {
     const file = this.getDataPath(config)
     if (!fs.existsSync(file)) return { version: 1, users: {}, groups: {} }
     try {
-      const data = JSON.parse(fs.readFileSync(file, "utf8"))
-      return data && typeof data === "object"
-        ? { version: 1, users: {}, groups: {}, ...data }
-        : { version: 1, users: {}, groups: {} }
+      return readStateFile(file)
     } catch (error) {
       this.logger?.warn?.(`[骰娘] 读取数据失败: ${error.message}`)
-      return { version: 1, users: {}, groups: {} }
+      const backup = `${file}.bak`
+      if (fs.existsSync(backup)) {
+        try {
+          const recovered = readStateFile(backup)
+          this.logger?.warn?.("[骰娘] 已从 state.json.bak 读取最近一次有效状态；下一次写入会隔离损坏文件。")
+          return recovered
+        } catch (backupError) {
+          this.logger?.error?.(`[骰娘] 备份数据也无法读取: ${backupError.message}`)
+        }
+      }
+      throw new Error("骰娘状态文件损坏，且没有可用备份；为防止覆盖原数据，本次操作已停止")
     }
   }
 
   async writeState(state, config = this.getConfig()) {
-    this.writeChain = this.writeChain.then(async () => {
+    this.writeChain = this.writeChain.catch(() => {}).then(async () => {
       const file = this.getDataPath(config)
       ensureDir(path.dirname(file))
       const tmp = `${file}.${process.pid}.tmp`
+      const backup = `${file}.bak`
       try {
         fs.writeFileSync(tmp, JSON.stringify(state, null, 2), "utf8")
+        readStateFile(tmp)
+        if (fs.existsSync(file)) {
+          try {
+            readStateFile(file)
+            const backupTmp = `${backup}.${process.pid}.tmp`
+            fs.copyFileSync(file, backupTmp)
+            fs.renameSync(backupTmp, backup)
+          } catch {
+            const corrupt = `${file}.corrupt-${new Date().toISOString().replace(/[:.]/g, "-")}`
+            fs.renameSync(file, corrupt)
+            this.logger?.error?.(`[骰娘] 已隔离损坏状态文件：${path.basename(corrupt)}`)
+          }
+        }
         fs.renameSync(tmp, file)
       } finally {
         try { fs.rmSync(tmp, { force: true }) } catch {}
@@ -424,6 +472,20 @@ export class DiceManager {
       path.join(this.getDataDir(config), "locks", "state.lock"),
       work
     ))
+  }
+
+  canManageGroupDice(e) {
+    return canManageGroupDice(e)
+  }
+
+  isReplyEnabled(e, config = this.getConfig(), state = null) {
+    if (!e?.group_id) return true
+    const currentState = state || this.readState(config)
+    return currentState.groups?.[String(e.group_id)]?.replyEnabled !== false
+  }
+
+  getTodayKey(date = new Date(), config = this.getConfig()) {
+    return todayKey(date, config.timeZone || DEFAULT_CONFIG.timeZone)
   }
 
   isLogActive(groupId, config = this.getConfig()) {
@@ -501,13 +563,24 @@ export class DiceManager {
 
   async startLog(e, raw = "") {
     const config = this.getConfig()
-    if (!config.enabled) return "骰娘模块现在没开。"
-    if (!e?.group_id) return "log 只能在群聊中开启。"
-    const groupId = String(e.group_id)
     const state = this.readState(config)
+    const result = this.prepareStartLog(e, state, raw, config)
+    if (result.changed) await this.writeState(state, config)
+    return result.text
+  }
+
+  prepareStartLog(e, state, raw = "", config = this.getConfig(), { authorized = false } = {}) {
+    if (!config.enabled) return { changed: false, text: "骰娘模块现在没开。", log: null }
+    if (!e?.group_id) return { changed: false, text: "log 只能在群聊中开启。", log: null }
+    if (!authorized && !this.canManageGroupDice(e)) return { changed: false, text: "只有主人、群主或管理员可以开启跑团 log。", log: null }
+    const groupId = String(e.group_id)
     state.groups[groupId] ||= {}
+    state.groups[groupId].logs ||= []
     const current = state.groups[groupId].log
-    if (current?.active) return `log 已经开启：${current.title || "未命名"}`
+    if (current?.active) return { changed: false, text: `log 已经开启：${current.title || "未命名"}`, log: current }
+    if (current?.file && !state.groups[groupId].logs.some(item => item.file === current.file)) {
+      state.groups[groupId].logs.push({ ...current })
+    }
     const title = String(raw || "").trim() || `COC-log-${new Date().toISOString().slice(0, 10)}`
     const stamp = new Date().toISOString().replace(/[:.]/g, "-")
     const file = path.join(this.getLogDir(groupId, config), `${stamp}.jsonl`)
@@ -518,21 +591,38 @@ export class DiceManager {
       startedBy: String(e.user_id || ""),
       file
     }
-    await this.writeState(state, config)
-    return `跑团 log 已开启：${state.groups[groupId].log.title}\n期间本群 AI 对话会暂时静默，骰娘命令仍可使用。`
+    return {
+      changed: true,
+      log: state.groups[groupId].log,
+      text: `跑团 log 已开启：${state.groups[groupId].log.title}\n期间本群 AI 对话会暂时静默，骰娘命令仍可使用。`
+    }
   }
 
   async stopLog(e) {
     const config = this.getConfig()
-    if (!e?.group_id) return "log 只能在群聊中使用。"
-    const groupId = String(e.group_id)
     const state = this.readState(config)
+    const result = this.prepareStopLog(e, state, config)
+    if (result.changed) await this.writeState(state, config)
+    return result.text
+  }
+
+  prepareStopLog(e, state, config = this.getConfig(), { authorized = false } = {}) {
+    if (!e?.group_id) return { changed: false, text: "log 只能在群聊中使用。", log: null }
+    if (!authorized && !this.canManageGroupDice(e)) return { changed: false, text: "只有主人、群主或管理员可以停止跑团 log。", log: null }
+    const groupId = String(e.group_id)
     const log = state.groups?.[groupId]?.log
-    if (!log?.active) return "当前群没有开启 log。"
+    if (!log?.active) return { changed: false, text: "当前群没有开启 log。", log: null }
     log.active = false
     log.endedAt = new Date().toISOString()
-    await this.writeState(state, config)
-    return `跑团 log 已结束：${log.title || "未命名"}\nAI 对话已恢复。导出：.log export`
+    state.groups[groupId].logs ||= []
+    const index = state.groups[groupId].logs.findIndex(item => item.file === log.file)
+    if (index >= 0) state.groups[groupId].logs[index] = { ...log }
+    else state.groups[groupId].logs.push({ ...log })
+    return {
+      changed: true,
+      log,
+      text: `跑团 log 已结束：${log.title || "未命名"}\nAI 对话已恢复。导出：.log export`
+    }
   }
 
   async handleBotControl(e, raw = "") {
@@ -549,6 +639,7 @@ export class DiceManager {
     const groupId = String(e?.group_id || "private")
     state.groups[groupId] ||= {}
     const text = String(raw || "").trim().toLowerCase()
+    if (text && !this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改 reply 开关。"
     if (/^(on|开启)$/.test(text)) state.groups[groupId].replyEnabled = true
     else if (/^(off|关闭)$/.test(text)) state.groups[groupId].replyEnabled = false
     else return `reply 状态：${state.groups[groupId].replyEnabled === false ? "关闭" : "开启"}`
@@ -572,6 +663,7 @@ export class DiceManager {
       const group = state.groups[groupId]
       return `当前设置：默认骰 d${group.defaultDiceSides || 100}；规则 ${group.system || "coc"}`
     }
+    if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改当前群骰娘设置。"
     const diceMatch = text.match(/^(?:d|骰子|默认骰)\s*(\d+)$/i) || text.match(/^(\d+)$/)
     if (diceMatch) {
       const sides = Math.max(2, Math.min(100000000, Number(diceMatch[1])))
@@ -589,9 +681,80 @@ export class DiceManager {
 
   async handleSn(e, raw = "") {
     const text = String(raw || "").trim()
-    if (/^(on|开启)$/i.test(text)) return "自动改群名片需要平台权限，当前未启用；可用 .nn 设置骰娘内显示名。"
-    if (/^(off|关闭)$/i.test(text)) return "自动改群名片当前未启用。"
-    return "sn 命令：.sn on / .sn off（当前只做兼容提示）"
+    if (!e?.group_id) return "自动群名片只能在群聊中使用。"
+    const config = this.getConfig()
+    const state = this.readState(config)
+    const groupId = String(e.group_id)
+    const userId = String(e.user_id || e?.sender?.user_id || "")
+    state.groups[groupId] ||= {}
+    state.groups[groupId].autoCardNames ||= {}
+    const current = state.groups[groupId].autoCardNames[userId]
+    if (/^(on|开启)$/i.test(text)) {
+      const user = this.ensureUser(state, e)
+      const desired = String(user.cards?.[user.activeCard]?.name || user.nickname || e?.sender?.card || e?.sender?.nickname || userId).slice(0, 60)
+      try {
+        await this.setGroupCardName(e, desired)
+      } catch (error) {
+        return `自动群名片没有开启：${sanitizeDiceCommandError(error)}`
+      }
+      state.groups[groupId].autoCardNames[userId] = {
+        enabled: true,
+        original: current?.original || e?.sender?.card || e?.sender?.nickname || "",
+        updatedAt: new Date().toISOString()
+      }
+      await this.writeState(state, config)
+      return `自动群名片已开启，当前同步为：${desired}`
+    }
+    if (/^(off|关闭)$/i.test(text)) {
+      if (!current?.enabled) return "自动群名片本来就是关闭的。"
+      current.enabled = false
+      current.updatedAt = new Date().toISOString()
+      await this.writeState(state, config)
+      let suffix = ""
+      if (current.original) {
+        try {
+          await this.setGroupCardName(e, current.original)
+          suffix = `，并恢复为：${current.original}`
+        } catch (error) {
+          suffix = `；自动同步已关闭，但原名恢复失败：${sanitizeDiceCommandError(error)}`
+        }
+      }
+      return `自动群名片已关闭${suffix}`
+    }
+    return `自动群名片：${current?.enabled ? "开启" : "关闭"}\n命令：.sn on / .sn off`
+  }
+
+  async setGroupCardName(e, name, userId = e?.user_id || e?.sender?.user_id) {
+    if (!e?.group_id) throw new Error("不在群聊中")
+    const card = String(name || "").trim().slice(0, 60)
+    if (!card) throw new Error("群名片不能为空")
+    const bot = e?.bot || globalThis.Bot
+    if (typeof bot?.sendApi !== "function") throw new Error("当前 QQ 适配器没有修改群名片的接口")
+    const result = await bot.sendApi("set_group_card", {
+      group_id: Number(e.group_id),
+      user_id: Number(userId),
+      card
+    })
+    if (!result || result.status === "failed" || (result.retcode !== undefined && Number(result.retcode) !== 0)) {
+      throw new Error(result?.wording || result?.msg || "QQ 平台没有返回成功回执；请确认机器人具有群管理权限")
+    }
+    return true
+  }
+
+  isAutoCardNameEnabled(state, e) {
+    return state?.groups?.[String(e?.group_id || "")]?.autoCardNames?.[String(e?.user_id || e?.sender?.user_id || "")]?.enabled === true
+  }
+
+  async syncAutoGroupCard(e, name, state = null, config = this.getConfig()) {
+    if (!e?.group_id) return ""
+    const currentState = state || this.readState(config)
+    if (!this.isAutoCardNameEnabled(currentState, e)) return ""
+    try {
+      await this.setGroupCardName(e, name)
+      return `\n群名片已同步为：${String(name).slice(0, 60)}`
+    } catch (error) {
+      return `\n人物卡已更新，但群名片同步失败：${sanitizeDiceCommandError(error)}`
+    }
   }
 
   handleFind(e, raw = "") {
@@ -644,47 +807,72 @@ export class DiceManager {
     const config = this.getConfig()
     const state = this.readState(config)
     const user = this.ensureUser(state, e)
-    user.dnd ||= { buffs: [], spellSlots: {}, deathSaves: { success: 0, failure: 0 } }
+    const card = user.cards[user.activeCard]
+    if (!card.dnd && user.dnd) {
+      card.dnd = user.dnd
+      delete user.dnd
+    }
+    card.dnd ||= { buffs: [], spellSlots: {}, deathSaves: { success: 0, failure: 0 } }
+    const dnd = card.dnd
+    dnd.buffs ||= []
+    dnd.spellSlots ||= {}
+    dnd.deathSaves ||= { success: 0, failure: 0 }
     const cmd = String(command || "").toLowerCase()
     const text = String(raw || "").trim()
     if (cmd === "buff") {
-      if (!text || /^(list|列表)$/i.test(text)) return `当前 Buff：${user.dnd.buffs.join("，") || "无"}`
-      if (/^(clr|clear|清空)$/i.test(text)) user.dnd.buffs = []
-      else user.dnd.buffs.push(text.slice(0, 80))
+      if (!text || /^(list|列表)$/i.test(text)) return `当前 Buff：${dnd.buffs.join("，") || "无"}`
+      if (this.isCardLocked(card)) return this.lockedCardReply(card)
+      if (/^(clr|clear|清空)$/i.test(text)) dnd.buffs = []
+      else dnd.buffs.push(text.slice(0, 80))
       await this.writeState(state, config)
-      return `当前 Buff：${user.dnd.buffs.join("，") || "无"}`
+      return `当前 Buff：${dnd.buffs.join("，") || "无"}`
     }
     if (cmd === "ss") {
-      const m = text.match(/^(\d+)\s+(\d+)$/)
+      const m = text.match(/^(\d+)\s+(\d+)(?:\s*\/\s*(\d+))?$/)
       if (m) {
-        user.dnd.spellSlots[m[1]] = Number(m[2])
+        if (this.isCardLocked(card)) return this.lockedCardReply(card)
+        dnd.spellSlots[m[1]] = { current: Number(m[2]), max: Number(m[3] ?? m[2]) }
         await this.writeState(state, config)
       }
-      const slots = Object.entries(user.dnd.spellSlots).map(([lv, n]) => `${lv}环:${n}`).join("，") || "未记录"
+      const slots = Object.entries(dnd.spellSlots).map(([lv, value]) => {
+        const slot = typeof value === "object" ? value : { current: Number(value) || 0, max: Number(value) || 0 }
+        return `${lv}环:${slot.current}/${slot.max}`
+      }).join("，") || "未记录"
       return `法术位：${slots}`
     }
     if (cmd === "cast") {
       const level = String(text.match(/\d+/)?.[0] || "")
       if (!level) return "格式：.cast 环数"
-      const left = Number(user.dnd.spellSlots[level] || 0)
+      if (this.isCardLocked(card)) return this.lockedCardReply(card)
+      const rawSlot = dnd.spellSlots[level]
+      const slot = typeof rawSlot === "object" ? rawSlot : { current: Number(rawSlot) || 0, max: Number(rawSlot) || 0 }
+      const left = Number(slot.current || 0)
       if (left <= 0) return `${level}环法术位不足。`
-      user.dnd.spellSlots[level] = left - 1
+      slot.current = left - 1
+      dnd.spellSlots[level] = slot
       await this.writeState(state, config)
-      return `已消耗 ${level} 环法术位，剩余 ${user.dnd.spellSlots[level]}。`
+      return `已消耗 ${level} 环法术位，剩余 ${slot.current}/${slot.max}。`
     }
     if (cmd === "longrest") {
-      user.dnd.deathSaves = { success: 0, failure: 0 }
+      if (this.isCardLocked(card)) return this.lockedCardReply(card)
+      dnd.deathSaves = { success: 0, failure: 0 }
+      for (const [level, value] of Object.entries(dnd.spellSlots)) {
+        const slot = typeof value === "object" ? value : { current: Number(value) || 0, max: Number(value) || 0 }
+        slot.current = slot.max
+        dnd.spellSlots[level] = slot
+      }
       await this.writeState(state, config)
-      return "长休完成：死亡豁免已清空。法术位恢复请用 .ss 重新记录。"
+      return "长休完成：死亡豁免已清空，已记录法术位恢复到上限。"
     }
     if (cmd === "ds") {
+      if (this.isCardLocked(card)) return this.lockedCardReply(card)
       const roll = rollInt(20)
-      if (roll === 1) user.dnd.deathSaves.failure += 2
-      else if (roll === 20) user.dnd.deathSaves.success = 3
-      else if (roll >= 10) user.dnd.deathSaves.success += 1
-      else user.dnd.deathSaves.failure += 1
+      if (roll === 1) dnd.deathSaves.failure += 2
+      else if (roll === 20) dnd.deathSaves.success = 3
+      else if (roll >= 10) dnd.deathSaves.success += 1
+      else dnd.deathSaves.failure += 1
       await this.writeState(state, config)
-      return `死亡豁免：1D20=${roll}；成功 ${user.dnd.deathSaves.success}/3，失败 ${user.dnd.deathSaves.failure}/3`
+      return `死亡豁免：1D20=${roll}；成功 ${dnd.deathSaves.success}/3，失败 ${dnd.deathSaves.failure}/3`
     }
     return "DND 命令：.buff / .ss / .cast / .longrest / .ds"
   }
@@ -696,11 +884,23 @@ export class DiceManager {
     return `DND 随机姓名：${names.join("、")}`
   }
 
-  handleInitiativeRoll(e, raw = "") {
+  async handleInitiativeRoll(e, raw = "") {
     const name = this.getUserName(e)
     const bonus = Number(String(raw || "").match(/[+\-]?\d+/)?.[0] || 0)
     const roll = rollInt(20)
-    return `${name} 先攻：1D20[${roll}]${bonus >= 0 ? "+" : ""}${bonus}=${roll + bonus}`
+    const total = roll + bonus
+    if (!e?.group_id) return `${name} 先攻：1D20[${roll}]${bonus >= 0 ? "+" : ""}${bonus}=${total}`
+    const config = this.getConfig()
+    const state = this.readState(config)
+    const groupId = String(e.group_id)
+    state.groups[groupId] ||= {}
+    state.groups[groupId].initiative ||= []
+    const item = { name, value: total, userId: String(e.user_id || "") }
+    const index = state.groups[groupId].initiative.findIndex(old => old.userId && old.userId === item.userId)
+    if (index >= 0) state.groups[groupId].initiative[index] = item
+    else state.groups[groupId].initiative.push(item)
+    await this.writeState(state, config)
+    return `${name} 先攻：1D20[${roll}]${bonus >= 0 ? "+" : ""}${bonus}=${total}\n已写入当前群先攻列表。`
   }
 
   async handleInitiative(e, raw = "") {
@@ -716,12 +916,14 @@ export class DiceManager {
       return `先攻列表：\n${list.sort((a, b) => b.value - a.value).map((item, i) => `${i + 1}. ${item.name} ${item.value}`).join("\n")}`
     }
     if (/^(clr|clear|清空)$/i.test(text)) {
+      if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以清空先攻列表。"
       state.groups[groupId].initiative = []
       await this.writeState(state, config)
       return "先攻列表已清空。"
     }
     const del = text.match(/^(del|rm|删除)\s+(.+)$/i)
     if (del) {
+      if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以删除先攻项。"
       state.groups[groupId].initiative = list.filter(item => item.name !== del[2].trim())
       await this.writeState(state, config)
       return `已删除先攻项：${del[2].trim()}`
@@ -746,9 +948,21 @@ export class DiceManager {
     const text = String(raw || "").trim()
     const count = Math.min(100, Math.max(1, Number(text.match(/\d+/)?.[0]) || 1))
     const target = Number(text.match(/(?:>=|难度|tn)\s*(\d+)/i)?.[1] || 8)
-    const rolls = Array.from({ length: count }, () => rollInt(10))
-    const success = rolls.filter(v => v >= target).length
-    return `WoD 骰池 ${count}D10 难度${target}：[${rolls.join(", ")}] 成功数 ${success}`
+    const again = Number(text.match(/(?:again|爆骰|a)\s*(\d+)/i)?.[1] || 0)
+    const queue = Array.from({ length: count }, () => true)
+    const rolls = []
+    while (queue.length) {
+      queue.shift()
+      if (rolls.length >= this.getConfig().maxDiceCount) return `WoD 骰池触发的总骰数超过 ${this.getConfig().maxDiceCount}，已停止，未给出不完整结算。`
+      const value = rollInt(10)
+      rolls.push(value)
+      if (again >= 2 && again <= 10 && value >= again) queue.push(true)
+    }
+    const rawSuccess = rolls.filter(v => v >= target).length
+    const ones = rolls.filter(v => v === 1).length
+    const success = Math.max(0, rawSuccess - ones)
+    const outcome = rawSuccess === 0 && ones > 0 ? "大失败" : success > 0 ? `${success} 成功` : "失败"
+    return `WoD 骰池 ${count}D10 难度${target}${again ? `（${again}-again）` : ""}：[${rolls.join(", ")}] 成功 ${rawSuccess} - 1点抵消 ${ones} = ${success}；${outcome}`
   }
 
   handleDx(e, raw = "") {
@@ -756,10 +970,24 @@ export class DiceManager {
     const nums = text.match(/\d+/g)?.map(Number) || []
     const count = Math.min(100, Math.max(1, nums[0] || 1))
     const critical = Math.min(10, Math.max(2, nums[1] || 10))
-    const rolls = Array.from({ length: count }, () => rollInt(10))
-    const best = Math.max(...rolls)
-    const critCount = rolls.filter(v => v >= critical).length
-    return `DX 骰池 ${count}D10 C${critical}：[${rolls.join(", ")}] 最高 ${best}${critCount ? `，触发暴击骰 ${critCount} 个` : ""}`
+    let pool = count
+    let total = 0
+    const rounds = []
+    let diceUsed = 0
+    while (true) {
+      diceUsed += pool
+      if (diceUsed > this.getConfig().maxDiceCount) return `DX 暴击链总骰数超过 ${this.getConfig().maxDiceCount}，已停止，未给出不完整达成值。`
+      const rolls = Array.from({ length: pool }, () => rollInt(10))
+      rounds.push(rolls)
+      const criticals = rolls.filter(value => value >= critical).length
+      if (!criticals) {
+        total += Math.max(...rolls)
+        break
+      }
+      total += 10
+      pool = criticals
+    }
+    return `DX 检定 ${count}D10 C${critical}：${rounds.map((rolls, index) => `第${index + 1}轮[${rolls.join(",")}]`).join(" → ")}；达成值 ${total}`
   }
 
   handleEk(e, raw = "") {
@@ -788,16 +1016,74 @@ export class DiceManager {
   getLogStatus(e) {
     const config = this.getConfig()
     if (!e?.group_id) return "log 只能在群聊中使用。"
-    const log = this.readState(config).groups?.[String(e.group_id)]?.log
+    const group = this.readState(config).groups?.[String(e.group_id)]
+    const log = group?.log
     if (!log) return "当前群还没有 log。"
     const count = this.readLogLines(log.file).length
+    const history = [...(group?.logs || [])]
+      .filter(item => item?.file && item.file !== log.file)
+      .slice(-5)
+      .reverse()
     return [
       `log 状态：${log.active ? "记录中" : "已结束"}`,
       `标题：${log.title || "未命名"}`,
       `开始：${log.startedAt || "未知"}`,
       log.endedAt ? `结束：${log.endedAt}` : "",
-      `消息数：${count}`
+      `消息数：${count}`,
+      history.length ? `历史团录：\n${history.map((item, index) => `${index + 1}. ${item.title || "未命名"}（${item.startedAt || "时间未知"}）`).join("\n")}\n导出历史：.log export 序号` : ""
     ].filter(Boolean).join("\n")
+  }
+
+  resolveLogForExport(group = {}, raw = "") {
+    const selector = String(raw || "").trim()
+    const current = group.log?.file ? group.log : null
+    const history = [...(group.logs || [])]
+      .filter(item => item?.file && item.file !== current?.file)
+      .reverse()
+    if (!selector || /^(current|当前)$/i.test(selector)) return current
+    if (/^\d+$/.test(selector)) return history[Number(selector) - 1] || null
+    return [current, ...history].filter(Boolean).find(item => String(item.title || "") === selector) || null
+  }
+
+  async sendCompleteFile(e, file, options = {}) {
+    const config = this.getConfig()
+    const stat = fs.statSync(file)
+    const maxMb = safeNumber(options.maxMb, config.logExportMaxMb, 1, 100)
+    const maxBytes = maxMb * 1024 * 1024
+    if (stat.size > maxBytes) throw new Error(`文件 ${Math.ceil(stat.size / 1024 / 1024)}MB，超过 ${maxMb}MB 的安全发送上限`)
+    const name = path.basename(file)
+    const errors = []
+    const bot = e?.bot || globalThis.Bot
+    if (e?.group_id && typeof bot?.sendApi === "function") {
+      try {
+        const encoded = `base64://${fs.readFileSync(file).toString("base64")}`
+        const result = await bot.sendApi("upload_group_file", {
+          group_id: Number(e.group_id),
+          file: encoded,
+          name
+        })
+        if (result?.status === "failed" || (result?.retcode !== undefined && Number(result.retcode) !== 0)) {
+          throw new Error(result?.wording || result?.msg || `retcode=${result?.retcode}`)
+        }
+        return true
+      } catch (error) {
+        errors.push(sanitizeDiceCommandError(error))
+      }
+    }
+    const target = e?.group || e?.friend
+    if (typeof target?.sendFile === "function") {
+      try {
+        await target.sendFile(`file://${file}`, name)
+        return true
+      } catch (error) {
+        errors.push(sanitizeDiceCommandError(error))
+      }
+    }
+    throw new Error(errors.filter(Boolean).join("；") || "当前适配器没有可用的完整文件上传接口")
+  }
+
+  async sendLogFile(e, file, config = this.getConfig()) {
+    return await this.sendCompleteFile(e, file, { maxMb: config.logExportMaxMb })
   }
 
   buildLogText(log, lines) {
@@ -814,11 +1100,14 @@ export class DiceManager {
     return `${header}${body}\n`
   }
 
-  async exportLog(e) {
+  async exportLog(e, raw = "") {
     const config = this.getConfig()
     if (!e?.group_id) return "log 只能在群聊中使用。"
+    if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以导出跑团 log。"
     const groupId = String(e.group_id)
-    const log = this.readState(config).groups?.[groupId]?.log
+    const group = this.readState(config).groups?.[groupId] || {}
+    const log = this.resolveLogForExport(group, raw)
+    if (String(raw || "").trim() && !log) return `没有找到团录：${String(raw).trim()}。可先用 .log status 查看历史序号。`
     if (!log?.file) return "当前群还没有可导出的 log。"
     const lines = this.readLogLines(log.file)
     if (!lines.length) return "当前 log 还没有记录到消息。"
@@ -828,14 +1117,16 @@ export class DiceManager {
     const txtFile = path.join(exportDir, `${safeTitle}-${Date.now()}.txt`)
     fs.writeFileSync(txtFile, this.buildLogText(log, lines), "utf8")
     try {
-      if (e.group?.sendFile) {
-        await e.group.sendFile(txtFile)
-        return `log 已导出：${lines.length} 条`
-      }
+      await this.sendLogFile(e, txtFile, config)
+      // 文件本身就是导出结果；成功时不再补发一条普通聊天，避免用户
+      // 把状态文字误认为导出的日志正文。
+      return ""
     } catch (error) {
       this.logger?.warn?.(`[骰娘] log 文件发送失败: ${error.message}`)
+      return `log 文本已经生成，但文件发送失败：${sanitizeDiceCommandError(error)}。没有把截断内容当作完整导出。`
+    } finally {
+      try { fs.rmSync(txtFile, { force: true }) } catch {}
     }
-    return this.buildLogText(log, lines).slice(0, 4500)
   }
 
   getUserName(e) {
@@ -858,7 +1149,21 @@ export class DiceManager {
     user.cards ||= {}
     user.activeCard ||= Object.keys(user.cards)[0] || "默认"
     if (!user.cards[user.activeCard]) user.cards[user.activeCard] = { name: user.nickname || "调查员", attrs: {}, skills: {} }
+    if (typeof user.locked === "boolean") {
+      for (const card of Object.values(user.cards)) {
+        if (card && typeof card === "object" && card.locked === undefined) card.locked = user.locked
+      }
+      delete user.locked
+    }
     return user
+  }
+
+  isCardLocked(card) {
+    return card?.locked === true
+  }
+
+  lockedCardReply(card) {
+    return `人物卡「${card?.name || "当前人物卡"}」已锁定；请先用 .pc unlock 解锁后再修改。`
   }
 
   getEventForUser(e, userId) {
@@ -920,7 +1225,7 @@ export class DiceManager {
     return { rounds: 1, expr: raw }
   }
 
-  rollExpression(expr = "1d100", config = this.getConfig(), random = Math.random) {
+  rollExpression(expr = "1d100", config = this.getConfig(), random = secureDiceRandom) {
     return new DiceExpressionParser(expr || "1d100", config, random).parse()
   }
 
@@ -1132,6 +1437,11 @@ export class DiceManager {
     if (!m) return "格式：.sc 成功损失/失败损失 [当前SAN]，例如 .sc 1/1d6 60"
     const target = this.getTargetValue("SAN", m[3], e)
     if (!Number.isFinite(target)) return "找不到当前 SAN。请写成：.sc 1/1d6 60，或先用 .st SAN=60"
+    if (!m[3]) {
+      const currentState = this.readState(config)
+      const currentCard = this.getActiveCard(e, currentState)
+      if (this.isCardLocked(currentCard)) return this.lockedCardReply(currentCard)
+    }
     const roll = this.rollD100(0)
     const level = this.judgeCoc(roll.value, target, this.getGroupRule(e, config))
     const lossExpr = level.includes("成功") ? m[1] : m[2]
@@ -1144,11 +1454,16 @@ export class DiceManager {
       if (Number.isFinite(Number(card.attrs?.SAN))) {
         card.attrs.SAN = sanAfter
         card.sanLossLog ||= {}
-        const day = todayKey()
-        card.sanLossLog[day] = (Number(card.sanLossLog[day]) || 0) + loss
-        const indefiniteThreshold = Math.max(1, Math.floor(target / 5))
-        if (card.sanLossLog[day] >= indefiniteThreshold) {
-          insanity += `；今日累计损失 ${card.sanLossLog[day]}，达到五分之一，建议进入不定疯狂判定`
+        const day = this.getTodayKey(new Date(), config)
+        const previous = card.sanLossLog[day]
+        const previousLoss = Number(typeof previous === "object" ? previous.loss : previous) || 0
+        const baseline = Number(typeof previous === "object" ? previous.baseline : NaN)
+        const dayBaseline = Number.isFinite(baseline) ? baseline : target + previousLoss
+        const dayLoss = previousLoss + loss
+        card.sanLossLog[day] = { loss: dayLoss, baseline: dayBaseline }
+        const indefiniteThreshold = Math.max(1, Math.floor(dayBaseline / 5))
+        if (dayLoss >= indefiniteThreshold) {
+          insanity += `；今日累计损失 ${dayLoss}，达到当日初始 SAN 的五分之一，建议进入不定疯狂判定`
         }
         await this.writeState(state, config)
       }
@@ -1166,20 +1481,37 @@ export class DiceManager {
     })
   }
 
-  handleEn(e, raw = "") {
+  async handleEn(e, raw = "") {
     const config = this.getConfig()
     const parsed = this.parseCheckArgs(raw)
-    const target = this.getTargetValue(parsed.skill, parsed.target, e)
+    const state = this.readState(config)
+    const card = this.getActiveCard(e, state)
+    const key = normalizeSkillName(parsed.skill)
+    const attr = ATTR_ALIASES[parsed.skill] || ATTR_ALIASES[key]
+    const storedValue = attr ? card.attrs?.[attr] : card.skills?.[key]
+    const usesCardValue = !Number.isFinite(Number(parsed.target))
+    const target = usesCardValue ? Number(storedValue) : Number(parsed.target)
     if (!Number.isFinite(target)) return `找不到「${parsed.skill}」的技能值。请写成：.en ${parsed.skill} 60`
+    if (usesCardValue && this.isCardLocked(card)) return this.lockedCardReply(card)
     const roll = this.rollD100(0).value
     const success = roll > target
     const gain = success ? this.rollExpression("1d10", config).total : 0
+    let result = "成长失败"
+    if (success && usesCardValue) {
+      const after = Number(storedValue) + gain
+      if (attr) card.attrs[attr] = after
+      else card.skills[key] = after
+      await this.writeState(state, config)
+      result = `成长成功，增加 ${gain}（${target}→${after}，已写入人物卡）`
+    } else if (success) {
+      result = `成长成功，增加 ${gain}（使用临时技能值，未修改人物卡）`
+    }
     return renderTemplate(config.templates.en, {
       name: this.getUserName(e),
       skill: parsed.skill,
       target,
       roll,
-      result: success ? `成长成功，增加 ${gain}` : "成长失败"
+      result
     })
   }
 
@@ -1236,7 +1568,7 @@ export class DiceManager {
     const config = this.getConfig()
     const userId = String(e?.user_id || "")
     let hash = 2166136261
-    for (const char of `${todayKey()}:${userId}`) {
+    for (const char of `${this.getTodayKey(new Date(), config)}:${userId}`) {
       hash ^= char.charCodeAt(0)
       hash = Math.imul(hash, 16777619)
     }
@@ -1278,6 +1610,7 @@ export class DiceManager {
     const text = String(raw || "").trim()
     if (!text) return this.renderCard(e, card, config)
     if (/^(show|查看|查询)$/i.test(text)) return this.renderCard(e, card, config)
+    if (this.isCardLocked(card)) return this.lockedCardReply(card)
     const clearMatch = text.match(/^(clr|clear|清空)(?:\s+(.+))?$/i)
     if (clearMatch) {
       const target = String(clearMatch[2] || "").trim()
@@ -1379,6 +1712,7 @@ export class DiceManager {
     const skills = Object.entries(card.skills || {}).map(([k, v]) => `${k}:${v}`).join(" ")
     const cardText = [
       `角色：${card.name || this.getUserName(e)}`,
+      `状态：${this.isCardLocked(card) ? "已锁定" : "可编辑"}`,
       attrs ? `属性：${attrs}` : "属性：暂无",
       skills ? `技能：${skills}` : "技能：暂无"
     ].join("\n")
@@ -1392,22 +1726,26 @@ export class DiceManager {
     const text = String(raw || "").trim()
     const [cmd, ...rest] = text.split(/\s+/)
     const name = rest.join(" ").trim()
-    if (!cmd || /^(list|列表)$/i.test(cmd)) return `人物卡：${Object.keys(user.cards).join("，")}\n当前：${user.activeCard}`
+    if (!cmd || /^(list|列表)$/i.test(cmd)) {
+      const cards = Object.entries(user.cards).map(([cardName, card]) => `${cardName}${this.isCardLocked(card) ? "🔒" : ""}`)
+      return `人物卡：${cards.join("，")}\n当前：${user.activeCard}`
+    }
     if (/^(new|新增|创建|save|保存)$/i.test(cmd)) {
       if (!name) return "格式：.pc new 角色名"
       user.cards[name] = user.cards[name] || { name, attrs: {}, skills: {} }
       user.activeCard = name
       await this.writeState(state, config)
-      return `已保存并切换人物卡：${name}`
+      return `已保存并切换人物卡：${name}${await this.syncAutoGroupCard(e, user.cards[name].name || name, state, config)}`
     }
     if (/^(use|切换|使用|load|载入)$/i.test(cmd)) {
       if (!user.cards[name]) return `没有找到人物卡：${name}`
       user.activeCard = name
       await this.writeState(state, config)
-      return `已切换人物卡：${name}`
+      return `已切换人物卡：${name}${await this.syncAutoGroupCard(e, user.cards[name].name || name, state, config)}`
     }
     if (/^(del|删除)$/i.test(cmd)) {
       if (!user.cards[name]) return `没有找到人物卡：${name}`
+      if (this.isCardLocked(user.cards[name])) return this.lockedCardReply(user.cards[name])
       delete user.cards[name]
       user.activeCard = Object.keys(user.cards)[0] || "默认"
       if (!user.cards[user.activeCard]) user.cards[user.activeCard] = { name: user.nickname || "调查员", attrs: {}, skills: {} }
@@ -1416,17 +1754,18 @@ export class DiceManager {
     }
     if (/^(tag|标签)$/i.test(cmd)) {
       const card = user.cards[user.activeCard]
+      if (this.isCardLocked(card)) return this.lockedCardReply(card)
       card.tags = name ? name.split(/[,\s，]+/).filter(Boolean) : []
       await this.writeState(state, config)
       return `当前人物卡标签：${card.tags.join("，") || "无"}`
     }
     if (/^(lock|锁定)$/i.test(cmd)) {
-      user.locked = true
+      user.cards[user.activeCard].locked = true
       await this.writeState(state, config)
       return "当前人物卡已锁定。"
     }
     if (/^(unlock|解锁)$/i.test(cmd)) {
-      user.locked = false
+      user.cards[user.activeCard].locked = false
       await this.writeState(state, config)
       return "当前人物卡已解锁。"
     }
@@ -1441,7 +1780,7 @@ export class DiceManager {
     const user = this.ensureUser(state, e)
     user.nickname = name.slice(0, 30)
     await this.writeState(state, config)
-    return `骰娘昵称已设置为：${user.nickname}`
+    return `骰娘昵称已设置为：${user.nickname}${await this.syncAutoGroupCard(e, user.nickname, state, config)}`
   }
 
   async handleSetCoc(e, raw = "") {
@@ -1462,6 +1801,7 @@ export class DiceManager {
         "5: 1 大成功；100 大失败"
       ].join("\n")
     }
+    if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改当前群 COC 房规。"
     if (!this.isValidCocRule(text)) {
       return "规则不认识。请使用：.setcoc 0 / 1 / 2 / 3 / 4 / 5 / 无大失败"
     }
@@ -1492,6 +1832,8 @@ export class DiceManager {
       ".st - 查看卡；.st STR=50 侦查=60 / .st san-1 - 录卡或增减",
       ".pc list/new/use/del/tag/lock - 人物卡管理",
       ".nn 昵称 - 设置骰娘显示名",
+      ".sn on/off - 开启或关闭当前用户的自动群名片同步",
+      ".reply on/off - 管理员开启或关闭当前群骰娘回复",
       ".jrrp - 今日人品；.db [STR SIZ] - 伤害加值",
       ".ti / .li - 临时疯狂 / 总结疯狂",
       ".setcoc [规则] - 查看或设置当前群规则",
@@ -1501,7 +1843,7 @@ export class DiceManager {
       ".ww / .dx / .ek / .ekgen / .rsr - 其它规则基础骰与随机选择",
       ".find 关键词 - 搜索本地词条；.set d20 - 设置默认骰",
       ".骰规则帮助 - 固定点命令的 YAML 规则包、角色权限与团务系统",
-      ".log new [标题] / .log on / .log off / .log get / .log end - 跑团记录与导出"
+      ".log new [标题] / .log on / .log off / .log status / .log export [历史序号] / .log end - 跑团记录与完整文件导出"
     ].join("\n")
   }
 }

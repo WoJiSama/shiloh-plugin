@@ -80,8 +80,10 @@ const CHINESE_LIMITS = new Map([
 
 export function parseModrinthRequestOptions(text = "") {
   const content = String(text || "").replace(/\s+/g, " ").trim()
-  if (!content || !/(?:modrinth|mc\s*模组|minecraft\s*模组)/i.test(content)) return null
-  if (!/(?:排名|排行|榜|热门|前\s*(?:10|[1-9一二两三四五六七八九十]))/i.test(content)) return null
+  if (!content || !/(?:modrinth|mc\s*模组|minecraft\s*模组|(?:mc|minecraft).{0,24}(?:榜|排行|排名).{0,24}模组)/i.test(content)) return null
+  const nameQuery = content.match(/(?:名字|名称)(?:里面|中|里)?(?:带有|包含|含有|有)\s*["“”']?([A-Za-z0-9][A-Za-z0-9._-]{0,47})/i)?.[1] || ""
+  const isRankingRequest = /(?:排名|排行|榜|热门|前\s*(?:10|[1-9一二两三四五六七八九十]))/i.test(content)
+  if (!isRankingRequest && !nameQuery) return null
   if (/https?:\/\/modrinth\.com\//i.test(content)) return null
 
   const limitMatch = content.match(/前\s*(10|[1-9]|[一二两三四五六七八九十])/i)
@@ -97,7 +99,9 @@ export function parseModrinthRequestOptions(text = "") {
     [/魔法/i, "magic"]
   ]
   const category = categoryMap.find(([pattern]) => pattern.test(content))?.[1]
-  const sort = /关注(?:数|量)?|按关注/.test(content)
+  const sort = nameQuery
+    ? "relevance"
+    : /关注(?:数|量)?|按关注/.test(content)
     ? "follows"
     : /最新发布|新发布|最新上架/.test(content)
       ? "newest"
@@ -110,7 +114,8 @@ export function parseModrinthRequestOptions(text = "") {
     limit,
     ...(version ? { gameVersion: version } : {}),
     ...(loader ? { loader } : {}),
-    ...(category ? { category } : {})
+    ...(category ? { category } : {}),
+    ...(nameQuery ? { query: nameQuery } : {})
   })
 }
 

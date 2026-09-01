@@ -1,6 +1,8 @@
 /**
  * 抽象工具类，所有具体工具需继承此类并实现func方法
  */
+import { buildVisibleFailureDetail } from "../../utils/visibleFailure.js"
+
 export class AbstractTool {
   constructor() {
     this.name = '';
@@ -144,7 +146,7 @@ export class AbstractTool {
     try {
       normalizedParams = this.normalizeParameters(params, { event });
     } catch (error) {
-      return `error: 参数规范化失败: ${error.message}`;
+      return `error: 参数规范化失败: ${buildVisibleFailureDetail(error)}`;
     }
     const validation = this.validateParameters(normalizedParams);
     if (validation !== true) {
@@ -155,7 +157,7 @@ export class AbstractTool {
       return await this.func(normalizedParams, event);
     } catch (error) {
       // 返回错误信息而不是抛出错误
-      return `error: 工具 ${this.name} 执行失败: ${error.message}`;
+      return `error: 工具 ${this.name} 执行失败: ${buildVisibleFailureDetail(error)}`;
     }
   }
 

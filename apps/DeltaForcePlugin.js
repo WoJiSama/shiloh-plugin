@@ -22,6 +22,7 @@ import {
 } from "../utils/DeltaForceClient.js"
 import { DeltaForceObjectCache } from "../utils/DeltaForceObjectCache.js"
 import { renderDeltaForceReport } from "../utils/DeltaForceReportRenderer.js"
+import { buildVisibleFailureDetail } from "../utils/visibleFailure.js"
 
 const _path = process.cwd()
 let objectCache = null
@@ -109,7 +110,7 @@ export class DeltaForcePlugin extends plugin {
       await e.reply(formatDailyKeywordResponse(result))
     } catch (err) {
       globalThis.logger?.warn?.(`[三角洲行动工具] 今日密码查询失败: ${err.message}`)
-      await e.reply(`三角洲今日密码查询失败：${err.message}`)
+      await e.reply(`三角洲今日密码查询失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -137,7 +138,7 @@ export class DeltaForcePlugin extends plugin {
       )
     } catch (err) {
       globalThis.logger?.warn?.(`[三角洲行动工具] 物品价值搜索失败: ${err.message}`)
-      await e.reply(`三角洲物品价值搜索失败：${err.message}`)
+      await e.reply(`三角洲物品价值搜索失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -172,7 +173,7 @@ export class DeltaForcePlugin extends plugin {
       )
     } catch (err) {
       globalThis.logger?.warn?.(`[三角洲行动工具] 价格历史查询失败: ${err.message}`)
-      await e.reply(`三角洲价格历史查询失败：${err.message}`)
+      await e.reply(`三角洲价格历史查询失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -196,7 +197,7 @@ export class DeltaForcePlugin extends plugin {
       )
     } catch (err) {
       globalThis.logger?.warn?.(`[三角洲行动工具] 改枪码查询失败: ${err.message}`)
-      await e.reply(`三角洲改枪码查询失败：${err.message}`)
+      await e.reply(`三角洲改枪码查询失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -239,7 +240,7 @@ export class DeltaForcePlugin extends plugin {
       )
     } catch (err) {
       globalThis.logger?.warn?.(`[三角洲行动工具] 特勤处利润查询失败: ${err.message}`)
-      await e.reply(`三角洲特勤处利润查询失败：${err.message}`)
+      await e.reply(`三角洲特勤处利润查询失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }
@@ -281,7 +282,7 @@ export class DeltaForcePlugin extends plugin {
       )
     } catch (err) {
       globalThis.logger?.warn?.(`[三角洲行动工具] 利润排行查询失败: ${err.message}`)
-      await e.reply(`三角洲利润排行查询失败：${err.message}`)
+      await e.reply(`三角洲利润排行查询失败：${buildVisibleFailureDetail(err)}`)
     }
     return true
   }

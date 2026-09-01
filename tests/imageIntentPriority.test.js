@@ -41,6 +41,18 @@ test("a drawing request with a prompt label is not mistaken for an edit because 
   assert.equal(classifyImageTaskPolicy({ text, hasImages: false }), "image_generation")
 })
 
+test("natural long-form drawing requests are explicit generation intents", async () => {
+  const { hasExplicitImageGenerationRequest, classifyImageTaskPolicy } = await import("../utils/imageTaskPolicy.js")
+  const cases = [
+    "希洛画一个龙族里面的绘梨衣和蔚蓝档案里面的小鸟游星野拥抱的画",
+    "希洛，画一个明日方舟中的阿米娅帮博士整理文件的画面"
+  ]
+  for (const text of cases) {
+    assert.equal(hasExplicitImageGenerationRequest(text), true, text)
+    assert.equal(classifyImageTaskPolicy({ text }), "image_generation", text)
+  }
+})
+
 test("real references to an existing image still require an edit base", async () => {
   const {
     classifyImageTaskPolicy,

@@ -103,10 +103,12 @@ function isExplicitProviderMention(text = "", alias = "") {
   if (index < 0) return false;
   const before = String(text).slice(Math.max(0, index - 32), index);
   const after = String(text).slice(index + alias.length, index + alias.length + 32);
+  const beforeRejects = /(?:不要|别|禁止|不准|无需|不用)\s*(?:再)?\s*(?:用|使用)?\s*(?:名字?(?:叫|是|为)?\s*)?[“"'「『【]?\s*$/i.test(before);
+  if (beforeRejects) return false;
   const beforeSelects = /(?:用|使用|指定|选择|选用|走|调用|切到|切换到|换成|通过|让)\s*(?:名字?(?:叫|是|为)?\s*)?[“"'「『【]?\s*$/i.test(before);
-  const afterDraws = /^\s*[”"'」』】]?\s*的?\s*(?:(?:渠道|通道|模型)\s*)?(?:来|去|帮我|给我|替我)?\s*(?:画|绘制|生成|生图|出图|做图|改(?:图|一下|下|成|为)|修(?:图|一下|下)|编辑)/i.test(after);
+  const afterDraws = /^\s*[”"'」』】]?\s*的?\s*(?:(?:渠道|通道|模型)\s*)?(?:来|去|帮我|给我|替我)?\s*(?:画|绘制|生成|生图|出图|做图|改(?:图|一下|下|成|为)|修(?:图|一下|下)|编辑|去掉|去除|删除|移除|擦掉|换掉|替换|调整|处理)/i.test(after);
   const afterNamesChannel = /^\s*[”"'」』】]?\s*的?\s*(?:渠道|通道|模型)(?:\s|来|去|画|绘制|生成|生图|出图|做图|改|修|编辑|$)/i.test(after);
-  const directlyDraws = /^\s*(?:画|绘制|生成|生图|出图|做图|改(?:图|一下|下|成|为)|修(?:图|一下|下)|编辑)/i.test(after);
+  const directlyDraws = /^\s*(?:画|绘制|生成|生图|出图|做图|改(?:图|一下|下|成|为)|修(?:图|一下|下)|编辑|去掉|去除|删除|移除|擦掉|换掉|替换|调整|处理)/i.test(after);
   const saysStyle = /^\s*风格/i.test(after);
   return (beforeSelects && !saysStyle && (afterDraws || afterNamesChannel || directlyDraws)) ||
     afterNamesChannel || directlyDraws;
@@ -114,9 +116,23 @@ function isExplicitProviderMention(text = "", alias = "") {
 
 export function resolveRequestedImageProvider(config = {}, text = "", explicitProvider = "") {
   const explicit = compactString(explicitProvider);
-  if (explicit) return explicit;
   const source = String(text || "").replace(/\[CQ:[^\]]+\]/g, " ");
   if (!source.trim()) return "";
+
+  // provider is often produced by a planner/model. It is only an execution
+  // constraint when the user's own text proves that they selected it.
+  if (explicit) {
+    if (isExplicitProviderMention(source, explicit)) return explicit;
+    const matchingCandidates = getRawImageProviderCandidates(config)
+      .filter(candidate => matchesImageProvider(candidate, explicit));
+    for (const candidate of matchingCandidates) {
+      const matchedAlias = getImageProviderAliases(candidate)
+        .find(alias => isExplicitProviderMention(source, alias));
+      if (matchedAlias) {
+        return pickFirst(candidate.name, candidate.label, candidate.imageGenerationApiModel, candidate.imageEditApiModel, candidate.model, explicit);
+      }
+    }
+  }
 
   const entries = getRawImageProviderCandidates(config)
     .flatMap(candidate => {
@@ -139,6 +155,14 @@ export function resolveRequestedImageProvider(config = {}, text = "", explicitPr
 
   const marked = source.match(/(?:用|使用|指定|选择|选用|走|调用|切到|切换到|换成|通过)\s*[“"'「『【]?\s*([A-Za-z0-9][A-Za-z0-9_.\-/ ]{0,38}|[\u4e00-\u9fa5][\u4e00-\u9fa5A-Za-z0-9_.\-/]{1,20})\s*[”"'」』】]?\s*(?:渠道|通道|模型)/i);
   return compactString(marked?.[1]);
+}
+
+export function normalizeImageProviderParameter(params = {}, config = {}, userText = "") {
+  const normalized = params && typeof params === "object" ? { ...params } : {};
+  const provider = resolveRequestedImageProvider(config, userText, normalized.provider);
+  if (provider) normalized.provider = provider;
+  else delete normalized.provider;
+  return normalized;
 }
 
 export function selectImageConfigsByProvider(configs, requestedProvider = "", capability = "图片生成") {
@@ -222,6 +246,30 @@ function normalizeImageGenerationConfig(candidate = {}, fallback = {}) {
       fallback.imageGenerationSize,
       fallback.size,
       DEFAULT_IMAGE_GENERATION_SIZE
+    ),
+    squareSize: pickFirst(
+      candidate.imageGenerationSquareSize,
+      candidate.squareSize,
+      fallback.imageGenerationSquareSize,
+      fallback.squareSize
+    ),
+    portraitSize: pickFirst(
+      candidate.imageGenerationPortraitSize,
+      candidate.portraitSize,
+      fallback.imageGenerationPortraitSize,
+      fallback.portraitSize
+    ),
+    landscapeSize: pickFirst(
+      candidate.imageGenerationLandscapeSize,
+      candidate.landscapeSize,
+      fallback.imageGenerationLandscapeSize,
+      fallback.landscapeSize
+    ),
+    autoSize: pickFirst(
+      candidate.imageGenerationAutoSize,
+      candidate.autoSize,
+      fallback.imageGenerationAutoSize,
+      fallback.autoSize
     )
   };
 }
@@ -230,7 +278,18 @@ function dedupeConfigs(configs) {
   const seen = new Map();
   const result = [];
   for (const config of configs) {
-    const key = [config.apiUrl, config.model, config.size, config.quality, config.apiKey].join("\u0000");
+    const key = [
+      config.apiUrl,
+      config.model,
+      config.size,
+      config.squareSize,
+      config.portraitSize,
+      config.landscapeSize,
+      config.autoSize,
+      config.defaultEditSize,
+      config.quality,
+      config.apiKey
+    ].join("\u0000");
     const existing = seen.get(key);
     if (existing) {
       existing.aliases = uniqueStrings([...(existing.aliases || []), ...(config.aliases || []), config.name]);
@@ -313,7 +372,7 @@ function isExplicitImageEditEndpoint(apiUrl = "") {
   return /\/images\/edits\/?$/i.test(compactString(apiUrl));
 }
 
-function normalizeImageEditConfig(candidate = {}, fallback = {}, { explicitEditConfig = false } = {}) {
+function normalizeImageEditConfig(candidate = {}, fallback = {}, { explicitEditConfig = false, fromEditConfig = false } = {}) {
   const candidateModel = pickFirst(
     candidate.imageEditApiModel,
     candidate.imageGenerationApiModel,
@@ -357,6 +416,7 @@ function normalizeImageEditConfig(candidate = {}, fallback = {}, { explicitEditC
     DEFAULT_IMAGE_EDIT_URL
   ));
 
+  const editConfigOwnsDefaultSize = explicitEditConfig || fromEditConfig;
   return {
     name: pickFirst(candidate.name, candidate.label, fallback.name, model),
     aliases: uniqueStrings([...getImageProviderAliases(candidate), model]),
@@ -372,6 +432,41 @@ function normalizeImageEditConfig(candidate = {}, fallback = {}, { explicitEditC
       fallback.imageGenerationSize,
       fallback.size,
       DEFAULT_IMAGE_GENERATION_SIZE
+    ),
+    defaultEditSize: editConfigOwnsDefaultSize
+      ? pickFirst(candidate.imageEditSize, candidate.size, fallback.imageEditSize, fallback.size)
+      : "",
+    squareSize: pickFirst(
+      candidate.imageEditSquareSize,
+      candidate.imageGenerationSquareSize,
+      candidate.squareSize,
+      fallback.imageEditSquareSize,
+      fallback.imageGenerationSquareSize,
+      fallback.squareSize
+    ),
+    portraitSize: pickFirst(
+      candidate.imageEditPortraitSize,
+      candidate.imageGenerationPortraitSize,
+      candidate.portraitSize,
+      fallback.imageEditPortraitSize,
+      fallback.imageGenerationPortraitSize,
+      fallback.portraitSize
+    ),
+    landscapeSize: pickFirst(
+      candidate.imageEditLandscapeSize,
+      candidate.imageGenerationLandscapeSize,
+      candidate.landscapeSize,
+      fallback.imageEditLandscapeSize,
+      fallback.imageGenerationLandscapeSize,
+      fallback.landscapeSize
+    ),
+    autoSize: pickFirst(
+      candidate.imageEditAutoSize,
+      candidate.imageGenerationAutoSize,
+      candidate.autoSize,
+      fallback.imageEditAutoSize,
+      fallback.imageGenerationAutoSize,
+      fallback.autoSize
     )
   };
 }
@@ -416,6 +511,10 @@ function buildLegacyFallback(generationCfg = {}, editCfg = {}) {
       editCfg.imageGenerationSize,
       DEFAULT_IMAGE_GENERATION_SIZE
     ),
+    imageGenerationSquareSize: generationCfg.imageGenerationSquareSize,
+    imageGenerationPortraitSize: generationCfg.imageGenerationPortraitSize,
+    imageGenerationLandscapeSize: generationCfg.imageGenerationLandscapeSize,
+    imageGenerationAutoSize: generationCfg.imageGenerationAutoSize,
     imageGenerationPriority: generationCfg.imageGenerationPriority ?? generationCfg.priority,
     name: pickFirst(generationCfg.name, generationCfg.imageGenerationApiModel, editCfg.imageGenerationApiModel, editModel)
   };
@@ -446,7 +545,11 @@ export function resolveImageGenerationConfigs(config = {}) {
   const fallbackBase = {
     imageGenerationApiUrl: generationCfg.imageGenerationApiUrl || DEFAULT_IMAGE_GENERATION_URL,
     imageGenerationApiKey: generationCfg.imageGenerationApiKey,
-    imageGenerationSize: generationCfg.imageGenerationSize || DEFAULT_IMAGE_GENERATION_SIZE
+    imageGenerationSize: generationCfg.imageGenerationSize || DEFAULT_IMAGE_GENERATION_SIZE,
+    imageGenerationSquareSize: generationCfg.imageGenerationSquareSize,
+    imageGenerationPortraitSize: generationCfg.imageGenerationPortraitSize,
+    imageGenerationLandscapeSize: generationCfg.imageGenerationLandscapeSize,
+    imageGenerationAutoSize: generationCfg.imageGenerationAutoSize
   };
   for (const fallback of getFallbackList(generationCfg)) {
     const normalized = normalizeImageGenerationConfig(fallback, fallbackBase);
@@ -465,14 +568,14 @@ export function resolveImageEditConfigs(config = {}) {
   if (primary) configs.push(primary);
 
   const fallbackCandidates = [
-    ...getImageEditProviderList(editCfg).map(candidate => ({ candidate, fallback: editCfg })),
-    ...getImageEditFallbackList(editCfg).map(candidate => ({ candidate, fallback: editCfg })),
-    { candidate: generationCfg, fallback: generationCfg },
-    ...getProviderList(generationCfg).map(candidate => ({ candidate, fallback: generationCfg })),
-    ...getFallbackList(generationCfg).map(candidate => ({ candidate, fallback: generationCfg }))
+    ...getImageEditProviderList(editCfg).map(candidate => ({ candidate, fallback: editCfg, fromEditConfig: true })),
+    ...getImageEditFallbackList(editCfg).map(candidate => ({ candidate, fallback: editCfg, fromEditConfig: true })),
+    { candidate: generationCfg, fallback: generationCfg, fromEditConfig: false },
+    ...getProviderList(generationCfg).map(candidate => ({ candidate, fallback: generationCfg, fromEditConfig: false })),
+    ...getFallbackList(generationCfg).map(candidate => ({ candidate, fallback: generationCfg, fromEditConfig: false }))
   ];
   const fallbacks = fallbackCandidates
-    .map(({ candidate, fallback }) => normalizeImageEditConfig(candidate, fallback))
+    .map(({ candidate, fallback, fromEditConfig }) => normalizeImageEditConfig(candidate, fallback, { fromEditConfig }))
     .filter(Boolean);
 
   return dedupeConfigs([

@@ -4,11 +4,19 @@ import fs from "fs";
 import YAML from "yaml";
 import path from "path";
 import { safeTruncateUnicode } from "../../utils/unicodeText.js";
+import { resolveChatCompletionUrl } from "../../utils/chatCompletionUrl.js";
+import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
 /**
  * Search 工具类，用于自由搜索并控制返回结果的大小
  */
 export class SearchInformationTool extends AbstractTool {
-  constructor({ fetchImpl = globalThis.fetch, progressDelayMs = 2500 } = {}) {
+  constructor({
+    fetchImpl = globalThis.fetch,
+    progressFetchImpl = globalThis.fetch,
+    progressDelayMs = 2500,
+    configLoader,
+    progressReplyFactory = generateContextualProgressReply
+  } = {}) {
     super();
     this.name = 'searchInformationTool';
     this.description = '请求外部 API 进行自由搜索，检索结果，对于需要进行搜索或需要实时数据信息的时候使用，总结群聊聊天记录时无需调用';
@@ -18,6 +26,10 @@ export class SearchInformationTool extends AbstractTool {
         query: {
           type: 'string',
           description: '搜索的查询关键词'
+        },
+        progressText: {
+          type: 'string',
+          description: '可选：根据当前对话生成一句自然的搜索中途接话；不能编造结果或完成时间，不要使用客服腔'
         }
       },
       required: ['query']
@@ -26,7 +38,35 @@ export class SearchInformationTool extends AbstractTool {
     // 固定最大 token 数量为 30000
     this.maxTokens = 30000;
     this.fetchImpl = fetchImpl;
+    this.progressFetchImpl = progressFetchImpl;
     this.progressDelayMs = Math.max(500, Number(progressDelayMs) || 2500);
+    this.configLoader = configLoader;
+    this.progressReplyFactory = progressReplyFactory;
+  }
+
+  loadConfig() {
+    if (typeof this.configLoader === 'function') return this.configLoader();
+    const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml');
+    return YAML.parse(fs.readFileSync(configPath, 'utf8')).pluginSettings;
+  }
+
+  async sendContextualProgress({ config, opts, e, query, signal, isActive }) {
+    try {
+      const text = await this.progressReplyFactory({
+        config,
+        taskType: '联网查询',
+        userText: e?.msg || e?.raw_message || query,
+        stage: '查询请求已经发出，正在等待可靠结果',
+        suggestedText: opts?.progressText,
+        agentContext: opts?.agentContext,
+        fetchImpl: this.progressFetchImpl,
+        signal
+      });
+      if (!text || !isActive() || signal?.aborted) return;
+      await e?.reply?.(text);
+    } catch (error) {
+      globalThis.logger?.debug?.(`[搜索进度] 生成或发送失败: ${error?.name || 'Error'}`);
+    }
   }
 
   /**
@@ -118,21 +158,30 @@ export class SearchInformationTool extends AbstractTool {
 
     let progressTimer = null;
     let controller = null;
+    let requestTimeout = null;
+    let completed = false;
+    let progressController = null;
+    let timeoutMs = 20000;
     try {
-      // 配置路径
-      const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml');
-      const configFile = fs.readFileSync(configPath, 'utf8');
-      const config = YAML.parse(configFile).pluginSettings;
+      const config = this.loadConfig();
       
-      const apiUrl = config.searchAiConfig?.searchApiUrl || 'https://api.openai.com/v1/chat/completions'
+      const apiUrl = resolveChatCompletionUrl(config.searchAiConfig?.searchApiUrl || 'https://api.openai.com/v1/chat/completions')
       const apiKey = config.searchAiConfig?.searchApiKey || 'sk-xxxxxx'
 
       const requestData = { "model": config.searchAiConfig?.searchApiModel || 'deepseek-r1-search', "messages": [{ "role": "user", "content": query }], "temperature": 1, "top_p": 0.1 }
-      const timeoutMs = Math.max(3000, Number(config.searchAiConfig?.timeoutMs) || 20000)
+      timeoutMs = Math.max(3000, Number(config.searchAiConfig?.timeoutMs) || 20000)
       controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), timeoutMs)
+      requestTimeout = setTimeout(() => controller.abort(), timeoutMs)
       progressTimer = setTimeout(() => {
-        e?.reply?.('我还在查，结果出来就发。').catch?.(() => {})
+        progressController = new AbortController()
+        void this.sendContextualProgress({
+          config,
+          opts,
+          e,
+          query,
+          signal: progressController.signal,
+          isActive: () => !completed
+        })
       }, this.progressDelayMs)
 
       const response = await this.fetchImpl(apiUrl, {
@@ -144,7 +193,7 @@ export class SearchInformationTool extends AbstractTool {
         body: JSON.stringify(requestData),
         signal: controller.signal
       })
-      clearTimeout(timeout)
+      clearTimeout(requestTimeout)
 
       const analysis = await response.json()
       if (!response.ok) throw new Error(`搜索服务返回 ${response.status}`)
@@ -154,10 +203,13 @@ export class SearchInformationTool extends AbstractTool {
 
     } catch (error) {
       console.error('搜索过程发生错误:', error);
-      const message = error?.name === 'AbortError' ? '搜索超过 20 秒仍未返回' : error.message || '发生未知错误'
+      const message = error?.name === 'AbortError' ? `搜索超过 ${Math.ceil(timeoutMs / 1000)} 秒仍未返回` : error.message || '发生未知错误'
       return `搜索失败：${message}`;
     } finally {
+      completed = true
       if (progressTimer) clearTimeout(progressTimer)
+      if (requestTimeout) clearTimeout(requestTimeout)
+      progressController?.abort?.()
       controller?.abort?.()
     }
   }

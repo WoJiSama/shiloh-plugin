@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { MemoryManager } from '../../utils/MemoryManager.js'
-import { extractExplicitGroupKnowledge, findGroupKnowledgeDeletionCandidates, parseSemanticGroupKnowledgeOutput } from '../../utils/memory/groupKnowledge.js'
+import { findGroupKnowledgeDeletionCandidates, parseSemanticGroupKnowledgeOutput, parseSemanticGroupMemoryOutput } from '../../utils/memory/groupKnowledge.js'
 import { createFakeRedis } from './helpers/fakeRedis.js'
 
 function memberMap() {
@@ -13,14 +13,26 @@ function memberMap() {
   ])
 }
 
-function mapTeaching() {
-  return extractExplicitGroupKnowledge({
-    text: '希洛，群文件里面的地图世界.zip是我做的地图',
+function parseKnowledge(items, context = {}) {
+  return parseSemanticGroupKnowledgeOutput(JSON.stringify(items), {
+    text: '原始用户消息',
     memberMap: memberMap(),
-    fileAssets: [{ type: 'file', fileName: '地图世界.zip', fileId: 'file-1', origin: 'current', source: 'https://temporary.example/file' }],
     creatorQQ: '9',
+    creatorDisplay: '沃基',
     botId: '1',
-    now: 100
+    now: 100,
+    ...context
+  })
+}
+
+function mapTeaching() {
+  return parseKnowledge([{
+    kind: 'group_file',
+    subject: '地图',
+    owner: 'speaker',
+    resourceFileName: '地图世界.zip'
+  }], {
+    fileAssets: [{ type: 'file', fileName: '地图世界.zip', fileId: 'file-1', origin: 'current', source: 'https://temporary.example/file' }]
   })
 }
 
@@ -46,13 +58,9 @@ test('answers a natural first-person group-file query only for the defined owner
 })
 
 test('records one or many named members as a reusable group definition', async () => {
-  const entries = extractExplicitGroupKnowledge({
-    text: '@甲 和 @乙 是美术组',
-    messageSegments: [{ type: 'at', data: { qq: '2' } }, { type: 'at', data: { qq: '3' } }],
-    memberMap: memberMap(),
-    botId: '1',
-    now: 100
-  })
+  const entries = parseKnowledge([{
+    kind: 'member_set', subject: '美术组', targetNames: ['甲', '乙']
+  }])
   assert.equal(entries[0].kind, 'member_set')
   assert.equal(entries[0].subject, '美术组')
   assert.deepEqual(entries[0].targetUserIds, ['2', '3'])
@@ -66,13 +74,11 @@ test('records one or many named members as a reusable group definition', async (
 })
 
 test('resolves my relationship to the current speaker instead of storing the pronoun', async () => {
-  const teaching = '希洛群里的星野是我的星怒你记住了'
-  const entries = extractExplicitGroupKnowledge({
-    text: teaching,
+  const entries = parseKnowledge([{
+    kind: 'member_definition', subject: '星怒', owner: 'speaker', targetNames: ['星野']
+  }], {
+    text: '希洛群里的星野是我的星怒你记住了',
     memberMap: new Map([...memberMap(), [4, { user_id: 4, card: '星野' }]]),
-    creatorQQ: '9',
-    creatorDisplay: '沃基',
-    botId: '1'
   })
   assert.equal(entries.length, 1)
   assert.equal(entries[0].subject, '星怒')
@@ -87,22 +93,55 @@ test('resolves my relationship to the current speaker instead of storing the pro
 
 test('model semantic output resolves pronouns through provided speaker and live member context', () => {
   const members = new Map([...memberMap(), [4, { user_id: 4, card: '星野' }]])
-  const entries = parseSemanticGroupKnowledgeOutput(JSON.stringify([
+  const entries = parseKnowledge([
     { kind: 'member_definition', subject: '星怒', owner: 'speaker', targetNames: ['星野'] }
-  ]), {
+  ], {
     text: '希洛群里的星野是我的星怒你记住了',
     memberMap: members,
-    creatorQQ: '9',
-    creatorDisplay: '沃基',
-    botId: '1'
   })
   assert.equal(entries.length, 1)
   assert.equal(entries[0].ownerQQ, '9')
   assert.equal(entries[0].targets[0].userId, '4')
 })
 
-test('ordinary chat without a resource or named member definition does not create group knowledge', () => {
-  assert.deepEqual(extractExplicitGroupKnowledge({ text: '这个地图是我昨天做的，真累', memberMap: memberMap(), creatorQQ: '9' }), [])
+test('semantic adjudicator rejects story casting and quoted bot acknowledgements', async () => {
+  const manager = new MemoryManager({
+    enabled: true,
+    memoryAiConfig: { memoryAiUrl: 'https://memory.example/chat', memoryAiApikey: 'test', memoryAiModel: 'test' }
+  }, { redis: createFakeRedis() })
+  let prompt = ''
+  manager.extractor._callChat = async messages => {
+    prompt = messages[1].content
+    return '[]'
+  }
+  const decision = await manager.interpretGroupKnowledgeInstruction({
+    text: "这个故事不够有反转，再加新角色'水水水水'和'兔头'；上次它还说‘记住了’",
+    memberMap: new Map([...memberMap(), [4, { user_id: 4, card: '水水水水' }], [5, { user_id: 5, card: '诺登不登校' }]]),
+    creatorQQ: '9',
+    botId: '1'
+  })
+  assert.equal(decision.status, 'ignored')
+  assert.deepEqual(decision.knowledgeEntries, [])
+  assert.match(prompt, /创作故事/)
+  assert.match(prompt, /“记住了”/)
+})
+
+test('stores a quoted alias as one exact member definition', async () => {
+  const members = new Map([...memberMap(), [5, { user_id: 5, card: '诺登不登校' }]])
+  const entries = parseKnowledge([
+    { kind: 'member_definition', subject: '兔头', targetNames: ['诺登不登校'] }
+  ], {
+    text: "希洛，记住'兔头'也就是群里的诺登不登校",
+    memberMap: members,
+  })
+  assert.equal(entries.length, 1)
+  assert.equal(entries[0].subject, '兔头')
+  assert.deepEqual(entries[0].targetUserIds, ['5'])
+
+  const manager = new MemoryManager({ enabled: true }, { redis: createFakeRedis() })
+  await manager.upsertGroupKnowledgeEntries('g', entries)
+  const prompt = await manager.getGroupKnowledgePrompt('g', { message: '兔头是谁' })
+  assert.match(prompt, /“兔头”指的是：诺登不登校/)
 })
 
 test('forgets only the requesting user\'s uniquely named group knowledge', async () => {
@@ -138,4 +177,75 @@ test('does not delete an ambiguous or foreign group knowledge entry', async () =
   const foreign = await manager.forgetGroupKnowledge({ groupId: 'g', requesterQQ: '2', query: '搭档' })
   assert.equal(foreign.reason, 'not-found')
   assert.equal((await manager.getGroupKnowledgeEntries('g')).length, 2)
+})
+
+test('unified semantic commit uses one source for aliases, knowledge and workflows and forget removes all of it', async () => {
+  const manager = new MemoryManager({ enabled: true }, { redis: createFakeRedis() })
+  const decision = parseSemanticGroupMemoryOutput(JSON.stringify([
+    { kind: 'member_definition', subject: '星怒', owner: 'speaker', targetNames: ['甲'] },
+    { kind: 'alias', alias: '甲哥', targetNames: ['甲'] },
+    { kind: 'workflow', condition: '有人要挂团', targetNames: ['甲'] }
+  ]), {
+    text: '希洛，记住甲是我的星怒，甲哥也是甲；有人要挂团就找甲',
+    memberMap: memberMap(), creatorQQ: '9', creatorDisplay: '沃基', botId: '1', sourceMessageId: 'm-1', now: 100
+  })
+  const committed = await manager.commitGroupMemoryDecision('g', decision, {
+    requesterQQ: '9', isGroupManager: true, sourceMessageId: 'm-1', text: '原话', now: 100
+  })
+  assert.equal(committed.status, 'accepted')
+  assert.equal((await manager.getGroupKnowledgeEntries('g')).length, 1)
+  assert.equal((await manager.getGroupWorkflowRules('g')).length, 1)
+  assert.equal(Object.keys(await manager.store.getAlias('g')).length, 1)
+  const source = (await manager.getGroupKnowledgeEntries('g'))[0].proposalId
+  assert.ok(source)
+  assert.equal((await manager.getGroupWorkflowRules('g'))[0].proposalId, source)
+  assert.equal((await manager.store.getAlias('g'))['甲哥'].proposalId, source)
+
+  const forgotten = await manager.forgetGroupKnowledge({ groupId: 'g', requesterQQ: '9', query: '我的星怒' })
+  assert.equal(forgotten.deleted, true)
+  assert.equal((await manager.getGroupKnowledgeEntries('g')).length, 0)
+  assert.equal((await manager.getGroupWorkflowRules('g')).length, 0)
+  assert.equal(Object.keys(await manager.store.getAlias('g')).length, 0)
+})
+
+test('unified semantic commit rejects non-manager workflows and another member overwriting shared definitions', async () => {
+  const manager = new MemoryManager({ enabled: true }, { redis: createFakeRedis() })
+  const workflowOnly = parseSemanticGroupMemoryOutput(JSON.stringify([
+    { kind: 'workflow', condition: '有人要挂团', targetNames: ['甲'] }
+  ]), { text: '记住有人要挂团找甲', memberMap: memberMap(), creatorQQ: '9', botId: '1', sourceMessageId: 'm-w' })
+  const denied = await manager.commitGroupMemoryDecision('g', workflowOnly, { requesterQQ: '9', isGroupManager: false, sourceMessageId: 'm-w' })
+  assert.equal(denied.status, 'rejected')
+  assert.equal(denied.rejected[0].reason, 'unauthorized')
+  assert.equal((await manager.getGroupWorkflowRules('g')).length, 0)
+
+  const first = parseSemanticGroupMemoryOutput(JSON.stringify([
+    { kind: 'member_definition', subject: '策划', targetNames: ['甲'] },
+    { kind: 'alias', alias: '主策', targetNames: ['甲'] }
+  ]), { text: '记住甲是策划', memberMap: memberMap(), creatorQQ: '9', botId: '1', sourceMessageId: 'm-a' })
+  await manager.commitGroupMemoryDecision('g', first, { requesterQQ: '9', sourceMessageId: 'm-a' })
+  const replacement = parseSemanticGroupMemoryOutput(JSON.stringify([
+    { kind: 'member_definition', subject: '策划', targetNames: ['乙'] },
+    { kind: 'alias', alias: '主策', targetNames: ['乙'] }
+  ]), { text: '记住乙是策划', memberMap: memberMap(), creatorQQ: '3', botId: '1', sourceMessageId: 'm-b' })
+  const conflict = await manager.commitGroupMemoryDecision('g', replacement, { requesterQQ: '3', sourceMessageId: 'm-b' })
+  assert.equal(conflict.status, 'rejected')
+  assert.deepEqual(conflict.rejected.map(item => item.reason), ['conflict', 'conflict'])
+  assert.equal((await manager.getGroupKnowledgeEntries('g'))[0].targets[0].userId, '2')
+  assert.equal((await manager.store.getAlias('g'))['主策'].qq, '2')
+})
+
+test('semantic adjudicator includes explicit at targets and the speaker among identity candidates', async () => {
+  const manager = new MemoryManager({
+    enabled: true,
+    memoryAiConfig: { memoryAiUrl: 'https://memory.example/chat', memoryAiApikey: 'test', memoryAiModel: 'test' }
+  }, { redis: createFakeRedis() })
+  let prompt = ''
+  manager.extractor._callChat = async messages => { prompt = messages[1].content; return '[]' }
+  await manager.interpretGroupKnowledgeInstruction({
+    text: '希洛，记住这个人是我的搭档',
+    messageSegments: [{ type: 'at', data: { qq: '2' } }],
+    memberMap: memberMap(), creatorQQ: '9', creatorDisplay: '沃基', botId: '1'
+  })
+  assert.match(prompt, /沃基\(QQ:9\)/)
+  assert.match(prompt, /甲\(QQ:2\)/)
 })

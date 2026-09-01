@@ -6,7 +6,7 @@ export class ForgetGroupKnowledgeTool extends AbstractTool {
   constructor() {
     super()
     this.name = 'forgetGroupKnowledgeTool'
-    this.description = '忘掉当前用户明确教给希洛的一条当前群群知识。'
+    this.description = '忘掉当前群一条由语义教学写入的共享定义、别名或通知规则；普通成员只能删除自己创建的内容。'
     this.parameters = {
       type: 'object',
       properties: {
@@ -16,9 +16,9 @@ export class ForgetGroupKnowledgeTool extends AbstractTool {
     }
     this.skill = {
       name: this.name,
-      purpose: '精确删除当前用户在当前群教会的一条结构化群知识。',
-      whenToUse: '仅当用户明确要求忘掉、删除、清除自己先前教会的群知识时使用。',
-      boundaries: '只操作当前群的结构化群知识，且只能删除当前用户创建的条目；找不到或匹配多条时绝不删除。不能用于聊天记录、群文件本体、其他人的记忆或任何普通数据。',
+      purpose: '精确删除当前群中由语义教学提交的一条结构化群定义、别名或通知规则。',
+      whenToUse: '仅当用户明确要求忘掉、删除、清除先前教会的群知识、别名或通知规则时使用。',
+      boundaries: '只操作当前群的结构化共享状态。普通成员只能删除自己创建的内容；群主、管理员和主人可处理其他人的精确条目。找不到或匹配多条时绝不删除。不能用于聊天记录、群文件本体或任何普通数据。',
       instructions: 'memory 只填写用户要忘掉的称呼，不要编造 ID。含“我的”时必须原样保留，以便按当前发言者限定。工具返回歧义时请让用户明确哪一条，不要自行挑选。',
       examples: [
         '“忘掉我的星怒” -> {"memory":"我的星怒"}',
@@ -35,11 +35,12 @@ export class ForgetGroupKnowledgeTool extends AbstractTool {
     const result = await e.memoryManager.forgetGroupKnowledge({
       groupId: e.group_id,
       requesterQQ: e.user_id,
+      requesterIsGroupManager: Boolean(e.isMaster || ['owner', 'admin'].includes(e.sender?.role)),
       query: options.memory
     })
-    if (result.deleted) return `已经忘掉：${describeGroupKnowledgeEntry(result.entry)}。`
+    if (result.deleted) return `已经忘掉：${result.description || describeGroupKnowledgeEntry(result.entry)}。`
     if (result.reason === 'ambiguous') {
-      const candidates = result.candidates.map(describeGroupKnowledgeEntry).join('；')
+      const candidates = result.candidateDescriptions?.join('；') || result.candidates.map(describeGroupKnowledgeEntry).join('；')
       return `我找到了不止一条可能的记忆：${candidates}。你说清楚要忘掉哪一条，我再删。`
     }
     if (result.reason === 'not-found') return '没有找到你自己教给我的这条群知识，所以我没有删除别的内容。'

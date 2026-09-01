@@ -9,6 +9,41 @@ function compactText(text = "", maxLength = 6000) {
     .trim(), maxLength)
 }
 
+const FORWARD_SNAPSHOT_MAX_SEGMENTS = 100
+const FORWARD_SNAPSHOT_MAX_STRING_LENGTH = 100000
+
+function copyForwardSnapshotValue(value, depth = 0, seen = new WeakSet()) {
+  if (value === null || value === undefined) return value
+  if (typeof value === "string") return value.slice(0, FORWARD_SNAPSHOT_MAX_STRING_LENGTH)
+  if (["number", "boolean"].includes(typeof value)) return value
+  if (typeof value === "bigint") return String(value)
+  if (typeof value !== "object" || depth >= 8 || Buffer.isBuffer(value) || seen.has(value)) return undefined
+  seen.add(value)
+  if (Array.isArray(value)) {
+    return value.slice(0, FORWARD_SNAPSHOT_MAX_SEGMENTS)
+      .map(item => copyForwardSnapshotValue(item, depth + 1, seen))
+      .filter(item => item !== undefined)
+  }
+  const copied = {}
+  for (const [key, item] of Object.entries(value)) {
+    const next = copyForwardSnapshotValue(item, depth + 1, seen)
+    if (next !== undefined) copied[key] = next
+  }
+  return copied
+}
+
+function snapshotForwardSegments(segments = []) {
+  return normalizeMessageSegments(segments).slice(0, FORWARD_SNAPSHOT_MAX_SEGMENTS).map(segment => {
+    const copied = copyForwardSnapshotValue(segment)
+    if (!copied || typeof copied !== "object") return null
+    if (copied.type === "forward") {
+      const id = extractForwardIdFromSegment(copied)
+      return id ? { type: "forward", id: String(id) } : { type: "forward" }
+    }
+    return copied
+  }).filter(Boolean)
+}
+
 function parseForwardJsonPayload(value) {
   if (!value) return null
   if (typeof value === "string") {
@@ -117,6 +152,43 @@ function normalizeMediaSource(value = "", type = "image") {
   return ""
 }
 
+function extractFileIdFromSource(source = "") {
+  if (!/^https?:\/\//i.test(source)) return ""
+  try {
+    const url = new URL(source)
+    for (const key of ["fileid", "file_id", "fid"]) {
+      const value = String(url.searchParams.get(key) || "").trim()
+      if (value) return value
+    }
+  } catch {}
+  return ""
+}
+
+function extractStableFileId(segment = {}, data = {}, source = "") {
+  const explicit = segment.file_id || segment.fid || segment.id || data.file_id || data.fid || data.id
+  if (String(explicit || "").trim()) return String(explicit).trim()
+  const sourceFileId = extractFileIdFromSource(source)
+  if (sourceFileId) return sourceFileId
+  const rawFile = segment.file || data.file
+  const value = String(rawFile || "").trim()
+  return value && !/^(?:https?:\/\/|base64:\/\/|file:\/\/|data:)/i.test(value) ? value : ""
+}
+
+function canonicalizeMediaSource(source = "") {
+  const value = String(source || "").trim()
+  if (!/^https?:\/\//i.test(value)) return value
+  try {
+    const url = new URL(value)
+    for (const key of ["rkey", "spec", "download", "quality", "thumb", "term", "flags"]) {
+      url.searchParams.delete(key)
+    }
+    url.hash = ""
+    return url.toString()
+  } catch {
+    return value
+  }
+}
+
 function mediaLabel(type = "image") {
   return { image: "图片", video: "视频", record: "语音", voice: "语音", file: "文件" }[type] || "媒体"
 }
@@ -135,13 +207,11 @@ export function extractMediaAssetsFromSegments(segments = [], meta = {}) {
     const fileName = type === "file"
       ? String(segment.name || data.name || segment.file_name || data.file_name || segment.file || data.file || "").trim()
       : ""
-    const fileId = type === "file"
-      ? String(segment.file_id || segment.fid || data.file_id || data.fid || data.id || "").trim()
-      : ""
     const source = normalizeMediaSource(
       segment.url || segment.file_url || data.url || data.file_url || segment.file || data.file,
       type
     )
+    const fileId = extractStableFileId(segment, data, source)
     if (!source && !(type === "file" && fileId)) continue
     const index = (typeCounts.get(type) || 0) + 1
     typeCounts.set(type, index)
@@ -171,7 +241,7 @@ function dedupeAssets(assets = [], maxItems = 12) {
   for (const asset of assets) {
     const source = String(asset?.source || "").trim()
     const fileId = String(asset?.fileId || "").trim()
-    const key = `${asset?.type || "image"}:${source || fileId}`
+    const key = `${asset?.type || "image"}:${fileId || canonicalizeMediaSource(source)}`
     if ((!source && !fileId) || seen.has(key)) continue
     seen.add(key)
     result.push({ ...asset, source, position: result.length + 1 })
@@ -188,6 +258,44 @@ export async function collectForwardContext(group, segments = [], options = {}) 
   const images = []
   const media = []
   const visited = new Set()
+  const active = new Set()
+  const snapshots = new Map()
+  let nodeCount = 0
+
+  const snapshotForward = async (forwardId, depth = 0) => {
+    const id = String(forwardId || "").trim()
+    if (!id || depth >= maxDepth || nodeCount >= maxLines || !group?.getForwardMsg) return []
+    if (snapshots.has(id)) return snapshots.get(id)
+    if (active.has(id)) return []
+    active.add(id)
+    let messages = []
+    try {
+      messages = normalizeForwardMessageList(await group.getForwardMsg(id))
+    } catch {
+      active.delete(id)
+      return []
+    }
+    const nodes = []
+    for (const message of messages) {
+      if (nodeCount >= maxLines) break
+      const messageSegments = normalizeMessageSegments(message)
+      const nested = []
+      for (const nestedId of extractForwardIdsFromSegments(messageSegments)) {
+        nested.push({ id: nestedId, nodes: await snapshotForward(nestedId, depth + 1) })
+      }
+      nodes.push({
+        user_id: String(getReplyTargetUserId(message) || ""),
+        nickname: getForwardSenderName(message),
+        time: Number(message?.time || message?.sender?.time || 0) || undefined,
+        message: snapshotForwardSegments(messageSegments),
+        nested_forwards: nested.filter(item => item.id)
+      })
+      nodeCount++
+    }
+    active.delete(id)
+    snapshots.set(id, nodes)
+    return nodes
+  }
 
   const visit = async (forwardId, depth = 0) => {
     const id = String(forwardId || "").trim()
@@ -243,12 +351,18 @@ export async function collectForwardContext(group, segments = [], options = {}) 
     await visit(forwardId, 0)
   }
 
+  const forwardNodes = []
+  for (const forwardId of extractForwardIdsFromSegments(segments)) {
+    forwardNodes.push({ id: forwardId, nodes: await snapshotForward(forwardId, 0) })
+  }
+
   return {
     text: compactText(lines.join("\n"), Number(options.maxText) || 6000),
     lines,
     images: dedupeAssets(images, maxImages),
     media: dedupeAssets(media, maxImages * 2),
-    forwardIds: [...visited]
+    forwardIds: [...visited],
+    forwardNodes
   }
 }
 
@@ -300,6 +414,8 @@ export async function resolveGroupContextAssets({ e = {}, group = null, reply = 
     files: media.filter(asset => asset.type === "file"),
     currentForwardText: currentForward.text,
     quotedForwardText: quotedForward.text,
+    forwardNodes: currentForward.forwardNodes,
+    quotedForwardNodes: quotedForward.forwardNodes,
     forwardText: compactText([currentForward.text, quotedForward.text].filter(Boolean).join("\n"), 8000)
   }
 }

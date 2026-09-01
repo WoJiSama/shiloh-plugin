@@ -270,6 +270,9 @@ export class MessageManager {
           case 'forward':
             action = '转发了消息';
             break;
+          case 'forward_context':
+            action = `转发记录内容: ${msg.text || ''}`;
+            break;
           case 'bface':
             action = '发送了qq表情包';
             break;

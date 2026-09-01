@@ -35,12 +35,12 @@ function makeProviderSchemas(definition) {
   for (const extra of definition.extraFields || []) {
     schemas.push({
       field: extra.panelField,
-      label: extra.panelField === "size" ? "图片尺寸" : extra.panelField,
+      label: extra.label || (extra.panelField === "size" ? "图片尺寸" : extra.panelField),
       component: "Input",
       componentProps: {
-        placeholder: definition.configKey === "imageGenerationAiConfig"
+        placeholder: extra.placeholder || (definition.configKey === "imageGenerationAiConfig"
           ? "Seedream 可填 2K，OpenAI 常见为 1024x1024"
-          : ""
+          : "")
       }
     })
   }

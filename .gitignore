@@ -10,3 +10,8 @@ custom_tools/**/*.js
 custom_tools/**/*.mjs
 custom_tools/**/*.cjs
 !custom_tools/*.example
+.DS_Store
+.remote-edit/
+.idea/
+reports/
+torrent-tool-*/

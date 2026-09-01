@@ -35,6 +35,7 @@ import { ModrinthTool } from "../functions/functions_tools/ModrinthTool.js"
 import { MentionAdminsTool } from "../functions/functions_tools/MentionAdminsTool.js"
 import { MentionMembersTool } from "../functions/functions_tools/MentionMembersTool.js"
 import { ForgetGroupKnowledgeTool } from "../functions/functions_tools/ForgetGroupKnowledgeTool.js"
+import { TorrentDownloadTool } from "../functions/functions_tools/TorrentDownloadTool.js"
 import { resolveToolSkill } from "./toolSkills.js"
 
 const PLUGIN_NAME = "bl-chat-plugin"
@@ -77,6 +78,7 @@ const BUILT_IN_TOOL_FACTORIES = [
   () => new MentionAdminsTool(),
   () => new MentionMembersTool(),
   () => new ForgetGroupKnowledgeTool(),
+  () => new TorrentDownloadTool(),
 ]
 
 function logInfo(message) {

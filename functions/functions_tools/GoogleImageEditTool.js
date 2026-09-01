@@ -11,12 +11,15 @@ import { randomUUID } from "crypto";
 import {
     generateImageEditWithFallbacks,
     matchesImageProvider,
+    normalizeImageProviderParameter,
     resolveRequestedImageProvider,
     resolveImageEditConfigs,
     selectImageConfigsByProvider,
     shouldRetryWithoutUrlResponseFormat,
     toImageEditUrl
 } from "../../utils/imageGenerationFallback.js";
+import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
+import { personaFeedbackManager } from "../../utils/PersonaFeedbackManager.js";
 
 const { mimeTypes, FormData } = dependencies;
 const DEFAULT_CHAT_IMAGE_EDIT_URL = 'https://api.openai.com/v1/chat/completions';
@@ -24,19 +27,15 @@ const DEFAULT_IMAGE_EDIT_URL = 'https://api.openai.com/v1/images/edits';
 const IMAGE_EDIT_TIMEOUT_MS = 240000;
 const IMAGE_EDIT_JOB_PREFIX = "ytbot:image_edit_job:";
 const IMAGE_EDIT_JOB_TTL_SECONDS = 24 * 60 * 60;
-const IMAGE_EDIT_PROGRESS_MESSAGES = [
-    "收到，我按你的要求改这张图，完成后直接发你。",
-    "好，我来处理这张图，只改你指定的部分。",
-    "嗯，我按你这次说的要求改，其他内容尽量保持不变。",
-    "好，我开始改这张图，弄好后直接发出来。"
-];
-
 export class GoogleImageEditTool extends AbstractTool {
-    constructor() {
+    constructor({
+        progressFetchImpl = globalThis.fetch,
+        progressReplyFactory = generateContextualProgressReply
+    } = {}) {
         super();
         this.recoveringJobIds = new Set();
         this.name = 'googleImageEditTool';
-        this.description = '使用Google Gemini处理用户的任意图片（或用户的群聊头像），支持编辑图片内容。当用户请求编辑图片/头像时调用此工具。';
+        this.description = '使用已配置的图片编辑渠道处理用户提供的图片或群友头像；仅修改用户明确要求的内容。';
         this.parameters = {
             type: 'object',
             properties: {
@@ -52,17 +51,24 @@ export class GoogleImageEditTool extends AbstractTool {
                 provider: {
                     type: 'string',
                     description: '仅当用户明确指定图片渠道或模型名称时填写，例如 Grok；未指定时不要填写'
+                },
+                progressText: {
+                    type: 'string',
+                    description: '可选：结合当前编辑要求生成一句自然开场；不能编造已经看见的图片细节或声称已经完成'
                 }
             },
             required: ['prompt', 'images'],
             additionalProperties: false
         };
+        this.progressFetchImpl = progressFetchImpl;
+        this.progressReplyFactory = progressReplyFactory;
     }
 
     async func(opts, e) {
         const config = this.loadConfig();
         const requestedProvider = this.resolveRequestedProvider(config, opts, e);
-        const effectiveOpts = requestedProvider ? { ...opts, provider: requestedProvider } : opts;
+        const { provider: _untrustedProvider, ...baseOpts } = opts || {};
+        const effectiveOpts = requestedProvider ? { ...baseOpts, provider: requestedProvider } : baseOpts;
         const job = this.createDurableJob(effectiveOpts, e);
         await this.persistDurableJob(job);
         try {
@@ -74,6 +80,7 @@ export class GoogleImageEditTool extends AbstractTool {
 
     async performImageEdit(opts, e, options = {}) {
         const STREAM = false;
+        let progressController = null;
 
         try {
             const config = this.loadConfig();
@@ -91,7 +98,14 @@ export class GoogleImageEditTool extends AbstractTool {
             const model = imageEditApiModel || "gemini-3-pro-image-preview";
             this.validateRequestedImageEditProvider(config, apiUrl, requestedProvider);
 
-            if (!options.skipProgressNotice) await this.sendProgress(e, prompt);
+            if (!options.skipProgressNotice) {
+                progressController = new AbortController();
+                void Promise.resolve(this.sendProgress(e, {
+                    config,
+                    opts,
+                    signal: progressController.signal
+                })).catch(error => this.logWarn(`[图片编辑] 进度生成或发送异常: ${error?.message || error}`));
+            }
 
             // 处理图片URL
             const images = await normalizeImageUrls(rawImages);
@@ -121,6 +135,8 @@ export class GoogleImageEditTool extends AbstractTool {
         } catch (error) {
             console.error('图片编辑失败:', error);
             return { error: `图片编辑失败: ${error.message}` };
+        } finally {
+            progressController?.abort?.();
         }
     }
 
@@ -240,8 +256,25 @@ export class GoogleImageEditTool extends AbstractTool {
     }
 
     resolveRequestedProvider(config = {}, opts = {}, e = {}) {
-        const sourceText = [e?.msg, e?.raw_message, opts?.prompt].filter(Boolean).join("\n");
+        const directUserText = [e?.msg, e?.raw_message].filter(Boolean).join("\n");
+        const sourceText = directUserText || opts?.prompt || "";
         return resolveRequestedImageProvider(config, sourceText, opts?.provider);
+    }
+
+    normalizeParameters(params = {}, context = {}) {
+        const normalized = super.normalizeParameters(params, context);
+        const directUserText = [
+            context?.userText,
+            context?.currentIntentText,
+            context?.event?.msg,
+            context?.event?.raw_message
+        ].filter(Boolean).join("\n");
+        const sourceText = directUserText || normalized.prompt || "";
+        let config = {};
+        try {
+            config = this.loadConfig();
+        } catch {}
+        return normalizeImageProviderParameter(normalized, config, sourceText);
     }
 
     validateRequestedImageEditProvider(config = {}, apiUrl = "", provider = "") {
@@ -495,16 +528,31 @@ export class GoogleImageEditTool extends AbstractTool {
         else console.warn(...args);
     }
 
-    getProgressMessage(prompt = "") {
-        return IMAGE_EDIT_PROGRESS_MESSAGES[Math.floor(Math.random() * IMAGE_EDIT_PROGRESS_MESSAGES.length)];
-    }
-
-    async sendProgress(e, prompt = "") {
-        if (!e?.reply) return;
+    async sendProgress(e, { config = {}, opts = {}, signal } = {}) {
+        if (!e?.reply || signal?.aborted) return false;
         try {
-            await e.reply(this.getProgressMessage(prompt));
+            const text = await this.progressReplyFactory({
+                config,
+                taskType: "图片编辑",
+                taskMode: "image_edit",
+                userText: e?.msg || e?.raw_message || opts?.prompt || "编辑这张图片",
+                stage: "已经取得待编辑图片，正在按用户明确要求修改，尚未得到成图",
+                suggestedText: opts?.progressText,
+                agentContext: opts?.agentContext,
+                fetchImpl: this.progressFetchImpl,
+                signal
+            });
+            if (!text || signal?.aborted) return false;
+            const guardedText = personaFeedbackManager.guardReply(text, config?.personaGuard, {
+                userText: e?.msg || e?.raw_message || opts?.prompt || "",
+                botNames: [config?.persona?.name]
+            });
+            if (!guardedText) return false;
+            await e.reply(guardedText);
+            return true;
         } catch (error) {
             this.logWarn(`[图片编辑] 发送进度提示失败: ${error.message}`);
+            return false;
         }
     }
 

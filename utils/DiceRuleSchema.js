@@ -13,7 +13,7 @@ const STATUS_ACTIONS = new Set(["add_status", "remove_status"])
 const ITEM_ACTIONS = new Set(["add_item", "remove_item", "equip", "unequip"])
 const ABILITY_ACTIONS = new Set(["learn_ability", "forget_ability", "use_ability", "reset_ability"])
 const ACTIONS = new Set([...VALUE_ACTIONS, ...STATUS_ACTIONS, ...ITEM_ACTIONS, ...ABILITY_ACTIONS])
-const EXPRESSION_FUNCTIONS = new Set(["min", "max", "clamp", "abs", "floor", "ceil", "round", "sqrt", "pow", "if", "coalesce", "len", "dice"])
+const EXPRESSION_FUNCTIONS = new Set(["min", "max", "clamp", "abs", "floor", "ceil", "round", "sqrt", "pow", "if", "coalesce", "len", "dice", "cancel", "successes", "explode", "reroll", "pool"])
 const PERMISSIONS = new Set(["player", "gm", "admin", "master"])
 const VISIBILITIES = new Set(["public", "private", "gm"])
 const ACTOR_KINDS = new Set(["self", "member", "npc"])
@@ -27,13 +27,13 @@ const RESERVED_ALIASES = new Set([
 const RESERVED_SUBCOMMAND_ALIASES = new Set([
   "卡", "card", "设", "set", "查", "get", "删", "clear", "权限", "role", "roles", "npc",
   "群卡", "groupcard", "群设", "groupset", "群查", "groupget", "团务", "session", "先攻", "init",
-  "状态", "status", "物品", "item", "inventory", "技能", "ability", "abilities", "spell", "审计", "audit"
+  "战役", "campaign", "群组", "状态", "status", "物品", "item", "inventory", "技能", "ability", "abilities", "spell", "审计", "audit", "投递", "delivery"
 ])
 
 const TOP_LEVEL_KEYS = new Set(["version", "id", "name", "aliases", "description", "compatibility", "identity", "character", "group", "statuses", "items", "abilities", "events", "dice_sets", "tables", "commands", "templates", "limits"])
 const COMPATIBILITY_KEYS = new Set(["min_runtime", "package_version", "migrations"])
-const MIGRATION_KEYS = new Set(["from", "rename_fields", "add_defaults"])
-const IDENTITY_KEYS = new Set(["display_name", "fallback"])
+const MIGRATION_KEYS = new Set(["from", "to", "rename_fields", "add_defaults", "rename_group_fields", "add_group_defaults"])
+const IDENTITY_KEYS = new Set(["display_name", "fallback", "group_card", "sync_group_card"])
 const CHARACTER_KEYS = new Set(["fields"])
 const FIELD_KEYS = new Set(["type", "label", "description", "default", "formula", "min", "max", "step", "enum", "max_length", "secret", "persistent"])
 const DICE_SET_KEYS = new Set(["label", "faces"])
@@ -42,8 +42,8 @@ const TABLE_KEYS = new Set(["label", "entries"])
 const TABLE_ENTRY_KEYS = new Set(["weight", "text", "value", "tags"])
 const GROUP_KEYS = new Set(["fields"])
 const STATUS_KEYS = new Set(["label", "description", "default_duration", "max_stacks", "tick", "on_apply", "on_tick", "on_expire"])
-const ITEM_KEYS = new Set(["label", "description", "stackable", "max_quantity", "slot"])
-const ABILITY_KEYS = new Set(["label", "description", "kind", "max_rank", "cooldown", "resource_scope", "resource_field", "resource_cost"])
+const ITEM_KEYS = new Set(["label", "description", "stackable", "max_quantity", "slot", "consumable", "on_use", "on_equip", "on_unequip"])
+const ABILITY_KEYS = new Set(["label", "description", "kind", "max_rank", "cooldown", "resource_scope", "resource_field", "resource_cost", "on_use"])
 const COMMAND_KEYS = new Set(["id", "aliases", "label", "description", "permission", "visibility", "public_output", "arguments", "rolls", "draws", "let", "opposed", "branches", "actions", "template", "output", "error_output"])
 const ARGUMENT_KEYS = new Set(["id", "label", "description", "type", "required", "default", "min", "max", "enum", "rest", "multiple", "allowed"])
 const BRANCH_KEYS = new Set(["when", "result", "let", "actions", "output", "tags"])
@@ -491,6 +491,7 @@ function validateItemDefinitions(pack, errors) {
     checkString(definition.description, `${path}.description`, errors, { max: 200 })
     checkString(definition.slot, `${path}.slot`, errors, { max: 40 })
     if (definition.stackable !== undefined && typeof definition.stackable !== "boolean") addError(errors, `${path}.stackable`, "必须是布尔值")
+    if (definition.consumable !== undefined && typeof definition.consumable !== "boolean") addError(errors, `${path}.consumable`, "必须是布尔值")
     if (definition.max_quantity !== undefined) checkNumberSetting(definition.max_quantity, `${path}.max_quantity`, errors, { integer: true, min: 1, max: 1000000 })
     if (definition.stackable === false && definition.max_quantity !== undefined && definition.max_quantity !== 1) addError(errors, `${path}.max_quantity`, "不可堆叠物品的上限只能是 1")
   }
@@ -597,6 +598,14 @@ function validateLifecycleActions(pack, errors, fields, groupFields, statuses, i
     for (const key of ["on_apply", "on_tick", "on_expire"]) {
       validateActions(definition?.[key], `statuses.${id}.${key}`, errors, scope, fields, { maxLength: limits.max_expression_length }, definitions)
     }
+  }
+  for (const [id, definition] of Object.entries(pack.items || {})) {
+    for (const key of ["on_use", "on_equip", "on_unequip"]) {
+      validateActions(definition?.[key], `items.${id}.${key}`, errors, scope, fields, { maxLength: limits.max_expression_length }, definitions)
+    }
+  }
+  for (const [id, definition] of Object.entries(pack.abilities || {})) {
+    validateActions(definition?.on_use, `abilities.${id}.on_use`, errors, scope, fields, { maxLength: limits.max_expression_length }, definitions)
   }
   if (pack.events === undefined) return
   if (!checkObject(pack.events, "events", errors)) return
@@ -786,6 +795,9 @@ function validateCommands(pack, errors, fields, groupFields, statuses, items, ab
     if (restrictedAccess.length && !["gm", "admin", "master"].includes(command.permission)) {
       addError(errors, `${path}.permission`, `访问 secret 字段时至少需要 gm：${restrictedAccess.join("、")}`)
     }
+    if (restrictedAccess.length && !["private", "gm"].includes(command.visibility)) {
+      addError(errors, `${path}.visibility`, `访问 secret 字段时必须使用 private 或 gm，不能公开输出：${restrictedAccess.join("、")}`)
+    }
   })
 }
 
@@ -814,7 +826,8 @@ export function validateDiceRulePack(input, options = {}) {
   if (pack.compatibility !== undefined && checkObject(pack.compatibility, "compatibility", errors)) {
     rejectUnknownKeys(pack.compatibility, COMPATIBILITY_KEYS, "compatibility", errors)
     checkString(pack.compatibility.min_runtime, "compatibility.min_runtime", errors, { max: 20 })
-    checkString(pack.compatibility.package_version, "compatibility.package_version", errors, { max: 40 })
+    const packageVersion = checkString(pack.compatibility.package_version, "compatibility.package_version", errors, { max: 40 })
+    if (packageVersion && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(packageVersion)) addError(errors, "compatibility.package_version", "必须使用语义版本，例如 1.2.0")
     if (pack.compatibility.migrations !== undefined) {
       if (!Array.isArray(pack.compatibility.migrations) || pack.compatibility.migrations.length > 20) addError(errors, "compatibility.migrations", "必须是最多 20 项的数组")
       else {
@@ -824,9 +837,12 @@ export function validateDiceRulePack(input, options = {}) {
           if (!checkObject(migration, path, errors)) return
           rejectUnknownKeys(migration, MIGRATION_KEYS, path, errors)
           const from = checkString(migration.from, `${path}.from`, errors, { required: true, max: 40 })
+          const to = checkString(migration.to, `${path}.to`, errors, { max: 40 })
+          if (from && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(from)) addError(errors, `${path}.from`, "必须使用语义版本")
+          if (to && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(to)) addError(errors, `${path}.to`, "必须使用语义版本")
           if (migrationSources.has(from)) addError(errors, `${path}.from`, `迁移来源 ${from} 重复`)
           migrationSources.add(from)
-          for (const key of ["rename_fields", "add_defaults"]) {
+          for (const key of ["rename_fields", "add_defaults", "rename_group_fields", "add_group_defaults"]) {
             if (migration[key] !== undefined && !isObject(migration[key])) addError(errors, `${path}.${key}`, "必须是对象")
           }
           if (isObject(migration.rename_fields)) {
@@ -889,6 +905,15 @@ export function validateDiceRulePack(input, options = {}) {
       if (!definition || !fields.stored.has(id)) addError(errors, `${path}.add_defaults.${id}`, `字段 ${id} 不存在或不是可持久字段`)
       else checkTypedValue(value, definition, `${path}.add_defaults.${id}`, errors)
     }
+    for (const [oldId, newId] of Object.entries(migration.rename_group_fields || {})) {
+      if (!ITEM_ID_PATTERN.test(oldId)) addError(errors, `${path}.rename_group_fields.${oldId}`, "旧群字段 ID 不合法")
+      if (!groupFields.stored.has(newId)) addError(errors, `${path}.rename_group_fields.${oldId}`, `目标群字段 ${newId} 不存在或不是可持久字段`)
+    }
+    for (const [id, value] of Object.entries(migration.add_group_defaults || {})) {
+      const definition = groupFields.fields[id]
+      if (!definition || !groupFields.stored.has(id)) addError(errors, `${path}.add_group_defaults.${id}`, `群字段 ${id} 不存在或不是可持久字段`)
+      else checkTypedValue(value, definition, `${path}.add_group_defaults.${id}`, errors)
+    }
   }
   const diceSets = validateDiceSets(pack, errors)
   const tables = validateTables(pack, errors, limits.max_table_entries)
@@ -898,6 +923,8 @@ export function validateDiceRulePack(input, options = {}) {
     const identityScope = { attr: fields.persistent, derived: fields.derived }
     if (pack.identity.display_name !== undefined) validateTemplate(pack.identity.display_name, "identity.display_name", errors, identityScope)
     if (pack.identity.fallback !== undefined) validateTemplate(pack.identity.fallback, "identity.fallback", errors, identityScope)
+    if (pack.identity.group_card !== undefined) validateTemplate(pack.identity.group_card, "identity.group_card", errors, identityScope)
+    if (pack.identity.sync_group_card !== undefined && typeof pack.identity.sync_group_card !== "boolean") addError(errors, "identity.sync_group_card", "必须是布尔值")
     for (const [key, template] of Object.entries(pack.identity)) {
       if (typeof template !== "string") continue
       const leaked = [...template.matchAll(/\b(attr|derived)\.([a-z][a-z0-9_]*)\b/g)].find(match => fields.secret.has(match[2]))

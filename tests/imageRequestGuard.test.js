@@ -58,9 +58,9 @@ test('separates content verification from image authenticity', () => {
   assert.equal(looksLikeImageAuthenticityRequest('这张图片是不是P的'), true)
 })
 
-test('missing image reply asks for image warmly', () => {
+test('missing image reply asks for an image directly without inventing details', () => {
   const reply = buildMissingImageAnalysisReply()
-  assert.ok(reply.includes('没看到图'))
-  assert.ok(reply.includes('发一下') || reply.includes('引用'))
-  assert.ok(!reply.includes('真没有'))
+  assert.ok(reply.includes('没有可看的图片'))
+  assert.ok(reply.includes('图片') && reply.includes('原图'))
+  assert.ok(!reply.includes('我怕乱讲'))
 })

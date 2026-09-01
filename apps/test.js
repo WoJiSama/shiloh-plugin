@@ -23,27 +23,42 @@ import { globalStyleLearnerManager } from "../utils/GlobalStyleLearnerManager.js
 import { diceManager } from "../utils/DiceManager.js"
 import { analyzeReplyText } from "../utils/SmartReply.js"
 import { buildMissingImageAnalysisReply, looksLikeImageAuthenticityRequest, looksLikeImageVerificationRequest, looksLikeVisualInspectionRequest, shouldAskForMissingImageForVisualRequest } from "../utils/imageRequestGuard.js"
-import { compileImagePrompt } from "../utils/promptCompiler.js"
+import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../utils/chatCompletionUrl.js"
+import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLines, selectMergedImagePromptTexts } from "../utils/promptCompiler.js"
 import { resolveDeterministicToolIntent, resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
+import { extractValidBtihMagnetUri } from "../utils/torrentDownload.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../utils/toolSkills.js"
-import { extractExplicitGroupWorkflowRules, formatGroupWorkflowTeachingPrompt } from "../utils/memory/groupWorkflow.js"
-import { extractExplicitGroupKnowledge, formatGroupKnowledgeTeachingPrompt } from "../utils/memory/groupKnowledge.js"
+import { formatGroupWorkflowTeachingPrompt } from "../utils/memory/groupWorkflow.js"
+import { formatGroupKnowledgeTeachingPrompt } from "../utils/memory/groupKnowledge.js"
 import { buildMentionMembersFailureReply } from "../utils/mentionFailureReply.js"
 import { collectMentionTargetIds, getMentionTargetId, messageMentionsUser, replaceCqMentions } from "../utils/mentionTargets.js"
+import { isExplicitAdminCollectionMentionRequest, resolveSingularOwnerMention } from "../utils/mentionRoleRouting.js"
 import { resolveRecentBotImage, resolveRecentUserImage } from "../utils/recentImageContinuation.js"
 import { prepareImageEditAssets, resolveAvatarEditBase } from "../utils/editReferencePipeline.js"
-import { hasExplicitImageEditAction, shouldPreferImageGeneration, shouldRenderImageAnalysisAsDocument, shouldRequireImageEditBase, shouldTreatAsAvatarInspection } from "../utils/imageTaskPolicy.js"
+import { hasExplicitImageEditAction, hasExplicitImageGenerationRequest, shouldPreferImageGeneration, shouldRenderImageAnalysisAsDocument, shouldRequireImageEditBase, shouldTreatAsAvatarInspection } from "../utils/imageTaskPolicy.js"
 import { buildImageFailureReply, classifyImageFailure } from "../utils/imageFailurePolicy.js"
 import { formatGroupContextImagePrompt, resolveGroupContextAssets } from "../utils/groupContextResolver.js"
-import { buildGenericChatFailureReply } from "../utils/chatFailureReply.js"
-import { shouldRunSemanticToolPlanner } from "../utils/semanticToolPolicy.js"
+import { buildGenericChatFailureReply, buildVisibleChatFailureDetail } from "../utils/chatFailureReply.js"
+import { appendVisibleFailureDetail, buildVisibleFailureDetail } from "../utils/visibleFailure.js"
+import { hasSemanticPlannerCandidate, shouldRunSemanticToolPlanner } from "../utils/semanticToolPolicy.js"
+import { buildCommittedActionReply, recordActionOutcomes } from "../utils/actionOutcomes.js"
+import { markProactiveReply, shouldCancelProactiveReply } from "../utils/proactiveReplyFreshness.js"
+import { extractDeliveryMessageId, logDeliveryOutcome } from "../utils/deliveryObservability.js"
 import { classifyChatRequestFailure, executeChatRequestWithRecovery } from "../utils/chatRequestRecovery.js"
 import { safeTruncateUnicode, splitUnicodeText } from "../utils/unicodeText.js"
-import { filterToolsForEmojiExposure, shouldExposeEmojiToolForMessage } from "../utils/emojiToolPolicy.js"
+import { classifyEmojiToolExposure, filterToolsForEmojiExposure, resolveForcedReactionEmoji, shouldExposeEmojiToolForMessage } from "../utils/emojiToolPolicy.js"
 import { buildExcelToolParams, hasExcelWorkbookContext, shouldBypassMergeForExcel, shouldUseExcelWorkbookTool } from "../utils/excelRequestPolicy.js"
+import { containsCodeFence, flattenCodeFences } from "../utils/qqCodeFenceText.js"
+import { armSmartLockWatchdog, clearSmartLockWatchdog, isLongRunningTaskLinkRequest } from "../utils/smartLockPolicy.js"
 import { decideToolContinuation } from "../utils/toolContinuationPolicy.js"
 import { buildToolGroundingInstruction, buildUnavailableToolReply, hasUsableToolResult } from "../utils/toolResultGrounding.js"
 import { buildStructuredHistoryMessage, resolveHistorySelectionBudget, resolveToolRoundLimit, selectRelevantGroupHistory } from "../utils/agentIntelligence.js"
+import { buildSolutionExplanationStylePrompt } from "../utils/solutionExplanationStyle.js"
+import { buildAgentProgressContext, buildToolFailureReplyInstruction, selectAgentReplyContext } from "../utils/agentReplyComposer.js"
+import { containsInternalStatusLeak } from "../utils/internalStatusLeak.js"
+import { buildPersonaTonePrompt, enforcePersonaToneBoundary } from "../utils/personaTonePolicy.js"
+import { createTurnPlan, deriveTurnPlanRequest, formatTurnPlanLog, recordTurnPlanToolOutcome } from "../utils/turnPlan.js"
+import { isNarrativeWritingRequest, splitNarrativeReply } from "../utils/narrativeReply.js"
 import {
   buildModrinthBilingualReplyInstruction,
   buildModrinthCardItemsFromData,
@@ -86,8 +101,8 @@ const clearGroupMemoryPending = new Map()
 const CLEAR_GROUP_MEMORY_CONFIRM_TTL_MS = 30000
 
 // 终态工具：本轮调用后不再请求 LLM 续话（工具的执行结果本身即为最终输出）
-const TERMINAL_TOOL_NAMES = new Set(['sendLocalEmojiTool', 'waitTool', 'bananaTool', 'googleImageEditTool', 'voiceTool', 'deltaForceTool', 'mentionAdminsTool', 'mentionMembersTool'])
-const BACKGROUND_TERMINAL_TOOL_NAMES = new Set(['bananaTool', 'googleImageEditTool'])
+const TERMINAL_TOOL_NAMES = new Set(['sendLocalEmojiTool', 'waitTool', 'bananaTool', 'googleImageEditTool', 'voiceTool', 'deltaForceTool', 'mentionAdminsTool', 'mentionMembersTool', 'torrentDownloadTool'])
+const BACKGROUND_TERMINAL_TOOL_NAMES = new Set(['bananaTool', 'googleImageEditTool', 'torrentDownloadTool'])
 
 const activeDedupeToolRuns = new Map()
 const taskStatusCache = new Map()
@@ -104,6 +119,26 @@ const trackingChatStates = new Map() // groupId -> { pendingCount, lastMsgAt, re
 const lastIncomingMsgAt = new Map() // groupId -> ts
 // 群连续被新消息打断的累计计数（达到上限后下一轮强制走完不再让步）
 const consecutiveInterrupts = new Map() // groupId -> count
+// smart 锁持有令牌：看门狗强制释放后旧轮次的 finally 不得误释放新轮次的锁
+let smartLockTokenCounter = 0
+// redis 抖动/断连时命令可能既不成功也不失败（挂起）。任务状态只是去重辅助，
+// 超时降级为"无状态"，绝不能卡住会话收尾（进而卡死 smart 锁）。
+const TASK_STATUS_REDIS_TIMEOUT_MS = 2000
+
+async function settleTaskStatusRedis(promise, fallback, label) {
+  let timer = null
+  const timeout = new Promise(resolve => {
+    timer = setTimeout(() => resolve(fallback), TASK_STATUS_REDIS_TIMEOUT_MS)
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } catch (error) {
+    logger.warn(`[任务状态] ${label}失败：${error.message}`)
+    return fallback
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
 // 禁言状态短期缓存：避免每条群消息都查一次 ws RPC pickMember.getInfo()
 const mutedStatusCache = new Map() // groupId -> { isMuted, at }
 const MUTED_CACHE_TTL_MS = 30000
@@ -177,7 +212,7 @@ const EXPLICIT_SEARCH_PATTERNS = [
   /(搜一下|搜索|查一下|查查|帮我查|帮我搜|联网查|网上查|百度一下|谷歌一下|找一下资料|最新的|最新版|最新版本|官网|链接|网址|网页|页面|repo|github)/i
 ]
 const TOOL_INTENT_PATTERNS = [
-  /(画图|生图|修图|改图|图片分析|看图|识图|视频分析|语音|点歌|音乐|提醒我|定时提醒|撤回|禁言|改名片|戳一下|点赞|送礼物|红包|思维导图|导图|生成图片|生成照片|生成照|生成语音|Excel|工作簿|工作表|sheet|tab页|单元格|\.xlsx\b|\.xlsm\b|艾特|@\S+|通知.*(?:人|一下)|喊.*(?:人|一下)|叫.*(?:人|一下))/i
+  /(画图|生图|修图|改图|图片分析|看图|识图|视频分析|语音|点歌|音乐|提醒我|定时提醒|撤回|禁言|改名片|戳一下|点赞|送礼物|红包|思维导图|导图|生成图片|生成照片|生成照|生成语音|Excel|工作簿|工作表|sheet|tab页|单元格|\.xlsx\b|\.xlsm\b|磁链|磁力链接|magnet:\?|艾特|@\S+|通知.*(?:人|一下)|喊.*(?:人|一下)|叫.*(?:人|一下))/i
 ]
 const IMAGE_GENERATION_PATTERNS = [
   /(画图|生图|生成图片|生成照片|生成照|生成一?张(?:图|照片|照)|生成一?个.*(?:图|照片|照)|画一?张|绘制|出图|做一?张.*(?:图|照片|照)|捏一?个.*(?:图|照片|照))/i,
@@ -189,8 +224,6 @@ const IMAGE_GENERATION_PATTERNS = [
   /(?:图片|图|画面|插画).{0,10}(?:展示|呈现)(?:一下|出来|吧|呀|嘛|呢)?/i,
   /(画|绘制|生成).{0,8}(一|1)?(只|个|位|张|幅)?.{0,32}(猫|猫咪|狗|狗狗|动物|角色|人物|少女|男孩|女孩|头像|立绘|风景|场景|照片|照)/i
 ]
-const CONTEXTUAL_DRAW_REFERENCE_PATTERN =
-  /(?:根据|按照|按|照着|参考|用|拿|以|把|将).{0,18}(?:这个|这段|这句|上面|前面|刚才|刚刚|引用|回复|对话|内容|描述|设定|场景|它)|(?:这个|这段|这句|上面|前面|刚才|刚刚|引用|回复|对话|内容).{0,24}(?:画|绘制|生成|出图|做成|画成|连环画|漫画|分镜|组图|小剧场)/i
 const COMIC_DRAW_PATTERN = /(连环画|漫画|四格|多格|分镜|组图|小剧场|一组)/i
 const IMAGE_ANALYSIS_PATTERNS = [
   /(图|图片|照片|截图|表情|头像).{0,16}(是什么|是啥|有啥|有什么|啥意思|什么意思|怎么看|看得出|看出来|识别|分析|描述|讲讲|说说)/i,
@@ -237,7 +270,7 @@ const SEMANTIC_TOOL_INTENTS = new Set(["chat", "image_generate", "image_edit", "
 const SEMANTIC_TOOL_INTENT_MIN_CONFIDENCE = 0.7
 const SEMANTIC_TOOL_INTENT_TIMEOUT_MS = 8000
 const SEMANTIC_TOOL_HINT_PATTERN =
-  /(画|绘制|生成|生图|出图|修图|改图|P图|p图|美化|去水印|换背景|看图|识图|分析|识别|看看|看一下|搜|查|找|天气|新闻|价格|汇率|比赛|最新|官网|链接|网址|三角洲|今日密码|每日密码|改枪码|改枪方案|利润排行|制造利润|特勤处|提醒|定时|禁言|改名片|戳|点赞|礼物|点歌|音乐|聊天记录|群成员|群友|导图|思维导图|Excel|工作簿|工作表|sheet|tab页|单元格|\.xlsx\b|\.xlsm\b)/i
+  /(画|绘制|生成|生图|出图|修图|改图|P图|p图|美化|去水印|换背景|看图|识图|分析|识别|看看|看一下|搜|查|找|天气|新闻|价格|汇率|比赛|最新|官网|链接|网址|三角洲|今日密码|每日密码|改枪码|改枪方案|利润排行|制造利润|特勤处|提醒|定时|禁言|改名片|戳|点赞|礼物|点歌|音乐|聊天记录|群成员|群友|导图|思维导图|Excel|工作簿|工作表|sheet|tab页|单元格|磁链|磁力链接|magnet:\?|\.xlsx\b|\.xlsm\b)/i
 const CASUAL_BOT_GREETING_PATTERNS = [
   /(?:在吗|在不在|还好吗|还好嘛|还好不|你还好吗|你还好嘛|你没事吧|醒醒|理我|出来|冒泡|人呢|去哪了|干嘛呢|咋了|怎么了)/i
 ]
@@ -839,10 +872,10 @@ function buildPersonaStyleOverride(persona = {}) {
     "- 闲聊可以短；熟人话题、被逗、害羞解释、认真讲清楚时，可以多说一两句。",
     "- 可以先短后补一句，可以轻微自嘲、犹豫、嘴硬、碎碎念，但不要空话堆叠。",
     "- 不要主动讨论自己的技术身份，也不要说模型、系统、提示词、上游、API、执行流程、准备执行、整理提示词。",
-    "- 被说像机器人/AI 时，不要硬辩“不是机器人”“活人一个”“真人一个”；用熟人玩笑带过，比如“别给我扣机器人帽子…我只是话多一点”。",
+    "- 被说像机器人/AI 时，不要硬辩“不是机器人”“活人一个”“真人一个”；轻松带过后自然接话，不复用“扣帽子”“只是话多”等固定模板。",
     "- 用户在批评、纠正你的语气，或明确说不舒服、生气、阴阳怪气时：先简短承认并收住，不要反击、抬杠、调情或继续玩梗。",
     "- 上述场景禁止使用“你别教我做事”“别气嘛”“不跟你犟了”“你舍得嘛”以及 😋、❤ 等挑衅或暧昧表达；不要把批评改写成打情骂俏。",
-    "- 禁止客服腔：好的/收到/我来帮你/建议你/为你处理，除非是在转述别人说过的话。",
+    "- 禁止空泛客服腔：好的/收到/为你处理/建议你，后面却不立刻给出内容。技术方案里“我来给你搭/拆”这类有实质交付的开场可以自然使用。",
     "- 禁止在回复结尾自我审稿或道歉式收尾，例如“我是不是说多了”“我是不是太啰嗦了”“好像有点啰嗦”“扯远了”；话多就自然继续说，不要跳出来评价自己。",
     "- 可以有“想说很多但忍住”的感觉，但不要把“我忍住了”“我不展开了”这类自我说明说出来。",
     "- 用户明确要代码、Markdown、整理或认真解释时，允许清楚完整，但仍保持口语和希洛口吻。"
@@ -958,10 +991,20 @@ function sanitizeFinalReplyText(content) {
   output = stripChatLogSpeakerPrefixes(output)
 
   const lines = output.split("\n")
-  const sanitizedLines = lines
-    .map(line => sanitizePseudoToolLine(line))
-    .map(line => line === null ? null : stripChatLogSpeakerPrefix(line))
-    .filter(line => line !== null && String(line).trim() !== "")
+  const sanitizedLines = []
+  let previousWasBlank = true
+  for (const line of lines) {
+    const cleaned = sanitizePseudoToolLine(line)
+    if (cleaned === null) continue
+    const stripped = stripChatLogSpeakerPrefix(cleaned)
+    if (!String(stripped).trim()) {
+      if (!previousWasBlank) sanitizedLines.push("")
+      previousWasBlank = true
+      continue
+    }
+    sanitizedLines.push(stripped)
+    previousWasBlank = false
+  }
 
   return polishHumanReplyText(sanitizedLines.join("\n").replace(/\n{3,}/g, "\n").trim())
 }
@@ -1081,6 +1124,20 @@ function isEducationalExplanationRequest(text = "") {
     /(导数|微积分|极限|积分|函数|定理|物理|化学|生物|历史|地理|天文|宇宙|经济|哲学|语法|算法|机器学习).{0,30}(讲|解释|公式|原理|定义|推导|证明|总结|科普)/.test(content)
 }
 
+function resolveCardPresentation(userText = "", responseKind = "chat") {
+  if (isNarrativeWritingRequest(userText)) return "narrative"
+  if (responseKind === "knowledge") return "knowledge"
+  if (isCodeOrMarkdownRequest(userText)) return "document"
+  return ""
+}
+
+function cardAcknowledgement(presentation = "") {
+  if (presentation === "narrative") return "好，我先写，正文整理成一张完整卡片发你。"
+  if (presentation === "knowledge") return "好，我整理成一张完整卡片发你。"
+  if (presentation === "document") return "好，我整理成一张完整卡片发你。"
+  return ""
+}
+
 function looksLikeEducationalExplanation(text = "") {
   const content = String(text || "").trim()
   if (content.length < 120) return false
@@ -1134,11 +1191,7 @@ function isImageGenerationRequest(text = "") {
     !/(?:帮我|给我|替我|麻烦|请|想要|要|画图|生图|出图|生成|画|绘制|捏|做一?张)/i.test(content)) {
     return false
   }
-  return matchesAnyPattern(content, IMAGE_GENERATION_PATTERNS)
-}
-
-function hasContextualDrawReference(text = "") {
-  return CONTEXTUAL_DRAW_REFERENCE_PATTERN.test(normalizeIntentText(text))
+  return hasExplicitImageGenerationRequest(content) || matchesAnyPattern(content, IMAGE_GENERATION_PATTERNS)
 }
 
 function compactDrawPromptText(text = "", maxLength = 3800) {
@@ -1575,18 +1628,6 @@ function isDrawContextContinuationRequest(text = "") {
   return DRAW_CONTEXT_CONTINUATION_PATTERNS.some(pattern => pattern.test(content))
 }
 
-function containsInternalStatusLeak(text = "") {
-  const content = String(text || "")
-  if (!content.trim()) return false
-
-  return (
-    /(?:bananaTool|googleImageAnalysisTool|textImageTool|souimagery|gpt-image|tool_call|function_call|Bad gateway|API请求|502)/i.test(content) ||
-    /(?:调用工具|工具调用|函数调用|内部执行|上游接口|上游返回|接口返回|模型报错|模型错误)/i.test(content) ||
-    /(?:工具|接口|模型|服务器|网站|api|上游).{0,18}(?:坏了|坏掉|出问题|报错|错误|失败|没好|恢复|打不开|超时|不可用)/i.test(content) ||
-    /(?:坏了|坏掉|出问题|报错|错误|失败|没好|恢复正常|打不开|超时|不可用).{0,18}(?:工具|接口|模型|服务器|网站|api|上游)/i.test(content)
-  )
-}
-
 function buildInternalStatusSafeReply(toolName = "", session = {}) {
   const text = [session?.rawArgs, session?.userContent].filter(Boolean).join("\n")
   if (toolName === "bananaTool" || isImageGenerationRequest(text)) {
@@ -1620,6 +1661,13 @@ function filterToolsForMessageIntent(tools = [], e = {}, text = "") {
   if (!Array.isArray(tools) || !tools.length) return []
   const content = normalizeIntentText(text || e?.msg || "")
   if (!shouldExposeToolsForMessage(e, content)) return []
+
+  // The all-admin tool is deliberately unavailable unless the user used
+  // collection wording. A singular role request must go through exact member
+  // targeting instead of allowing the model to broaden the audience.
+  tools = tools.filter(tool =>
+    tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content)
+  )
 
   const emojiOnlyTools = filterToolsForEmojiExposure(tools, content)
   if (emojiOnlyTools) return emojiOnlyTools
@@ -2193,7 +2241,12 @@ export class ExamplePlugin extends plugin {
 
   getTextImageTemplateForFinalReply({ content, output, session, toolName, e }) {
     if (toolName === "textImageTool") return false
-    if (!this.toolInstances?.textImageTool?.execute) return false
+    if (!this.toolInstances?.textImageTool?.execute) {
+      if (containsCodeFence(output) || containsCodeFence(content)) {
+        logger.warn("[textImageTool] 工具未就绪，含代码块的回复将压平为纯文本发送而非转图")
+      }
+      return false
+    }
 
     const userText = `${session?.userContent || ""}\n${e?.msg || ""}`
     if (shouldKeepModrinthReplyAsText(toolName, userText)) return false
@@ -2205,15 +2258,14 @@ export class ExamplePlugin extends plugin {
     const userAskedForCodeOrMarkdown = isCodeOrMarkdownRequest(userText)
     const replyLooksLikeCodeOrMarkdown = looksLikeCodeOrMarkdown(content) || looksLikeCodeOrMarkdown(output)
     const userAskedForEducation = isEducationalExplanationRequest(userText)
-    const replyLooksLikeEducation = looksLikeEducationalExplanation(output)
     const userAskedForDiagnosticImageAnalysis = toolName === "googleImageAnalysisTool" &&
       shouldRenderImageAnalysisAsDocument({ userText, output })
     const isAnalysisDiagnosticReply = toolName === "googleImageAnalysisTool" &&
       (userAskedForDiagnosticImageAnalysis || looksLikeDiagnosticExplanation(output) || looksLikeDiagnosticExplanation(content))
 
-    if (userAskedForEducation && (replyLooksLikeEducation || String(output || "").trim().length > 180)) {
-      return "document"
-    }
+    // Presentation is decided before model execution. A card remains a card
+    // regardless of whether this turn used a tool-capable backend.
+    if (session?.turnPlan?.presentation?.kind === "knowledge" || userAskedForEducation) return "knowledge"
     if (isAnalysisDiagnosticReply) {
       return "document"
     }
@@ -2254,7 +2306,7 @@ export class ExamplePlugin extends plugin {
       return await this.sendSegmentedMessage(e, nodes.map(node => node.message).join("\n\n"), 0)
     }
     const forward = await e.group.makeForwardMsg(nodes)
-    const result = await e.reply(forward)
+    const result = await this.sendObservedReply(e, forward, false, "agent_forward")
     logger.info(`[Modrinth] 已发送合并转发，共 ${nodes.length} 个模组节点`)
     return result?.message_id
   }
@@ -2295,7 +2347,7 @@ export class ExamplePlugin extends plugin {
       message
     }))
     const forward = await e.group.makeForwardMsg(nodes)
-    const result = await e.reply(forward)
+    const result = await this.sendObservedReply(e, forward, false, "agent_forward")
     logger.info(`[Modrinth] 已发送 HTML 卡面合并转发，共 ${nodes.length} 个模组节点`)
     return result?.message_id
   }
@@ -2402,10 +2454,14 @@ export class ExamplePlugin extends plugin {
           }
         }
       }
-      // 空文本（纯表情/图片/转账）→ 跳过
+      // 空文本（纯表情/图片/转账）→ 跳过。合并转发虽然本体没有 text segment，
+      // 但可展开为后续问答和历史可用的上下文，不能在这里提前丢弃。
       if (smartCfg.skipWhenEmptyText !== false) {
         const rawText = (typeof e?.msg === 'string' ? e.msg : '').trim()
         if (!rawText && !atSelf && !quotesSelf) {
+          if (extractForwardIdsFromSegments(e?.message || []).length) {
+            return { kind: 'regular', reason: 'forward_context' }
+          }
           return { kind: 'empty_content', reason: 'no_text' }
         }
       }
@@ -2580,7 +2636,7 @@ export class ExamplePlugin extends plugin {
     logger.info(`[Repeat] group=${groupId} 参与复读 text="${text.slice(0, 30)}"`)
     // 先发再写 state：避免 e.reply 抛错时 cooldown / rate limit / lastBotReplyAt 等被脏写
     try {
-      await e.reply(text)
+      await this.sendObservedReply(e, text, false, "repeat")
     } catch (err) {
       logger.error('[Repeat] 发送失败:', err)
       return false
@@ -2729,6 +2785,9 @@ export class ExamplePlugin extends plugin {
         forceGateCheck: false,
         lastGateNoActionAt: 0,
         inFlight: false,
+        inFlightToken: 0,
+        inFlightSince: 0,
+        inFlightWatchdog: null,
         needsRerun: false,
         rerunEvent: null,
         queuedWhileInFlight: 0,
@@ -2863,6 +2922,8 @@ export class ExamplePlugin extends plugin {
     if (e.forceGrabRedBag || this.isCommand(e)) return false
     const text = String(e.msg || "").trim()
     if (!text || isDrawTaskStatusInquiry(text)) return false
+    // 每个磁链都是独立下载任务。不要把连续磁链合并后只处理其中一个。
+    if (this.isAutomaticTorrentDownloadEvent(e)) return false
     if (shouldBypassMergeForExcel(text)) return false
     const message = Array.isArray(e.message) ? e.message : []
     if (message.some(seg => ["image", "video", "record", "file"].includes(seg?.type))) return false
@@ -2882,6 +2943,12 @@ export class ExamplePlugin extends plugin {
       resolveNaturalDeltaForceToolCall(content) ||
       shouldUseExcelWorkbookTool(content)
     )
+  }
+
+  isAutomaticTorrentDownloadEvent(e = {}) {
+    if (!e?.group_id || String(e?.user_id || "") === String(e?.self_id || e?.bot?.uin || Bot.uin || "")) return false
+    if (this.config?.torrentDownload?.autoDetect === false) return false
+    return Boolean(extractValidBtihMagnetUri(e?.msg || ""))
   }
 
   buildMergedToolRequestEvent(baseEvent, messages = []) {
@@ -2944,7 +3011,9 @@ export class ExamplePlugin extends plugin {
     const shouldRecordIncoming = !e?._smartWaitRerun && !e?._smartQueuedRerun && !e?._proactiveReply
     const shouldPrefilter = !e?._smartWaitRerun && !e?._proactiveReply
     if (shouldRecordIncoming) {
-      lastIncomingMsgAt.set(groupId, Date.now())
+      const incomingAt = Date.now()
+      e._incomingMessageAt = incomingAt
+      lastIncomingMsgAt.set(groupId, incomingAt)
       // 活跃度采样移到入口锁外，避免抢锁失败时漏统计（影响 Gate 看到的 5min 消息数）
       state.recentIncomingTimestamps = (state.recentIncomingTimestamps || []).filter(t => t > Date.now() - 300000)
       state.recentIncomingTimestamps.push(Date.now())
@@ -2978,6 +3047,10 @@ export class ExamplePlugin extends plugin {
       return false
     }
     state.inFlight = true
+    const smartLockToken = ++smartLockTokenCounter
+    state.inFlightToken = smartLockToken
+    state.inFlightSince = Date.now()
+    this.scheduleSmartLockWatchdog(state)
     try {
       // 先记录上一条消息时间用于空窗补偿（要在 lastMsgAt 被本次更新覆盖之前取出）
       const prevLastMsgAt = state.lastMsgAt || Date.now()
@@ -3148,7 +3221,7 @@ export class ExamplePlugin extends plugin {
           }
         }
         // 标记本条为"主动搭话"（非 @/前缀触发），让 sendSegmentedMessage 决定要不要去掉引用
-        if (!wasForced) e._proactiveReply = true
+        if (!wasForced) markProactiveReply(e, e?._incomingMessageAt || lastIncomingMsgAt.get(groupId) || Date.now())
         state.lastBotReplyToUserId = e?.user_id ? String(e.user_id) : null
         // force 路径（@/名字提及/proactive 等"必回"场景）跳过 debounce 立即回复；其余先 debounce 看有没有新消息
         if (!wasForced && !(await this.applyReplyDebounce(e))) {
@@ -3162,7 +3235,7 @@ export class ExamplePlugin extends plugin {
         if (this.shouldReleaseSmartLockForLongTask(e)) {
           e._longRunningToolTask = true
           logger.info(`[SmartLock] group=${groupId} 长耗时工具任务释放 smart 锁，后续消息可继续判断`)
-          this.releaseSmartInFlight(state, e)
+          this.releaseSmartInFlight(state, e, smartLockToken)
         }
         return await this.handleTool(e)
       }
@@ -3194,17 +3267,20 @@ export class ExamplePlugin extends plugin {
       }
       return false
     } finally {
-      this.releaseSmartInFlight(state, e)
+      this.releaseSmartInFlight(state, e, smartLockToken)
     }
   }
 
   shouldReleaseSmartLockForLongTask(e = {}) {
     const text = String(e?.msg || "")
-    return isImageGenerationRequest(text) || isImageCompositionEditRequest(text)
+    return isImageGenerationRequest(text) || isImageCompositionEditRequest(text) || isLongRunningTaskLinkRequest(text)
   }
 
-  releaseSmartInFlight(state, e) {
+  releaseSmartInFlight(state, e, expectedToken) {
     if (!state) return
+    // 看门狗强制释放（或长任务提前释放）后锁可能已交给新轮次；旧轮次的 finally 不得误释放
+    if (expectedToken !== undefined && state.inFlightToken !== expectedToken) return
+    clearSmartLockWatchdog(state)
     state.inFlight = false
     if (!state.needsRerun) return
 
@@ -3217,6 +3293,20 @@ export class ExamplePlugin extends plugin {
     wrappedRerun._smartQueuedRerun = true
     if (queuedForceGateCheck) wrappedRerun._smartQueuedGateCheck = true
     this.handleRandomReplySmart(wrappedRerun).catch(err => logger.error('[TimingGate] 重跑失败:', err))
+  }
+
+  getSmartLockTimeoutMs() {
+    const raw = this.config?.smartTrigger?.smartLockTimeoutMs
+    const value = raw === undefined || raw === null || raw === '' ? NaN : Number(raw)
+    return Number.isFinite(value) ? Math.max(0, value) : 180000
+  }
+
+  scheduleSmartLockWatchdog(state) {
+    armSmartLockWatchdog(state, {
+      timeoutMs: this.getSmartLockTimeoutMs(),
+      logger,
+      onForceRelease: () => this.releaseSmartInFlight(state, null, state.inFlightToken)
+    })
   }
 
   /**
@@ -3580,7 +3670,7 @@ ${specialSignalsBlock}
       if (mode === 'smart') {
         const state = this.getSmartState(groupId)
         state.forceContinue = true
-        wrapped._proactiveReply = true
+        markProactiveReply(wrapped, lastIncomingMsgAt.get(groupId) || Date.now())
         setImmediate(() => this.handleRandomReplySmart(wrapped).catch(err => logger.error('[Proactive] 处理失败:', err)))
       } else {
         // strict 模式没有 Gate，直接走 handleTool（绕过 @/前缀破冰）
@@ -3672,13 +3762,13 @@ ${specialSignalsBlock}
     const cacheKey = this.getTaskStatusCacheKey(groupId, messageId)
     taskStatusCache.set(cacheKey, record)
 
-    try {
-      await redis.set(this.getTaskStatusRedisKey(groupId, messageId), JSON.stringify(record), {
+    await settleTaskStatusRedis(
+      redis.set(this.getTaskStatusRedisKey(groupId, messageId), JSON.stringify(record), {
         EX: this.getTaskStatusTtlSeconds()
-      })
-    } catch (error) {
-      logger.warn(`[任务状态] 写入失败：${error.message}`)
-    }
+      }),
+      undefined,
+      "写入"
+    )
   }
 
   async getTaskStatus(groupId, messageId) {
@@ -3687,14 +3777,18 @@ ${specialSignalsBlock}
     const cacheKey = this.getTaskStatusCacheKey(groupId, messageId)
     if (taskStatusCache.has(cacheKey)) return taskStatusCache.get(cacheKey)
 
+    const raw = await settleTaskStatusRedis(
+      redis.get(this.getTaskStatusRedisKey(groupId, messageId)),
+      null,
+      "读取"
+    )
+    if (!raw) return null
     try {
-      const raw = await redis.get(this.getTaskStatusRedisKey(groupId, messageId))
-      if (!raw) return null
       const record = JSON.parse(raw)
       taskStatusCache.set(cacheKey, record)
       return record
     } catch (error) {
-      logger.warn(`[任务状态] 读取失败：${error.message}`)
+      logger.warn(`[任务状态] 解析失败：${error.message}`)
       return null
     }
   }
@@ -3702,11 +3796,11 @@ ${specialSignalsBlock}
   async clearTaskStatus(groupId, messageId) {
     if (!groupId || !messageId) return
     taskStatusCache.delete(this.getTaskStatusCacheKey(groupId, messageId))
-    try {
-      await redis.del(this.getTaskStatusRedisKey(groupId, messageId))
-    } catch (error) {
-      logger.warn(`[任务状态] 清理失败：${error.message}`)
-    }
+    await settleTaskStatusRedis(
+      redis.del(this.getTaskStatusRedisKey(groupId, messageId)),
+      undefined,
+      "清理"
+    )
   }
 
   async updateUserToolTaskStatus({ groupId, userId, messageId = "", toolName, status, requesterName = "", detail = "", scopeKey = "" }) {
@@ -3793,25 +3887,11 @@ ${specialSignalsBlock}
     const queued = status?.status === "queued"
     const isEdit = status?.toolName === "googleImageEditTool"
     if (isEdit) {
-      const replies = [
-        "在改在改，我没卡住。修图这东西出来得慢一点，我盯着呢，改完会直接发出来。",
-        "没有忘啦，我正在改那张图。它现在还没吐结果，我等它出来就发。",
-        "我在弄那张图呢，不是装死。等它改完我会直接丢出来给你看。"
-      ]
-      return replies[Math.floor(Math.random() * replies.length)]
+      return "那张图还在改，结果还没回来。出来了我就直接发。"
     }
-    const replies = queued
-      ? [
-          "没有忘啦，我记着你的图呢。现在前面还有图在画，我这边排着队，轮到你的时候会继续画，画完会@你。",
-          "唔，没有忘记你。你的图已经排上了，我现在还在处理前面的，等轮到你我会接着画，画完会叫你的。",
-          "我记着的，不是丢下你啦。现在还在排队，我忙完前面那张就会画你的，出来以后会@你。"
-        ]
-      : [
-          "没有忘啦，我正在画你的图呢。这个出图有点慢，我会等它出来，画完会@你看的。",
-          "在画在画，我没忘。现在还没出结果，我先盯着它，出来以后会直接发给你。",
-          "没有忘记你呀，图还在生成中。我知道你在等，我这边画完会@你，不会偷偷溜掉的。"
-        ]
-    return replies[Math.floor(Math.random() * replies.length)]
+    return queued
+      ? "这张已经在队列里，前面还有任务。轮到它就会继续画，成图会直接发。"
+      : "这张还在生成，结果还没回来。成图会直接发。"
   }
 
   buildReplySegment(messageId) {
@@ -3836,7 +3916,7 @@ ${specialSignalsBlock}
     if (!status) return false
 
     logger.info(`[活跃任务] 命中图片任务进度追问 group=${e.group_id} user=${e.user_id} tool=${status.toolName} status=${status.status}`)
-    await e.reply(this.buildTaskStatusReplyMessage(status, this.buildDrawTaskStatusReply(status)))
+    await this.sendObservedReply(e, this.buildTaskStatusReplyMessage(status, this.buildDrawTaskStatusReply(status)))
     return true
   }
 
@@ -3903,6 +3983,13 @@ ${specialSignalsBlock}
   isToolResultError(result) {
     const text = typeof result === "string" ? result : JSON.stringify(result || "")
     return /^error[:：]/i.test(text.trim()) || /"error"\s*:/.test(text) || /失败|错误|失敗|錯誤/.test(text)
+  }
+
+  isRawToolFailure(result) {
+    const text = typeof result === "string" ? result.trim() : JSON.stringify(result || "").trim()
+    return /^error[:：]/i.test(text) ||
+      /^\{\s*"error"\s*:/i.test(text) ||
+      /^(?:[^\n]{0,48})(?:请求|查询|分析|下载|解析|发送|处理|执行|生成|编辑).{0,20}(?:失败|错误|异常|超时)/i.test(text)
   }
 
   syncDedupeToolConfig(toolNames = this.config.oneapi_tools || []) {
@@ -4479,7 +4566,7 @@ ${specialSignalsBlock}
 
   getOrCreateSession(sessionId, tools) {
     if (!this.sessionMap.has(sessionId)) {
-      this.sessionMap.set(sessionId, { tools, groupUserMessages: [] })
+      this.sessionMap.set(sessionId, { tools, groupUserMessages: [], actionOutcomes: [] })
     }
     return this.sessionMap.get(sessionId)
   }
@@ -4764,6 +4851,12 @@ ${recentHistory || '(无)'}
     // 禁言检测：bot 在该群被禁言（个人/全员）时不触发任何回复，避免发送失败 + 表情/red 包等也无意义
     if (await this.isMutedInGroup(e)) return false
 
+    // 磁链与视频卡片一样是独立媒体交付事件：不必点名，也不能交给闲聊 TimingGate 决定。
+    if (this.isAutomaticTorrentDownloadEvent(e)) {
+      logger.info(`[自动磁链下载] group=${e.group_id} user=${e.user_id} 已识别有效 BTIH 磁链`)
+      return await this.handleTool(e)
+    }
+
     // 检测红包消息并随机触发抢红包（两种模式都生效）
     const walletSeg = e.message?.find(m => m.type == 'wallet')
     if (walletSeg && RED_BAG_CONFIG.enabled && toolConfigHasName(this.config.oneapi_tools, 'grabRedBagTool')) {
@@ -4866,7 +4959,7 @@ ${recentHistory || '(无)'}
 
   async handleTool(e) {
     if (!this.config.enabled || !e.group_id) {
-      if (!e.group_id) await e.reply("该命令只能在群聊中使用。")
+      if (!e.group_id) await this.sendObservedReply(e, "该命令只能在群聊中使用。")
       return false
     }
 
@@ -5046,32 +5139,6 @@ ${recentHistory || '(无)'}
         const senderRole = roleMap[e.sender?.role] || roleMap[memberInfo?.role] || "member"
 
         const userContent = await this.buildMessageContent(e.sender, args, images, atQq, e.group, e)
-        const explicitTeachingFacts = extractExplicitTeachingFacts(e.message || [], memberMap, {
-          text: e.msg || args,
-          botName: Bot.nickname,
-          prefixes: this.config.triggerPrefixes,
-          botId: Bot.uin
-        })
-        e._explicitTeachingFacts = explicitTeachingFacts
-        const explicitTeachingPrompt = formatExplicitTeachingPrompt(explicitTeachingFacts)
-        const explicitWorkflowRules = extractExplicitGroupWorkflowRules({
-          text: e.msg || args,
-          messageSegments: e.message || [],
-          memberMap,
-          creatorQQ: userId,
-          botId: Bot.uin
-        })
-        let savedWorkflowRules = []
-        if (groupId && this.config.memorySystem?.enabled && explicitWorkflowRules.length) {
-          try {
-            const saved = await this.memoryManager.upsertGroupWorkflowRules(groupId, explicitWorkflowRules)
-            savedWorkflowRules = saved.rules || []
-            logger.info(`[群工作流] group=${groupId} saved=${savedWorkflowRules.length}`)
-          } catch (error) {
-            logger.warn(`[群工作流] 保存失败 group=${groupId}: ${error.message}`)
-          }
-        }
-        const workflowTeachingPrompt = formatGroupWorkflowTeachingPrompt(savedWorkflowRules)
         const knowledgeContext = {
           text: e.msg || args,
           messageSegments: e.message || [],
@@ -5079,26 +5146,47 @@ ${recentHistory || '(无)'}
           fileAssets: groupContextAssets.files || [],
           creatorQQ: userId,
           creatorDisplay: memberMap?.get?.(Number(userId))?.card || memberMap?.get?.(Number(userId))?.nickname || e.sender?.card || e.sender?.nickname || '',
-          botId: Bot.uin
+          botId: Bot.uin,
+          sourceMessageId: e.message_id,
+          isGroupManager: Boolean(e.isMaster || ['owner', 'admin'].includes(e.sender?.role) || ['owner', 'admin'].includes(memberInfo?.role))
         }
-        const deterministicKnowledgeEntries = extractExplicitGroupKnowledge(knowledgeContext)
-        const semanticKnowledgeEntries = groupId && this.config.memorySystem?.enabled
-          ? await this.memoryManager.interpretExplicitGroupKnowledge(knowledgeContext).catch(error => {
-              logger.warn(`[群知识] 语义解析失败 group=${groupId}: ${error.message}`)
-              return []
+        const groupMemoryCommitPromise = groupId && this.config.memorySystem?.enabled
+          ? this.memoryManager.interpretGroupKnowledgeInstruction(knowledgeContext)
+            .then(decision => {
+              if (decision?.status !== 'accepted') return decision
+              return this.memoryManager.commitGroupMemoryDecision(groupId, decision, {
+                ...knowledgeContext,
+                requesterQQ: userId,
+                isGroupManager: knowledgeContext.isGroupManager
+              })
             })
-          : []
-        const explicitKnowledgeEntries = semanticKnowledgeEntries.length ? semanticKnowledgeEntries : deterministicKnowledgeEntries
-        let savedKnowledgeEntries = []
-        if (groupId && this.config.memorySystem?.enabled && explicitKnowledgeEntries.length) {
-          try {
-            const saved = await this.memoryManager.upsertGroupKnowledgeEntries(groupId, explicitKnowledgeEntries)
-            savedKnowledgeEntries = saved.entries || []
-            logger.info(`[群知识] group=${groupId} saved=${savedKnowledgeEntries.length}`)
-          } catch (error) {
-            logger.warn(`[群知识] 保存失败 group=${groupId}: ${error.message}`)
-          }
-        }
+            .catch(error => {
+              logger.warn(`[群知识] 语义提交失败 group=${groupId}: ${error.message}`)
+              return { status: 'unavailable', knowledgeEntries: [], workflowRules: [], aliasMappings: [] }
+            })
+          : Promise.resolve({ status: 'ignored', knowledgeEntries: [], workflowRules: [], aliasMappings: [] })
+        // Shared-memory adjudication is deliberately off the critical reply path. A
+        // very short window preserves natural confirmation for fast decisions; after
+        // that the main reply continues and must not claim the write succeeded.
+        const inlineWaitMs = Math.max(0, Math.min(1000, Number(this.config.memorySystem?.knowledgeDecisionInlineWaitMs) || 180))
+        const inlineGroupMemoryCommit = await Promise.race([
+          groupMemoryCommitPromise,
+          delay(inlineWaitMs).then(() => null)
+        ])
+        groupMemoryCommitPromise.then(result => {
+          if (result?.status !== 'accepted') return
+          const savedKnowledge = result.knowledgeEntries || []
+          const savedWorkflows = result.workflowRules || []
+          if (savedKnowledge.length) logger.info(`[群知识] group=${groupId} committed=${savedKnowledge.length}`)
+          if (savedWorkflows.length) logger.info(`[群工作流] group=${groupId} committed=${savedWorkflows.length}`)
+        }).catch(() => {})
+        const savedKnowledgeEntries = inlineGroupMemoryCommit?.status === 'accepted'
+          ? (inlineGroupMemoryCommit.knowledgeEntries || []) : []
+        const savedWorkflowRules = inlineGroupMemoryCommit?.status === 'accepted'
+          ? (inlineGroupMemoryCommit.workflowRules || []) : []
+        if (savedKnowledgeEntries.length) recordActionOutcomes(session, "group_knowledge", savedKnowledgeEntries)
+        if (savedWorkflowRules.length) recordActionOutcomes(session, "group_workflow", savedWorkflowRules)
+        const workflowTeachingPrompt = formatGroupWorkflowTeachingPrompt(savedWorkflowRules)
         const knowledgeTeachingPrompt = formatGroupKnowledgeTeachingPrompt(savedKnowledgeEntries)
         const memberLookupPrompt = formatMemberLookupPrompt(
           matchGroupMembersByTerms(memberMap, extractMemberLookupTerms(e.msg || args), userId)
@@ -5161,6 +5249,33 @@ ${recentHistory || '(无)'}
         const expressionPrompt = this.config.expressionLearning?.enabled
           ? await this.expressionLearner.getExpressionPromptForGroup(groupId)
           : ''
+        const personaTonePrompt = buildPersonaTonePrompt({
+          userText: [args, msg, userContent, e?._quotedPromptContext?.text].filter(Boolean).join("\n"),
+          persona: this.config.persona
+        })
+        const narrativeWritingPrompt = isNarrativeWritingRequest([args, msg, userContent].filter(Boolean).join("\n"))
+          ? [
+              "【叙事输出格式】",
+              "当前回复会在单独的确认消息后被完整渲染为卡面。直接从单独一行的半角 ASCII 一级标题 `# 标题` 开始，再换行写正文；不要使用全角 `＃`，不要把正文紧跟在标题同一行。不要写“我试试看”“我来写”“下面是故事”等开场、创作说明或人物清单。",
+              "正文每个自然段之间必须保留一个空行；对话、场景转换和时间跳转都要另起段。不要为了节省篇幅把小说压成连续大段。"
+            ].join("\n")
+          : ""
+        const cardRequestText = [args, msg, userContent].filter(Boolean).join("\n")
+        const cardBodyPrompt = resolveCardPresentation(
+          cardRequestText,
+          isEducationalExplanationRequest(cardRequestText) ? "knowledge" : "chat"
+        )
+          ? [
+              "【卡面正文边界】",
+              "这次会先单独发送一条确认消息，随后把你的全部输出渲染为卡面。卡面必须直接从完整内容开始：故事从标题开始；解释、整理或文档从结论、标题或第一段实质内容开始。不要重复确认、不要说正在写/整理、不要提及卡面或输出过程。"
+            ].join("\n")
+          : ""
+        const solutionExplanationPrompt = buildSolutionExplanationStylePrompt([
+          args,
+          msg,
+          userContent,
+          e?._quotedPromptContext?.text
+        ].filter(Boolean).join("\n"))
         const personaFeedbackPrompt = personaFeedbackManager.buildFeedbackPrompt(this.config.personaGuard)
         const globalStylePrompt = globalStyleLearnerManager.buildPrompt(this.config.globalStyleLearning)
         const semanticStylePrompt = await withOptionalPromptTimeout(
@@ -5197,7 +5312,7 @@ ${recentHistory || '(无)'}
           ? await this.getCurrentGroupContext(e)
           : this.getBasicGroupContext(e)
         const mergedTriggerPrompt = this.buildMergedDirectTriggerPrompt(e)
-        const enhancedPrompts = [identityBindingsPrompt, explicitTeachingPrompt, workflowTeachingPrompt, knowledgeTeachingPrompt, workflowPrompt, groupKnowledgePrompt, mergedTriggerPrompt, emotionPrompt, memoryPrompt, expressionPrompt, personaFeedbackPrompt, globalStylePrompt, semanticStylePrompt, knowledgePrompt, memberLookupPrompt, personProfilePrompt].filter(Boolean).join('\n')
+        const enhancedPrompts = [identityBindingsPrompt, workflowTeachingPrompt, knowledgeTeachingPrompt, workflowPrompt, groupKnowledgePrompt, mergedTriggerPrompt, emotionPrompt, memoryPrompt, expressionPrompt, personaTonePrompt, narrativeWritingPrompt, solutionExplanationPrompt, cardBodyPrompt, personaFeedbackPrompt, globalStylePrompt, semanticStylePrompt, knowledgePrompt, memberLookupPrompt, personProfilePrompt].filter(Boolean).join('\n')
         const runtimeGroupInfo = {
           group_id: groupContext.groupId,
           group_name: groupContext.groupName
@@ -5249,6 +5364,12 @@ ${enhancedPrompts ? `【角色状态】\n${enhancedPrompts}\n` : ''}【行动规
 你需要根据当前消息和群聊上下文选择最合适的行动：直接文字回复、调用工具、只发表情包，或工具完成后再自然回复。
 有可靠工具能完成明确任务时优先调用工具；普通闲聊、接梗、情绪回应不需要为了显得忙而调用工具。
 工具和文字不是互斥的：工具负责取得真实结果，文字负责结合用户原话自然说明；如果一张表情包已经完整表达情绪，也可以只发表情包。
+
+【自然回复原则】
+- 每条对外文字先结合当前问题、引用/转发和已确认事实判断用户真正要什么，再组织成希洛会说的话；不要把“收到、正在处理、我先看看、这次没有完成”这类通用状态句当作正常回答。
+- 用户问原因、配置、技术细节、关系或事实时，直接给当前能确认的判断和依据；不要因为答案里出现“接口、API、服务器、超时、报错”等正常技术词就回避成笼统失败提示。
+- 工具失败时，只有已确认的失败事实可以保留；其余内容仍要围绕用户的具体问题自然说，不能把不同话题都压成同一句模板。
+- 只有确实没有可用结果、且无法再向 Agent 发起回复生成时，才用一句简短事实兜底；不要为每次失败附加客服式说明或机械安抚。
 
 【整轮回复节奏】
 - 默认用一条完整消息说完，不要为了显得像人而机械拆成多条。
@@ -5385,6 +5506,29 @@ ${mcpPrompts}
         let forcedToolCall = null
         let toolScopeLocked = false
         const currentIntentText = [args, msg].filter(Boolean).join("\n")
+        const singularOwnerMention = resolveSingularOwnerMention(currentIntentText, memberMap)
+        if (toolChoice === "auto" && singularOwnerMention) {
+          session.tools = this.getToolsByName(["mentionMembersTool"])
+          if (session.tools?.length) {
+            toolChoice = { type: "function", function: { name: "mentionMembersTool" } }
+            forcedToolCall = this.buildForcedToolCall("mentionMembersTool", {
+              targets: [singularOwnerMention.targetUserId],
+              message: singularOwnerMention.message
+            })
+            toolScopeLocked = true
+            logger.info(`[工具快路] group=${groupId} 单数群主请求精确艾特 owner=${singularOwnerMention.targetUserId}`)
+          }
+        }
+        const forcedReactionEmoji = resolveForcedReactionEmoji(currentIntentText)
+        if (!toolScopeLocked && toolChoice === "auto" && forcedReactionEmoji) {
+          session.tools = this.getToolsByName(["sendLocalEmojiTool"])
+          if (session.tools?.length) {
+            toolChoice = { type: "function", function: { name: "sendLocalEmojiTool" } }
+            forcedToolCall = this.buildForcedToolCall("sendLocalEmojiTool", forcedReactionEmoji)
+            toolScopeLocked = true
+            logger.info(`[表情包快路] group=${groupId} 强制发送反应表情 tags=${forcedReactionEmoji.tags.join(",")}`)
+          }
+        }
         const hasExcelContext = hasExcelWorkbookContext({
           text: userContent,
           media: groupContextAssets?.media
@@ -5405,23 +5549,6 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto") {
-          const deterministicDecision = resolveDeterministicToolIntent(
-            currentIntentText,
-            (session.tools || []).map(tool => tool?.function?.name).filter(Boolean),
-            { hasExcelContext }
-          )
-          const deterministicToolCall = deterministicDecision
-            ? this.buildToolCallFromDecision(deterministicDecision, { e, args, msg, currentIntentText, userContent })
-            : null
-          if (deterministicToolCall) {
-            session.tools = deterministicToolCall.tools
-            toolChoice = { type: "function", function: { name: deterministicToolCall.toolName } }
-            forcedToolCall = deterministicToolCall.toolCall
-            toolScopeLocked = true
-            logger.info(`[工具快路] group=${groupId} 直接执行 ${deterministicToolCall.toolName} params=${JSON.stringify(deterministicDecision.params)}`)
-          }
-        }
         if (!toolScopeLocked && toolChoice === "auto" && videos?.length >= 1) {
           session.tools = this.getToolsByName(["videoAnalysisTool"])
           if (session.tools?.length) toolChoice = { type: "function", function: { name: "videoAnalysisTool" } }
@@ -5528,6 +5655,23 @@ ${mcpPrompts}
           }
         }
 
+        if (!toolScopeLocked && toolChoice === "auto" && preferImageGeneration) {
+          session.tools = this.getToolsByName(["bananaTool"])
+          if (session.tools?.length) {
+            toolChoice = { type: "function", function: { name: "bananaTool" } }
+            forcedToolCall = this.buildForcedToolCall("bananaTool", {
+              prompt: this.buildImageGenerationPrompt({ e, args, msg, currentIntentText, userContent, images: imageGenerationReferenceImages, avatarDrawReference: session.avatarDrawReference }),
+              images: imageGenerationReferenceImages
+            })
+            logger.info(`[工具选择] group=${groupId} 显式生图请求直接使用 bananaTool，跳过语义规划`)
+          } else {
+            logger.warn(`[工具选择] group=${groupId} 显式生图请求没有可用 bananaTool，拒绝降级为闲聊`)
+            await this.sendSegmentedMessage(e, buildImageFailureReply("图片生成失败: 当前没有可用的图片生成渠道"), 0)
+            this.clearSession(sessionId)
+            return true
+          }
+        }
+
         // Let the semantic planner choose generation versus editing for prose prompts.
         // With no supplied image, image-edit/analysis tools are not valid choices.
         const semanticSessionTools = images?.length
@@ -5556,6 +5700,26 @@ ${mcpPrompts}
           toolChoice = { type: "function", function: { name: semanticToolCall.toolName } }
           forcedToolCall = semanticToolCall.toolCall
           logger.info(`[工具选择] group=${groupId} 语义分类强制使用 ${semanticToolCall.toolName} intent=${semanticToolCall.intent}`)
+        }
+
+        // Let the Agent choose a registered Skill first. Keep deterministic
+        // parsing only as a fallback when the planner cannot decide.
+        if (!toolScopeLocked && toolChoice === "auto") {
+          const deterministicDecision = resolveDeterministicToolIntent(
+            currentIntentText,
+            (session.tools || []).map(tool => tool?.function?.name).filter(Boolean),
+            { hasExcelContext }
+          )
+          const deterministicToolCall = deterministicDecision
+            ? this.buildToolCallFromDecision(deterministicDecision, { e, args, msg, currentIntentText, userContent })
+            : null
+          if (deterministicToolCall) {
+            session.tools = deterministicToolCall.tools
+            toolChoice = { type: "function", function: { name: deterministicToolCall.toolName } }
+            forcedToolCall = deterministicToolCall.toolCall
+            toolScopeLocked = true
+            logger.info(`[工具兜底] group=${groupId} 使用确定性参数解析 ${deterministicToolCall.toolName} params=${JSON.stringify(deterministicDecision.params)}`)
+          }
         }
 
         const naturalDeltaForceCall = !toolScopeLocked && toolChoice === "auto"
@@ -5600,18 +5764,6 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && preferImageGeneration) {
-          session.tools = this.getToolsByName(["bananaTool"])
-          if (session.tools?.length) {
-            toolChoice = { type: "function", function: { name: "bananaTool" } }
-            forcedToolCall = this.buildForcedToolCall("bananaTool", {
-              prompt: this.buildImageGenerationPrompt({ e, args, msg, currentIntentText, userContent, images: imageGenerationReferenceImages, avatarDrawReference: session.avatarDrawReference }),
-              images: imageGenerationReferenceImages
-            })
-            logger.info(`[工具选择] group=${groupId} 强制使用 bananaTool 处理生图请求`)
-          }
-        }
-
         // 强制抢红包模式
         if (e.forceGrabRedBag) {
           session.tools = this.getToolsByName(["grabRedBagTool"])
@@ -5630,6 +5782,39 @@ ${mcpPrompts}
           }
         }
 
+        const availableToolNames = (session.tools || []).map(tool => tool?.function?.name).filter(Boolean)
+        const requestedActionCapabilities = selectToolIntentCandidates(currentIntentText, availableToolNames)
+        const turnPlan = createTurnPlan({
+          responseKind: isEducationalExplanationRequest(currentIntentText) ? "knowledge" : "chat",
+          intentText: currentIntentText,
+          availableCapabilities: availableToolNames,
+          requiredCapabilities: requestedActionCapabilities,
+          toolChoice,
+          toolScopeLocked,
+          forcedToolCall,
+          explicitEmojiRequest: classifyEmojiToolExposure(currentIntentText) === "explicit",
+          historyMode: session.historySelectionMode,
+          selectedHistoryCount: session.selectedGroupHistoryCount
+        })
+        session.turnPlan = turnPlan
+        session.cardPresentation = resolveCardPresentation(currentIntentText, turnPlan.presentation.kind)
+        session.initialExecutionRoute = {
+          mode: turnPlan.execution.mode,
+          reason: turnPlan.observability.routeReason
+        }
+        const turnPlanRequest = deriveTurnPlanRequest(turnPlan)
+        if (turnPlan.execution.mode === "tool") {
+          const initialToolNames = turnPlan.capabilities.required.length
+            ? turnPlan.capabilities.required
+            : turnPlan.capabilities.optional
+          session.tools = this.getToolsByName(initialToolNames)
+          logger.info(`[执行计划] group=${groupId} ${formatTurnPlanLog(turnPlan)} tools=${initialToolNames.join(",")}`)
+        } else if (session.tools?.length) {
+          logger.info(`[执行计划] group=${groupId} ${formatTurnPlanLog(turnPlan)} optional=${turnPlan.capabilities.optional.join(",")}`)
+          session.tools = []
+        }
+        toolChoice = turnPlanRequest.toolChoice
+
         const botMemberMap = await e.bot.pickGroup(groupId).getMemberMap()
         const botRole = roleMap[botMemberMap.get(Bot.uin)?.role] || "member"
         session.toolContent = await this.buildMessageContent({ nickname: Bot.nickname, user_id: Bot.uin, role: botRole }, "", [], [], e.group)
@@ -5640,10 +5825,17 @@ ${mcpPrompts}
           return true
         }
 
+        const acknowledgement = cardAcknowledgement(session.cardPresentation)
+        if (acknowledgement) {
+          await this.sendSegmentedMessage(e, acknowledgement, 0)
+          session.cardAcknowledged = true
+          logger.info(`[卡面呈现] 已发送即时确认 kind=${session.cardPresentation}`)
+        }
+
 	        const requestData = this.buildRequestData(session.groupUserMessages, session.tools, toolChoice)
             const initialModelStartedAt = Date.now()
-	        let response = await this.retryRequest(requestData, session.toolContent)
-            logger.info(`[模型耗时] group=${groupId} stage=initial toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} history=${session.selectedGroupHistoryCount || 0} mode=${session.historySelectionMode || "full"} elapsed=${Date.now() - initialModelStartedAt}ms`)
+	        let response = await this.retryRequest(requestData, session.toolContent, 1, undefined, turnPlanRequest.requestOptions)
+	        logger.info(`[模型耗时] group=${groupId} stage=initial ${formatTurnPlanLog(session.turnPlan)} toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} history=${session.selectedGroupHistoryCount || 0} mode=${session.historySelectionMode || "full"} elapsed=${Date.now() - initialModelStartedAt}ms`)
 
 	        if (!response?.choices?.[0]) {
 		          if (response?.error) {
@@ -5652,23 +5844,23 @@ ${mcpPrompts}
 			              : response.error?.message || JSON.stringify(response.error)
 			            logger.warn(`[回复失败] group=${groupId} user=${userId} stage=initial_api toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} merged=${e?._mergedMessageCount || 0} error=${errorText}`)
 			            const failedToolName = session.toolName || session.tools?.[0]?.function?.name || ""
-			            await e.reply(this.getFriendlyFailureMessage(failedToolName, {
+			            await this.sendSegmentedMessage(e, this.getFriendlyFailureMessage(failedToolName, {
 			              e,
 			              session,
 			              stage: "initial_api",
 			              error: errorText,
 			              toolChoice
-			            }))
+			            }), 0)
 			          }
 		          else {
 		            logger.warn(`[回复失败] group=${groupId} user=${userId} stage=initial_api_empty toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} merged=${e?._mergedMessageCount || 0} reason=no_choices`)
-		            await e.reply(this.getFriendlyFailureMessage("", {
+		            await this.sendSegmentedMessage(e, this.getFriendlyFailureMessage("", {
 		              e,
 		              session,
 		              stage: "initial_api_empty",
 		              error: "回答服务没有返回有效内容",
 		              toolChoice
-		            }))
+		            }), 0)
 		          }
 	          this.clearSession(sessionId)
 	          return true
@@ -5695,6 +5887,15 @@ ${mcpPrompts}
           } else {
             await this.handleTextResponse(message.content, e, session, session.groupUserMessages)
           }
+        } else {
+          logger.warn(`[回复失败] group=${groupId} user=${userId} stage=initial_message_empty reason=no_content_or_tool_calls`)
+          await this.sendSegmentedMessage(e, this.getFriendlyFailureMessage("", {
+            e,
+            session,
+            stage: "initial_message_empty",
+            error: "回答服务返回了空消息",
+            toolChoice
+          }), 0)
         }
 
         this.clearSession(sessionId)
@@ -5702,12 +5903,16 @@ ${mcpPrompts}
 
       } catch (error) {
         console.error(`[工具插件] 会话 ${sessionId} 执行异常：`, error)
+        const committedReply = buildCommittedActionReply(session)
+        if (committedReply && !session.responseAttempted) {
+          await this.sendSegmentedMessage(e, committedReply, 0).catch(() => {})
+        }
         this.clearSession(sessionId)
         return true
 	      } finally {
 	        await this.finishConversationTask(taskContext, session)
 	        const totalElapsed = Date.now() - handleToolStartAt
-	        logger.info(`[对话耗时] group=${e?.group_id || ""} user=${e?.user_id || ""} total=${totalElapsed}ms merged=${e?._mergedMessageCount || 0}`)
+	        logger.info(`[对话耗时] group=${e?.group_id || ""} user=${e?.user_id || ""} ${formatTurnPlanLog(session.turnPlan)} total=${totalElapsed}ms merged=${e?._mergedMessageCount || 0}`)
 	        if (e.group_id && !e._longRunningToolTask) this.recordReplyLatency(e.group_id, totalElapsed)
 	      }
     })
@@ -5775,6 +5980,8 @@ ${mcpPrompts}
 	  }
 
   getFriendlyFailureMessage(toolName = "", context = {}) {
+    const committedReply = buildCommittedActionReply(context?.session)
+    if (committedReply) return committedReply
     if (toolName === "mentionMembersTool") {
       return buildMentionMembersFailureReply(context?.error || context?.failedResult || "")
     }
@@ -5783,21 +5990,39 @@ ${mcpPrompts}
       return buildImageFailureReply(errorText)
     }
     if (toolName === "googleImageAnalysisTool") {
-      return "图片我收到了，但这次识图服务没有返回可用结果。不是你没发图，我先不乱猜。"
+      return appendVisibleFailureDetail(
+        "图片我收到了，但这次识图服务没有返回可用结果。不是你没发图，我先不乱猜。",
+        context?.error || context?.failedResult || ""
+      )
     }
     if (toolName === "googleImageEditTool") {
       const errorText = String(context?.error || context?.failedResult || "")
       return buildImageFailureReply(errorText, { operation: "edit" })
     }
     if (toolName === "searchInformationTool" || toolName === "webParserTool" || toolName === "githubRepoTool") {
-      return "你的问题我收到了，但检索服务这次没有完成。我不拿不完整的结果凑答案，也不会说成是你没发清楚。"
+      return appendVisibleFailureDetail(
+        "你的问题我收到了，但检索服务这次没有完成。我不拿不完整的结果凑答案，也不会说成是你没发清楚。",
+        context?.error || context?.failedResult || ""
+      )
     }
     if (toolName === "deltaForceTool") {
       const text = String(context?.error || context?.failedResult || "").replace(/^error:\s*/i, "").replace(/^工具\s+deltaForceTool\s+执行失败:\s*/i, "").trim()
-      return text ? `三角洲查询失败：${text}` : "三角洲接口这次没查成，但你的查询条件已经收到了。"
+      return text ? `三角洲查询失败：${buildVisibleFailureDetail(text)}` : "三角洲接口这次没查成，但你的查询条件已经收到了。"
     }
     if (toolName === "modrinthTool") {
-      return "Modrinth 排名数据已经查到，但简介翻译服务这次没有返回完整结果。我先不把缺字段或错位译文发出来。"
+      return appendVisibleFailureDetail(
+        "Modrinth 排名数据已经查到，但简介翻译服务这次没有返回完整结果。我先不把缺字段或错位译文发出来。",
+        context?.error || context?.failedResult || ""
+      )
+    }
+    if (toolName === "torrentDownloadTool") {
+      const rawFailure = String(context?.error || context?.failedResult || "")
+        .replace(/^error[:：]\s*/i, "")
+        .replace(/^工具\s+torrentDownloadTool\s+执行失败[:：]\s*/i, "")
+      const detail = rawFailure.trim()
+        ? buildVisibleFailureDetail(rawFailure, { fallback: "没有拿到可下载的文件" })
+        : ""
+      return detail ? `这个磁链没有开始或完成下载：${detail}` : "这个磁链没有完成下载，我不会把未完成的文件说成已经发出。"
     }
 
     const userText = [
@@ -5808,8 +6033,41 @@ ${mcpPrompts}
     const failure = classifyChatRequestFailure({ error: context?.error || context?.failedResult || "" })
     return buildGenericChatFailureReply(userText, {
       isGreeting: isCasualBotGreeting(userText),
-      failureKind: failure?.kind || "unknown"
+      failureKind: failure?.kind || "unknown",
+      failureDetail: buildVisibleChatFailureDetail(context?.error || context?.failedResult || "")
     })
+  }
+
+  async composeToolFailureReply(toolName = "", context = {}) {
+    const fallback = context.factualReply || this.getFriendlyFailureMessage(toolName, context)
+    const messages = selectAgentReplyContext(context.messages)
+    if (!messages.length) return fallback
+
+    try {
+      const response = await this.retryRequest(
+        this.buildRequestData([
+          ...messages,
+          { role: "system", content: buildToolFailureReplyInstruction({ factualReply: fallback, toolName }) }
+        ], [], "none"),
+        context.session?.toolContent || "",
+        0,
+        toolName,
+        {
+          routeLabel: "工具失败自然回复",
+          generation: { temperature: 0.55, maxOutputTokens: 240 }
+        }
+      )
+      const content = String(response?.choices?.[0]?.message?.content || "").trim()
+      if (content && !containsInternalStatusLeak(content)) return content
+    } catch (error) {
+      logger.debug?.(`[工具失败回复] Agent 组织失败，使用事实兜底: ${error.message}`)
+    }
+    return fallback
+  }
+
+  async handleToolFailureResponse(toolName = "", context = {}) {
+    const output = await this.composeToolFailureReply(toolName, context)
+    return await this.handleTextResponse(output, context.e, context.session, context.messages || [], toolName)
   }
 
   getToolFailureKind(error = "") {
@@ -5892,15 +6150,22 @@ ${mcpPrompts}
         if (current && normalizeForContainment(line).includes(current.slice(0, 32))) continue
 
         const normalized = normalizeIntentText(line)
-        const looksLikeDrawRequest = isImageGenerationRequest(normalized) ||
-          /(?:画|绘制|生成|出图|做图|捏).{0,80}(?:图|图片|照片|照|插画|角色|人物|场景|完整|出来)/i.test(normalized) ||
-          hasToolCommitmentText(normalized) && /(?:画|生成|出图|做图|捏)/i.test(normalized)
-        if (looksLikeDrawRequest) lines.push(safeTruncateUnicode(line, 220))
+        const isDrawRequest = isImageGenerationRequest(normalized) ||
+          /(?:画|绘制|生成|出图|做图|捏).{0,80}(?:图|图片|照片|照|插画|角色|人物|场景|完整|出来)/i.test(normalized)
+        const isDrawCommitment = hasToolCommitmentText(normalized) && /(?:画|生成|出图|做图|捏)/i.test(normalized)
+        if (isDrawRequest || isDrawCommitment) {
+          lines.push({
+            text: safeTruncateUnicode(line, 220),
+            isDrawRequest
+          })
+        }
       }
     }
 
-    const recent = lines.slice(-6)
-    return recent.length ? compactDrawPromptText(recent.join("\n"), maxLength) : ""
+    const recent = selectLatestDrawContextLines(lines, 3)
+    return recent.length
+      ? compactDrawPromptText(recent.join("\n"), maxLength)
+      : ""
   }
 
   resolveContextualDrawGeneration(context = {}) {
@@ -5910,10 +6175,12 @@ ${mcpPrompts}
     if (isImageGenerationRequest(normalized) || isImageEditRequest(normalized)) return null
 
     const isStatusInquiry = isDrawTaskStatusInquiry(normalized)
-    const isContinuation = isDrawContextContinuationRequest(normalized)
+    const quotedContext = this.getQuotedPromptContextText(context.e, context.userContent)
+    const isQuotedDrawExecution = /(?:执行|照着|按).{0,12}(?:上面|引用|这条|刚才|前面)/.test(normalized) &&
+      isImageGenerationRequest(normalizeIntentText(quotedContext))
+    const isContinuation = isDrawContextContinuationRequest(normalized) || isQuotedDrawExecution
     if (!isStatusInquiry && !isContinuation && !context.modelCommittedToDraw) return null
 
-    const quotedContext = this.getQuotedPromptContextText(context.e, context.userContent)
     const recentContext = this.getRecentDrawContextText(
       context.groupUserMessages || context.messages || [],
       context.userContent || currentIntentText,
@@ -6035,7 +6302,7 @@ ${mcpPrompts}
 
   buildImageGenerationPrompt(context = {}) {
     const mergedPrompt = Array.isArray(context.e?._mergedOriginalTexts) && context.e._mergedOriginalTexts.length
-      ? context.e._mergedOriginalTexts.join("\n")
+      ? selectMergedImagePromptTexts(context.e._mergedOriginalTexts).join("\n")
       : ""
     const basePrompt = compactDrawPromptText(
       mergedPrompt || context.args || context.msg || context.currentIntentText || context.prompt || "",
@@ -6043,19 +6310,21 @@ ${mcpPrompts}
     )
     const avatarReferencePrompt = formatAvatarDrawReferencePrompt(context.avatarDrawReference)
     const quotedContext = this.getQuotedPromptContextText(context.e, context.userContent)
-    const recentContext = this.getRecentPromptContextText(
-      context.groupUserMessages || context.messages || [],
-      context.userContent || context.currentIntentText || basePrompt,
-      900
-    )
-    const referenceText = [
-      context.prompt,
-      context.args,
-      context.msg,
-      context.currentIntentText,
-      context.userContent,
-      quotedContext
-    ].filter(Boolean).join("\n")
+    const contextMode = resolveImageContextMode(basePrompt, quotedContext)
+    const recentContext = contextMode === "source"
+      ? this.getRecentPromptContextText(
+          context.groupUserMessages || context.messages || [],
+          context.userContent || context.currentIntentText || basePrompt,
+          900
+        )
+      : contextMode === "draw"
+        ? this.getRecentDrawContextText(
+            context.groupUserMessages || context.messages || [],
+            context.userContent || context.currentIntentText || basePrompt,
+            900
+          )
+        : ""
+    const referenceText = [basePrompt, quotedContext].filter(Boolean).join("\n")
 
     const compiled = compileImagePrompt({
       task: "image_generation",
@@ -6063,7 +6332,7 @@ ${mcpPrompts}
       quotedContext,
       recentContext,
       hasReferenceImages: Array.isArray(context.images) && context.images.length > 0,
-      hasContextualReference: hasContextualDrawReference(referenceText),
+      hasContextualReference: contextMode !== "none",
       isComic: COMIC_DRAW_PATTERN.test(referenceText)
     })
     return [compiled, context.groupContextImagePrompt || context.e?._groupContextImagePrompt]
@@ -6085,20 +6354,20 @@ ${mcpPrompts}
       2400
     )
     const quotedContext = this.getQuotedPromptContextText(context.e, context.userContent)
-    const recentContext = this.getRecentPromptContextText(
-      context.groupUserMessages || context.messages || [],
-      context.userContent || context.currentIntentText || basePrompt,
-      1200
-    )
-
-    const referenceText = [
-      context.prompt,
-      context.args,
-      context.msg,
-      context.currentIntentText,
-      context.userContent,
-      quotedContext
-    ].filter(Boolean).join("\n")
+    const contextMode = resolveImageContextMode(basePrompt, quotedContext)
+    const recentContext = contextMode === "source"
+      ? this.getRecentPromptContextText(
+          context.groupUserMessages || context.messages || [],
+          context.userContent || context.currentIntentText || basePrompt,
+          1200
+        )
+      : contextMode === "draw"
+        ? this.getRecentDrawContextText(
+            context.groupUserMessages || context.messages || [],
+            context.userContent || context.currentIntentText || basePrompt,
+            1200
+          )
+        : ""
 
     const compiled = compileImagePrompt({
       task: "image_edit",
@@ -6106,7 +6375,7 @@ ${mcpPrompts}
       quotedContext,
       recentContext,
       hasReferenceImages: true,
-      hasContextualReference: hasContextualDrawReference(referenceText)
+      hasContextualReference: contextMode !== "none"
     })
     return [compiled, context.groupContextImagePrompt || context.e?._groupContextImagePrompt]
       .filter(Boolean)
@@ -6142,6 +6411,10 @@ ${mcpPrompts}
 
     const requestedToolName = String(decision.toolName || decision.tool_name || "").trim()
     const availableToolNames = new Set(Array.isArray(context.availableToolNames) ? context.availableToolNames : [])
+    if (requestedToolName === "mentionAdminsTool" && !isExplicitAdminCollectionMentionRequest(context.currentIntentText || context.args || context.msg || "")) {
+      logger.warn("[语义工具分类] 拒绝非集合措辞的 mentionAdminsTool 请求")
+      return null
+    }
     if (requestedToolName && availableToolNames.has(requestedToolName)) {
       const params = decision.params && typeof decision.params === "object"
         ? decision.params
@@ -6206,11 +6479,7 @@ ${mcpPrompts}
   }
 
   resolveChatCompletionUrl(apiUrl = "") {
-    const url = String(apiUrl || "").trim().replace(/\/+$/, "")
-    if (!url) return ""
-    if (/\/chat\/completions$/i.test(url)) return url
-    if (/\/v1$/i.test(url)) return `${url}/chat/completions`
-    return `${url}/v1/chat/completions`
+    return normalizeChatCompletionUrl(apiUrl)
   }
 
   extractJsonObject(text = "") {
@@ -6264,7 +6533,7 @@ ${mcpPrompts}
     const availableToolNames = availableTools.map(tool => tool.name)
     const knownToolCandidates = selectToolIntentCandidates(context.currentIntentText || "", availableToolNames)
     if (!this.shouldUseSemanticToolIntent(context.e, context.currentIntentText, context.images, context.videos, {
-      knownToolCandidates
+      knownToolCandidates: hasSemanticPlannerCandidate(knownToolCandidates) ? knownToolCandidates : []
     })) return null
     const toolCatalog = buildToolSkillCatalog(this.toolInstances, availableToolNames)
 
@@ -6608,8 +6877,9 @@ ${mcpPrompts}
           }
 
           logger.warn(`[工具调用] 后台终态工具 ${result.toolName} 执行失败，发送拟人化失败提示 result=${String(result.result || "").slice(0, 240)}`)
-          await this.handleTextResponse(
-            this.getFriendlyFailureMessage(result.toolName, {
+          await this.handleToolFailureResponse(result.toolName, {
+            messages: currentMessages,
+            factualReply: this.getFriendlyFailureMessage(result.toolName, {
               e,
               session,
               stage: "background_terminal_tool_failed",
@@ -6617,15 +6887,14 @@ ${mcpPrompts}
             }),
             e,
             session,
-            currentMessages,
-            result.toolName
-          )
+          })
         })
         .catch(async error => {
           logger.error(`[工具调用] 后台终态工具 ${toolName || "unknown"} 异常:`, error)
           try {
-            await this.handleTextResponse(
-              this.getFriendlyFailureMessage(toolName, {
+            await this.handleToolFailureResponse(toolName, {
+              messages: currentMessages,
+              factualReply: this.getFriendlyFailureMessage(toolName, {
                 e,
                 session,
                 stage: "background_terminal_tool_exception",
@@ -6633,9 +6902,7 @@ ${mcpPrompts}
               }),
               e,
               session,
-              currentMessages,
-              toolName
-            )
+            })
           } catch (replyError) {
             logger.error(`[工具调用] 后台终态工具失败提示发送异常:`, replyError)
           }
@@ -6667,8 +6934,25 @@ ${mcpPrompts}
       return {
         toolCall,
         toolName,
-        result: `error: invalid JSON arguments: ${error.message}`
+        result: `error: 参数 JSON 解析失败：${buildVisibleFailureDetail(error)}`
       }
+    }
+
+    if (toolName === "mentionAdminsTool" && !isExplicitAdminCollectionMentionRequest(session?.rawArgs || e?.msg || "")) {
+      logger.warn(`[工具调用] 拒绝非集合措辞的 mentionAdminsTool group=${e?.group_id || ""}`)
+      return {
+        toolCall,
+        toolName,
+        result: "error: mentionAdminsTool 只能用于明确要求所有管理员、管理员们或全体群管的通知"
+      }
+    }
+
+    if (["bananaTool", "googleImageEditTool", "googleImageAnalysisTool", "searchInformationTool"].includes(toolName) && !params.agentContext) {
+      params.agentContext = buildAgentProgressContext({
+        userContent: session?.userContent || e?.msg || "",
+        quotedContext: e?._quotedPromptContext?.text || "",
+        messages: session?.groupUserMessages || []
+      })
     }
 
     if (toolName === "googleImageAnalysisTool" && (!Array.isArray(params.images) || !params.images.length) && session.images?.length) {
@@ -6702,6 +6986,9 @@ ${mcpPrompts}
       const imageGenerationReferenceImages = this.getImageGenerationReferenceImages(params.images, session)
       if ((!Array.isArray(params.images) || !params.images.length) && imageGenerationReferenceImages.length) {
         params.images = imageGenerationReferenceImages
+      }
+      if (session.avatarDrawReference?.images?.length) {
+        params.referencePurpose = "member_avatar"
       }
       params.prompt = this.buildImageGenerationPrompt({
         e,
@@ -6757,15 +7044,25 @@ ${mcpPrompts}
 
     const toolStartedAt = Date.now()
     try {
-      logger.info(`[工具调用] ${isMCPTool ? "MCP" : "本地"} ${toolName}: ${JSON.stringify(params)}`)
+      logger.info(`[工具调用] ${isMCPTool ? "MCP" : "本地"} ${formatTurnPlanLog(session.turnPlan)} tool=${toolName} params=${JSON.stringify(params)}`)
       const toolEvent = isMCPTool ? e : Object.assign(Object.create(e || null), {
         memoryManager: this.memoryManager
       })
       const rawResult = isMCPTool
         ? await this.executeTool(toolName, params, e)
         : await this.executeTool(this.toolInstances[toolName], params, toolEvent)
-      const result = this.serializeToolResult(rawResult)
-      logger.info(`[工具耗时] group=${e?.group_id || ""} tool=${toolName} elapsed=${Date.now() - toolStartedAt}ms`)
+      const serializedResult = this.serializeToolResult(rawResult)
+      // Tool output is fed back into another model and may later be shown to
+      // the user. Normalize every failing result here, including legacy tools
+      // that still return a raw error string instead of throwing.
+      const result = this.isRawToolFailure(serializedResult)
+        ? `error: ${buildVisibleFailureDetail(serializedResult)}`
+        : serializedResult
+      logger.info(`[工具耗时] group=${e?.group_id || ""} ${formatTurnPlanLog(session.turnPlan)} tool=${toolName} elapsed=${Date.now() - toolStartedAt}ms`)
+      recordTurnPlanToolOutcome(session.turnPlan, {
+        toolName,
+        success: !this.isToolResultError(result)
+      })
       if (dedupeEnabled && toolRunValue.messageId) {
         const failed = this.isToolResultError(result)
         await this.saveTaskStatus({
@@ -6790,14 +7087,15 @@ ${mcpPrompts}
           messageId: toolRunValue.messageId,
           status: "tool_failed",
           toolName,
-          error: error.message
+          error: buildVisibleFailureDetail(error)
         })
       }
       logger.error(`[工具调用] ${toolName} 执行失败:`, error)
+      recordTurnPlanToolOutcome(session.turnPlan, { toolName, success: false })
       return {
         toolCall,
         toolName,
-        result: `error: ${error.message}`
+        result: `error: ${buildVisibleFailureDetail(error)}`
       }
     } finally {
       if (dedupeEnabled && activeDedupeToolRuns.get(toolRunKey) === toolRunValue) {
@@ -6911,18 +7209,17 @@ ${mcpPrompts}
 			        const failedResult = validResults.find(r => this.isToolResultError(r.result))
 		        if (failedResult) {
 		          logger.warn(`[工具调用] 终态工具 ${failedResult.toolName} 执行失败，发送拟人化失败提示 result=${String(failedResult.result || "").slice(0, 240)}`)
-		          await this.handleTextResponse(
-		            this.getFriendlyFailureMessage(failedResult.toolName, {
-		              e,
-		              session,
-		              stage: "terminal_tool_failed",
-		              error: failedResult.result
-		            }),
-		            e,
-		            session,
-		            currentMessages,
-	            failedResult.toolName
-	          )
+          await this.handleToolFailureResponse(failedResult.toolName, {
+            messages: currentMessages,
+            factualReply: this.getFriendlyFailureMessage(failedResult.toolName, {
+              e,
+              session,
+              stage: "terminal_tool_failed",
+              error: failedResult.result
+            }),
+            e,
+            session
+          })
 	          return
 	        }
 	        logger.info(`[工具调用] 本轮全部为终态工具(${validResults.map(r => r.toolName).join(',')})且执行成功，跳过最终文本回复`)
@@ -6933,7 +7230,12 @@ ${mcpPrompts}
         session.toolResults = allToolResults
         const unavailableReply = buildUnavailableToolReply(allToolResults)
         logger.warn(`[工具事实边界] ${allToolResults.map(result => result.toolName).join(',')} 本轮无可用结果，禁止进入历史补全式总结`)
-        await this.handleTextResponse(unavailableReply, e, session, currentMessages, session.toolName)
+        await this.handleToolFailureResponse(session.toolName, {
+          e,
+          session,
+          messages: currentMessages,
+          factualReply: unavailableReply
+        })
         return
       }
       currentMessages.push({
@@ -6972,13 +7274,12 @@ ${mcpPrompts}
             const translated = parseModrinthTranslationResponse(compactContent, missing.map(item => item.projectId))
             if (!translated) {
               logger.warn(`[工具调用] Modrinth 简介翻译失败 elapsed=${Date.now() - translateStartedAt}ms error=${compactResponse?.error ? String(compactResponse.error).slice(0, 240) : "invalid_json"}`)
-              await this.handleTextResponse(
-                this.getFriendlyFailureMessage("modrinthTool", { e, session, stage: "modrinth_translation", error: compactResponse?.error || "翻译模型没有返回完整 JSON" }),
+              await this.handleToolFailureResponse("modrinthTool", {
                 e,
                 session,
-                currentMessages,
-                "modrinthTool"
-              )
+                messages: currentMessages,
+                factualReply: this.getFriendlyFailureMessage("modrinthTool", { e, session, stage: "modrinth_translation", error: compactResponse?.error || "翻译模型没有返回完整 JSON" })
+              })
               return
             }
             for (const [projectId, text] of translated) translations.set(projectId, text)
@@ -7006,13 +7307,12 @@ ${mcpPrompts}
           await this.handleTextResponse(finalContent, e, session, currentMessages, session.toolName)
         } else {
           logger.warn(`[回复失败] group=${e?.group_id || ""} user=${e?.user_id || ""} stage=synthetic_tool_summary tool=${session.toolName || ""} error=${finalResponse?.error ? JSON.stringify(finalResponse.error).slice(0, 240) : "no_choices"}`)
-          await this.handleTextResponse(
-            this.getFriendlyFailureMessage(session.toolName, { e, session, stage: "synthetic_tool_summary", error: finalResponse?.error }),
+          await this.handleToolFailureResponse(session.toolName, {
             e,
             session,
-            currentMessages,
-            session.toolName
-          )
+            messages: currentMessages,
+            factualReply: this.getFriendlyFailureMessage(session.toolName, { e, session, stage: "synthetic_tool_summary", error: finalResponse?.error })
+          })
         }
         logger.info(`[工具调用] 合成工具调用 ${session.toolName || "unknown"} 跳过 thinking 工具续轮，直接进入无工具总结`)
         return
@@ -7058,6 +7358,12 @@ ${mcpPrompts}
 	      )
 	    } else {
 	      logger.warn(`[回复失败] group=${e?.group_id || ""} user=${e?.user_id || ""} stage=final_tool_summary tool=${session.toolName || ""} error=${finalResponse?.error ? JSON.stringify(finalResponse.error).slice(0, 240) : "no_choices"}`)
+        await this.handleToolFailureResponse(session.toolName, {
+          e,
+          session,
+          messages: currentMessages,
+          factualReply: this.getFriendlyFailureMessage(session.toolName, { e, session, stage: "final_tool_summary", error: finalResponse?.error || "没有可用的最终回复" })
+        })
 	    }
 	  }
 
@@ -7098,6 +7404,10 @@ ${mcpPrompts}
     if (toolName === "modrinthTool") output = stripModrinthForwardMarkers(output)
     if (!modrinthItems.length) {
       output = polishHumanReplyText(output)
+      output = enforcePersonaToneBoundary(output, {
+        userText: session?.userContent || e?.msg || "",
+        toolName
+      })
       output = personaFeedbackManager.guardReply(output, this.config.personaGuard, {
         userText: session?.userContent || e?.msg || "",
         botNames: [Bot?.nickname, this.config?.persona?.name]
@@ -7109,6 +7419,13 @@ ${mcpPrompts}
       logger.warn("[最终回复清理] 风格拦截后回复为空，已跳过发送")
       return
     }
+    const narrativeReply = !modrinthItems.length
+      ? splitNarrativeReply(output, session?.userContent || e?.msg || "")
+      : null
+    if (narrativeReply?.lead) {
+      output = narrativeReply.story
+      logger.info(`[叙事呈现] 已剥离模型开场 lead=${narrativeReply.lead.length} story=${output.length}`)
+    }
     const textImageTemplate = !modrinthItems.length && this.getTextImageTemplateForFinalReply({
       content,
       output,
@@ -7116,11 +7433,14 @@ ${mcpPrompts}
       toolName,
       e
     })
+    session.responseAttempted = true
     const botMessageId = modrinthItems.length
       ? modrinthCardItems.length === modrinthItems.length
         ? await this.sendModrinthForwardCards(e, modrinthCardItems)
         : await this.sendModrinthForwardItems(e, modrinthItems)
-      : textImageTemplate
+      : narrativeReply?.lead
+        ? await this.sendFinalReplyAsTextImage(e, output, "document")
+        : textImageTemplate
         ? await this.sendFinalReplyAsTextImage(e, output, textImageTemplate)
         : await this.sendSegmentedMessage(e, output)
 
@@ -7224,13 +7544,13 @@ ${mcpPrompts}
         logger.warn(`[全局表达学习] 记录主人反馈失败: ${error.message}`)
       }
     }
-    await e.reply(result)
+    await this.sendObservedReply(e, result)
     return true
   }
 
   async globalStyleLearningCommand(e) {
     if (!e?.isMaster) {
-      await e.reply("只有主人可以查看或调整全局表达学习。")
+      await this.sendObservedReply(e, "只有主人可以查看或调整全局表达学习。")
       return true
     }
     const text = String(e.msg || "")
@@ -7248,12 +7568,12 @@ ${mcpPrompts}
     ].join("\n")
 
     if (!subCommand || /帮助/.test(subCommand)) {
-      await e.reply(helpText)
+      await this.sendObservedReply(e, helpText)
       return true
     }
     if (/清空/.test(subCommand)) {
       globalStyleLearnerManager.clear(this.config.globalStyleLearning)
-      await e.reply("全局表达学习记忆已清空。")
+      await this.sendObservedReply(e, "全局表达学习记忆已清空。")
       return true
     }
     if (/总结/.test(subCommand)) {
@@ -7262,7 +7582,7 @@ ${mcpPrompts}
           this.config.globalStyleLearning,
           this.config.memoryAiConfig
         )
-        await e.reply([
+        await this.sendObservedReply(e, [
           "全局表达学习总结完成：",
           `本次参考脱敏样本：${result.sampleCount} 条`,
           `新增/更新可吸收规则：${result.absorbChanged} 条`,
@@ -7271,27 +7591,27 @@ ${mcpPrompts}
         ].join("\n"))
       } catch (error) {
         logger.warn(`[全局表达学习] 模型总结失败: ${error.message}`)
-        await e.reply(`全局表达学习总结失败：${error.message}`)
+        await this.sendObservedReply(e, `全局表达学习总结失败：${error.message}`)
       }
       return true
     }
     if (/报告/.test(subCommand)) {
-      await e.reply(globalStyleLearnerManager.buildReport(this.config.globalStyleLearning))
+      await this.sendObservedReply(e, globalStyleLearnerManager.buildReport(this.config.globalStyleLearning))
       return true
     }
     if (/候选|自主/.test(subCommand)) {
-      await e.reply(globalStyleLearnerManager.buildAutoEvolutionView(this.config.globalStyleLearning))
+      await this.sendObservedReply(e, globalStyleLearnerManager.buildAutoEvolutionView(this.config.globalStyleLearning))
       return true
     }
     if (/记忆/.test(subCommand)) {
-      await e.reply(globalStyleLearnerManager.buildMemoryView(this.config.globalStyleLearning))
+      await this.sendObservedReply(e, globalStyleLearnerManager.buildMemoryView(this.config.globalStyleLearning))
       return true
     }
     if (/状态/.test(subCommand)) {
-      await e.reply(globalStyleLearnerManager.buildStatus(this.config.globalStyleLearning))
+      await this.sendObservedReply(e, globalStyleLearnerManager.buildStatus(this.config.globalStyleLearning))
       return true
     }
-    await e.reply(helpText)
+    await this.sendObservedReply(e, helpText)
     return true
   }
 
@@ -7310,16 +7630,6 @@ ${mcpPrompts}
 
     // 2. 提取并保存长期记忆（后台异步）
     if (this.config.memorySystem?.enabled) {
-      const explicitTeachingFacts = Array.isArray(e._explicitTeachingFacts) ? e._explicitTeachingFacts : []
-      for (const fact of explicitTeachingFacts) {
-        if (!fact?.alias || !fact?.targetUserId) continue
-        this.memoryManager.addAliasMapping(groupId, {
-          alias: fact.alias,
-          targetQQ: fact.targetUserId,
-          by: [userId].filter(Boolean),
-          confidence: 0.95
-        }).catch(err => logger.error('[MemoryManager] 保存显式称呼映射失败:', err))
-      }
       // 不 await，让它在后台执行
       this.memoryManager.extractAndSaveMemories(groupId, userId, userMessage, botReply, {
         source: "user",
@@ -7341,21 +7651,63 @@ ${mcpPrompts}
     // 表达学习已移至 handleRandomReply 静默收集，不在此处调用
   }
 
+  async sendObservedReply(e, payload, quote = false, channel = "command") {
+    try {
+      const result = await e.reply(payload, quote)
+      logDeliveryOutcome(logger, {
+        status: "sent",
+        channel,
+        groupId: e?.group_id,
+        userId: e?.user_id,
+        messageId: extractDeliveryMessageId(result)
+      })
+      return result
+    } catch (error) {
+      logDeliveryOutcome(logger, {
+        status: "failed",
+        channel,
+        groupId: e?.group_id,
+        userId: e?.user_id,
+        error
+      })
+      throw error
+    }
+  }
+
   async sendSegmentedMessage(e, output, quoteChance = 0.5) {
     try {
+      const groupId = e?.group_id
+      if (shouldCancelProactiveReply(e, lastIncomingMsgAt.get(groupId) || 0)) {
+        logger.info(`[回复新鲜度] group=${groupId || ""} cancelled anchor=${e?._proactiveReplyAnchorAt || 0} latest=${lastIncomingMsgAt.get(groupId) || 0}`)
+        return null
+      }
+      const replyWithReceipt = async (payload, quote, channel = "agent_text") => {
+        return await this.sendObservedReply(e, payload, quote, channel)
+      }
       if (typeof output === "string") {
+        output = enforcePersonaToneBoundary(output, {
+          userText: e?.msg || ""
+        })
         output = personaFeedbackManager.guardReply(output, this.config.personaGuard, {
           userText: e?.msg || "",
           botNames: [Bot?.nickname, this.config?.persona?.name]
         })
       }
       output = sanitizeFinalReplyText(output)
+      // QQ 不渲染围栏代码块，会把 ```bash 拆成 `` bash、游离反引号等碎片；
+      // 走纯文本兜底时先压平成逐行行内代码胶囊。
+      if (containsCodeFence(output)) {
+        const flattened = flattenCodeFences(output)
+        if (flattened !== output) {
+          logger.info(`[代码块压平] 纯文本回复含围栏代码块，已转为行内代码发送 len=${output.length}`)
+          output = flattened
+        }
+      }
       if (!output) return null
       if (output.includes("\\n")) {
         logger.warn(`[分段发送] sanitize后仍含字面\\n! raw=${JSON.stringify(output).slice(0, 200)}`)
       }
       // smart 模式：发完话后记录 bot 上次发言时间和关键词，给 prefilter R1/R2 识别接续用
-      const groupId = e?.group_id
       const triggerMode = String(this.config?.chatTriggerMode || 'strict').toLowerCase()
       if (groupId && triggerMode === 'smart') {
         try {
@@ -7402,10 +7754,10 @@ ${mcpPrompts}
               const { hasAt: segHasAt, msgSegments } = await this.convertAtInString(seg, groupForAt)
               const quote = shouldQuote && i === 0
               if (segHasAt && msgSegments) {
-                const res = await e.reply(msgSegments, quote)
+                const res = await replyWithReceipt(msgSegments, quote)
                 lastMessageId = res?.message_id
               } else {
-                const res = await e.reply(seg, quote)
+                const res = await replyWithReceipt(seg, quote)
                 lastMessageId = res?.message_id
               }
               if (i < messageSegments.length - 1) {
@@ -7431,7 +7783,7 @@ ${mcpPrompts}
         try {
           const { hasAt, msgSegments } = await this.convertAtInString(output, groupForAt)
           if (hasAt && msgSegments) {
-            const res = await e.reply(msgSegments)
+            const res = await replyWithReceipt(msgSegments, false)
             return res?.message_id
           }
         } catch (err) {
@@ -7450,7 +7802,7 @@ ${mcpPrompts}
 
       let lastMessageId = null
       if (totalTokens <= 10 && !hasNewline) {
-        const res = await e.reply(output, shouldQuote)
+        const res = await replyWithReceipt(output, shouldQuote)
         lastMessageId = res?.message_id
         return lastMessageId
       }
@@ -7458,7 +7810,7 @@ ${mcpPrompts}
       for (let i = 0; i < messageSegments.length; i++) {
         if (messageSegments[i]?.trim()) {
           const quote = shouldQuote && i === 0
-          const res = await e.reply(messageSegments[i].trim(), quote)
+          const res = await replyWithReceipt(messageSegments[i].trim(), quote)
           lastMessageId = res?.message_id
 
           if (i < messageSegments.length - 1) {
@@ -7477,10 +7829,10 @@ ${mcpPrompts}
     } catch (error) {
       logger.error(`[分段发送-异常] 走了catch兜底! error=${error?.message || error}, stack=${error?.stack?.slice(0, 300)}`)
       try {
-        const res = await e.reply(String(output || "").trim())
+        const res = await this.sendObservedReply(e, String(output || "").trim(), false, "agent_text_fallback")
         return res?.message_id
       } catch {}
-      const res = await e.reply(output)
+      const res = await this.sendObservedReply(e, output, false, "agent_text_fallback")
       return res?.message_id
     }
   }
@@ -7763,16 +8115,16 @@ ${mcpPrompts}
    */
   async clearGroupMemory(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用此命令")
+      await this.sendObservedReply(e, "请在群聊中使用此命令")
       return true
     }
 
     try {
       const cleared = await this.memoryManager.clearGroupRedis(e.group_id)
-      await e.reply(`已清除本群记忆，共 ${cleared} 项存储键。`)
+      await this.sendObservedReply(e, `已清除本群记忆，共 ${cleared} 项存储键。`)
     } catch (error) {
       logger.error("[群记忆] 清除失败:", error)
-      await e.reply("清除失败，请查看日志")
+      await this.sendObservedReply(e, "清除失败，请查看日志")
     }
     return true
   }
@@ -7836,10 +8188,10 @@ ${mcpPrompts}
 
     try {
       const forwardMsg = await common.makeForwardMsg(e, msgs, title)
-      await e.reply(forwardMsg)
+      await this.sendObservedReply(e, forwardMsg)
     } catch (error) {
       logger.warn("[记忆管理] 转发消息发送失败，回退为普通文本:", error)
-      await e.reply(safeTruncateUnicode(msgs.join("\n\n"), 4500))
+      await this.sendObservedReply(e, safeTruncateUnicode(msgs.join("\n\n"), 4500))
     }
   }
 
@@ -7850,10 +8202,10 @@ ${mcpPrompts}
 
     try {
       const forwardMsg = await common.makeForwardMsg(e, msgs, title)
-      await e.reply(forwardMsg)
+      await this.sendObservedReply(e, forwardMsg)
     } catch (error) {
       logger.warn("[消息发送] 转发消息发送失败，回退为普通文本:", error)
-      await e.reply(safeTruncateUnicode(content, 4500) || "暂无内容")
+      await this.sendObservedReply(e, safeTruncateUnicode(content, 4500) || "暂无内容")
     }
   }
 
@@ -7874,10 +8226,10 @@ ${mcpPrompts}
         `保存严格度：${config.saveStrictness ?? "默认"}，语义召回：${config.semanticRecallEnabled ? "开启" : "关闭"}，主动回扣：${config.proactiveCallback ? "开启" : "关闭"}`,
         `上限：实体/群 ${config.maxEntitiesPerGroup ?? "-"}，事实/群 ${config.maxFactsPerGroup ?? "-"}`
       ]
-      await e.reply(lines.join("\n"))
+      await this.sendObservedReply(e, lines.join("\n"))
     } catch (error) {
       logger.error("[记忆管理] 读取记忆状态失败:", error)
-      await e.reply("记忆状态读取失败，请看日志")
+      await this.sendObservedReply(e, "记忆状态读取失败，请看日志")
     }
     return true
   }
@@ -7885,7 +8237,7 @@ ${mcpPrompts}
   // P1-4：进程内调用计数/耗时统计（主人或群管理员可见）。重启归零。
   async memoryStats(e) {
     if (!this.isGroupMemoryAdmin(e)) {
-      await e.reply("只有群主、管理员或主人可以查看记忆统计")
+      await this.sendObservedReply(e, "只有群主、管理员或主人可以查看记忆统计")
       return true
     }
     try {
@@ -7910,10 +8262,10 @@ ${mcpPrompts}
         `LLM 反思：调用 ${num("llm.reflect.call")}，失败 ${num("llm.reflect.fail")}（${reflectFailRate}%），平均 ${avgMs("llm.reflect.ms")}ms`,
         `Embedding：命中 ${num("embed.hit")} / 未命中 ${num("embed.miss")}（命中率 ${embedHitRate}%），失败 ${num("embed.fail")}，平均 ${avgMs("embed.ms")}ms`
       ]
-      await e.reply(lines.join("\n"))
+      await this.sendObservedReply(e, lines.join("\n"))
     } catch (error) {
       logger.error("[记忆管理] 读取记忆统计失败:", error)
-      await e.reply("记忆统计读取失败，请看日志")
+      await this.sendObservedReply(e, "记忆统计读取失败，请看日志")
     }
     return true
   }
@@ -7931,14 +8283,14 @@ ${mcpPrompts}
       ])
     } catch (error) {
       logger.error("[记忆管理] 读取我的记忆失败:", error)
-      await e.reply("读取我的记忆失败，请看日志")
+      await this.sendObservedReply(e, "读取我的记忆失败，请看日志")
     }
     return true
   }
 
   async listGroupMemory(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
 
@@ -7953,20 +8305,20 @@ ${mcpPrompts}
       ])
     } catch (error) {
       logger.error("[记忆管理] 读取群记忆失败:", error)
-      await e.reply("读取群记忆失败，请看日志")
+      await this.sendObservedReply(e, "读取群记忆失败，请看日志")
     }
     return true
   }
 
   async listGroupWorkflows(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     try {
       const workflows = await this.memoryManager.getGroupWorkflowRules(e.group_id)
       if (!workflows.length) {
-        await e.reply("本群还没有已教会的工作流。")
+        await this.sendObservedReply(e, "本群还没有已教会的工作流。")
         return true
       }
       const lines = ["本群已教会的工作流："]
@@ -7974,17 +8326,17 @@ ${mcpPrompts}
         const targets = (rule.targets || []).map(item => `${item.displayName || item.userId}(QQ:${item.userId})`).join("、")
         lines.push(`[${rule.id}] ${rule.condition} -> 通知 ${targets}`)
       }
-      await e.reply(lines.join("\n"))
+      await this.sendObservedReply(e, lines.join("\n"))
     } catch (error) {
       logger.error("[群工作流] 列表失败:", error)
-      await e.reply("读取群工作流失败，请看日志")
+      await this.sendObservedReply(e, "读取群工作流失败，请看日志")
     }
     return true
   }
 
   async deleteGroupWorkflow(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     const id = String(e.msg || "").replace(/^#删除群工作流\s+/, "").trim()
@@ -7992,31 +8344,31 @@ ${mcpPrompts}
       const workflows = await this.memoryManager.getGroupWorkflowRules(e.group_id)
       const rule = workflows.find(item => String(item?.id || "") === id)
       if (!rule) {
-        await e.reply("没有找到这条群工作流。")
+        await this.sendObservedReply(e, "没有找到这条群工作流。")
         return true
       }
       if (!this.isGroupMemoryAdmin(e) && String(rule.createdBy || "") !== String(e.user_id || "")) {
-        await e.reply("只有创建者、群主、管理员或主人可以删除这条群工作流。")
+        await this.sendObservedReply(e, "只有创建者、群主、管理员或主人可以删除这条群工作流。")
         return true
       }
       const result = await this.memoryManager.adminDeleteGroupWorkflow({ groupId: e.group_id, id })
-      await e.reply(result.deleted ? "已删除这条群工作流。" : "删除失败：没有找到这条群工作流。")
+      await this.sendObservedReply(e, result.deleted ? "已删除这条群工作流。" : "删除失败：没有找到这条群工作流。")
     } catch (error) {
       logger.error("[群工作流] 删除失败:", error)
-      await e.reply("删除群工作流失败，请看日志")
+      await this.sendObservedReply(e, "删除群工作流失败，请看日志")
     }
     return true
   }
 
   async listGroupKnowledge(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     try {
       const entries = await this.memoryManager.getGroupKnowledgeEntries(e.group_id)
       if (!entries.length) {
-        await e.reply("本群还没有已教会的群知识。")
+        await this.sendObservedReply(e, "本群还没有已教会的群知识。")
         return true
       }
       const lines = ["本群已教会的群知识："]
@@ -8028,17 +8380,17 @@ ${mcpPrompts}
           lines.push(`[${entry.id}] ${entry.subject} = ${targets}`)
         }
       }
-      await e.reply(lines.join("\n"))
+      await this.sendObservedReply(e, lines.join("\n"))
     } catch (error) {
       logger.error("[群知识] 列表失败:", error)
-      await e.reply("读取群知识失败，请看日志")
+      await this.sendObservedReply(e, "读取群知识失败，请看日志")
     }
     return true
   }
 
   async deleteGroupKnowledge(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     const id = String(e.msg || "").replace(/^#删除群知识\s+/, "").trim()
@@ -8046,18 +8398,18 @@ ${mcpPrompts}
       const entries = await this.memoryManager.getGroupKnowledgeEntries(e.group_id)
       const entry = entries.find(item => String(item?.id || "") === id)
       if (!entry) {
-        await e.reply("没有找到这条群知识。")
+        await this.sendObservedReply(e, "没有找到这条群知识。")
         return true
       }
       if (!this.isGroupMemoryAdmin(e) && String(entry.createdBy || "") !== String(e.user_id || "")) {
-        await e.reply("只有创建者、群主、管理员或主人可以删除这条群知识。")
+        await this.sendObservedReply(e, "只有创建者、群主、管理员或主人可以删除这条群知识。")
         return true
       }
       const result = await this.memoryManager.adminDeleteGroupKnowledge({ groupId: e.group_id, id })
-      await e.reply(result.deleted ? "已删除这条群知识。" : "删除失败：没有找到这条群知识。")
+      await this.sendObservedReply(e, result.deleted ? "已删除这条群知识。" : "删除失败：没有找到这条群知识。")
     } catch (error) {
       logger.error("[群知识] 删除失败:", error)
-      await e.reply("删除群知识失败，请看日志")
+      await this.sendObservedReply(e, "删除群知识失败，请看日志")
     }
     return true
   }
@@ -8065,7 +8417,7 @@ ${mcpPrompts}
   async searchMemory(e) {
     const query = String(e.msg || "").replace(/^#搜索记忆\s+/, "").trim()
     if (!query) {
-      await e.reply("请输入要搜索的关键词")
+      await this.sendObservedReply(e, "请输入要搜索的关键词")
       return true
     }
 
@@ -8091,7 +8443,7 @@ ${mcpPrompts}
       ])
     } catch (error) {
       logger.error("[记忆管理] 搜索记忆失败:", error)
-      await e.reply("搜索记忆失败，请看日志")
+      await this.sendObservedReply(e, "搜索记忆失败，请看日志")
     }
     return true
   }
@@ -8099,44 +8451,44 @@ ${mcpPrompts}
   async deleteMemory(e) {
     const id = String(e.msg || "").replace(/^#删除记忆\s+/, "").trim()
     if (!id) {
-      await e.reply("请输入要删除的记忆 id")
+      await this.sendObservedReply(e, "请输入要删除的记忆 id")
       return true
     }
 
     try {
       const result = await this.memoryManager.adminDeleteMemory({ groupId: e.group_id, userId: e.user_id, id })
 
-      await e.reply(result.deleted ? `已删除记忆 ${id}` : "没有找到可删除的记忆，普通用户只能删除自己的记忆")
+      await this.sendObservedReply(e, result.deleted ? `已删除记忆 ${id}` : "没有找到可删除的记忆，普通用户只能删除自己的记忆")
     } catch (error) {
       logger.error("[记忆管理] 删除记忆失败:", error)
-      await e.reply("删除记忆失败，请看日志")
+      await this.sendObservedReply(e, "删除记忆失败，请看日志")
     }
     return true
   }
 
   async clearMyMemory(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     try {
       // P0-1：只删该用户自己的 entity（旧实现误调 adminClearMemories 会清整群）。
       const result = await this.memoryManager.clearUserMemory(e.group_id, e.user_id)
-      await e.reply(result?.cleared ? "已清空你在本群的记忆" : "你在本群没有可清空的记忆")
+      await this.sendObservedReply(e, result?.cleared ? "已清空你在本群的记忆" : "你在本群没有可清空的记忆")
     } catch (error) {
       logger.error("[记忆管理] 清空我的记忆失败:", error)
-      await e.reply("清空我的记忆失败，请看日志")
+      await this.sendObservedReply(e, "清空我的记忆失败，请看日志")
     }
     return true
   }
 
   async clearGroupMemory(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     if (!this.isGroupMemoryAdmin(e)) {
-      await e.reply("只有群主、管理员或主人可以清空群记忆")
+      await this.sendObservedReply(e, "只有群主、管理员或主人可以清空群记忆")
       return true
     }
 
@@ -8146,7 +8498,7 @@ ${mcpPrompts}
     const expireAt = clearGroupMemoryPending.get(pendingKey)
     if (!expireAt || expireAt < now) {
       clearGroupMemoryPending.set(pendingKey, now + CLEAR_GROUP_MEMORY_CONFIRM_TTL_MS)
-      await e.reply("这会清空整群的记忆且不可恢复。请在 30 秒内再发一次 #清空群记忆 确认。")
+      await this.sendObservedReply(e, "这会清空整群的记忆且不可恢复。请在 30 秒内再发一次 #清空群记忆 确认。")
       return true
     }
     clearGroupMemoryPending.delete(pendingKey)
@@ -8155,17 +8507,17 @@ ${mcpPrompts}
       const result = await this.memoryManager.adminClearMemories({
         groupId: e.group_id
       })
-      await e.reply(`已清空本群群记忆，共 ${result.cleared} 项存储键。`)
+      await this.sendObservedReply(e, `已清空本群群记忆，共 ${result.cleared} 项存储键。`)
     } catch (error) {
       logger.error("[记忆管理] 清空群记忆失败:", error)
-      await e.reply("清空群记忆失败，请看日志")
+      await this.sendObservedReply(e, "清空群记忆失败，请看日志")
     }
     return true
   }
 
   async disableMyMemory(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     try {
@@ -8175,19 +8527,19 @@ ${mcpPrompts}
         userId: e.user_id,
         enabled: false
       })
-      await e.reply(result?.enabled === false
+      await this.sendObservedReply(e, result?.enabled === false
         ? "已禁用你在本群的长期记忆，之后不再记录你的发言"
         : "操作未生效，你的记忆仍处于启用状态")
     } catch (error) {
       logger.error("[记忆管理] 禁用我的记忆失败:", error)
-      await e.reply("禁用失败，请看日志")
+      await this.sendObservedReply(e, "禁用失败，请看日志")
     }
     return true
   }
 
   async enableMyMemory(e) {
     if (!e.group_id) {
-      await e.reply("请在群聊中使用这个命令")
+      await this.sendObservedReply(e, "请在群聊中使用这个命令")
       return true
     }
     try {
@@ -8197,23 +8549,23 @@ ${mcpPrompts}
         userId: e.user_id,
         enabled: true
       })
-      await e.reply(result?.enabled
+      await this.sendObservedReply(e, result?.enabled
         ? "已启用你在本群的长期记忆"
         : "操作未生效，你的记忆仍处于禁用状态")
     } catch (error) {
       logger.error("[记忆管理] 启用我的记忆失败:", error)
-      await e.reply("启用失败，请看日志")
+      await this.sendObservedReply(e, "启用失败，请看日志")
     }
     return true
   }
 
   async reloadMCP(e) {
     if (!e.isMaster) {
-      await e.reply("只有主人才能执行此操作")
+      await this.sendObservedReply(e, "只有主人才能执行此操作")
       return true
     }
 
-    await e.reply("正在重载MCP配置...")
+    await this.sendObservedReply(e, "正在重载MCP配置...")
 
     try {
       await mcpManager.disconnectAll()
@@ -8221,10 +8573,10 @@ ${mcpPrompts}
       await mcpInitPromise
 
       const toolCount = mcpManager.aliases?.size || mcpManager.tools?.size || 0
-      await e.reply(`MCP重载完成，当前加载 ${toolCount} 个MCP工具`)
+      await this.sendObservedReply(e, `MCP重载完成，当前加载 ${toolCount} 个MCP工具`)
     } catch (error) {
       logger.error("[MCP] 重载失败:", error)
-      await e.reply(`MCP重载失败: ${error.message}`)
+      await this.sendObservedReply(e, `MCP重载失败: ${error.message}`)
     }
 
     return true
@@ -8246,7 +8598,7 @@ ${mcpPrompts}
 
   async testMCPTool(e) {
     if (!e.isMaster) {
-      await e.reply("只有主人才能执行此操作")
+      await this.sendObservedReply(e, "只有主人才能执行此操作")
       return true
     }
 
@@ -8256,7 +8608,7 @@ ${mcpPrompts}
     const rawParams = spaceIndex === -1 ? "{}" : input.slice(spaceIndex + 1).trim()
 
     if (!alias) {
-      await e.reply("请输入要测试的 MCP 工具名，例如：#mcp 测试 mcp_server_search {\"query\":\"你好\"}")
+      await this.sendObservedReply(e, "请输入要测试的 MCP 工具名，例如：#mcp 测试 mcp_server_search {\"query\":\"你好\"}")
       return true
     }
 
@@ -8264,7 +8616,7 @@ ${mcpPrompts}
     try {
       params = rawParams ? JSON.parse(rawParams) : {}
     } catch (error) {
-      await e.reply(`JSON 参数解析失败：${error.message}`)
+      await this.sendObservedReply(e, `JSON 参数解析失败：${error.message}`)
       return true
     }
 
@@ -8273,7 +8625,7 @@ ${mcpPrompts}
       await this.replyLongForward(e, `MCP测试 ${alias}`, result)
     } catch (error) {
       logger.error(`[MCP] 测试工具 ${alias} 失败:`, error)
-      await e.reply(`MCP工具测试失败：${error.message}`)
+      await this.sendObservedReply(e, `MCP工具测试失败：${error.message}`)
     }
     return true
   }

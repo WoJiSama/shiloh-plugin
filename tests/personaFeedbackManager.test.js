@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PersonaFeedbackManager } from '../utils/PersonaFeedbackManager.js'
+import { PersonaFeedbackManager, IDENTITY_DEFLECTION_POOL } from '../utils/PersonaFeedbackManager.js'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -13,8 +13,9 @@ test('softens hard robot or human identity denial', () => {
     userText: '你怎么这么像机器人啊'
   })
 
-  assert.equal(output, '别给我扣机器人帽子……我只是话多一点。')
-  assert.doesNotMatch(output, /活人|真人|不是机器人/)
+  // 硬否认片段被删掉，其余自然内容保留（不再归一成固定句）
+  assert.equal(output, '就是话多了一点')
+  assert.doesNotMatch(output, /活人|真人|不是机器人|扣帽子/)
 })
 
 test('keeps normal replies unchanged', () => {
@@ -30,14 +31,35 @@ test('handles hard denial variants only for bot identity challenges', () => {
   const manager = new PersonaFeedbackManager({ logger: null })
   const context = { userText: '希洛你不会是 AI 吧', botNames: ['希洛'] }
 
-  assert.equal(
-    manager.guardReply('我才不是AI呢，真人一个。', { enabled: true }, context),
-    '别给我扣机器人帽子……我只是话多一点。'
-  )
+  // 整条只剩否认 → 从轮换池取一句，且不含否认措辞
+  const collapsed = manager.guardReply('我才不是AI呢，真人一个。', { enabled: true }, context)
+  assert.ok(IDENTITY_DEFLECTION_POOL.some(line => collapsed === `${line}。`), `unexpected: ${collapsed}`)
+  assert.doesNotMatch(collapsed, /不是|活人|真人|扣帽子/)
+
+  // 部分否认 → 只删否认片段，保留其余自然内容
   assert.equal(
     manager.guardReply('谁是机器人啊，我可是活人一个！你少来。', { enabled: true }, context),
-    '别给我扣机器人帽子……你少来。'
+    '你少来。'
   )
+})
+
+test('collapses to rotated deflections instead of one fixed line', () => {
+  const manager = new PersonaFeedbackManager({ logger: null })
+  const context = { userText: '你是机器人吗', botNames: ['希洛'] }
+
+  const replies = Array.from({ length: IDENTITY_DEFLECTION_POOL.length }, () =>
+    manager.guardReply('我才不是机器人！', { enabled: true }, context)
+  )
+  assert.equal(new Set(replies).size, replies.length, '连续多次被问不应重复同一句')
+})
+
+test('strips canned marker phrase regurgitated from history', () => {
+  const manager = new PersonaFeedbackManager({ logger: null })
+  const context = { userText: '希洛你是不是机器人', botNames: ['希洛'] }
+
+  const output = manager.guardReply('别给我扣机器人帽子……你少来', { enabled: true }, context)
+  assert.equal(output, '你少来')
+  assert.doesNotMatch(output, /扣帽子/)
 })
 
 test('does not corrupt image authenticity or ordinary human-related content', () => {
@@ -72,6 +94,16 @@ test('keeps playful banter outside explicit tone criticism', () => {
   const reply = '你少来，我就开个玩笑😋'
 
   assert.equal(manager.guardReply(reply, { enabled: true }, { userText: '哈哈你又开始了' }), reply)
+})
+
+test('removes unprompted intimate nicknames and shy flirt framing', () => {
+  const manager = new PersonaFeedbackManager({ logger: null })
+  const output = manager.guardReply('嗯嗯，别突然这么叫呀，有点不好意思欸……', { enabled: true }, {
+    userText: '好的，宝宝~'
+  })
+
+  assert.doesNotMatch(output, /宝宝|宝贝|不好意思/)
+  assert.match(output, /叫我希洛就好/)
 })
 
 test('only explicit master feedback is exposed for semantic style learning', async () => {

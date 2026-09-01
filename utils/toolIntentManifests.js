@@ -2,6 +2,7 @@ import { classifyEmojiToolExposure, getEmojiToolIntentPatterns } from "./emojiTo
 import { buildExcelToolParams } from "./excelRequestPolicy.js"
 import { parseModrinthRequestOptions } from "./modrinth.js"
 import { extractGroupKnowledgeForgetTarget, isExplicitGroupKnowledgeForgetRequest } from "./groupKnowledgeForgetPolicy.js"
+import { extractValidBtihMagnetUri } from "./torrentDownload.js"
 
 function normalizeText(text = "") {
   return String(text || "")
@@ -143,6 +144,22 @@ const TOOL_INTENT_MANIFESTS = {
       "- ‘通知 @小明和@小红开会’ -> targets=[小明,小红], message=开会"
     ].join("\n")
   },
+  mentionAdminsTool: {
+    triggers: [
+      /(?:艾特|@|通知|喊(?:一下|人)?|叫(?:一下|人)?).{0,32}(?:(?:所有|全部|全体).{0,8}(?:管理员|管理|群管)|(?:管理员|管理|群管)(?:们|全体)|(?:管理们|群管们)|(?:除了?|除去).{0,40}(?:管理员|管理|群管))/iu
+    ],
+    disclosure: [
+      "【mentionAdminsTool 详细用法】",
+      "用途：在当前群真实艾特一个管理员集合并发送通知。",
+      "调用边界：",
+      "- 只有‘所有管理员’‘管理员们’‘管理们’‘全体群管’或明确排除一部分管理员等集合措辞才能调用。",
+      "- ‘群主’是唯一角色，绝不能用此工具；应由 mentionMembersTool 精确艾特当前群主。",
+      "- message 只保留要传达的通知内容；includeOwner 仅在用户明确说管理员集合还要包含群主时为 true。",
+      "等价例子：",
+      "- ‘艾特所有管理员说有人要挂团’ -> {\"message\":\"有人要挂团\",\"includeOwner\":false}",
+      "- ‘通知全体群管和群主开会’ -> {\"message\":\"开会\",\"includeOwner\":true}"
+    ].join("\n")
+  },
   forgetGroupKnowledgeTool: {
     triggers: [
       /(?:忘(?:掉|记)?|删(?:掉|除)?|清除|移除).{0,48}(?:记忆|群知识|记住|教会|定义|我的|我之前)/u,
@@ -150,11 +167,11 @@ const TOOL_INTENT_MANIFESTS = {
     ],
     disclosure: [
       "【forgetGroupKnowledgeTool 详细用法】",
-      "用途：删除当前用户在当前群明确教会的某一条群知识。",
+      "用途：删除当前群由语义教学提交的某一条群知识、别名或通知规则。",
       "调用边界：",
       "- 只有用户明确说忘掉、删除、清除自己之前教会的群知识时调用。",
       "- memory 填用户要忘掉的称呼；‘我的星怒’里的‘我的’必须保留。",
-      "- 工具只删除当前用户创建的唯一匹配项；找不到或多条候选时不会删除。",
+      "- 普通成员只删除自己创建的唯一匹配项；群主、管理员或主人可处理其他人的精确条目。找不到或多条候选时不会删除。",
       "- 不能用于聊天记录、群文件本体、其他人的记忆或泛泛的‘忘了吧’。",
       "等价例子：",
       "- ‘忘掉我的星怒’ -> {\"memory\":\"我的星怒\"}",
@@ -279,6 +296,8 @@ const TOOL_INTENT_MANIFESTS = {
       /(?:^|[\s（(，,])Modrinth(?=.{0,36}(?:模组|mods?|排行|排名|前\s*\d+|热门|下载量|关注|版本|Fabric|Forge|NeoForge|Quilt))/i,
       /(?:查|看|搜|告诉我|给我说|发我).{0,6}Modrinth(?=.{0,36}(?:模组|mods?|排行|排名|前\s*\d+|热门|下载量|关注|版本|Fabric|Forge|NeoForge|Quilt))/i,
       /(?:MC|Minecraft|我的世界).{0,24}(?:模组|mod).{0,24}(?:排行|排名|前\s*\d+|热门|下载量|关注)/i,
+      /(?:MC|Minecraft|我的世界).{0,24}(?:榜|排行|排名|前\s*\d+|热门|下载量|关注).{0,24}(?:模组|mod)/i,
+      /(?:名字|名称).{0,24}(?:带有|包含|含有|有).{0,48}(?:MC|Minecraft).{0,8}(?:模组|mod)/i,
       /(?:模组|mod).{0,24}(?:排行|排名|前\s*\d+|热门|下载量|关注).{0,24}(?:MC|Minecraft|我的世界|Fabric|Forge|NeoForge|Quilt)/i
     ],
     disclosure: [
@@ -293,6 +312,27 @@ const TOOL_INTENT_MANIFESTS = {
       "等价例子：",
       "- ‘查一下 Modrinth 1.21.1 Fabric 下载量前五的优化模组’ -> {\"sort\":\"downloads\",\"limit\":5,\"gameVersion\":\"1.21.1\",\"loader\":\"fabric\",\"category\":\"optimization\"}",
       "- ‘Modrinth 最近更新的机械模组前 3 个’ -> {\"sort\":\"updated\",\"limit\":3,\"query\":\"technology\"}"
+    ].join("\n")
+  },
+  torrentDownloadTool: {
+    triggers: [
+      /magnet:\?xt=urn:btih:/i,
+      /(?:下载|下下来|搬运|发我|传我).{0,48}(?:磁链|磁力链接)/i,
+      /(?:下载|下|选择|选)\s*(?:第\s*)?\d+(?:\s*(?:,|，|、)\s*(?:第\s*)?\d+)*/i
+    ],
+    disclosure: [
+      "【torrentDownloadTool 详细用法】",
+      "用途：下载用户当前消息中明确提供的 BT magnet 磁链，将符合限制的内容打成一个 ZIP 上传，并发送目录与压缩包说明的合并转发。若完整磁链超限，发起人可从工具列出的文件清单中选择部分文件。",
+      "调用边界：",
+      "- 只接受当前用户原样给出的 magnet:?xt=urn:btih: 磁链；HTTP 链接、种子网址、口头 hash 或猜测内容都不能用。",
+      "- 群里出现有效 BTIH 磁链时会自动处理，行为与视频分享一致；无效磁链不调用。",
+      "- 工具会先读取元数据并强制检查总大小、单文件大小、文件数和 ZIP 上传上限。超限时正文下载不会开始；无元数据、下载超时、打包或发送失败时不要声称已下载。",
+      "参数规则：",
+      "- magnet 逐字复制用户当前消息中的完整 magnet URI；不得缩短、改写或替换 tracker 参数。",
+      "- 只有当前群内同一发起人在 30 分钟内收到过文件清单时，才可传 selection（1 起始编号数组）；例如用户说‘下载 1,3’则传 {\"selection\":[1,3]}。没有清单时不猜文件。",
+      "等价例子：",
+      "- ‘帮我下载 magnet:?xt=urn:btih:AF4B684892182408E4AE9DF0C8FFE9E49CCBF171’ -> {\"magnet\":\"用户原样磁链\"}",
+      "- 已收到清单后：‘下载第2个’ -> {\"selection\":[2]}"
     ].join("\n")
   },
   textImageTool: {
@@ -413,6 +453,9 @@ function resolveCandidateConflicts(candidates = [], content = "") {
   if (resolved.includes("modrinthTool")) {
     resolved = resolved.filter(name => name !== "webParserTool" && name !== "searchInformationTool")
   }
+  if (resolved.includes("mentionAdminsTool")) {
+    resolved = resolved.filter(name => name !== "mentionMembersTool")
+  }
 
   const specificTools = resolved.filter(name => !["searchInformationTool", "webParserTool"].includes(name))
   if (specificTools.length) {
@@ -442,6 +485,15 @@ function extractSingleUrl(text = "") {
 }
 
 const DETERMINISTIC_TOOL_RESOLVERS = {
+  torrentDownloadTool: text => {
+    const magnet = extractValidBtihMagnetUri(text)
+    if (magnet) return { magnet }
+    const selectionText = String(text || "").match(/(?:下载|下|选择|选)\s*([\s\S]{1,80})$/i)?.[1] || ""
+    const indexes = [...selectionText.matchAll(/(?:^|[,，、\s])(?:第\s*)?(\d+)(?:个|项|号)?/g)]
+      .map(match => Number(match[1]))
+      .filter(value => Number.isSafeInteger(value) && value >= 1)
+    return indexes.length ? { selection: indexes } : null
+  },
   forgetGroupKnowledgeTool: text => {
     const memory = extractGroupKnowledgeForgetTarget(text)
     return memory ? { memory } : null

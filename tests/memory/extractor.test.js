@@ -5,15 +5,11 @@ import { parseAndRoute } from '../../utils/memory/extractor.js'
 
 const ctx = { speakerQQ: '925640859', at: 1000 }
 
-test('explicit_teaching with alias+targetQQ -> alias op authority teaching', () => {
+test('explicit_teaching is ignored by the background extractor', () => {
   const ops = parseAndRoute([
     { route: 'explicit_teaching', alias: 'maela', targetQQ: '3188163302', confidence: 0.9 }
   ], ctx)
-  assert.equal(ops.length, 1)
-  assert.equal(ops[0].stream, 'alias')
-  assert.equal(ops[0].authority, 'teaching')
-  assert.equal(ops[0].qq, '3188163302')
-  assert.equal(ops[0].text, 'maela')
+  assert.deepEqual(ops, [])
 })
 
 test('self_statement name -> speaker alias authority self', () => {
@@ -72,12 +68,11 @@ test('eventInDays negative sets past eventAt on group fact (group_consensus)', (
   assert.equal(ops[0].fact.eventAt, NOW - 1 * DAY_MS)
 })
 
-test('eventInDays on teaching group fact resolves eventAt', () => {
+test('teaching facts are reserved for the synchronous group decision', () => {
   const ops = parseAndRoute([
     { route: 'explicit_teaching', content: '群庆在三天后', eventInDays: 3, confidence: 0.8 }
   ], ctxNow)
-  assert.equal(ops[0].stream, 'groupFact')
-  assert.equal(ops[0].fact.eventAt, NOW + 3 * DAY_MS)
+  assert.deepEqual(ops, [])
 })
 
 test('eventAt stays null when ctx.now missing', () => {

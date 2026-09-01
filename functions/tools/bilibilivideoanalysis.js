@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
 import crypto from 'crypto';
+import { extractBilibiliEpisodeId, extractBilibiliUrls } from '../../utils/bilibiliMessage.js';
 
 /**
  * B站视频解析器
@@ -306,13 +307,12 @@ Source: Bilibili-API-v2
 export const bilibiliParser = async (Urls) => {
   const parser = new BilibiliParser();
   const results = [];
-  const regex = /https?:\/\/(?:www\.)?bilibili\.com\/video\/[a-zA-Z0-9]+(?:[/?][^)\s]*)?/g;
-  const videos = Urls.match(regex) || [];
+  const videos = extractBilibiliUrls(Urls).filter(url => !extractBilibiliEpisodeId(url));
   console.log('找到的视频链接:', videos);
   const cleanedVideos = [...new Set(videos.map(url => {
     const match = url.match(/bilibili\.com\/video\/([A-Za-z0-9]+)/);
-    return match ? `https://www.bilibili.com/video/${match[1]}` : null;
-  }).filter(Boolean))];
+    return match ? `https://www.bilibili.com/video/${match[1]}` : url;
+  }))];
   for (const url of cleanedVideos) {
     try {
       const result = await parser.parseVideo(url);

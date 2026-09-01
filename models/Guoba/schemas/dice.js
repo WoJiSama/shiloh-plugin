@@ -63,6 +63,19 @@ export default [
     bottomHelpMessage: "开启跑团 log 后，本群主 AI 对话暂时关闭；.log off 后恢复。骰娘命令不受影响"
   },
   {
+    field: "diceSystem.timeZone",
+    label: "骰娘日期时区",
+    component: "Input",
+    bottomHelpMessage: "用于 SAN 每日累计和今日人品日期，例如 Asia/Shanghai；无效值会安全回退到 UTC 日期"
+  },
+  {
+    field: "diceSystem.logExportMaxMb",
+    label: "团录文件发送上限(MB)",
+    component: "InputNumber",
+    componentProps: { min: 1, max: 100, step: 1, placeholder: "8" },
+    bottomHelpMessage: "超过上限会明确提示未发送，不会把截断文本冒充完整导出"
+  },
+  {
     field: "diceSystem.baseDir",
     label: "骰娘数据目录",
     component: "Input",

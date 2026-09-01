@@ -22,7 +22,7 @@ function rawEvent(groupId, messageId) {
   return event
 }
 
-function buildPipeline({ redis = createFakeRedis(), delayMs = 0, enrichBilibili, emojiCollector } = {}) {
+function buildPipeline({ redis = createFakeRedis(), delayMs = 0, enrichBilibili, enrichYoutube, enrichPixiv, emojiCollector, resolveForwardContext } = {}) {
   const recent = []
   const archive = []
   const deliveries = []
@@ -48,7 +48,10 @@ function buildPipeline({ redis = createFakeRedis(), delayMs = 0, enrichBilibili,
       if (delayMs) await new Promise(resolve => setTimeout(resolve, delayMs))
       return message
     }),
-    enrichDouyin: async message => message
+    enrichDouyin: async message => message,
+    enrichYoutube: enrichYoutube || (async message => message),
+    enrichPixiv: enrichPixiv || (async message => message),
+    resolveForwardContext
   })
   return { pipeline, store, recent, archive, deliveries, redis }
 }
@@ -108,6 +111,34 @@ test("raw CQ JSON is detected even when the normalized message array is empty", 
   pipeline.stop()
 })
 
+test("plain b23.tv links enter the Bilibili media pipeline", async () => {
+  const { pipeline, deliveries } = buildPipeline()
+  const event = rawEvent(609235590, 209)
+  event.raw_message = "https://b23.tv/SqfuVXT"
+  event.message = [{ type: "text", text: event.raw_message }]
+  pipeline.handleRawEvent(event, "message")
+  await new Promise(resolve => setTimeout(resolve, 30))
+  assert.equal(deliveries.length, 1)
+  assert.equal(deliveries[0].media.type, "bilibili")
+  assert.equal(deliveries[0].media.short_url, "https://b23.tv/SqfuVXT")
+  pipeline.stop()
+})
+
+test("plain YouTube and Pixiv links enter the same raw media pipeline", async () => {
+  const { pipeline, deliveries } = buildPipeline()
+  const youtube = rawEvent(609235590, 211)
+  youtube.raw_message = "https://youtu.be/AbC_123-xYz"
+  youtube.message = [{ type: "text", text: youtube.raw_message }]
+  const pixiv = rawEvent(609235590, 212)
+  pixiv.raw_message = "https://www.pixiv.net/artworks/12345678"
+  pixiv.message = [{ type: "text", text: pixiv.raw_message }]
+  pipeline.handleRawEvent(youtube, "message")
+  pipeline.handleRawEvent(pixiv, "message")
+  await new Promise(resolve => setTimeout(resolve, 40))
+  assert.deepEqual(deliveries.map(item => item.media.type).sort(), ["pixiv", "youtube"])
+  pipeline.stop()
+})
+
 test("metadata enrichment failure preserves raw storage consumers", async () => {
   const { pipeline, store, recent, archive } = buildPipeline({
     enrichBilibili: async () => { throw new Error("metadata unavailable") }
@@ -118,6 +149,71 @@ test("metadata enrichment failure preserves raw storage consumers", async () => 
   assert.equal(recent.length, 1)
   assert.equal(archive.length, 1)
   assert.equal(recent[0].message[0].title, "same-card")
+  pipeline.stop()
+})
+
+test("pipeline expands forward-only events into durable conversation context", async () => {
+  const { pipeline, store, recent, archive } = buildPipeline({
+    resolveForwardContext: async envelope => {
+      assert.equal(envelope.groupId, "609235590")
+      return {
+        forwardIds: ["forward-1"],
+        text: "解释机器人: 先说结论，再用例子拆开。",
+        media: [{ type: "image", label: "合并转发中的第1张图片", source: "https://img.example/forward.jpg" }],
+        forwardNodes: [{
+          id: "forward-1",
+          nodes: [{ user_id: "10001", nickname: "解释机器人", message: [{ type: "text", text: "先说结论" }], nested_forwards: [] }]
+        }]
+      }
+    }
+  })
+  const event = rawEvent(609235590, 210)
+  event.raw_message = "[CQ:forward,id=forward-1]"
+  event.message = [{ type: "forward", id: "forward-1" }]
+  const id = pipeline.handleRawEvent(event, "message")
+  await new Promise(resolve => setTimeout(resolve, 30))
+
+  const job = await store.get("event", id)
+  assert.equal(job.state, "completed")
+  assert.equal(job.envelope.forwardContext.text, "解释机器人: 先说结论，再用例子拆开。")
+  assert.equal(recent[0].forward_context.forwardIds[0], "forward-1")
+  assert.deepEqual(recent[0].message.at(-1), {
+    type: "forward_context",
+    text: "解释机器人: 先说结论，再用例子拆开。",
+    forward_ids: ["forward-1"],
+    media: [{ type: "image", label: "合并转发中的第1张图片", source: "https://img.example/forward.jpg" }],
+    forward_nodes: [{
+      id: "forward-1",
+      nodes: [{ user_id: "10001", nickname: "解释机器人", message: [{ type: "text", text: "先说结论" }], nested_forwards: [] }]
+    }]
+  })
+  assert.equal(archive[0].message.at(-1).type, "forward_context")
+  pipeline.stop()
+})
+
+test("pipeline retries a forward context until the OneBot group becomes available", async () => {
+  let calls = 0
+  const { pipeline, store } = buildPipeline({
+    resolveForwardContext: async () => {
+      calls++
+      if (calls === 1) {
+        const error = new Error("OneBot forward context is not ready: OneBot returned no forward nodes")
+        error.code = "forward_context_unavailable"
+        throw error
+      }
+      return { forwardIds: ["forward-ready"], text: "展开完成", media: [] }
+    }
+  })
+  pipeline.retryBaseMs = 1
+  const event = rawEvent(609235590, 211)
+  event.raw_message = "[CQ:forward,id=forward-ready]"
+  event.message = [{ type: "forward", id: "forward-ready" }]
+  const id = pipeline.handleRawEvent(event, "message")
+  await new Promise(resolve => setTimeout(resolve, 80))
+  const job = await store.get("event", id)
+  assert.equal(calls, 2)
+  assert.equal(job.state, "completed")
+  assert.equal(job.envelope.forwardContext.text, "展开完成")
   pipeline.stop()
 })
 

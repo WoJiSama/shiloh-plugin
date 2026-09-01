@@ -23,7 +23,7 @@ test('forgets through MemoryManager only for an explicit current-group request',
     }
   }
   assert.match(await tool.execute({ memory: '我的星怒' }, event), /已经忘掉.*星怒.*星野/)
-  assert.deepEqual(calls, [{ groupId: 'g', requesterQQ: '9', query: '我的星怒' }])
+  assert.deepEqual(calls, [{ groupId: 'g', requesterQQ: '9', requesterIsGroupManager: false, query: '我的星怒' }])
 })
 
 test('does not call deletion for a non-destructive sentence', async () => {

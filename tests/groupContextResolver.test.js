@@ -68,6 +68,15 @@ test("collects current, quoted and nested forward images in stable source order"
   assert.match(context.forwardText, /转发乙: 第二层\[图片\]/)
   assert.match(formatGroupContextImagePrompt(context.images), /第5张：合并转发中 转发乙/)
   assert.deepEqual(context.videos.map(item => item.source), ["https://video.example/forward.mp4"])
+
+  const root = context.forwardNodes[0]
+  assert.equal(root.id, "root")
+  assert.equal(root.nodes[0].nickname, "转发甲")
+  assert.equal(root.nodes[0].user_id, "30001")
+  assert.deepEqual(root.nodes[0].message[1], image("https://img.example/forward-1.jpg"))
+  assert.equal(root.nodes[0].nested_forwards[0].id, "nested")
+  assert.equal(root.nodes[0].nested_forwards[0].nodes[0].nickname, "转发乙")
+  assert.deepEqual(root.nodes[0].nested_forwards[0].nodes[0].message[1], image("https://img.example/forward-2.jpg"))
 })
 
 test("deduplicates repeated forwarded images and stops recursive loops", async () => {
@@ -84,6 +93,7 @@ test("deduplicates repeated forwarded images and stops recursive loops", async (
 
   assert.deepEqual(result.images.map(item => item.source), ["https://img.example/same.jpg"])
   assert.deepEqual(result.forwardIds, ["loop"])
+  assert.equal(result.forwardNodes[0].nodes[0].nested_forwards[0].nodes.length, 0)
 })
 
 test("supports adapter data fields and ignores inaccessible image filenames", async () => {
@@ -97,6 +107,22 @@ test("supports adapter data fields and ignores inaccessible image filenames", as
   })
 
   assert.deepEqual(context.images.map(item => item.source), ["https://img.example/data-url.png"])
+})
+
+test("deduplicates QQ image URL variants by stable fileid", async () => {
+  const fileid = "AQAQ-example-file-id"
+  const context = await resolveGroupContextAssets({
+    e: {
+      message: [
+        image(`https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=${fileid}&spec=0&rkey=first`),
+        image(`https://multimedia.nt.qq.com.cn/download?fileid=${fileid}&spec=720&rkey=second`)
+      ]
+    }
+  })
+
+  assert.equal(context.images.length, 1)
+  assert.equal(context.images[0].fileId, fileid)
+  assert.doesNotMatch(formatGroupContextImagePrompt(context.images), /第2张/)
 })
 
 test("preserves Excel file names and file ids for downstream workbook tools", async () => {

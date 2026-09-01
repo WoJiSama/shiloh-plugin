@@ -26,6 +26,12 @@ test('Guoba getConfigData converts legacy AI config fields into provider lists',
       chatApiKey: 'chat-key',
       chatAiPriority: 2
     },
+    analysisAiConfig: {
+      analysisApiUrl: 'https://vision.example.com/v1',
+      analysisApiModel: 'vision-model',
+      analysisApiKey: 'vision-key',
+      timeoutMs: 45000
+    },
     imageGenerationAiConfig: {
       imageGenerationApiUrl: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
       imageGenerationApiModel: 'doubao-seedream-5-0-260128',
@@ -52,6 +58,16 @@ test('Guoba getConfigData converts legacy AI config fields into provider lists',
       apiKey: 'seedream-key',
       size: '2K',
       priority: 1
+    }
+  ])
+  assert.deepEqual(settings.analysisAiConfig.providers, [
+    {
+      name: 'vision-model',
+      apiUrl: 'https://vision.example.com/v1',
+      model: 'vision-model',
+      apiKey: 'vision-key',
+      priority: 1,
+      timeoutMs: 45000
     }
   ])
 })
@@ -89,6 +105,19 @@ test('Guoba save updates sync first-priority provider back to each legacy config
         model: 'gpt-image-2',
         apiKey: 'image2-key',
         size: '1024x1024',
+        squareSize: '1024x1024',
+        portraitSize: '1024x1536',
+        landscapeSize: '1536x1024',
+        priority: 1
+      }
+    ],
+    'analysisAiConfig.providers': [
+      {
+        name: 'vision',
+        apiUrl: 'https://vision.example.com/v1',
+        model: 'vision-model',
+        apiKey: 'vision-key',
+        timeoutMs: 45000,
         priority: 1
       }
     ]
@@ -103,5 +132,10 @@ test('Guoba save updates sync first-priority provider back to each legacy config
   assert.equal(updates['imageGenerationAiConfig.name'], 'image2')
   assert.equal(updates['imageGenerationAiConfig.imageGenerationApiModel'], 'gpt-image-2')
   assert.equal(updates['imageGenerationAiConfig.imageGenerationSize'], '1024x1024')
+  assert.equal(updates['imageGenerationAiConfig.imageGenerationSquareSize'], '1024x1024')
+  assert.equal(updates['imageGenerationAiConfig.imageGenerationPortraitSize'], '1024x1536')
+  assert.equal(updates['imageGenerationAiConfig.imageGenerationLandscapeSize'], '1536x1024')
   assert.equal(updates['imageGenerationAiConfig.imageGenerationPriority'], 1)
+  assert.equal(updates['analysisAiConfig.analysisApiUrl'], 'https://vision.example.com/v1')
+  assert.equal(updates['analysisAiConfig.timeoutMs'], 45000)
 })

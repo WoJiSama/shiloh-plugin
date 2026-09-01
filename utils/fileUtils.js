@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import common from '../../../lib/common/common.js';
 import { splitUnicodeText } from './unicodeText.js';
 import { classifyMessageSegmentMedia } from './mediaTypePolicy.js';
+import { buildVisibleFailureDetail } from './visibleFailure.js';
 const validImageExtensions = ['.webp', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg'];
 
 const TENCENT_IMAGE_APPIDS = [1408, 1407, 1406, 1405, 1404, 1403];
@@ -1172,7 +1173,7 @@ export async function handleImages(e, urls, _path) {
         }
       } catch (replyError) {
         console.error('发送图片消息失败:', replyError);
-        processResults.push(`❌ 发送图片消息失败: ${replyError.message}`);
+        processResults.push(`❌ 发送图片消息失败: ${buildVisibleFailureDetail(replyError)}`);
       }
     } else {
       processResults.push(`ℹ️ 没有成功下载的图片可供发送。`);
@@ -1185,7 +1186,7 @@ export async function handleImages(e, urls, _path) {
     // 捕获 Promise.all 或其他同步错误
     console.error('处理图片下载时发生错误:', error);
     // 返回包含错误信息的处理结果
-    return ['图片处理时发生意外错误:', `❌ 错误: ${error.message}`];
+    return ['图片处理时发生意外错误:', `❌ 错误: ${buildVisibleFailureDetail(error)}`];
   }
 }
 
@@ -1241,7 +1242,7 @@ export async function sendLongMessage(e, messages, forwardMsg, maxLength = 1000)
 
     } catch (secondError) {
       logger.error(`分段发送也失败了: ${secondError.message}`);
-      await e.reply('消息发送失败，请稍后重试');
+      await e.reply(`消息发送失败：${buildVisibleFailureDetail(secondError)}`);
     }
   }
 }

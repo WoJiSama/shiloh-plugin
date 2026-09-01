@@ -9,6 +9,7 @@ import {
 } from "./groupModerationRules.js"
 import { getMentionTargetId } from "./mentionTargets.js"
 import { safeTruncateUnicode } from "./unicodeText.js"
+import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "./chatCompletionUrl.js"
 
 function getSegmentText(segment) {
   if (!segment) return ""
@@ -217,11 +218,7 @@ class GroupModerationManager {
   }
 
   resolveChatCompletionUrl(apiUrl = "") {
-    const url = String(apiUrl || "").trim().replace(/\/+$/, "")
-    if (!url) return ""
-    if (/\/chat\/completions$/i.test(url)) return url
-    if (/\/v1$/i.test(url)) return `${url}/chat/completions`
-    return `${url}/v1/chat/completions`
+    return normalizeChatCompletionUrl(apiUrl)
   }
 
   decideAction(config, confidence) {

@@ -130,6 +130,57 @@ test('banana durable queue restores unfinished draw job after restart', async t 
   }
 })
 
+test('recovered draw job notifies the original group when generation ultimately fails', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  const previousRedis = globalThis.redis
+  const previousBot = globalThis.Bot
+  const previousInstance = pluginBridge.instance
+  const sent = []
+  globalThis.redis = createFakeRedis()
+  globalThis.Bot = {
+    uin: 3094088525,
+    pickGroup: groupId => ({
+      sendMsg: async message => sent.push({ groupId, message })
+    })
+  }
+  pluginBridge.instance = { getTaskStatusTtlSeconds: () => 3600 }
+
+  class FailedRecoveredDrawTool extends BananaTool {
+    async performDraw() {
+      return { error: '图片生成失败: 上游没有返回图片' }
+    }
+  }
+
+  try {
+    const tool = new FailedRecoveredDrawTool()
+    const recovered = tool.deserializeDrawJob({
+      id: 'recovered-failure-job',
+      opts: { prompt: '画一只白猫' },
+      scopeKey: 'group:9527',
+      requesterName: '测试用户',
+      requesterId: '10001',
+      userId: '10001',
+      groupId: '9527',
+      messageId: '10002',
+      messageType: 'group'
+    })
+
+    const result = await tool.runDrawJob(recovered)
+
+    assert.match(result.error, /上游没有返回图片/)
+    assert.deepEqual(sent, [{
+      groupId: 9527,
+      message: tool.getQueuedFailureMessage(result.error)
+    }])
+  } finally {
+    globalThis.redis = previousRedis
+    globalThis.Bot = previousBot
+    pluginBridge.instance = previousInstance
+  }
+})
+
 test('queued draw notice quotes the active draw request', async t => {
   const BananaTool = await loadBananaTool(t)
   if (!BananaTool) return
@@ -172,7 +223,7 @@ test('active text-to-image draw sends a local progress reply before generation',
   class ImmediateProgressTool extends BananaTool {
     loadConfig() { return {} }
     resolveImageGenerationConfigs() { return [{ model: 'test-model' }] }
-    async sendProgress(_e, message) { calls.push(['progress', message]); return true }
+    async sendProgress(_e, context) { calls.push(['progress', context]); return true }
     async generateImage(_configs, prompt) { calls.push(['generate', prompt]); return 'base64://image' }
     async replyImageToRequester() { calls.push(['reply-image']) }
   }
@@ -183,7 +234,7 @@ test('active text-to-image draw sends a local progress reply before generation',
 
   assert.equal(result, '图片生成成功')
   assert.equal(calls[0][0], 'progress')
-  assert.match(calls[0][1], /画|画面|点子/)
+  assert.equal(calls[0][1].hasReferenceImages, false)
   assert.deepEqual(calls.slice(1).map(item => item[0]), ['generate', 'reply-image'])
   assert.equal(calls[1][1], rawPrompt)
 })
@@ -204,7 +255,7 @@ test('reference-image draw also sends a progress reply before image editing', as
       }
     }
     resolveImageGenerationConfigs() { return [] }
-    async sendProgress(_e, message) { calls.push(['progress', message]); return true }
+    async sendProgress(_e, context) { calls.push(['progress', context]); return true }
     async generateImageEdit() { calls.push(['edit']); return 'base64://edited' }
     async replyImageToRequester() { calls.push(['reply-image']) }
   }
@@ -217,8 +268,130 @@ test('reference-image draw also sends a progress reply before image editing', as
 
   assert.equal(result, '图片编辑成功')
   assert.equal(calls[0][0], 'progress')
-  assert.match(calls[0][1], /图|参考|这几张|照着/)
+  assert.equal(calls[0][1].hasReferenceImages, true)
   assert.deepEqual(calls.slice(1).map(item => item[0]), ['edit', 'reply-image'])
+})
+
+test('member-avatar reference draw is described as new image generation, not viewing or editing a source image', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  let progressArgs
+  const sent = []
+  const tool = new BananaTool({
+    progressReplyFactory: async args => {
+      progressArgs = args
+      return '这个场面人不少，我先把构图搭起来。'
+    }
+  })
+  const ok = await tool.sendProgress({
+    msg: '希洛，画出群里的翠月多子多福，200个孩子拥护她坐在战锤里面的黄金马桶的照片',
+    sender: { nickname: '测试用户' },
+    reply: async message => { sent.push(message); return { message_id: 1 } }
+  }, {
+    config: {},
+    opts: {
+      prompt: '内部编译后的绘图提示',
+      referencePurpose: 'member_avatar'
+    },
+    hasReferenceImages: true
+  })
+
+  assert.equal(ok, true)
+  assert.equal(progressArgs.taskMode, 'reference_generation')
+  assert.equal(progressArgs.taskType, '群友形象图片生成')
+  assert.match(progressArgs.userText, /翠月多子多福/)
+  assert.deepEqual(sent, ['这个场面人不少，我先把构图搭起来。'])
+})
+
+test('member-avatar reference keeps the image input but reports generation semantics', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  const calls = []
+  class MemberAvatarTool extends BananaTool {
+    loadConfig() { return {} }
+    resolveImageGenerationConfigs() { return [] }
+    resolveImageEditConfigs() { return [{ name: 'reference-capable' }] }
+    async sendProgress() { return true }
+    async generateImageEdit(_configs, _prompt, images) { calls.push(images); return 'base64://image' }
+    async replyImageToRequester() {}
+  }
+
+  const tool = new MemberAvatarTool()
+  const reference = ['https://img.example/member-avatar.jpg']
+  const result = await tool.performDraw({
+    prompt: '画成二次元角色立绘',
+    images: reference,
+    referencePurpose: 'member_avatar'
+  }, { reply: async () => ({ message_id: 1 }) })
+
+  assert.equal(result, '图片生成成功')
+  assert.deepEqual(calls, [reference])
+})
+
+test('draw work is marked active before durable persistence can yield', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  let activeAtPersist = null
+  class ActiveBeforePersistTool extends BananaTool {
+    async persistDrawJob(job) {
+      activeAtPersist = this.getDrawQueueState(job.scopeKey).activeTask?.jobId
+    }
+    async performDraw() { return '图片生成成功' }
+  }
+
+  const tool = new ActiveBeforePersistTool()
+  const event = { group_id: 9527, user_id: 10001, message_id: 10002, sender: { nickname: '测试用户' } }
+  const job = {
+    id: 'active-before-persist', opts: { prompt: '画一只猫' }, e: event,
+    scopeKey: tool.getDrawScopeKey(event), requesterName: '测试用户', requesterId: '10001', messageId: '10002'
+  }
+  await tool.runDrawJob(job)
+  assert.equal(activeAtPersist, job.id)
+})
+
+test('transport display cards are never shown as the queued requester name', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  const tool = new BananaTool()
+  assert.equal(tool.getRequesterDisplayName({
+    user_id: 10001,
+    sender: { card: '[有人@我]ooseven回应了你的消息', nickname: 'ooseven' }
+  }), 'ooseven')
+})
+
+test('draw completion aborts a pending contextual progress reply without blocking the image', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  let progressSignal
+  let progressSettled = false
+  class NonBlockingProgressTool extends BananaTool {
+    loadConfig() { return {} }
+    resolveImageGenerationConfigs() { return [{ model: 'test-model' }] }
+    async sendProgress(_e, context) {
+      progressSignal = context.signal
+      await new Promise(resolve => context.signal.addEventListener('abort', resolve, { once: true }))
+      progressSettled = true
+      return false
+    }
+    async generateImage() { return 'base64://image' }
+    async replyImageToRequester() {}
+  }
+
+  const tool = new NonBlockingProgressTool()
+  const result = await tool.performDraw(
+    { prompt: '画一只白猫' },
+    { msg: '希洛，画一只白猫', reply: async () => ({ message_id: 1 }) }
+  )
+  await new Promise(resolve => setImmediate(resolve))
+
+  assert.equal(result, '图片生成成功')
+  assert.equal(progressSignal?.aborted, true)
+  assert.equal(progressSettled, true)
 })
 
 test('reference-image draw retries a second edit provider and then sends the image', async t => {
@@ -418,12 +591,114 @@ test('progress reply failures are logged instead of being swallowed', async t =>
     logWarn(message) { warnings.push(String(message)) }
   }
 
-  const tool = new ObservableProgressTool()
+  const tool = new ObservableProgressTool({
+    progressReplyFactory: async () => '这个构图我先理一下。'
+  })
   const sent = await tool.sendProgress({
     sender: { nickname: '测试用户' },
     reply: async () => ({ retcode: 1200, status: 'failed', message: 'send failed' })
-  }, '我先画一下。')
+  }, { config: {}, opts: { prompt: '画一只猫' }, hasReferenceImages: false })
 
   assert.equal(sent, false)
   assert.match(warnings.join('\n'), /图片进度提示.*发送失败/)
+})
+
+test('image response body timeout is bounded after headers arrive', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  const previousFetch = globalThis.fetch
+  globalThis.fetch = async (_url, { signal }) => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    text: async () => await new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => {
+        const error = new Error('body aborted')
+        error.name = 'AbortError'
+        reject(error)
+      }, { once: true })
+    })
+  })
+
+  try {
+    const tool = new BananaTool()
+    const response = await tool.fetchWithTimeout('https://slow.example/images/generations', {}, 25)
+    await assert.rejects(
+      tool.parseImageGenerationResponse(response),
+      /图片接口超过 1 秒没有返回完整响应/
+    )
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test('response-body timeout clears the durable draw job and active queue state', async t => {
+  const BananaTool = await loadBananaTool(t)
+  if (!BananaTool) return
+
+  const previousRedis = globalThis.redis
+  const previousFetch = globalThis.fetch
+  const previousInstance = pluginBridge.instance
+  const fakeRedis = createFakeRedis()
+  globalThis.redis = fakeRedis
+  globalThis.fetch = async (_url, { signal }) => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    text: async () => await new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => {
+        const error = new Error('body aborted')
+        error.name = 'AbortError'
+        reject(error)
+      }, { once: true })
+    })
+  })
+  pluginBridge.instance = { getTaskStatusTtlSeconds: () => 3600 }
+
+  class SlowBodyTool extends BananaTool {
+    loadConfig() { return {} }
+    resolveImageGenerationConfigs() {
+      return [{ name: 'slow', model: 'test-model', apiUrl: 'https://slow.example/images/generations', apiKey: 'test-key' }]
+    }
+    async sendProgress() { return false }
+    async requestImageGeneration(config, prompt, responseFormat) {
+      return await this.fetchWithTimeout(config.apiUrl, {
+        method: 'POST',
+        body: JSON.stringify({ prompt, responseFormat })
+      }, 25)
+    }
+  }
+
+  try {
+    const tool = new SlowBodyTool()
+    const event = {
+      group_id: 9527,
+      user_id: 10001,
+      message_id: 10002,
+      sender: { user_id: 10001, nickname: '测试用户' },
+      reply: async () => ({ retcode: 0 })
+    }
+    const job = {
+      id: 'body-timeout-job',
+      opts: { prompt: '画一只白猫' },
+      e: event,
+      scopeKey: tool.getDrawScopeKey(event),
+      requesterName: '测试用户',
+      requesterId: '10001',
+      messageId: '10002',
+      queuedAt: Date.now()
+    }
+
+    const result = await tool.runDrawJob(job)
+
+    assert.match(result.error, /图片接口超过 1 秒没有返回完整响应/)
+    assert.equal(fakeRedis.data.has('ytbot:image_draw_job:body-timeout-job'), false)
+    assert.equal(fakeRedis.data.has('ytbot:image_draw_queue:group:9527'), false)
+    assert.equal(tool.getDrawQueueState(job.scopeKey).activeTask, null)
+  } finally {
+    globalThis.redis = previousRedis
+    globalThis.fetch = previousFetch
+    pluginBridge.instance = previousInstance
+  }
 })

@@ -47,6 +47,11 @@ export function ensureRuleGroupState(state, groupId, packId) {
   }
   root.session.initiative ||= []
   root.audit ||= []
+  root.privateDeliveries ||= []
+  root.sessions ||= []
+  root.campaigns ||= {}
+  root.activeCampaignId ||= ""
+  root.snapshots ||= []
   return root
 }
 
@@ -91,7 +96,11 @@ async function resolveReplyActor(e) {
     const reply = await e?.getReply?.()
     const id = String(reply?.user_id || reply?.sender?.user_id || "")
     if (!id) return null
-    return { kind: "member", id, name: memberDisplayName(reply?.sender, id), role: reply?.sender?.role || "member", self: id === eventUserId(e) }
+    if (id === eventUserId(e)) return selfActor(e)
+    const members = await getMemberMap(e)
+    const member = members.get(Number(id)) || members.get(String(id))
+    if (!member) throw new Error("引用消息的发言者已不在当前群，不能作为团务目标")
+    return { kind: "member", id, name: memberDisplayName(member, id), role: member?.role || "member", self: false }
   } catch {
     return null
   }
@@ -113,8 +122,10 @@ export async function resolveRuleActor(e, raw, ruleState, allowedKinds = ["self"
   const qqId = token.match(/^(?:qq:)?(\d{5,20})$/i)?.[1]
   const memberId = cqId || mentionId || qqId
   if (memberId) {
+    if (String(memberId) === eventUserId(e)) return assertAllowed(selfActor(e), allowed)
     const members = await getMemberMap(e)
     const member = members.get(Number(memberId)) || members.get(String(memberId))
+    if (!member) throw new Error(`QQ ${memberId} 不在当前群，不能作为团务目标`)
     return assertAllowed({
       kind: "member",
       id: String(memberId),
@@ -139,9 +150,14 @@ export async function resolveRuleActor(e, raw, ruleState, allowedKinds = ["self"
 }
 
 export async function getRuleGmRecipients(e, ruleState) {
-  const ids = new Set(Object.entries(ruleState?.roles || {}).filter(([, role]) => role === "gm").map(([id]) => String(id)))
   const members = await getMemberMap(e)
+  const ids = new Set()
+  for (const [id, role] of Object.entries(ruleState?.roles || {})) {
+    if (role !== "gm") continue
+    if (members.has(Number(id)) || members.has(String(id))) ids.add(String(id))
+  }
   for (const [id, member] of members) if (["owner", "admin"].includes(member?.role)) ids.add(String(id))
+  if (["owner", "admin"].includes(e?.sender?.role)) ids.add(eventUserId(e))
   return [...ids].filter(Boolean)
 }
 
