@@ -161,8 +161,12 @@ export class SealExtRuntime {
         }
         return ctx
       },
-      applyPlayerGroupCardByTemplate: () => {
-        runtime.noteUnsupported("seal.applyPlayerGroupCardByTemplate", "暂不改群名片")
+      applyPlayerGroupCardByTemplate: (ctx, template) => {
+        try {
+          runtime.applyGroupCardByTemplate(ctx, template)
+        } catch (error) {
+          runtime.logger?.debug?.(`[海豹扩展] 群名片更新失败: ${error?.message || error}`)
+        }
       },
       gameSystem: {
         newTemplate: (json) => {
@@ -187,6 +191,38 @@ export class SealExtRuntime {
       ban: {},
       censor: {}
     }
+  }
+
+  /**
+   * 群名片模板应用：{$t玩家_RAW} 为玩家名，{变量} 走 vars（人物卡）。
+   * 需要 bot.sendApi("set_group_card")；机器人无群管理权限时静默失败。
+   */
+  applyGroupCardByTemplate(ctx, template = "") {
+    const event = ctx?.__event
+    if (!event?.group_id) return false
+    const bot = event?.bot || globalThis.Bot
+    if (typeof bot?.sendApi !== "function") return false
+    const rendered = String(template ?? "")
+      .replace(/\{\$t玩家_RAW\}/g, () => ctx.player?.name || String(ctx.player?.userId || ""))
+      .replace(/\{([^{}]+)\}/g, (raw, name) => {
+        const [value, exists] = this.buildVarsApi().intGet(ctx, name)
+        return exists ? String(value) : raw
+      })
+      .slice(0, 60)
+    if (!rendered.trim()) return false
+    const targetUser = String(ctx.player?.userId || "")
+    Promise.resolve(bot.sendApi("set_group_card", {
+      group_id: Number(event.group_id),
+      user_id: Number(targetUser),
+      card: rendered
+    })).then(result => {
+      if (!result || result.status === "failed" || (result.retcode !== undefined && Number(result.retcode) !== 0)) {
+        this.logger?.debug?.(`[海豹扩展] 群名片未生效（可能缺少群管理权限）: ${result?.wording || result?.msg || "无回执"}`)
+      }
+    }).catch(error => {
+      this.logger?.debug?.(`[海豹扩展] 群名片更新失败: ${error?.message || error}`)
+    })
+    return true
   }
 
   /** sealdice seal.format 子集：{dN} 掷骰、{$t玩家}、{变量名}（走 vars） */

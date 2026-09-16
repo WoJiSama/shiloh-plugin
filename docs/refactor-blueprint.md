@@ -93,3 +93,16 @@ bl-chat-plugin/                      # 仓库根（保持一个 git 仓库）
 - ⚠️ 事故记录（2026-09-16 13:12-13:21）：批量脚本误写 GoogleAnalysisTool.js 致主聊天 9 分钟未加载。教训：①多文件 python 批量改写必须逐文件独立缓冲并 diff 校验；②部署健康检查的 grep 必须覆盖「载入插件错误/插件加载超时/ERRO」等 Yunzai 实际用词，不能只搜 ERROR/Cannot find；③每次部署后必须确认主聊天处理链（SmartSkip/触发合并）有新日志
 - ✅ P4 切片一·影子模式（2026-09-16）：`core/intent/modelIntentClassifier.js`——全模型意图判定器（14 类意图、严格 JSON、6s 超时、失败即 unavailable 走正则兜底）+ 影子统计（等价类合并一致率、分歧采样）+ `.意图影子` 主人命令。**已在 test.js 并行运行但不影响任何行为**；分类模型独立配置 `intentAiConfig`（线上指向 DeepSeek，避开 terra 高延迟）。下一步：攒 1-2 天分歧数据 → 修复高频分歧 → 切换为主判定
 - ⏭ 待定分叉：多插件物理拆分（siblings 目录）需要先解决部署/`#bl更新` 流程——当前以"单部署根 + domains/ 逻辑分域"推进，不阻塞后续域迁移
+
+## 八、物理拆分落地（2026-09-16，方案 B 首例）
+
+- `standalone/bl-dice-plugin/`：首个独立 Yunzai 插件。apps/dice.js + diceLog.js 为入口，
+  实体代码仍在 bl-chat-plugin/domains/dice/（chat 集成与独立插件共用一份域代码，零复制）；
+  锅巴配置页直接复用 bl-chat-plugin 的 dice schema（同一 message.yaml，单数据源）
+- `scripts/deploy-standalone.sh`：把 standalone/* 同步到 Yunzai plugins/ 兄弟目录
+- 双重注册防护：bl-chat-plugin/apps 的 DicePlugin/DiceLogRecorder 入口已移除，
+  骰子命令现在只由 bl-dice-plugin 加载
+- 其余域（emoji/games/media/...）迁移模式相同：standalone/bl-<name>-plugin/ +
+  移除 bl-chat-plugin 对应 app 入口，随时可按需增加
+- 更新流程注意：`#bl更新` 只更新 bl-chat-plugin；standalone 插件用
+  `bash scripts/deploy-standalone.sh` 同步（部署脚本幂等）

@@ -120,6 +120,30 @@ test("沙箱安全：无 require/fs，脚本崩了不伤宿主", async () => {
   assert.match(result.error, /爆炸/)
 })
 
+test("群名片模板：变量渲染 + set_group_card 调用 + 无群权限静默", async () => {
+  const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
+  const runtime = new SealExtRuntime({ packId: "cardtest", statePath: tmpStatePath() })
+  const cardStore = { "g1:u1:希望": 3, "g1:u1:希望上限": 6 }
+  runtime.varsAdapter = {
+    get: (g, u, n) => { const raw = cardStore[`${g}:${u}:${n}`]; return raw === undefined ? [0, false] : [raw, true] },
+    set: () => true
+  }
+  const calls = []
+  const fakeBot = { sendApi: async (api, params) => { calls.push({ api, params }); return { retcode: 0 } } }
+  const event = { group_id: 888, user_id: 111, bot: fakeBot }
+  const ctx = runtime.makeContext({ event, userId: "u1", name: "阿明", groupId: "g1" })
+  runtime.applyGroupCardByTemplate(ctx, "{$t玩家_RAW} 希望{希望}/{希望上限}")
+  await new Promise(resolve => setTimeout(resolve, 50))
+  assert.equal(calls.length, 1, "set_group_card 被调用")
+  assert.equal(calls[0].api, "set_group_card")
+  assert.equal(calls[0].params.group_id, 888)
+  assert.equal(calls[0].params.card, "阿明 希望3/6")
+  // 私聊上下文直接跳过
+  const privateCtx = runtime.makeContext({ userId: "u1", groupId: "" })
+  assert.equal(runtime.applyGroupCardByTemplate(privateCtx, "x"), false)
+  assert.equal(calls.length, 1)
+})
+
 test("真实 Daggerheart 扩展可加载并注册全部命令", async () => {
   const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
   const source = fs.readFileSync(new URL("../docs/dice-rules/examples/daggerheart-seal-ext.js", import.meta.url), "utf-8")
@@ -132,8 +156,8 @@ test("真实 Daggerheart 扩展可加载并注册全部命令", async () => {
   assert.equal(dispatch.matched, true)
   assert.ok(dispatch.replies.length >= 1)
   assert.match(dispatch.replies[0].text, /希望骰|恐惧骰/)
-  // 固定 12/12 触发关键成功的属性更新路径，群名片 API 在执行期降级
+  // 固定 12/12 触发关键成功的属性更新路径（群名片 API 现已真实现，不再降级）
   const critical = runtime.dispatch("test", { userId: "u1", userName: "阿明", groupId: "g1", args: ["12", "12"], rawArgs: "12 12" })
   assert.match(critical.replies[0].text, /关键成功|总点数/)
-  assert.ok(runtime.unsupportedCalls.length >= 1, "未支持 API 有记录")
+  assert.equal(runtime.unsupportedCalls.length, 0, "调用的 API 均已支持")
 })
