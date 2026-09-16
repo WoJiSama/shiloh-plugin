@@ -52,7 +52,7 @@ export async function downloadYoutubeArchiveVideo(card = {}, options = {}) {
   const sourceUrl = String(card.page_url || card.short_url || "").trim()
   if (!sourceUrl) return { filePath: "", reason: "未找到 YouTube 视频页面" }
   const maxBytes = Math.min(YOUTUBE_ARCHIVE_VIDEO_MAX_BYTES, Math.max(1, Number(options.maxBytes) || YOUTUBE_ARCHIVE_VIDEO_MAX_BYTES))
-  const dir = path.join(os.tmpdir(), "bl-chat-plugin-youtube-archive")
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-youtube-archive")
   await fs.promises.mkdir(dir, { recursive: true })
   const template = path.join(dir, `${safeName(card.video_id)}-${Date.now()}-${Math.random().toString(16).slice(2)}.%(ext)s`)
   const outputPrefix = path.basename(template).replace(".%(ext)s", "")

@@ -1,4 +1,4 @@
-// bl-dice-plugin 入口：与 bl-chat-plugin 相同的动态加载模式
+// bl-dice-plugin 入口：与 shiloh-plugin 相同的动态加载模式
 import fs from "fs"
 import path from "path"
 

@@ -11,7 +11,7 @@ const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
 
 export async function downloadDouyinArchiveVideo(card = {}, { logger = globalThis.logger } = {}) {
   if (!card.play_url) return null
-  const dir = path.join(os.tmpdir(), "bl-chat-plugin-douyin-archive")
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-douyin-archive")
   await fs.promises.mkdir(dir, { recursive: true })
   const safeId = String(card.aweme_id || "video").replace(/[^A-Za-z0-9_-]/g, "")
   const filePath = path.join(dir, `${safeId}-${Date.now()}-${Math.random().toString(16).slice(2)}.mp4`)

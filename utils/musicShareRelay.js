@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto"
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 60_000
-const TEMP_DIR = path.join(os.tmpdir(), "bl-chat-plugin-music-share")
+const TEMP_DIR = path.join(os.tmpdir(), "shiloh-plugin-music-share")
 
 function decodeEntities(value = "") {
   return String(value || "")

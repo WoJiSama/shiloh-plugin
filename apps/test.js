@@ -1441,7 +1441,7 @@ function initializeSharedState(config) {
       sharedState.knowledgeSearcher = new KnowledgeSearcher({
         apiKey: config.embeddingAiConfig?.embeddingApiKey,
         apiUrl: config.embeddingAiConfig?.embeddingApiUrl,
-        dbPath: path.join(_path, 'plugins/bl-chat-plugin/database/knowledge-db.ndjson'),
+        dbPath: path.join(_path, 'plugins/shiloh-plugin/database/knowledge-db.ndjson'),
         model: config.embeddingAiConfig?.embeddingApiModel || 'text-embedding-3-small',
         topN: config.knowledgeSystem?.topN || 4,
         threshold: config.knowledgeSystem?.threshold || 0.6
@@ -1482,7 +1482,7 @@ function initializeSharedState(config) {
       ? new KnowledgeSearcher({
           apiKey: config.embeddingAiConfig?.embeddingApiKey,
           apiUrl: config.embeddingAiConfig?.embeddingApiUrl,
-          dbPath: path.join(_path, 'plugins/bl-chat-plugin/database/knowledge-db.ndjson'),
+          dbPath: path.join(_path, 'plugins/shiloh-plugin/database/knowledge-db.ndjson'),
           model: config.embeddingAiConfig?.embeddingApiModel || 'text-embedding-3-small',
           topN: config.knowledgeSystem?.topN || 4,
           threshold: config.knowledgeSystem?.threshold || 0.6
@@ -1501,8 +1501,8 @@ function initializeSharedState(config) {
 
   // 知识库自动导入：首次启动时如果 ndjson 不存在，从 database_default 导入
   if (config.knowledgeSystem?.enabled && sharedState.knowledgeSearcher) {
-    const dbPath = path.join(_path, 'plugins/bl-chat-plugin/database/knowledge-db.ndjson')
-    const defaultTxt = path.join(_path, 'plugins/bl-chat-plugin/database_default/knowledge-base.txt')
+    const dbPath = path.join(_path, 'plugins/shiloh-plugin/database/knowledge-db.ndjson')
+    const defaultTxt = path.join(_path, 'plugins/shiloh-plugin/database_default/knowledge-base.txt')
     if (!fs.existsSync(dbPath) && fs.existsSync(defaultTxt)) {
       const dbDir = path.dirname(dbPath)
       if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true })
@@ -1569,7 +1569,7 @@ function initMusicCookieRefresh(searchMusicTool, config) {
   schedule.scheduleJob('*/10 * * * *', async () => {
     try {
       // 重新从配置读取最新的 token
-      const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml')
+      const configPath = path.join(process.cwd(), 'plugins/shiloh-plugin/config/message.yaml')
       const currentConfig = YAML.parse(fs.readFileSync(configPath, 'utf8')).pluginSettings
       if (currentConfig?.qqMusicToken) {
         searchMusicTool.musicCookies.qqmusic = currentConfig.qqMusicToken
@@ -3733,7 +3733,7 @@ ${specialSignalsBlock}
   initConfigStore() {
     if (sharedConfigStore) return sharedConfigStore
     sharedConfigStore = createConfigStore({
-      pluginRoot: path.join(process.cwd(), "plugins/bl-chat-plugin"),
+      pluginRoot: path.join(process.cwd(), "plugins/shiloh-plugin"),
       configFiles: ["message.yaml", "mcp-servers.yaml"],
       watchImpl: (file, cb) => chokidar.watch(file).on("change", cb),
       onChange: async settings => {
@@ -3743,7 +3743,7 @@ ${specialSignalsBlock}
         this.knowledgeSearcher = state.knowledgeSearcher
         this.MAX_HISTORY = this.config.groupMaxMessages || 100
         await this.refreshLocalToolRegistry({ force: true }).catch(error => {
-          logger.error(`[bl-chat-plugin][热更新] 重新加载本地工具失败: ${error}`)
+          logger.error(`[shiloh-plugin][热更新] 重新加载本地工具失败: ${error}`)
           this.initTools()
         })
       }
@@ -7584,8 +7584,8 @@ ${mcpPrompts}
    */
   async initMCP() {
     try {
-      const configDir = path.join(process.cwd(), "plugins/bl-chat-plugin/config")
-      const configDefaultDir = path.join(process.cwd(), "plugins/bl-chat-plugin/config_default")
+      const configDir = path.join(process.cwd(), "plugins/shiloh-plugin/config")
+      const configDefaultDir = path.join(process.cwd(), "plugins/shiloh-plugin/config_default")
       const configPath = path.join(configDir, "mcp-servers.yaml")
       const defaultConfigPath = path.join(configDefaultDir, "mcp-servers.yaml")
 

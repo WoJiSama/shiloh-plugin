@@ -29,9 +29,9 @@ let objectCache = null
 function readPluginSettings() {
   const root = process.cwd()
   const candidates = [
-    path.join(root, "plugins/bl-chat-plugin/config/message.yaml"),
+    path.join(root, "plugins/shiloh-plugin/config/message.yaml"),
     path.join(root, "config/message.yaml"),
-    path.join(root, "plugins/bl-chat-plugin/config_default/message.yaml"),
+    path.join(root, "plugins/shiloh-plugin/config_default/message.yaml"),
     path.join(root, "config_default/message.yaml")
   ]
   const configPath = candidates.find(file => fs.existsSync(file))

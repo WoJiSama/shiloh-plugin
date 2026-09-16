@@ -76,8 +76,8 @@ function formatMusicFileSize(size = 0) {
 
 function readMessageCacheOptions() {
     const root = process.cwd();
-    const defaultPath = path.join(root, 'plugins/bl-chat-plugin/config_default/message.yaml');
-    const userPath = path.join(root, 'plugins/bl-chat-plugin/config/message.yaml');
+    const defaultPath = path.join(root, 'plugins/shiloh-plugin/config_default/message.yaml');
+    const userPath = path.join(root, 'plugins/shiloh-plugin/config/message.yaml');
     const readSettings = file => {
         try {
             return fs.existsSync(file) ? (YAML.parse(fs.readFileSync(file, 'utf8'))?.pluginSettings || {}) : {};
@@ -146,7 +146,7 @@ export class MessageRecordPlugin extends plugin {
                 },
             ]
         });
-        this.configPath = './plugins/bl-chat-plugin/config/message.yaml';
+        this.configPath = './plugins/shiloh-plugin/config/message.yaml';
         // 此插件与主聊天链路写入同一 Redis key，必须使用同一短期 TTL。
         this.messageManager = new MessageManager(readMessageCacheOptions());
         this.archiveManager = messageArchiveManager;

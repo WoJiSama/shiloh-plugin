@@ -6,7 +6,7 @@ const GENERATE_URL = "https://passport.bilibili.com/x/passport-login/web/qrcode/
 const POLL_URL = "https://passport.bilibili.com/x/passport-login/web/qrcode/poll"
 
 export class BilibiliAuthManager {
-  constructor({ file = path.join(process.cwd(), "plugins/bl-chat-plugin/config/bilibili-auth.json"), fetchImpl = globalThis.fetch, logger = globalThis.logger } = {}) {
+  constructor({ file = path.join(process.cwd(), "plugins/shiloh-plugin/config/bilibili-auth.json"), fetchImpl = globalThis.fetch, logger = globalThis.logger } = {}) {
     this.file = file
     this.fetch = fetchImpl
     this.logger = logger

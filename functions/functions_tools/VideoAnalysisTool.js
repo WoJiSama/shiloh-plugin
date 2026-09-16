@@ -97,7 +97,7 @@ export class VideoAnalysisTool extends AbstractTool {
 
   loadConfig() {
     try {
-      const configPath = path.join(process.cwd(), "plugins/bl-chat-plugin/config/message.yaml")
+      const configPath = path.join(process.cwd(), "plugins/shiloh-plugin/config/message.yaml")
       return YAML.parse(fs.readFileSync(configPath, "utf8")).pluginSettings || {}
     } catch (error) {
       logger.debug?.(`[VideoAnalysisTool] 读取配置失败: ${error.message}`)

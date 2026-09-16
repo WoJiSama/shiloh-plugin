@@ -1,9 +1,9 @@
 export const pluginInfo = {
-  name: "bl-chat-plugin",
-  title: "bl-chat-plugin",
+  name: "shiloh-plugin",
+  title: "shiloh-plugin",
   author: "@Cat-bl",
   authorLink: "https://github.com/Cat-bl",
-  link: "https://github.com/Cat-bl/bl-chat-plugin",
+  link: "https://github.com/Cat-bl/shiloh-plugin",
   isV3: true,
   isV2: false,
   showInMenu: "auto",

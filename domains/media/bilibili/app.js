@@ -57,7 +57,7 @@ function extractMentionedUserIds(e = {}, message = '') {
 export class BilibiliRelayPlugin extends plugin {
   constructor() {
     super({
-      name: "bl-chat-plugin B站高清搬运",
+      name: "shiloh-plugin B站高清搬运",
       dsc: ".B站授权 / .高清搬运白名单 / .高清搬运",
       event: "message",
       priority: 2000,
@@ -67,7 +67,7 @@ export class BilibiliRelayPlugin extends plugin {
         { reg: "^[.。]高清搬运(?:\s+[\s\S]+)?$", fnc: "relayBilibiliHighQuality" }
       ]
     });
-    this.configPath = './plugins/bl-chat-plugin/config/message.yaml';
+    this.configPath = './plugins/shiloh-plugin/config/message.yaml';
     this.bilibiliAuthManager = new BilibiliAuthManager();
   }
 

@@ -23,7 +23,7 @@ const STRUCTURAL_PATTERNS = [
   // 内部日志键值对: stage=initial group=821466122 elapsed=12000ms
   { kind: "log_kv", re: /\b(?:stage|elapsed|merged|toolChoice|retcode)=[\w.:/+-]+|\bgroup=\d{5,}\b|\buser=\d{5,}\b/g },
   // 内部路径与存储键
-  { kind: "internal_path", re: /(?:\/opt\/trss-yunzai|plugins\/bl-chat-plugin|ytbot:[\w:-]*|file:\/\/\/\S{3,})/g },
+  { kind: "internal_path", re: /(?:\/opt\/trss-yunzai|plugins\/shiloh-plugin|ytbot:[\w:-]*|file:\/\/\/\S{3,})/g },
   // 工具调用语法
   { kind: "tool_syntax", re: /\[(?:tool(?:_code)?)\]|<tool(?:_code)?>|\btool_call|\bfunction_call/gi },
   // 本插件工具名 + 调用括号(裸提工具名不算,带调用形式才算)

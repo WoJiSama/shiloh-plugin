@@ -1,1 +1,1 @@
-export * from "../../bl-chat-plugin/domains/dice/logRecorder.js"
+export * from "../../shiloh-plugin/domains/dice/logRecorder.js"

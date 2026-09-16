@@ -238,14 +238,14 @@ export class SearchMusicTool extends AbstractTool {
 
   // 加载配置
   loadConfig() {
-    const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml');
+    const configPath = path.join(process.cwd(), 'plugins/shiloh-plugin/config/message.yaml');
     return YAML.parse(fs.readFileSync(configPath, 'utf8')).pluginSettings;
   }
 
   // 保存配置
   saveConfig(newToken) {
     try {
-      const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml');
+      const configPath = path.join(process.cwd(), 'plugins/shiloh-plugin/config/message.yaml');
       const config = YAML.parse(fs.readFileSync(configPath, 'utf8'));
       config.pluginSettings.qqMusicToken = newToken;
       fs.writeFileSync(configPath, YAML.stringify(config), 'utf8');

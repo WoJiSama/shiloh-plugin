@@ -380,8 +380,8 @@ export class DiceManager {
   }
 
   getConfig() {
-    const userPath = path.join(this.cwd, "plugins/bl-chat-plugin/config/message.yaml")
-    const defaultPath = path.join(this.cwd, "plugins/bl-chat-plugin/config_default/message.yaml")
+    const userPath = path.join(this.cwd, "plugins/shiloh-plugin/config/message.yaml")
+    const defaultPath = path.join(this.cwd, "plugins/shiloh-plugin/config_default/message.yaml")
     const configPath = fs.existsSync(userPath) ? userPath : defaultPath
     let raw = {}
     try {
@@ -407,7 +407,7 @@ export class DiceManager {
   getDataDir(config = this.getConfig()) {
     return path.isAbsolute(config.baseDir)
       ? config.baseDir
-      : path.join(this.cwd, "plugins/bl-chat-plugin", config.baseDir)
+      : path.join(this.cwd, "plugins/shiloh-plugin", config.baseDir)
   }
 
   getDataPath(config = this.getConfig()) {
@@ -784,8 +784,8 @@ export class DiceManager {
     const key = String(raw || "").trim()
     if (!key) return "格式：.find 关键词"
     const files = [
-      path.join(this.cwd, "plugins/bl-chat-plugin/database/knowledge-base.txt"),
-      path.join(this.cwd, "plugins/bl-chat-plugin/database_default/knowledge-base.txt"),
+      path.join(this.cwd, "plugins/shiloh-plugin/database/knowledge-base.txt"),
+      path.join(this.cwd, "plugins/shiloh-plugin/database_default/knowledge-base.txt"),
       path.join(this.cwd, "database_default/knowledge-base.txt")
     ]
     const file = files.find(item => fs.existsSync(item))

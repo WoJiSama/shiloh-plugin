@@ -557,7 +557,7 @@ export class GoogleImageEditTool extends AbstractTool {
     }
 
     loadConfig() {
-        const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml');
+        const configPath = path.join(process.cwd(), 'plugins/shiloh-plugin/config/message.yaml');
         return YAML.parse(fs.readFileSync(configPath, 'utf8')).pluginSettings;
     }
 

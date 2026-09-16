@@ -588,8 +588,8 @@ pluginSettings:
     embeddingApiKey: sk-xxxxx
   emojiSystem:
     enabled: false
-    dbPath: plugins/bl-chat-plugin/database/emoji-packs.ndjson
-    storeDir: plugins/bl-chat-plugin/database/emoji_files
+    dbPath: plugins/shiloh-plugin/database/emoji-packs.ndjson
+    storeDir: plugins/shiloh-plugin/database/emoji_files
     maxItems: 200
     autoCollect: false
     visionTagOnAdd: true
@@ -627,7 +627,7 @@ pluginSettings:
       accessToken: ""
       resourceId: ""                      # 火山 V3 资源 ID，例如你的声音复刻/豆包语音资源
       voiceType: ""                       # 希洛复刻后的音色 ID
-      uid: "bl-chat-plugin"
+      uid: "shiloh-plugin"
       format: "mp3"
       sampleRate: 24000
       speedRatio: 1.0

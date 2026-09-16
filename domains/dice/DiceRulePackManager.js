@@ -333,7 +333,7 @@ export async function loadJsRuleSource(text, { rulesDir } = {}) {
   if (!looksLikeJsRuleSource(source)) throw new Error("JS 规则包必须以 module.exports 或 export default 导出规则对象")
   const useEsm = /^\s*export\s+(?:default|const|\{)/m.test(source)
   const ext = useEsm ? "mjs" : "cjs"
-  const dir = path.join(rulesDir || path.join(process.cwd(), "plugins/bl-chat-plugin/data/dice_rules"), "pending", ".js-load")
+  const dir = path.join(rulesDir || path.join(process.cwd(), "plugins/shiloh-plugin/data/dice_rules"), "pending", ".js-load")
   ensureDir(dir)
   const file = path.join(dir, `load-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.${ext}`)
   writeFileAtomic(file, source)

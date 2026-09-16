@@ -2,7 +2,7 @@ import fs from "fs"
 import path from "path"
 import { buildEmojiCandidatePool, structuredEmojiRelevanceScore } from "../domains/emoji/emojiSelection.js"
 
-const defaultPath = path.join(process.cwd(), "plugins/bl-chat-plugin/database/emoji-packs.ndjson")
+const defaultPath = path.join(process.cwd(), "plugins/shiloh-plugin/database/emoji-packs.ndjson")
 const dbPath = process.argv.find(arg => arg.startsWith("--db="))?.slice(5) || defaultPath
 const shouldAssert = process.argv.includes("--assert")
 

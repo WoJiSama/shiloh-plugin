@@ -24,7 +24,7 @@ class RConfig extends Base{
     updateField(name, field, value) {
         let config = this.getConfig(name);
         config[field] = value;
-        logger.mark(`[bl-chat-plugin][修改配置项][${name}][${field}]修改为：${value}`);
+        logger.mark(`[shiloh-plugin][修改配置项][${name}][${field}]修改为：${value}`);
         this.saveAllConfig(name, config);
     }
 
@@ -62,11 +62,11 @@ class RConfig extends Base{
                 const previousContent = this.previousContent.get(name);
 
                 if (!_.isEqual(previousContent, currentContent)) {
-                    logger.mark(`[bl-chat-plugin][配置文件]：${name}已被重新加载`);
+                    logger.mark(`[shiloh-plugin][配置文件]：${name}已被重新加载`);
                     this.previousContent.set(name, currentContent);
                 }
             } catch (error) {
-                logger.error(`[bl-chat-plugin][配置文件]：${name}读取失败`, error);
+                logger.error(`[shiloh-plugin][配置文件]：${name}读取失败`, error);
             }
         });
 
@@ -75,7 +75,7 @@ class RConfig extends Base{
         });
 
         watcher.on('error', error => {
-            logger.error(`[bl-chat-plugin][配置文件]：${name}监听失败`, error);
+            logger.error(`[shiloh-plugin][配置文件]：${name}监听失败`, error);
         });
 
         this.watchers.set(name, watcher);

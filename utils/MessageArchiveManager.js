@@ -231,8 +231,8 @@ export class MessageArchiveManager {
     this.cwd = cwd
     this.logger = logger
     this.redis = redis
-    this.configPath = path.join(cwd, "plugins/bl-chat-plugin/config/message.yaml")
-    this.defaultConfigPath = path.join(cwd, "plugins/bl-chat-plugin/config_default/message.yaml")
+    this.configPath = path.join(cwd, "plugins/shiloh-plugin/config/message.yaml")
+    this.defaultConfigPath = path.join(cwd, "plugins/shiloh-plugin/config_default/message.yaml")
     this.configMtimeMs = 0
     this.config = { ...DEFAULT_CONFIG }
     this.lastCleanupAt = 0
@@ -264,7 +264,7 @@ export class MessageArchiveManager {
     const cfg = this.getConfig()
     return path.isAbsolute(cfg.baseDir)
       ? cfg.baseDir
-      : path.join(this.cwd, "plugins/bl-chat-plugin", cfg.baseDir)
+      : path.join(this.cwd, "plugins/shiloh-plugin", cfg.baseDir)
   }
 
   shouldRecord(e, cfg = this.getConfig()) {

@@ -205,7 +205,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
         try {
             // 配置路径
             // 配置路径
-            const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml');
+            const configPath = path.join(process.cwd(), 'plugins/shiloh-plugin/config/message.yaml');
             const configFile = fs.readFileSync(configPath, 'utf8');
             const config = YAML.parse(configFile).pluginSettings;
             // 确保 opts.images 是数组并处理每个URL

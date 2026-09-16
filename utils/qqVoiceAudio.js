@@ -3,7 +3,7 @@ import os from "os"
 import path from "path"
 import { randomUUID } from "crypto"
 
-const VOICE_TMP_DIR = path.join(os.tmpdir(), "bl-chat-plugin-voice")
+const VOICE_TMP_DIR = path.join(os.tmpdir(), "shiloh-plugin-voice")
 
 export function sanitizeVoiceText(text = "", maxLength = 80) {
   const limit = Math.max(8, Math.min(300, Number(maxLength) || 80))

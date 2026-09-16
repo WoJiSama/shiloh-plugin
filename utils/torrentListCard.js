@@ -123,7 +123,7 @@ function buildTorrentListHtml(data) {
 
 /** 渲染清单卡面,返回图片路径;调用方负责发送后删除临时文件 */
 export async function renderTorrentListCard(data) {
-  const outputDir = path.join(process.cwd(), "resources", "bl-chat-plugin", "torrent_cards")
+  const outputDir = path.join(process.cwd(), "resources", "shiloh-plugin", "torrent_cards")
   await fs.promises.mkdir(outputDir, { recursive: true })
   const outputPath = path.join(outputDir, `torrent-list-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`)
 

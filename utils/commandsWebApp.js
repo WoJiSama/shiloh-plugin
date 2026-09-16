@@ -8,6 +8,9 @@ import {
   writeCommandsMarkdown
 } from "./commandRegistry.js"
 import { ensureGuobaJumpLink, watchGuobaJumpLink } from "./guobaJumpLink.js"
+import fs2 from "fs"
+import path2 from "path"
+import YAML2 from "yaml"
 
 // 命令管理页：挂在 Yunzai 自带 express（cfg.server.port，默认 2536）上。
 // 2536 端口可能无 Yunzai 层鉴权，因此本页强制自带令牌校验。
@@ -40,7 +43,7 @@ function buildPageHtml() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>命令管理 · bl-chat-plugin</title>
+<title>命令管理 · shiloh-plugin</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f3f5f9; color: #1f2430; }
@@ -100,7 +103,7 @@ function buildPageHtml() {
 </main>
 <div id="status"></div>
 <script>
-const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false }
+const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [] }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
@@ -203,10 +206,64 @@ function renderEditor() {
   addCmd.textContent = "+ 新增命令"
   addCmd.onclick = () => { d.commands.push({ usage: "#新命令", desc: "", perm: "all", src: "" }); state.dirty = true; renderDomains(); renderEditor() }
   box.appendChild(addCmd)
+
+  if (d.key === "dice") {
+    const tplTitle = document.createElement("h3")
+    tplTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
+    tplTitle.textContent = "🎲 回复模板（保存即热生效，改的是 message.yaml diceSystem.templates）"
+    box.appendChild(tplTitle)
+    const tplTable = document.createElement("table")
+    tplTable.innerHTML = "<thead><tr><th style='width:110px'>模板名</th><th>内容（支持 {name} {roll} 等变量）</th></tr></thead><tbody></tbody>"
+    const tplBody = tplTable.querySelector("tbody")
+    for (const [key, value] of Object.entries(state.diceTemplates)) {
+      const tr = document.createElement("tr")
+      tr.innerHTML = '<td class="num">' + key + '</td><td><input data-tpl="' + key + '"></td>'
+      const input = tr.querySelector("input")
+      input.value = value
+      input.oninput = () => { state.diceTemplates[key] = input.value }
+      tplBody.appendChild(tr)
+    }
+    box.appendChild(tplTable)
+    const tplSave = document.createElement("button")
+    tplSave.style.marginTop = "10px"
+    tplSave.textContent = "保存骰子模板"
+    tplSave.onclick = async () => {
+      try {
+        const r = await api("api/dice-templates", { templates: state.diceTemplates })
+        toast("骰子模板已保存并热生效：" + r.saved + " 条")
+      } catch (e) { toast(e.message, true) }
+    }
+    box.appendChild(tplSave)
+
+    if (state.dicePacks.length) {
+      const packTitle = document.createElement("h3")
+      packTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
+      packTitle.textContent = "📦 已导入的规则包/海豹扩展（只读，用 .骰规则 命令管理）"
+      box.appendChild(packTitle)
+      const packTable = document.createElement("table")
+      packTable.innerHTML = "<thead><tr><th>包名</th><th>ID</th><th>版本</th><th>启用群数</th><th>命令</th></tr></thead><tbody></tbody>"
+      const packBody = packTable.querySelector("tbody")
+      for (const pack of state.dicePacks) {
+        const tr = document.createElement("tr")
+        tr.innerHTML = "<td>" + pack.name + "</td><td>" + pack.id + "</td><td>" + (pack.versions || []).join("/") + "</td><td>" + (pack.enabledGroups || 0) + "</td><td style='font-size:12px'>" + (pack.commands || []).join(" ") + "</td>"
+        packBody.appendChild(tr)
+      }
+      box.appendChild(packTable)
+    }
+  }
+}
+
+async function loadDiceExtras() {
+  try {
+    const data = await api("api/dice-data")
+    state.diceTemplates = data.templates || {}
+    state.dicePacks = data.packs || []
+  } catch (e) { toast("骰子模板读取失败：" + e.message, true) }
 }
 
 async function load() {
   try {
+    loadDiceExtras()
     const data = await api("api/data")
     state.domains = data.domains
     state.dirty = false
@@ -253,7 +310,7 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
   }
   const token = readOrCreateToken(pluginRoot)
 
-  expressApp.use(MOUNT_PATH, (req, res, next) => {
+  expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
       res.type("html").send(buildPageHtml())
       return
@@ -281,6 +338,68 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           const docPath = writeCommandsMarkdown(registry, pluginRoot)
           logger?.info?.(`[命令管理页] 已保存命令表 ${registry.commandCount} 条 → ${target}`)
           res.json({ ok: true, commandCount: registry.commandCount, docPath: path.relative(pluginRoot, docPath) })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/dice-data") {
+        try {
+          const pluginRootDir = pluginRoot
+          const settingsPath = path2.join(pluginRootDir, "config", "message.yaml")
+          const defaultsPath = path2.join(pluginRootDir, "config_default", "message.yaml")
+          const cfgPath = fs2.existsSync(settingsPath) ? settingsPath : defaultsPath
+          const settings = YAML2.parse(fs2.readFileSync(cfgPath, "utf8")).pluginSettings || {}
+          const templates = settings.diceSystem?.templates || {}
+          let packs = []
+          try {
+            const { DiceRulePackManager } = await import("../domains/dice/DiceRulePackManager.js")
+            const { diceManager } = await import("../domains/dice/DiceManager.js")
+            const manager = new DiceRulePackManager({ diceManager, logger })
+            packs = manager.listPackages().map(item => ({
+              id: item.id,
+              name: item.name,
+              versions: item.versions,
+              enabledGroups: item.enabledGroups,
+              commands: (item.latestCommands || []).map(cmd => `.${cmd}`)
+            }))
+          } catch (packError) {
+            logger?.warn?.(`[命令管理页] 规则包列表读取失败: ${packError?.message || packError}`)
+          }
+          res.json({ templates, packs })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/dice-templates" && req.method === "POST") {
+        try {
+          const templates = req.body?.templates
+          if (!templates || typeof templates !== "object" || Array.isArray(templates)) {
+            res.status(400).json({ error: "templates 必须是对象" })
+            return
+          }
+          const cleaned = {}
+          for (const [key, value] of Object.entries(templates)) {
+            if (!/^[a-zA-Z][a-zA-Z0-9_]{0,30}$/.test(key)) continue
+            cleaned[key] = String(value ?? "").slice(0, 500)
+          }
+          if (!Object.keys(cleaned).length) {
+            res.status(400).json({ error: "没有合法模板" })
+            return
+          }
+          const settingsPath = path2.join(pluginRoot, "config", "message.yaml")
+          const source = fs2.existsSync(settingsPath)
+            ? settingsPath
+            : path2.join(pluginRoot, "config_default", "message.yaml")
+          const doc = YAML2.parse(fs2.readFileSync(source, "utf8"))
+          doc.pluginSettings ||= {}
+          doc.pluginSettings.diceSystem ||= {}
+          doc.pluginSettings.diceSystem.templates = { ...(doc.pluginSettings.diceSystem.templates || {}), ...cleaned }
+          if (!fs2.existsSync(settingsPath)) fs2.copyFileSync(source, settingsPath)
+          fs2.writeFileSync(settingsPath, YAML2.stringify(doc), "utf8")
+          logger?.info?.(`[命令管理页] 已保存骰子回复模板 ${Object.keys(cleaned).length} 条（配置热更新自动生效）`)
+          res.json({ ok: true, saved: Object.keys(cleaned).length })
         } catch (error) {
           res.status(400).json({ error: error?.message || String(error) })
         }

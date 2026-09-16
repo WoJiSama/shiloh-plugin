@@ -122,7 +122,7 @@
 ## 当前验证
 - 本地定向回归 53/53，通过共享语义裁决、群知识、工作流、后台提取和别名存储的组合检查。
 - 本地最终验证：定向回归 72/72 通过，目标模块 `node --check` 与 `git diff --check` 通过。广测 718 项中 669 通过、45 跳过、4 失败；本次新增的忘记工具断言已修复，余下失败为既有 `moment`/TRSS/Puppeteer 缺失及归档时序问题。
-- 已部署生产：仅同步 `apps/test.js` 的群记忆入口区块及 5 个记忆相关运行文件；备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-group-memory-20260805-180000`。生产目录回归 59/59，目标文件 SHA-256 与 staging 一致；服务重启后 `trss-yunzai.service=active`，PID 880762，MessagePipeline 持续收到事件且未见 `SyntaxError`、`ReferenceError` 或模块加载错误。
+- 已部署生产：仅同步 `apps/test.js` 的群记忆入口区块及 5 个记忆相关运行文件；备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-group-memory-20260805-180000`。生产目录回归 59/59，目标文件 SHA-256 与 staging 一致；服务重启后 `trss-yunzai.service=active`，PID 880762，MessagePipeline 持续收到事件且未见 `SyntaxError`、`ReferenceError` 或模块加载错误。
 
 # 2026-08-03 科普知识卡版式与结构化修复
 
@@ -139,8 +139,8 @@
 
 ### 验证记录
 - 本地定向回归 25 通过、2 个 Chromium 截图用例因本机缺浏览器跳过；线上从 TRSS 根目录运行路由 mock、知识卡截图和策略测试均通过。
-- 已部署最小补丁：`replyExecutionRoute.js`、`TextImageTool.js`、`apps/test.js` 路由入口及测试；备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-execution-route-20260804-150000`。
-- 服务重启后 active，`bl-chat-plugin`、MessagePipeline 正常初始化，加载 34 个插件。下一条真实知识解释将用 `route=chat` 和 `textImageTool timing` 日志验收端到端加速。
+- 已部署最小补丁：`replyExecutionRoute.js`、`TextImageTool.js`、`apps/test.js` 路由入口及测试；备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-execution-route-20260804-150000`。
+- 服务重启后 active，`shiloh-plugin`、MessagePipeline 正常初始化，加载 34 个插件。下一条真实知识解释将用 `route=chat` 和 `textImageTool timing` 日志验收端到端加速。
 
 ## 目标
 让群内科普与技术入门保留图片卡面，并根据题目给出明确选择、前置条件、实现边界与验证路径。卡面必须具备可扫描的知识结构，不能只是把长文本截图；也不得以回复字数作为是否转卡的依据。
@@ -158,8 +158,8 @@
 
 ## 验证记录
 - 纠正后本地和线上定向回归均通过：`solutionExplanationStyle` 5/5，`textImageDocument` 3/3；线上 Chromium 实际生成 `1960 x 2106` 的 knowledge PNG。
-- 线上仅同步 `TextImageTool.js`、`solutionExplanationStyle.js`、最小 `apps/test.js` 路由补丁和相应测试。备份：`/opt/trss-yunzai-backups/bl-chat-plugin-knowledge-card-20260803-213000`。
-- 清理了阻碍加载的 7 个 AppleDouble 元数据文件并移入同一备份目录。重启后服务 active，`bl-chat-plugin` 初始化、加载 34 个插件，后续启动日志无 `SyntaxError`。
+- 线上仅同步 `TextImageTool.js`、`solutionExplanationStyle.js`、最小 `apps/test.js` 路由补丁和相应测试。备份：`/opt/trss-yunzai-backups/shiloh-plugin-knowledge-card-20260803-213000`。
+- 清理了阻碍加载的 7 个 AppleDouble 元数据文件并移入同一备份目录。重启后服务 active，`shiloh-plugin` 初始化、加载 34 个插件，后续启动日志无 `SyntaxError`。
 
 # 2026-08-03 单数群主艾特路由修复
 
@@ -178,7 +178,7 @@
 ## 验证记录
 - 本地与线上定向回归均为 23/23；线上 `node --check` 通过。
 - 初次整体同步本地 `apps/test.js` 时带入尚未同步的本地依赖，线上缺 `utils/solutionExplanationStyle.js` 而未加载插件；已立即从本次备份还原，确认 34 插件恢复后，改为只对线上版本应用最小补丁。
-- 最终重启后服务 active，PID 2096627，`bl-chat-plugin` 初始化一次、MessagePipeline 启动、共加载 34 个插件。
+- 最终重启后服务 active，PID 2096627，`shiloh-plugin` 初始化一次、MessagePipeline 启动、共加载 34 个插件。
 
 # 2026-08-03 磁链元数据真实解析路径
 
@@ -216,7 +216,7 @@
 ## 验证记录
 - 定向测试 `node --test tests/torrentDownload.test.js tests/toolIntentManifests.test.js`：35/35 通过。
 - `npm test`：647 通过、44 因本机缺既有 TRSS/Chromium 依赖跳过；2 项失败均不涉及磁链修改：`messageStorageIdempotence` 的临时归档文件缺失、`umaRaceBalance` 缺 `/Users/shiqi/lib/puppeteer/puppeteer.js`。
-- 已部署到 `/opt/trss-yunzai/plugins/bl-chat-plugin`；备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-torrent-selection-20260803-191809`。服务安全重启后 active、PID 1987584、加载 34 个插件；线上无发送运行探针通过。
+- 已部署到 `/opt/trss-yunzai/plugins/shiloh-plugin`；备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-torrent-selection-20260803-191809`。服务安全重启后 active、PID 1987584、加载 34 个插件；线上无发送运行探针通过。
 
 # 2026-07-29 群 821466122 会话链路修复
 
@@ -262,7 +262,7 @@
 ## 验证记录
 - 本地与线上 `contextualProgressReply`、`toolResultGrounding` 定向回归均为 18/18；目标模块 `node --check` 和 `git diff --check` 均通过。
 - 改图/识图运行级用例在本地因缺少 Yunzai 宿主依赖而跳过；线上本轮先跑不依赖该宿主的精确回归，再以真实服务启动日志、目标哈希和 OneBotv11 重连验收。
-- 线上备份：`/opt/trss-yunzai-backups/bl-chat-plugin-tone-progress-20260729-232330`。安全重启后 PID=`3056052`，服务 active，插件仅初始化一次、加载 34 个插件，OneBotv11 于 23:24:51 重新连接。
+- 线上备份：`/opt/trss-yunzai-backups/shiloh-plugin-tone-progress-20260729-232330`。安全重启后 PID=`3056052`，服务 active，插件仅初始化一次、加载 34 个插件，OneBotv11 于 23:24:51 重新连接。
 
 ## 目标
 修复已在线上群 `821466122` 复现的文生图误走编辑、绘图任务重复恢复、引用任务被闲聊过滤遮蔽、成员展示名泄漏和亲密化语气问题；补定向回归，完成后再决定是否部署。
@@ -315,7 +315,7 @@
 ## 验证记录
 - 本地及线上定向回归均为 7/7：相关样本只输出匿名模式、低相似度不命中、查询失败静默降级、重复入队合并、旧脱敏样本后台回填，以及既有多消息节奏不回归。
 - 线上 `embeddingAiConfig` 使用既有 `BAAI/bge-m3`；健康探针返回 HTTP 200 和 1024 维向量。未打印密钥、用户内容或向量值。
-- 已备份 `/opt/trss-yunzai-backups/bl-chat-plugin-semantic-style-20260720-230647.tar.gz`，安全重启后 PID=675779、34 个插件加载完成；下一条真实群消息会启动低并发旧样本回填。
+- 已备份 `/opt/trss-yunzai-backups/shiloh-plugin-semantic-style-20260720-230647.tar.gz`，安全重启后 PID=675779、34 个插件加载完成；下一条真实群消息会启动低并发旧样本回填。
 
 # 2026-07-21 语义表达质量与可靠性升级
 
@@ -331,7 +331,7 @@
 ## 验证记录
 - 本地/线上定向回归均 17/17，通过场景输入不含原文、场景索引不含原文、歧义静默、主人反馈权重、回填失败重试、多消息节奏和既有 persona guard。
 - 主回复最多等待语义 prompt 350ms；超出后回复继续，后台调用仍会完成并填充缓存。Embedding 请求本身保留 1200ms保护。
-- 已备份 `/opt/trss-yunzai-backups/bl-chat-plugin-semantic-scene-20260721-011236.tar.gz`；安全重启后 PID=704266、34 插件加载完成。迁移为惰性触发：线上索引仍是旧 schema 0/240 条，等待下一条真实消息执行安全重建，未向群发送测试消息。
+- 已备份 `/opt/trss-yunzai-backups/shiloh-plugin-semantic-scene-20260721-011236.tar.gz`；安全重启后 PID=704266、34 插件加载完成。迁移为惰性触发：线上索引仍是旧 schema 0/240 条，等待下一条真实消息执行安全重建，未向群发送测试消息。
 
 # 2026-07-21 自主风格进化闭环
 
@@ -346,7 +346,7 @@
 
 ## 验证记录
 - 本地与线上均 18/18：新增用例覆盖跨两名用户三次认可自动晋升、四次“还是不行”撤销、状态不含请求/回复/认可原文；原有场景、反馈、回填和 persona guard 均未回归。
-- 已备份 `/opt/trss-yunzai-backups/bl-chat-plugin-auto-evolution-20260721-012250.tar.gz`，安全重启后 PID=706932、34 插件加载完成。线上配置插入时发现已有同值块而出现重复键，已立即压缩为单一块后再执行回归。
+- 已备份 `/opt/trss-yunzai-backups/shiloh-plugin-auto-evolution-20260721-012250.tar.gz`，安全重启后 PID=706932、34 插件加载完成。线上配置插入时发现已有同值块而出现重复键，已立即压缩为单一块后再执行回归。
 
 ## 约束
 - 不保存群聊原文、机器人原文、QQ 号或群号到自主学习状态；只保存哈希身份、场景类别、回复风格类别、计数和时间。
@@ -423,7 +423,7 @@
 ## 验证记录
 - 本地定向 19/19、线上同一组 19/19 通过；覆盖自然语序解析、本人/跨群隔离、歧义不删、普通“忘记”不触发和直接回复策略。
 - 线上完整依赖成功注册 `forgetGroupKnowledgeTool`；裸 Node 注册探针首次缺 TRSS 全局 `logger`，补最小运行时注入后通过，未影响服务。
-- 已备份 `/opt/trss-yunzai-backups/bl-chat-plugin-forget-group-knowledge-20260720-175343.tar.gz` 并部署；安全重启后 PID=602270、service active、加载 34 个插件、OneBotv11 WebSocket 已建立。
+- 已备份 `/opt/trss-yunzai-backups/shiloh-plugin-forget-group-knowledge-20260720-175343.tar.gz` 并部署；安全重启后 PID=602270、service active、加载 34 个插件、OneBotv11 WebSocket 已建立。
 
 ## 约束
 - 只删除结构化群知识；不把“忘记”误解成删除聊天归档、群文件或其他 Redis 数据。
@@ -456,7 +456,7 @@
 
 ## 验证记录
 - 本地群知识、工作流和记忆回归 34/34；生产完整依赖定向回归 40/40。
-- 生产备份：`/opt/trss-yunzai-backups/bl-chat-plugin-group-knowledge-20260720-171905.tar.gz`。同步使用 `COPYFILE_DISABLE=1` 和 `tar --no-xattrs`，确认未带入 AppleDouble 文件。
+- 生产备份：`/opt/trss-yunzai-backups/shiloh-plugin-group-knowledge-20260720-171905.tar.gz`。同步使用 `COPYFILE_DISABLE=1` 和 `tar --no-xattrs`，确认未带入 AppleDouble 文件。
 - 安全重启后 PID=593388、service active、OneBotv11 已连接；`maxGroupKnowledge=100`、`knowledgePromptMaxEntries=8` 已生效，启动日志无模块或语法错误。
 
 ## 目标
@@ -1052,7 +1052,7 @@
 - 线上首次备份 root `package.json/pnpm-lock.yaml` 时把备份放进了 pnpm workspace 内的插件目录，`pnpm add` 将其误识别为额外项目并打印本地依赖路径警告；安装仍成功，随后立即把备份移动到 `/opt/trss-yunzai-backups`，避免后续 workspace 扫描。
 - 本地验证配置启用脚本时因当前 checkout 缺少 `yaml` 依赖而报 `ERR_MODULE_NOT_FOUND`；生产代码测试 28/29（唯一跳过同样是本地缺 yaml）和 Excel 全部用例已通过，配置脚本留到线上真实依赖环境执行并验证幂等。
 - 首轮代码部署备份再次包含插件 `package.json` 并暂存在 workspace 内，`pnpm install` 因而把备份识别成额外项目；测试和安装均成功，但已在重启前把整个备份移到 `/opt/trss-yunzai-backups`，以后含 package.json 的备份不得放在 workspace 下。
-- 线上收尾检查从 Yunzai 根目录直接 `import('exceljs')` 失败；这是依赖已按插件 importer 安装、根 importer 已清理重复依赖后的正常隔离。改在插件目录验证 `plugin_exceljs=function`，并确认 `pnpm list -r` 只有 bl-chat-plugin 声明 ExcelJS。
+- 线上收尾检查从 Yunzai 根目录直接 `import('exceljs')` 失败；这是依赖已按插件 importer 安装、根 importer 已清理重复依赖后的正常隔离。改在插件目录验证 `plugin_exceljs=function`，并确认 `pnpm list -r` 只有 shiloh-plugin 声明 ExcelJS。
 
 ---
 
@@ -1363,7 +1363,7 @@ Modrinth 工具查询完成后，使用不带群历史、人设和工具定义�
 - 扩展定向回归 50 通过、0 失败、1 项因本地 checkout 缺少既有 `node-fetch` 依赖跳过；阶段 5 必须在服务器完整依赖目录复跑该项。
 - 本地全量回归 402 通过、2 失败、26 跳过；两项加载失败仍分别是 checkout 缺少 `exceljs` 和 `js-yaml`，与上一轮已知环境基线一致。新增与相关测试无失败，线上 staging 需补齐完整依赖证据。
 - 线上同层 staging 首轮目标回归 69 通过、1 失败、0 跳过；唯一失败为 `agentApiRouting.test.js` 从插件目录启动时 TRSS 配置按 cwd 查找 `config/default_config/`，属于测试启动目录问题。下一次改从 `/opt/trss-yunzai` 根目录单独运行，不重复原命令。
-- 首次生产重启后发现 TRSS 会扫描并加载 `plugins/` 下的隐藏 staging 目录，造成 bl-chat-plugin 初始化和 MessagePipeline 各出现两次、插件总数升至 50。必须立即删除本轮 staging 并二次安全重启；后续 staging 不得留在插件扫描目录跨越重启。
+- 首次生产重启后发现 TRSS 会扫描并加载 `plugins/` 下的隐藏 staging 目录，造成 shiloh-plugin 初始化和 MessagePipeline 各出现两次、插件总数升至 50。必须立即删除本轮 staging 并二次安全重启；后续 staging 不得留在插件扫描目录跨越重启。
 - 首次线上独立问答探针直接把 `message.yaml` 根对象传给 `YTapi`，得到“URL、模型或 API Key 未配置”；运行时真实加载的是 `merged.pluginSettings`。这是探针构造错误，不是线上配置缺失，下一次按应用相同层级读取后复测。
 - 清理 staging 后二次启动恢复单实例：PID 532132、插件 34 个、MessagePipeline 单次启动、OneBot/NapCat 已连接；修正配置层级后的原问题真实后端探针 `ok=true` 且无 API error。
 
@@ -2063,8 +2063,8 @@ Modrinth 工具查询完成后，使用不带群历史、人设和工具定义�
 ## 最终验证
 - 本轮本地定向回归 46/46；完整 `npm test` 为 640 项，603 通过、36 因本机缺 TRSS/Chromium 宿主依赖跳过、1 个既有 UmaRace 文件级失败。唯一失败仍为缺 `/Users/shiqi/lib/puppeteer/puppeteer.js`，与本轮无关。
 - 线上正式目录定向回归 46/46；真实 TRSS 根目录下上一轮图片进度、Banana 队列与 Google 图片编辑断言全部通过。
-- 正式文件备份：`/opt/trss-yunzai/backups/bl-chat-plugin-20260727-104000`；已验证 staging 移至 `/opt/trss-yunzai/backups/bl-chat-plugin-staging-20260727-104000-validated`。
-- 最终服务 `trss-yunzai.service` 为 active，`bl-chat-plugin` 初始化 1 次，消息管道启动 1 次，启动日志无语法/模块/加载错误；NapCat OneBot 已连接并持续收到群消息，活动图片任务为 0。
+- 正式文件备份：`/opt/trss-yunzai/backups/shiloh-plugin-20260727-104000`；已验证 staging 移至 `/opt/trss-yunzai/backups/shiloh-plugin-staging-20260727-104000-validated`。
+- 最终服务 `trss-yunzai.service` 为 active，`shiloh-plugin` 初始化 1 次，消息管道启动 1 次，启动日志无语法/模块/加载错误；NapCat OneBot 已连接并持续收到群消息，活动图片任务为 0。
 - 本地运行图片工具级测试时有 15 项因 checkout 缺少 TRSS 宿主文件 `/Users/shiqi/lib/common/common.js` 跳过；共享进度层 10 项全部通过，工具级断言需在服务器临时 staging 复跑。
 - 新增两条竞态断言后本地为 27 项：10 通过、17 因同一宿主依赖跳过；7 个相关文件 `node --check` 与全工作区 `git diff --check` 均通过。
 - 服务器免密 SSH 探针返回 `Permission denied (publickey,password)`；下一次改用既有授权密码进入临时 staging，不重复免密尝试。
@@ -2097,8 +2097,8 @@ Modrinth 工具查询完成后，使用不带群历史、人设和工具定义�
 
 ## 最终验证
 - 本地音乐定向回归 11/11，服务器真实 TRSS staging 与正式目录的工具级集成测试均通过；MP3 完整字节进入 `upload_group_file`，上传发生在合并信息和试听之前。
-- 正式文件 3/3 哈希一致；部署前图片任务为 0。备份位于 `/opt/trss-yunzai/backups/bl-chat-plugin-music-file-20260728-150518`。
-- 安全重启后服务 PID=1016027、状态 active，`bl-chat-plugin` 与 MessagePipeline 均只初始化一次；OneBotv11/NapCat 已连接并重新收到群消息。
+- 正式文件 3/3 哈希一致；部署前图片任务为 0。备份位于 `/opt/trss-yunzai/backups/shiloh-plugin-music-file-20260728-150518`。
+- 安全重启后服务 PID=1016027、状态 active，`shiloh-plugin` 与 MessagePipeline 均只初始化一次；OneBotv11/NapCat 已连接并重新收到群消息。
 - 本地全量测试 643 项：605 通过、36 跳过、2 失败。失败为既有消息归档临时路径未生成及 UmaRace 缺 `/Users/shiqi/lib/puppeteer/puppeteer.js`，音乐相关断言无失败。
 
 ---
@@ -2175,8 +2175,8 @@ Modrinth 工具查询完成后，使用不带群历史、人设和工具定义�
 
 ## 验证记录
 - 本地 `node --check` 通过；定向回归 41/41，通过链接识别、元数据整理、稳定归档、受限 Pixiv 不传图、图片/视频大小限制、跨群 artifact 复用和真实失败原因。
-- 已部署 9 个运行模块及新增平台模块，备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-youtube-pixiv-20260809-152627/runtime-before.tar`；生产 `yt-dlp 2025.04.30` 与 `ffmpeg` 已验证存在。
-- 生产目录语法检查和无发送解析探针通过；既有媒体/消息管线回归 28/28。最终 `trss-yunzai.service=active`，`bl-chat-plugin` 与 MessagePipeline 初始化成功，日志未见 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件载入错误。
+- 已部署 9 个运行模块及新增平台模块，备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-youtube-pixiv-20260809-152627/runtime-before.tar`；生产 `yt-dlp 2025.04.30` 与 `ffmpeg` 已验证存在。
+- 生产目录语法检查和无发送解析探针通过；既有媒体/消息管线回归 28/28。最终 `trss-yunzai.service=active`，`shiloh-plugin` 与 MessagePipeline 初始化成功，日志未见 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件载入错误。
 # 2026-08-19 合并转发聊天记录无损回放
 
 - [completed] 追踪 OneBot 转发节点从事件采集、归档到聊天记录查询的结构丢失点。

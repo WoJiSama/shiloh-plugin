@@ -13,8 +13,8 @@ import { renderMagnetSearchReport } from "./MagnetSearchReportRenderer.js"
 const _path = process.cwd()
 
 function readPluginSettings() {
-  const userConfigPath = path.join(_path, "plugins/bl-chat-plugin/config/message.yaml")
-  const defaultConfigPath = path.join(_path, "plugins/bl-chat-plugin/config_default/message.yaml")
+  const userConfigPath = path.join(_path, "plugins/shiloh-plugin/config/message.yaml")
+  const defaultConfigPath = path.join(_path, "plugins/shiloh-plugin/config_default/message.yaml")
   const configPath = fs.existsSync(userConfigPath) ? userConfigPath : defaultConfigPath
   if (!fs.existsSync(configPath)) return {}
   return yaml.load(fs.readFileSync(configPath, "utf8"))?.pluginSettings || {}

@@ -8,7 +8,7 @@ import { getMissingRedisJobCapabilities, RedisJobStore } from "./redisJobStore.j
 import { BilibiliAuthManager } from "../BilibiliAuthManager.js"
 import { collectForwardContext, extractForwardIdsFromSegments } from "../groupContextResolver.js"
 
-const RUNTIME_KEY = Symbol.for("bl-chat-plugin.message-pipeline.runtime")
+const RUNTIME_KEY = Symbol.for("shiloh-plugin.message-pipeline.runtime")
 
 export const DEFAULT_MESSAGE_PIPELINE_CONFIG = Object.freeze({
   enabled: true,

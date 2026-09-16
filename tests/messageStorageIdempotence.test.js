@@ -85,7 +85,7 @@ test("NDJSON archive appends one line for the same durable event", async t => {
     throw error
   }
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "message-archive-idempotence-"))
-  const configDir = path.join(cwd, "plugins/bl-chat-plugin/config_default")
+  const configDir = path.join(cwd, "plugins/shiloh-plugin/config_default")
   fs.mkdirSync(configDir, { recursive: true })
   fs.writeFileSync(path.join(configDir, "message.yaml"), [
     "pluginSettings:",
@@ -115,7 +115,7 @@ test("NDJSON archive appends one line for the same durable event", async t => {
       preEnrichedMessage: event.message,
       throwOnError: true
     })
-    const file = path.join(cwd, "plugins/bl-chat-plugin/data/message_archive/group/609235590/2026-07-20.ndjson")
+    const file = path.join(cwd, "plugins/shiloh-plugin/data/message_archive/group/609235590/2026-07-20.ndjson")
     const lines = fs.readFileSync(file, "utf8").trim().split(/\r?\n/)
     assert.equal(lines.length, 2)
     assert.equal(archiveReadCount, 1)

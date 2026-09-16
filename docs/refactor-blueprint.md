@@ -1,4 +1,4 @@
-# bl-chat-plugin 究极重构蓝图
+# shiloh-plugin 究极重构蓝图
 
 > 状态：待主人审阅 ｜ 起草：2026-09-16 ｜ 决策已定：monorepo 多插件 + 共享 core；sealdice 走 JS 语法兼容层；命令总表先行（已落地）
 
@@ -12,7 +12,7 @@
 ## 二、目标架构（monorepo 多插件 + 共享 core）
 
 ```
-bl-chat-plugin/                      # 仓库根（保持一个 git 仓库）
+shiloh-plugin/                      # 仓库根（保持一个 git 仓库）
 ├── core/                            # 共享内核（普通 ES 模块包，非 Yunzai 插件）
 │   ├── config/                      # 配置加载/热更/合并（message.yaml 拆分后的家）
 │   ├── session/                     # 会话状态、redis 封装、群上下文
@@ -69,7 +69,7 @@ bl-chat-plugin/                      # 仓库根（保持一个 git 仓库）
 - **线上机器人不停机**：每阶段小步部署 + 观察 3 天；出问题回滚单个插件而不是整个仓库。
 - **配置迁移**：写 `scripts/migrate-config.mjs`（message.yaml → 各插件配置），迁移前后 diff 报告。
 - **不重写而搬迁**：P3 各域的 utils 基本原样搬目录 + 改 import，逻辑不动；重写只发生在 P4 意图层。
-- **回滚锚点**：服务器上每次部署前 `cp -r plugins/bl-chat-plugin plugins/bl-chat-plugin.bak-<stage>-<date>`（沿用现有习惯）。
+- **回滚锚点**：服务器上每次部署前 `cp -r plugins/shiloh-plugin plugins/shiloh-plugin.bak-<stage>-<date>`（沿用现有习惯）。
 
 ## 七、当前完成项
 
@@ -97,12 +97,12 @@ bl-chat-plugin/                      # 仓库根（保持一个 git 仓库）
 ## 八、物理拆分落地（2026-09-16，方案 B 首例）
 
 - `standalone/bl-dice-plugin/`：首个独立 Yunzai 插件。apps/dice.js + diceLog.js 为入口，
-  实体代码仍在 bl-chat-plugin/domains/dice/（chat 集成与独立插件共用一份域代码，零复制）；
-  锅巴配置页直接复用 bl-chat-plugin 的 dice schema（同一 message.yaml，单数据源）
+  实体代码仍在 shiloh-plugin/domains/dice/（chat 集成与独立插件共用一份域代码，零复制）；
+  锅巴配置页直接复用 shiloh-plugin 的 dice schema（同一 message.yaml，单数据源）
 - `scripts/deploy-standalone.sh`：把 standalone/* 同步到 Yunzai plugins/ 兄弟目录
-- 双重注册防护：bl-chat-plugin/apps 的 DicePlugin/DiceLogRecorder 入口已移除，
+- 双重注册防护：shiloh-plugin/apps 的 DicePlugin/DiceLogRecorder 入口已移除，
   骰子命令现在只由 bl-dice-plugin 加载
 - 其余域（emoji/games/media/...）迁移模式相同：standalone/bl-<name>-plugin/ +
-  移除 bl-chat-plugin 对应 app 入口，随时可按需增加
-- 更新流程注意：`#bl更新` 只更新 bl-chat-plugin；standalone 插件用
+  移除 shiloh-plugin 对应 app 入口，随时可按需增加
+- 更新流程注意：`#bl更新` 只更新 shiloh-plugin；standalone 插件用
   `bash scripts/deploy-standalone.sh` 同步（部署脚本幂等）

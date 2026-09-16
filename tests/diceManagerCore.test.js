@@ -9,7 +9,7 @@ import { secureDiceInt, secureDiceRandom } from "../utils/diceRandom.js"
 
 function createRuntime(overrides = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "dice-core-test-"))
-  const pluginDir = path.join(cwd, "plugins", "bl-chat-plugin")
+  const pluginDir = path.join(cwd, "plugins", "shiloh-plugin")
   fs.mkdirSync(path.join(pluginDir, "config_default"), { recursive: true })
   fs.writeFileSync(path.join(pluginDir, "config_default", "message.yaml"), [
     "pluginSettings:",

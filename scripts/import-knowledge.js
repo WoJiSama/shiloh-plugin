@@ -6,11 +6,11 @@
  *   .json - 字符串数组 ["知识1", "知识2"] 或 CHIME 格式 [{meme, meaning, origin, type_cn}]
  *
  * 用法:
- *   node plugins/bl-chat-plugin/scripts/import-knowledge.js <文件路径>
+ *   node plugins/shiloh-plugin/scripts/import-knowledge.js <文件路径>
  *
  * 示例:
- *   node plugins/bl-chat-plugin/scripts/import-knowledge.js ./my-knowledge.txt
- *   node plugins/bl-chat-plugin/scripts/import-knowledge.js C:/bot/chime/data/chime_full.json
+ *   node plugins/shiloh-plugin/scripts/import-knowledge.js ./my-knowledge.txt
+ *   node plugins/shiloh-plugin/scripts/import-knowledge.js C:/bot/chime/data/chime_full.json
  */
 
 import { readFile } from 'fs/promises'
@@ -24,15 +24,15 @@ const inputFile = process.argv[2]
 if (!inputFile) {
   console.log(`知识库批量导入脚本
 
-用法: node plugins/bl-chat-plugin/scripts/import-knowledge.js <文件路径>
+用法: node plugins/shiloh-plugin/scripts/import-knowledge.js <文件路径>
 
 支持格式:
   .txt  - 每行一条知识（空行自动跳过）
   .json - 字符串数组 或 CHIME 格式对象数组
 
 示例:
-  node plugins/bl-chat-plugin/scripts/import-knowledge.js ./my-knowledge.txt
-  node plugins/bl-chat-plugin/scripts/import-knowledge.js C:/bot/chime/data/chime_full.json`)
+  node plugins/shiloh-plugin/scripts/import-knowledge.js ./my-knowledge.txt
+  node plugins/shiloh-plugin/scripts/import-knowledge.js C:/bot/chime/data/chime_full.json`)
   process.exit(0)
 }
 
@@ -45,8 +45,8 @@ if (!fs.existsSync(filePath)) {
 
 // 读取配置
 const _path = process.cwd()
-const configPath = path.join(_path, 'plugins/bl-chat-plugin/config/message.yaml')
-const defaultPath = path.join(_path, 'plugins/bl-chat-plugin/config_default/message.yaml')
+const configPath = path.join(_path, 'plugins/shiloh-plugin/config/message.yaml')
+const defaultPath = path.join(_path, 'plugins/shiloh-plugin/config_default/message.yaml')
 const cfgPath = fs.existsSync(configPath) ? configPath : defaultPath
 const config = YAML.parse(fs.readFileSync(cfgPath, 'utf8')).pluginSettings
 
@@ -98,7 +98,7 @@ console.log(`文件: ${filePath}`)
 console.log(`共 ${texts.length} 条，开始导入...\n`)
 
 // 确保 data 目录存在
-const dataDir = path.join(_path, 'plugins/bl-chat-plugin/database')
+const dataDir = path.join(_path, 'plugins/shiloh-plugin/database')
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true })
 }

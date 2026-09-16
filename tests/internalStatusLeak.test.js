@@ -23,7 +23,7 @@ test("结构性泄漏被识别:堆栈/错误码/协议JSON/日志行/路径/调�
     "connect ETIMEDOUT 124.223.95.142:80",
     "{\"kind\":\"tool_outcome\",\"status\":\"selection_required\"}",
     "[SmartSkip] group=821466122 reason=below_threshold",
-    "文件在 /opt/trss-yunzai/plugins/bl-chat-plugin/config 下",
+    "文件在 /opt/trss-yunzai/plugins/shiloh-plugin/config 下",
     "模型输出了 [tool_code] searchInformationTool(查询)",
     "stage=initial elapsed=18627ms"
   ]

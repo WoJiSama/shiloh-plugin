@@ -16,14 +16,14 @@ export default [
     label: "元数据 ndjson 路径",
     component: "Input",
     bottomHelpMessage: "存放每张表情包的 hash/标签/向量等元数据；相对路径相对 Yunzai 根目录。一般保持默认",
-    componentProps: { placeholder: "plugins/bl-chat-plugin/database/emoji-packs.ndjson" }
+    componentProps: { placeholder: "plugins/shiloh-plugin/database/emoji-packs.ndjson" }
   },
   {
     field: "emojiSystem.storeDir",
     label: "表情包图片目录",
     component: "Input",
     bottomHelpMessage: "存放表情包图片本体的目录；相对路径相对 Yunzai 根目录。一般保持默认",
-    componentProps: { placeholder: "plugins/bl-chat-plugin/database/emoji_files" }
+    componentProps: { placeholder: "plugins/shiloh-plugin/database/emoji_files" }
   },
   {
     field: "emojiSystem.maxItems",

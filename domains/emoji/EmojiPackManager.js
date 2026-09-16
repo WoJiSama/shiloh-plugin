@@ -8,13 +8,13 @@ import { resolveChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
 import { buildEmojiCandidatePool, filterEmojiSelectionCriteriaToCatalog, normalizeEmojiSelectionCriteria, structuredEmojiRelevanceScore } from "./emojiSelection.js"
 
 const _path = process.cwd()
-const CONFIG_PATH = path.join(_path, "plugins/bl-chat-plugin/config/message.yaml")
-const CONFIG_DEFAULT_PATH = path.join(_path, "plugins/bl-chat-plugin/config_default/message.yaml")
+const CONFIG_PATH = path.join(_path, "plugins/shiloh-plugin/config/message.yaml")
+const CONFIG_DEFAULT_PATH = path.join(_path, "plugins/shiloh-plugin/config_default/message.yaml")
 
 const DEFAULT_EMOJI_CONFIG = {
   enabled: false,
-  dbPath: "plugins/bl-chat-plugin/database/emoji-packs.ndjson",
-  storeDir: "plugins/bl-chat-plugin/database/emoji_files",
+  dbPath: "plugins/shiloh-plugin/database/emoji-packs.ndjson",
+  storeDir: "plugins/shiloh-plugin/database/emoji_files",
   maxItems: 200,
   autoCollect: false,
   visionTagOnAdd: true,

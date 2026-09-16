@@ -122,7 +122,7 @@ export class MagnetSearchClient {
         method: "GET",
         headers: {
           Accept: "application/json",
-          "User-Agent": "bl-chat-plugin-magnet-search"
+          "User-Agent": "shiloh-plugin-magnet-search"
         },
         signal: controller.signal
       })

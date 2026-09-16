@@ -30,7 +30,7 @@ export class GrabRedBagTool extends AbstractTool {
    */
   getGroupMaxMessages() {
     try {
-      const configPath = path.join(process.cwd(), 'plugins/bl-chat-plugin/config/message.yaml')
+      const configPath = path.join(process.cwd(), 'plugins/shiloh-plugin/config/message.yaml')
       if (fs.existsSync(configPath)) {
         const config = YAML.parse(fs.readFileSync(configPath, 'utf8'))
         return config?.pluginSettings?.groupMaxMessages || 100

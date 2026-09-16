@@ -11,7 +11,7 @@ const examplesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 function createRuntime(options = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "dice-rule-pack-test-"))
-  const pluginDir = path.join(cwd, "plugins", "bl-chat-plugin")
+  const pluginDir = path.join(cwd, "plugins", "shiloh-plugin")
   fs.mkdirSync(path.join(pluginDir, "config_default"), { recursive: true })
   fs.writeFileSync(path.join(pluginDir, "config_default", "message.yaml"), [
     "pluginSettings:",

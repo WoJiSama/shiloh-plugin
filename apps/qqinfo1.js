@@ -45,9 +45,9 @@ export class QQinfo extends plugin {
         // const data = {
         //     saveId: "qqinfo",
         //     tplFile:
-        //         "./plugins/bl-chat-plugin/resources/html/qqinfo/qqinfo.html",
+        //         "./plugins/shiloh-plugin/resources/html/qqinfo/qqinfo.html",
         //     pluResPath:
-        //         "C:/bot/Miao-Yunzai/plugins/bl-chat-plugin/resources/",
+        //         "C:/bot/Miao-Yunzai/plugins/shiloh-plugin/resources/",
         //     ...DATA_JSON
         // }
         const data = await new Qqinfo(e).getData(DATA_JSON);

@@ -72,14 +72,14 @@
 - 发现并修复遗留的 `explicitTeachingPrompt` 未定义引用：旧正则链路已不再赋值但仍参与提示词拼接，会导致正常聊天在该路径出现 `ReferenceError`。
 
 ## 2026-07-29 群 821466122 异常会话审计
-- 用户反馈群 `821466122` 中希洛出现多类错误。以线上部署 `/opt/trss-yunzai/plugins/bl-chat-plugin`、消息归档和 systemd 日志为唯一事实来源；本轮先读后分析，不改线上。
+- 用户反馈群 `821466122` 中希洛出现多类错误。以线上部署 `/opt/trss-yunzai/plugins/shiloh-plugin`、消息归档和 systemd 日志为唯一事实来源；本轮先读后分析，不改线上。
 
 ## 2026-07-29 工具等待回复去机器人化
 - 正常主聊天已拿到完整 `systemContent`，可自然回应；慢工具的 `contextualProgressReply` 只携带 `persona.name/tone/speechStyle` 并走快速模型，因此最容易退化为“正在按要求修改图片”“正在编辑图片”这类任务状态播报。
 - `BananaTool` 已对进度文字调用 `personaFeedbackManager.guardReply`，但 `GoogleImageEditTool` 与 `GoogleImageAnalysisTool` 漏掉了同一守卫。守卫不负责强行卖萌，只负责清除客服/身份硬辩/非自愿亲密等已知坏模式。
 - 修复方向：把纯执行状态短句作为无效进度回复要求模型重写，提示中明确要求像熟人接住具体话题、非暧昧且不假称已经看过图片；两个漏接出口统一应用现有守卫。工具失败文案保持可验证但改为第一人称自然表达。
 - 已实现：`正在按要求修改图片`、`正在调整图片中的领口`、`正在编辑图片` 等纯状态短句会被拒绝，即使来自工具参数也会触发紧凑模型重写；未提供快速模型或两次生成均不合格时仍保持静默，不用固定口头禅兜底。
-- 已上线：生产定向回归 18/18，四个运行模块线上 SHA-256 与本地一致；服务安全重启后插件初始化一次、加载 34 个插件，OneBotv11 已重连。备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-tone-progress-20260729-232330`。
+- 已上线：生产定向回归 18/18，四个运行模块线上 SHA-256 与本地一致；服务安全重启后插件初始化一次、加载 34 个插件，OneBotv11 已重连。备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-tone-progress-20260729-232330`。
 
 ## 2026-08-03 群 609235590 合并转发可读性核查
 - 最新合并转发为 14:30:55 的 `CQ:forward,id=7669689123275068986`。`ytbot:message_pipeline:event:v1:3094088525:message:group:609235590:1962531612` 和当天归档均只有该 ID；没有可读节点文本、图片或文件元数据。
@@ -369,7 +369,7 @@
 - 最终生产行为不再依赖模型是否愿意调用：38 类高置信日常反应直接进入本地表情选择并以 emoji-only 发送；4 类明确配文和 20 类需要文字/其他工具的场景不被强制。
 
 ## 2026-07-14 表情选图关键词与真实标签对齐
-- 已只读取得线上 `/opt/trss-yunzai/plugins/bl-chat-plugin/database/emoji-packs.ndjson` 快照：共 200 条，200 条都有 tags、useCases 和 description；共有 114 个唯一 tag、398 个唯一 useCase。
+- 已只读取得线上 `/opt/trss-yunzai/plugins/shiloh-plugin/database/emoji-packs.ndjson` 快照：共 200 条，200 条都有 tags、useCases 和 description；共有 114 个唯一 tag、398 个唯一 useCase。
 - 高频真实 tag 为：吐槽 64、得意 58、无奈 58、卖萌 56、嘲讽 47、崩溃 44、无语 44、敷衍 33、震惊 28、委屈 27、傲娇 23、心动 20；另有笑死 12、尴尬 13、疲惫 5、害羞 5、认怂 8、安慰 1 等可作更精确主标签。
 - 高频真实 useCase 为：看到离谱 95、无言以对 65、接梗吐槽 34、轻微嘲讽 28、想装无辜 24、被人夸奖 23、群友翻车 13；其余如安慰对方、场面尴尬、认怂求饶、拒绝加班等更稀疏但区分度更高。
 - 当前 `localRelevanceScore()` 会把 query 切成所有 2-4 字中文片段并逐项累加，最后封顶 1；长场景句会产生大量泛化片段和满分并列。实测旧笑类长句让 119/200 张进入 L0，旧无语震惊长句让 112/200 张进入 L0。
@@ -391,7 +391,7 @@
 - 最小操作应覆盖：`list_sheets`、`read_cell`、`read_range`、`find`；范围和搜索必须限量，下载要限制大小、超时并防止访问内网地址。
 - 工具不应设为 terminal：读取结果回到主对话模型，让希洛自然回答，但工具输出必须结构化包含精确公式、值、显示值和地址，提示模型不得改写公式。
 - 线上实际 tools 模型对 4 种说法均能正确抽参：单格 -> `read_cell/sheetName=预算表/cell=C12`，列 tab -> `list_sheets`，sheet 内搜索 -> `find/sheetName=明细/query=20260715`，附文件后短问 B7 -> `read_cell/cell=B7`；均没有凭空要求 fileUrl。
-- ExcelJS 最终按插件 workspace importer 安装，根项目的临时重复依赖已移除；从 `plugins/bl-chat-plugin` 解析成功，避免把插件依赖永久污染 root package.json。
+- ExcelJS 最终按插件 workspace importer 安装，根项目的临时重复依赖已移除；从 `plugins/shiloh-plugin` 解析成功，避免把插件依赖永久污染 root package.json。
 - 用户追加的“群文件”指 OneBot 群文件仓库，而不是聊天消息 file segment。NapCat/OneBot 可通过 `get_group_root_files` 获取根文件与文件夹、`get_group_files_by_folder` 递归子目录，再用 `get_group_file_url(group_id,file_id,busid)` 换下载链接。
 - 群文件仓库可能存在同名文件和深层目录，正确策略是精确文件名优先、再做唯一模糊匹配；多个候选必须返回完整目录路径。无文件名时只能在群内恰好一个 Excel 时自动选择，否则先列出候选。
 - OneBot 群文件读取需要组合 `get_group_root_files`、`get_group_files_by_folder` 和 `get_group_file_url`；下载 URL 请求必须把文件记录中的 `busid` 一并传回，不能只传 `file_id`。
@@ -526,21 +526,21 @@
 - 一次真实 Modrinth 排名请求的 API 查询耗时不足 1 秒，后续最终模型调用约 11 秒；该调用携带约 8908 个 prompt token 的人设、群历史与工具结果，并因复杂度路由进入 `deepseek-v4-pro`，还产生了 282 个 reasoning token。
 - 修复使用“工具原始结果 + 严格项目块协议”的两条消息，显式走 `chatAiConfig` 的快速聊天模型。只有本轮累计结果全部为成功的 `modrinthTool` 时才启用；失败时回退既有通用续轮，不编造项目资料。
 - 线上 `chatAiConfig.chatApiModel` 当前为 `deepseek-v4-flash`；API 路由定向测试验证复杂无工具上下文仍到 Pro，而 `forceChatBackend` 紧凑请求到 Flash。
-- 已备份并同步 5 个目标文件，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-fast-translation-20260719-210618.tar.gz`；线上 Modrinth 回归 8/8、相关意图/续轮回归 13/13、API 路由回归 1/1。目标文件 SHA-256 与部署副本一致。
+- 已备份并同步 5 个目标文件，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-fast-translation-20260719-210618.tar.gz`；线上 Modrinth 回归 8/8、相关意图/续轮回归 13/13、API 路由回归 1/1。目标文件 SHA-256 与部署副本一致。
 - 安全重启后 PID 从 292190 切换为 297191，service active，加载插件 36 个，OneBotv11 WebSocket 已建立。
 
 # 2026-07-19 Modrinth 排名占位符
 - 提示词同时写了“第 N 名”字段和 `第 N 名: ...` 样例；模型将 N 当作字面量，再把实际排名填在冒号后，产生 `第 N 名: 5`。
 - 旧严格解析器只接受 `第 <数字> 名:`，因此该块无法被提取为转发节点，最终退化为普通文本。修复将新格式改为 `排名: 第 5 名`，并只对明确的旧占位符行做无损规范化。
-- 已备份并部署 `utils/modrinth.js` 与其定向测试，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-rank-format-20260719-212247.tar.gz`；线上回归 9/9，包含真实坏格式的规范化断言。安全重启后 PID 从 297191 切换为 300928，service active、加载插件 36 个、OneBotv11 WebSocket 已建立。
+- 已备份并部署 `utils/modrinth.js` 与其定向测试，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-rank-format-20260719-212247.tar.gz`；线上回归 9/9，包含真实坏格式的规范化断言。安全重启后 PID 从 297191 切换为 300928，service active、加载插件 36 个、OneBotv11 WebSocket 已建立。
 
 # 2026-07-19 跨群视频搬运入口顺序
 - 线上 21:21:19 收到同一 B站卡片：609235590 与 981339693 相差 40ms；609235590 已写入 resolved B站归档，981339693 没有归档记录，也没有发送或发送失败日志。归档配置没有 include/exclude 群限制。
 - Yunzai 按数值升序执行插件，任一规则返回非 false 就停止后续规则。全局聊天插件优先级 9999，归档搬运插件原为 10050；609235590 的聊天流程 SmartSkip 返回 false 因而搬运成功，981339693 的聊天流程返回已处理导致归档入口完全未执行。
 - 仅把归档入口提到前面会让短视频下载占住 Yunzai 的规则链直到发送完成；归档入口因此需要立即返回 false，并对事件做快照后在后台完成归档/搬运。
-- 已备份并部署 3 个目标文件，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-video-dispatch-background-20260719-213658.tar.gz`；线上 B站/抖音自动搬运与优先级回归 6/6。重启后 PID 从 303484 切到 304834，service active，动态 status 插件补入后 OneBotv11/NapCat 于 21:38:16 已连接；目标文件 SHA-256 与部署副本一致。
+- 已备份并部署 3 个目标文件，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-video-dispatch-background-20260719-213658.tar.gz`；线上 B站/抖音自动搬运与优先级回归 6/6。重启后 PID 从 303484 切到 304834，service active，动态 status 插件补入后 OneBotv11/NapCat 于 21:38:16 已连接；目标文件 SHA-256 与部署副本一致。
 - 后台化后的两条新视频均未入库，且没有发送或失败日志。根因是 `snapshotArchiveEvent()` 的 `{ ...e }` 不会复制 Yunzai 事件的非枚举 `message_type`；`MessageArchiveManager.shouldRecord()` 因此直接返回 false。修复必须显式保留消息类型和归档/发送依赖的运行时字段。
-- 已备份并部署快照修复，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-video-dispatch-snapshot-20260719-214400.tar.gz`；线上自动搬运、后台释放和非枚举事件字段回归 7/7。安全重启后 PID=306724，OneBotv11/NapCat 于 21:45:19 已连接。
+- 已备份并部署快照修复，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-video-dispatch-snapshot-20260719-214400.tar.gz`；线上自动搬运、后台释放和非枚举事件字段回归 7/7。安全重启后 PID=306724，OneBotv11/NapCat 于 21:45:19 已连接。
 - 次日 10:06 在 609235590 的真实 B站卡片仍未入库，证明后台化不能仅靠离线探针认定为可用。已回退后台化/快照，恢复已验证的同步 `recordArchiveMessage()` 路径；线上 B站/抖音转发回归 5/5，安全重启后 PID=483832，OneBotv11/NapCat 于 10:11:52 已连接。
 - 同步路径在真实 10:18 B站卡片中仍未入库，排除后台问题；归档规则在 9000 前仍被其他规则截断。下一轮将其调为 `-Infinity`（与基础消息记录同级），并用媒体卡片入口日志验证调度而非依赖离线测试。
 - 部署后用线上依赖与当前磁盘源码做了无发送的端到端回放：`MessageArchiveRecorder` 实例 priority 为 `-Infinity`，真实入口返回 false，B站卡片构造出 1 个合并转发节点，回放通过。该回放不替用户群发送测试消息。
@@ -901,7 +901,7 @@
 - `runDrawJob()` 的 finally 已能删除 durable job、清除 active status、调度下一项；只要请求层对正文超时真正 reject，就不需要冒险手工删除 Redis key。
 - 生产恢复原任务后，Redis job 和队列均为 0、active-task 已清空；消息状态留存为 `tool_failed`（约 24 小时，用于原消息状态查询）。本次不是继续卡住，而是 Krill 返回了没有图片数据的 `error/type` 响应。
 - 恢复任务没有原始 Agent 调用栈接管工具失败，但原记录中 `notifyFailure` 对正在执行的初始任务是 false；恢复后必须强制打开失败通知，否则会出现“状态失败但原群无说明”的静默收尾。
-- 该恢复通知分支已上线并经真实 TRSS 17/17 定向回归验证：恢复任务返回图片错误时会调用原群的 `sendMsg`，成功时不新增文字消息。生产服务运行 PID `1198400`，`bl-chat-plugin` 与 MessagePipeline 各初始化一次，OneBot 已连接。
+- 该恢复通知分支已上线并经真实 TRSS 17/17 定向回归验证：恢复任务返回图片错误时会调用原群的 `sendMsg`，成功时不新增文字消息。生产服务运行 PID `1198400`，`shiloh-plugin` 与 MessagePipeline 各初始化一次，OneBot 已连接。
 
 ## 2026-07-25 绘图开场任务语义修复
 - 用户原话没有携带或引用图片，但明确要求画“群里的翠月”；`resolveAvatarDrawReference()` 会按群成员唯一名称命中翠月并生成 QQ 头像 URL，这个按需参考行为符合既有需求。
@@ -979,7 +979,7 @@
 - 审计确认 `apps/test.js` 的主聊天和高频工具入口已接入统一可见错误格式化器。
 - 仍需修复的直接可见出口集中在 `apps/MessageManager.js`、`apps/EmojiPackImport.js` 和 `utils/fileUtils.js`；它们要么仅提示“失败”，要么直接透出 `error.message`。
 - 最终统一边界：主聊天、图片、搜索和管理命令外，`apps/test.js#runToolCall()` 也会在旧工具返回失败字符串后、交给模型前格式化该结果；工具基类在异常和参数规范化失败时同样使用此格式化器。这样即使旧工具未迁移，也不会通过模型转述泄露密钥、签名 URL、磁链或本地路径。
-- 线上部署首次受 macOS AppleDouble `._*.js` 和先前未同步的依赖影响；已用无 AppleDouble 的归档重传、补齐入口依赖，并将伪脚本移入 `/opt/trss-yunzai-backups/bl-chat-plugin-visible-failure-20260807-20260807-110646/appledouble`。最终启动正常。
+- 线上部署首次受 macOS AppleDouble `._*.js` 和先前未同步的依赖影响；已用无 AppleDouble 的归档重传、补齐入口依赖，并将伪脚本移入 `/opt/trss-yunzai-backups/shiloh-plugin-visible-failure-20260807-20260807-110646/appledouble`。最终启动正常。
 - 无 HTTP 状态码的 `servers are currently overloaded` 是上游容量不足，而非用户消息、解析或鉴权错误；需要在 `visibleFailure` 和 `chatRequestRecovery` 同时归类为 upstream，避免英文原样进入群聊。
 - 已上线验证：`Our servers are currently overloaded. Please try again later.` 输出为“回答服务现在有点忙，这次请求没等到结果。原因：上游服务当前负载过高，请稍后重试”。
 
@@ -987,7 +987,7 @@
 - “喊爸爸”被直接执行且附带讨好表情，说明现有提示只包含风格而没有自主关系边界。修复应让模型基于已有关系/记忆选择是否接受，而非对单个称呼做关键词拦截。
 - 本地已接入关系自主性、稳定偏好与固定边界。主聊天提示要求先参考关系、长期记忆和群语境；对于单句强塞亲密、支配、家庭、占有或服从称呼，应自然推开且不补讨好型表情。`apps/test.js` 已传入运行配置中的 `persona`，默认配置已补 preferences/boundaries。定向测试 12/12、语法检查和 diff 检查通过。
 - 线上覆盖配置原先没有 preferences 和“关系称呼不能由单句决定”的 boundary，且其主提示调用未传入 `this.config.persona`，两处共同使本地默认配置无法生效。已做最小运行补丁：替换 `personaTonePolicy.js`、在既有调用加入 `persona: this.config.persona`、仅向线上 persona 区块添加三条偏好和一条关系边界。远端语法检查和现有独立回归 8/8 通过；远端测试文件不是本轮新增版本，因此其总数少于本地。
-- 服务已重启并验收为 active；`bl-chat-plugin` 初始化正常、加载 34 个插件，启动后未见 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件载入错误。远端策略文件 SHA-256 与已验证的本地版本一致；本地以默认 persona 做的最终提示探针确认四项自主性/偏好/关系边界要求均会进入“喊爸爸”这一类普通聊天的模型提示。
+- 服务已重启并验收为 active；`shiloh-plugin` 初始化正常、加载 34 个插件，启动后未见 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件载入错误。远端策略文件 SHA-256 与已验证的本地版本一致；本地以默认 persona 做的最终提示探针确认四项自主性/偏好/关系边界要求均会进入“喊爸爸”这一类普通聊天的模型提示。
 
 ## 2026-08-08 骰娘随机性审计
 - 群 `953676639` 在 10:54-10:55 的六次 `D12` 是 `12、12、1、11、11、11`；每条都有不同消息 ID 和独立骰娘执行/发送日志，不是消息重放或请求幂等缓存。
@@ -995,7 +995,7 @@
 - 自定义规则的正常命令执行已经通过 `DiceRuleSession.createRuleRandom()` 用 `crypto.randomBytes(16)` 生成每次调用独立种子，并用 SHA-256 派生后续随机值和记录审计种子。修复普通骰时应保留这一机制，只替换其少数后备 `Math.random` 默认值。
 - 已新增 `utils/diceRandom.js`：`secureDiceInt()` 直接使用 `crypto.randomInt`，`secureDiceRandom()` 提供 [0,1) 形式以兼容表达式和加权表。普通骰、表达式、规则包的后备随机源均已接入；规则包实际命令仍优先使用原有独立加密种子。三份骰娘运行文件中已无 `Math.random`。
 - 本地定向回归 56/56 通过；新增测试在全局 `Math.random` 抛错时验证普通骰和表达式后备仍可工作，显式注入随机函数的测试能力未变。12 万次加密 `D12` 抽样每面为 9,795-10,127 次。
-- 已部署运行文件 `diceRandom.js`、`DiceManager.js`、`DiceRuleExpression.js`、`DiceRulePackManager.js`；远端备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-dice-crypto-20260808-110349`。远端语法检查通过，并以把 `Math.random` 设为抛错的实际模块探针验证标准骰、表达式和规则包后备均可运行。服务重启后 active，插件初始化成功、加载 34 个插件，无启动错误。
+- 已部署运行文件 `diceRandom.js`、`DiceManager.js`、`DiceRuleExpression.js`、`DiceRulePackManager.js`；远端备份为 `/opt/trss-yunzai-backups/shiloh-plugin-dice-crypto-20260808-110349`。远端语法检查通过，并以把 `Math.random` 设为抛错的实际模块探针验证标准骰、表达式和规则包后备均可运行。服务重启后 active，插件初始化成功、加载 34 个插件，无启动错误。
 - 远端历史 `diceRulePackManager.test.js` 有 5 个失败，均为测试文件早于当前运行文件版本导致的规则包状态断言失败；本次修改的 DiceManager/表达式回归及运行探针均通过，未将该组历史不一致误判为随机源失败。
 # 2026-08-19 合并转发聊天记录无损回放
 

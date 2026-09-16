@@ -165,7 +165,7 @@ export class PersonaFeedbackManager {
   }
 
   getDataDir() {
-    return path.join(this.cwd, "plugins/bl-chat-plugin/data/persona_feedback")
+    return path.join(this.cwd, "plugins/shiloh-plugin/data/persona_feedback")
   }
 
   getFeedbackPath() {

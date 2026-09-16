@@ -7,10 +7,10 @@ const DEFAULT_CACHE_TTL_MS = 6 * 60 * 60 * 1000
 function getDefaultCachePath() {
   const cwd = process.cwd()
   const looksLikePluginRoot =
-    path.basename(cwd) === "bl-chat-plugin" &&
+    path.basename(cwd) === "shiloh-plugin" &&
     fs.existsSync(path.join(cwd, "config_default")) &&
     fs.existsSync(path.join(cwd, "apps"))
-  const pluginRoot = looksLikePluginRoot ? cwd : path.join(cwd, "plugins/bl-chat-plugin")
+  const pluginRoot = looksLikePluginRoot ? cwd : path.join(cwd, "plugins/shiloh-plugin")
   return path.join(pluginRoot, "database/delta-force-objects.json")
 }
 

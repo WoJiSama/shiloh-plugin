@@ -54,7 +54,7 @@ test("resolves a plain Netease DJ link to its official audio source", async () =
 
 test("downloads only audio returned by an official music redirect", async () => {
   const result = await downloadOfficialMusicShare({ title: "测试", artist: "歌手", sourceUrl: "https://music.163.com/song/media/outer/url?id=1" }, {
-    tempDir: "/tmp/bl-chat-plugin-music-share-test",
+    tempDir: "/tmp/shiloh-plugin-music-share-test",
     fetchImpl: async () => new Response(Buffer.from("audio"), {
       status: 200,
       headers: { "content-type": "audio/mpeg", "content-length": "5" }

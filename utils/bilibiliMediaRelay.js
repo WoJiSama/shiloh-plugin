@@ -21,7 +21,7 @@ export async function downloadBilibiliArchiveVideo(resource = {}, { logger = glo
   const candidates = [resource.url, ...(resource.backup_urls || [])].filter(Boolean)
   if (!candidates.length || resource.size > BILIBILI_ARCHIVE_VIDEO_MAX_BYTES) return null
 
-  const dir = path.join(os.tmpdir(), "bl-chat-plugin-bilibili-archive")
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-bilibili-archive")
   await fs.promises.mkdir(dir, { recursive: true })
   const safeBvid = String(resource.bvid || "video").replace(/[^A-Za-z0-9_-]/g, "")
   const filePath = path.join(dir, `${safeBvid}-p${Number(resource.page || 1)}-${Date.now()}-${Math.random().toString(16).slice(2)}.mp4`)

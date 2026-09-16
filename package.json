@@ -1,5 +1,5 @@
 {
-  "name": "bl-chat-plugin",
+  "name": "shiloh-plugin",
   "description": "测试",
   "type": "module",
   "version": "0.0.1",
@@ -13,7 +13,7 @@
   },
   "keywords": [
     "Yunzai-Bot",
-    "bl-chat-plugin"
+    "shiloh-plugin"
   ],
   "author": "test",
   "license": "MIT",

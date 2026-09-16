@@ -1289,7 +1289,7 @@ export class TextImageTool extends AbstractTool {
   }
 
   async renderDocumentImage({ text, template = "document" }) {
-    const outputDir = path.join(process.cwd(), "resources", "bl-chat-plugin", "safe_text_images")
+    const outputDir = path.join(process.cwd(), "resources", "shiloh-plugin", "safe_text_images")
     await fs.promises.mkdir(outputDir, { recursive: true })
     const outputPath = path.join(
       outputDir,
@@ -1320,7 +1320,7 @@ export class TextImageTool extends AbstractTool {
   }
 
   async renderChatImage({ text, nickname, avatarUrl }) {
-    const outputDir = path.join(process.cwd(), "resources", "bl-chat-plugin", "safe_text_images")
+    const outputDir = path.join(process.cwd(), "resources", "shiloh-plugin", "safe_text_images")
     await fs.promises.mkdir(outputDir, { recursive: true })
 
     const theme = getRenderTheme()

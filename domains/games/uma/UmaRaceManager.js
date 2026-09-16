@@ -959,8 +959,8 @@ export class UmaRaceManager {
   }
 
   getConfig() {
-    const userPath = path.join(this.cwd, "plugins/bl-chat-plugin/config/message.yaml")
-    const defaultPath = path.join(this.cwd, "plugins/bl-chat-plugin/config_default/message.yaml")
+    const userPath = path.join(this.cwd, "plugins/shiloh-plugin/config/message.yaml")
+    const defaultPath = path.join(this.cwd, "plugins/shiloh-plugin/config_default/message.yaml")
     const configPath = fs.existsSync(userPath) ? userPath : defaultPath
     let raw = {}
     try {
@@ -987,7 +987,7 @@ export class UmaRaceManager {
   getDataDir(config = this.getConfig()) {
     return path.isAbsolute(config.baseDir)
       ? config.baseDir
-      : path.join(this.cwd, "plugins/bl-chat-plugin", config.baseDir)
+      : path.join(this.cwd, "plugins/shiloh-plugin", config.baseDir)
   }
 
   getPointsPath(config = this.getConfig()) {

@@ -54,7 +54,7 @@ function compactError(error) {
 function findConfigPath() {
   const cwd = process.cwd()
   const candidates = [
-    path.join(cwd, "plugins", "bl-chat-plugin", "config", "message.yaml"),
+    path.join(cwd, "plugins", "shiloh-plugin", "config", "message.yaml"),
     path.join(cwd, "config", "message.yaml")
   ]
   return candidates.find(candidate => fs.existsSync(candidate)) || candidates[0]

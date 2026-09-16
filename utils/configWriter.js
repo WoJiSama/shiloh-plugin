@@ -3,8 +3,8 @@ import path from "path"
 import YAML from "yaml"
 
 const _path = process.cwd()
-const USER_CONFIG_PATH = path.join(_path, "plugins/bl-chat-plugin/config/message.yaml")
-const DEFAULT_CONFIG_PATH = path.join(_path, "plugins/bl-chat-plugin/config_default/message.yaml")
+const USER_CONFIG_PATH = path.join(_path, "plugins/shiloh-plugin/config/message.yaml")
+const DEFAULT_CONFIG_PATH = path.join(_path, "plugins/shiloh-plugin/config_default/message.yaml")
 
 export function readUserSettings() {
   const file = fs.existsSync(USER_CONFIG_PATH) ? USER_CONFIG_PATH : DEFAULT_CONFIG_PATH

@@ -14,7 +14,7 @@ const _path = process.cwd()
 export class CommandHelp extends plugin {
   constructor() {
     super({
-      name: "bl-chat-plugin命令总表",
+      name: "shiloh-plugin命令总表",
       dsc: ".命令 / .帮助 查看全部命令；.命令 <模块> 看分模块；.命令 导出 生成文档；网页管理页同步挂载",
       event: "message",
       priority: 500,
@@ -27,7 +27,7 @@ export class CommandHelp extends plugin {
         { reg: "^[.。#]帮助\\s*$", fnc: "showMenu" }
       ]
     })
-    this.pluginRoot = path.join(_path, "plugins/bl-chat-plugin")
+    this.pluginRoot = path.join(_path, "plugins/shiloh-plugin")
     try {
       registerCommandsWebApp(this.pluginRoot)
     } catch (error) {

@@ -32,7 +32,7 @@ function newEntryId() {
  */
 export class AdCorpusStore {
   constructor({
-    filePath = path.join(process.cwd(), "plugins/bl-chat-plugin/data/group_moderation/ad_corpus.jsonl"),
+    filePath = path.join(process.cwd(), "plugins/shiloh-plugin/data/group_moderation/ad_corpus.jsonl"),
     maxEntries = DEFAULT_MAX_ENTRIES,
     logger = globalThis.logger
   } = {}) {

@@ -23,7 +23,7 @@ function extensionForUrl(url = "") {
 export async function downloadPixivArchiveImage(imageUrl, { maxBytes = PIXIV_ARCHIVE_MAX_IMAGE_BYTES, timeoutMs = DOWNLOAD_TIMEOUT_MS, fetchImpl = globalThis.fetch } = {}) {
   if (!isTrustedPixivImageUrl(imageUrl)) return ""
   if (typeof fetchImpl !== "function") return ""
-  const dir = path.join(os.tmpdir(), "bl-chat-plugin-pixiv-archive")
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-archive")
   await fs.promises.mkdir(dir, { recursive: true })
   const filePath = path.join(dir, `${Date.now()}-${Math.random().toString(16).slice(2)}${extensionForUrl(imageUrl)}`)
   const controller = new AbortController()

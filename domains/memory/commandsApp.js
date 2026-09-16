@@ -11,7 +11,7 @@ const CLEAR_GROUP_MEMORY_CONFIRM_TTL_MS = 30000
 export class MemoryCommandsPlugin extends plugin {
   constructor() {
     super({
-      name: "bl-chat-plugin 记忆与表达命令",
+      name: "shiloh-plugin 记忆与表达命令",
       dsc: "#记忆状态 / #我的记忆 / #群记忆 / .表达学习 / .希洛反馈 等记忆管理命令",
       event: "message",
       priority: 1500,

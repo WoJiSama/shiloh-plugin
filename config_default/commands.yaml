@@ -105,20 +105,76 @@ domains:
   - key: dice
     name: 骰子
     icon: "🎲"
-    desc: 自定义规则包骰子系统（JS 规则包，规划中兼容 sealdice 骰句语法）
+    desc: COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；回复文案可在命令管理页「骰子模板」里改
     commands:
+      - usage: ".r <表达式>"
+        desc: 掷骰，如 .r1d100 / .r 2d6+3 / .r 3#1d100 / .r 4d6kh3（取高丢低都支持）
+        perm: all
+        src: "domains/dice/app.js roll"
+      - usage: ".ra <技能> <值> [困难|极难|大成功]"
+        desc: COC 检定（支持难度前缀与 .ra b/p 奖惩骰）
+        perm: all
+        src: "domains/dice/app.js check"
+      - usage: ".rav A 60 vs B 50"
+        desc: 对抗检定；也可 .rav 斗殴 @对方
+        perm: all
+        src: "domains/dice/app.js opposed"
+      - usage: ".rh <技能> <值>"
+        desc: 暗骰，结果私聊发送
+        perm: all
+        src: "domains/dice/app.js hiddenCheck"
+      - usage: ".sc <成功/失败> [SAN] [--half --cap=N]"
+        desc: SAN Check（大失败时损失骰取最大）
+        perm: all
+        src: "domains/dice/app.js sanCheck"
+      - usage: ".en <技能> [值]"
+        desc: 成长检定（失败可成长 +1d10，自动写卡）
+        perm: all
+        src: "domains/dice/app.js enCheck"
+      - usage: ".st <录入|show|showall|hide|del|clr>"
+        desc: 人物卡管理（侦查=60 / san-1 增减 / 隐藏属性）
+        perm: all
+        src: "domains/dice/app.js st"
+      - usage: ".pc <list|new|use|del|tag|lock>"
+        desc: 多人物卡管理
+        perm: all
+        src: "domains/dice/app.js pc"
+      - usage: ".coc7 [数量] / .dnd [数量]"
+        desc: 生成 COC7/DND 属性
+        perm: all
+        src: "domains/dice/app.js coc|dnd"
+      - usage: ".setcoc [0-5|无大失败]"
+        desc: 查看或设置本群 COC 房规
+        perm: all
+        src: "domains/dice/app.js setCoc"
+      - usage: ".bp/.pp [数量]"
+        desc: 奖励骰/惩罚骰
+        perm: all
+        src: "domains/dice/app.js roll"
+      - usage: ".ti / .li"
+        desc: 临时疯狂/总结疯狂表
+        perm: all
+        src: "domains/dice/app.js ti|li"
+      - usage: ".nn <昵称> / .sn on|off"
+        desc: 骰娘显示名 / 自动群名片
+        perm: all
+        src: "domains/dice/app.js nn|sn"
+      - usage: ".jrrp / .db [STR SIZ]"
+        desc: 今日人品 / 伤害加值
+        perm: all
+        src: "domains/dice/app.js jrrp|db"
       - usage: ".draw <牌组> [keys|list|search|desc|reload]"
         desc: 牌堆抽牌与管理（牌堆文件放 config/decks/）
         perm: all
         src: "domains/dice/DeckManager.js"
-      - usage: ".<规则包命令>"
-        desc: 规则包定义的任意骰子命令，如 .r 1d100、.ra 力量 70（以已加载规则包为准）
+      - usage: ".骰规则 [导入|确认|启用|禁用|列表|删除]"
+        desc: 规则包/海豹扩展管理（三种格式：YAML/JS/海豹脚本）
+        perm: master
+        src: "domains/dice/DiceRulePackManager.js"
+      - usage: ".<规则包命令> / .<海豹扩展命令>"
+        desc: 已启用规则包与海豹扩展注册的命令（在命令管理页「骰子扩展」可见）
         perm: all
-        src: "apps/DicePlugin.js customDiceRule"
-      - usage: ".骰子规则 [列表|详情|帮助]"
-        desc: 查看已加载的规则包与命令（以规则包内置帮助为准）
-        perm: all
-        src: "utils/DiceRulePackManager.js"
+        src: "动态注册"
 
   - key: deltaforce
     name: 三角洲

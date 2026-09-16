@@ -548,7 +548,7 @@ export class ModrinthClient {
       const timer = setTimeout(() => controller.abort(), this.timeoutMs)
       try {
         const response = await this.fetchImpl(url, {
-          headers: { Accept: "application/json", "User-Agent": "bl-chat-plugin/1.0 Modrinth ranking" },
+          headers: { Accept: "application/json", "User-Agent": "shiloh-plugin/1.0 Modrinth ranking" },
           signal: controller.signal,
           ...(dispatcher ? { dispatcher } : {})
         })

@@ -11,7 +11,7 @@ function makeFakeGuoba() {
   const guobaStatic = path.join(root, "Guoba-Plugin", "server", "static")
   fs.mkdirSync(guobaStatic, { recursive: true })
   fs.writeFileSync(path.join(guobaStatic, "index.html"), FAKE_PAGE)
-  const pluginRoot = path.join(root, "bl-chat-plugin")
+  const pluginRoot = path.join(root, "shiloh-plugin")
   fs.mkdirSync(pluginRoot, { recursive: true })
   return { root, pluginRoot, index: path.join(guobaStatic, "index.html") }
 }

@@ -38,7 +38,7 @@ import { ForgetGroupKnowledgeTool } from "../functions/functions_tools/ForgetGro
 import { TorrentDownloadTool } from "../functions/functions_tools/TorrentDownloadTool.js"
 import { resolveToolSkill } from "./toolSkills.js"
 
-const PLUGIN_NAME = "bl-chat-plugin"
+const PLUGIN_NAME = "shiloh-plugin"
 const CUSTOM_TOOL_EXTENSIONS = new Set([".js", ".mjs", ".cjs"])
 const TOOL_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]{0,63}$/
 const DEFAULT_RELOAD_INTERVAL_MS = 5000

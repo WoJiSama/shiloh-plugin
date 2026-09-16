@@ -10,15 +10,15 @@ import { buildVisibleFailureDetail } from '../../utils/visibleFailure.js'
 const _path = process.cwd()
 
 function getKnowledgeConfig() {
-  const configPath = path.join(_path, 'plugins/bl-chat-plugin/config/message.yaml')
-  const defaultPath = path.join(_path, 'plugins/bl-chat-plugin/config_default/message.yaml')
+  const configPath = path.join(_path, 'plugins/shiloh-plugin/config/message.yaml')
+  const defaultPath = path.join(_path, 'plugins/shiloh-plugin/config_default/message.yaml')
   const cfgPath = fs.existsSync(configPath) ? configPath : defaultPath
   const config = YAML.parse(fs.readFileSync(cfgPath, 'utf8')).pluginSettings
   return config
 }
 
 function getDbPath() {
-  return path.join(_path, 'plugins/bl-chat-plugin/database/knowledge-db.ndjson')
+  return path.join(_path, 'plugins/shiloh-plugin/database/knowledge-db.ndjson')
 }
 
 function createExpander(config) {
@@ -42,7 +42,7 @@ function createSearcher(config) {
 }
 
 async function ensureDataDir() {
-  const dataDir = path.join(_path, 'plugins/bl-chat-plugin/database')
+  const dataDir = path.join(_path, 'plugins/shiloh-plugin/database')
   try {
     await access(dataDir)
   } catch {

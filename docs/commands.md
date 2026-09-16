@@ -1,7 +1,7 @@
 # 命令总表
 
 > 本文档由 `config_default/commands.yaml` 生成（`.命令 导出` 或运行 scripts/gen-commands-doc.mjs）。
-> 生成时间：2026-09-16 06:27:40 ｜ 共 83 条命令 / 11 个模块
+> 生成时间：2026-09-16 10:51:50 ｜ 共 97 条命令 / 11 个模块
 
 ## 🧠 记忆与表达
 
@@ -38,13 +38,27 @@
 
 ## 🎲 骰子
 
-自定义规则包骰子系统（JS 规则包，规划中兼容 sealdice 骰句语法）
+COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；回复文案可在命令管理页「骰子模板」里改
 
 | 用法 | 说明 | 权限 | 实现位置 |
 | --- | --- | --- | --- |
+| `.r <表达式>` | 掷骰，如 .r1d100 / .r 2d6+3 / .r 3#1d100 / .r 4d6kh3（取高丢低都支持） | 所有人 | `domains/dice/app.js roll` |
+| `.ra <技能> <值> [困难|极难|大成功]` | COC 检定（支持难度前缀与 .ra b/p 奖惩骰） | 所有人 | `domains/dice/app.js check` |
+| `.rav A 60 vs B 50` | 对抗检定；也可 .rav 斗殴 @对方 | 所有人 | `domains/dice/app.js opposed` |
+| `.rh <技能> <值>` | 暗骰，结果私聊发送 | 所有人 | `domains/dice/app.js hiddenCheck` |
+| `.sc <成功/失败> [SAN] [--half --cap=N]` | SAN Check（大失败时损失骰取最大） | 所有人 | `domains/dice/app.js sanCheck` |
+| `.en <技能> [值]` | 成长检定（失败可成长 +1d10，自动写卡） | 所有人 | `domains/dice/app.js enCheck` |
+| `.st <录入|show|showall|hide|del|clr>` | 人物卡管理（侦查=60 / san-1 增减 / 隐藏属性） | 所有人 | `domains/dice/app.js st` |
+| `.pc <list|new|use|del|tag|lock>` | 多人物卡管理 | 所有人 | `domains/dice/app.js pc` |
+| `.coc7 [数量] / .dnd [数量]` | 生成 COC7/DND 属性 | 所有人 | `domains/dice/app.js coc|dnd` |
+| `.setcoc [0-5|无大失败]` | 查看或设置本群 COC 房规 | 所有人 | `domains/dice/app.js setCoc` |
+| `.bp/.pp [数量]` | 奖励骰/惩罚骰 | 所有人 | `domains/dice/app.js roll` |
+| `.ti / .li` | 临时疯狂/总结疯狂表 | 所有人 | `domains/dice/app.js ti|li` |
+| `.nn <昵称> / .sn on|off` | 骰娘显示名 / 自动群名片 | 所有人 | `domains/dice/app.js nn|sn` |
+| `.jrrp / .db [STR SIZ]` | 今日人品 / 伤害加值 | 所有人 | `domains/dice/app.js jrrp|db` |
 | `.draw <牌组> [keys|list|search|desc|reload]` | 牌堆抽牌与管理（牌堆文件放 config/decks/） | 所有人 | `domains/dice/DeckManager.js` |
-| `.<规则包命令>` | 规则包定义的任意骰子命令，如 .r 1d100、.ra 力量 70（以已加载规则包为准） | 所有人 | `apps/DicePlugin.js customDiceRule` |
-| `.骰子规则 [列表|详情|帮助]` | 查看已加载的规则包与命令（以规则包内置帮助为准） | 所有人 | `utils/DiceRulePackManager.js` |
+| `.骰规则 [导入|确认|启用|禁用|列表|删除]` | 规则包/海豹扩展管理（三种格式：YAML/JS/海豹脚本） | 仅主人 | `domains/dice/DiceRulePackManager.js` |
+| `.<规则包命令> / .<海豹扩展命令>` | 已启用规则包与海豹扩展注册的命令（在命令管理页「骰子扩展」可见） | 所有人 | `动态注册` |
 
 ## 🔫 三角洲
 

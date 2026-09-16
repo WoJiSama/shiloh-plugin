@@ -659,7 +659,7 @@ export class GlobalStyleLearnerManager {
     const cfg = normalizeConfig(config)
     return path.isAbsolute(cfg.baseDir)
       ? cfg.baseDir
-      : path.join(this.cwd, "plugins/bl-chat-plugin", cfg.baseDir)
+      : path.join(this.cwd, "plugins/shiloh-plugin", cfg.baseDir)
   }
 
   getMemoryPath(config = {}) {

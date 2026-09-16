@@ -107,7 +107,7 @@ export class VolcengineVoiceProvider {
     const requestId = randomUUID()
     const body = compactObject({
       user: {
-        uid: cfg.uid || "bl-chat-plugin"
+        uid: cfg.uid || "shiloh-plugin"
       },
       req_params: {
         text,

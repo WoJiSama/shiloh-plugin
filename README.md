@@ -1,6 +1,6 @@
-# bl-chat-plugin 个人改造版
+# shiloh-plugin 个人改造版
 
-> 本项目借鉴并基于 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin) 做二次改造。
+> 本项目借鉴并基于 [Cat-bl/shiloh-plugin](https://github.com/Cat-bl/shiloh-plugin) 做二次改造。
 >
 > 这里不是上游项目的官方文档，也不是通用发行版说明。这个仓库主要记录我在原项目基础上，为自己的 TRSS Yunzai + NapCat 环境做了哪些重构、增强和定制。
 
@@ -30,7 +30,7 @@
 
 ## 和上游的关系
 
-上游 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin) 是本仓库的基础来源。上游已有能力仍然以原项目为准，本仓库主要是在其基础上继续维护个人化改造。
+上游 [Cat-bl/shiloh-plugin](https://github.com/Cat-bl/shiloh-plugin) 是本仓库的基础来源。上游已有能力仍然以原项目为准，本仓库主要是在其基础上继续维护个人化改造。
 
 如果你想找更通用的原版说明，请优先看上游项目。
 
@@ -285,15 +285,15 @@ memorySystem:
 在 Yunzai 根目录执行：
 
 ```bash
-git clone --depth=1 https://github.com/WoJiSama/bl-chat-plugin plugins/bl-chat-plugin
-cd plugins/bl-chat-plugin
+git clone --depth=1 https://github.com/WoJiSama/shiloh-plugin plugins/shiloh-plugin
+cd plugins/shiloh-plugin
 pnpm install
 ```
 
 如果你想安装上游原版，请使用：
 
 ```bash
-git clone --depth=1 https://github.com/Cat-bl/bl-chat-plugin plugins/bl-chat-plugin
+git clone --depth=1 https://github.com/Cat-bl/shiloh-plugin plugins/shiloh-plugin
 ```
 
 首次启动会自动创建 `config` 文件夹。
@@ -492,7 +492,7 @@ oneapi_tools:
 不要直接改 `functions/functions_tools` 里的自带工具。自定义工具放这里：
 
 ```text
-plugins/bl-chat-plugin/custom_tools/
+plugins/shiloh-plugin/custom_tools/
 ```
 
 步骤：
@@ -536,7 +536,7 @@ config_default/mcp-servers.yaml
 - 群聊量大的群建议调大 `userExtractDebounceSeconds` 和 `groupExtractMinIntervalMinutes`，避免频繁抽取。
 - 生图、修图、识图建议分别配适合的模型，不要所有任务共用一个慢模型。
 - 长任务工具建议加 `(dedupe)`，防止群里连续刷同一个请求。
-- 如果你只想要原版插件，建议直接使用上游 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin)。
+- 如果你只想要原版插件，建议直接使用上游 [Cat-bl/shiloh-plugin](https://github.com/Cat-bl/shiloh-plugin)。
 
 ## 维护说明
 

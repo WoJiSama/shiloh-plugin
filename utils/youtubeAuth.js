@@ -32,7 +32,7 @@ export async function withYoutubeYtDlpAuth({ cookieHeader, poToken } = {}, run) 
   const tokenText = poTokenText(poToken)
   if (!cookieText && !tokenText) return await run([])
 
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "bl-chat-plugin-youtube-auth-"))
+  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "shiloh-plugin-youtube-auth-"))
   try {
     await fs.promises.chmod(directory, 0o700)
     const args = []

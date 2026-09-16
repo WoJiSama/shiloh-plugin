@@ -3,9 +3,9 @@
 # 2026-09-01 群广告扫描艾特通知
 - 已确认项目已有复合群管骨架，后台配置与默认配置均存在；当前缺口是群内提醒未艾特配置管理员。
 - 已完成实现：后台改名为“广告扫描”，新增群内艾特开关，群内命中提醒会艾特全局与本群配置名单，同时保留原有私聊证据转发选项。
-- 本地与生产定向回归 14/14 通过，生产服务已重启并正常运行（34 个插件加载、锅巴启动成功）。备份：`/opt/trss-yunzai-backups/bl-chat-plugin-ad-scan-mention-20260901-143646`。
+- 本地与生产定向回归 14/14 通过，生产服务已重启并正常运行（34 个插件加载、锅巴启动成功）。备份：`/opt/trss-yunzai-backups/shiloh-plugin-ad-scan-mention-20260901-143646`。
 - 正在补后台文案与回归保护，明确“通知名单”不等于 QQ 群管理员。
-- 已上线：本地和线上 15/15 定向测试通过，服务重启后正常；后台仅将填写的 QQ 视为通知收件人。备份：`/opt/trss-yunzai-backups/bl-chat-plugin-ad-scan-notification-labels-20260901-144621`。
+- 已上线：本地和线上 15/15 定向测试通过，服务重启后正常；后台仅将填写的 QQ 视为通知收件人。备份：`/opt/trss-yunzai-backups/shiloh-plugin-ad-scan-notification-labels-20260901-144621`。
 - 已完成主聊天、工具兜底和直接命令出口初查；下一步实现共享脱敏格式化器，随后替换高频直接回复出口。
 
 # 2026-08-05 统一群记忆链路
@@ -77,7 +77,7 @@
 - 已完成稳定性改动：召回相关性阈值、允许注入条数为 0、低信号内容过滤、画像注入长度上限和近期发言去重。
 - `node --check` 已通过：`utils/MemoryManager.js`、`utils/PersonProfileInjector.js`、`models/Guoba/schemas/memory.js`、`models/Guoba/schemas/tracking.js`。
 - `git diff --check` 已通过。
-- 已同步远端 `/opt/trss-yunzai/plugins/bl-chat-plugin` 对应文件，并删除误同步到插件根目录的临时 basename 文件。
+- 已同步远端 `/opt/trss-yunzai/plugins/shiloh-plugin` 对应文件，并删除误同步到插件根目录的临时 basename 文件。
 - 已重启 `trss-yunzai.service`，服务状态 `active`，Guoba 启动成功。
 - 远端部署路径再次执行 `node --check` 通过，`systemctl is-active trss-yunzai.service` 返回 `active`。
 
@@ -90,7 +90,7 @@
 - 本地模拟首次失败：`utils/UmaRaceManager.js` 引入了未声明依赖 `yaml`；已改为项目已有的 `js-yaml`。
 - 本地 `node --check` 通过：`utils/UmaRaceManager.js`、`apps/UmaRacePlugin.js`、`models/Guoba/schemas/umaRace.js`、`models/Guoba/schemas/index.js`。
 - 本机运行级模拟因 `node_modules` 缺失无法 import 项目依赖；改用服务器实际环境模拟。
-- 已同步到服务器并在 `/opt/trss-yunzai/plugins/bl-chat-plugin` 执行 `node --check` 通过。
+- 已同步到服务器并在 `/opt/trss-yunzai/plugins/shiloh-plugin` 执行 `node --check` 通过。
 - 服务器临时目录模拟比赛通过，两个玩家积分写入结果为 `5,2`。
 - 已重启 `trss-yunzai.service`，状态 `active`，日志显示插件加载数为 33。
 
@@ -260,7 +260,7 @@
 - 已注册 `excelWorkbookTool`、默认配置和自然语言 manifest，并把 Excel 意图加入总工具暴露、语义提示和表情工具排除层。
 - Excel 与相关回归本地 28/29，通过 28、仅既有表情工具运行级因 checkout 缺 `yaml` 跳过；Excel 的公式/cached value、缺缓存、中文 sheet、范围、合并格、值/公式搜索、文件来源、旧 `.xls`、SSRF 和完整工具输出均通过。
 - 线上已安装 ExcelJS 4.4.0；首次依赖备份目录触发 pnpm workspace 警告后已移到 `/opt/trss-yunzai-backups`，当前依赖解析正常。
-- 已同步生产代码和 live 配置；线上运行级 29/29、工具注册 `registry_excel=true`、live 配置幂等后 `config_excel=1`，ExcelJS 仅由 bl-chat-plugin importer 声明并可从插件目录加载。
+- 已同步生产代码和 live 配置；线上运行级 29/29、工具注册 `registry_excel=true`、live 配置幂等后 `config_excel=1`，ExcelJS 仅由 shiloh-plugin importer 声明并可从插件目录加载。
 - 线上模型抽参探针 4/4：read_cell、list_sheets、find、附文件短问均调用 `excelWorkbookTool` 且参数正确，没有乱填 fileUrl。
 - 补强 QQ 文件下载：存在 file_id/fid 时先向群/好友接口刷新 URL，再退回消息段旧直链；新增回归后本地与线上相关测试 24/24。
 - 已在图片任务为 0 时安全重启；服务 active，Guoba 正常、加载插件 36 个、OneBotv11 于 13:13:44 重连，AppleDouble 0，重启后无 Excel 工具缺失、ExcelJS 模块或语法载入错误。
@@ -269,7 +269,7 @@
 - 已验证群文件下载链接请求携带 `busid`，当前/引用/近期文件仍优先于群文件；无指定文件名时只在当前群恰好一个可支持 Excel 时自动选择。
 - 本地 `node --check` 全部通过；`tests/excelWorkbook.test.js`、`tests/toolIntentManifests.test.js`、`tests/groupContextResolver.test.js` 合计 28/28 通过。
 - 阶段 6、7 完成，进入阶段 8：线上备份、部署、模型抽参和安全重启验证。
-- 已将 5 个群文件相关文件备份并同步到 `/opt/trss-yunzai/plugins/bl-chat-plugin`；部署使用无扩展属性 tar，线上 AppleDouble 文件为 0。
+- 已将 5 个群文件相关文件备份并同步到 `/opt/trss-yunzai/plugins/shiloh-plugin`；部署使用无扩展属性 tar，线上 AppleDouble 文件为 0。
 - 线上语法检查和 Excel/manifest/群上下文定向回归 28/28 通过；真实 tools 模型抽参探针 2/2，通过 `list_group_excels` 和带 `fileName=预算.xlsx` 的 `read_cell`。
 - 重启前图片任务为 0，已执行安全重启；`trss-yunzai.service` 为 active，Guoba 启动成功、加载插件 36 个，OneBotv11 于 13:24:40 建立连接。
 - 重启后运行时检查：live 配置 `excelWorkbookTool` 恰好 1 项，注册表已加载，操作列表为 `list_group_excels/list_sheets/read_cell/read_range/find`，未发现 ExcelJS、语法或插件载入错误。
@@ -305,7 +305,7 @@
 - 已确认刚才图片工具原始结果为 `{}`；旧流程误当成功并让模型从历史补出“闪避 80”。
 - 已实现共享工具结果 grounding：empty/not_found/error 全部直接如实回复，不再进入模型总结；混合结果仅允许使用本轮 success 内容。
 - 已修正图片分析空响应和失败文案，删除失败后“正常回复”的诱导。
-- 本地与线上相关回归 46/46；部署备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-tool-grounding-20260715-142435.tar.gz`。
+- 本地与线上相关回归 46/46；部署备份为 `/opt/trss-yunzai-backups/shiloh-plugin-tool-grounding-20260715-142435.tar.gz`。
 - 重启前图片任务为 0，已安全重启；服务 active、Guoba 正常、加载插件 36 个、OneBotv11 于 14:25:35 连接，AppleDouble 0，未见载入、语法或模块错误。
 - 工具未命中禁止编造阶段 1-5 全部完成。
 # 2026-07-17 回复节奏与表情包编排
@@ -351,7 +351,7 @@
 - 已补锅巴配置项，可调整序列时间窗、每轮条数和样本上限。
 - 定向语法与节奏回归 14/14 通过；覆盖新旧 AI 输出、普通图片排除、A-B-A 插话断序、旧 Redis 结构和默认单条边界。
 - 本地全量测试：350 通过、15 跳过；2 个既有测试文件因本地未安装 `axios/js-yaml` 加载失败，本轮表达学习相关测试全部通过。
-- 已备份并同步 8 个相关文件，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-expression-rhythm-20260717-115309.tar.gz`；远端文件哈希与本地一致，AppleDouble 为 0。
+- 已备份并同步 8 个相关文件，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-expression-rhythm-20260717-115309.tar.gz`；远端文件哈希与本地一致，AppleDouble 为 0。
 - 线上真实运行依赖下节奏回归 14/14 通过，服务尚未重启。
 - 首次运行态写入证明新字段会真实增长，同时发现异步检查造成的观察顺序风险；已把独立学习观察前移到第一个 await 前并补生产顺序回归。
 - 最终本地与线上定向回归均为 15/15；精确删除 1 条受旧顺序影响的 twoBeat 样本，保留 single/emojiOnly 计数。
@@ -378,7 +378,7 @@
 - 精确教程请求仍返回 400；当前 Key 的 `/models` 仅有 `grok-4.5`，没有 Grok 图片模型，已确认还存在渠道权限/模型暴露问题。
 - 已实现 Grok 文生图专用 payload：只发送 model/prompt/size/quality=high，忽略 n/response_format；普通图片 provider 保持原协议。
 - 本地共享策略 25/25，通过；Banana 运行级 payload 用例因本地缺 axios 跳过，准备线上复验。
-- 已备份并同步 Grok payload 兼容改动，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-grok-payload-20260717-175540.tar.gz`；线上运行依赖回归 37/37。
+- 已备份并同步 Grok payload 兼容改动，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-grok-payload-20260717-175540.tar.gz`；线上运行依赖回归 37/37。
 - 重启前活动图片任务 0；安全重启后 PID 从 3776323 切到 3781000，service active。代码已匹配教程，但当前 Key 未暴露图片模型，真实生成仍需更换有权限的 Key/渠道组。
 
 # 2026-07-17 线上图片编辑失败复核
@@ -390,7 +390,7 @@
 - 已实现自动任务类型归因：强错误证据中的“文生图/图片生成”优先判定 generate，“图片编辑”优先判定 edit；BananaTool 编辑异常也不再统一包成“图片生成失败”。
 - 已把 `400 Invalid request format` 识别为渠道请求契约未接通，回复明确“原样重试也不会解决”，不再建议用户稍后按原话重试。
 - 定向语法、失败策略与 fallback 回归 36/36 通过，`git diff --check` 通过。
-- 已备份并部署 4 个目标文件，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-image-failure-20260718-001829.tar.gz`；远端回归 36/36，AppleDouble=0，活动图片任务=0。
+- 已备份并部署 4 个目标文件，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-image-failure-20260718-001829.tar.gz`；远端回归 36/36，AppleDouble=0，活动图片任务=0。
 - 已安全重启，PID 从 3781000 切换为 3869216；service active、加载插件 36 个，OneBotv11/NapCat 于 00:19:50 重连。
 - 本地与远端 4 个目标文件 SHA-256 全部一致；线上模块回放真实 Grok 400 已输出“图片生成渠道当前没有接通……原样重试也不会解决”。
 
@@ -439,7 +439,7 @@
 - 检查确认过期风险来自解析层缓存完整卡片（含临时 `play_url`），而非合并转发或视频本体发送。
 - 已有本地补丁：默认缓存由 15 分钟缩至 30 秒；新增 0 TTL 回归覆盖两次请求获取不同播放地址。
 - 首轮组合测试发现新增测试少导入 `enrichDouyinShare`；已修复该测试导入，准备重跑本地及远端测试。
-- 本地与远端完整依赖环境均通过抖音相关回归 6/6，包含重复请求刷新临时 `play_url` 的用例；备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-douyin-play-url-refresh-20260719-104949.tar.gz`。
+- 本地与远端完整依赖环境均通过抖音相关回归 6/6，包含重复请求刷新临时 `play_url` 的用例；备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-douyin-play-url-refresh-20260719-104949.tar.gz`。
 - 已安全重启 `trss-yunzai.service`；当前 PID=154246、状态 active、加载插件 36 个，OneBotv11/NapCat 于 10:50:39 重新连接。线上与本地两个目标文件 SHA-256 一致。
 
 # 2026-07-19 Modrinth 双语简介
@@ -448,19 +448,19 @@
 - 已新增 `modrinthTool` 与公开 API 客户端：排序、版本/加载器/分类/关键词筛选、1-10 条边界、8 秒超时、2 分钟进程内缓存、公开项目页输出；已接入本地工具注册、默认工具列表和专用意图清单。
 - 已在 Modrinth 工具结果回流到聊天模型前加入系统级双语规则，要求每条保留英文原文并输出“中文翻译（希洛）”，禁止把翻译或补充伪装成官网资料。
 - 真实公开 API 工具调用已验证 1.21.1 + Fabric + optimization + downloads 返回 Sodium 的英文原始简介、下载/关注数据和项目页。补充 URL 路由边界：明确排名需求优先 Modrinth 工具，单纯页面阅读仍走 webParserTool。
-- 已以线上文件为基线精确合并 Modrinth 改动，避免覆盖本地其他未同步差异；备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-20260719-195113.tar.gz`。远端回归 15/15，真实 Modrinth 查询与工具注册均成功。
+- 已以线上文件为基线精确合并 Modrinth 改动，避免覆盖本地其他未同步差异；备份为 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-20260719-195113.tar.gz`。远端回归 15/15，真实 Modrinth 查询与工具注册均成功。
 - 已安全重启 `trss-yunzai.service`；新 PID=278837、服务 active、加载插件 36 个，OneBotv11/NapCat 于 19:52:58 连接。live `oneapi_tools` 已启用 `modrinthTool`，新进程无工具缺失、语法或插件加载错误。
 
 # 2026-07-19 Modrinth 卡面与字段缺失
 - 已还原群 `953676639` 的真实过程：只调用了 `modrinthTool`，模型成功翻译但省略作者、关注数、标签和项目页；发送层随后因 Markdown/长结构化文本自动转 document 图片。
 - 开始修复：对 Modrinth 结果禁用自动转图，并将最终双语字段改为强制固定格式。
-- 本地与远端定向回归 19/19；仅基于线上 `apps/test.js` 精确合并两处改动，未覆盖其他本地未同步内容。备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-text-20260719-195953.tar.gz`。
+- 本地与远端定向回归 19/19；仅基于线上 `apps/test.js` 精确合并两处改动，未覆盖其他本地未同步内容。备份为 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-text-20260719-195953.tar.gz`。
 - 已安全重启 `trss-yunzai.service`；新 PID=281117，服务 active、加载插件 36 个，OneBotv11/NapCat 于 20:00:45 连接。线上策略直测：默认 Modrinth 查询 `true`（保持文字），明确“转成图片” `false`（允许用户要求的转图）。
 
 # 2026-07-19 Modrinth 逐模组转发节点
 - 用户明确要求一条合并转发内每个模组各占独立聊天记录，并禁止结尾总评、推荐与追问。
 - 已实现 `[[MODRINTH_ITEM]]` 严格项目块协议、发送层逐项合并转发和块外文本丢弃；本地回归 20/20，准备部署。
-- 已按线上基线部署 `apps/test.js` 精确发送层补丁及 Modrinth 规则/工具/测试，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-forward-20260719-204653.tar.gz`；远端回归 20/20。
+- 已按线上基线部署 `apps/test.js` 精确发送层补丁及 Modrinth 规则/工具/测试，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-forward-20260719-204653.tar.gz`；远端回归 20/20。
 - 已安全重启 `trss-yunzai.service`；新 PID=292190，服务 active、加载插件 36 个，OneBotv11/NapCat 于 20:47:50 连接。线上探针确认 `forward_nodes=1` 且 `summary_dropped=true`。
 
 # 2026-07-19 Modrinth 翻译延迟
@@ -502,7 +502,7 @@
 - B站/抖音与消息管道扩展回归 37 通过、0 失败、3 项本地依赖缺失跳过；阶段 2-7 已完成，进入阶段 8 线上验证与迁移。
 - 本地全量回归 392 通过、2 个测试文件因缺 `exceljs/js-yaml` 加载失败、26 项依赖缺失跳过；无新增断言失败，待线上完整依赖补齐证据。
 - 线上同目录层级 staging 使用真实 TRSS/plugin 依赖运行 33/33，通过且 0 跳过；生产服务保持 PID=498897、active，尚未覆盖或重启。
-- 已备份并部署生产，备份：`/opt/trss-yunzai-backups/bl-chat-plugin-message-pipeline-20260720-125528.tar.gz`。生产磁盘新版本 33/33、0 跳过，旧 recorder/notice/relay 文件为 0，图片任务 0，AppleDouble 0。
+- 已备份并部署生产，备份：`/opt/trss-yunzai-backups/shiloh-plugin-message-pipeline-20260720-125528.tar.gz`。生产磁盘新版本 33/33、0 跳过，旧 recorder/notice/relay 文件为 0，图片任务 0，AppleDouble 0。
 - 已安全重启一次：PID `498897 -> 524500`；启动日志确认 MessagePipeline 已启动，静态插件 33 + 动态 status 1，OneBotv11/NapCat 于 12:56:22 建立连接，服务 active。
 - 24 个部署目标文件线上 SHA-256 与本地全部一致；live `messagePipeline` 参数和 `groupChatMemoryMinutes=60` 已写入。当前尚无重启后的真实入站样本，Redis event/delivery 均为 0，等待用户向 609235590 与 953676639 发送同一分享完成最终验收。
 
@@ -542,7 +542,7 @@
 - 已完成 Modrinth 结构化数据、仅译简介 JSON、7 天进程内译文缓存、确定性合并转发和可配置 translation 后端；不再让模型重写下载量等字段。
 - 已完成 API 可选生成参数透传与兼容性 400 同后端降级；本地组合定向回归 51 通过、0 失败、1 项因 node-fetch 缺失跳过，进入全量回归。
 - 本地全量：413 通过、2 个既有依赖加载失败、26 跳过；新增业务断言无失败。线上完整依赖目标回归 96/96。
-- 已备份并部署，主备份 `/opt/trss-yunzai-backups/bl-chat-plugin-performance-20260720-142449.tar.gz`；Modrinth IPv4 增量备份 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-ipv4-20260720-144508.tar.gz`。
+- 已备份并部署，主备份 `/opt/trss-yunzai-backups/shiloh-plugin-performance-20260720-142449.tar.gz`；Modrinth IPv4 增量备份 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-ipv4-20260720-144508.tar.gz`。
 - 真实探针定位并修复 Node fetch 到 Modrinth 的双栈超时：专用 IPv4 dispatcher 连续 3/3 成功，失败时回退默认路径。
 - 五项 Modrinth 冷请求实测约 6.64 秒、同进程暖缓存约 0.53ms；翻译映射和五个转发节点完整。
 - 最终安全重启到 PID 552915；service active、34 插件、MessagePipeline 单实例、OneBot/NapCat 已连接、HTTP 2536=302、AppleDouble 0。实施阶段 1-5 完成。
@@ -555,7 +555,7 @@
 # 2026-07-20 视频搬运提速
 - 用户要求继续加速视频搬运。开始以现有 `MediaTiming`、relay 和 outbox 为依据定位，目标是拆开资源准备与群级最终发送，不先假定下载一定是唯一瓶颈。
 - 已完成实现与本地回归：新增预准备池/租约清理、保留群内最终发送顺序，并修正 B站 artifact 成功误报。媒体及消息管道定向回归 29/29 通过；服务器同层完整依赖复跑同样 29/29 通过。
-- 已备份并部署线上，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-media-prewarm-20260720-150603.tar.gz`。服务已重启至 PID `557599`、active、34 个插件、MessagePipeline 单实例且 OneBotv11 已连接；3 个生产模块 SHA-256 与本地一致，错误平铺的根目录文件已清理。等待下一条真实 B站/抖音分享记录新的 `MediaTiming` 分段耗时。
+- 已备份并部署线上，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-media-prewarm-20260720-150603.tar.gz`。服务已重启至 PID `557599`、active、34 个插件、MessagePipeline 单实例且 OneBotv11 已连接；3 个生产模块 SHA-256 与本地一致，错误平铺的根目录文件已清理。等待下一条真实 B站/抖音分享记录新的 `MediaTiming` 分段耗时。
 
 # 2026-07-20 Modrinth 可展示字段核对
 - 用户询问当前排名节点还可展示哪些 API 内容。已实时核对 `/v2/search` 与 `/v2/project/NNAgCjsB`：搜索结果可无额外请求补图标、版本、加载器、支持端、日期、许可证和精选图；完整正文、官方链接、问题页与图库需要按项目详情请求，适合显式展开而非默认前五。
@@ -565,7 +565,7 @@
 - 本地 Modrinth 定向回归 16/16 通过；线上同目录运行 28/29，通过项均与本轮相关，唯一失败仍是从插件目录运行时 TRSS 配置 cwd 缺失。已从 `/opt/trss-yunzai` 根目录补跑该项并通过。
 - 首次独立 Node 渲染探针缺少 TRSS 启动期注入的全局 `logger`，在 renderer loader 初始化前失败；不是模板或卡面实现失败。下一次为探针补足最小运行时全局后重试，生产服务尚未重启。
 - 服务器已完成 Modrinth 相关完整依赖验证：定向 28 项通过，`agentApiRouting` 以 TRSS 根目录补跑通过；6 个生产文件 SHA-256 与本地一致，线上语法检查通过。独立 renderer 探针因 TRSS 全局依赖停止，准备以正常服务真实请求验收。
-- 已备份并部署，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-modrinth-cards-20260720-152302.tar.gz`。服务重启至 PID `563263`、active、34 个插件；Puppeteer renderer 已加载，MessagePipeline 单实例，NapCat/OneBotv11 已连接。等待用户发起真实 Modrinth 排名请求，确认 QQ 合并转发中每节点为卡图加卡外 URL。
+- 已备份并部署，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-modrinth-cards-20260720-152302.tar.gz`。服务重启至 PID `563263`、active、34 个插件；Puppeteer renderer 已加载，MessagePipeline 单实例，NapCat/OneBotv11 已连接。等待用户发起真实 Modrinth 排名请求，确认 QQ 合并转发中每节点为卡图加卡外 URL。
 # 2026-07-20 群工作流记忆
 - 已开始：根据现有长期记忆的“非指令性”召回边界，准备新增独立的可执行群工作流规则层；尚未修改业务代码或线上服务。
 - 已完成链路审计：`MemoryManager` + `RedisStore` 可扩展独立 key；系统提示已有执行动作说明；管理员专用工具不能覆盖任意已教成员，需接通用精确成员提及工具。
@@ -575,8 +575,8 @@
 # 2026-07-21 B站番剧卡片本体失败续修
 - 恢复上下文后确认：番剧短链已能解析出 `ep_id` 并获取详情，但播放阶段在约 93ms 后得到空资源，尚未发生下载。开始以线上脱敏接口响应验证字段和业务错误码，随后再写实际兼容与错误原因映射。
 - 生产接口确认 `result.durl` 为唯一可用资源字段；本地修复与新增短链->season->playurl、空资源、地区限制夹具后，定向回归 14/14 通过。准备同步生产磁盘并在重启前用真实番剧做无发送验证。
-- 已备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-bangumi-playurl-20260721-115838.tar.gz` 并同步 4 个业务文件、2 个测试文件；生产逐文件回归 13/13。直接解析真实 `ep1455179` 得到 1 条 qn=6 资源（不输出临时 URL），安全重启后 PID=853328、active、34 插件、MessagePipeline/OneBotv11 正常。业务改动已提交并经 SSH 推送为 `c881101 fix: relay Bilibili Bangumi episodes`；规划文件和无关未跟踪文件未纳入提交。
-- 复测发现 `ep411084` 是 B 站 6 分钟试看：完整集约 24:52，响应 `is_preview=true` 且唯一资源约 6:00。新增试看资源拒发与真实原因文案；本地/生产回归 14/14，生产同集直测确认资源数为 0。备份 `/opt/trss-yunzai-backups/bl-chat-plugin-bangumi-preview-20260721-130524.tar.gz` 后安全重启为 PID=868618，active、34 插件、MessagePipeline/OneBotv11 正常。
+- 已备份为 `/opt/trss-yunzai-backups/shiloh-plugin-bangumi-playurl-20260721-115838.tar.gz` 并同步 4 个业务文件、2 个测试文件；生产逐文件回归 13/13。直接解析真实 `ep1455179` 得到 1 条 qn=6 资源（不输出临时 URL），安全重启后 PID=853328、active、34 插件、MessagePipeline/OneBotv11 正常。业务改动已提交并经 SSH 推送为 `c881101 fix: relay Bilibili Bangumi episodes`；规划文件和无关未跟踪文件未纳入提交。
+- 复测发现 `ep411084` 是 B 站 6 分钟试看：完整集约 24:52，响应 `is_preview=true` 且唯一资源约 6:00。新增试看资源拒发与真实原因文案；本地/生产回归 14/14，生产同集直测确认资源数为 0。备份 `/opt/trss-yunzai-backups/shiloh-plugin-bangumi-preview-20260721-130524.tar.gz` 后安全重启为 PID=868618，active、34 插件、MessagePipeline/OneBotv11 正常。
 
 # 2026-07-20 结构化群知识
 - 已开始群文件/人物关系记忆扩展设计：确认普通群事实不具备可检索的文件资源身份，下一步读取当前消息段和群文件记录的真实字段，再增加独立知识条目层。
@@ -641,7 +641,7 @@
 - 生产强制回退探针首次失败：旧额度 900 已触发紧凑重试，但 6000 token 重试仍使用 30 秒超时，被 `AbortSignal` 中止且泄露底层数字 code 23；未修改正式表达记忆，进入第二轮超时/紧凑度修正。
 - 第二轮改为紧凑 4+4 条规则、4000 token、独立 60 秒超时，并把 timeout/abort 归一为可重试业务错误；本地与生产相关回归均为 16/16。
 - 生产真实强制回退探针成功：调用额度序列 `[900, 4000]`，总耗时约 25.5 秒，第二轮使用 20 条样本并成功生成规则；探针使用临时内存副本，正式表达记忆未改变。
-- 最终备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-style-summary-retry-20260723-161601.tar.gz`；服务 PID 1586632 active、34 插件、OneBot/NapCat 已连接、4/4 文件哈希一致。
+- 最终备份为 `/opt/trss-yunzai-backups/shiloh-plugin-style-summary-retry-20260723-161601.tar.gz`；服务 PID 1586632 active、34 插件、OneBot/NapCat 已连接、4/4 文件哈希一致。
 
 # 2026-07-23 生图比例与像素规格解耦
 - 已确认目标：`1024×1024` 是 1:1 输出档位，不是构图文本、像素坐标或强制变形依据；开始审计完整尺寸链路。
@@ -653,7 +653,7 @@
 - 比例意图会在绘图任务进入持久队列前写回结构化参数，服务器即使之后恢复队列也不依赖已丢失的原始事件文本。
 - 仓库全量测试共 563 项：539 通过、23 跳过、1 失败；唯一失败仍是既有 UmaRace 测试缺 `/Users/shiqi/lib/puppeteer/puppeteer.js`，本轮比例和图片断言无失败。
 - 2026-07-24 用户授权把现有比例修复同步到线上，但明确禁止重启。只读检查已确认生产仍是旧 `BananaTool.js` 且缺少 `utils/imageAspectRatio.js`；开始重新回归并准备最小部署。
-- 已备份生产旧文件到 `/opt/trss-yunzai-backups/bl-chat-plugin-image-aspect-20260724-1124.tar.gz`，同步 6 个比例链路文件且未覆盖 `config/message.yaml`。线上哈希 6/6 一致、语法通过、生产宿主真实依赖回归 53/53。
+- 已备份生产旧文件到 `/opt/trss-yunzai-backups/shiloh-plugin-image-aspect-20260724-1124.tar.gz`，同步 6 个比例链路文件且未覆盖 `config/message.yaml`。线上哈希 6/6 一致、语法通过、生产宿主真实依赖回归 53/53。
 - 使用当前生产配置做无网络请求映射验收：1:1 为 1024x1024、9:16 为 1024x1536、16:9 为 1536x1024。临时测试文件和上传包已清理；服务 PID 全程保持 1651465，按要求未重启，因此运行中进程要到后续重启才会加载新实现。
 
 # 2026-07-23 图片渠道参数信任边界修复
@@ -710,7 +710,7 @@
 - 本地全量 `npm test`：593 项中 559 通过、33 跳过、1 失败；唯一失败仍是既有 `tests/umaRaceBalance.test.js` 缺少 `/Users/shiqi/lib/puppeteer/puppeteer.js`。本轮新增上下文策略与生产宿主断言均通过。
 - 用户明确要求“上线重启”，此前不重启约束被本次授权覆盖；开始执行图片任务排空、安全重启和新进程验收。
 - 上线完成：重启前图片任务为 0，关键 4 文件线上/本地哈希一致；安全重启退出正常，PID `1651465 -> 1854936`，service active/running。
-- 新进程已加载 bl-chat-plugin、MessagePipeline、锅巴、34 个插件、5 个监听器和 7 个适配器；OneBotv11 已连接并收到真实群消息，2536 锅巴入口返回 302。启动日志无 SyntaxError、ERR_MODULE_NOT_FOUND、加载/初始化失败或未捕获异常。
+- 新进程已加载 shiloh-plugin、MessagePipeline、锅巴、34 个插件、5 个监听器和 7 个适配器；OneBotv11 已连接并收到真实群消息，2536 锅巴入口返回 302。启动日志无 SyntaxError、ERR_MODULE_NOT_FOUND、加载/初始化失败或未捕获异常。
 
 # 2026-07-24 骰娘完整性审计
 - 用户要求先自行分析骰娘不完善之处；已建立只读审计范围，不修改业务代码，开始整理固定命令与自定义规则/团务双系统功能矩阵。
@@ -811,7 +811,7 @@
 - 已实现共享 `sendCompleteLocalFile()`，支持 OneBot 群/私聊文件上传、适配器后备、文件大小与空文件校验、明确回执失败和脱敏错误日志。
 - 音乐发送现在先上传完整 MP3，成功后再发合并信息和试听；合并节点不再伪造 QQ 不支持的新文件段。定向回归 11/11 通过，语法与 `git diff --check` 通过；工具级集成测试需在真实 TRSS 依赖环境复跑。
 - 已从线上 12:46:45 日志还原原故障：4.3MB MP3 被编码为合并节点内的 `type=file`，QQ 随后仅展示合并信息与 `record`，证实平台丢弃了伪附件。
-- 服务器真实 TRSS staging 和正式目录集成测试均通过；3 个部署文件哈希一致。备份为 `/opt/trss-yunzai/backups/bl-chat-plugin-music-file-20260728-150518`。
+- 服务器真实 TRSS staging 和正式目录集成测试均通过；3 个部署文件哈希一致。备份为 `/opt/trss-yunzai/backups/shiloh-plugin-music-file-20260728-150518`。
 - 部署前图片任务 0；安全重启后 PID=1016027、服务 active、插件和 MessagePipeline 各初始化一次，OneBotv11/NapCat 已连接并恢复群消息接收。
 - 本地全量 643 项中 605 通过、36 跳过、2 个既有非音乐失败：消息归档测试临时 NDJSON 未生成，以及 UmaRace 缺宿主 Puppeteer 文件。
 
@@ -820,7 +820,7 @@
 - 代码边界复核完成：头像参考应保留真实参考图输入并采用独立 reference-generation 语义；队列只需在首个 await 前声明 active 状态即可消除恢复扫描竞态。开始实现与回归。
 
 # 2026-07-29 群 821466122 异常会话审计
-- 阶段 1 完成：确认用户需要线上群会话审计，生产目录为 `/opt/trss-yunzai/plugins/bl-chat-plugin`；采用只读取证，不修改、部署或重启。
+- 阶段 1 完成：确认用户需要线上群会话审计，生产目录为 `/opt/trss-yunzai/plugins/shiloh-plugin`；采用只读取证，不修改、部署或重启。
 - 阶段 2 进行中：生产服务 active（PID 1281625）；已提取 21:44-22:15 的群日志，发现文生图误归类为编辑通道失败、失败任务恢复错配和暧昧人设回复三类独立问题，继续关联精确任务状态与调用链。
 - 已完成两项核心调用链还原：`member_avatar` 参考触发错误图片编辑分支；内存排队与 durable 队列扫描并发导致同一任务被“恢复”并重复执行。正在汇总全部机器人出站和群表达状态。
 - 出站汇总完成：确认竞态反复造成假重启、重复图片和排队提示；另确认群名片展示泄漏到排队文案，以及 persona/群表达状态共同放大暧昧语气。最后核对 21:44 的历史上下文串题后完成根因排序。
@@ -831,7 +831,7 @@
 - 已定位到 Krill 连接的响应体卡死：当前 120 秒计时在收到 HTTP response 后提前取消，`response.text()` 无时间上限，导致持久队列无法进入 finally 清理。
 - 已让 `fetchWithTimeout()` 在 response body 被 `text()` 完整读取前保留 AbortController，并将正文中止规范化为“没有返回完整响应”；普通连接超时语义保持不变。
 - 新增正文卡死回归与 durable job 清理回归；服务器 staging 通过，正文卡死约 28ms 即失败并释放 Redis job、queue 和活动状态。一次复合 SSH 认证抖动后改为拆分连接完成验证，正式目录尚未改动。
-- 正式正文超时补丁已同步且哈希一致，生产定向回归 16/16；服务安全重启至 PID 1190874、`bl-chat-plugin` 和 MessagePipeline 各初始化一次、OneBotv11/NapCat 已连接。
+- 正式正文超时补丁已同步且哈希一致，生产定向回归 16/16；服务安全重启至 PID 1190874、`shiloh-plugin` 和 MessagePipeline 各初始化一次、OneBotv11/NapCat 已连接。
 - 原卡死任务已由 durable queue 恢复并收尾：job/queue/active-task 全清；Krill 返回 `error/type` 而不是有效图片，终态为 `tool_failed`。
 - 已上线恢复后失败通知：恢复任务不再静默失败，端到端回归确认会向原群发送真实失败说明。生产真实 TRSS 回归 17/17、业务与测试文件哈希一致，`trss-yunzai.service` active（PID 1198400）、OneBot/NapCat 已连接；原任务已经结束，未重放原始绘图请求，避免重复提交。
 # 2026-07-29 群 821466122 修复
@@ -853,7 +853,7 @@
 - 已复核：问题集中在紧凑的工具进度路径而非主聊天人设。当前开始收紧状态播报过滤，并为改图/识图补上既有 persona guard。
 - 首轮定向测试的两处失败均为旧文案断言：图片空结果本来走识图专用分支，通用失败仍含“可靠结果”汇报词；已按真实分支修正并准备复跑。
 - 定向回归完成：`contextualProgressReply` 和 `toolResultGrounding` 共 18/18 通过；4 个改动模块均通过 `node --check`，`git diff --check` 通过。改图/识图运行级测试在本地因缺少 Yunzai 的 `/Users/shiqi/lib/common/common.js` 依赖跳过，未把跳过误报为验证成功。
-- 已备份并同步 4 个运行模块及 2 个定向测试到生产；生产定向回归 18/18，线上源文件 SHA-256 与本地一致。备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-tone-progress-20260729-232330`。
+- 已备份并同步 4 个运行模块及 2 个定向测试到生产；生产定向回归 18/18，线上源文件 SHA-256 与本地一致。备份为 `/opt/trss-yunzai-backups/shiloh-plugin-tone-progress-20260729-232330`。
 - 已安全重启 `trss-yunzai.service`：PID=`3056052`、状态 active、插件初始化一次并加载 34 个插件；OneBotv11/NapCat 于 23:24:51 重连，未见语法或模块加载错误。
 
 # 2026-08-03 群 609235590 合并转发核查
@@ -874,7 +874,7 @@
 - 定向语法、工具 Skill、语义路由和下载回归通过 33/33；覆盖超限不启动正文、ZIP 上限预检、模型不可替换磁链、错误 URL 脱敏和符号链接拒绝。线上尚未部署，运行时仍需安装 `aria2c` 与 `zip`。
 - 大小配额已收紧为代码硬上限 50 MB（50,000,000 bytes）：总内容、单文件和最终 ZIP 都不能被部署配置提高到该数值以上。
 - 已定位纯磁链被 `TimingGate` 当作普通分享而 `no_action`；本地改为有效 BTIH 磁链自动绕过闲聊门控、确定性调用下载工具，并禁止与其他磁链合并。待回归与部署。
-- 已部署到 `/opt/trss-yunzai/plugins/bl-chat-plugin`：线上安装 `aria2c` 与 `zip`，生产目录定向回归 28/28、工具注册验证通过，服务已安全重启为 PID `1852499`。旧版本收到的两条磁链不会回放；等待新的真实磁链验证自动群交付。
+- 已部署到 `/opt/trss-yunzai/plugins/shiloh-plugin`：线上安装 `aria2c` 与 `zip`，生产目录定向回归 28/28、工具注册验证通过，服务已安全重启为 PID `1852499`。旧版本收到的两条磁链不会回放；等待新的真实磁链验证自动群交付。
 - 首次真实自动调用确认路由正常，但部署包中的线上 `message.yaml` 只写入了工具列表、遗漏 `torrentDownload` 配置块，导致工具如实拒绝 `enabled=undefined`。已原子补齐配置并以 YAML 和 `TorrentDownloadTool.configProvider()` 双重验证 `enabled=true`、自动识别开启、50 MB 上限及 `aria2c`/`zip` 路径；无需重启。
 # 2026-08-03 磁链元数据持久化解析
 
@@ -900,13 +900,13 @@
 - 已仅修改用户可见清单样式：完整列出全部文件、每项独立换行显示大小，并标记可下载或不可下载及原因；底部只展示可用编号，避免把隐藏的大文件误认为可选。
 - 本地 `tests/torrentDownload.test.js` 23/23 通过，示例输出确认 6.5 GB 种子仅显示“下载 1”。
 - 首次线上同步尝试被服务器临时拒绝密码认证，尚未替换文件或重启服务；准备使用显式密码认证重试一次。
-- 第二次使用显式密码认证同步成功；已备份线上旧文件至 `/opt/trss-yunzai-backups/bl-chat-plugin-torrent-selection-display-20260803-192623`，安全重启后服务 active（PID 1996381）、加载 34 个插件。
+- 第二次使用显式密码认证同步成功；已备份线上旧文件至 `/opt/trss-yunzai-backups/shiloh-plugin-torrent-selection-display-20260803-192623`，安全重启后服务 active（PID 1996381）、加载 34 个插件。
 - 线上无发送展示探针通过：可下载/不可下载条目、GB/MB 大小、逐项换行和“只能填写可下载编号”的提示均已验证。
 
 # 2026-08-03 磁链文件私聊交付
 - 已改为群内磁链下载完成后将 ZIP 私发给原发起人；群内不再上传群文件或发送目录合并转发，只发送一条已私发确认。私聊触发保持在私聊交付。
 - 本地磁链回归 23/23 通过，覆盖交付事件去除 `group_id`、保留触发人 `user_id`，确保文件上传进入私聊路径。
-- 已同步线上并安全重启；备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-torrent-private-delivery-20260803-193351`，服务 active（PID 2004394）、加载 34 个插件；无发送探针确认交付事件为 private。
+- 已同步线上并安全重启；备份为 `/opt/trss-yunzai-backups/shiloh-plugin-torrent-private-delivery-20260803-193351`，服务 active（PID 2004394）、加载 34 个插件；无发送探针确认交付事件为 private。
 ## 2026-08-03 单数群主艾特路由修复
 - 已定位生产根因：语义分类把单数“群主”误映射到 all-admin 工具，并带 `includeOwner=true`。
 - 已实现：新增纯角色路由模块，主链路以当前群 `role=owner` 成员构造精确成员艾特；待运行回归测试和部署验证。
@@ -935,7 +935,7 @@
 - 已从延迟取证确认当前问题是“候选工具存在”与“应走工具模型”被同一个 `session.tools` 数组混用。新增纯 `replyExecutionRoute` 策略，准备由入口传入响应类型、候选工具、强制动作和显式表情请求；该策略不包含任何具体业务工具实现。
 - 已接入初始请求：强制/真实工具动作完成选择后，知识解释若只剩可选表情包工具，会显式切到 `tool_choice=none` 并清空本轮工具，进入既有聊天后端；模型耗时日志新增 `route` 和 `routeReason`。
 - 已补知识卡分段观测：`textImageTool` 现在记录 render、QQ send 和 total，便于将模型延迟与卡面阶段延迟分开比较。
-- 已部署：线上最小补丁预检、语法检查、TRSS 根目录 mock API 路由测试和 Chromium 知识卡截图测试通过；服务重启后 active、插件和 MessagePipeline 初始化成功、加载 34 个插件。备份：`/opt/trss-yunzai-backups/bl-chat-plugin-execution-route-20260804-150000`。
+- 已部署：线上最小补丁预检、语法检查、TRSS 根目录 mock API 路由测试和 Chromium 知识卡截图测试通过；服务重启后 active、插件和 MessagePipeline 初始化成功、加载 34 个插件。备份：`/opt/trss-yunzai-backups/shiloh-plugin-execution-route-20260804-150000`。
 
 # 2026-08-05 统一群记忆链路续作
 - 确认语义输出已覆盖 alias/knowledge/workflow，但 runtime 仍串行 await 裁决并分三次写 Redis。下一步新增单一提交网关、来源级删除和授权冲突策略，再把裁决改为短窗口并发，不让正常回复等待完整模型超时。
@@ -943,7 +943,7 @@
 - 已完成删除收口：自然语言忘记支持同源定义、别名、工作流的级联删除；普通成员限本人，群管理可删除精确他人条目。歧义候选返回正确类型说明。
 - 已完成非阻塞化：主链路最多等 180 ms，超过后继续正常回复且不说“记住了”；裁决总超时默认 900 ms。明确 @ 目标与说话人均进入候选身份。
 - 回归：目标测试 72/72、语法和 diff 检查全通过。广测的新增断言已修正；其余 3 个环境/既有失败（`moment`、TRSS/Puppeteer、归档时序）未归因于本改动。线上仍未部署，因为现有 SSH 密码认证被拒绝，未重试或重启服务。
-- 线上部署完成：认证恢复后先读取了生产旧链路，确认仍存在 `extractExplicitTeachingFacts` / 正则工作流直写。只在生产原始 `apps/test.js` 的记忆区块上生成定点补丁，未覆盖同文件其他功能；同步 `MemoryManager`、`groupKnowledge`、`extractor`、`aliasRegistry`、Forget 工具共 6 个运行文件。备份：`/opt/trss-yunzai-backups/bl-chat-plugin-group-memory-20260805-180000`。
+- 线上部署完成：认证恢复后先读取了生产旧链路，确认仍存在 `extractExplicitTeachingFacts` / 正则工作流直写。只在生产原始 `apps/test.js` 的记忆区块上生成定点补丁，未覆盖同文件其他功能；同步 `MemoryManager`、`groupKnowledge`、`extractor`、`aliasRegistry`、Forget 工具共 6 个运行文件。备份：`/opt/trss-yunzai-backups/shiloh-plugin-group-memory-20260805-180000`。
 - 线上 staging 六文件 `node --check` 与本地 SHA-256 一致；生产目录定向回归 59/59。重启首次连接在 SSH 认证层失败、未执行远端命令；改为仅密码认证后重启成功。服务为 `active`、PID 880762，重启后 MessagePipeline 连续处理新事件，启动后日志未见 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或未捕获异常。
 # 2026-08-07 对外失败原因统一展示（续）
 
@@ -966,7 +966,7 @@
 - 修复后验证：显式指定系统 Google Chrome，`tests/textImageDocument.test.js` 的 6 项全部通过，原先的两项 document/knowledge 截图测试也已实际运行。再以用户的 `BizCode` 示例生成 document 卡面并人工检查：说明和列表正常排版，完整 enum（包括逗号结尾的常量、字段和结束大括号）都位于同一个带 `JAVA` 标签的深色代码块中。
 - 用户请求上线。已完成本地目标文件 SHA-256、diff 检查和部署前预检；生产 `root@124.223.95.142` 仍返回 `Permission denied (publickey,password)`。未同步文件、未创建远端备份、未重启服务。等待可用认证后执行最小部署：`TextImageTool.js` 与目标回归文件，随后运行生产语法/渲染检查并验证 `trss-yunzai.service`。
 - 用户提供部署认证后，首次 `sshpass` 预检错误使用了非标准环境变量名，命令在本地因 `SSHPASS` 未设置退出；没有建立远端连接、备份、同步或重启。已更正为 `SSHPASS` 后重试。
-- 认证成功，已创建生产备份 `/opt/trss-yunzai-backups/bl-chat-plugin-markdown-java-20260811-195514` 和临时上传目录。首次上传后校验错误引用了远端未定义的 `text_hash` 变量，在 `install` 前退出；生产运行文件未替换、服务未重启。将本地 SHA-256 作为校验常量传入远端后重试。
+- 认证成功，已创建生产备份 `/opt/trss-yunzai-backups/shiloh-plugin-markdown-java-20260811-195514` 和临时上传目录。首次上传后校验错误引用了远端未定义的 `text_hash` 变量，在 `install` 前退出；生产运行文件未替换、服务未重启。将本地 SHA-256 作为校验常量传入远端后重试。
 - 已上线：只同步 `functions/functions_tools/TextImageTool.js` 与 `tests/textImageDocument.test.js`。生产 SHA-256 与本地一致；生产 `/usr/bin/chromium` 下的 `tests/textImageDocument.test.js` 为 6/6 通过。安全重启后 `trss-yunzai.service=active`，最近启动日志未见 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件加载失败。
 
 ## 2026-08-11 YouTube 授权后台配置
@@ -975,7 +975,7 @@
 - 已确认主聊天、图片、搜索、网页解析、骰娘、知识库和三角洲工具已统一使用 `visibleFailure`。
 - 正在收敛仍直接向用户回复通用失败或原始 `error.message` 的 B 站授权/搬运、音乐交付、消息记录、表情包管理与长消息投递出口；继续保持脱敏边界，禁止泄漏密钥、签名参数、磁链和内部路径。
 - 已完成本地出口收敛：直接命令和统一 `runToolCall` 均使用同一格式化器，旧工具返回的失败字符串也会在进入模型前脱敏。定向回归 30 通过、4 项因本机缺少既有 `moment` 依赖跳过；目标模块语法检查和 `git diff --check` 通过，准备上线。
-- 已上线到 `/opt/trss-yunzai/plugins/bl-chat-plugin`。首次包携带了 macOS AppleDouble `._*.js` 且漏传了既有新增依赖，主插件未加载；已将这批伪脚本移动至本次备份目录，补齐依赖并使用无 AppleDouble 包二次部署。最终服务 `active`、`bl-chat-plugin` 初始化成功、加载 34 个插件；无群消息脱敏探针通过，启动后日志无 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件载入错误。
+- 已上线到 `/opt/trss-yunzai/plugins/shiloh-plugin`。首次包携带了 macOS AppleDouble `._*.js` 且漏传了既有新增依赖，主插件未加载；已将这批伪脚本移动至本次备份目录，补齐依赖并使用无 AppleDouble 包二次部署。最终服务 `active`、`shiloh-plugin` 初始化成功、加载 34 个插件；无群消息脱敏探针通过，启动后日志无 `SyntaxError`、`ReferenceError`、`ERR_MODULE_NOT_FOUND` 或插件载入错误。
 
 # 2026-08-07 上游过载话术补充
 - 线上实际回复暴露无状态码错误 `Our servers are currently overloaded. Please try again later.`。当前 formatter 未识别该文本，导致英文直出并走未知错误模板；正在改为中文的“上游服务当前负载过高，请稍后重试”。
@@ -984,13 +984,13 @@
 # 2026-08-07 人格自主性与关系边界
 - 已定位：系统只给了“害羞、熟人感、接梗”等风格，缺少关系不能由单句命令建立的原则；`persona.preferences` 未被主提示读取。正在接入人格自主性、稳定偏好和固定边界，并以回归覆盖。
 - 已复核本地实现：`utils/personaTonePolicy.js` 使用 `persona.preferences` 与 `persona.boundaries`，`apps/test.js` 将实际配置传入。`node --test tests/personaTonePolicy.test.js tests/personaFeedbackManager.test.js` 为 12/12；`node --check` 和 `git diff --check` 通过。下一步读取生产覆盖配置后最小化同步。
-- 线上已备份到 `/opt/trss-yunzai-backups/bl-chat-plugin-persona-autonomy-*` 并同步最小补丁。第一次远程修改入口时，自动文本定位没有命中；第二次定点插入缺少对象字段逗号，`node --check` 在重启前拦截，已将上一行补逗号后通过。远端 `apps/test.js` 和 `personaTonePolicy.js` 均 `node --check` 通过，线上已有定向回归 8/8。
-- 已重启并验证：`trss-yunzai.service` 为 active，`bl-chat-plugin` 正常初始化并加载 34 个插件，日志未见语法/引用/模块加载异常。远端策略文件 SHA-256 与本地相同；本地最终人格提示探针通过。
+- 线上已备份到 `/opt/trss-yunzai-backups/shiloh-plugin-persona-autonomy-*` 并同步最小补丁。第一次远程修改入口时，自动文本定位没有命中；第二次定点插入缺少对象字段逗号，`node --check` 在重启前拦截，已将上一行补逗号后通过。远端 `apps/test.js` 和 `personaTonePolicy.js` 均 `node --check` 通过，线上已有定向回归 8/8。
+- 已重启并验证：`trss-yunzai.service` 为 active，`shiloh-plugin` 正常初始化并加载 34 个插件，日志未见语法/引用/模块加载异常。远端策略文件 SHA-256 与本地相同；本地最终人格提示探针通过。
 
 # 2026-08-08 骰娘安全随机源统一
 - 诊断完成：线上群 `953676639` 的六次 D12 结果高度聚集，但日志确认是独立消息和独立执行；当前普通骰直接使用 `Math.random`，未发现缓存、固定用户种子或全局覆写。用户已授权改为加密随机源，待实现和部署。
 - 已完成本地实现：新增 `diceRandom` 加密随机模块，替换 `DiceManager` 的标准骰/检定随机、表达式默认随机和规则包表/表达式的后备随机。规则包调用级加密种子与审计记录保持不变。语法检查、`git diff --check`、三组骰娘回归 56/56 均通过；12 万次 D12 分布正常。待最小部署与运行态验证。
-- 已部署：仅同步 `utils/diceRandom.js`、`DiceManager.js`、`DiceRuleExpression.js`、`DiceRulePackManager.js`；线上备份 `/opt/trss-yunzai-backups/bl-chat-plugin-dice-crypto-20260808-110349`。远端 `node --check` 通过，且在运行探针中让 `Math.random` 抛错后标准骰、表达式和规则包后备均成功执行。安全重启后 `trss-yunzai.service=active`、`bl-chat-plugin` 初始化成功、加载 34 个插件，未见语法/引用/模块加载错误。
+- 已部署：仅同步 `utils/diceRandom.js`、`DiceManager.js`、`DiceRuleExpression.js`、`DiceRulePackManager.js`；线上备份 `/opt/trss-yunzai-backups/shiloh-plugin-dice-crypto-20260808-110349`。远端 `node --check` 通过，且在运行探针中让 `Math.random` 抛错后标准骰、表达式和规则包后备均成功执行。安全重启后 `trss-yunzai.service=active`、`shiloh-plugin` 初始化成功、加载 34 个插件，未见语法/引用/模块加载错误。
 
 # 2026-08-09 YouTube 与 Pixiv 自动媒体解析
 - 已开始：用户确认第二个工具是 Pixiv 图片解析。将与 YouTube 一起接入现有 B 站/抖音自动媒体管线，而非新增命令式实现。
@@ -1007,15 +1007,15 @@
 - 移除了项目未使用的 `SOFT_GROUP_END` schema 标记；临时目录改为 finally 中递归删除，覆盖认证文件写入中断路径。
 - 本地验证通过：`node --check` 覆盖所有改动 JS，`node --test tests/youtubeMessage.test.js` 为 6/6；schema 导入断言确认两个 YouTube 授权字段存在。
 - 部署尝试 1：生产目录没有既有 `tests/youtubeMessage.test.js`，备份命令在替换前退出；未改动运行文件。后续备份仅覆盖线上已有文件，测试作为新增回归文件部署。
-- 阶段 3 完成：最小部署了 3 个既有运行文件、1 个新增授权辅助模块、Guoba schema、生产配置空字段和定向测试。备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-youtube-auth-20260811-203444`。
-- 生产验证：`node --check` 通过，`node --test tests/youtubeMessage.test.js` 为 6/6，schema 断言通过，部署前后 SHA-256 一致；服务重启后 `trss-yunzai.service=active`，日志显示 `bl-chat-plugin`、MessagePipeline、Guoba 正常启动，无模块加载或语法错误。
+- 阶段 3 完成：最小部署了 3 个既有运行文件、1 个新增授权辅助模块、Guoba schema、生产配置空字段和定向测试。备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-youtube-auth-20260811-203444`。
+- 生产验证：`node --check` 通过，`node --test tests/youtubeMessage.test.js` 为 6/6，schema 断言通过，部署前后 SHA-256 一致；服务重启后 `trss-yunzai.service=active`，日志显示 `shiloh-plugin`、MessagePipeline、Guoba 正常启动，无模块加载或语法错误。
 - 清理尝试：执行环境拒绝 `rm -rf` 临时目录；部署未受影响，改用限定路径的 `find -delete` 清理。
 
 # 2026-08-11 YouTube 失败卡片信息修正
 - 完成阶段 1 的本地定位：失败卡片同时存在重复标题前缀和将不可用元数据渲染为“未命名视频”的问题；待读取生产原始 yt-dlp 错误后决定最精确的失败文案。
 - 生产探针确认 `cookieConfigured=false`、`poTokenConfigured=false`。首次诊断脚本对空字符串调用 `replaceAll`，把错误文本全量遮盖；此错误仅在探针中，未影响插件或服务，后续仅对非空敏感值执行脱敏。
 - 完成阶段 2：新增共享的 YouTube 访问失败分类，将“确认不是机器人”映射为 Cookie 验证要求；失败卡片不再显示“未命名视频”，成功卡片移除重复的 YouTube 名称。下载阶段复用相同分类。
-- 阶段 3 完成：仅部署 `youtubeMessage.js`、`youtubeMediaRelay.js` 与 YouTube 回归测试，备份位于 `/opt/trss-yunzai-backups/bl-chat-plugin-youtube-message-20260811-204247`。生产 `node --test tests/youtubeMessage.test.js` 为 7/7，服务重启后 active、无模块加载错误。
+- 阶段 3 完成：仅部署 `youtubeMessage.js`、`youtubeMediaRelay.js` 与 YouTube 回归测试，备份位于 `/opt/trss-yunzai-backups/shiloh-plugin-youtube-message-20260811-204247`。生产 `node --test tests/youtubeMessage.test.js` 为 7/7，服务重启后 active、无模块加载错误。
 - 生产无发送实测该视频输出为“视频信息未获取 / 视频:0JZtdAtJiyk”，原因是“YouTube 要求通过账号 Cookie 完成访问验证”。
 
 # 2026-08-12 叙事卡片前言与正文呈现诊断
@@ -1025,9 +1025,9 @@
 - 用户确认采用“即时确认 + 完整卡面正文”方式。阶段 1 已完成：故事、知识解释和明确文档请求可在模型调用前判定；下一步把确认从模型输出移到发送层，并为旧叙事格式保留兼容拆分。
 - 完成阶段 2：卡面类请求在模型调用前发送确定性即时确认；故事/解释提示要求正文直接开始。最终层剥离旧模型前言但不再二次发送。叙事解析兼容用户示例的全角 `＃` 与标题、正文同一行格式。
 - 静态复核发现新增卡面提示一度引用了稍后才初始化的 `currentIntentText`；已改用同一位置已存在的 `cardRequestText`，避免运行时 TDZ 错误。
-- 阶段 3 完成：本地定向回归 18/18 通过；生产定点补丁回归 13/13、语法检查与旧格式分割探针均通过。仅部署 `apps/test.js`、`narrativeReply.js` 与两份回归，备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-card-presentation-20260812-153242`。
-- 生产服务重启后 `trss-yunzai.service=active`；部署文件 SHA-256 一致，启动日志显示 `bl-chat-plugin`、MessagePipeline 与 Guoba 正常加载，无语法、引用或模块加载错误。
+- 阶段 3 完成：本地定向回归 18/18 通过；生产定点补丁回归 13/13、语法检查与旧格式分割探针均通过。仅部署 `apps/test.js`、`narrativeReply.js` 与两份回归，备份为 `/opt/trss-yunzai-backups/shiloh-plugin-card-presentation-20260812-153242`。
+- 生产服务重启后 `trss-yunzai.service=active`；部署文件 SHA-256 一致，启动日志显示 `shiloh-plugin`、MessagePipeline 与 Guoba 正常加载，无语法、引用或模块加载错误。
 # 2026-08-19 合并转发聊天记录无损回放
 
 - 已完成生产归档取证和 OneBotv11 适配器只读核对，开始实现结构快照与回放。
-- 已上线最小补丁：生产备份为 `/opt/trss-yunzai-backups/bl-chat-plugin-forward-replay-20260824-104000`（第二版查询保护备份追加 `-v2`）。生产无发送探针验证顶层/嵌套发送者、图片段、归档持久化、旧记录文本回退和嵌套 ID 失效后的结构化展开；重启后服务 active，插件和 MessagePipeline 均正常加载。
+- 已上线最小补丁：生产备份为 `/opt/trss-yunzai-backups/shiloh-plugin-forward-replay-20260824-104000`（第二版查询保护备份追加 `-v2`）。生产无发送探针验证顶层/嵌套发送者、图片段、归档持久化、旧记录文本回退和嵌套 ID 失效后的结构化展开；重启后服务 active，插件和 MessagePipeline 均正常加载。
