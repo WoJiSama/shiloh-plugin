@@ -17,7 +17,7 @@ import {
   normalizeHistoryDays,
   normalizeDeltaForcePlace,
   normalizeRankLimit
-} from "../utils/DeltaForceClient.js"
+} from "../domains/games/deltaforce/DeltaForceClient.js"
 
 test("buildDeltaForceUrl joins base url and api path", () => {
   assert.equal(

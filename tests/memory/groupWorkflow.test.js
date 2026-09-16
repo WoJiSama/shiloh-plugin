@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { MemoryManager } from '../../utils/MemoryManager.js'
-import { extractExplicitGroupWorkflowRules } from '../../utils/memory/groupWorkflow.js'
+import { MemoryManager } from '../../domains/memory/MemoryManager.js'
+import { extractExplicitGroupWorkflowRules } from '../../domains/memory/engine/groupWorkflow.js'
 import { createFakeRedis } from './helpers/fakeRedis.js'
 
 function members() {

@@ -1,8 +1,8 @@
-import { EmotionManager } from "../utils/EmotionManager.js"
-import { MemoryManager } from "../utils/MemoryManager.js"
-import { ExpressionLearner } from "../utils/ExpressionLearner.js"
-import KnowledgeSearcher from "../functions/KnowledgeSearcher.js"
-import KnowledgeExpander from "../functions/KnowledgeExpander.js"
+import { EmotionManager } from "../domains/memory/EmotionManager.js"
+import { MemoryManager } from "../domains/memory/MemoryManager.js"
+import { ExpressionLearner } from "../domains/memory/ExpressionLearner.js"
+import KnowledgeSearcher from "../domains/knowledge/KnowledgeSearcher.js"
+import KnowledgeExpander from "../domains/knowledge/KnowledgeExpander.js"
 import { checkPendingReminders } from "../functions/functions_tools/ReminderTool.js"
 import { TakeImages } from "../utils/fileUtils.js"
 import { loadData, saveData } from "../utils/redisClient.js"
@@ -14,13 +14,13 @@ import { mcpManager } from "../utils/MCPClient.js"
 import { localToolRegistry } from "../utils/LocalToolRegistry.js"
 import { getRedBagType, isExclusiveForUser } from "../utils/redBagUtils.js"
 import { pluginBridge } from "../utils/pluginBridge.js"
-import { personProfileInjector } from "../utils/PersonProfileInjector.js"
-import { memStats } from "../utils/memory/stats.js"
-import { factShortId } from "../utils/memory/entityModel.js"
+import { personProfileInjector } from "../domains/memory/PersonProfileInjector.js"
+import { memStats } from "../domains/memory/engine/stats.js"
+import { factShortId } from "../domains/memory/engine/entityModel.js"
 import { stripChatLogSpeakerPrefix, stripChatLogSpeakerPrefixes } from "../utils/replySanitizer.js"
-import { personaFeedbackManager } from "../utils/PersonaFeedbackManager.js"
-import { globalStyleLearnerManager } from "../utils/GlobalStyleLearnerManager.js"
-import { diceManager } from "../utils/DiceManager.js"
+import { personaFeedbackManager } from "../domains/memory/PersonaFeedbackManager.js"
+import { globalStyleLearnerManager } from "../domains/memory/GlobalStyleLearnerManager.js"
+import { diceManager } from "../domains/dice/DiceManager.js"
 import { analyzeReplyText } from "../utils/SmartReply.js"
 import { buildMissingImageAnalysisReply, looksLikeImageAuthenticityRequest, looksLikeImageVerificationRequest, looksLikeVisualInspectionRequest, shouldAskForMissingImageForVisualRequest } from "../utils/imageRequestGuard.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../utils/chatCompletionUrl.js"
@@ -28,12 +28,18 @@ import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLin
 import { resolveDeterministicToolIntent, resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
 import { extractValidBtihMagnetUri } from "../utils/torrentDownload.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../utils/toolSkills.js"
-import { formatGroupWorkflowTeachingPrompt } from "../utils/memory/groupWorkflow.js"
-import { formatGroupKnowledgeTeachingPrompt } from "../utils/memory/groupKnowledge.js"
+import { formatGroupWorkflowTeachingPrompt } from "../domains/memory/engine/groupWorkflow.js"
+import { formatGroupKnowledgeTeachingPrompt } from "../domains/memory/engine/groupKnowledge.js"
 import { buildMentionMembersFailureReply } from "../utils/mentionFailureReply.js"
 import { collectMentionTargetIds, getMentionTargetId, messageMentionsUser, replaceCqMentions } from "../utils/mentionTargets.js"
 import { isExplicitAdminCollectionMentionRequest, resolveSingularOwnerMention } from "../utils/mentionRoleRouting.js"
-import { resolveRecentBotImage, resolveRecentUserImage } from "../utils/recentImageContinuation.js"
+import { resolveRecentBotImage, resolveRecentUserImage, findRecentBotImage } from "../utils/recentImageContinuation.js"
+import { recordDrawTextFallback, clearDrawFailureNote, takeDrawFailureNote, buildDrawFailureNoteMessage, isImageDeliveryToolName } from "../utils/drawFailureNote.js"
+import { shouldSkipNicknameAvatarReference } from "../utils/avatarReferencePolicy.js"
+import { createConfigStore, mergeDeepConfig } from "../core/config/configStore.js"
+import { classifyIntentWithModel, recordShadowComparison, areIntentsEquivalent } from "../core/intent/modelIntentClassifier.js"
+import { setSharedRuntime } from "../core/runtime/sharedRuntime.js"
+import { TERMINAL_TOOL_NAMES, BACKGROUND_TERMINAL_TOOL_NAMES, PSEUDO_TOOL_MARKER_SET, PSEUDO_TOOL_TEXT_KEYS, PREVIOUS_SPEAKER_REPLY_PATTERNS, COMIC_DRAW_PATTERN, SEARCH_TOOL_NAMES, SEMANTIC_TOOL_INTENTS, SEMANTIC_TOOL_INTENT_MIN_CONFIDENCE, SEMANTIC_TOOL_INTENT_TIMEOUT_MS, isPseudoToolMarker, extractChatKeywords, isQuestionMessage, isFeedbackMessage, isLikelyFollowupMessage, isCasualBotGreeting, shouldUseCompactHistory, looksDirectedAtBotByPronoun, looksGroupAddressed, normalizeIntentText, isRealtimeInfoRequest, isExplicitSearchRequest, isExplicitToolIntent, isImageGenerationRequest, isImageAnalysisRequest, isAvatarInspectionRequest, getImageVerificationMode, isImageEditRequest, isImageCompositionEditRequest, hasToolCommitmentText, isDrawTaskStatusInquiry, isDrawContextContinuationRequest, shouldInjectGroupContext } from "../core/intent/messageIntent.js"
 import { prepareImageEditAssets, resolveAvatarEditBase } from "../utils/editReferencePipeline.js"
 import { hasExplicitImageEditAction, hasExplicitImageGenerationRequest, shouldPreferImageGeneration, shouldRenderImageAnalysisAsDocument, shouldRequireImageEditBase, shouldTreatAsAvatarInspection } from "../utils/imageTaskPolicy.js"
 import { buildImageFailureReply, classifyImageFailure } from "../utils/imageFailurePolicy.js"
@@ -55,7 +61,7 @@ import { buildToolGroundingInstruction, buildUnavailableToolReply, hasUsableTool
 import { buildStructuredHistoryMessage, resolveHistorySelectionBudget, resolveToolRoundLimit, selectRelevantGroupHistory } from "../utils/agentIntelligence.js"
 import { buildSolutionExplanationStylePrompt } from "../utils/solutionExplanationStyle.js"
 import { buildAgentProgressContext, buildToolFailureReplyInstruction, selectAgentReplyContext } from "../utils/agentReplyComposer.js"
-import { containsInternalStatusLeak } from "../utils/internalStatusLeak.js"
+import { containsInternalStatusLeak, redactInternalStatusLeaks } from "../utils/internalStatusLeak.js"
 import { buildPersonaTonePrompt, enforcePersonaToneBoundary } from "../utils/personaTonePolicy.js"
 import { createTurnPlan, deriveTurnPlanRequest, formatTurnPlanLog, recordTurnPlanToolOutcome } from "../utils/turnPlan.js"
 import { isNarrativeWritingRequest, splitNarrativeReply } from "../utils/narrativeReply.js"
@@ -97,12 +103,6 @@ const RED_BAG_CONFIG = {
 const redBagCooldowns = new Map() // 红包冷却记录: key: groupId, value: lastGrabTime
 
 // 清空群记忆二次确认（P0-1）：进程内 pending，key: `${groupId}_${userId}`, value: 过期时间戳。
-const clearGroupMemoryPending = new Map()
-const CLEAR_GROUP_MEMORY_CONFIRM_TTL_MS = 30000
-
-// 终态工具：本轮调用后不再请求 LLM 续话（工具的执行结果本身即为最终输出）
-const TERMINAL_TOOL_NAMES = new Set(['sendLocalEmojiTool', 'waitTool', 'bananaTool', 'googleImageEditTool', 'voiceTool', 'deltaForceTool', 'mentionAdminsTool', 'mentionMembersTool', 'torrentDownloadTool'])
-const BACKGROUND_TERMINAL_TOOL_NAMES = new Set(['bananaTool', 'googleImageEditTool', 'torrentDownloadTool'])
 
 const activeDedupeToolRuns = new Map()
 const taskStatusCache = new Map()
@@ -150,225 +150,10 @@ const FORWARD_CONTEXT_MAX_TEXT = 9000
 let activeChatLruTimer = null // 全局 24h LRU 扫描定时器，进程内单例
 let durableToolRecoveryStarted = false
 const roleMap = { owner: "owner", admin: "admin", member: "member" }
-const PSEUDO_TOOL_MARKERS = [
-  "tool", "tools", "tool_call", "toolcall", "function", "function_call", "functioncall", "func", "call", "voice", "audio", "tts", "image", "img",
-  "video", "file", "send", "reply", "search", "google", "mcp", "banana", "reminder",
-  "poke", "like", "music", "weather", "map", "draw", "generate", "edit",
-  "工具", "工具调用", "函数", "函数调用", "调用", "语音", "音频", "图片", "图像", "视频", "文件", "发送",
-  "回复", "搜索", "生图", "画图", "修图", "提醒", "戳", "点赞", "点歌", "天气", "地图"
-]
-const PSEUDO_TOOL_MARKER_SET = new Set(PSEUDO_TOOL_MARKERS.map(item => item.toLowerCase()))
-const PSEUDO_TOOL_TEXT_KEYS = ["text", "content", "message", "reply", "spoken_text", "speech", "voice"]
-
-function isPseudoToolMarker(marker = "") {
-  const normalized = String(marker || "")
-    .trim()
-    .replace(/tool$/i, "")
-    .replace(/工具$/, "")
-    .toLowerCase()
-  return PSEUDO_TOOL_MARKER_SET.has(normalized) || PSEUDO_TOOL_MARKER_SET.has(`${normalized}tool`)
-}
-
-// ─── 拟人化对话相关：本地预筛辅助常量与函数 ────────────────────────────
-// 中文停用词（提取关键词时跳过这些）
-const CHAT_STOPWORDS = new Set([
-  "的", "了", "是", "也", "就", "都", "吧", "吗", "呢", "啊", "么", "哦", "呀", "嘛", "哈",
-  "这", "那", "我", "你", "他", "她", "它", "我们", "你们", "他们",
-  "觉得", "感觉", "可能", "应该", "不", "没", "有", "在", "和", "与", "或", "但", "而",
-  "什么", "怎么", "怎样", "如何", "哪里", "哪个", "为什么", "因为", "所以",
-  "一个", "一些", "这个", "那个", "这样", "那样", "这里", "那里",
-  "可以", "不能", "需要", "想要", "知道", "听说", "看到"
-])
-// 反馈词（用户消息开头或主体如果是这些，认为是在回应 bot）
-const FEEDBACK_WORDS = [
-  "嗯", "对", "不对", "真的", "真的吗", "是吗", "是的", "确实", "对哦", "也是",
-  "好的", "好吧", "可以", "可以的", "不可以", "不是", "没错", "没", "我也", "我觉得", "我感觉",
-  "那", "那你", "那我", "你说", "你这", "你这么说",
-  "啊？", "啊", "诶", "诶？", "哦", "哦？", "哈哈", "哈"
-]
-// 问句尾字（消息末尾包含这些算问句）
-const QUESTION_TAIL_CHARS = ["?", "？", "吗", "呢", "啊", "么", "嘛"]
-const DIRECT_BOT_PRONOUN_PATTERNS = [
-  /(?:^|[\s，,。.!！?？~～])你(?:刚才|刚刚|前面|上一句|说|讲|回|回复|意思|怎么|为啥|为什么|是不是|能不能|可以|会不会|要不要|觉得|知道|认识|记得|是谁|叫啥|叫)/,
-  /(?:^|[\s，,。.!！?？~～])你(?:呢|呀|啊|吗|嘛|么|？|\?)?$/
-]
-const GROUP_ADDRESS_PATTERNS = [
-  /(?:大家|各位|群友|兄弟们|姐妹们|你们|咱们|有人|有没有人|哪位|大佬).{0,18}(?:知道|认识|会|能|可以|看看|帮|觉得|推荐|有|在吗|吗|嘛|\?|？)/,
-  /(?:谁知道|有人知道|有没有人知道|问一下|请问|求问|求助|有无).{0,30}/,
-  /(?:这个|这|那个|那).{0,14}(?:是什么|是啥|啥|怎么回事|咋回事|有人知道|谁知道)/
-]
-const PREVIOUS_SPEAKER_REPLY_PATTERNS = [
-  /^[？?]+$/,
-  /^(你|妳|他|她|这|那|对|不对|不是|是啊|确实|笑死|草|绷|哈哈|那你|那他|那她|别|不要|可以|不行|行|嗯|啊|哦|所以|但是|可是)/
-]
-const REALTIME_INFO_PATTERNS = [
-  /(天气|气温|温度|下雨|降雨|台风|空气质量|AQI|空气指数)/i,
-  /(新闻|热搜|最新消息|刚刚发生|最近发生|实时|现在|当前|目前|今天|今日|明天|昨天).{0,24}(新闻|情况|怎么样|如何|发生|政策|规定|结果|价格|行情|汇率|股价|天气|赛程|比分|营业|开门|关门)/i,
-  /(股价|股票|基金|币价|比特币|汇率|油价|金价|价格|报价|行情|房价|票价)/i,
-  /(赛程|比分|比赛结果|战绩|排名|积分榜|开奖|中奖号码)/i,
-  /(营业|开门|关门|限行|航班|车次|路况|排队|库存|余票|票价)/i
-]
-const EXPLICIT_SEARCH_PATTERNS = [
-  /(搜一下|搜索|查一下|查查|帮我查|帮我搜|联网查|网上查|百度一下|谷歌一下|找一下资料|最新的|最新版|最新版本|官网|链接|网址|网页|页面|repo|github)/i
-]
-const TOOL_INTENT_PATTERNS = [
-  /(画图|生图|修图|改图|图片分析|看图|识图|视频分析|语音|点歌|音乐|提醒我|定时提醒|撤回|禁言|改名片|戳一下|点赞|送礼物|红包|思维导图|导图|生成图片|生成照片|生成照|生成语音|Excel|工作簿|工作表|sheet|tab页|单元格|\.xlsx\b|\.xlsm\b|磁链|磁力链接|magnet:\?|艾特|@\S+|通知.*(?:人|一下)|喊.*(?:人|一下)|叫.*(?:人|一下))/i
-]
-const IMAGE_GENERATION_PATTERNS = [
-  /(画图|生图|生成图片|生成照片|生成照|生成一?张(?:图|照片|照)|生成一?个.*(?:图|照片|照)|画一?张|绘制|出图|做一?张.*(?:图|照片|照)|捏一?个.*(?:图|照片|照))/i,
-  /(?:把|将|给|帮我|替我|麻烦|可以|能不能|能|想要|要|一会|待会|等下).{0,24}(?:这个|这段|这句|上面|刚才|刚刚|内容|描述|设定|场景|它)?.{0,16}(?:画出来|画成图|画成图片|出成图|生成出来)/i,
-  /(?:画|绘制|生成).{0,16}(?:出来|成图|成图片|成一张图)/i,
-  /(帮我|给我|替我|可以|能不能|能|想要|要).{0,12}(画|生成|绘制|做|捏).{0,140}(图|图片|照片|照|插画|壁纸|头像|封面|海报|表情包|logo|标志|立绘|角色|人物|少女|男孩|女孩|猫|猫咪|狗|狗狗|动物|风景|场景)/i,
-  /(?:帮我|给我|替我|麻烦|可以|能不能|想要|要).{0,12}(?:画|生成|绘制|做|捏)(?:一|1)?(?:个|张|幅|只|位)?.{1,180}(?:的)?(?:图|图片|照片|照|插画|壁纸|头像|封面|海报|表情包|立绘)$/i,
-  /(?:用|拿|以).{0,8}(?:图片|图|画面|画|插画).{0,16}(?:展示|呈现)(?:一下|出来|吧|呀|嘛|呢)?/i,
-  /(?:图片|图|画面|插画).{0,10}(?:展示|呈现)(?:一下|出来|吧|呀|嘛|呢)?/i,
-  /(画|绘制|生成).{0,8}(一|1)?(只|个|位|张|幅)?.{0,32}(猫|猫咪|狗|狗狗|动物|角色|人物|少女|男孩|女孩|头像|立绘|风景|场景|照片|照)/i
-]
-const COMIC_DRAW_PATTERN = /(连环画|漫画|四格|多格|分镜|组图|小剧场|一组)/i
-const IMAGE_ANALYSIS_PATTERNS = [
-  /(图|图片|照片|截图|表情|头像).{0,16}(是什么|是啥|有啥|有什么|啥意思|什么意思|怎么看|看得出|看出来|识别|分析|描述|讲讲|说说)/i,
-  /(看看|看下|看一下|帮我看|帮我看看|告诉我|识别一下|分析一下|描述一下).{0,18}(图|图片|照片|截图|表情|头像|里面|里边|上面|内容)/i,
-  /(图里|图中|图片里|图片中|照片里|截图里|这里面|这上面).{0,16}(是什么|是啥|有啥|有什么|谁|哪|啥意思|什么意思)/i
-]
-const IMAGE_EDIT_PATTERNS = [
-  /(修图|改图|美化图片|图片美化|编辑图片|图片编辑|P图|p图|图生图|重绘|局部重绘|扩图|抠图|去水印|换背景|换衣服|换颜色|换发型|换脸|加滤镜|上色|变清晰|高清修复|无损放大)/i,
-  /(?:把|将|给|帮我|替我|麻烦|可以|能不能|能|想要|要).{0,18}(?:这张|这个|图片|图|照片|截图|头像|它|猫|猫咪|人|角色|主体)?.{0,16}(?:加|加上|添加|放上|画上|换|换成|变成|改成|改为|改一下|改改|修|修一下|修修|美化|变美|变漂亮|变好看|弄好看|弄漂亮|优化|去掉|去除|删掉|删除|移除|擦掉|抹掉|保留|增强|修复|变清晰|放大|补全|扩展|扩成).{0,40}/i,
-  /(?:这个|这张|图片|图|照片|截图|头像).{0,16}(?:改一下|改改|修一下|修修|美化|变美|变漂亮|变好看|弄好看|弄漂亮|优化|精修)/i,
-  /(?:把|将|给|帮我|替我|麻烦|可以|能不能|能|想要|要).{0,48}(?:放到|放在|放上|摆到|摆在|坐到|坐在|站到|站在|贴到|贴在|塞到|塞进|加到|加进|放进).{0,32}(?:上|里|里面|图里|图片里|画面里|照片里|截图里|背景里|旁边|中间|前面|后面|左边|右边|椅子|桌子|沙发|床|地上|墙上)/i,
-  /(?:翅膀|尾巴|耳朵|帽子|眼镜|衣服|背景|文字|水印|光效|滤镜|颜色|表情|姿势|发型).{0,12}(?:加上|添加|换成|改成|去掉|去除|删除|移除|变成)/i
-]
-const IMAGE_COMPOSITION_EDIT_PATTERNS = [
-  /(?:把|将).{1,60}(?:放到|放在|放上|放进|摆到|摆在|摆上|坐到|坐在|站到|站在|贴到|贴在|塞到|塞进|加到|加进|放|摆|贴|塞).{0,36}/i,
-  /(?:让|叫).{1,40}(?:坐到|坐在|站到|站在|躺到|躺在|趴到|趴在).{0,36}/i,
-  /(?:给|帮我|替我).{0,20}(?:图里|图片里|画面里|照片里|截图里).{0,24}(?:加|放|摆|塞|贴).{1,40}/i
-]
-const IMAGE_COMPOSITION_ACTION_PATTERNS = [
-  /(?:放到|放在|放上|放进|放入|放|摆到|摆在|摆上|摆进|摆|坐到|坐在|站到|站在|贴到|贴在|贴上|贴进|贴|塞到|塞进|塞入|塞|加到|加进|加上|加入)/i
-]
-const IMAGE_COMPOSITION_TARGET_PATTERNS = [
-  /(?:图里|图片里|画面里|照片里|截图里|背景里|上面|里面|旁边|中间|前面|后面|左边|右边|角落|椅子|桌子|沙发|床|地上|墙上|怀里|头上|手里|身边)/i
-]
-const GROUP_CONTEXT_PATTERNS = [
-  /(群公告|公告|群规|群规则|入群规则|群主|管理员|管理|群管|群成员|成员|群名片|头衔|谁是|是谁|哪位|哪个人|哪个群友|这人是谁|那人是谁|禁言规则|发公告)/i
-]
-const SEARCH_TOOL_NAMES = new Set(['searchInformationTool', 'webParserTool', 'githubRepoTool'])
-const TOOL_COMMITMENT_PATTERNS = [
-  /(?:我|希洛)?(?:马上|现在|这就|等我|稍等|等一下|我来|我去|帮你|给你|让我|这就).{0,24}(?:画|生成|出图|改|修|处理|弄|编辑|看看|看一下|识别|分析|查|搜|找|搓|捏|整|做)/i,
-  /(?:马上弄好|马上弄|马上画|马上改|马上处理|我来弄|我去弄|我来画|我去画|我来改|我去改|我来处理|我试试|我看看怎么|开始弄|开始画|开始改|等我一下|这就搓|这就捏|这就整|这就做|搓一个|捏一个|整一个|做一个)/i
-]
-const DRAW_TASK_STATUS_PATTERNS = [
-  /(?:我的|我那张|刚才|刚刚|上一张|前面|之前).{0,12}(?:图|图片|画|出图).{0,18}(?:呢|好了没|好了吗|画好|生成好|出来|进度|到哪|还在|卡住|忘了|是不是忘)/i,
-  /(?:图|图片|画|出图).{0,12}(?:呢|好了没|好了吗|画好|生成好|出来|进度|到哪|还在|卡住|是不是忘|忘了)/i,
-  /(?:是不是|不会是|你是不是).{0,8}(?:忘了|忘记).{0,12}(?:我的|那张|刚才|图|画|图片)/i
-]
-const DRAW_CONTEXT_CONTINUATION_PATTERNS = [
-  /(?:人物|角色|形象|造型|画面|构图|场景|背景|风格|表情|动作|姿势|细节).{0,18}(?:调整|改|修改|换|加|补|优化|重画|重新画|再画|继续)/i,
-  /(?:调整|改|修改|换|加|补|优化|重画|重新画|再画|继续).{0,40}(?:人物|角色|形象|造型|画面|构图|场景|背景|风格|表情|动作|姿势|细节|这个|那张|刚才|刚刚|上一张)/i,
-  /(?:全都要|都要|全部要|都加上|全加上|就按这个|就这样|按你说的|照你说的|继续画|接着画|那就画|画完整|重画一张|再来一张)/i
-]
-const SEMANTIC_TOOL_INTENTS = new Set(["chat", "image_generate", "image_edit", "image_analysis", "search"])
-const SEMANTIC_TOOL_INTENT_MIN_CONFIDENCE = 0.7
-const SEMANTIC_TOOL_INTENT_TIMEOUT_MS = 8000
-const SEMANTIC_TOOL_HINT_PATTERN =
-  /(画|绘制|生成|生图|出图|修图|改图|P图|p图|美化|去水印|换背景|看图|识图|分析|识别|看看|看一下|搜|查|找|天气|新闻|价格|汇率|比赛|最新|官网|链接|网址|三角洲|今日密码|每日密码|改枪码|改枪方案|利润排行|制造利润|特勤处|提醒|定时|禁言|改名片|戳|点赞|礼物|点歌|音乐|聊天记录|群成员|群友|导图|思维导图|Excel|工作簿|工作表|sheet|tab页|单元格|磁链|磁力链接|magnet:\?|\.xlsx\b|\.xlsm\b)/i
-const CASUAL_BOT_GREETING_PATTERNS = [
-  /(?:在吗|在不在|还好吗|还好嘛|还好不|你还好吗|你还好嘛|你没事吧|醒醒|理我|出来|冒泡|人呢|去哪了|干嘛呢|咋了|怎么了)/i
-]
-
-/**
- * 从一段文本提取关键词（给 R2 关键词命中识别用）。
- * 简单实现：按中英标点切分，取长度 ≥2 的非停用词词块，去重，最多 maxCount 个。
- */
-function extractChatKeywords(text, maxCount = 5) {
-  if (!text || typeof text !== "string") return []
-  // 去除 CQ 码、@ 字段等噪声
-  const cleaned = text
-    .replace(/\[CQ:[^\]]+\]/g, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/https?:\/\/\S+/g, " ")
-  // 按非中英文数字字符切分
-  const tokens = cleaned.split(/[^一-龥A-Za-z0-9]+/).filter(Boolean)
-  const seen = new Set()
-  const result = []
-  for (const tok of tokens) {
-    const t = tok.trim()
-    if (t.length < 2) continue
-    if (CHAT_STOPWORDS.has(t)) continue
-    // 对中文长词额外拆分 2-3 字滑动窗口（避免长句一个 token 没法匹配）
-    if (/^[一-龥]+$/.test(t) && t.length >= 4) {
-      // 取 2-gram 前缀作为辅助关键词
-      for (let i = 0; i <= t.length - 2 && result.length < maxCount; i++) {
-        const gram = t.slice(i, i + 2)
-        if (CHAT_STOPWORDS.has(gram)) continue
-        if (seen.has(gram)) continue
-        seen.add(gram)
-        result.push(gram)
-      }
-    } else {
-      if (seen.has(t)) continue
-      seen.add(t)
-      result.push(t)
-    }
-    if (result.length >= maxCount) break
-  }
-  return result.slice(0, maxCount)
-}
-
-/**
- * 判断消息是否是问句（含 ? / ？ 或末尾 5 字含问句尾字）
- */
-function isQuestionMessage(text) {
-  if (!text || typeof text !== "string") return false
-  if (/[?？]/.test(text)) return true
-  const tail = text.slice(-5)
-  for (const ch of QUESTION_TAIL_CHARS) {
-    if (tail.includes(ch)) return true
-  }
-  return false
-}
-
-/**
- * 判断消息是否以反馈词开头或主体由反馈词构成
- */
-function isFeedbackMessage(text) {
-  if (!text || typeof text !== "string") return false
-  const t = text.trim()
-  if (!t) return false
-  // 整条就是反馈词
-  if (FEEDBACK_WORDS.includes(t)) return true
-  // 开头是反馈词（后接标点或空格）
-  for (const w of FEEDBACK_WORDS) {
-    if (t.startsWith(w)) {
-      const next = t.charAt(w.length)
-      if (!next || /[\s,，。.!！?？~～]/.test(next)) return true
-    }
-  }
-  return false
-}
-
-function isLikelyFollowupMessage(text = "") {
-  const msg = String(text || "").replace(/\[CQ:[^\]]+\]/g, " ").trim()
-  if (!msg) return false
-  if (isQuestionMessage(msg)) return true
-  return /(?:谁|誰|什么|啥|哪(?:个|位|里|裏)|怎么|怎样|咋|为什么|为啥|多少|几|能不能|可不可以|要不要|是不是|还记得|记得|刚才|刚刚|前面|上一句|推荐|告诉|讲讲|说说|解释|评价|分析|帮我|给我|那你|那就|所以)/.test(msg)
-}
 
 function summarizeForLog(text = "", max = 100) {
   const compact = stripCqMarkup(text).replace(/\s+/g, " ").trim()
   return compact.length > max ? `${compact.slice(0, max)}...` : compact
-}
-
-function isCasualBotGreeting(text = "") {
-  const content = normalizeIntentText(text)
-  if (!content) return false
-  return CASUAL_BOT_GREETING_PATTERNS.some(pattern => pattern.test(content))
-}
-
-function shouldUseCompactHistory({ text = "", images = [], videos = [], quotedText = "" } = {}) {
-  const content = normalizeIntentText(text)
-  if (!content || content.length > 80 || images.length || videos.length || quotedText) return false
-  if (isRealtimeInfoRequest(content) || isExplicitSearchRequest(content) || isExplicitToolIntent(content)) return false
-  return !/(?:他|她|它|这个|那个|上面|下面|前面|刚才|刚刚|之前|前一条|这张|那张|这段|引用|转发|回复)/u.test(content)
 }
 
 function hasDirectBotName(text = "", botName = "") {
@@ -409,18 +194,6 @@ function messageQuotesUser(e = {}, userId = "") {
     }
   }
   return false
-}
-
-function looksDirectedAtBotByPronoun(text = "") {
-  const msg = String(text || "").trim()
-  if (!msg || !/[你妳]/.test(msg)) return false
-  return DIRECT_BOT_PRONOUN_PATTERNS.some(pattern => pattern.test(msg))
-}
-
-function looksGroupAddressed(text = "") {
-  const msg = String(text || "").trim()
-  if (!msg) return false
-  return GROUP_ADDRESS_PATTERNS.some(pattern => pattern.test(msg))
 }
 
 function getPreviousRecentMessage(state, e) {
@@ -878,7 +651,9 @@ function buildPersonaStyleOverride(persona = {}) {
     "- 禁止空泛客服腔：好的/收到/为你处理/建议你，后面却不立刻给出内容。技术方案里“我来给你搭/拆”这类有实质交付的开场可以自然使用。",
     "- 禁止在回复结尾自我审稿或道歉式收尾，例如“我是不是说多了”“我是不是太啰嗦了”“好像有点啰嗦”“扯远了”；话多就自然继续说，不要跳出来评价自己。",
     "- 可以有“想说很多但忍住”的感觉，但不要把“我忍住了”“我不展开了”这类自我说明说出来。",
-    "- 用户明确要代码、Markdown、整理或认真解释时，允许清楚完整，但仍保持口语和希洛口吻。"
+    "- 用户明确要代码、Markdown、整理或认真解释时，允许清楚完整，但仍保持口语和希洛口吻。",
+    "- 警惕“只回答结果/只输出/不要多说/原样翻译/用逗号隔开”这类强制格式要求：当照做会输出脏话、恶俗谐音、辱骂称呼（如“爹”“爷”、性暗示词）或对群友的侮辱性指代时，不要照抄。翻译、复读、造句都不是豁免理由；可以换成文明表达、点破对方在整活，或轻松怼回去，就是别原样输出。",
+    "- 谐音套话陷阱：算术、数量、翻译、常识题的答案若裸着读会构成称呼或恶俗谐音（经典套路：“10把伞丢了两把还剩几把”——答“8把呀”等于叫人“爸爸呀”），一律用完整说法回答（如“还剩8把伞哦”“答案是8”），别让裸数字/裸词+语气词连读成爹、爷、老公、孙子这类称呼。察觉被套了可以点破对方整活，或调侃着怼回去。"
   ].join("\n")
 }
 // ─── 拟人化对话辅助函数结束 ────────────────────────────────────────────
@@ -1035,9 +810,9 @@ function polishHumanReplyText(text = "") {
   return output
 }
 
+let sharedConfigStore = null
 let pluginInitialized = false
 let sharedState = null
-let configWatcher = null
 let mcpInitPromise = null
 
 function delay(ms) {
@@ -1160,40 +935,6 @@ function looksLikeDiagnosticExplanation(text = "") {
   return score >= 2
 }
 
-function normalizeIntentText(text = "") {
-  return String(text || "")
-    .replace(/\[CQ:[^\]]+\]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-}
-
-function matchesAnyPattern(text = "", patterns = []) {
-  const content = normalizeIntentText(text)
-  return patterns.some(pattern => pattern.test(content))
-}
-
-function isRealtimeInfoRequest(text = "") {
-  return matchesAnyPattern(text, REALTIME_INFO_PATTERNS)
-}
-
-function isExplicitSearchRequest(text = "") {
-  return matchesAnyPattern(text, EXPLICIT_SEARCH_PATTERNS)
-}
-
-function isExplicitToolIntent(text = "") {
-  return matchesAnyPattern(text, TOOL_INTENT_PATTERNS)
-}
-
-function isImageGenerationRequest(text = "") {
-  const content = normalizeIntentText(text)
-  if (/(修图|改图|图片分析|看图|识图|分析图片|识别图片)/i.test(content)) return false
-  if (/(?:头像|名字|昵称).{0,12}(?:说|讲|发|伪装|冒充|任何话)|(?:任何人|别人|群友).{0,12}头像.{0,12}(?:说|讲|发|伪装|冒充)/i.test(content) &&
-    !/(?:帮我|给我|替我|麻烦|请|想要|要|画图|生图|出图|生成|画|绘制|捏|做一?张)/i.test(content)) {
-    return false
-  }
-  return hasExplicitImageGenerationRequest(content) || matchesAnyPattern(content, IMAGE_GENERATION_PATTERNS)
-}
-
 function compactDrawPromptText(text = "", maxLength = 3800) {
   return safeTruncateUnicode(String(text || "")
     .replace(/\[CQ:[^\]]+\]/g, " ")
@@ -1303,22 +1044,6 @@ function normalizeForContainment(text = "") {
   return normalizeIntentText(text)
     .replace(/[^\p{L}\p{N}\u4e00-\u9fa5]+/gu, "")
     .toLowerCase()
-}
-
-function isImageAnalysisRequest(text = "") {
-  const content = normalizeIntentText(text)
-  if (isImageGenerationRequest(content)) return false
-  if (isImageCompositionEditRequest(content)) return false
-  if (looksLikeVisualInspectionRequest(content)) return true
-  if (looksLikeImageVerificationRequest(content)) return true
-  return matchesAnyPattern(content, IMAGE_ANALYSIS_PATTERNS)
-}
-
-function isAvatarInspectionRequest(text = "") {
-  const content = normalizeIntentText(text)
-  if (!shouldTreatAsAvatarInspection(content)) return false
-  if (isImageGenerationRequest(content) || isImageCompositionEditRequest(content)) return false
-  return true
 }
 
 function buildQqAvatarUrl(userId) {
@@ -1471,7 +1196,13 @@ function resolveAvatarDrawReference({ e = {}, text = "", atQq = [], memberMap = 
       .replace(/@\S+/g, " ")
     const candidate = findUniqueGroupMemberMention(memberMap, cleaned, e?.user_id)
     if (candidate?.member?.user_id) {
-      addTarget(candidate.member.user_id, candidate.names?.[0] || "")
+      // "蔚蓝档案里面的小鸟游星野"这类作品角色请求不能挂同昵称群友的真人头像：
+      // 既指认错了人，也会触发上游"真人改造"内容审核
+      if (shouldSkipNicknameAvatarReference(cleaned, candidate.names?.[0] || "")) {
+        logger.info(`[头像参考] 命中作品角色/长名片段，跳过昵称匹配群友=${candidate.names?.[0] || ""}`)
+      } else {
+        addTarget(candidate.member.user_id, candidate.names?.[0] || "")
+      }
     }
   }
 
@@ -1588,46 +1319,6 @@ function getImageAnalysisToolNames(text = "") {
     : ["googleImageAnalysisTool"]
 }
 
-function getImageVerificationMode(text = "") {
-  return looksLikeImageAuthenticityRequest(text) ? "image_authenticity" : "content_claim"
-}
-
-function isImageEditRequest(text = "") {
-  const content = normalizeIntentText(text)
-  return hasExplicitImageEditAction(content) || matchesAnyPattern(content, IMAGE_EDIT_PATTERNS)
-}
-
-function isImageCompositionEditRequest(text = "") {
-  const content = normalizeIntentText(text)
-  if (!content) return false
-  if (isImageEditRequest(content)) return true
-  if (matchesAnyPattern(content, IMAGE_COMPOSITION_EDIT_PATTERNS)) return true
-
-  const hasTaskSubject = /(?:把|将|让|叫|给|帮我|替我|麻烦|可以|能不能|能不能帮我)/i.test(content)
-  if (!hasTaskSubject) return false
-  return matchesAnyPattern(content, IMAGE_COMPOSITION_ACTION_PATTERNS) &&
-    matchesAnyPattern(content, IMAGE_COMPOSITION_TARGET_PATTERNS)
-}
-
-function hasToolCommitmentText(text = "") {
-  const content = normalizeIntentText(text)
-  if (!content) return false
-  return TOOL_COMMITMENT_PATTERNS.some(pattern => pattern.test(content))
-}
-
-function isDrawTaskStatusInquiry(text = "") {
-  const content = normalizeIntentText(text)
-  if (!content) return false
-  return DRAW_TASK_STATUS_PATTERNS.some(pattern => pattern.test(content))
-}
-
-function isDrawContextContinuationRequest(text = "") {
-  const content = normalizeIntentText(text)
-  if (!content) return false
-  if (isImageGenerationRequest(content) || isImageEditRequest(content)) return false
-  return DRAW_CONTEXT_CONTINUATION_PATTERNS.some(pattern => pattern.test(content))
-}
-
 function buildInternalStatusSafeReply(toolName = "", session = {}) {
   const text = [session?.rawArgs, session?.userContent].filter(Boolean).join("\n")
   if (toolName === "bananaTool" || isImageGenerationRequest(text)) {
@@ -1637,10 +1328,6 @@ function buildInternalStatusSafeReply(toolName = "", session = {}) {
     return "图片我收到了，但这次识图服务没有返回可用结果。不是你没发图，我先不乱猜。"
   }
   return buildGenericChatFailureReply(text, { failureKind: "upstream" })
-}
-
-function shouldInjectGroupContext(text = "") {
-  return matchesAnyPattern(text, GROUP_CONTEXT_PATTERNS)
 }
 
 function hasMediaNeedingTool(message = []) {
@@ -1771,6 +1458,7 @@ function initializeSharedState(config) {
     refreshLocalTools(sharedState, { force: true }).catch(error => {
       logger.error('[LocalToolRegistry] 热更新工具失败:', error)
     })
+    setSharedRuntime({ memoryManager: sharedState.memoryManager, getConfig: () => config })
     return applyToolRegistrySnapshot(sharedState)
   }
   sharedState = {
@@ -1802,6 +1490,7 @@ function initializeSharedState(config) {
       : null,
     sessionMap: new Map()
   }
+  setSharedRuntime({ memoryManager: sharedState.memoryManager, getConfig: () => config })
 
   applyToolRegistrySnapshot(sharedState)
   refreshLocalTools(sharedState, { force: true }).catch(error => {
@@ -1905,27 +1594,10 @@ export class ExamplePlugin extends plugin {
       priority: 9999,
       rule: [
         { reg: "^#tool\\s*(.*)", fnc: "handleTool" },
-        { reg: "^#记忆状态$", fnc: "memoryStatus" },
-        { reg: "^#记忆统计$", fnc: "memoryStats" },
-        { reg: "^#我的记忆$", fnc: "listMyMemory" },
-        { reg: "^#群记忆$", fnc: "listGroupMemory" },
-        { reg: "^#群工作流$", fnc: "listGroupWorkflows" },
-        { reg: "^#删除群工作流\\s+\\S+$", fnc: "deleteGroupWorkflow" },
-        { reg: "^#群知识$", fnc: "listGroupKnowledge" },
-        { reg: "^#删除群知识\\s+\\S+$", fnc: "deleteGroupKnowledge" },
-        { reg: "^#搜索记忆\\s+[\\s\\S]+$", fnc: "searchMemory" },
-        { reg: "^#删除记忆\\s+\\S+$", fnc: "deleteMemory" },
-        { reg: "^#清空我的记忆$", fnc: "clearMyMemory" },
-        { reg: "^#清空群记忆$", fnc: "clearGroupMemory" },
-        { reg: "^#禁用我的记忆$", fnc: "disableMyMemory" },
-        { reg: "^#启用我的记忆$", fnc: "enableMyMemory" },
         { reg: "^#mcp\\s+重载", fnc: "reloadMCP" },
         { reg: "^#mcp\\s+列表", fnc: "listMCPTools" },
         { reg: "^#mcp\\s+状态", fnc: "mcpStatus" },
         { reg: "^#mcp\\s+测试\\s+\\S+", fnc: "testMCPTool" },
-        { reg: "^#清除群记忆$", fnc: "clearGroupMemory" },
-        { reg: "^[#＃.。]\\s*希洛反馈\\s+[\\s\\S]+$", fnc: "recordPersonaFeedback" },
-        { reg: "^[#＃.。]\\s*(全局表达学习|表达学习)\\s*(报告|状态|记忆|总结|清空|帮助)?\\s*$", fnc: "globalStyleLearningCommand" },
         { reg: "[\\s\\S]*", fnc: "handleRandomReply", log: false }
       ]
     })
@@ -4054,121 +3726,40 @@ ${specialSignalsBlock}
   }
 
   ensureConfigFiles() {
-    const configDir = path.join(process.cwd(), "plugins/bl-chat-plugin/config")
-    const configDefaultDir = path.join(process.cwd(), "plugins/bl-chat-plugin/config_default")
+    if (!sharedConfigStore) this.initConfigStore()
+    return sharedConfigStore.ensureFiles()
+  }
 
-    const configFiles = ["message.yaml", "mcp-servers.yaml"]
-
-    if (!fs.existsSync(configDefaultDir)) {
-      logger.error(`[配置] 默认配置目录不存在: ${configDefaultDir}`)
-      logger.error(`[配置] 请确保 config_default 目录存在并包含默认配置文件`)
-      return false
-    }
-
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true })
-      logger.info(`[配置] 已创建配置目录: ${configDir}`)
-    }
-
-    for (const fileName of configFiles) {
-      const configPath = path.join(configDir, fileName)
-      const defaultPath = path.join(configDefaultDir, fileName)
-
-      if (!fs.existsSync(configPath)) {
-        if (fs.existsSync(defaultPath)) {
-          fs.copyFileSync(defaultPath, configPath)
-          logger.info(`[配置] 已从 config_default 复制配置文件: ${fileName}`)
-        } else {
-          logger.error(`[配置] 默认配置文件不存在: ${defaultPath}`)
-        }
+  initConfigStore() {
+    if (sharedConfigStore) return sharedConfigStore
+    sharedConfigStore = createConfigStore({
+      pluginRoot: path.join(process.cwd(), "plugins/bl-chat-plugin"),
+      configFiles: ["message.yaml", "mcp-servers.yaml"],
+      watchImpl: (file, cb) => chokidar.watch(file).on("change", cb),
+      onChange: async settings => {
+        this.config = settings
+        // 刷新各模块配置
+        const state = initializeSharedState(this.config)
+        this.knowledgeSearcher = state.knowledgeSearcher
+        this.MAX_HISTORY = this.config.groupMaxMessages || 100
+        await this.refreshLocalToolRegistry({ force: true }).catch(error => {
+          logger.error(`[bl-chat-plugin][热更新] 重新加载本地工具失败: ${error}`)
+          this.initTools()
+        })
       }
-    }
-
-    return true
+    })
+    return sharedConfigStore
   }
 
   initConfig() {
-    this.ensureConfigFiles()
-
-    const configDir = path.join(process.cwd(), "plugins/bl-chat-plugin/config")
-    const configDefaultDir = path.join(process.cwd(), "plugins/bl-chat-plugin/config_default")
-    const configPath = path.join(configDir, "message.yaml")
-    const defaultConfigPath = path.join(configDefaultDir, "message.yaml")
-
-    try {
-      if (!fs.existsSync(defaultConfigPath)) {
-        logger.error(`[配置] 默认配置文件不存在: ${defaultConfigPath}`)
-        logger.error(`[配置] 请在 config_default 目录下创建 message.yaml 文件`)
-        this.config = {}
-        return
-      }
-
-      const defaultConfig = YAML.parse(fs.readFileSync(defaultConfigPath, "utf8"))
-
-      if (fs.existsSync(configPath)) {
-        const config = YAML.parse(fs.readFileSync(configPath, "utf8"))
-        const merged = this.mergeConfig(defaultConfig, config)
-
-        if (JSON.stringify(config) !== JSON.stringify(merged)) {
-          fs.writeFileSync(configPath, YAML.stringify(merged))
-          logger.info(`[配置] 配置文件已更新，合并了新增字段`)
-        }
-        this.config = merged.pluginSettings
-      } else {
-        fs.mkdirSync(path.dirname(configPath), { recursive: true })
-        fs.writeFileSync(configPath, YAML.stringify(defaultConfig))
-        logger.info(`[配置] 已从默认配置创建: ${configPath}`)
-        this.config = defaultConfig.pluginSettings
-      }
-    } catch (err) {
-      logger.error(`[配置] 加载配置文件失败: ${err}`)
-      this.config = {}
-    }
-
-    // 监听 yaml 配置文件变化，实现真正的热更新
-    if (!configWatcher) {
-      let reloadTimer = null
-      configWatcher = chokidar.watch(configPath).on('change', () => {
-        // 防抖：500ms 内多次修改只触发一次
-        clearTimeout(reloadTimer)
-        reloadTimer = setTimeout(() => {
-          try {
-            const defaultConfig = YAML.parse(fs.readFileSync(defaultConfigPath, "utf8"))
-            const userConfig = YAML.parse(fs.readFileSync(configPath, "utf8"))
-            const merged = this.mergeConfig(defaultConfig, userConfig)
-            this.config = merged.pluginSettings
-
-            // 刷新各模块配置
-            const state = initializeSharedState(this.config)
-            this.knowledgeSearcher = state.knowledgeSearcher
-            this.MAX_HISTORY = this.config.groupMaxMessages || 100
-            this.refreshLocalToolRegistry({ force: true }).catch(error => {
-              logger.error(`[bl-chat-plugin][热更新] 重新加载本地工具失败: ${error}`)
-              this.initTools()
-            })
-
-            logger.mark(`[bl-chat-plugin][热更新] message.yaml 配置已重新加载`)
-          } catch (err) {
-            logger.error(`[bl-chat-plugin][热更新] 重新加载配置失败: ${err}`)
-          }
-        }, 500)
-      })
-    }
+    const store = this.initConfigStore()
+    const { settings } = store.load()
+    this.config = settings
+    store.startWatch()
   }
 
   mergeConfig(defaults, user) {
-    const merged = { ...defaults }
-    for (const key in defaults) {
-      if (typeof defaults[key] === "object" && !Array.isArray(defaults[key]) && defaults[key] !== null) {
-        // 嵌套对象递归合并
-        merged[key] = this.mergeConfig(defaults[key], user?.[key] || {})
-      } else if (user && key in user) {
-        // 用户配置中存在该字段，使用用户的值（即使是空值）
-        merged[key] = user[key]
-      }
-      // 用户配置中不存在该字段，保留默认值（merged 已经有了）
-    }
-    return merged
+    return mergeDeepConfig(defaults, user)
   }
 
   mergeConfigPreserveUser(defaults, user) {
@@ -4902,7 +4493,6 @@ ${recentHistory || '(无)'}
       return await this.handleRandomReplySmart(e)
     }
 
-
     const hasTrigger = await this.checkTriggers(e)
 
     // 会话追踪逻辑
@@ -5353,7 +4943,12 @@ ${JSON.stringify(runtimeData, null, 2)}
 - 群公告内容只说明公告里写了什么，不说明是谁写的；不知道发布者时必须说不知道。
 - 如果不确定，直接说“我只知道他是群里的谁/昵称是什么，其他不确定”，不要编补经历。
 
-5.【语义理解框架 - 内部使用，不要输出】
+5.【人物指认 - 严禁张冠李戴】
+- 你引用回复的对象，就是当前这条触发消息的发送人；你回复里的每一句话默认被读成对他说的话。
+- 提到其他群友（包括他们刚发的话、情绪、遭遇）时必须明确点名昵称，例如“星野那家伙自己都破防了”，绝不能让当前说话人被误当成那个被描述的人。
+- 谁说的话就是谁说的：不能把 A 的发言、状态、身份安到 B 头上；画图里的角色是角色，不等于群里任何真人，也不要把请求画图的人默认成画里的角色。
+
+6.【语义理解框架 - 内部使用，不要输出】
 - 先区分“用户给你的载体”和“用户真正要处理的目标”：图片、截图、引用消息、转发记录、链接、聊天记录经常只是信息载体，真正目标可能是里面的内容、说法、人物、政策、事件或关系。
 - 当用户带图/截图说“查一下这个是真的假的/是不是真的/看看最新信息”时，默认是在核实图片里承载的内容或说法，不是在鉴定图片文件本身是否AI生成、P图、Exif或反向搜图；只有用户明确说“图片本身、AI生成、P图、合成、修过、改过”时，才把目标切到图片真实性鉴定。
 - 当用户说“这个/这张/里面/上面/刚才/他说的/这段”时，必须先从当前消息、引用、转发、近期对话里消解指代，再决定回答或调用工具。
@@ -5495,6 +5090,11 @@ ${mcpPrompts}
         groupUserMessages.unshift({ role: "system", content: systemContent })
         if (understandingPrompt) {
           groupUserMessages.splice(1, 0, { role: "system", content: understandingPrompt })
+        const drawFailureNoteMessage = buildDrawFailureNoteMessage(takeDrawFailureNote(e.group_id))
+        if (drawFailureNoteMessage) {
+          groupUserMessages.splice(2, 0, { role: "system", content: drawFailureNoteMessage })
+          logger.info(`[画图失败标记] group=${e?.group_id || ""} 已注入上一轮画图失败提示`)
+        }
         }
         groupUserMessages.push({ role: "user", content: userContent })
         session.userContent = userContent
@@ -5506,6 +5106,7 @@ ${mcpPrompts}
         let forcedToolCall = null
         let toolScopeLocked = false
         const currentIntentText = [args, msg].filter(Boolean).join("\n")
+        session.turnDrawRequested = isImageGenerationRequest(currentIntentText)
         const singularOwnerMention = resolveSingularOwnerMention(currentIntentText, memberMap)
         if (toolChoice === "auto" && singularOwnerMention) {
           session.tools = this.getToolsByName(["mentionMembersTool"])
@@ -5667,6 +5268,7 @@ ${mcpPrompts}
           } else {
             logger.warn(`[工具选择] group=${groupId} 显式生图请求没有可用 bananaTool，拒绝降级为闲聊`)
             await this.sendSegmentedMessage(e, buildImageFailureReply("图片生成失败: 当前没有可用的图片生成渠道"), 0)
+            recordDrawTextFallback(groupId, currentIntentText)
             this.clearSession(sessionId)
             return true
           }
@@ -5797,6 +5399,8 @@ ${mcpPrompts}
           selectedHistoryCount: session.selectedGroupHistoryCount
         })
         session.turnPlan = turnPlan
+        // P4 影子模式：模型意图判定并行运行，只记录与正则路径的差异，不影响行为
+        this.runShadowIntent(currentIntentText, { hasImages: Boolean(images?.length), forcedToolName: forcedToolCall?.function?.name || "", turnPlanIntent: turnPlan?.intent || turnPlan?.responseKind || "chat" })
         session.cardPresentation = resolveCardPresentation(currentIntentText, turnPlan.presentation.kind)
         session.initialExecutionRoute = {
           mode: turnPlan.execution.mode,
@@ -6065,7 +5669,36 @@ ${mcpPrompts}
     return fallback
   }
 
+  // P4 影子模式：fire-and-forget，绝不抛错、绝不阻塞主流程
+  runShadowIntent(text, { hasImages = false, forcedToolName = "", turnPlanIntent = "chat" } = {}) {
+    const ai = this.config?.toolsAiConfig || {}
+    if (!ai.toolsAiUrl || !ai.toolsAiApikey) return
+    const regexIntent = forcedToolName === "bananaTool" ? "image_generate"
+      : forcedToolName === "googleImageEditTool" ? "image_edit"
+      : forcedToolName === "googleImageAnalysisTool" ? "image_analysis"
+      : forcedToolName === "deltaForceTool" ? "deltaforce"
+      : forcedToolName === "torrentDownloadTool" ? "magnet"
+      : String(turnPlanIntent || "chat")
+    classifyIntentWithModel({ text, hasImages, config: this.config, timeoutMs: 6000 })
+      .then(result => {
+        recordShadowComparison({ text, regexIntent, modelIntent: result.intent, confidence: result.confidence })
+        if (result.intent !== "unavailable" && !areIntentsEquivalent(regexIntent, result.intent)) {
+          logger.info(`[意图影子] 分歧 regex=${regexIntent} model=${result.intent} conf=${result.confidence} text=${String(text).slice(0, 40)}`)
+        }
+      })
+      .catch(() => {})
+  }
+
   async handleToolFailureResponse(toolName = "", context = {}) {
+    if (isImageDeliveryToolName(toolName) && context?.e?.group_id) {
+      recordDrawTextFallback(context.e.group_id, context?.session?.rawArgs || context?.e?.msg || "")
+    }
+    // 画图类失败不交给模型润色：实测模型会无视"已失败"的事实指令，
+    // 对着原始请求回出"当然可以～我会画成…"这类承诺话术
+    if (isImageDeliveryToolName(toolName)) {
+      const factualReply = context.factualReply || this.getFriendlyFailureMessage(toolName, context)
+      return await this.handleTextResponse(factualReply, context.e, context.session, context.messages || [], toolName)
+    }
     const output = await this.composeToolFailureReply(toolName, context)
     return await this.handleTextResponse(output, context.e, context.session, context.messages || [], toolName)
   }
@@ -6873,9 +6506,13 @@ ${mcpPrompts}
           session.toolResults = [result]
           if (!this.isToolResultError(result.result)) {
             logger.info(`[工具调用] 后台终态工具 ${result.toolName} 执行完成`)
+            if (isImageDeliveryToolName(result.toolName) && e?.group_id) clearDrawFailureNote(e.group_id)
             return
           }
 
+          if (isImageDeliveryToolName(result.toolName) && e?.group_id) {
+            recordDrawTextFallback(e.group_id, session?.rawArgs || e?.msg || "")
+          }
           logger.warn(`[工具调用] 后台终态工具 ${result.toolName} 执行失败，发送拟人化失败提示 result=${String(result.result || "").slice(0, 240)}`)
           await this.handleToolFailureResponse(result.toolName, {
             messages: currentMessages,
@@ -7392,9 +7029,15 @@ ${mcpPrompts}
       logger.warn("[最终回复清理] 模型回复只包含伪工具格式，已跳过发送")
       return
     }
-    if (containsInternalStatusLeak(output)) {
-      logger.warn(`[最终回复清理] 检测到内部状态泄漏，已替换为自然失败提示: ${output.slice(0, 120)}`)
-      output = buildInternalStatusSafeReply(toolName, session)
+    const cleaned = redactInternalStatusLeaks(output)
+    if (cleaned.redactedChars > 0) {
+      if (cleaned.heavy) {
+        logger.warn(`[最终回复清理] 内部信息占比过高(${cleaned.kinds.join(",")} ${(cleaned.ratio * 100).toFixed(0)}%)，整段回退: ${output.slice(0, 120)}`)
+        output = buildInternalStatusSafeReply(toolName, session)
+      } else {
+        logger.warn(`[最终回复清理] 已脱敏内部片段(${cleaned.kinds.join(",")} ${cleaned.redactedChars}字)，保留其余回复`)
+        output = cleaned.text
+      }
     }
     const modrinthItems = toolName === "modrinthTool" ? extractModrinthForwardItems(output) : []
     const modrinthCardItems = modrinthItems.length && Array.isArray(session?.modrinthCardItems)
@@ -7443,6 +7086,21 @@ ${mcpPrompts}
         : textImageTemplate
         ? await this.sendFinalReplyAsTextImage(e, output, textImageTemplate)
         : await this.sendSegmentedMessage(e, output)
+
+    // 画图请求最终走了纯文字回复且本回合没有出图：给下一轮留失败标记，让模型能接住用户的不满
+    if (session?.turnDrawRequested && e.group_id) {
+      try {
+        const delivered = await findRecentBotImage(e, { botId: Bot.uin, maxAgeMs: 90000, limit: 12 })
+        if (delivered) {
+          clearDrawFailureNote(e.group_id)
+        } else {
+          recordDrawTextFallback(e.group_id, session.rawArgs || session.userContent || e?.msg || "")
+          logger.info(`[画图失败标记] group=${e.group_id} 画图请求只得到文字回复，已记录失败标记`)
+        }
+      } catch (noteError) {
+        logger.warn(`[画图失败标记] group=${e.group_id} 记录失败: ${noteError?.message || noteError}`)
+      }
+    }
 
     // 更新会话追踪中的对话历史
     if (this.config.conversationTrackingEnabled && e.group_id && e.user_id) {
@@ -7528,91 +7186,6 @@ ${mcpPrompts}
     this.updateEnhancedSystems(e, e.msg || '', output).catch(err => {
       logger.error('[增强系统] 更新失败:', err)
     })
-  }
-
-  async recordPersonaFeedback(e) {
-    const result = await personaFeedbackManager.recordFeedback(e, e.msg || "")
-    const feedback = personaFeedbackManager.getLatestFeedback(e)
-    if (feedback) {
-      try {
-        globalStyleLearnerManager.observePersonaFeedback(
-          feedback,
-          this.config.globalStyleLearning,
-          this.config.embeddingAiConfig
-        )
-      } catch (error) {
-        logger.warn(`[全局表达学习] 记录主人反馈失败: ${error.message}`)
-      }
-    }
-    await this.sendObservedReply(e, result)
-    return true
-  }
-
-  async globalStyleLearningCommand(e) {
-    if (!e?.isMaster) {
-      await this.sendObservedReply(e, "只有主人可以查看或调整全局表达学习。")
-      return true
-    }
-    const text = String(e.msg || "")
-    const subCommand = text
-      .replace(/^[#＃.。]\s*(全局表达学习|表达学习)\s*/, "")
-      .trim()
-    const helpText = [
-      "全局表达学习：",
-      ".表达学习 状态 - 看是否在学习、是否已注入",
-      ".表达学习 记忆 - 看希洛当前会吸收/避开的表达策略",
-      ".表达学习 报告 - 看样本和离散特征统计",
-      ".表达学习 总结 - 调用模型，把脱敏样本沉淀成表达规则",
-      ".表达学习 候选 - 看自主学习候选和影子策略",
-      ".表达学习 清空 - 清空全局表达学习记忆"
-    ].join("\n")
-
-    if (!subCommand || /帮助/.test(subCommand)) {
-      await this.sendObservedReply(e, helpText)
-      return true
-    }
-    if (/清空/.test(subCommand)) {
-      globalStyleLearnerManager.clear(this.config.globalStyleLearning)
-      await this.sendObservedReply(e, "全局表达学习记忆已清空。")
-      return true
-    }
-    if (/总结/.test(subCommand)) {
-      try {
-        const result = await globalStyleLearnerManager.summarizeWithAI(
-          this.config.globalStyleLearning,
-          this.config.memoryAiConfig
-        )
-        await this.sendObservedReply(e, [
-          "全局表达学习总结完成：",
-          `本次参考脱敏样本：${result.sampleCount} 条`,
-          `新增/更新可吸收规则：${result.absorbChanged} 条`,
-          `新增/更新避坑规则：${result.avoidChanged} 条`,
-          `当前模型规则：可吸收 ${result.totalAbsorb} 条，避坑 ${result.totalAvoid} 条`
-        ].join("\n"))
-      } catch (error) {
-        logger.warn(`[全局表达学习] 模型总结失败: ${error.message}`)
-        await this.sendObservedReply(e, `全局表达学习总结失败：${error.message}`)
-      }
-      return true
-    }
-    if (/报告/.test(subCommand)) {
-      await this.sendObservedReply(e, globalStyleLearnerManager.buildReport(this.config.globalStyleLearning))
-      return true
-    }
-    if (/候选|自主/.test(subCommand)) {
-      await this.sendObservedReply(e, globalStyleLearnerManager.buildAutoEvolutionView(this.config.globalStyleLearning))
-      return true
-    }
-    if (/记忆/.test(subCommand)) {
-      await this.sendObservedReply(e, globalStyleLearnerManager.buildMemoryView(this.config.globalStyleLearning))
-      return true
-    }
-    if (/状态/.test(subCommand)) {
-      await this.sendObservedReply(e, globalStyleLearnerManager.buildStatus(this.config.globalStyleLearning))
-      return true
-    }
-    await this.sendObservedReply(e, helpText)
-    return true
   }
 
   /**
@@ -8113,39 +7686,12 @@ ${mcpPrompts}
   /**
    * 清除当前群的所有记忆（群记忆 + 用户记忆）
    */
-  async clearGroupMemory(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用此命令")
-      return true
-    }
-
-    try {
-      const cleared = await this.memoryManager.clearGroupRedis(e.group_id)
-      await this.sendObservedReply(e, `已清除本群记忆，共 ${cleared} 项存储键。`)
-    } catch (error) {
-      logger.error("[群记忆] 清除失败:", error)
-      await this.sendObservedReply(e, "清除失败，请查看日志")
-    }
-    return true
-  }
 
   /**
    * 重载MCP配置（管理员命令）
    */
-  isGroupMemoryAdmin(e) {
-    return Boolean(e.isMaster || ["owner", "admin"].includes(e.sender?.role))
-  }
-
-  formatMemoryTime(timestamp) {
-    if (!timestamp) return "无"
-    return new Date(timestamp).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
-  }
 
   // authority → 中文来源（新模型权威分级 config>self>teaching>mention）
-  memoryAuthoritySource(authority) {
-    const map = { config: "配置", self: "本人说", teaching: "群里教", mention: "提及推断" }
-    return map[authority] || "提及推断"
-  }
 
   // 对齐新 fact 模型（entityModel.makeFact）：factShortId(text) 作 id、tags[0] 作分类、
   // text、confidence、authority 中文来源；eventAt 存在附"(待回扣)"。
@@ -8209,355 +7755,7 @@ ${mcpPrompts}
     }
   }
 
-  async memoryStatus(e) {
-    try {
-      const status = await this.memoryManager.adminStatus({
-        groupId: e.group_id,
-        userId: e.user_id
-      })
-      const user = status.user || {}
-      const group = status.group || {}
-      const config = status.config || {}
-      const lines = [
-        `记忆系统：${status.enabled ? "开启" : "关闭"}`,
-        `我的记忆：${user.optedOut ? "已禁用" : "启用"}，事实 ${user.factCount || 0} 条，别名 ${user.aliasCount || 0} 条`,
-        `群记忆：${group.disabled ? "已禁用" : "启用"}，实体 ${group.entityCount || 0} 个，群事实 ${group.factCount || 0} 条，别名 ${group.aliasCount || 0} 条，工作流 ${group.workflowCount || 0} 条，群知识 ${group.knowledgeCount || 0} 条`,
-        `群上次抽取：${this.formatMemoryTime(group.lastExtractAt)}，连续失败 ${group.failureCount || 0} 次`,
-        `保存严格度：${config.saveStrictness ?? "默认"}，语义召回：${config.semanticRecallEnabled ? "开启" : "关闭"}，主动回扣：${config.proactiveCallback ? "开启" : "关闭"}`,
-        `上限：实体/群 ${config.maxEntitiesPerGroup ?? "-"}，事实/群 ${config.maxFactsPerGroup ?? "-"}`
-      ]
-      await this.sendObservedReply(e, lines.join("\n"))
-    } catch (error) {
-      logger.error("[记忆管理] 读取记忆状态失败:", error)
-      await this.sendObservedReply(e, "记忆状态读取失败，请看日志")
-    }
-    return true
-  }
-
   // P1-4：进程内调用计数/耗时统计（主人或群管理员可见）。重启归零。
-  async memoryStats(e) {
-    if (!this.isGroupMemoryAdmin(e)) {
-      await this.sendObservedReply(e, "只有群主、管理员或主人可以查看记忆统计")
-      return true
-    }
-    try {
-      const { counters, timings } = memStats.snapshot()
-      const num = key => Number(counters[key] || 0)
-
-      const embedTotal = num("embed.hit") + num("embed.miss")
-      const embedHitRate = embedTotal ? ((num("embed.hit") / embedTotal) * 100).toFixed(1) : "0.0"
-      const extractFailRate = num("llm.extract.call")
-        ? ((num("llm.extract.fail") / num("llm.extract.call")) * 100).toFixed(1)
-        : "0.0"
-      const reflectFailRate = num("llm.reflect.call")
-        ? ((num("llm.reflect.fail") / num("llm.reflect.call")) * 100).toFixed(1)
-        : "0.0"
-      const avgMs = key => (timings[key]?.avgMs ? timings[key].avgMs.toFixed(0) : "0")
-
-      const lines = [
-        "记忆系统调用统计（进程内，重启归零）",
-        `抽取(用户)：flush ${num("extract.user.flushed")} / buffer ${num("extract.user.buffered")} / opt-out ${num("extract.user.optedOut")}`,
-        `抽取(群)：run ${num("extract.group.run")} / 节流 ${num("extract.group.throttled")} / 边界丢弃 ${num("extract.boundary.drop")}`,
-        `LLM 抽取：调用 ${num("llm.extract.call")}，失败 ${num("llm.extract.fail")}（${extractFailRate}%），平均 ${avgMs("llm.extract.ms")}ms`,
-        `LLM 反思：调用 ${num("llm.reflect.call")}，失败 ${num("llm.reflect.fail")}（${reflectFailRate}%），平均 ${avgMs("llm.reflect.ms")}ms`,
-        `Embedding：命中 ${num("embed.hit")} / 未命中 ${num("embed.miss")}（命中率 ${embedHitRate}%），失败 ${num("embed.fail")}，平均 ${avgMs("embed.ms")}ms`
-      ]
-      await this.sendObservedReply(e, lines.join("\n"))
-    } catch (error) {
-      logger.error("[记忆管理] 读取记忆统计失败:", error)
-      await this.sendObservedReply(e, "记忆统计读取失败，请看日志")
-    }
-    return true
-  }
-
-  async listMyMemory(e) {
-    try {
-      const result = await this.memoryManager.adminListMemories({
-        scope: "user",
-        groupId: e.group_id,
-        userId: e.user_id,
-        limit: 30
-      })
-      await this.replyMemoryForward(e, "我的记忆", [
-        { title: "我的记忆", facts: result.facts }
-      ])
-    } catch (error) {
-      logger.error("[记忆管理] 读取我的记忆失败:", error)
-      await this.sendObservedReply(e, "读取我的记忆失败，请看日志")
-    }
-    return true
-  }
-
-  async listGroupMemory(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-
-    try {
-      const result = await this.memoryManager.adminListMemories({
-        scope: "group",
-        groupId: e.group_id,
-        limit: 30
-      })
-      await this.replyMemoryForward(e, "群记忆", [
-        { title: "群记忆", facts: result.facts }
-      ])
-    } catch (error) {
-      logger.error("[记忆管理] 读取群记忆失败:", error)
-      await this.sendObservedReply(e, "读取群记忆失败，请看日志")
-    }
-    return true
-  }
-
-  async listGroupWorkflows(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    try {
-      const workflows = await this.memoryManager.getGroupWorkflowRules(e.group_id)
-      if (!workflows.length) {
-        await this.sendObservedReply(e, "本群还没有已教会的工作流。")
-        return true
-      }
-      const lines = ["本群已教会的工作流："]
-      for (const rule of workflows) {
-        const targets = (rule.targets || []).map(item => `${item.displayName || item.userId}(QQ:${item.userId})`).join("、")
-        lines.push(`[${rule.id}] ${rule.condition} -> 通知 ${targets}`)
-      }
-      await this.sendObservedReply(e, lines.join("\n"))
-    } catch (error) {
-      logger.error("[群工作流] 列表失败:", error)
-      await this.sendObservedReply(e, "读取群工作流失败，请看日志")
-    }
-    return true
-  }
-
-  async deleteGroupWorkflow(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    const id = String(e.msg || "").replace(/^#删除群工作流\s+/, "").trim()
-    try {
-      const workflows = await this.memoryManager.getGroupWorkflowRules(e.group_id)
-      const rule = workflows.find(item => String(item?.id || "") === id)
-      if (!rule) {
-        await this.sendObservedReply(e, "没有找到这条群工作流。")
-        return true
-      }
-      if (!this.isGroupMemoryAdmin(e) && String(rule.createdBy || "") !== String(e.user_id || "")) {
-        await this.sendObservedReply(e, "只有创建者、群主、管理员或主人可以删除这条群工作流。")
-        return true
-      }
-      const result = await this.memoryManager.adminDeleteGroupWorkflow({ groupId: e.group_id, id })
-      await this.sendObservedReply(e, result.deleted ? "已删除这条群工作流。" : "删除失败：没有找到这条群工作流。")
-    } catch (error) {
-      logger.error("[群工作流] 删除失败:", error)
-      await this.sendObservedReply(e, "删除群工作流失败，请看日志")
-    }
-    return true
-  }
-
-  async listGroupKnowledge(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    try {
-      const entries = await this.memoryManager.getGroupKnowledgeEntries(e.group_id)
-      if (!entries.length) {
-        await this.sendObservedReply(e, "本群还没有已教会的群知识。")
-        return true
-      }
-      const lines = ["本群已教会的群知识："]
-      for (const entry of entries) {
-        if (entry.kind === "group_file") {
-          lines.push(`[${entry.id}] ${entry.ownerQQ ? `QQ:${entry.ownerQQ} 的` : ""}${entry.subject} = 群文件「${entry.resource?.fileName || "未知"}」`)
-        } else {
-          const targets = (entry.targets || []).map(item => `${item.displayName || item.userId}(QQ:${item.userId})`).join("、")
-          lines.push(`[${entry.id}] ${entry.subject} = ${targets}`)
-        }
-      }
-      await this.sendObservedReply(e, lines.join("\n"))
-    } catch (error) {
-      logger.error("[群知识] 列表失败:", error)
-      await this.sendObservedReply(e, "读取群知识失败，请看日志")
-    }
-    return true
-  }
-
-  async deleteGroupKnowledge(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    const id = String(e.msg || "").replace(/^#删除群知识\s+/, "").trim()
-    try {
-      const entries = await this.memoryManager.getGroupKnowledgeEntries(e.group_id)
-      const entry = entries.find(item => String(item?.id || "") === id)
-      if (!entry) {
-        await this.sendObservedReply(e, "没有找到这条群知识。")
-        return true
-      }
-      if (!this.isGroupMemoryAdmin(e) && String(entry.createdBy || "") !== String(e.user_id || "")) {
-        await this.sendObservedReply(e, "只有创建者、群主、管理员或主人可以删除这条群知识。")
-        return true
-      }
-      const result = await this.memoryManager.adminDeleteGroupKnowledge({ groupId: e.group_id, id })
-      await this.sendObservedReply(e, result.deleted ? "已删除这条群知识。" : "删除失败：没有找到这条群知识。")
-    } catch (error) {
-      logger.error("[群知识] 删除失败:", error)
-      await this.sendObservedReply(e, "删除群知识失败，请看日志")
-    }
-    return true
-  }
-
-  async searchMemory(e) {
-    const query = String(e.msg || "").replace(/^#搜索记忆\s+/, "").trim()
-    if (!query) {
-      await this.sendObservedReply(e, "请输入要搜索的关键词")
-      return true
-    }
-
-    try {
-      const myResult = await this.memoryManager.adminListMemories({
-        scope: "user",
-        groupId: e.group_id,
-        userId: e.user_id,
-        query,
-        limit: 10
-      })
-      const groupResult = e.group_id
-        ? await this.memoryManager.adminListMemories({
-            scope: "group",
-            groupId: e.group_id,
-            query,
-            limit: 10
-          })
-        : { facts: [] }
-      await this.replyMemoryForward(e, "搜索记忆", [
-        { title: "我的匹配记忆", facts: myResult.facts },
-        { title: "群匹配记忆", facts: groupResult.facts }
-      ])
-    } catch (error) {
-      logger.error("[记忆管理] 搜索记忆失败:", error)
-      await this.sendObservedReply(e, "搜索记忆失败，请看日志")
-    }
-    return true
-  }
-
-  async deleteMemory(e) {
-    const id = String(e.msg || "").replace(/^#删除记忆\s+/, "").trim()
-    if (!id) {
-      await this.sendObservedReply(e, "请输入要删除的记忆 id")
-      return true
-    }
-
-    try {
-      const result = await this.memoryManager.adminDeleteMemory({ groupId: e.group_id, userId: e.user_id, id })
-
-      await this.sendObservedReply(e, result.deleted ? `已删除记忆 ${id}` : "没有找到可删除的记忆，普通用户只能删除自己的记忆")
-    } catch (error) {
-      logger.error("[记忆管理] 删除记忆失败:", error)
-      await this.sendObservedReply(e, "删除记忆失败，请看日志")
-    }
-    return true
-  }
-
-  async clearMyMemory(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    try {
-      // P0-1：只删该用户自己的 entity（旧实现误调 adminClearMemories 会清整群）。
-      const result = await this.memoryManager.clearUserMemory(e.group_id, e.user_id)
-      await this.sendObservedReply(e, result?.cleared ? "已清空你在本群的记忆" : "你在本群没有可清空的记忆")
-    } catch (error) {
-      logger.error("[记忆管理] 清空我的记忆失败:", error)
-      await this.sendObservedReply(e, "清空我的记忆失败，请看日志")
-    }
-    return true
-  }
-
-  async clearGroupMemory(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    if (!this.isGroupMemoryAdmin(e)) {
-      await this.sendObservedReply(e, "只有群主、管理员或主人可以清空群记忆")
-      return true
-    }
-
-    // P0-1 二次确认：首次仅登记 pending（30s 过期），需再发一次同命令才真正清空。
-    const pendingKey = `${e.group_id}_${e.user_id}`
-    const now = Date.now()
-    const expireAt = clearGroupMemoryPending.get(pendingKey)
-    if (!expireAt || expireAt < now) {
-      clearGroupMemoryPending.set(pendingKey, now + CLEAR_GROUP_MEMORY_CONFIRM_TTL_MS)
-      await this.sendObservedReply(e, "这会清空整群的记忆且不可恢复。请在 30 秒内再发一次 #清空群记忆 确认。")
-      return true
-    }
-    clearGroupMemoryPending.delete(pendingKey)
-
-    try {
-      const result = await this.memoryManager.adminClearMemories({
-        groupId: e.group_id
-      })
-      await this.sendObservedReply(e, `已清空本群群记忆，共 ${result.cleared} 项存储键。`)
-    } catch (error) {
-      logger.error("[记忆管理] 清空群记忆失败:", error)
-      await this.sendObservedReply(e, "清空群记忆失败，请看日志")
-    }
-    return true
-  }
-
-  async disableMyMemory(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    try {
-      // P0-2：按真实返回写文案。返回 {enabled:<是否仍在记>}，false 表示已退出记忆。
-      const result = await this.memoryManager.adminSetUserMemoryEnabled({
-        groupId: e.group_id,
-        userId: e.user_id,
-        enabled: false
-      })
-      await this.sendObservedReply(e, result?.enabled === false
-        ? "已禁用你在本群的长期记忆，之后不再记录你的发言"
-        : "操作未生效，你的记忆仍处于启用状态")
-    } catch (error) {
-      logger.error("[记忆管理] 禁用我的记忆失败:", error)
-      await this.sendObservedReply(e, "禁用失败，请看日志")
-    }
-    return true
-  }
-
-  async enableMyMemory(e) {
-    if (!e.group_id) {
-      await this.sendObservedReply(e, "请在群聊中使用这个命令")
-      return true
-    }
-    try {
-      // P0-2：返回 {enabled:<是否仍在记>}，true 表示已重新启用记忆。
-      const result = await this.memoryManager.adminSetUserMemoryEnabled({
-        groupId: e.group_id,
-        userId: e.user_id,
-        enabled: true
-      })
-      await this.sendObservedReply(e, result?.enabled
-        ? "已启用你在本群的长期记忆"
-        : "操作未生效，你的记忆仍处于禁用状态")
-    } catch (error) {
-      logger.error("[记忆管理] 启用我的记忆失败:", error)
-      await this.sendObservedReply(e, "启用失败，请看日志")
-    }
-    return true
-  }
 
   async reloadMCP(e) {
     if (!e.isMaster) {

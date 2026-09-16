@@ -1,22 +1,2 @@
-import { groupNoticeManager } from "../utils/GroupNoticeManager.js"
-
-export class GroupNoticeDecrease extends plugin {
-  constructor() {
-    super({
-      name: "群通知-退群提示",
-      dsc: "成员退群后发送自定义提示",
-      event: "notice.group.decrease",
-      priority: 4900,
-      rule: [
-        {
-          fnc: "handleGroupDecrease",
-          log: false
-        }
-      ]
-    })
-  }
-
-  async handleGroupDecrease(e) {
-    return await groupNoticeManager.handleGroupDecrease(e)
-  }
-}
+// group-admin 域已迁移至 domains/group-admin/，此文件仅作 Yunzai 加载入口
+export * from "../domains/group-admin/noticeDecrease.js"

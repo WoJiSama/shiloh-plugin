@@ -83,3 +83,55 @@ test("refreshes temporary Douyin playback resources after the short cache window
   assert.equal(calls, 2)
   assert.notEqual(first.play_url, second.play_url)
 })
+
+test("分享页静态解析失败时走浏览器兜底并合并卡片字段", async () => {
+  const calls = []
+  const failingFetch = async () => ({ ok: false, url: "https://www.iesdouyin.com/share/video/1/", status: 403 })
+  const browserResolver = async card => {
+    calls.push(card)
+    return {
+      play_url: "https://v26.douyinvod.com/video/tos/cn/tos-cn-ve-15c001-alinc2/abc.mp4",
+      cover_url: "https://p3.douyinpic.com/cover.jpg",
+      title: "香蕉出轨了",
+      author: "free1987hl",
+      duration: 45000,
+      aweme_id: "7461",
+      final_url: "https://www.iesdouyin.com/share/video/7461/"
+    }
+  }
+  const card = await enrichDouyinShare(
+    { type: "douyin", short_url: "https://v.douyin.com/abc123/", page_url: "https://www.iesdouyin.com/share/video/7461/", aweme_id: "7461" },
+    { fetchImpl: failingFetch, browserResolver, logger: null }
+  )
+  assert.equal(calls.length, 1)
+  assert.equal(card.metadata_status, "resolved")
+  assert.match(card.play_url, /\.mp4/)
+  assert.equal(card.title, "香蕉出轨了")
+  assert.equal(card.author, "free1987hl")
+  assert.equal(card.duration, 45, "毫秒口径应折算成秒")
+  assert.equal(card.page_url, "https://www.iesdouyin.com/share/video/7461/")
+})
+
+test("浏览器兜底也拿不到地址时保持 link 降级且不抛错", async () => {
+  const failingFetch = async () => ({ ok: false, url: "https://www.iesdouyin.com/share/video/2/", status: 403 })
+  const card = await enrichDouyinShare(
+    { type: "douyin", short_url: "https://v.douyin.com/xyz/", aweme_id: "xyz" },
+    { fetchImpl: failingFetch, browserResolver: async () => null, logger: null }
+  )
+  assert.equal(card.metadata_status, "link")
+  assert.ok(!card.play_url)
+})
+
+test("extractPlayUrlFromJson 深找各版本 detail 响应结构", async () => {
+  const { extractPlayUrlFromJson } = await import("../utils/douyinBrowserResolver.js")
+  assert.equal(
+    extractPlayUrlFromJson({ aweme_detail: { video: { play_addr: { url_list: ["https://a.douyinvod.com/x.mp4"] } } } }),
+    "https://a.douyinvod.com/x.mp4"
+  )
+  assert.equal(
+    extractPlayUrlFromJson({ item_list: [{ video: { playAddr: { url_list: [null, "https://b.douyinvod.com/y.mp4"] } } }] }),
+    "https://b.douyinvod.com/y.mp4"
+  )
+  assert.equal(extractPlayUrlFromJson({ nothing: true }), "")
+  assert.equal(extractPlayUrlFromJson(null), "")
+})

@@ -19,7 +19,7 @@ import {
     toImageEditUrl
 } from "../../utils/imageGenerationFallback.js";
 import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
-import { personaFeedbackManager } from "../../utils/PersonaFeedbackManager.js";
+import { personaFeedbackManager } from "../../domains/memory/PersonaFeedbackManager.js";
 
 const { mimeTypes, FormData } = dependencies;
 const DEFAULT_CHAT_IMAGE_EDIT_URL = 'https://api.openai.com/v1/chat/completions';

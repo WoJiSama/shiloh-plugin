@@ -1,7 +1,7 @@
 // tests/memory/constants.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { AUTHORITY_RANK, ROUTES, normalizeAlias, clamp, compactText } from '../../utils/memory/constants.js'
+import { AUTHORITY_RANK, ROUTES, normalizeAlias, clamp, compactText } from '../../domains/memory/engine/constants.js'
 
 test('authority rank ordering config>self>teaching>mention', () => {
   assert.ok(AUTHORITY_RANK.config > AUTHORITY_RANK.self)

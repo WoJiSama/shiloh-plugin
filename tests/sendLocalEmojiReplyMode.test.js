@@ -11,7 +11,7 @@ async function loadRuntime(t) {
   try {
     const [{ SendLocalEmojiTool }, { emojiPackManager }] = await Promise.all([
       import("../functions/functions_tools/SendLocalEmojiTool.js"),
-      import("../utils/EmojiPackManager.js")
+      import("../domains/emoji/EmojiPackManager.js")
     ])
     return { SendLocalEmojiTool, emojiPackManager }
   } catch (error) {

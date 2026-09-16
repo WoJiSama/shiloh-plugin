@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createFakeRedis } from './helpers/fakeRedis.js'
-import { RedisStore } from '../../utils/memory/redisStore.js'
+import { RedisStore } from '../../domains/memory/engine/redisStore.js'
 
 test('entities round-trip + slimming on read', async () => {
   const redis = createFakeRedis()

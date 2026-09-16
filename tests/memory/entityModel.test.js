@@ -1,7 +1,7 @@
 // tests/memory/entityModel.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { makeEntity, makeAlias, makeFact, slimEntityDoc, factShortId } from '../../utils/memory/entityModel.js'
+import { makeEntity, makeAlias, makeFact, slimEntityDoc, factShortId } from '../../domains/memory/engine/entityModel.js'
 import { createHash } from 'node:crypto'
 
 test('makeAlias produces slim shape, no bloat fields', () => {

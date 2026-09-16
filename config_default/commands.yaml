@@ -1,0 +1,413 @@
+# ================================================================
+# 命令总表 —— 机器人全部命令的唯一权威定义处
+#
+# · 这里是给你看的说明书 + 给机器人生成帮助菜单的数据源
+# · 修改保存后自动热更新，无需重启机器人
+# · 发送「.命令 导出」可重新生成 docs/commands.md 快照文档
+# · 正则匹配仍在各 app 代码里，这里的 usage 是展示用写法
+#
+# 字段说明：
+#   usage  展示用法（[] 表示可选参数）
+#   desc   一句话说明
+#   perm   all=所有人 | admin=群管理 | master=仅主人
+#   src    实现位置（文件名 处理函数），便于重构时定位
+# ================================================================
+
+domains:
+  - key: memory
+    name: 记忆与表达
+    icon: "🧠"
+    desc: 长期记忆、群记忆、群工作流、全局表达学习
+    commands:
+      - usage: "#记忆状态"
+        desc: 查看记忆系统运行状态
+        perm: all
+        src: "domains/memory/commandsApp.js memoryStatus"
+      - usage: "#记忆统计"
+        desc: 查看记忆库统计
+        perm: all
+        src: "domains/memory/commandsApp.js memoryStats"
+      - usage: "#我的记忆"
+        desc: 列出我的长期记忆
+        perm: all
+        src: "domains/memory/commandsApp.js listMyMemory"
+      - usage: "#群记忆"
+        desc: 列出本群共享记忆
+        perm: all
+        src: "domains/memory/commandsApp.js listGroupMemory"
+      - usage: "#搜索记忆 <关键词>"
+        desc: 搜索记忆库
+        perm: all
+        src: "domains/memory/commandsApp.js searchMemory"
+      - usage: "#删除记忆 <ID>"
+        desc: 删除指定记忆条目
+        perm: all
+        src: "domains/memory/commandsApp.js deleteMemory"
+      - usage: "#清空我的记忆 / #清空群记忆"
+        desc: 清空个人或本群记忆
+        perm: all
+        src: "domains/memory/commandsApp.js clearMyMemory/clearGroupMemory"
+      - usage: "#禁用我的记忆 / #启用我的记忆"
+        desc: 开关我个人记忆写入
+        perm: all
+        src: "domains/memory/commandsApp.js disableMyMemory/enableMyMemory"
+      - usage: "#群工作流"
+        desc: 查看本群自动通知工作流
+        perm: all
+        src: "domains/memory/commandsApp.js listGroupWorkflows"
+      - usage: "#删除群工作流 <ID>"
+        desc: 删除指定工作流
+        perm: all
+        src: "domains/memory/commandsApp.js deleteGroupWorkflow"
+      - usage: "#群知识"
+        desc: 查看本群知识绑定（谁是谁、黑话等）
+        perm: all
+        src: "domains/memory/commandsApp.js listGroupKnowledge"
+      - usage: "#删除群知识 <ID>"
+        desc: 删除指定群知识
+        perm: all
+        src: "domains/memory/commandsApp.js deleteGroupKnowledge"
+      - usage: ".表达学习 [状态|记忆|报告|总结|清空]"
+        desc: 全局表达学习管理（无参数看帮助）
+        perm: master
+        src: "domains/memory/commandsApp.js globalStyleLearningCommand"
+      - usage: ".希洛反馈 <内容>"
+        desc: 对机器人说话风格提意见
+        perm: all
+        src: "domains/memory/commandsApp.js recordPersonaFeedback"
+
+  - key: tools
+    name: 工具与MCP
+    icon: "🛠"
+    desc: 本地工具调用与 MCP 服务管理
+    commands:
+      - usage: "#tool <内容>"
+        desc: 调用本地工具
+        perm: all
+        src: "apps/test.js handleTool"
+      - usage: "#mcp 重载"
+        desc: 重新加载 MCP 服务配置
+        perm: master
+        src: "apps/test.js reloadMCP"
+      - usage: "#mcp 列表"
+        desc: 列出可用 MCP 工具
+        perm: all
+        src: "apps/test.js listMCPTools"
+      - usage: "#mcp 状态"
+        desc: 查看 MCP 连接状态
+        perm: all
+        src: "apps/test.js mcpStatus"
+      - usage: "#mcp 测试 <工具名>"
+        desc: 测试指定 MCP 工具
+        perm: master
+        src: "apps/test.js testMCPTool"
+
+  - key: dice
+    name: 骰子
+    icon: "🎲"
+    desc: 自定义规则包骰子系统（JS 规则包，规划中兼容 sealdice 骰句语法）
+    commands:
+      - usage: ".draw <牌组> [keys|list|search|desc|reload]"
+        desc: 牌堆抽牌与管理（牌堆文件放 config/decks/）
+        perm: all
+        src: "domains/dice/DeckManager.js"
+      - usage: ".<规则包命令>"
+        desc: 规则包定义的任意骰子命令，如 .r 1d100、.ra 力量 70（以已加载规则包为准）
+        perm: all
+        src: "apps/DicePlugin.js customDiceRule"
+      - usage: ".骰子规则 [列表|详情|帮助]"
+        desc: 查看已加载的规则包与命令（以规则包内置帮助为准）
+        perm: all
+        src: "utils/DiceRulePackManager.js"
+
+  - key: deltaforce
+    name: 三角洲
+    icon: "🔫"
+    desc: 三角洲行动游戏数据查询
+    commands:
+      - usage: ".三角洲"
+        desc: 三角洲模块帮助
+        perm: all
+        src: "domains/games/deltaforce/app.js showHelp"
+      - usage: ".三角洲 密码"
+        desc: 今日/每日密码
+        perm: all
+        src: "domains/games/deltaforce/app.js dailyKeyword"
+      - usage: ".三角洲 物品价值 <名称>"
+        desc: 查物品价值/价格
+        perm: all
+        src: "domains/games/deltaforce/app.js objectValueSearch"
+      - usage: ".三角洲 价格历史 <名称>"
+        desc: 价格走势折线图
+        perm: all
+        src: "domains/games/deltaforce/app.js priceHistory"
+      - usage: ".三角洲 改枪码 [方案]"
+        desc: 改枪方案列表/详情
+        perm: all
+        src: "domains/games/deltaforce/app.js solutionList"
+      - usage: ".三角洲 特勤处利润 [设施]"
+        desc: 制造利润查询
+        perm: all
+        src: "domains/games/deltaforce/app.js placeProfit"
+      - usage: ".三角洲 利润排行"
+        desc: 制造利润排行
+        perm: all
+        src: "domains/games/deltaforce/app.js profitRank"
+
+  - key: uma
+    name: 赛马娘
+    icon: "🐎"
+    desc: 赛马娘养成与竞速小游戏
+    commands:
+      - usage: ".赛马娘"
+        desc: 赛马娘模块帮助
+        perm: all
+        src: "domains/games/uma/app.js showHelp"
+      - usage: ".赛马娘 领养 <名字>"
+        desc: 领养/创建你的赛马娘
+        perm: all
+        src: "domains/games/uma/app.js adoptUma"
+      - usage: ".赛马娘 重新领养 <名字>"
+        desc: 重新领养（重置养成）
+        perm: all
+        src: "domains/games/uma/app.js readoptUma"
+      - usage: ".赛马娘 弃养 [确认]"
+        desc: 弃养当前赛马娘
+        perm: all
+        src: "domains/games/uma/app.js abandonUma"
+      - usage: ".赛马娘 属性"
+        desc: 查看赛马娘六维信息
+        perm: all
+        src: "domains/games/uma/app.js showUma"
+      - usage: ".赛马娘 词条"
+        desc: 查看小马词条
+        perm: all
+        src: "domains/games/uma/app.js showAffix"
+      - usage: ".赛马娘 重铸"
+        desc: 洗练词条
+        perm: all
+        src: "domains/games/uma/app.js rerollAffix"
+      - usage: ".赛马娘 词条池"
+        desc: 查看词条池列表
+        perm: all
+        src: "domains/games/uma/app.js showAffixPool"
+      - usage: ".赛马娘 训练"
+        desc: 查看训练状态
+        perm: all
+        src: "domains/games/uma/app.js showTrainingStatus"
+      - usage: ".赛马娘 训练 <项目>"
+        desc: 执行训练
+        perm: all
+        src: "domains/games/uma/app.js trainUma"
+      - usage: ".赛马娘 开始"
+        desc: 发起一场竞速
+        perm: all
+        src: "domains/games/uma/app.js startRace"
+      - usage: ".赛马娘 加入"
+        desc: 报名参加比赛
+        perm: all
+        src: "domains/games/uma/app.js joinRace"
+      - usage: ".赛马娘 决策 <选择>"
+        desc: 比赛中的策略选择
+        perm: all
+        src: "domains/games/uma/app.js raceDecision"
+      - usage: ".赛马娘 开跑"
+        desc: 开始比赛
+        perm: all
+        src: "domains/games/uma/app.js runRace"
+      - usage: ".赛马娘 取消"
+        desc: 取消当前比赛
+        perm: all
+        src: "domains/games/uma/app.js cancelRace"
+      - usage: ".赛马娘 加积分 <QQ> <数量>"
+        desc: 调整积分
+        perm: admin
+        src: "domains/games/uma/app.js adjustScore"
+      - usage: ".赛马娘 积分"
+        desc: 查看我的积分
+        perm: all
+        src: "domains/games/uma/app.js showScore"
+      - usage: ".赛马娘 排行 [页码]"
+        desc: 积分排行榜
+        perm: all
+        src: "domains/games/uma/app.js showRank"
+
+  - key: emoji
+    name: 表情包
+    icon: "😹"
+    desc: 表情包库管理（全部仅主人）
+    commands:
+      - usage: "#表情包导入"
+        desc: 从引用/图片导入表情包
+        perm: master
+        src: "domains/emoji/app.js importEmoji"
+      - usage: "#表情包列表 [页码]"
+        desc: 分页浏览表情包库
+        perm: master
+        src: "domains/emoji/app.js listEmoji"
+      - usage: "#表情包删除 [ID]"
+        desc: 删除表情包
+        perm: master
+        src: "domains/emoji/app.js deleteEmoji"
+      - usage: "#表情包打标 [ID]"
+        desc: 重新生成表情包标签
+        perm: master
+        src: "domains/emoji/app.js retagEmoji"
+      - usage: "#表情包预览 [ID]"
+        desc: 预览表情包
+        perm: master
+        src: "domains/emoji/app.js previewEmoji"
+      - usage: "#表情包封禁 [ID] / #表情包解封 [ID]"
+        desc: 封禁/解封表情包
+        perm: master
+        src: "domains/emoji/app.js banEmoji/unbanEmoji"
+      - usage: "#表情包重载"
+        desc: 重载表情包库
+        perm: master
+        src: "domains/emoji/app.js reloadEmoji"
+      - usage: "#表情包统计"
+        desc: 表情包库统计
+        perm: master
+        src: "domains/emoji/app.js emojiStats"
+      - usage: "#表情包巡检"
+        desc: 执行维护巡检
+        perm: master
+        src: "domains/emoji/app.js runMaintenance"
+      - usage: "#表情包清空 [确认]"
+        desc: 清空表情包库（危险）
+        perm: master
+        src: "domains/emoji/app.js clearAll"
+
+  - key: groupadmin
+    name: 群管理与广告
+    icon: "🛡"
+    desc: 广告语料库与群内容治理
+    commands:
+      - usage: ".广告入库"
+        desc: 将引用消息存入广告语料库
+        perm: admin
+        src: "domains/group-admin/moderationMessage.js"
+      - usage: ".广告出库"
+        desc: 处理待审广告样本
+        perm: admin
+        src: "domains/group-admin/moderationMessage.js"
+      - usage: ".广告样本 [列表|统计]"
+        desc: 查看广告语料库
+        perm: admin
+        src: "domains/group-admin/moderationMessage.js"
+      - usage: ".广告样本 删除 <ID>"
+        desc: 删除广告样本
+        perm: admin
+        src: "domains/group-admin/moderationMessage.js"
+
+  - key: chatlog
+    name: 聊天记录与管道
+    icon: "📜"
+    desc: 聊天记录查询、消息可靠管道、B站搬运
+    commands:
+      - usage: "#查看群聊记录 [条数] / #查看私聊记录 [条数]"
+        desc: 查看最近聊天记录
+        perm: master
+        src: "apps/MessageManager.js"
+      - usage: "#清除群聊记录 / #清除私聊记录"
+        desc: 清除本地记录缓存
+        perm: master
+        src: "apps/MessageManager.js"
+      - usage: "#搜索聊天记录 <关键词>"
+        desc: 搜索历史聊天记录
+        perm: all
+        src: "apps/MessageManager.js"
+      - usage: ".群聊天记录 管理员添加 <QQ> / 管理员删除 <QQ>"
+        desc: 聊天记录查询权限管理
+        perm: master
+        src: "apps/MessageManager.js"
+      - usage: ".群聊天记录 <关键词>"
+        desc: 群员查询群聊天记录（需授权）
+        perm: all
+        src: "apps/MessageManager.js"
+      - usage: ".消息管道状态 [QQ]"
+        desc: 查看消息可靠管道状态
+        perm: all
+        src: "apps/MessageManager.js"
+      - usage: ".B站授权 登录/状态/退出"
+        desc: B站高清搬运授权管理
+        perm: master
+        src: "domains/media/bilibili/app.js bilibiliAuth"
+      - usage: ".高清搬运 <链接>"
+        desc: B站视频高清搬运（引用或链接）
+        perm: all
+        src: "domains/media/bilibili/app.js relayBilibiliHighQuality"
+      - usage: ".高清搬运白名单 添加/删除/查看"
+        desc: 高清搬运群白名单管理
+        perm: master
+        src: "domains/media/bilibili/app.js manageBilibiliQualityWhitelist"
+      - usage: ".音乐提取"
+        desc: 提取引用分享卡片里的音乐
+        perm: master
+        src: "apps/MessageManager.js relayQuotedMusic"
+
+  - key: magnet
+    name: 磁链
+    icon: "🧲"
+    desc: 磁力链接搜索与受限下载
+    commands:
+      - usage: ".磁力搜索 <关键词>"
+        desc: 搜索磁力资源（.磁力/.磁链搜索 同义）
+        perm: all
+        src: "domains/media/magnetsearch/app.js search"
+      - usage: ".磁力"
+        desc: 磁链模块帮助
+        perm: all
+        src: "domains/media/magnetsearch/app.js showHelp"
+
+  - key: knowledge
+    name: 知识库
+    icon: "📚"
+    desc: 主人维护的静态知识库（全部仅主人）
+    commands:
+      - usage: "#知识库添加 <内容>"
+        desc: 添加知识条目
+        perm: master
+        src: "domains/knowledge/app.js addKnowledge"
+      - usage: "#知识库删除 <ID>"
+        desc: 删除知识条目
+        perm: master
+        src: "domains/knowledge/app.js deleteKnowledge"
+      - usage: "#知识库列表 [页码]"
+        desc: 分页浏览知识库
+        perm: master
+        src: "domains/knowledge/app.js listKnowledge"
+      - usage: "#知识库搜索 <关键词>"
+        desc: 搜索知识库
+        perm: master
+        src: "domains/knowledge/app.js searchKnowledge"
+      - usage: "#知识库统计"
+        desc: 知识库统计
+        perm: master
+        src: "domains/knowledge/app.js knowledgeStats"
+      - usage: "#知识库清空"
+        desc: 清空知识库（危险）
+        perm: master
+        src: "domains/knowledge/app.js clearKnowledge"
+
+  - key: system
+    name: 系统维护
+    icon: "⚙"
+    desc: 插件更新与查询工具
+    commands:
+      - usage: "#bl更新 / #bl强制更新"
+        desc: 更新插件
+        perm: master
+        src: "apps/update.js update"
+      - usage: "#查询qq <QQ号>"
+        desc: 查询QQ信息
+        perm: all
+        src: "apps/qqinfo1.js"
+      - usage: ".命令 [域名] / .帮助"
+        desc: 本命令总表（.命令 导出 重新生成文档）
+        perm: all
+        src: "apps/CommandHelp.js"
+      - usage: ".意图影子"
+        desc: 查看 P4 影子判定统计（模型 vs 正则一致率）
+        perm: master
+        src: "apps/CommandHelp.js showShadowStats"

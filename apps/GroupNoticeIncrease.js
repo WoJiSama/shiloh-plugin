@@ -1,22 +1,2 @@
-import { groupNoticeManager } from "../utils/GroupNoticeManager.js"
-
-export class GroupNoticeIncrease extends plugin {
-  constructor() {
-    super({
-      name: "群通知-入群欢迎",
-      dsc: "新成员入群后发送自定义欢迎语",
-      event: "notice.group.increase",
-      priority: 4900,
-      rule: [
-        {
-          fnc: "handleGroupIncrease",
-          log: false
-        }
-      ]
-    })
-  }
-
-  async handleGroupIncrease(e) {
-    return await groupNoticeManager.handleGroupIncrease(e)
-  }
-}
+// group-admin 域已迁移至 domains/group-admin/，此文件仅作 Yunzai 加载入口
+export * from "../domains/group-admin/noticeIncrease.js"

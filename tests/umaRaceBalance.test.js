@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 globalThis.logger ||= { error() {}, warn() {}, info() {}, debug() {}, mark() {} }
 globalThis.segment ||= { image: file => ({ type: "image", file }) }
 
-const { UmaRaceManager } = await import("../utils/UmaRaceManager.js")
+const { UmaRaceManager } = await import("../domains/games/uma/UmaRaceManager.js")
 const manager = new UmaRaceManager({ logger: null })
 
 function attrs(value) {

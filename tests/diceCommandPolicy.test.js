@@ -5,7 +5,7 @@ import {
   matchDiceCommand,
   normalizeDiceCommandText,
   stripDiceCommand
-} from "../utils/diceCommandPolicy.js"
+} from "../domains/dice/diceCommandPolicy.js"
 
 function route(message) {
   return DICE_COMMAND_RULES.find(rule => new RegExp(rule.reg).test(message))?.fnc || null
@@ -88,4 +88,24 @@ test("dice command parsing normalizes the Chinese period before extracting argum
 
 test("all dice routing rules compile as JavaScript regular expressions", () => {
   for (const rule of DICE_COMMAND_RULES) assert.doesNotThrow(() => new RegExp(rule.reg), rule.reg)
+})
+
+test(".dice 一级菜单与 .dice import 二级教程路由", () => {
+  assert.equal(route(".dice"), "diceHubMenu")
+  assert.equal(route(".骰娘"), "showHelp", "中文入口保持完整帮助")
+  assert.equal(route(".dice import"), "diceImportHub")
+  assert.equal(route(".dice import js"), "diceImportHub")
+  assert.equal(route(".dice 导入 yaml"), "diceImportHub")
+  assert.equal(route(".dice import yml"), "diceImportHub")
+  assert.equal(route(".dice rule 列表"), "manageDiceRules", "rule 子命令不受影响")
+  assert.equal(route(".dice help"), "showHelp", "help 仍进完整帮助")
+  assert.equal(route(".diceimport"), null, "紧贴前缀不误吞")
+})
+
+test(".dice import 文档与示例文件在仓库内真实存在", async () => {
+  const { resolveDiceDocPath } = await import("../domains/dice/diceCommandPolicy.js")
+  const { existsSync } = await import("node:fs")
+  for (const name of ["JS规则包教程.md", "骰娘自定义规则接入指南.md", "examples/bishou-zhixin.cjs"]) {
+    assert.ok(existsSync(resolveDiceDocPath(name)), name)
+  }
 })

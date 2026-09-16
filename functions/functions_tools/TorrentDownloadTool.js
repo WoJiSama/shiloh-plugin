@@ -5,6 +5,7 @@ import { spawn } from "node:child_process"
 import YAML from "yaml"
 import { AbstractTool } from "./AbstractTool.js"
 import { sendCompleteLocalFile } from "../../utils/messagePipeline/deliveryGateway.js"
+import { buildTorrentListCardData, renderTorrentListCard, deleteTorrentCard } from "../../utils/torrentListCard.js"
 import {
   TorrentDownloadError,
   addPublicTrackersToMagnet,
@@ -169,8 +170,29 @@ export class TorrentDownloadTool extends AbstractTool {
     this.commandRunner = options.commandRunner || runCommand
     this.fetchImpl = options.fetchImpl || globalThis.fetch
     this.fileSender = options.fileSender || sendCompleteLocalFile
+    this.cardRenderer = options.cardRenderer || renderTorrentListCard
     this.fs = options.fs || fs
     this.redis = options.redis || null
+  }
+
+  // 清单统一渲染成卡面图片发到群里;渲染或发送失败回退文本(fail-open)
+  async sendSelectionListing(e, metadata, options) {
+    const text = () => formatTorrentSelectionListing(metadata, options)
+    let imagePath = ""
+    try {
+      const data = buildTorrentListCardData(metadata, options)
+      imagePath = await this.cardRenderer(data)
+      const segmentApi = globalThis.segment
+      const imageSegment = segmentApi?.image?.(`file://${imagePath}`)
+      if (!imageSegment) throw new Error("当前运行环境没有 segment.image 可用")
+      await e?.reply?.(imageSegment)
+      globalThis.logger?.info?.(`[TorrentDownloadTool] 清单已转为卡面发送 files=${metadata.files.length}`)
+    } catch (error) {
+      globalThis.logger?.warn?.(`[TorrentDownloadTool] 清单卡面渲染失败,回退文本: ${error.message}`)
+      await this.sendNotice(e, text())
+    } finally {
+      if (imagePath) await deleteTorrentCard(imagePath)
+    }
   }
 
   async sendNotice(e, text) {
@@ -481,11 +503,11 @@ export class TorrentDownloadTool extends AbstractTool {
               size: file.size
             }))
           }, config.selectionTtlSeconds)
-          await this.sendNotice(e, formatTorrentSelectionListing(completeMetadata, {
+          await this.sendSelectionListing(e, completeMetadata, {
             selectableIndexes: selectable.map(file => file.index),
             unavailableReasons,
             maxTotalBytes: config.maxTotalBytes
-          }))
+          })
           return JSON.stringify({
             kind: "tool_outcome",
             status: "selection_required",

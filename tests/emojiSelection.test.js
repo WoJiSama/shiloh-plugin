@@ -5,7 +5,7 @@ import {
   filterEmojiSelectionCriteriaToCatalog,
   normalizeEmojiSelectionCriteria,
   structuredEmojiRelevanceScore
-} from "../utils/emojiSelection.js"
+} from "../domains/emoji/emojiSelection.js"
 
 // 组合来自 2026-07-14 线上 200 条库的脱敏 tags/useCases 分布，不复制图片、描述或 embedding。
 const catalog = [

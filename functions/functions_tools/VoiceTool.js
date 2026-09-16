@@ -1,6 +1,6 @@
 import { AbstractTool } from "./AbstractTool.js"
 import { pluginBridge } from "../../utils/pluginBridge.js"
-import { personaFeedbackManager } from "../../utils/PersonaFeedbackManager.js"
+import { personaFeedbackManager } from "../../domains/memory/PersonaFeedbackManager.js"
 import { VolcengineVoiceProvider } from "../../utils/VolcengineVoiceProvider.js"
 import {
   getVoiceStyleConfig,

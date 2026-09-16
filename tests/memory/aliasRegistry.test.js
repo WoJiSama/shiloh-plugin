@@ -1,7 +1,7 @@
 // tests/memory/aliasRegistry.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { upsertAlias, resolveAlias } from '../../utils/memory/aliasRegistry.js'
+import { upsertAlias, resolveAlias } from '../../domains/memory/engine/aliasRegistry.js'
 
 test('upsert new alias adds entry', () => {
   const doc = {}

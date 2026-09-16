@@ -39,6 +39,29 @@ export async function resolveRecentBotImage(event = {}, options = {}) {
   return null
 }
 
+/** 不带话术门槛的版本：扫描机器人最近发过的图片，用于判断画图回合是否真的出图了 */
+export async function findRecentBotImage(event = {}, options = {}) {
+  const group = event?.group || (event?.bot?.pickGroup && event?.group_id ? event.bot.pickGroup(event.group_id) : null)
+  if (!group?.getChatHistory) return null
+
+  const botId = String(options.botId || event?.bot?.uin || globalThis.Bot?.uin || "")
+  const maxAgeMs = Number(options.maxAgeMs) || 15 * 60 * 1000
+  const now = Number(options.now) || Date.now()
+  const history = await group.getChatHistory(0, Number(options.limit) || 60)
+
+  for (const record of [...(history || [])].reverse()) {
+    const senderId = String(record?.sender?.user_id || record?.user_id || "")
+    if (!botId || senderId !== botId) continue
+    const timestamp = getRecordTimestamp(record)
+    if (timestamp && now - timestamp > maxAgeMs) continue
+    for (const segment of record?.message || []) {
+      const image = getImageSource(segment)
+      if (image) return { image, record }
+    }
+  }
+  return null
+}
+
 export async function resolveRecentUserImage(event = {}, options = {}) {
   const group = event?.group || (event?.bot?.pickGroup && event?.group_id ? event.bot.pickGroup(event.group_id) : null)
   if (!group?.getChatHistory) return null

@@ -6,7 +6,7 @@ import YAML from "yaml";
 import path from "path";
 import { randomUUID } from "crypto";
 import { pluginBridge } from "../../utils/pluginBridge.js";
-import { personaFeedbackManager } from "../../utils/PersonaFeedbackManager.js";
+import { personaFeedbackManager } from "../../domains/memory/PersonaFeedbackManager.js";
 import {
   DEFAULT_IMAGE_GENERATION_URL,
   generateImageEditWithFallbacks,

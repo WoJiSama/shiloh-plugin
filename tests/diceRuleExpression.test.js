@@ -8,8 +8,8 @@ import {
   collectExpressionReferences,
   evaluateDiceRuleExpression,
   parseDiceRuleExpression
-} from "../utils/DiceRuleExpression.js"
-import { validateDiceRulePack } from "../utils/DiceRuleSchema.js"
+} from "../domains/dice/DiceRuleExpression.js"
+import { validateDiceRulePack } from "../domains/dice/DiceRuleSchema.js"
 
 const examplesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../docs/dice-rules/examples")
 

@@ -1,7 +1,7 @@
 // tests/memory/conflictResolver.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveClaim } from '../../utils/memory/conflictResolver.js'
+import { resolveClaim } from '../../domains/memory/engine/conflictResolver.js'
 
 const A = { authority: 'mention', at: 100, by: ['x'] }   // 路人指认
 const B = { authority: 'self', at: 50, by: ['y'] }        // 本人自述（更旧但更权威）

@@ -1,7 +1,7 @@
 // tests/memory/retriever.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAliasPrompt, buildEntityPrompt, buildGroupFactsPrompt, buildContextualPrompt } from '../../utils/memory/retriever.js'
+import { buildAliasPrompt, buildEntityPrompt, buildGroupFactsPrompt, buildContextualPrompt } from '../../domains/memory/engine/retriever.js'
 
 const aliasDoc = {
   'maela': { qq: '3188163302', authority: 'teaching', confidence: 0.9, at: 2, display: 'maela' },

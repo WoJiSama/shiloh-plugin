@@ -170,7 +170,34 @@ export async function enrichDouyinShare(card = {}, options = {}) {
   const cached = metadataCache.get(key)
   if (cached?.expiresAt > Date.now()) return await cached.promise
   const promise = requestDouyinShare(card, { fetchImpl, timeoutMs: options.timeoutMs || 7000 })
-    .catch(() => ({ ...card, metadata_status: card.metadata_status || "link" }))
+    .catch(async error => {
+      // 分享页静态解析失败(抖音改版常见):告警不再静默,并尝试浏览器兜底
+      ;(options.logger || globalThis.logger)?.warn?.(`[抖音] 分享页解析失败(${error.message}),尝试浏览器兜底: ${key}`)
+      try {
+        const resolver = options.browserResolver || (await import("./douyinBrowserResolver.js")).resolveDouyinShareViaBrowser
+        const resolved = await resolver(card, { logger: options.logger || globalThis.logger })
+        if (resolved?.play_url) {
+          const awemeId = String(resolved.aweme_id || card.aweme_id || "").trim()
+          const pageUrl = canonicalPageUrl(awemeId, resolved.final_url || card.page_url || card.short_url)
+          return {
+            ...card,
+            title: cleanText(resolved.title || card.title || "抖音视频", 300),
+            description: cleanText(resolved.description || resolved.title || "", 1000),
+            aweme_id: awemeId,
+            author: cleanText(resolved.author || card.author || "", 120),
+            duration: normalizeDuration(resolved.duration || card.duration),
+            cover_url: resolved.cover_url || card.cover_url || "",
+            play_url: resolved.play_url,
+            page_url: pageUrl,
+            video_url: pageUrl,
+            metadata_status: "resolved"
+          }
+        }
+      } catch (fallbackError) {
+        ;(options.logger || globalThis.logger)?.warn?.(`[抖音] 浏览器兜底也失败: ${fallbackError.message}`)
+      }
+      return { ...card, metadata_status: card.metadata_status || "link" }
+    })
   metadataCache.set(key, { promise, expiresAt: Date.now() + cacheTtlMs })
   return await promise
 }

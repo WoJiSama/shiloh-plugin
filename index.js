@@ -44,7 +44,7 @@ for (let i in files) {
 }
 let emojiCollector = null;
 try {
-    emojiCollector = (await import("./utils/EmojiPackManager.js")).emojiPackManager;
+    emojiCollector = (await import("./domains/emoji/EmojiPackManager.js")).emojiPackManager;
 } catch (error) {
     logger.warn(`[MessagePipeline] 表情包自动收集模块不可用，核心消息管道继续启动：${error.message}`);
 }

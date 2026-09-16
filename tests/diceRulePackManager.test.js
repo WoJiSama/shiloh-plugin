@@ -4,8 +4,8 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { DiceManager } from "../utils/DiceManager.js"
-import { DiceRulePackManager, resolveDiceRuleImportSource } from "../utils/DiceRulePackManager.js"
+import { DiceManager } from "../domains/dice/DiceManager.js"
+import { DiceRulePackManager, resolveDiceRuleImportSource } from "../domains/dice/DiceRulePackManager.js"
 
 const examplesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../docs/dice-rules/examples")
 
@@ -62,14 +62,14 @@ identity:
 character:
   fields:
     name: { type: string, default: "{sender.card}" }
-    hp: { type: integer, default: 10, min: 0, max: 10 }
-    injury: { type: integer, default: 0, min: 0, max: 10 }
-    effective_hp: { type: integer, formula: "attr.hp - attr.injury" }
+    hp: { type: "integer", default: 10, min: 0, max: 10 }
+    injury: { type: "integer", default: 0, min: 0, max: 10 }
+    effective_hp: { type: "integer", formula: "attr.hp - attr.injury" }
 commands:
   - id: hit
     aliases: [hit, 受伤]
     arguments:
-      - { id: damage, type: integer, required: true, min: 0, max: 10 }
+      - { id: damage, type: "integer", required: true, min: 0, max: 10 }
     rolls:
       amount: "arg.damage"
     branches:
@@ -91,14 +91,14 @@ compatibility: { package_version: "2.0.0" }
 character:
   fields:
     name: { type: string, default: "{sender.card}" }
-    hp: { type: integer, default: 10, min: 0, max: 20 }
-    mp: { type: integer, default: 3, min: 0, max: 10 }
+    hp: { type: "integer", default: 10, min: 0, max: 20 }
+    mp: { type: "integer", default: 3, min: 0, max: 10 }
     secret_note: { type: string, default: hidden, secret: true }
-    power: { type: integer, formula: "attr.hp + (inventory.sword.equipped ? 2 : 0)" }
+    power: { type: "integer", formula: "attr.hp + (inventory.sword.equipped ? 2 : 0)" }
 group:
   fields:
-    momentum: { type: integer, default: 0, min: 0, max: 20 }
-    mana_pool: { type: integer, default: 5, min: 0, max: 10 }
+    momentum: { type: "integer", default: 0, min: 0, max: 20 }
+    mana_pool: { type: "integer", default: 5, min: 0, max: 10 }
 statuses:
   poison:
     label: 中毒
@@ -128,7 +128,7 @@ commands:
     aliases: [attack, 攻击]
     arguments:
       - { id: victim, type: actor, required: true, allowed: [member, npc] }
-      - { id: damage, type: integer, required: true, min: 0, max: 10 }
+      - { id: damage, type: "integer", required: true, min: 0, max: 10 }
     actions:
       - { op: subtract, scope: target, target: victim, field: hp, value: "arg.damage" }
     output: "{actor}攻击{target.name}，目标HP={target.attr.hp}"
@@ -152,7 +152,7 @@ commands:
   - id: self_hit
     aliases: [selfhit, 自伤]
     arguments:
-      - { id: damage, type: integer, required: true, min: 0, max: 10 }
+      - { id: damage, type: "integer", required: true, min: 0, max: 10 }
     actions:
       - { op: subtract, field: hp, value: "arg.damage" }
     output: "{actor}当前HP={attr.hp}"
@@ -265,7 +265,7 @@ aliases: [migrate]
 compatibility: { package_version: "1.0.0" }
 character:
   fields:
-    old_score: { type: integer, default: 4, min: 0, max: 20 }
+    old_score: { type: "integer", default: 4, min: 0, max: 20 }
 commands:
   - id: show
     aliases: [show]
@@ -283,7 +283,7 @@ compatibility:
       rename_fields: { old_score: new_score }
 character:
   fields:
-    new_score: { type: integer, default: 0, min: 0, max: 20 }
+    new_score: { type: "integer", default: 0, min: 0, max: 20 }
 commands:
   - id: show
     aliases: [show]
@@ -365,7 +365,7 @@ name: 临时字段规则
 aliases: [temp]
 character:
   fields:
-    pulse: { type: integer, default: 0, persistent: false }
+    pulse: { type: "integer", default: 0, persistent: false }
 commands:
   - id: pulse
     aliases: [pulse, 脉冲]
@@ -398,7 +398,7 @@ character:
   fields:
     call_sign: { type: string }
 commands:
-  - { id: show, aliases: [show], output: "actor={actor}" }
+  - { id: show, aliases: ["show"], output: "actor={actor}" }
 `
   await runtime.manager.stageImport(source, "master")
   await runtime.manager.confirmImport("identity-pack", "master")
@@ -689,9 +689,9 @@ aliases: [saferoll]
 compatibility: { package_version: "1.0.0" }
 character:
   fields:
-    score: { type: integer, default: 1 }
+    score: { type: "integer", default: 1 }
 commands:
-  - { id: show, aliases: [show], output: "score={attr.score}" }
+  - { id: show, aliases: ["show"], output: "score={attr.score}" }
 `
   const v2 = `
 version: 1
@@ -704,9 +704,9 @@ compatibility:
     - { from: "1.0.0", rename_fields: { score: points } }
 character:
   fields:
-    points: { type: integer, default: 0 }
+    points: { type: "integer", default: 0 }
 commands:
-  - { id: show, aliases: [show], output: "points={attr.points}" }
+  - { id: show, aliases: ["show"], output: "points={attr.points}" }
 `
   await runtime.manager.stageImport(v1, "master")
   await runtime.manager.confirmImport("safe-rollback", "master")
@@ -764,8 +764,8 @@ aliases: [fx]
 compatibility: { package_version: "1.0.0" }
 character:
   fields:
-    hp: { type: integer, default: 5, min: 0, max: 20 }
-    mp: { type: integer, default: 3, min: 0, max: 10 }
+    hp: { type: "integer", default: 5, min: 0, max: 20 }
+    mp: { type: "integer", default: 3, min: 0, max: 10 }
 items:
   potion:
     label: 药水
@@ -791,7 +791,7 @@ abilities:
       - { op: add, field: hp, value: 3 }
       - { op: clamp, field: hp, min: 0, max: 20 }
 commands:
-  - { id: show, aliases: [show], output: "HP={attr.hp},MP={attr.mp}" }
+  - { id: show, aliases: ["show"], output: "HP={attr.hp},MP={attr.mp}" }
 `
   assert.equal((await runtime.manager.stageImport(effects, "master")).ok, true)
   await runtime.manager.confirmImport("effect-pack", "master")
@@ -829,7 +829,7 @@ character:
   fields:
     name: { type: string, default: "{sender.card}" }
 commands:
-  - { id: show, aliases: [show], output: "角色={actor}" }
+  - { id: show, aliases: ["show"], output: "角色={actor}" }
 `
   assert.equal((await runtime.manager.stageImport(source, "master")).ok, true)
   await runtime.manager.confirmImport("identity-sync", "master")
@@ -958,4 +958,81 @@ test("every documented example can be previewed, enabled and execute its first c
     assert.doesNotMatch(result.text, /执行失败/, `${file}: ${result.text}`)
     assert.ok(result.text.length > 0, file)
   }
+})
+
+test("JS 规则包：导入→确认→启用→调用，自定义函数参与公式计算", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const jsSource = `
+module.exports = {
+  version: 1,
+  id: "js-demo",
+  name: "JS演示",
+  aliases: ["jsd"],
+  character: {
+    fields: {
+      base: { type: "integer", default: 5, min: 0, max: 20 },
+      boosted: { type: "integer", formula: "double(attr.base)" }
+    }
+  },
+  commands: [
+    {
+      id: "show",
+      aliases: ["show"],
+      let: { calc: "calcTen(attr.base)" },
+      output: "base={attr.base} calc={let.calc}"
+    }
+  ],
+  functions: {
+    double(args) { return Number(args[0]) * 2 },
+    calcTen(args) { return 10 }
+  }
+}
+`
+  const staged = await runtime.manager.stageImport(jsSource, "master")
+  assert.equal(staged.ok, true, staged.report)
+  assert.equal(staged.pending.kind, "js")
+  assert.deepEqual(staged.pending.functionNames, ["double", "calcTen"])
+  // 序列化产物不包含函数体
+  const normalizedText = fs.readFileSync(runtime.manager.resolveRulePath(staged.pending.normalizedFile), "utf8")
+  // 公式字符串合法保留，但函数体（JS 代码）绝不进入序列化产物
+  assert.doesNotMatch(normalizedText, /args\[0\]|function|=>/)
+
+  const confirmed = await runtime.manager.confirmImport("js-demo", "master")
+  assert.equal(confirmed.version, 1)
+  await runtime.manager.enableForGroup("10001", "js-demo")
+  const result = await runtime.manager.handleDynamicCommand(event(".jsd show"))
+  assert.equal(result.matched, true)
+  assert.match(result.text, /base=5 calc=10/, result.text)
+})
+
+test("JS 规则包：语法错误与非法导出给出可读报错，allowJs=false 时拒绝", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const broken = await runtime.manager.stageImport("module.exports = 42", "master")
+  assert.equal(broken.ok, false)
+  assert.match(broken.report, /JS 规则包/)
+
+  const syntaxError = await runtime.manager.stageImport("module.exports = { version: 1, ", "master")
+  assert.equal(syntaxError.ok, false)
+
+  const blocked = await runtime.manager.stageImport(
+    `module.exports = { version: 1, id: "x", name: "X", aliases: ["x"], commands: [ { id: "show", aliases: ["show"], output: "ok" } ] }`,
+    "master",
+    { allowJs: false }
+  )
+  assert.equal(blocked.ok, false)
+  assert.match(blocked.report, /customJsRulesEnabled/)
+})
+
+test("JS 规则包：名称提示生效且未知函数报错可读", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const staged = await runtime.manager.stageImport(
+    `module.exports = { version: 1, id: "named-js", name: "占位", aliases: ["nj"], commands: [ { id: "show", aliases: ["show"], output: "ok" } ] }`,
+    "master",
+    { nameHint: "匕首之心" }
+  )
+  assert.equal(staged.ok, true, staged.report)
+  assert.equal(staged.pack.name, "匕首之心")
 })

@@ -1,9 +1,9 @@
 // tests/memory/reflector.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Reflector } from '../../utils/memory/reflector.js'
-import { makeEntity, makeFact } from '../../utils/memory/entityModel.js'
-import { memStats } from '../../utils/memory/stats.js'
+import { Reflector } from '../../domains/memory/engine/reflector.js'
+import { makeEntity, makeFact } from '../../domains/memory/engine/entityModel.js'
+import { memStats } from '../../domains/memory/engine/stats.js'
 
 const AI = { memoryAiConfig: { memoryAiUrl: 'u', memoryAiApikey: 'k' } }
 

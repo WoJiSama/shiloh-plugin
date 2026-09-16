@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { GlobalStyleLearnerManager } from "../utils/GlobalStyleLearnerManager.js"
+import { GlobalStyleLearnerManager } from "../domains/memory/GlobalStyleLearnerManager.js"
 
 const aiConfig = {
   memoryAiUrl: "https://summary.invalid/chat/completions",

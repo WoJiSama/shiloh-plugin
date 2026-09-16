@@ -7,7 +7,7 @@ import YAML from "yaml";
 import path from "path";
 import { resolveChatCompletionUrl } from '../../utils/chatCompletionUrl.js';
 import { generateContextualProgressReply } from '../../utils/contextualProgressReply.js';
-import { personaFeedbackManager } from '../../utils/PersonaFeedbackManager.js';
+import { personaFeedbackManager } from '../../domains/memory/PersonaFeedbackManager.js';
 const DEFAULT_ANALYSIS_TIMEOUT_MS = 45000;
 
 function redactErrorMessage(error) {

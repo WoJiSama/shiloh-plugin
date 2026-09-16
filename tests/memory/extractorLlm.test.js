@@ -1,7 +1,7 @@
 // tests/memory/extractorLlm.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { MemoryExtractor } from '../../utils/memory/extractor.js'
+import { MemoryExtractor } from '../../domains/memory/engine/extractor.js'
 
 test('extract returns [] when memory AI not configured', async () => {
   const ex = new MemoryExtractor({ memoryAiConfig: null })

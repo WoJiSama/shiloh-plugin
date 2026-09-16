@@ -1,8 +1,8 @@
 // tests/memory/embeddings.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { Embeddings, cosineSimilarity } from '../../utils/memory/embeddings.js'
-import { memStats } from '../../utils/memory/stats.js'
+import { Embeddings, cosineSimilarity } from '../../domains/memory/engine/embeddings.js'
+import { memStats } from '../../domains/memory/engine/stats.js'
 
 const enabledConfig = {
   semanticRecallEnabled: true,

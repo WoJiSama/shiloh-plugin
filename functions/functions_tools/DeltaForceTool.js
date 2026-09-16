@@ -20,9 +20,9 @@ import {
   normalizeHistoryDays,
   normalizeDeltaForcePlace,
   normalizeRankLimit
-} from "../../utils/DeltaForceClient.js"
-import { DeltaForceObjectCache } from "../../utils/DeltaForceObjectCache.js"
-import { renderDeltaForceReport } from "../../utils/DeltaForceReportRenderer.js"
+} from "../../domains/games/deltaforce/DeltaForceClient.js"
+import { DeltaForceObjectCache } from "../../domains/games/deltaforce/DeltaForceObjectCache.js"
+import { renderDeltaForceReport } from "../../domains/games/deltaforce/DeltaForceReportRenderer.js"
 
 let objectCache = null
 

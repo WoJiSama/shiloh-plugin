@@ -21,6 +21,7 @@ import emoji from "./emoji.js"
 import aiModels from "./aiModels.js"
 import voice from "./voice.js"
 import deltaForce from "./deltaForce.js"
+import magnetSearch from "./magnetSearch.js"
 import tools from "./tools.js"
 import umaRace from "./umaRace.js"
 import dice from "./dice.js"
@@ -43,6 +44,7 @@ export const schemas = [
   emoji,
   voice,
   deltaForce,
+  magnetSearch,
   umaRace,
   dice,
   tools

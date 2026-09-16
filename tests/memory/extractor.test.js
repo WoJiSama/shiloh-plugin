@@ -1,7 +1,7 @@
 // tests/memory/extractor.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseAndRoute } from '../../utils/memory/extractor.js'
+import { parseAndRoute } from '../../domains/memory/engine/extractor.js'
 
 const ctx = { speakerQQ: '925640859', at: 1000 }
 

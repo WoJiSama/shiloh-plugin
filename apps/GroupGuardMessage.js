@@ -1,23 +1,2 @@
-import { groupGuardManager } from "../utils/GroupGuardManager.js"
-
-export class GroupGuardMessage extends plugin {
-  constructor() {
-    super({
-      name: "群管理-验证答案",
-      dsc: "处理入群验证答案",
-      event: "message",
-      priority: 10000,
-      rule: [
-        {
-          reg: ".*",
-          fnc: "handleVerifyMessage",
-          log: false
-        }
-      ]
-    })
-  }
-
-  async handleVerifyMessage(e) {
-    return await groupGuardManager.handleMessage(e)
-  }
-}
+// group-admin 域已迁移至 domains/group-admin/，此文件仅作 Yunzai 加载入口
+export * from "../domains/group-admin/guardMessage.js"

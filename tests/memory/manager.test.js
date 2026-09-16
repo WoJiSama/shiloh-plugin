@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createFakeRedis } from './helpers/fakeRedis.js'
-import { MemoryManager } from '../../utils/MemoryManager.js'
-import { factShortId } from '../../utils/memory/entityModel.js'
+import { MemoryManager } from '../../domains/memory/MemoryManager.js'
+import { factShortId } from '../../domains/memory/engine/entityModel.js'
 
 function mgr(redis) {
   const m = new MemoryManager({ enabled: true }, { redis })

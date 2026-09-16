@@ -1,9 +1,9 @@
 import fs from "fs"
+import { getSharedBrowser, scheduleSharedBrowserClose } from "../../utils/sharedBrowser.js"
 import path from "path"
 import sharp from "sharp"
-import puppeteer from "puppeteer"
 import { AbstractTool } from "./AbstractTool.js"
-import { personaFeedbackManager } from "../../utils/PersonaFeedbackManager.js"
+import { personaFeedbackManager } from "../../domains/memory/PersonaFeedbackManager.js"
 import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 import { pluginBridge } from "../../utils/pluginBridge.js"
 
@@ -29,66 +29,6 @@ const PUPPETEER_LAUNCH_OPTIONS = {
     "--disable-gpu"
   ]
 }
-const SHARED_BROWSER_IDLE_MS = 60_000
-const CODE_COLORS = {
-  default: "#e5e7eb",
-  keyword: "#c084fc",
-  string: "#86efac",
-  number: "#fbbf24",
-  comment: "#7dd3fc",
-  literal: "#f472b6",
-  function: "#93c5fd",
-  operator: "#f9a8d4",
-  punctuation: "#94a3b8"
-}
-
-let sharedBrowserPromise = null
-let sharedBrowserIdleTimer = null
-
-function clearSharedBrowserIdleTimer() {
-  if (!sharedBrowserIdleTimer) return
-  clearTimeout(sharedBrowserIdleTimer)
-  sharedBrowserIdleTimer = null
-}
-
-async function getSharedBrowser() {
-  clearSharedBrowserIdleTimer()
-  if (!sharedBrowserPromise) {
-    sharedBrowserPromise = puppeteer.launch(PUPPETEER_LAUNCH_OPTIONS)
-      .then(browser => {
-        browser.on?.("disconnected", () => {
-          if (sharedBrowserPromise) sharedBrowserPromise = null
-        })
-        return browser
-      })
-      .catch(error => {
-        sharedBrowserPromise = null
-        throw error
-      })
-  }
-
-  const browser = await sharedBrowserPromise
-  if (!browser?.isConnected?.()) {
-    sharedBrowserPromise = null
-    return await getSharedBrowser()
-  }
-  return browser
-}
-
-function scheduleSharedBrowserClose() {
-  clearSharedBrowserIdleTimer()
-  sharedBrowserIdleTimer = setTimeout(async () => {
-    const browserPromise = sharedBrowserPromise
-    sharedBrowserPromise = null
-    sharedBrowserIdleTimer = null
-    try {
-      const browser = await browserPromise
-      if (browser?.isConnected?.()) await browser.close()
-    } catch {}
-  }, SHARED_BROWSER_IDLE_MS)
-  sharedBrowserIdleTimer.unref?.()
-}
-
 function getRenderTheme(date = new Date()) {
   let hour = date.getHours()
   try {
@@ -1371,7 +1311,6 @@ export class TextImageTool extends AbstractTool {
       await page.screenshot({ path: outputPath, clip, type: "png" })
       return outputPath
     } catch (error) {
-      sharedBrowserPromise = null
       await deleteGeneratedFile(outputPath)
       throw error
     } finally {

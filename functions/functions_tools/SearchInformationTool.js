@@ -10,6 +10,20 @@ import { generateContextualProgressReply } from "../../utils/contextualProgressR
  * Search 工具类，用于自由搜索并控制返回结果的大小
  */
 export class SearchInformationTool extends AbstractTool {
+  // 代理 fetch 缓存:同一 proxyUrl 复用 ProxyAgent;undici 的 fetch 与 ProxyAgent 成对使用
+  static proxyFetchCache = new Map()
+
+  async getProxyFetch(proxyUrl) {
+    if (!/^https?:\/\//i.test(proxyUrl)) throw new Error(`searchApiProxy 配置不合法: ${proxyUrl}`)
+    const cached = SearchInformationTool.proxyFetchCache.get(proxyUrl)
+    if (cached) return cached
+    const { fetch: undiciFetch, ProxyAgent } = await import("undici")
+    const agent = new ProxyAgent(proxyUrl)
+    const wrapped = (url, init) => undiciFetch(url, { ...init, dispatcher: agent })
+    SearchInformationTool.proxyFetchCache.set(proxyUrl, wrapped)
+    return wrapped
+  }
+
   constructor({
     fetchImpl = globalThis.fetch,
     progressFetchImpl = globalThis.fetch,
@@ -167,6 +181,9 @@ export class SearchInformationTool extends AbstractTool {
       
       const apiUrl = resolveChatCompletionUrl(config.searchAiConfig?.searchApiUrl || 'https://api.openai.com/v1/chat/completions')
       const apiKey = config.searchAiConfig?.searchApiKey || 'sk-xxxxxx'
+      // 搜索后端域名被墙/DNS污染时,可配 searchApiProxy: http://127.0.0.1:7890 走本地代理
+      const proxyUrl = String(config.searchAiConfig?.searchApiProxy || "").trim()
+      const proxyFetch = proxyUrl ? await this.getProxyFetch(proxyUrl) : null
 
       const requestData = { "model": config.searchAiConfig?.searchApiModel || 'deepseek-r1-search', "messages": [{ "role": "user", "content": query }], "temperature": 1, "top_p": 0.1 }
       timeoutMs = Math.max(3000, Number(config.searchAiConfig?.timeoutMs) || 20000)
@@ -184,7 +201,7 @@ export class SearchInformationTool extends AbstractTool {
         })
       }, this.progressDelayMs)
 
-      const response = await this.fetchImpl(apiUrl, {
+      const response = await (proxyFetch || this.fetchImpl)(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

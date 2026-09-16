@@ -1,8 +1,8 @@
 import { AbstractTool } from "./AbstractTool.js"
-import { emojiPackManager } from "../../utils/EmojiPackManager.js"
+import { emojiPackManager } from "../../domains/emoji/EmojiPackManager.js"
 import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 import { pluginBridge } from "../../utils/pluginBridge.js"
-import { describeEmojiSelectionCriteria, normalizeEmojiSelectionCriteria } from "../../utils/emojiSelection.js"
+import { describeEmojiSelectionCriteria, normalizeEmojiSelectionCriteria } from "../../domains/emoji/emojiSelection.js"
 import { planEmojiReplySequence } from "../../utils/replyRhythm.js"
 import fs from "fs"
 

@@ -4,7 +4,7 @@ import {
   generateMathQuestion,
   normalizeQuestionMaxNumber,
   normalizeQuestionOperators
-} from '../utils/groupGuardQuestion.js'
+} from '../domains/group-admin/groupGuardQuestion.js'
 
 function sequenceRandom(values) {
   let index = 0

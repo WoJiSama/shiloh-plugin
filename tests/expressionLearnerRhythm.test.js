@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ExpressionLearner, normalizeExpressionData } from '../utils/ExpressionLearner.js'
+import { ExpressionLearner, normalizeExpressionData } from '../domains/memory/ExpressionLearner.js'
 import { buildExpressionObservation, isLikelyEmojiPackSegment } from '../utils/expressionSequence.js'
 import fs from 'node:fs'
 

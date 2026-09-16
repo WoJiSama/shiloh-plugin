@@ -174,6 +174,7 @@ test("offers an over-limit multi-file torrent for selection and downloads only t
       minFreeDiskMb: 64,
       metadataHttpSources: ["https://cache.example/{infoHash}.torrent"]
     }),
+    cardRenderer: async () => { throw new Error("renderer unavailable in unit test") },
     fetchImpl: async () => ({ ok: true, headers: { get: () => null }, arrayBuffer: async () => torrent }),
     commandRunner: async (command, args) => {
       if (command === "zip") {
@@ -215,6 +216,55 @@ test("offers an over-limit multi-file torrent for selection and downloads only t
     assert.equal(sent[0].event.user_id, event.user_id)
     assert.match(String(notices.at(-1)), /已私发给发起人/)
   } finally {
+    await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
+  }
+})
+
+test("磁链清单统一渲染成卡面图片发送", async () => {
+  const dirName = `torrent-tool-card-${randomUUID()}`
+  const torrent = multiEntryTorrent([
+    { name: "one.bin", size: 4 },
+    { name: "two.bin", size: 5 }
+  ])
+  const infoHash = getTorrentInfoHash(torrent)
+  const magnet = `magnet:?xt=urn:btih:${infoHash}`
+  const notices = []
+  const rendered = []
+  const tool = new TorrentDownloadTool({
+    configProvider: () => normalizeTorrentDownloadConfig({
+      enabled: true,
+      downloadDir: dirName,
+      maxFiles: 1,
+      minFreeDiskMb: 64,
+      metadataHttpSources: ["https://cache.example/{infoHash}.torrent"]
+    }),
+    fetchImpl: async () => ({ ok: true, headers: { get: () => null }, arrayBuffer: async () => torrent }),
+    commandRunner: async () => {},
+    fileSender: async () => ({ receipt: { retcode: 0 } }),
+    cardRenderer: async data => {
+      rendered.push(data)
+      return "/tmp/fake-torrent-card.png"
+    }
+  })
+  const originalSegment = globalThis.segment
+  globalThis.segment = { image: file => ({ type: "image", file }) }
+  try {
+    const result = await tool.execute({ magnet }, {
+      group_id: 100000000 + Math.floor(Math.random() * 1000000),
+      user_id: 200000000 + Math.floor(Math.random() * 1000000),
+      reply: async value => notices.push(value)
+    })
+    assert.match(result, /selection_required/)
+    const imageNotice = notices.find(value => value?.type === "image")
+    assert.ok(imageNotice, "应通过 segment.image 发送卡面")
+    assert.equal(imageNotice.file, "file:///tmp/fake-torrent-card.png")
+    assert.ok(!notices.some(value => String(value).includes("磁链文件清单")), "不应再回退发送文本清单")
+    assert.equal(rendered.length, 1)
+    assert.equal(rendered[0].rows.length, 2)
+    assert.equal(rendered[0].selectableCount, 2)
+  } finally {
+    if (originalSegment === undefined) delete globalThis.segment
+    else globalThis.segment = originalSegment
     await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
   }
 })
@@ -442,4 +492,75 @@ test("uses the actual current magnet instead of a model-supplied replacement", (
     userText: `帮我下载 ${MAGNET}`
   })
   assert.equal(normalized.magnet, MAGNET)
+})
+
+test("老中文种子的 GBK 文件名回退解码,不再是 U+FFFD 乱码", async () => {
+  const { decodeTorrentTextBytes } = await import("../utils/torrentDownload.js")
+  // "中文电影" 的 GBK 字节
+  const gbkBytes = Buffer.from([0xD6, 0xD0, 0xCE, 0xC4, 0xB5, 0xE7, 0xD3, 0xB0])
+  assert.equal(decodeTorrentTextBytes(gbkBytes), "中文电影")
+  // 合法 UTF-8 不受影响
+  assert.equal(decodeTorrentTextBytes(Buffer.from("新种子文件名")), "新种子文件名")
+  assert.equal(decodeTorrentTextBytes(Buffer.from("ascii-name.mkv")), "ascii-name.mkv")
+  // 两种都不是的极端字节退回有损 UTF-8(不抛错)
+  assert.doesNotThrow(() => decodeTorrentTextBytes(Buffer.from([0xFF, 0xFE, 0xFF])))
+})
+
+test("GBK 种子元数据端到端解析出正常文件名", async () => {
+  const { parseTorrentMetadata } = await import("../utils/torrentDownload.js")
+  // Buffer 不支持 gbk 编码方向,这里用硬编码的 GBK 字节(py: "星球大战…".encode("gbk"))
+  const nameGbk = Buffer.from("d0c7c7f2b4f3d5bd342d4456445269702d4d4b56", "hex")
+  const fileGbk = Buffer.from("d0c7c7f2b4f3d5bdd5fdb4ab2d4456445269702d4d4b562dd3a2d3efd6d0d7d62e4d4b56", "hex")
+  const bencode = Buffer.concat([
+    Buffer.from("d4:infod4:name"),
+    Buffer.from(`${nameGbk.length}:`),
+    nameGbk,
+    Buffer.from("5:filesl"),
+    Buffer.from(`d4:pathl${fileGbk.length}:`),
+    fileGbk,
+    Buffer.from("e6:lengthi2048000000eee"),
+    Buffer.from("ee")
+  ])
+  const metadata = parseTorrentMetadata(bencode)
+  assert.equal(metadata.name, "星球大战4-DVDRip-MKV")
+  assert.equal(metadata.files[0].relativePath.at(-1), "星球大战正传-DVDRip-MKV-英语中字.MKV")
+  assert.ok(!metadata.name.includes("\uFFFD"))
+})
+
+test("磁链清单卡面数据：行徽章、截断与可下载摘要", async () => {
+  const { buildTorrentListCardData } = await import("../utils/torrentListCard.js")
+  const metadata = {
+    name: "钢铁侠",
+    totalBytes: 40_600_000_000,
+    files: Array.from({ length: 30 }, (_, i) => ({
+      index: i + 1,
+      relativePath: ["钢铁侠", `file-${i + 1}.mkv`],
+      size: i % 2 ? 40_000 : 500_000_000
+    }))
+  }
+  const selectableIndexes = metadata.files.filter(f => f.size < 50_000_000).map(f => f.index)
+  const data = buildTorrentListCardData(metadata, { selectableIndexes, maxRows: 24 })
+
+  assert.equal(data.fileCount, 30)
+  assert.equal(data.rows.length, 24)
+  assert.equal(data.hiddenCount, 6)
+  assert.equal(data.rows[0].selectable, false, "500MB 文件不可下载")
+  assert.match(data.rows[0].reason, /超过/)
+  assert.equal(data.rows[1].selectable, true)
+  assert.equal(data.rows[1].reason, "")
+  assert.ok(data.availablePreview.includes("2"))
+  assert.ok(data.total.includes("GB"))
+  assert.equal(data.selectableCount, 15)
+})
+
+test("卡面数据:短清单不截断,无 reason 时不生成说明行", async () => {
+  const { buildTorrentListCardData } = await import("../utils/torrentListCard.js")
+  const data = buildTorrentListCardData({
+    name: "小种子",
+    totalBytes: 1024,
+    files: [{ index: 1, relativePath: ["小种子", "a.txt"], size: 1024 }]
+  }, { selectableIndexes: [1] })
+  assert.equal(data.rows.length, 1)
+  assert.equal(data.hiddenCount, 0)
+  assert.equal(data.rows[0].selectable, true)
 })

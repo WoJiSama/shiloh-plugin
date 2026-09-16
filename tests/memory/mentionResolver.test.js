@@ -1,7 +1,7 @@
 // tests/memory/mentionResolver.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveMentions } from '../../utils/memory/mentionResolver.js'
+import { resolveMentions } from '../../domains/memory/engine/mentionResolver.js'
 
 const aliasDoc = {
   'maela': { qq: '3188163302', authority: 'teaching', confidence: 0.9, at: 2, display: 'Maela' },

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { MemoryManager } from '../../utils/MemoryManager.js'
-import { findGroupKnowledgeDeletionCandidates, parseSemanticGroupKnowledgeOutput, parseSemanticGroupMemoryOutput } from '../../utils/memory/groupKnowledge.js'
+import { MemoryManager } from '../../domains/memory/MemoryManager.js'
+import { findGroupKnowledgeDeletionCandidates, parseSemanticGroupKnowledgeOutput, parseSemanticGroupMemoryOutput } from '../../domains/memory/engine/groupKnowledge.js'
 import { createFakeRedis } from './helpers/fakeRedis.js'
 
 function memberMap() {

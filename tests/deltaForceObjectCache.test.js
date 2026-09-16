@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { DeltaForceObjectCache, normalizeDeltaForceObjects } from "../utils/DeltaForceObjectCache.js"
+import { DeltaForceObjectCache, normalizeDeltaForceObjects } from "../domains/games/deltaforce/DeltaForceObjectCache.js"
 
 test("normalizeDeltaForceObjects supports common object list shapes", () => {
   assert.deepEqual(

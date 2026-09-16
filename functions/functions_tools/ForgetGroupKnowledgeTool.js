@@ -1,5 +1,5 @@
 import { AbstractTool } from './AbstractTool.js'
-import { describeGroupKnowledgeEntry } from '../../utils/memory/groupKnowledge.js'
+import { describeGroupKnowledgeEntry } from '../../domains/memory/engine/groupKnowledge.js'
 import { isExplicitGroupKnowledgeForgetRequest } from '../../utils/groupKnowledgeForgetPolicy.js'
 
 export class ForgetGroupKnowledgeTool extends AbstractTool {

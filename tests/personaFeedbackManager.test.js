@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PersonaFeedbackManager, IDENTITY_DEFLECTION_POOL } from '../utils/PersonaFeedbackManager.js'
+import { PersonaFeedbackManager, IDENTITY_DEFLECTION_POOL } from '../domains/memory/PersonaFeedbackManager.js'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'

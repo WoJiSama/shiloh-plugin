@@ -22,7 +22,7 @@ export function hasMeaningfulUserText(text = "") {
 
 export const buildVisibleChatFailureDetail = buildVisibleFailureDetail
 
-export function buildGenericChatFailureReply(userText = "", { isGreeting = false, failureKind = "unknown", failureDetail = "" } = {}) {
+function buildGenericChatFailureReplyInner(userText = "", { isGreeting = false, failureKind = "unknown", failureDetail = "" } = {}) {
   if (isToneCorrectionMessage(userText)) {
     return "你说得对，刚才那几句有点顶着你说了，听着确实不舒服。我收一下。"
   }
@@ -47,3 +47,15 @@ export function buildGenericChatFailureReply(userText = "", { isGreeting = false
   return `这次没能生成回答。你的消息没丢，也不用重发。${failureDetail ? ` 原因：${failureDetail}` : ""}`
 }
 import { buildVisibleFailureDetail } from "./visibleFailure.js"
+import { getCachedDiagnosisLine, triggerChatFailureDiagnosis } from "./chatFailureDiagnosis.js"
+
+/**
+ * 失败话术统一出口:构建时触发一次后端自检(fire-and-forget,内部限频),
+ * 并把 3 分钟内的最近一次自检快照同步附加到回复末尾,让群里一眼看出是谁挂了。
+ */
+export function buildGenericChatFailureReply(userText, options = {}) {
+  triggerChatFailureDiagnosis()
+  const text = buildGenericChatFailureReplyInner(userText, options)
+  const diagnosis = getCachedDiagnosisLine()
+  return diagnosis ? `${text}\n${diagnosis}` : text
+}

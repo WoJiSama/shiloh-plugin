@@ -1,22 +1,2 @@
-import { groupGuardManager } from "../utils/GroupGuardManager.js"
-
-export class GroupGuardIncrease extends plugin {
-  constructor() {
-    super({
-      name: "群管理-入群验证",
-      dsc: "新成员入群后发送十以内加减法验证",
-      event: "notice.group.increase",
-      priority: 5000,
-      rule: [
-        {
-          fnc: "handleGroupIncrease",
-          log: false
-        }
-      ]
-    })
-  }
-
-  async handleGroupIncrease(e) {
-    return await groupGuardManager.handleGroupIncrease(e)
-  }
-}
+// group-admin 域已迁移至 domains/group-admin/，此文件仅作 Yunzai 加载入口
+export * from "../domains/group-admin/guardIncrease.js"

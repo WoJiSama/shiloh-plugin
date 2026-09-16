@@ -1,7 +1,7 @@
 // tests/memory/stats.test.js
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { memStats } from '../../utils/memory/stats.js'
+import { memStats } from '../../domains/memory/engine/stats.js'
 
 beforeEach(() => memStats.reset())
 

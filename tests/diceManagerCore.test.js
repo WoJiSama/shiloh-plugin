@@ -3,8 +3,8 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { DiceManager } from "../utils/DiceManager.js"
-import { executeDiceCommand, getCustomDiceCommandGate, getDiceCommandGate, startsWithMentionOfOtherMember } from "../utils/diceCommandGateway.js"
+import { DiceManager } from "../domains/dice/DiceManager.js"
+import { executeDiceCommand, getCustomDiceCommandGate, getDiceCommandGate, startsWithMentionOfOtherMember } from "../domains/dice/diceCommandGateway.js"
 import { secureDiceInt, secureDiceRandom } from "../utils/diceRandom.js"
 
 function createRuntime(overrides = {}) {

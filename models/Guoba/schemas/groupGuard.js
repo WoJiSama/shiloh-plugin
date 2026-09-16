@@ -98,13 +98,13 @@ export default [
   },
   {
     component: "Divider",
-    label: "复合群管"
+    label: "广告扫描"
   },
   {
     field: "groupModeration.enabled",
-    label: "复合群管开关",
+    label: "广告扫描开关",
     component: "Switch",
-    bottomHelpMessage: "检测低活跃成员的广告、外链、招募话术等风险"
+    bottomHelpMessage: "检测群内广告、外链和招募话术；机器人必须是该群管理员或群主"
   },
   {
     field: "groupModeration.enabledGroups",
@@ -115,23 +115,23 @@ export default [
   },
   {
     field: "groupModeration.globalAdmins",
-    label: "全局管理员 QQ",
+    label: "全局通知 QQ",
     component: "GTags",
-    bottomHelpMessage: "所有启用群都会向这些 QQ 私聊转发证据；这些用户本身不会被检测",
+    bottomHelpMessage: "所有启用群都只向这些 QQ 通知或私发证据；不会自动读取 QQ 群管理员",
     componentProps: { allowAdd: true, allowDel: true }
   },
   {
     field: "groupModeration.groupAdmins",
-    label: "每群管理员",
+    label: "每群通知 QQ",
     component: "GSubForm",
-    bottomHelpMessage: "可为不同群单独配置接收证据的管理员；群原生群主/管理员也会被跳过检测",
+    bottomHelpMessage: "为不同群单独配置通知名单；只有这里和全局通知 QQ 中填写的人会收到通知",
     componentProps: {
       multiple: true,
       schemas: [
         { field: "groupId", label: "群号", component: "Input" },
         {
           field: "admins",
-          label: "管理员 QQ",
+          label: "通知 QQ",
           component: "GTags",
           componentProps: { allowAdd: true, allowDel: true }
         }
@@ -158,10 +158,16 @@ export default [
     bottomHelpMessage: "命中报告阈值后在群内发自然语言提醒"
   },
   {
-    field: "groupModeration.forwardEvidenceToAdmins",
-    label: "私聊转发证据",
+    field: "groupModeration.mentionConfiguredAdminsInGroup",
+    label: "群内艾特通知名单",
     component: "Switch",
-    bottomHelpMessage: "命中后把证据私聊转发给全局管理员和本群管理员"
+    bottomHelpMessage: "群内提醒时仅艾特上方填写的 QQ；不会艾特 QQ 群原生管理员，名单为空时只发送提醒文本"
+  },
+  {
+    field: "groupModeration.forwardEvidenceToAdmins",
+    label: "私聊证据给通知名单",
+    component: "Switch",
+    bottomHelpMessage: "命中后仅向上方填写的 QQ 私聊证据；不会私发给 QQ 群原生管理员"
   },
   {
     field: "groupModeration.modelReviewEnabled",
@@ -170,11 +176,31 @@ export default [
     bottomHelpMessage: "开启后使用 toolsAiConfig 对疑似内容做语义复核，会增加模型调用量"
   },
   {
-    field: "groupModeration.adTemplates",
-    label: "广告判重模板",
-    component: "GTags",
-    bottomHelpMessage: "把漏判广告的核心话术填进来；系统会做去符号、去联系方式后的相似匹配",
-    componentProps: { allowAdd: true, allowDel: true }
+    field: "groupModeration.floodEnabled",
+    label: "刷屏检测",
+    component: "Switch",
+    bottomHelpMessage: "低等级成员在时间窗内发送超过条数上限即命中「刷屏」规则；默认 10 秒内 8 条、等级≤5 生效"
+  },
+  {
+    field: "groupModeration.floodMaxMessages",
+    label: "刷屏条数上限",
+    component: "InputNumber",
+    bottomHelpMessage: "时间窗内发送达到该条数即命中，默认 8",
+    componentProps: { min: 3, max: 100, placeholder: "8" }
+  },
+  {
+    field: "groupModeration.floodWindowSeconds",
+    label: "刷屏时间窗(秒)",
+    component: "InputNumber",
+    bottomHelpMessage: "滑动窗口长度，默认 10 秒",
+    componentProps: { min: 3, max: 600, placeholder: "10" }
+  },
+  {
+    field: "groupModeration.floodMaxLevel",
+    label: "刷屏检测等级上限",
+    component: "InputNumber",
+    bottomHelpMessage: "只检测成员等级≤该值的成员，默认 5",
+    componentProps: { min: 0, max: 100, placeholder: "5" }
   },
   {
     field: "groupModeration.adTemplateSimilarityThreshold",

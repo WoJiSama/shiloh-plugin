@@ -285,9 +285,31 @@ function bdecode(source, { maxDepth = 64, maxItems = 20_000 } = {}) {
   return result
 }
 
+// BT 元数据的 name/path 是原始字节:新种子用 UTF-8,2008 年前的老中文种子几乎都是 GBK,
+// 按 UTF-8 硬解会把每个非法字节变成 U+FFFD 乱码。先严格 UTF-8,失败回退 GBK。
+let strictUtf8Decoder = null
+let gbkDecoder = null
+try {
+  strictUtf8Decoder = new TextDecoder("utf-8", { fatal: true })
+  gbkDecoder = new TextDecoder("gbk")
+} catch {}
+
+export function decodeTorrentTextBytes(buffer) {
+  try {
+    return strictUtf8Decoder ? strictUtf8Decoder.decode(buffer) : buffer.toString("utf8")
+  } catch {}
+  if (gbkDecoder) {
+    try {
+      const decoded = gbkDecoder.decode(buffer)
+      if (decoded && !decoded.includes("\uFFFD")) return decoded
+    } catch {}
+  }
+  return buffer.toString("utf8")
+}
+
 function textValue(value, field) {
   if (!Buffer.isBuffer(value)) throw new TorrentDownloadError(`种子缺少有效的 ${field}`)
-  const text = value.toString("utf8").normalize("NFC")
+  const text = decodeTorrentTextBytes(value).normalize("NFC")
   if (!text || text.includes("\u0000")) throw new TorrentDownloadError(`种子中的 ${field} 无效`)
   return text
 }

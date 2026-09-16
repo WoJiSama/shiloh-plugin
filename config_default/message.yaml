@@ -95,6 +95,10 @@ pluginSettings:
   diceSystem:
     enabled: true
     customRulesEnabled: true
+    # JS 规则包：主人可引用 .js 文件用 .dice rule <名称> 导入，JS 导出的规则对象与 YAML 同 schema，
+    # 且可用 functions: { 名字: (args, ctx) => 值 } 注册受限表达式里的自定义公式函数。
+    # JS 会在本进程执行（等同主人在服务器上放代码），介意可关闭。
+    customJsRulesEnabled: true
     defaultRule: "0"
     maxDiceCount: 100
     maxDiceSides: 100000
@@ -341,12 +345,29 @@ pluginSettings:
     minActiveLevel: 5
     inspectLowLevelOnly: true
     publicReportEnabled: true
+    mentionConfiguredAdminsInGroup: true
     forwardEvidenceToAdmins: true
     evidenceMaxChars: 1200
     modelReviewEnabled: false
     modelThreshold: 0.55
     adTemplateSimilarityThreshold: 0.58
     adTemplateWeight: 0.55
+    adCorpusAutoCollect: true
+    # 刷屏检测：等级≤floodMaxLevel 的成员在 floodWindowSeconds 秒内发满 floodMaxMessages 条即命中"刷屏"规则
+    # （置信度取 floodConfidence，默认 0.9 恰好落在 mute 阈值；纯刷屏不进广告样本库）
+    floodEnabled: true
+    floodMaxLevel: 5
+    floodWindowSeconds: 10
+    floodMaxMessages: 8
+    floodConfidence: 0.9
+    # 机器人豁免名单：官方 Q群管家已内置豁免；群里其他功能 bot（会发 markdown 卡片/入群须知）
+    # 的 QQ 号填在这里，群管检测直接跳过，避免卡片里的链接/二维码误触广告规则。
+    ignoredBotIds: []
+    # 广告样本库（推荐用法）：在群里引用一条广告消息，发送 .广告入库 即入库（群主/群管理/群管管理员可用），
+    # 无需重启即时生效，与上面 adTemplates 种子一起参与判重；.广告样本 查看统计，.广告样本 删除 <编号> 移除，
+    # .广告出库 = 引用某条消息直接删除对应样本（先精确后相似度匹配）。
+    # adCorpusAutoCollect: 命中确认的广告是否自动入库（误判可用 .广告出库 删）。
+    # 样本持久化在 data/group_moderation/ad_corpus.jsonl，上限 1000 条，超出自动淘汰最旧的。
     adTemplates:
       - "AI 培训公司 需要 软件工程师 线上培训讲课 要求 6年以上代码经验 前端 后端 晚上时间 在家即可上课 无需外出 保障收益 加创始人微信"
       - "扫码进群 加群二维码 群聊邀请 长按识别二维码 进群领取福利"
@@ -433,6 +454,10 @@ pluginSettings:
     trackAiModel: gpt-4o-mini,
     trackAiApikey: sk-xxxxx
   }
+  intentAiConfig:
+    intentAiUrl: ""
+    intentAiModel: ""
+    intentAiApikey: ""
   toolsAiConfig: {
     toolsAiUrl: https://api.openai.com/v1/chat/completions,
     toolsAiModel: gemini-2.5-flash,
@@ -492,6 +517,8 @@ pluginSettings:
   }
   searchAiConfig: {
     searchApiUrl: https://api.openai.com/v1/chat/completions,
+    # 搜索后端域名被墙/DNS污染时填本地代理,例如 http://127.0.0.1:7890;留空走直连
+    searchApiProxy: "",
     searchApiModel: deepseek-r1-search,
     searchApiKey: sk-xxxxx,
     timeoutMs: 20000
@@ -630,6 +657,13 @@ pluginSettings:
     timeoutMs: 10000
     objectCacheEnabled: true
     objectCacheRefreshMinutes: 360
+  # 公开磁力搜索：默认使用 torrents-csv 索引，按关键词返回 infohash 后再拼磁链；只展示清单，不自动下载。
+  magnetSearchSystem:
+    enabled: true
+    searchUrl: https://torrents-csv.com/service/search
+    proxyUrl: http://127.0.0.1:7890
+    timeoutMs: 10000
+    proxyTimeoutMs: 8000
   # 受限磁链下载：先读取种子元数据，符合大小/文件数和 ZIP 上传限制后才下载；内容打成一个 ZIP 上传，目录和压缩包说明发合并转发。
   torrentDownload:
     enabled: true

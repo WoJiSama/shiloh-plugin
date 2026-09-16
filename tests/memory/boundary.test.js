@@ -1,7 +1,7 @@
 // tests/memory/boundary.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyBoundary } from '../../utils/memory/boundary.js'
+import { classifyBoundary } from '../../domains/memory/engine/boundary.js'
 
 test('tool/system feedback -> drop', () => {
   assert.equal(classifyBoundary('[tool_result] 调用结果: ok').verdict, 'drop')
