@@ -1344,9 +1344,10 @@ function shouldExposeToolsForMessage(e = {}, text = "") {
   return isRealtimeInfoRequest(content) || isExplicitSearchRequest(content) || isExplicitToolIntent(content)
 }
 
-function filterToolsForMessageIntent(tools = [], e = {}, text = "") {
+function filterToolsForMessageIntent(tools = [], e = {}, text = "", options = {}) {
   if (!Array.isArray(tools) || !tools.length) return []
   const content = normalizeIntentText(text || e?.msg || "")
+  if (options.allowSearch) return tools.filter(tool => tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content))
   if (!shouldExposeToolsForMessage(e, content)) return []
 
   // The all-admin tool is deliberately unavailable unless the user used
@@ -5107,6 +5108,9 @@ ${mcpPrompts}
         let toolScopeLocked = false
         const currentIntentText = [args, msg].filter(Boolean).join("\n")
         session.turnDrawRequested = isImageGenerationRequest(currentIntentText)
+        // P4 切片二：模型意图判定为主决策（confidence>=0.7 生效；正则保留为模型失败时的兜底）
+        const modelIntentDecision = await this.resolvePrimaryModelIntent(currentIntentText, { hasImages: Boolean(images?.length) })
+        session.modelIntentDecision = modelIntentDecision
         const singularOwnerMention = resolveSingularOwnerMention(currentIntentText, memberMap)
         if (toolChoice === "auto" && singularOwnerMention) {
           session.tools = this.getToolsByName(["mentionMembersTool"])
@@ -5193,7 +5197,7 @@ ${mcpPrompts}
           if (session.tools?.length) toolChoice = { type: "function", function: { name: "aiMindMapTool" } }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && images?.length && isImageAnalysisRequest(currentIntentText)) {
+        if (!toolScopeLocked && toolChoice === "auto" && (images?.length && isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === "image_analysis")) {
           const imageAnalysisToolNames = getImageAnalysisToolNames(currentIntentText)
           session.tools = this.getToolsByName(imageAnalysisToolNames)
           session.imageVerificationNeedsSearch = imageAnalysisToolNames.includes("searchInformationTool")
@@ -5228,7 +5232,7 @@ ${mcpPrompts}
         }
 
         const imageGenerationReferenceImages = this.getImageGenerationReferenceImages(images, session)
-        const preferImageGeneration = shouldPreferImageGeneration(currentIntentText, {
+        const preferImageGeneration = modelIntentDecision?.intent === "image_generate" || shouldPreferImageGeneration(currentIntentText, {
           hasImages: imageGenerationReferenceImages.length > 0,
           hasRecentBotImage: Boolean(session.recentImageContinuation)
         })
@@ -5336,7 +5340,7 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && images?.length && isImageCompositionEditRequest(currentIntentText)) {
+        if (!toolScopeLocked && toolChoice === "auto" && (images?.length && isImageCompositionEditRequest(currentIntentText) || modelIntentDecision?.intent === "image_edit")) {
           session.tools = this.getToolsByName(["googleImageEditTool"])
           if (session.tools?.length) {
             toolChoice = { type: "function", function: { name: "googleImageEditTool" } }
@@ -5351,7 +5355,7 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && images?.length && isImageAnalysisRequest(currentIntentText)) {
+        if (!toolScopeLocked && toolChoice === "auto" && (images?.length && isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === "image_analysis")) {
           const imageAnalysisToolNames = getImageAnalysisToolNames(currentIntentText)
           session.tools = this.getToolsByName(imageAnalysisToolNames)
           session.imageVerificationNeedsSearch = imageAnalysisToolNames.includes("searchInformationTool")
@@ -5374,7 +5378,7 @@ ${mcpPrompts}
 
         if (!toolScopeLocked && toolChoice === "auto") {
           const beforeToolCount = session.tools?.length || 0
-          session.tools = filterToolsForMessageIntent(session.tools, e, args)
+          session.tools = filterToolsForMessageIntent(session.tools, e, args, { allowSearch: modelIntentDecision?.intent === "search" })
           if (!session.tools.length) {
             toolChoice = "none"
           } else if (session.tools.length === 1 && session.tools[0]?.function?.name === "sendLocalEmojiTool") {
@@ -5667,6 +5671,20 @@ ${mcpPrompts}
       logger.debug?.(`[工具失败回复] Agent 组织失败，使用事实兜底: ${error.message}`)
     }
     return fallback
+  }
+
+  // P4 主判定：模型意图优先（6s 超时，confidence<0.7 或失败返回 null 走正则兜底）
+  async resolvePrimaryModelIntent(text, { hasImages = false } = {}) {
+    const ai = this.config?.intentAiConfig || this.config?.toolsAiConfig || {}
+    if (!ai.intentAiUrl && !ai.toolsAiUrl) return null
+    try {
+      const result = await classifyIntentWithModel({ text, hasImages, config: this.config, timeoutMs: 6000 })
+      if (result.intent === "unavailable" || result.confidence < 0.7) return null
+      logger.info(`[意图主判定] model=${result.intent} conf=${result.confidence} text=${String(text).slice(0, 30)}`)
+      return result
+    } catch {
+      return null
+    }
   }
 
   // P4 影子模式：fire-and-forget，绝不抛错、绝不阻塞主流程

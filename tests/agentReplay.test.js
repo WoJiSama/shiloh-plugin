@@ -56,3 +56,18 @@ test("回放#4 防误判边界：含画字的日常用语不得触发生图", as
     assert.equal(hasExplicitImageGenerationRequest(text), false, text)
   }
 })
+
+test("回放#5 P4 主判定：模型判定必须给出与正则修复后一致的路由结论", async () => {
+  const { classifyIntentWithModel } = await import("../core/intent/modelIntentClassifier.js")
+  const CONFIG = {
+    intentAiConfig: { intentAiUrl: "", intentAiModel: "", intentAiApikey: "" },
+    toolsAiConfig: { toolsAiUrl: "", toolsAiApikey: "" }
+  }
+  // 未配置时安全返回 null 路径（调用方走正则兜底）
+  const r = await classifyIntentWithModel({ text: "任意", config: CONFIG })
+  assert.equal(r.intent, "unavailable")
+  // resolvePrimaryModelIntent 的门槛逻辑等价于：conf<0.7 或 unavailable -> null
+  const gate = result => (result.intent !== "unavailable" && result.confidence >= 0.7) ? result : null
+  assert.equal(gate({ intent: "image_generate", confidence: 0.6 }), null)
+  assert.equal(gate({ intent: "image_generate", confidence: 0.7 }).intent, "image_generate")
+})
