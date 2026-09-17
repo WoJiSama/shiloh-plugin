@@ -6,14 +6,16 @@ import path from "path"
 
 const MARKER = "blchat-cmd-jump"
 
-const INJECT_SNIPPET = `<script>(function(){function add(){if(document.getElementById("blchat-cmd-jump"))return;var b=document.createElement("a");b.id="blchat-cmd-jump";b.href="/bl-chat/commands/";b.target="_blank";b.textContent="\\u{1F4D6} \\u547D\\u4EE4\\u7BA1\\u7406";b.style.cssText="position:fixed;right:18px;bottom:18px;z-index:99999;background:#4c6ef5;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:14px";document.body.appendChild(b)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",add);else add()})();</script>`
+const INJECT_SNIPPET = `<script>(function(){
+window.__BL_CMD_TOKEN__=window.__BL_CMD_TOKEN__||"";
+function add(){if(document.getElementById("blchat-cmd-jump"))return;var b=document.createElement("a");b.id="blchat-cmd-jump";b.href="/bl-chat/commands/?token="+encodeURIComponent(window.__BL_CMD_TOKEN__||"");b.target="_blank";b.textContent="\\u{1F4D6} \\u547D\\u4EE4\\u7BA1\\u7406";b.style.cssText="position:fixed;right:18px;bottom:18px;z-index:99999;background:#4c6ef5;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:14px";document.body.appendChild(b)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",add);else add()})();</script>`
 
 export function resolveGuobaIndexPath(pluginRoot = process.cwd()) {
   return path.join(String(pluginRoot || ""), "..", "Guoba-Plugin", "server", "static", "index.html")
 }
 
 /** 幂等注入：无标记则备份原文件后注入；返回注入结果 */
-export function ensureGuobaJumpLink({ pluginRoot = process.cwd(), logger = globalThis.logger } = {}) {
+export function ensureGuobaJumpLink({ pluginRoot = process.cwd(), token = "", logger = globalThis.logger } = {}) {
   const target = resolveGuobaIndexPath(pluginRoot)
   let src = ""
   try {
@@ -30,7 +32,8 @@ export function ensureGuobaJumpLink({ pluginRoot = process.cwd(), logger = globa
     fs.copyFileSync(target, backup)
   } catch {}
   try {
-    fs.writeFileSync(target, src.replace("</body>", `${INJECT_SNIPPET}</body>`), "utf8")
+    const snippet = INJECT_SNIPPET.replace('window.__BL_CMD_TOKEN__=window.__BL_CMD_TOKEN__||""', `window.__BL_CMD_TOKEN__=${JSON.stringify(String(token || ""))}`)
+    fs.writeFileSync(target, src.replace("</body>", `${snippet}</body>`), "utf8")
     logger?.mark?.("[命令管理页] 已自动注入锅巴跳转按钮（锅巴升级后自动补回）")
     return { injected: true }
   } catch (error) {

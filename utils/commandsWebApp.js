@@ -366,6 +366,13 @@ $("export").onclick = async () => {
   if (state.dirty && !confirm("有未保存修改，导出的将是已保存版本，继续？")) return
   try { const data = await api("api/export", {}); toast("文档已导出：" + data.docPath) } catch (e) { toast(e.message, true) }
 }
+const urlToken = new URLSearchParams(location.search).get("token")
+if (urlToken) {
+  state.token = urlToken
+  localStorage.setItem("bl-commands-token", urlToken)
+  $("token").value = urlToken
+  history.replaceState(null, "", location.pathname)
+}
 if (state.token) load(); else showLock()
 </script>
 </body>
@@ -538,7 +545,7 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
   registered = true
   logger?.mark?.(`[命令管理页] 已挂载 http://<机器人地址>:<端口>${MOUNT_PATH} （令牌见 config/${TOKEN_FILE}）`)
   try {
-    ensureGuobaJumpLink({ pluginRoot })
+    ensureGuobaJumpLink({ pluginRoot, token })
     watchGuobaJumpLink({
       pluginRoot,
       watchImpl: (file, cb) => chokidar.watch(file).on("all", (event) => {
