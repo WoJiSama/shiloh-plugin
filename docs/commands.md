@@ -1,7 +1,7 @@
 # 命令总表
 
 > 本文档由 `config_default/commands.yaml` 生成（`.命令 导出` 或运行 scripts/gen-commands-doc.mjs）。
-> 生成时间：2026-09-16 10:51:50 ｜ 共 97 条命令 / 11 个模块
+> 生成时间：2026-09-17 02:10:48 ｜ 共 100 条命令 / 11 个模块
 
 ## 🧠 记忆与表达
 
@@ -57,7 +57,10 @@ COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；
 | `.nn <昵称> / .sn on|off` | 骰娘显示名 / 自动群名片 | 所有人 | `domains/dice/app.js nn|sn` |
 | `.jrrp / .db [STR SIZ]` | 今日人品 / 伤害加值 | 所有人 | `domains/dice/app.js jrrp|db` |
 | `.draw <牌组> [keys|list|search|desc|reload]` | 牌堆抽牌与管理（牌堆文件放 config/decks/） | 所有人 | `domains/dice/DeckManager.js` |
-| `.骰规则 [导入|确认|启用|禁用|列表|删除]` | 规则包/海豹扩展管理（三种格式：YAML/JS/海豹脚本） | 仅主人 | `domains/dice/DiceRulePackManager.js` |
+| `.骰规则` | 查看规则包帮助（所有子命令一览） | 所有人 | `domains/dice/app.js manageDiceRules` |
+| `.骰规则列表` | 查看当前群已导入与已启用的规则包列表 | 群管理 | `domains/dice/app.js manageDiceRules` |
+| `.骰规则启用 <包名> / .骰规则禁用 <包名>` | 在当前群切换启用/停用某个规则包 | 群管理 | `domains/dice/app.js manageDiceRules` |
+| `.骰规则导入 <文件> / .骰规则确认 <包名>` | 导入 YAML/JS/海豹扩展三种格式规则包（主人） | 仅主人 | `domains/dice/app.js manageDiceRules` |
 | `.<规则包命令> / .<海豹扩展命令>` | 已启用规则包与海豹扩展注册的命令（在命令管理页「骰子扩展」可见） | 所有人 | `动态注册` |
 
 ## 🔫 三角洲

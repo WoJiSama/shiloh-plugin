@@ -167,10 +167,22 @@ domains:
         desc: 牌堆抽牌与管理（牌堆文件放 config/decks/）
         perm: all
         src: "domains/dice/DeckManager.js"
-      - usage: ".骰规则 [导入|确认|启用|禁用|列表|删除]"
-        desc: 规则包/海豹扩展管理（三种格式：YAML/JS/海豹脚本）
+      - usage: ".骰规则"
+        desc: 查看规则包帮助（所有子命令一览）
+        perm: all
+        src: "domains/dice/app.js manageDiceRules"
+      - usage: ".骰规则列表"
+        desc: 查看当前群已导入与已启用的规则包列表
+        perm: admin
+        src: "domains/dice/app.js manageDiceRules"
+      - usage: ".骰规则启用 <包名> / .骰规则禁用 <包名>"
+        desc: 在当前群切换启用/停用某个规则包
+        perm: admin
+        src: "domains/dice/app.js manageDiceRules"
+      - usage: ".骰规则导入 <文件> / .骰规则确认 <包名>"
+        desc: 导入 YAML/JS/海豹扩展三种格式规则包（主人）
         perm: master
-        src: "domains/dice/DiceRulePackManager.js"
+        src: "domains/dice/app.js manageDiceRules"
       - usage: ".<规则包命令> / .<海豹扩展命令>"
         desc: 已启用规则包与海豹扩展注册的命令（在命令管理页「骰子扩展」可见）
         perm: all

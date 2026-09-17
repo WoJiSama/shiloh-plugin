@@ -238,7 +238,7 @@ function renderEditor() {
     if (state.dicePacks.length) {
       const packTitle = document.createElement("h3")
       packTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
-      packTitle.textContent = "📦 已导入的规则包/海豹扩展（只读，用 .骰规则 命令管理）"
+      packTitle.textContent = "📦 当前规则包/海豹扩展（群里发 .骰规则列表 查看；.骰规则启用/禁用 <包名> 切换）"
       box.appendChild(packTitle)
       const packTable = document.createElement("table")
       packTable.innerHTML = "<thead><tr><th>包名</th><th>ID</th><th>版本</th><th>启用群数</th><th>命令</th></tr></thead><tbody></tbody>"
