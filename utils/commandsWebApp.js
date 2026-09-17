@@ -103,7 +103,7 @@ function buildPageHtml() {
 </main>
 <div id="status"></div>
 <script>
-const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [] }
+const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {} }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
