@@ -967,6 +967,13 @@ export class DiceRulePackManager {
       const normalized = fs.readFileSync(normalizedPath, "utf8")
       verifyHash(source, record.hash, "规则包源文件 ")
       verifyHash(normalized, record.normalizedHash, "规范化文件 ")
+      if (record.kind === "seal-ext") {
+        const pack = JSON.parse(normalized)
+        if (!pack.kind || !Array.isArray(pack.commands)) throw new Error("海豹扩展包缺少 commands")
+        const validatedPack = deepFreeze(pack)
+        this.packCache.set(cacheKey, { fingerprint, pack: validatedPack })
+        return { pack: validatedPack, record }
+      }
       const isJs = record.kind === "js"
       let jsPackObject = null
       let jsFunctions = null
