@@ -241,14 +241,50 @@ function renderEditor() {
       packTitle.textContent = "📦 当前规则包/海豹扩展（群里发 .骰规则列表 查看；.骰规则启用/禁用 <包名> 切换）"
       box.appendChild(packTitle)
       const packTable = document.createElement("table")
-      packTable.innerHTML = "<thead><tr><th>包名</th><th>ID</th><th>版本</th><th>启用群数</th><th>命令</th></tr></thead><tbody></tbody>"
+      packTable.innerHTML = "<thead><tr><th>包名</th><th>ID</th><th>版本</th><th>启用群数</th><th>命令</th><th></th></tr></thead><tbody></tbody>"
       const packBody = packTable.querySelector("tbody")
       for (const pack of state.dicePacks) {
         const tr = document.createElement("tr")
-        tr.innerHTML = "<td>" + pack.name + "</td><td>" + pack.id + "</td><td>" + (pack.versions || []).join("/") + "</td><td>" + (pack.enabledGroups || 0) + "</td><td style='font-size:12px'>" + (pack.commands || []).join(" ") + "</td>"
+        tr.innerHTML = "<td>" + pack.name + "</td><td>" + pack.id + "</td><td>" + (pack.versions || []).join("/") + "</td><td>" + (pack.enabledGroups || 0) + "</td><td style='font-size:12px'>" + (pack.commands || []).join(" ") + "</td><td><button class='ghost' data-edit-pack='" + pack.id + "'>编辑源码</button></td>"
         packBody.appendChild(tr)
       }
       box.appendChild(packTable)
+
+      // 海豹扩展源码编辑器
+      const editorDiv = document.createElement("div")
+      editorDiv.id = "seal-source-editor"
+      editorDiv.style.cssText = "display:none;margin-top:14px"
+      box.appendChild(editorDiv)
+
+      packTable.addEventListener("click", async e => {
+        const btn = e.target.closest("[data-edit-pack]")
+        if (!btn) return
+        const packId = btn.dataset.editPack
+        try {
+          const data = await api("api/seal-source/" + packId)
+          editorDiv.style.display = "block"
+          editorDiv.innerHTML = ""
+          const title = document.createElement("h4")
+          title.textContent = "📝 " + packId + " 源码（修改后保存即热生效，语法错误会被拒绝）"
+          editorDiv.appendChild(title)
+          const ta = document.createElement("textarea")
+          ta.style.cssText = "width:100%;height:400px;font-family:monospace;font-size:12px;border:1px solid #d4dae3;border-radius:8px;padding:8px"
+          ta.value = data.source
+          editorDiv.appendChild(ta)
+          const saveBtn = document.createElement("button")
+          saveBtn.style.marginTop = "8px"
+          saveBtn.textContent = "保存源码"
+          saveBtn.onclick = async () => {
+            try {
+              const r = await api("api/seal-source/" + packId, { source: ta.value })
+              toast("源码已保存并热生效（" + r.commands.join(",") + "）")
+            } catch (e2) { toast(e2.message, true) }
+          }
+          editorDiv.appendChild(saveBtn)
+        } catch (e2) {
+          toast(e2.message, true)
+        }
+      })
     }
   }
 }
@@ -400,6 +436,50 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           fs2.writeFileSync(settingsPath, YAML2.stringify(doc), "utf8")
           logger?.info?.(`[命令管理页] 已保存骰子回复模板 ${Object.keys(cleaned).length} 条（配置热更新自动生效）`)
           res.json({ ok: true, saved: Object.keys(cleaned).length })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path.startsWith("/api/seal-source/") && req.method === "GET") {
+        try {
+          const packId = req.path.slice("/api/seal-source/".length).replace(/[^\w-]/g, "")
+          if (!packId) { res.status(400).json({ error: "缺少包名" }); return }
+          const index = fs2.readFileSync(path2.join(pluginRoot, "data", "dice", "rules", "index.json"), "utf8")
+          const packages = JSON.parse(index).packages || {}
+          const record = packages[packId]
+          if (!record?.versions?.length) { res.status(404).json({ error: `没有找到规则包 ${packId}` }); return }
+          const latest = record.versions[record.versions.length - 1]
+          if (latest.kind !== "seal-ext") { res.status(400).json({ error: "仅海豹扩展支持在线编辑源码" }); return }
+          const sourcePath = path2.join(pluginRoot, "data", "dice", "rules", latest.sourceFile)
+          const source = fs2.readFileSync(sourcePath, "utf8")
+          res.json({ source, sourceFile: latest.sourceFile, packId, version: latest.version })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path.startsWith("/api/seal-source/") && req.method === "POST") {
+        try {
+          const packId = req.path.slice("/api/seal-source/".length).replace(/[^\w-]/g, "")
+          const source = String(req.body?.source || "")
+          if (!packId || !source.trim()) { res.status(400).json({ error: "缺少包名或源码" }); return }
+          const index = fs2.readFileSync(path2.join(pluginRoot, "data", "dice", "rules", "index.json"), "utf8")
+          const packages = JSON.parse(index).packages || {}
+          const record = packages[packId]
+          if (!record?.versions?.length) { res.status(404).json({ error: `没有找到规则包 ${packId}` }); return }
+          const latest = record.versions[record.versions.length - 1]
+          if (latest.kind !== "seal-ext") { res.status(400).json({ error: "仅海豹扩展支持在线编辑" }); return }
+          // 语法预检
+          const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
+          const testRuntime = new SealExtRuntime({ packId: "syntax-check", logger })
+          const testResult = testRuntime.run(source)
+          if (!testResult.commands.length) { res.status(400).json({ error: "修改后源码没有注册任何命令，请检查语法" }); return }
+          const sourcePath = path2.join(pluginRoot, "data", "dice", "rules", latest.sourceFile)
+          fs2.writeFileSync(sourcePath, source, "utf8")
+          // 清运行时缓存（下次命令自动用新源码）
+          logger?.info?.(`[命令管理页] 已保存海豹扩展 ${packId} 源码（${source.length} 字符，${testResult.commands.length} 命令），运行时缓存已刷新`)
+          res.json({ ok: true, commands: testResult.commands.map(c => c.name) })
         } catch (error) {
           res.status(400).json({ error: error?.message || String(error) })
         }
