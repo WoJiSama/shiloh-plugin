@@ -208,6 +208,42 @@ function renderEditor() {
   box.appendChild(addCmd)
 
   if (d.key === "dice") {
+// 判定档位名
+      const lvlTitle = document.createElement("h3")
+      lvlTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
+      lvlTitle.textContent = "🎯 判定档位名（改完点保存骰子模板生效）"
+      box.appendChild(lvlTitle)
+      const lvlTable = document.createElement("table")
+      lvlTable.innerHTML = "<thead><tr><th>档位</th><th>显示文字</th></tr></thead><tbody></tbody>"
+      const lvlBody = lvlTable.querySelector("tbody")
+      for (const [key, value] of Object.entries(state.diceCheckLevels)) {
+        const tr = document.createElement("tr")
+        tr.innerHTML = '<td style="width:100px">' + key + '</td><td><input data-lvl="' + key + '"></td>'
+        const input = tr.querySelector("input")
+        input.value = value
+        input.oninput = () => { state.diceCheckLevels[key] = input.value }
+        lvlBody.appendChild(tr)
+      }
+      box.appendChild(lvlTable)
+
+      // 疯狂表
+      const insTitle = document.createElement("h3")
+      insTitle.style.cssText = "margin:14px 0 8px;font-size:15px"
+      insTitle.textContent = "🧠 疯狂表（.ti 临时 / .li 总结，每行一条）"
+      box.appendChild(insTitle)
+      for (const tableKey of ["temp", "indefinite"]) {
+        const label = document.createElement("div")
+        label.style.cssText = "font-size:13px;color:#6b7280;margin:8px 0 4px"
+        label.textContent = tableKey === "temp" ? "临时疯狂表（.ti）" : "总结疯狂表（.li）"
+        box.appendChild(label)
+        const ta = document.createElement("textarea")
+        ta.style.cssText = "width:100%;height:150px;font-size:13px;border:1px solid #d4dae3;border-radius:8px;padding:8px;font-family:inherit"
+        ta.value = (state.diceInsanity[tableKey] || []).join("\n")
+        ta.dataset.insanity = tableKey
+        ta.oninput = () => { state.diceInsanity[tableKey] = ta.value.split("\n").filter(Boolean) }
+        box.appendChild(ta)
+      }
+
     const tplTitle = document.createElement("h3")
     tplTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
     tplTitle.textContent = "🎲 回复模板（保存即热生效，改的是 message.yaml diceSystem.templates）"
@@ -387,6 +423,8 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           const cfgPath = fs2.existsSync(settingsPath) ? settingsPath : defaultsPath
           const settings = YAML2.parse(fs2.readFileSync(cfgPath, "utf8")).pluginSettings || {}
           const templates = settings.diceSystem?.templates || {}
+          const checkLevels = settings.diceSystem?.checkLevels || {}
+          const insanityTables = settings.diceSystem?.insanityTables || {}
           let packs = []
           try {
             const { DiceRulePackManager } = await import("../domains/dice/DiceRulePackManager.js")
@@ -402,7 +440,7 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           } catch (packError) {
             logger?.warn?.(`[命令管理页] 规则包列表读取失败: ${packError?.message || packError}`)
           }
-          res.json({ templates, packs })
+          res.json({ templates, checkLevels, insanityTables, packs })
         } catch (error) {
           res.status(500).json({ error: error?.message || String(error) })
         }

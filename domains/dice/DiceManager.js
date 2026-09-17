@@ -57,7 +57,7 @@ const ATTR_ALIASES = {
   hp: "HP", HP: "HP", mp: "MP", MP: "MP"
 }
 
-const TEMP_INSANITY = [
+const DEFAULT_TEMP_INSANITY = [
   "失忆：调查员发现自己只记得最后身处的安全地点。",
   "假性残疾：调查员暂时失明、失聪或失去肢体功能。",
   "暴力倾向：调查员陷入攻击冲动。",
@@ -70,7 +70,7 @@ const TEMP_INSANITY = [
   "躁狂症：调查员获得一个临时躁狂症。"
 ]
 
-const INDEFINITE_INSANITY = [
+const DEFAULT_INDEFINITE_INSANITY = [
   "失忆：调查员回过神来时已经身处陌生地点。",
   "被窃：调查员发现重要物品不见了。",
   "伤痕：调查员醒来时身上出现新的伤痕。",
@@ -82,6 +82,15 @@ const INDEFINITE_INSANITY = [
   "恐惧症：调查员获得一个新的恐惧症。",
   "躁狂症：调查员获得一个新的躁狂症。"
 ]
+
+const DEFAULT_CHECK_LEVELS = {
+  critical: "大成功",
+  extreme: "极难成功",
+  hard: "困难成功",
+  success: "成功",
+  fail: "失败",
+  fumble: "大失败"
+}
 
 const DND_ATTRS = ["力量", "敏捷", "体质", "智力", "感知", "魅力"]
 const COC_PRIMARY_ATTRS = ["STR", "CON", "SIZ", "DEX", "APP", "INT", "POW", "EDU"]
@@ -1358,12 +1367,13 @@ export class DiceManager {
     const effectiveRule = noFumble ? "0" : normalizedRule
     const { rank } = this.computeCocRank(d100, value, effectiveRule, difficultyRequired)
     if (noFumble && rank === -2) return "失败"
-    if (rank === 4) return "大成功"
-    if (rank === 3) return "极难成功"
-    if (rank === 2) return "困难成功"
-    if (rank === 1) return "成功"
-    if (rank === -2) return "大失败"
-    return "失败"
+    const levels = this.getConfig().checkLevels || DEFAULT_CHECK_LEVELS
+    if (rank === 4) return levels.critical || "大成功"
+    if (rank === 3) return levels.extreme || "极难成功"
+    if (rank === 2) return levels.hard || "困难成功"
+    if (rank === 1) return levels.success || "成功"
+    if (rank === -2) return levels.fumble || "大失败"
+    return levels.fail || "失败"
   }
 
   handleRoll(e, raw = "") {
@@ -1969,7 +1979,10 @@ export class DiceManager {
   }
 
   handleInsanity(type = "ti") {
-    const list = type === "li" ? INDEFINITE_INSANITY : TEMP_INSANITY
+    const config = this.getConfig()
+    const list = type === "li"
+      ? (config.insanityTables?.indefinite || DEFAULT_INDEFINITE_INSANITY)
+      : (config.insanityTables?.temp || DEFAULT_TEMP_INSANITY)
     const idx = rollInt(list.length) - 1
     return `${type === "li" ? "总结疯狂" : "临时疯狂"}：${idx + 1}. ${list[idx]}`
   }
