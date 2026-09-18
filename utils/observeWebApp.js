@@ -106,11 +106,6 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
   logger?.mark?.(`[运行观测页] 已挂载 http://<机器人地址>:<端口>${MOUNT_PATH} （与命令管理页同一令牌）`)
 }
 
-function bar(value, max) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0
-  return `<div class="bar"><div class="fill" style="width:${Math.max(pct, value > 0 ? 4 : 0)}%"></div><span>${value}</span></div>`
-}
-
 function buildPageHtml(observeToken = "") {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -159,6 +154,10 @@ function buildPageHtml(observeToken = "") {
 <script>
 window.__OBSERVE_TOKEN__ = ${JSON.stringify(String(observeToken || ""))}
 const $ = id => document.getElementById(id)
+function bar(value, max) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0
+  return '<div class="bar"><div class="fill" style="width:' + Math.max(pct, value > 0 ? 4 : 0) + '%"></div><span>' + value + "</span></div>"
+}
 // 观测令牌由服务端内嵌（只读，不能用于命令管理接口）；URL 带主令牌时优先进 localStorage
 const state = { token: window.__OBSERVE_TOKEN__ || "" }
 function toast(msg) { const el = $("status"); el.textContent = msg; el.style.display = "block"; setTimeout(() => el.style.display = "none", 3000) }
