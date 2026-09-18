@@ -871,6 +871,29 @@ ${list}
     return pool[pool.length - 1]
   }
 
+  /** 清空全部数据（ndjson + 图片文件 + 内存缓存 + 反重复/限流状态），返回删除的图片文件数 */
+  async clearAllData() {
+    let deletedFiles = 0
+    // 先取消 pendingWriteTimer，避免清空期间 markUsed 的节流写回脏数据
+    if (this.pendingWriteTimer) {
+      clearTimeout(this.pendingWriteTimer)
+      this.pendingWriteTimer = null
+      this.pendingItems = null
+    }
+    await fs.promises.unlink(this.dbPath).catch(() => {})
+    try {
+      const files = await fs.promises.readdir(this.storeDir)
+      const results = await Promise.allSettled(
+        files.map(file => fs.promises.unlink(path.join(this.storeDir, file)))
+      )
+      deletedFiles = results.filter(result => result.status === "fulfilled").length
+    } catch {}
+    this.cache = { mtimeMs: 0, items: [], loaded: true }
+    this.recentPicksByGroup.clear()
+    this.recentSendsByGroup.clear()
+    return deletedFiles
+  }
+
   async selectEmoji(input, options = {}) {
     this.refreshConfig()
     const allItems = await this.loadItems()
@@ -937,7 +960,15 @@ ${list}
       }
     }
 
-    // L2 兜底：embedding 没结果（或未配置）时，全库走加权抽样
+    // L2 兜底只在"模型没有给出任何具体诉求"时随机；
+    // 有明确 tags/useCases/query 却全部未命中时不再随机发图——
+    // 发一张不相关的图比不发更伤观感（这是"选错表情"的主要来源）
+    const modelAskedSpecifically = requestedCriteria.tags.length > 0 ||
+      requestedCriteria.useCases.length > 0 ||
+      String(criteria.query || "").trim().length > 0
+    if (modelAskedSpecifically) {
+      return { item: null, strategy: "no_match", criteria }
+    }
     // 给所有图相同的 0.7 分（高于 weightedSampleByUsage 的 0.6 硬门）
     // 让所有候选通过相关性门，由 usageFactor + cooldownPenalty 主导多样性
     const fallback = items.map(item => ({ item, score: 0.7 }))

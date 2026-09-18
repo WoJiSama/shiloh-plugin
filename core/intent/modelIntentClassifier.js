@@ -1,8 +1,7 @@
 import { resolveChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
 
-// P4 意图层核心：全模型意图判定（主人拍板的方向）。
-// 正则瀑布降级为精确命令直配 + 模型故障兜底；本模块是模型判定的唯一实现，
-// 先以影子模式并行运行采集一致性数据，切换后成为主判定。
+// 意图层核心：全模型意图判定（已转正为主判定路径）。
+// 正则瀑布降级为精确命令直配 + 模型故障兜底；本模块是模型判定的唯一实现。
 
 export const MODEL_INTENT_LABELS = [
   "chat",              // 普通闲聊/对话，不需要工具
@@ -38,61 +37,6 @@ const SYSTEM_PROMPT = [
   "没有把握时给 chat 并降低 confidence。"
 ].join("\n")
 
-/** 影子统计：并行对比期间记录正则路径与模型判定的一致性 */
-const shadowStats = {
-  startedAt: 0,
-  total: 0,
-  unavailable: 0,
-  agree: 0,
-  disagreementSamples: [],
-  intentCounts: Object.create(null)
-}
-
-export function getShadowStats() {
-  return {
-    ...shadowStats,
-    agreeRate: shadowStats.total ? shadowStats.agree / shadowStats.total : 0,
-    intentCounts: { ...shadowStats.intentCounts }
-  }
-}
-
-export function recordShadowComparison({ text = "", regexIntent = "", modelIntent = "", confidence = 0 } = {}) {
-  shadowStats.startedAt ||= Date.now()
-  shadowStats.total += 1
-  if (modelIntent === "unavailable") {
-    shadowStats.unavailable += 1
-    return
-  }
-  const model = MODEL_INTENT_LABELS.includes(modelIntent) ? modelIntent : "chat"
-  shadowStats.intentCounts[model] = (shadowStats.intentCounts[model] || 0) + 1
-  const regex = String(regexIntent || "chat")
-  const equivalent = areIntentsEquivalent(regex, model)
-  if (equivalent) {
-    shadowStats.agree += 1
-    return
-  }
-  shadowStats.disagreementSamples.push({
-    at: new Date().toISOString().slice(11, 19),
-    text: String(text).slice(0, 60),
-    regex,
-    model,
-    confidence
-  })
-  if (shadowStats.disagreementSamples.length > 50) shadowStats.disagreementSamples.shift()
-}
-
-/** 正则路径的粗粒度意图与模型意图的等价性判断 */
-export function areIntentsEquivalent(regexIntent = "", modelIntent = "") {
-  const regex = String(regexIntent || "chat")
-  const model = String(modelIntent || "chat")
-  if (regex === model) return true
-  const groups = [
-    ["chat", "noise", "emoji"],
-    ["image_generate", "image_edit"],
-    ["memory_command", "group_admin"]
-  ]
-  return groups.some(group => group.includes(regex) && group.includes(model))
-}
 
 /**
  * 模型意图判定。失败/超时返回 { intent: "unavailable", confidence: 0 }，

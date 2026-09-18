@@ -66,3 +66,15 @@ test("管理页 HTML 包含核心交互元素", async () => {
     assert.ok(html.includes(marker), `页面缺少 ${marker}`)
   }
 })
+
+test("骰子面板按命令展示 .st 和失败/大失败发送文案", async () => {
+  const fs2 = await import("node:fs")
+  const src = fs2.readFileSync(path.join(pluginRoot, "utils/commandsWebApp.js"), "utf8")
+  assert.ok(src.includes("buildDiceReplyPayload"), "管理页应从回复目录加载内置规则")
+  assert.ok(src.includes("await loadDiceExtras()"), "骰子数据必须在渲染前加载完")
+  assert.ok(src.includes("cmd-group"), "卡片内应按命令分组")
+  assert.ok(src.includes("g.title"), "分组标题来自规则目录")
+  assert.ok(src.includes("失败/大失败整句发送") || src.includes("整句发送"), "失败/大失败应能改整句发送")
+  assert.ok(src.includes("命令帮助（只改说明书，不改群里实际发送的话）"), "骰子帮助表应标成说明书，避免和发送文案混淆")
+  assert.ok(src.indexOf("内置规则") < src.indexOf("box.appendChild(table)"), "骰子卡片应排在命令帮助表前面")
+})

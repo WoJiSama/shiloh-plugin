@@ -81,77 +81,8 @@ export default [
     component: "Input",
     bottomHelpMessage: "相对插件目录或绝对路径；存储人物卡、昵称和群规则"
   },
-  { component: "Divider", label: "回复模板" },
   {
-    field: "diceSystem.templates.roll",
-    label: ".r 掷骰模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {expr} {detail} {total}"
-  },
-  {
-    field: "diceSystem.templates.check",
-    label: ".ra/.rc 检定模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {skill} {diceText} {roll} {target} {level}"
-  },
-  {
-    field: "diceSystem.templates.hiddenPublic",
-    label: "暗骰群内提示",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {result}"
-  },
-  {
-    field: "diceSystem.templates.hiddenPrivate",
-    label: "暗骰私聊模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {result}"
-  },
-  {
-    field: "diceSystem.templates.san",
-    label: ".sc SAN 模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {diceText} {roll} {target} {level} {loss} {sanAfter} {insanity}"
-  },
-  {
-    field: "diceSystem.templates.en",
-    label: ".en 成长模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {skill} {roll} {target} {result}"
-  },
-  {
-    field: "diceSystem.templates.card",
-    label: ".st 查卡模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {card}"
-  },
-  {
-    field: "diceSystem.templates.cardSaved",
-    label: ".st 录卡成功模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {updates}"
-  },
-  {
-    field: "diceSystem.templates.coc",
-    label: ".coc7 属性模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {attributes}"
-  },
-  {
-    field: "diceSystem.templates.opposed",
-    label: ".rav 对抗模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{left} {right} {winner}"
-  },
-  {
-    field: "diceSystem.templates.jrrp",
-    label: ".jrrp 今日人品模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {value}"
-  },
-  {
-    field: "diceSystem.templates.db",
-    label: ".db 伤害加值模板",
-    component: "InputTextArea",
-    bottomHelpMessage: "变量：{name} {sum} {build} {db}"
+    component: "Divider",
+    label: "回复文案请到命令管理页骰子面板修改：按命令（含 .st）编辑发送，失败/大失败可改整句"
   }
 ]

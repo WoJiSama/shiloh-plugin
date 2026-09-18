@@ -116,6 +116,7 @@ export async function sendCompleteLocalFile(e, filePath, {
         status: "sent",
         channel: e?.group_id ? "group_file" : "private_file",
         groupId: e?.group_id,
+        turnId: e?._turnId,
         messageId: result?.data?.message_id || result?.message_id || null,
         parts: 1
       })
@@ -135,6 +136,7 @@ export async function sendCompleteLocalFile(e, filePath, {
         status: "sent",
         channel: e?.group_id ? "group_file_fallback" : "private_file_fallback",
         groupId: e?.group_id,
+        turnId: e?._turnId,
         messageId: result?.data?.message_id || result?.message_id || null,
         parts: 1
       })
@@ -149,6 +151,7 @@ export async function sendCompleteLocalFile(e, filePath, {
     status: "failed",
     channel: e?.group_id ? "group_file" : "private_file",
     groupId: e?.group_id,
+    turnId: e?._turnId,
     error: reason
   })
   throw new DeliveryError(reason, { retryable: true })

@@ -411,3 +411,85 @@ test("initiative rolls enter the fixed initiative list instead of requiring manu
     runtime.cleanup()
   }
 })
+
+test("st and check outcome templates control the sent text", async () => {
+  const runtime = createRuntime()
+  try {
+    const pluginDir = path.join(runtime.cwd, "plugins", "shiloh-plugin")
+    fs.mkdirSync(path.join(pluginDir, "config"), { recursive: true })
+    fs.writeFileSync(path.join(pluginDir, "config", "message.yaml"), [
+      "pluginSettings:",
+      "  diceSystem:",
+      "    enabled: true",
+      "    templates:",
+      '      check: "DEFAULT {level}"',
+      '      check_fail: "FAIL {roll}/{target} {skill}"',
+      '      check_fumble: "FUMBLE {skill}"',
+      '      cardSaved: "SAVED {updates}"',
+      '      card: "CARD {name}"'
+    ].join("\n"))
+    const e = event()
+    assert.match(await runtime.manager.handleSt(e, "侦查=60"), /SAVED 侦查=60/)
+    assert.match(await runtime.manager.handleSt(e, "show"), /CARD 调查员/)
+
+    runtime.manager.rollD100 = () => ({ value: 80, diceText: "1D100" })
+    assert.match(runtime.manager.handleCheck(e, "侦查 60"), /FAIL 80\/60 侦查/)
+
+    runtime.manager.rollD100 = () => ({ value: 100, diceText: "1D100" })
+    assert.match(runtime.manager.handleCheck(e, "侦查 60"), /FUMBLE 侦查/)
+
+    runtime.manager.rollD100 = () => ({ value: 40, diceText: "1D100" })
+    assert.match(runtime.manager.handleCheck(e, "侦查 60"), /DEFAULT 成功/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("empty outcome templates fall back to the default check template", () => {
+  const runtime = createRuntime()
+  try {
+    const pluginDir = path.join(runtime.cwd, "plugins", "shiloh-plugin")
+    fs.mkdirSync(path.join(pluginDir, "config"), { recursive: true })
+    fs.writeFileSync(path.join(pluginDir, "config", "message.yaml"), [
+      "pluginSettings:",
+      "  diceSystem:",
+      "    enabled: true",
+      "    templates:",
+      '      check: "DEFAULT {level} {roll}"',
+      '      check_fail: ""'
+    ].join("\n"))
+    runtime.manager.rollD100 = () => ({ value: 80, diceText: "1D100" })
+    assert.match(runtime.manager.handleCheck(event(), "侦查 60"), /DEFAULT 失败 80/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("custom level names still drive SAN success and fumble logic", async () => {
+  const runtime = createRuntime()
+  try {
+    const pluginDir = path.join(runtime.cwd, "plugins", "shiloh-plugin")
+    fs.mkdirSync(path.join(pluginDir, "config"), { recursive: true })
+    fs.writeFileSync(path.join(pluginDir, "config", "message.yaml"), [
+      "pluginSettings:",
+      "  diceSystem:",
+      "    enabled: true",
+      "    checkLevels:",
+      "      success: 过了",
+      "      fail: 没过",
+      "      fumble: 炸了",
+      "      critical: 神了",
+      "      extreme: 极难过了",
+      "      hard: 困难过了"
+    ].join("\n"))
+    await runtime.manager.handleSt(event(), "SAN=60")
+    runtime.manager.rollD100 = () => ({ value: 80, diceText: "1D100" })
+    const fail = await runtime.manager.handleSan(event(), "1/1d3")
+    assert.match(fail, /没过/)
+    runtime.manager.rollD100 = () => ({ value: 100, diceText: "1D100" })
+    const fumble = await runtime.manager.handleSan(event(), "1/1d3")
+    assert.match(fumble, /炸了/)
+  } finally {
+    runtime.cleanup()
+  }
+})

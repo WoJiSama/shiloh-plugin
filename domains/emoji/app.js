@@ -386,26 +386,7 @@ export class EmojiPackPlugin extends plugin {
     }
     let deletedFiles = 0
     try {
-      // 1. 先取消 pendingWriteTimer，避免清空期间 markUsed 的 2s 节流写回脏数据
-      if (emojiPackManager.pendingWriteTimer) {
-        clearTimeout(emojiPackManager.pendingWriteTimer)
-        emojiPackManager.pendingWriteTimer = null
-        emojiPackManager.pendingItems = null
-      }
-      // 2. 删 ndjson
-      await fs.promises.unlink(emojiPackManager.dbPath).catch(() => {})
-      // 3. 删 storeDir 下所有图片文件
-      try {
-        const files = await fs.promises.readdir(emojiPackManager.storeDir)
-        const results = await Promise.allSettled(
-          files.map(f => fs.promises.unlink(path.join(emojiPackManager.storeDir, f)))
-        )
-        deletedFiles = results.filter(r => r.status === "fulfilled").length
-      } catch {}
-      // 4. 清内存缓存 + avoidRecent / rateLimit 状态
-      emojiPackManager.cache = { mtimeMs: 0, items: [], loaded: true }
-      emojiPackManager.recentPicksByGroup.clear()
-      emojiPackManager.recentSendsByGroup.clear()
+      deletedFiles = await emojiPackManager.clearAllData()
       return e.reply(`✅ 表情包库已清空（删除 ${deletedFiles} 张图片文件），下次收图按强化过滤入库`)
     } catch (err) {
       return e.reply(`清空失败: ${buildVisibleFailureDetail(err)}`)

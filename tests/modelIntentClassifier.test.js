@@ -56,17 +56,9 @@ test("模型判定：HTTP 错误/异常/未配置都返回 unavailable（调用�
   assert.equal(fetchImpl.calls.length, 0)
 })
 
-test("影子统计：等价类合并、分歧采样、unavailable 单独计数", async () => {
-  const { recordShadowComparison, getShadowStats, areIntentsEquivalent } = await import("../core/intent/modelIntentClassifier.js")
-  assert.equal(areIntentsEquivalent("image_generate", "image_edit"), true)
-  assert.equal(areIntentsEquivalent("chat", "image_generate"), false)
-  recordShadowComparison({ text: "a", regexIntent: "image_generate", modelIntent: "image_edit", confidence: 0.9 })
-  recordShadowComparison({ text: "b", regexIntent: "chat", modelIntent: "search", confidence: 0.8 })
-  recordShadowComparison({ text: "c", regexIntent: "chat", modelIntent: "unavailable", confidence: 0 })
-  const stats = getShadowStats()
-  assert.equal(stats.total, 3)
-  assert.equal(stats.agree, 1)
-  assert.equal(stats.unavailable, 1)
-  assert.equal(stats.disagreementSamples.length, 1)
-  assert.equal(stats.intentCounts.search, 1)
+test("影子统计已随 P4 转正移除：模块不再导出影子接口", async () => {
+  const mod = await import("../core/intent/modelIntentClassifier.js")
+  assert.equal(mod.recordShadowComparison, undefined)
+  assert.equal(mod.getShadowStats, undefined)
+  assert.equal(mod.areIntentsEquivalent, undefined)
 })

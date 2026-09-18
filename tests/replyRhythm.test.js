@@ -10,6 +10,37 @@ test('keeps ordinary and formal replies in one visible message', () => {
   )
 })
 
+test('splits single-paragraph multi-sentence casual replies into separate bubbles', () => {
+  assert.deepEqual(
+    planTextReplyMessages('刚吃完饭回来。外面快热死了。').messages,
+    ['刚吃完饭回来。', '外面快热死了。']
+  )
+  assert.deepEqual(
+    planTextReplyMessages('哈哈哈。笑死我了。这什么操作。', { maxTextMessages: 3 }).messages,
+    ['哈哈哈。', '笑死我了。', '这什么操作。']
+  )
+  // 连续标点归入前一句，不产生以标点开头的碎句
+  assert.deepEqual(
+    planTextReplyMessages('真的吗？？我不信。').messages,
+    ['真的吗？？', '我不信。']
+  )
+})
+
+test('sentence splitting refuses structured, long or crowded replies', () => {
+  // 正式/结构化内容不拆
+  assert.equal(
+    planTextReplyMessages('先检查配置。再看日志。最后重启服务。', { userText: '服务器报错怎么排查' }).mode,
+    'single'
+  )
+  // 单句超长不拆
+  const longSentence = `今天真的累.${'琐事'.repeat(40)}。`
+  assert.equal(planTextReplyMessages(`${longSentence} 再补一句。`).mode, 'single')
+  // 超过 3 句不拆，避免刷屏
+  assert.equal(planTextReplyMessages('一。二。三。四。', { maxTextMessages: 3 }).mode, 'single')
+  // 句尾以逗号等未收尾标点结束时不拆
+  assert.equal(planTextReplyMessages('我先说一句。另外还有，').mode, 'single')
+})
+
 test('splits only a complete short reaction followed by an independent addendum', () => {
   assert.deepEqual(
     planTextReplyMessages('笑死，这也能撞上。\n\n不过他一直这样找项目，确实挺累的。').messages,

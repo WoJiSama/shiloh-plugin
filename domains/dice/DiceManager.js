@@ -6,6 +6,15 @@ import { collectMentionTargetIds, getMentionTargetId, stripCqMentions } from "..
 import { KeyedSerialQueue } from "../../utils/messagePipeline/keyedSerialQueue.js"
 import { canManageGroupDice, sanitizeDiceCommandError } from "./diceCommandGateway.js"
 import { secureDiceInt, secureDiceRandom } from "../../utils/diceRandom.js"
+import {
+  DEFAULT_TEMPLATES,
+  DEFAULT_CHECK_LEVELS,
+  DEFAULT_TEMP_INSANITY,
+  DEFAULT_INDEFINITE_INSANITY,
+  mergeDiceReplyConfig,
+  pickCheckTemplate,
+  cocRankToCompareRank
+} from "./diceReplyCatalog.js"
 
 const require = createRequire(import.meta.url)
 let yamlParser = null
@@ -26,21 +35,7 @@ const DEFAULT_CONFIG = {
   logAiSilent: true,
   logExportMaxMb: 8,
   timeZone: "Asia/Shanghai",
-  templates: {
-    roll: "{name} 掷骰：{expr}={detail}={total}",
-    check: "{name} 进行 {skill} 检定：{diceText}={roll}/{target} {level}",
-    hiddenPublic: "{name} 进行了一次暗骰，结果已私聊发送。",
-    hiddenPrivate: "暗骰结果：\n{result}",
-    san: "{name} SAN Check：{diceText}={roll}/{target} {level}，理智损失 {loss}，剩余 {sanAfter}{insanity}",
-    en: "{name} 进行 {skill} 成长检定：1D100={roll}/{target} {result}",
-    card: "{name} 的人物卡：\n{card}",
-    cardSaved: "人物卡已更新：{updates}",
-    coc: "COC7 调查员属性：\n{attributes}",
-    opposed: "对抗检定：\n{left}\n{right}\n结果：{winner}",
-    jrrp: "{name} 今日人品：{value}",
-    db: "{name} 体格 {build}，伤害加值 {db}",
-    error: "{message}"
-  }
+  templates: { ...DEFAULT_TEMPLATES }
 }
 
 const ATTR_ALIASES = {
@@ -55,41 +50,6 @@ const ATTR_ALIASES = {
   幸运: "LUCK", luck: "LUCK", LUCK: "LUCK",
   理智: "SAN", san: "SAN", SAN: "SAN",
   hp: "HP", HP: "HP", mp: "MP", MP: "MP"
-}
-
-const DEFAULT_TEMP_INSANITY = [
-  "失忆：调查员发现自己只记得最后身处的安全地点。",
-  "假性残疾：调查员暂时失明、失聪或失去肢体功能。",
-  "暴力倾向：调查员陷入攻击冲动。",
-  "偏执：调查员开始怀疑身边的人。",
-  "重要之人：调查员把某人误认为重要之人。",
-  "昏厥：调查员直接失去意识。",
-  "逃避行为：调查员只想远离当前场景。",
-  "歇斯底里：调查员大哭、大笑或尖叫。",
-  "恐惧症：调查员获得一个临时恐惧症。",
-  "躁狂症：调查员获得一个临时躁狂症。"
-]
-
-const DEFAULT_INDEFINITE_INSANITY = [
-  "失忆：调查员回过神来时已经身处陌生地点。",
-  "被窃：调查员发现重要物品不见了。",
-  "伤痕：调查员醒来时身上出现新的伤痕。",
-  "暴力：调查员卷入了暴力冲突。",
-  "极端信念：调查员执着于某个荒诞想法。",
-  "重要之人：调查员极度依赖某位重要之人。",
-  "被收容：调查员在安全机构或医院中醒来。",
-  "逃避现实：调查员用极端方式逃避真相。",
-  "恐惧症：调查员获得一个新的恐惧症。",
-  "躁狂症：调查员获得一个新的躁狂症。"
-]
-
-const DEFAULT_CHECK_LEVELS = {
-  critical: "大成功",
-  extreme: "极难成功",
-  hard: "困难成功",
-  success: "成功",
-  fail: "失败",
-  fumble: "大失败"
 }
 
 const DND_ATTRS = ["力量", "敏捷", "体质", "智力", "感知", "魅力"]
@@ -401,10 +361,13 @@ export class DiceManager {
     } catch (error) {
       this.logger?.warn?.(`[骰娘] 读取配置失败: ${error.message}`)
     }
+    const merged = mergeDiceReplyConfig(raw)
     return {
       ...DEFAULT_CONFIG,
       ...raw,
-      templates: { ...DEFAULT_CONFIG.templates, ...(raw.templates || {}) },
+      templates: merged.templates,
+      checkLevels: merged.checkLevels,
+      insanityTables: merged.insanityTables,
       maxDiceCount: safeNumber(raw.maxDiceCount, DEFAULT_CONFIG.maxDiceCount, 1, 10000),
       maxDiceSides: safeNumber(raw.maxDiceSides, DEFAULT_CONFIG.maxDiceSides, 2, 100000000),
       maxRounds: safeNumber(raw.maxRounds, DEFAULT_CONFIG.maxRounds, 1, 1000),
@@ -812,7 +775,7 @@ export class DiceManager {
       const attrs = DND_ATTRS.map(name => [name, this.rollExpression("4d6kh3", config).total])
       rows.push(`${count > 1 ? `${i + 1}. ` : ""}${attrs.map(([k, v]) => `${k} ${v}`).join(" / ")}`)
     }
-    return `DND5E 属性：\n${rows.join("\n")}`
+    return renderTemplate(config.templates.dnd, { attributes: rows.join("\n") })
   }
 
   shouldUseDndCheck(e, raw = "") {
@@ -1366,7 +1329,22 @@ export class DiceManager {
     const noFumble = normalizedRule === "nofumble"
     const effectiveRule = noFumble ? "0" : normalizedRule
     const { rank } = this.computeCocRank(d100, value, effectiveRule, difficultyRequired)
-    if (noFumble && rank === -2) return "失败"
+    return this.levelTextFromRank((noFumble && rank === -2) ? -1 : rank)
+  }
+
+  judgeCocDetails(roll, target, rule = "coc7", difficultyRequired = 0) {
+    const value = Number(target)
+    if (!Number.isFinite(value) || value < 1) throw new Error("检定值必须是正数")
+    const normalizedRule = this.normalizeCocRule(rule)
+    const d100 = Number(roll)
+    const noFumble = normalizedRule === "nofumble"
+    const effectiveRule = noFumble ? "0" : normalizedRule
+    const { rank } = this.computeCocRank(d100, value, effectiveRule, difficultyRequired)
+    const displayRank = (noFumble && rank === -2) ? -1 : rank
+    return { rank, displayRank, level: this.levelTextFromRank(displayRank) }
+  }
+
+  levelTextFromRank(rank) {
     const levels = this.getConfig().checkLevels || DEFAULT_CHECK_LEVELS
     if (rank === 4) return levels.critical || "大成功"
     if (rank === 3) return levels.extreme || "极难成功"
@@ -1399,7 +1377,12 @@ export class DiceManager {
     const results = []
     for (let i = 0; i < rounds; i += 1) {
       const roll = this.rollD100(modifier)
-      results.push(`${name} 掷${modifier > 0 ? "奖励骰" : "惩罚骰"}：${roll.diceText}=${roll.value}`)
+      results.push(renderTemplate(config.templates.bonus, {
+        name,
+        kind: modifier > 0 ? "奖励骰" : "惩罚骰",
+        diceText: roll.diceText,
+        value: roll.value
+      }))
     }
     return results.join("\n")
   }
@@ -1454,7 +1437,7 @@ export class DiceManager {
     const roll = this.rollD100(modifier)
     const rule = this.getGroupRule(e, config)
     const level = this.renderCheckLevel(roll.value, target, rule, difficulty)
-    return renderTemplate(config.templates.check, {
+    return renderTemplate(pickCheckTemplate(config.templates, level, config.checkLevels), {
       name: this.getUserName(targetEvent),
       skill: difficulty > 1 ? `${this.difficultyLabel(difficulty)}${parsed.skill}` : parsed.skill,
       target,
@@ -1482,12 +1465,13 @@ export class DiceManager {
   }
 
   checkLevelRank(level = "") {
-    if (level === "大成功") return 5
-    if (level === "极难成功") return 4
-    if (level === "困难成功") return 3
-    if (level === "成功") return 2
-    if (level === "失败") return 1
-    if (level === "大失败") return 0
+    const levels = this.getConfig().checkLevels || DEFAULT_CHECK_LEVELS
+    if (level === (levels.critical || "大成功")) return 5
+    if (level === (levels.extreme || "极难成功")) return 4
+    if (level === (levels.hard || "困难成功")) return 3
+    if (level === (levels.success || "成功")) return 2
+    if (level === (levels.fail || "失败")) return 1
+    if (level === (levels.fumble || "大失败")) return 0
     return -1
   }
 
@@ -1499,15 +1483,15 @@ export class DiceManager {
     const modifier = options.modifier ?? parsed.modifier
     const roll = this.rollD100(modifier)
     const rule = this.getGroupRule(e, config)
-    const level = this.judgeCoc(roll.value, target, rule)
+    const details = this.judgeCocDetails(roll.value, target, rule)
     return {
       name: this.getUserName(e),
       skill: parsed.skill,
       target,
       roll: roll.value,
       diceText: roll.diceText,
-      level,
-      rank: this.checkLevelRank(level)
+      level: details.level,
+      rank: cocRankToCompareRank(details.displayRank)
     }
   }
 
@@ -1584,10 +1568,11 @@ export class DiceManager {
     }
     const roll = this.rollD100(0)
     const rule = this.getGroupRule(e, config)
-    const level = this.judgeCoc(roll.value, target, rule)
-    const lossExpr = level.includes("成功") ? m[1] : m[2]
+    const details = this.judgeCocDetails(roll.value, target, rule)
+    const level = details.level
+    const lossExpr = details.displayRank > 0 ? m[1] : m[2]
     // sealdice：大失败时损失骰取最大值（BigFailDiceOn）
-    const isBigFail = level === "大失败"
+    const isBigFail = details.displayRank === -2
     const lossRandom = isBigFail ? () => 0.999999 : undefined
     let loss = this.rollExpression(lossExpr, config, lossRandom).total
     if (halfLoss) loss = Math.floor(loss / 2)
@@ -1983,8 +1968,13 @@ export class DiceManager {
     const list = type === "li"
       ? (config.insanityTables?.indefinite || DEFAULT_INDEFINITE_INSANITY)
       : (config.insanityTables?.temp || DEFAULT_TEMP_INSANITY)
+    if (!list.length) return "疯狂表是空的。"
     const idx = rollInt(list.length) - 1
-    return `${type === "li" ? "总结疯狂" : "临时疯狂"}：${idx + 1}. ${list[idx]}`
+    return renderTemplate(config.templates.insanity, {
+      kind: type === "li" ? "总结疯狂" : "临时疯狂",
+      index: idx + 1,
+      text: list[idx]
+    })
   }
 
   showHelp() {

@@ -37,7 +37,15 @@ import { resolveRecentBotImage, resolveRecentUserImage, findRecentBotImage } fro
 import { recordDrawTextFallback, clearDrawFailureNote, takeDrawFailureNote, buildDrawFailureNoteMessage, isImageDeliveryToolName } from "../utils/drawFailureNote.js"
 import { shouldSkipNicknameAvatarReference } from "../utils/avatarReferencePolicy.js"
 import { createConfigStore, mergeDeepConfig } from "../core/config/configStore.js"
-import { classifyIntentWithModel, recordShadowComparison, areIntentsEquivalent } from "../core/intent/modelIntentClassifier.js"
+import { classifyIntentWithModel } from "../core/intent/modelIntentClassifier.js"
+import { isAiConversationEnabled } from "../utils/aiConversationGate.js"
+import { shouldSkipIntentModel } from "../utils/intentFastPath.js"
+import { computeAddresseeSignal, buildAddresseePrompt } from "../utils/addresseeSignals.js"
+import { recordTurnContinuity, loadTurnContinuity, buildTurnContinuityPrompt } from "../utils/turnContinuity.js"
+import { createTurnTrace } from "../utils/turnTrace.js"
+import { createOutboundArbiter } from "../utils/messagePipeline/outboundArbiter.js"
+import { resolveLongTaskFeedbackPolicy } from "../utils/longTaskFeedbackPolicy.js"
+import { resolvePromptLayerProfile, applyPromptLayerProfile } from "../utils/promptLayers.js"
 import { setSharedRuntime } from "../core/runtime/sharedRuntime.js"
 import { TERMINAL_TOOL_NAMES, BACKGROUND_TERMINAL_TOOL_NAMES, PSEUDO_TOOL_MARKER_SET, PSEUDO_TOOL_TEXT_KEYS, PREVIOUS_SPEAKER_REPLY_PATTERNS, COMIC_DRAW_PATTERN, SEARCH_TOOL_NAMES, SEMANTIC_TOOL_INTENTS, SEMANTIC_TOOL_INTENT_MIN_CONFIDENCE, SEMANTIC_TOOL_INTENT_TIMEOUT_MS, isPseudoToolMarker, extractChatKeywords, isQuestionMessage, isFeedbackMessage, isLikelyFollowupMessage, isCasualBotGreeting, shouldUseCompactHistory, looksDirectedAtBotByPronoun, looksGroupAddressed, normalizeIntentText, isRealtimeInfoRequest, isExplicitSearchRequest, isExplicitToolIntent, isImageGenerationRequest, isImageAnalysisRequest, isAvatarInspectionRequest, getImageVerificationMode, isImageEditRequest, isImageCompositionEditRequest, hasToolCommitmentText, isDrawTaskStatusInquiry, isDrawContextContinuationRequest, shouldInjectGroupContext } from "../core/intent/messageIntent.js"
 import { prepareImageEditAssets, resolveAvatarEditBase } from "../utils/editReferencePipeline.js"
@@ -55,7 +63,7 @@ import { safeTruncateUnicode, splitUnicodeText } from "../utils/unicodeText.js"
 import { classifyEmojiToolExposure, filterToolsForEmojiExposure, resolveForcedReactionEmoji, shouldExposeEmojiToolForMessage } from "../utils/emojiToolPolicy.js"
 import { buildExcelToolParams, hasExcelWorkbookContext, shouldBypassMergeForExcel, shouldUseExcelWorkbookTool } from "../utils/excelRequestPolicy.js"
 import { containsCodeFence, flattenCodeFences } from "../utils/qqCodeFenceText.js"
-import { armSmartLockWatchdog, clearSmartLockWatchdog, isLongRunningTaskLinkRequest } from "../utils/smartLockPolicy.js"
+import { armSmartLockWatchdog, clearSmartLockWatchdog } from "../utils/smartLockPolicy.js"
 import { decideToolContinuation } from "../utils/toolContinuationPolicy.js"
 import { buildToolGroundingInstruction, buildUnavailableToolReply, hasUsableToolResult } from "../utils/toolResultGrounding.js"
 import { buildStructuredHistoryMessage, resolveHistorySelectionBudget, resolveToolRoundLimit, selectRelevantGroupHistory } from "../utils/agentIntelligence.js"
@@ -880,6 +888,13 @@ function parseToolConfigEntry(entry) {
   }
 }
 
+const LOCAL_EMOJI_TOOL_NAME = "sendLocalEmojiTool"
+
+/** 高置信改图/识图意图与生图正则冲突时，模型意图优先，生图正则不得抢路由 */
+function modelImageIntentConflictsGeneration(modelIntent = "") {
+  return modelIntent === "image_edit" || modelIntent === "image_analysis"
+}
+
 function toolConfigHasName(toolNames, name) {
   return Array.isArray(toolNames) && toolNames.some(item => parseToolConfigEntry(item).name === name)
 }
@@ -895,13 +910,16 @@ function isEducationalExplanationRequest(text = "") {
   if (/(为什么|为何).{0,12}(失败|没回|没反应|报错|不能|不行|画不出来|发不出来|撤回|崩了|卡住)|怎么配置|怎么设置|接口|API|api|key|token|上游|日志/.test(content)) {
     return false
   }
+  if (/(表情包|表情|插件|机器人|文件|导入|删除|重启|禁言|群名片)/.test(content)) {
+    return false
+  }
   return /(科普|讲解|讲讲|解释|解释一下|推导|证明|总结|整理|梳理|公式|原理|定义|概念|知识点|例题|举例|怎么理解|常见.*公式|什么是).{0,60}/.test(content) ||
     /(导数|微积分|极限|积分|函数|定理|物理|化学|生物|历史|地理|天文|宇宙|经济|哲学|语法|算法|机器学习).{0,30}(讲|解释|公式|原理|定义|推导|证明|总结|科普)/.test(content)
 }
 
 function resolveCardPresentation(userText = "", responseKind = "chat") {
   if (isNarrativeWritingRequest(userText)) return "narrative"
-  if (responseKind === "knowledge") return "knowledge"
+  if (responseKind === "knowledge" && normalizeIntentText(userText).length >= 12) return "knowledge"
   if (isCodeOrMarkdownRequest(userText)) return "document"
   return ""
 }
@@ -1383,7 +1401,7 @@ function looksLikeCodeOrMarkdown(text = "") {
     /^\s*(def|class|for|if|elif|else|while|return|import|from|print|break|continue|const|let|var|function|class|export|switch|try|catch|public|private|static|package|func|fn)\b/.test(line) ||
     /^\s{2,}\S/.test(line) ||
     /[A-Za-z_$][\w$.\[\]]*\s*(?:=|==|===|>|<|\+|-|\*|\/)/.test(line) ||
-    /[{}();]/.test(line)
+    /[{}]/.test(line)
   ).length
 
   return codeLineCount >= 2
@@ -1938,7 +1956,8 @@ export class ExamplePlugin extends plugin {
 
     // Presentation is decided before model execution. A card remains a card
     // regardless of whether this turn used a tool-capable backend.
-    if (session?.turnPlan?.presentation?.kind === "knowledge" || userAskedForEducation) return "knowledge"
+    if ((session?.turnPlan?.presentation?.kind === "knowledge" || userAskedForEducation) &&
+        (looksLikeEducationalExplanation(output) || String(output || "").trim().length >= 260)) return "knowledge"
     if (isAnalysisDiagnosticReply) {
       return "document"
     }
@@ -2273,6 +2292,7 @@ export class ExamplePlugin extends plugin {
       try {
         const mode = String(this.config?.chatTriggerMode || 'strict').toLowerCase()
         if (mode !== 'smart') return
+        if (!isAiConversationEnabled(this.config)) return
         if (!this.checkGroupPermission(e)) return
         if (this.isUserBlacklisted(e)) return
         if (await this.isMutedInGroup(e)) return
@@ -2296,6 +2316,7 @@ export class ExamplePlugin extends plugin {
    * rate limit 已满时返回 false 不复读。
    */
   async joinRepeat(e, state, text) {
+    if (!isAiConversationEnabled(this.config)) return false
     const smartCfg = this.config.smartTrigger || {}
     const groupId = e.group_id
     // 复用速率检查（避免和正常回复一起把 bot 刷成复读机）
@@ -2674,6 +2695,7 @@ export class ExamplePlugin extends plugin {
    * smart 模式触发入口：每条群消息进入此函数，按 talkValue 阈值/空窗补偿/强制覆盖三种条件决定是否调 Timing Gate
    */
   async handleRandomReplySmart(e) {
+    if (!isAiConversationEnabled(this.config)) return false
     const groupId = e.group_id
     if (this.isUserBlacklisted(e)) {
       logger.info(`[用户黑名单] smart group=${groupId} user=${e.user_id} msg="${summarizeForLog(e.msg || "")}"`)
@@ -2905,11 +2927,13 @@ export class ExamplePlugin extends plugin {
           state.recentReplyTimestamps = (state.recentReplyTimestamps || []).slice(0, -1)
           return false
         }
-        if (this.shouldReleaseSmartLockForLongTask(e)) {
+        const longTaskPolicy = resolveLongTaskFeedbackPolicy(String(e?.msg || ""))
+        if (longTaskPolicy?.releaseSmartLock === true) {
           e._longRunningToolTask = true
-          logger.info(`[SmartLock] group=${groupId} 长耗时工具任务释放 smart 锁，后续消息可继续判断`)
+          logger.info(`[SmartLock] group=${groupId} 长耗时任务(${longTaskPolicy.kind})释放 smart 锁，后续消息可继续判断`)
           this.releaseSmartInFlight(state, e, smartLockToken)
         }
+        e._triggerContext = { mode: "smart_gate", gateDecision: "continue", gateReason: gateResult?.reason || "", phase }
         return await this.handleTool(e)
       }
       if (decision === 'wait') {
@@ -2945,8 +2969,7 @@ export class ExamplePlugin extends plugin {
   }
 
   shouldReleaseSmartLockForLongTask(e = {}) {
-    const text = String(e?.msg || "")
-    return isImageGenerationRequest(text) || isImageCompositionEditRequest(text) || isLongRunningTaskLinkRequest(text)
+    return resolveLongTaskFeedbackPolicy(String(e?.msg || ""))?.releaseSmartLock === true
   }
 
   releaseSmartInFlight(state, e, expectedToken) {
@@ -3046,15 +3069,16 @@ export class ExamplePlugin extends plugin {
     const currentText = String(e?.msg || '')
     const mentionsBotName = hasBotTextAnchor(currentText, botName, this.config.triggerPrefixes)
     const sameUserAsLastReply = state.lastBotReplyToUserId && String(e?.user_id || '') === String(state.lastBotReplyToUserId)
-    const groupAddressed = looksGroupAddressed(currentText)
-    const pronounWithoutBotAnchor = /[你妳]/.test(currentText) && !mentionsBotName && !atBot && !currentMsgQuotesBot && !sameUserAsLastReply && !groupAddressed
-    const targetKind = (atBot || mentionsBotName || currentMsgQuotesBot || sameUserAsLastReply)
-      ? 'bot'
-      : groupAddressed
-        ? 'group'
-        : (prefilterKind === 'likely_addressed_other' || addressedToOther)
-          ? 'other'
-          : 'unknown'
+    // 触发决策与主链路共享同一份人设与对象信号：Gate 判断"要不要回"，主链路判断"回给谁"，口径必须一致
+    const addresseeSignal = computeAddresseeSignal({
+      e,
+      botId: e?.bot?.uin || Bot.uin,
+      mentionsBotName,
+      quotesBot: currentMsgQuotesBot,
+      sameUserAsLastReply,
+      prefilterKind
+    })
+    const { groupAddressed, targetKind, pronounWithoutBotAnchor } = addresseeSignal
     const triggerReason = e?._deferredReason
       ? 'deferred'
       : (prefilterKind === 'continuation_strong' ? `continuation_strong(${prefilterReason})` : 'regular')
@@ -3088,9 +3112,14 @@ export class ExamplePlugin extends plugin {
 - 看到"触发原因=continuation_strong"且消息明显在向 ${botName} 提问/反馈：可以 continue；如果只是相关词命中但没有对 ${botName} 说，仍然 no_action
 - 没有明确"应该插"的理由时，必须 no_action
 
+${gatePersonaTone ? `\n${gatePersonaTone}\n` : ""}
 只返回严格的 JSON，格式：{"decision":"continue|no_action|wait","wait_seconds":3,"reason":"简短理由"}
 wait 时 wait_seconds 取 3-15 之间。不要任何其他文字、不要 markdown、不要代码块包装。`
 
+    const gatePersonaTone = buildPersonaTonePrompt({
+      userText: currentText,
+      persona: this.config.persona
+    })
     const specialSignals = []
     if (addressedToOther) specialSignals.push('⚠ 当前消息 @ 了别人，谨慎插话')
     if (currentMsgQuotesBot) specialSignals.push(`✓ 当前消息引用了 ${botName} 的某条消息`)
@@ -3315,6 +3344,10 @@ ${specialSignalsBlock}
    * @param {object} opts { source: '插件名', anchorE: 可选锚点 e }
    */
   async enqueueProactiveTask(groupId, intent, opts = {}) {
+    if (!isAiConversationEnabled(this.config)) {
+      logger.info('[Proactive] 插件总开关已关闭，取消续话')
+      return { ok: false, error: 'plugin_disabled' }
+    }
     if (!groupId || !intent) return { ok: false, error: 'missing_params' }
     const anchor = opts.anchorE
     if (!anchor) {
@@ -4446,6 +4479,7 @@ ${recentHistory || '(无)'}
     // 磁链与视频卡片一样是独立媒体交付事件：不必点名，也不能交给闲聊 TimingGate 决定。
     if (this.isAutomaticTorrentDownloadEvent(e)) {
       logger.info(`[自动磁链下载] group=${e.group_id} user=${e.user_id} 已识别有效 BTIH 磁链`)
+      e._triggerContext = { mode: "auto_media" }
       return await this.handleTool(e)
     }
 
@@ -4465,6 +4499,7 @@ ${recentHistory || '(无)'}
         // 专属红包给机器人，直接触发
         logger.info(`[自动抢红包] 检测到给机器人的专属红包，直接触发抢红包`)
         e.forceGrabRedBag = true
+        e._triggerContext = { mode: "red_bag" }
         return await this.handleTool(e)
       }
 
@@ -4481,6 +4516,7 @@ ${recentHistory || '(无)'}
           redBagCooldowns.set(e.group_id, now)
           logger.info(`[自动抢红包] 检测到${redBagType.name}，触发概率 ${(probability * 100).toFixed(1)}%，执行抢红包`)
           e.forceGrabRedBag = true // 标记强制抢红包
+          e._triggerContext = { mode: "red_bag" }
           return await this.handleTool(e)
         } else {
           logger.info(`[自动抢红包] 检测到${redBagType.name}，未命中概率 ${(probability * 100).toFixed(1)}%，跳过`)
@@ -4502,6 +4538,7 @@ ${recentHistory || '(无)'}
 
     // 如果明确触发（@或前缀），直接触发并更新追踪
     if (hasTrigger) {
+      e._triggerContext = { mode: "strict_trigger" }
       if (this.config.conversationTrackingEnabled) {
         this.setTrackingWithTimer(conversationKey)
       }
@@ -4538,6 +4575,7 @@ ${recentHistory || '(无)'}
       if (isTalking) {
         // 重置定时器
         this.setTrackingWithTimer(conversationKey)
+        e._triggerContext = { mode: "conversation_tracking" }
         return await this.handleTool(e)
       }
       // 判断不是在跟机器人对话，直接返回不触发
@@ -4549,6 +4587,7 @@ ${recentHistory || '(无)'}
   }
 
   async handleTool(e) {
+    if (!isAiConversationEnabled(this.config)) return false
     if (!this.config.enabled || !e.group_id) {
       if (!e.group_id) await this.sendObservedReply(e, "该命令只能在群聊中使用。")
       return false
@@ -4576,6 +4615,14 @@ ${recentHistory || '(无)'}
     e.sessionId = sessionId
     const session = this.getOrCreateSession(sessionId, this.tools)
     session.taskContext = taskContext
+    // 一个回合一条 trace + 一个出站仲裁：回合内所有出站消息过同一个有序队列
+    const turnTrace = createTurnTrace({ groupId, userId, sessionId, logger })
+    e._turnId = turnTrace.id
+    if (e?._triggerContext) turnTrace.setTrigger(e._triggerContext.mode, e._triggerContext)
+    const outboundArbiter = createOutboundArbiter({ logger, trace: turnTrace })
+    session.outboundArbiter = outboundArbiter
+    session.turnTrace = turnTrace
+    e = outboundArbiter.wrapEvent(e)
     const groupLimiter = getOrCreateGroupLimiter(this._groupLimiters, groupId, this.config.concurrentLimit || 5)
 
     let groupUserMessages = session.groupUserMessages
@@ -4729,6 +4776,55 @@ ${recentHistory || '(无)'}
         })()
         const senderRole = roleMap[e.sender?.role] || roleMap[memberInfo?.role] || "member"
 
+        // ── 意图判定前置（P4 主判定 + 闲聊快路）：必须在分层画像与 prompt 拼接之前 ──
+        const currentIntentText = [args, msg].filter(Boolean).join("\n")
+        session.turnDrawRequested = isImageGenerationRequest(currentIntentText)
+        const intentToolCandidates = selectToolIntentCandidates(currentIntentText, (session.tools || []).map(tool => tool?.function?.name).filter(Boolean))
+        const skipIntentModel = shouldSkipIntentModel({
+          text: currentIntentText,
+          hasImages: Boolean(images?.length),
+          hasVideos: Boolean(videos?.length),
+          toolCandidates: intentToolCandidates
+        })
+        let modelIntentDecision = null
+        if (skipIntentModel) {
+          turnTrace.setIntent("chat", null, "fast_path_skip")
+          logger.info(`[意图快路] group=${groupId} 无工具信号的短闲聊，跳过意图模型`)
+        } else {
+          const intentModelStartedAt = Date.now()
+          modelIntentDecision = await this.resolvePrimaryModelIntent(currentIntentText, { hasImages: Boolean(images?.length) })
+          turnTrace.addModelCall("intent", Date.now() - intentModelStartedAt)
+          if (modelIntentDecision) turnTrace.setIntent(modelIntentDecision.intent, modelIntentDecision.confidence, "model")
+        }
+        session.modelIntentDecision = modelIntentDecision
+
+        // 对象指认：与 TimingGate 共享同一套「这句话在回谁」信号，主链路据此决定接话姿态
+        const smartStateForSignal = this.getSmartState(groupId)
+        const mainQuotesBot = messageQuotesUser(e, Bot.uin)
+        session.addresseeSignal = computeAddresseeSignal({
+          e,
+          botId: Bot.uin,
+          mentionsBotName: hasBotTextAnchor(String(e?.msg || ""), Bot.nickname || "机器人", this.config.triggerPrefixes),
+          quotesBot: mainQuotesBot,
+          sameUserAsLastReply: Boolean(smartStateForSignal?.lastBotReplyToUserId && String(userId) === String(smartStateForSignal.lastBotReplyToUserId)),
+          prefilterKind: e?._prefilterKind || "regular"
+        })
+        const addresseePrompt = buildAddresseePrompt(session.addresseeSignal)
+
+        // 分层画像：闲聊只喂保底层，任务/知识/带素材回合注入全部层（依据前置的意图判定）
+        session.promptLayerProfile = resolvePromptLayerProfile({
+          responseKind: isEducationalExplanationRequest(currentIntentText) ? "knowledge" : "chat",
+          modelIntent: modelIntentDecision?.intent || "",
+          requiredToolNames: intentToolCandidates,
+          hasImages: Boolean(images?.length),
+          hasVideos: Boolean(videos?.length)
+        })
+
+        // 上一轮任务摘要：同一用户 10 分钟内的工具/回复延续，防止反复认图、反复确认
+        const lastTurnContinuity = await loadTurnContinuity({ redis: globalThis.redis, groupId, userId }).catch(() => null)
+        const turnContinuityPrompt = buildTurnContinuityPrompt(lastTurnContinuity)
+        if (lastTurnContinuity) logger.info(`[任务延续] group=${groupId} user=${userId} 注入上一轮摘要 intent=${lastTurnContinuity.intent} tools=${(lastTurnContinuity.tools || []).length}`)
+
         const userContent = await this.buildMessageContent(e.sender, args, images, atQq, e.group, e)
         const knowledgeContext = {
           text: e.msg || args,
@@ -4808,13 +4904,16 @@ ${recentHistory || '(无)'}
           message: e.msg
         })
         // 和记忆/情绪读取并发，Embedding 超时或失败只会省略这一层提示。
-        const semanticStylePromptPromise = globalStyleLearnerManager.buildRelevantPrompt(
-          this.config.globalStyleLearning,
-          { query: e.msg || args, embeddingConfig: this.config.embeddingAiConfig }
-        ).catch(error => {
-          logger.warn(`[全局表达学习] 语义提示读取失败: ${error.message}`)
-          return ''
-        })
+        const chatFastPath = session.promptLayerProfile?.profile === "chat"
+        const semanticStylePromptPromise = chatFastPath
+          ? null
+          : globalStyleLearnerManager.buildRelevantPrompt(
+              this.config.globalStyleLearning,
+              { query: e.msg || args, embeddingConfig: this.config.embeddingAiConfig }
+            ).catch(error => {
+              logger.warn(`[全局表达学习] 语义提示读取失败: ${error.message}`)
+              return ''
+            })
 
         // 获取情感、记忆、表达学习的 prompt
         const emotionPrompt = this.config.emotionSystem?.enabled
@@ -4876,7 +4975,7 @@ ${recentHistory || '(无)'}
 
         // 知识库检索
         let knowledgePrompt = ''
-        if (this.knowledgeSearcher && e.msg) {
+        if (this.knowledgeSearcher && e.msg && !chatFastPath) {
           try {
             const result = await this.knowledgeSearcher.search(e.msg)
             if (result?.knowledgeContext) {
@@ -4903,7 +5002,28 @@ ${recentHistory || '(无)'}
           ? await this.getCurrentGroupContext(e)
           : this.getBasicGroupContext(e)
         const mergedTriggerPrompt = this.buildMergedDirectTriggerPrompt(e)
-        const enhancedPrompts = [identityBindingsPrompt, workflowTeachingPrompt, knowledgeTeachingPrompt, workflowPrompt, groupKnowledgePrompt, mergedTriggerPrompt, emotionPrompt, memoryPrompt, expressionPrompt, personaTonePrompt, narrativeWritingPrompt, solutionExplanationPrompt, cardBodyPrompt, personaFeedbackPrompt, globalStylePrompt, semanticStylePrompt, knowledgePrompt, memberLookupPrompt, personProfilePrompt].filter(Boolean).join('\n')
+        const promptLayers = applyPromptLayerProfile(session.promptLayerProfile, {
+          identityBindings: identityBindingsPrompt,
+          workflowTeaching: workflowTeachingPrompt,
+          knowledgeTeaching: knowledgeTeachingPrompt,
+          workflow: workflowPrompt,
+          groupKnowledge: groupKnowledgePrompt,
+          mergedTrigger: mergedTriggerPrompt,
+          emotion: emotionPrompt,
+          memory: memoryPrompt,
+          expression: expressionPrompt,
+          personaTone: personaTonePrompt,
+          narrativeWriting: narrativeWritingPrompt,
+          solutionExplanation: solutionExplanationPrompt,
+          cardBody: cardBodyPrompt,
+          personaFeedback: personaFeedbackPrompt,
+          globalStyle: globalStylePrompt,
+          semanticStyle: semanticStylePrompt,
+          knowledge: knowledgePrompt,
+          memberLookup: memberLookupPrompt,
+          personProfile: personProfilePrompt
+        })
+        const enhancedPrompts = [promptLayers.prompt, addresseePrompt, turnContinuityPrompt].filter(Boolean).join('\n')
         const runtimeGroupInfo = {
           group_id: groupContext.groupId,
           group_name: groupContext.groupName
@@ -5076,7 +5196,9 @@ ${mcpPrompts}
           }
         }
 
-        const understandingPrompt = this.buildUnderstandingContextPrompt({
+        const understandingPrompt = session.promptLayerProfile?.profile === "chat"
+          ? ""
+          : this.buildUnderstandingContextPrompt({
           e,
           args,
           msg,
@@ -5106,11 +5228,6 @@ ${mcpPrompts}
         let toolChoice = "auto"
         let forcedToolCall = null
         let toolScopeLocked = false
-        const currentIntentText = [args, msg].filter(Boolean).join("\n")
-        session.turnDrawRequested = isImageGenerationRequest(currentIntentText)
-        // P4 切片二：模型意图判定为主决策（confidence>=0.7 生效；正则保留为模型失败时的兜底）
-        const modelIntentDecision = await this.resolvePrimaryModelIntent(currentIntentText, { hasImages: Boolean(images?.length) })
-        session.modelIntentDecision = modelIntentDecision
         const singularOwnerMention = resolveSingularOwnerMention(currentIntentText, memberMap)
         if (toolChoice === "auto" && singularOwnerMention) {
           session.tools = this.getToolsByName(["mentionMembersTool"])
@@ -5197,7 +5314,7 @@ ${mcpPrompts}
           if (session.tools?.length) toolChoice = { type: "function", function: { name: "aiMindMapTool" } }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && (images?.length && isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === "image_analysis")) {
+        if (!toolScopeLocked && toolChoice === "auto" && images?.length && (isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === "image_analysis")) {
           const imageAnalysisToolNames = getImageAnalysisToolNames(currentIntentText)
           session.tools = this.getToolsByName(imageAnalysisToolNames)
           session.imageVerificationNeedsSearch = imageAnalysisToolNames.includes("searchInformationTool")
@@ -5212,7 +5329,7 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && session.recentImageContinuation?.image) {
+        if (!toolScopeLocked && toolChoice === "auto" && session.recentImageContinuation?.image && modelIntentDecision?.intent !== "image_analysis") {
           session.tools = this.getToolsByName(["googleImageEditTool"])
           if (session.tools?.length) {
             toolChoice = { type: "function", function: { name: "googleImageEditTool" } }
@@ -5232,10 +5349,10 @@ ${mcpPrompts}
         }
 
         const imageGenerationReferenceImages = this.getImageGenerationReferenceImages(images, session)
-        const preferImageGeneration = modelIntentDecision?.intent === "image_generate" || shouldPreferImageGeneration(currentIntentText, {
+        const preferImageGeneration = modelIntentDecision?.intent === "image_generate" || (!modelImageIntentConflictsGeneration(modelIntentDecision?.intent) && shouldPreferImageGeneration(currentIntentText, {
           hasImages: imageGenerationReferenceImages.length > 0,
           hasRecentBotImage: Boolean(session.recentImageContinuation)
-        })
+        }))
         const contextualDrawCall = !toolScopeLocked && toolChoice === "auto"
           ? this.resolveContextualDrawGeneration({
               e,
@@ -5340,7 +5457,7 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && (images?.length && isImageCompositionEditRequest(currentIntentText) || modelIntentDecision?.intent === "image_edit")) {
+        if (!toolScopeLocked && toolChoice === "auto" && images?.length && (isImageCompositionEditRequest(currentIntentText) || modelIntentDecision?.intent === "image_edit")) {
           session.tools = this.getToolsByName(["googleImageEditTool"])
           if (session.tools?.length) {
             toolChoice = { type: "function", function: { name: "googleImageEditTool" } }
@@ -5355,7 +5472,7 @@ ${mcpPrompts}
           }
         }
 
-        if (!toolScopeLocked && toolChoice === "auto" && (images?.length && isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === "image_analysis")) {
+        if (!toolScopeLocked && toolChoice === "auto" && images?.length && (isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === "image_analysis")) {
           const imageAnalysisToolNames = getImageAnalysisToolNames(currentIntentText)
           session.tools = this.getToolsByName(imageAnalysisToolNames)
           session.imageVerificationNeedsSearch = imageAnalysisToolNames.includes("searchInformationTool")
@@ -5403,8 +5520,6 @@ ${mcpPrompts}
           selectedHistoryCount: session.selectedGroupHistoryCount
         })
         session.turnPlan = turnPlan
-        // P4 影子模式：模型意图判定并行运行，只记录与正则路径的差异，不影响行为
-        this.runShadowIntent(currentIntentText, { hasImages: Boolean(images?.length), forcedToolName: forcedToolCall?.function?.name || "", turnPlanIntent: turnPlan?.intent || turnPlan?.responseKind || "chat" })
         session.cardPresentation = resolveCardPresentation(currentIntentText, turnPlan.presentation.kind)
         session.initialExecutionRoute = {
           mode: turnPlan.execution.mode,
@@ -5435,9 +5550,10 @@ ${mcpPrompts}
 
         const acknowledgement = cardAcknowledgement(session.cardPresentation)
         if (acknowledgement) {
-          await this.sendSegmentedMessage(e, acknowledgement, 0)
+          outboundArbiter.beginToolOutcomes()
+          outboundArbiter.enqueue("commitment", () => this.sendSegmentedMessage(e, acknowledgement, 0))
           session.cardAcknowledged = true
-          logger.info(`[卡面呈现] 已发送即时确认 kind=${session.cardPresentation}`)
+          logger.info(`[卡面呈现] 承诺类确认已入队（工具结果决出后放行） kind=${session.cardPresentation}`)
         }
 
 	        const requestData = this.buildRequestData(session.groupUserMessages, session.tools, toolChoice)
@@ -5518,9 +5634,11 @@ ${mcpPrompts}
         this.clearSession(sessionId)
         return true
 	      } finally {
+	        outboundArbiter.settle(session.turnPlan?.outcomes || [])
+	        turnTrace.finish()
 	        await this.finishConversationTask(taskContext, session)
 	        const totalElapsed = Date.now() - handleToolStartAt
-	        logger.info(`[对话耗时] group=${e?.group_id || ""} user=${e?.user_id || ""} ${formatTurnPlanLog(session.turnPlan)} total=${totalElapsed}ms merged=${e?._mergedMessageCount || 0}`)
+	        logger.info(`[对话耗时] group=${e?.group_id || ""} user=${e?.user_id || ""} ${formatTurnPlanLog(session.turnPlan)} total=${totalElapsed}ms merged=${e?._mergedMessageCount || 0}`, { turnId: e?._turnId })
 	        if (e.group_id && !e._longRunningToolTask) this.recordReplyLatency(e.group_id, totalElapsed)
 	      }
     })
@@ -5546,30 +5664,6 @@ ${mcpPrompts}
   /**
    * 格式化工具返回结果（截断过长内容）
    */
-  formatToolResult(content, toolName) {
-    if (!content) return "执行完成"
-    let result = typeof content === "string" ? content : JSON.stringify(content)
-    const maxLength = {
-      searchInformationTool: 500,
-      webParserTool: 500,
-      chatHistoryTool: 800,
-      default: 300
-    }
-
-    const limit = maxLength[toolName] || maxLength.default
-
-    if (result.length > limit) {
-      result = safeTruncateUnicode(result, limit, "...(内容已截断)")
-    }
-
-    if (result.includes("成功")) {
-      return "✓ " + result
-    } else if (result.includes("失败") || result.includes("错误")) {
-      return "✗ " + result
-    }
-
-    return result
-  }
 
 	  async retryRequest(requestData, toolContent, retries = 1, toolName, options = {}) {
 	    return executeChatRequestWithRecovery(
@@ -5687,27 +5781,15 @@ ${mcpPrompts}
     }
   }
 
-  // P4 影子模式：fire-and-forget，绝不抛错、绝不阻塞主流程
-  runShadowIntent(text, { hasImages = false, forcedToolName = "", turnPlanIntent = "chat" } = {}) {
-    const ai = this.config?.toolsAiConfig || {}
-    if (!ai.toolsAiUrl || !ai.toolsAiApikey) return
-    const regexIntent = forcedToolName === "bananaTool" ? "image_generate"
-      : forcedToolName === "googleImageEditTool" ? "image_edit"
-      : forcedToolName === "googleImageAnalysisTool" ? "image_analysis"
-      : forcedToolName === "deltaForceTool" ? "deltaforce"
-      : forcedToolName === "torrentDownloadTool" ? "magnet"
-      : String(turnPlanIntent || "chat")
-    classifyIntentWithModel({ text, hasImages, config: this.config, timeoutMs: 6000 })
-      .then(result => {
-        recordShadowComparison({ text, regexIntent, modelIntent: result.intent, confidence: result.confidence })
-        if (result.intent !== "unavailable" && !areIntentsEquivalent(regexIntent, result.intent)) {
-          logger.info(`[意图影子] 分歧 regex=${regexIntent} model=${result.intent} conf=${result.confidence} text=${String(text).slice(0, 40)}`)
-        }
-      })
-      .catch(() => {})
-  }
-
   async handleToolFailureResponse(toolName = "", context = {}) {
+    // 出站仲裁：工具已失败，扣住的承诺类文案直接丢弃，只发事实性失败说明
+    context?.session?.outboundArbiter?.markFailure()
+    // 表情包是锦上添花的反应形态：限流/文件缺失/发送失败时不再起一次润色模型道歉——
+    // 道歉文本本身就是观感问题，静默跳过即可（无匹配/库空已由工具返回文字引导，不走这里）
+    if (toolName === LOCAL_EMOJI_TOOL_NAME) {
+      logger.info(`[表情包] 发送未完成，本轮静默跳过: ${String(context?.factualReply || context?.error || "").slice(0, 120)}`)
+      return
+    }
     if (isImageDeliveryToolName(toolName) && context?.e?.group_id) {
       recordDrawTextFallback(context.e.group_id, context?.session?.rawArgs || context?.e?.msg || "")
     }
@@ -6804,6 +6886,12 @@ ${mcpPrompts}
 
       allToolResults.push(...validResults)
       session.toolName = validResults[validResults.length - 1]?.toolName
+      const roundToolOk = validResults.map(({ result }) => !this.isToolResultError(result))
+      validResults.forEach(({ toolName: outcomeToolName }, index) => {
+        recordTurnPlanToolOutcome(session.turnPlan, { toolName: outcomeToolName, success: roundToolOk[index] })
+        session?.turnTrace?.addTool(outcomeToolName, roundToolOk[index], 0)
+      })
+      if (roundToolOk.every(Boolean)) session?.outboundArbiter?.resolveToolOutcomes()
 
       currentMessages.push(...validResults.map(({ toolCall, toolName, result }) => ({
         role: "tool",
@@ -7103,7 +7191,7 @@ ${mcpPrompts}
         ? await this.sendFinalReplyAsTextImage(e, output, "document")
         : textImageTemplate
         ? await this.sendFinalReplyAsTextImage(e, output, textImageTemplate)
-        : await this.sendSegmentedMessage(e, output)
+        : await this.sendSegmentedMessage(e, output, 0.5, { alreadyGuarded: true })
 
     // 画图请求最终走了纯文字回复且本回合没有出图：给下一轮留失败标记，让模型能接住用户的不满
     if (session?.turnDrawRequested && e.group_id) {
@@ -7119,6 +7207,18 @@ ${mcpPrompts}
         logger.warn(`[画图失败标记] group=${e.group_id} 记录失败: ${noteError?.message || noteError}`)
       }
     }
+
+    // 轮末延续摘要：同用户 10 分钟内再来说话时注入上一轮做了什么、回了什么
+    session.lastFinalReply = String(output || "").slice(0, 240)
+    await recordTurnContinuity({
+      redis: globalThis.redis,
+      groupId: e?.group_id,
+      userId: e?.user_id,
+      intent: session?.modelIntentDecision?.intent || "",
+      route: session?.initialExecutionRoute?.mode || "",
+      tools: (session?.turnPlan?.outcomes || []).map(outcome => `${outcome.toolName}${outcome.success === false ? "(失败)" : "(成功)"}`).slice(0, 6),
+      lastReply: session.lastFinalReply
+    }).catch(() => {})
 
     // 更新会话追踪中的对话历史
     if (this.config.conversationTrackingEnabled && e.group_id && e.user_id) {
@@ -7265,7 +7365,7 @@ ${mcpPrompts}
     }
   }
 
-  async sendSegmentedMessage(e, output, quoteChance = 0.5) {
+  async sendSegmentedMessage(e, output, quoteChance = 0.5, { alreadyGuarded = false } = {}) {
     try {
       const groupId = e?.group_id
       if (shouldCancelProactiveReply(e, lastIncomingMsgAt.get(groupId) || 0)) {
@@ -7275,7 +7375,7 @@ ${mcpPrompts}
       const replyWithReceipt = async (payload, quote, channel = "agent_text") => {
         return await this.sendObservedReply(e, payload, quote, channel)
       }
-      if (typeof output === "string") {
+      if (typeof output === "string" && !alreadyGuarded) {
         output = enforcePersonaToneBoundary(output, {
           userText: e?.msg || ""
         })

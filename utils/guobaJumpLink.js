@@ -8,7 +8,7 @@ const MARKER = "blchat-cmd-jump"
 
 const INJECT_SNIPPET = `<script>(function(){
 window.__BL_CMD_TOKEN__=window.__BL_CMD_TOKEN__||"";
-function add(){if(document.getElementById("blchat-cmd-jump"))return;var b=document.createElement("a");b.id="blchat-cmd-jump";b.href="/bl-chat/commands/?token="+encodeURIComponent(window.__BL_CMD_TOKEN__||"");b.target="_blank";b.textContent="\\u{1F4D6} \\u547D\\u4EE4\\u7BA1\\u7406";b.style.cssText="position:fixed;right:18px;bottom:18px;z-index:99999;background:#4c6ef5;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:14px";document.body.appendChild(b)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",add);else add()})();</script>`
+function add(){if(document.getElementById("blchat-cmd-jump"))return;var b=document.createElement("a");b.id="blchat-cmd-jump";b.href="/bl-chat/commands/?v=2&token="+encodeURIComponent(window.__BL_CMD_TOKEN__||"");b.target="_blank";b.textContent="\\u{1F4D6} \\u547D\\u4EE4\\u7BA1\\u7406";b.style.cssText="position:fixed;right:18px;bottom:18px;z-index:99999;background:#4c6ef5;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:14px";document.body.appendChild(b)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",add);else add()})();</script>`
 
 export function resolveGuobaIndexPath(pluginRoot = process.cwd()) {
   return path.join(String(pluginRoot || ""), "..", "Guoba-Plugin", "server", "static", "index.html")
@@ -42,14 +42,14 @@ export function ensureGuobaJumpLink({ pluginRoot = process.cwd(), token = "", lo
   }
 }
 
-/** 监听锅巴 index.html：升级重写后 1 秒自动补注入（幂等） */
-export function watchGuobaJumpLink({ pluginRoot = process.cwd(), watchImpl, logger = globalThis.logger } = {}) {
+/** 监听锅巴 index.html：升级重写后 1 秒自动补注入（幂等，需带回原 token） */
+export function watchGuobaJumpLink({ pluginRoot = process.cwd(), token = "", watchImpl, logger = globalThis.logger } = {}) {
   if (typeof watchImpl !== "function") return false
   const target = resolveGuobaIndexPath(pluginRoot)
   let timer = null
   watchImpl(target, () => {
     clearTimeout(timer)
-    timer = setTimeout(() => ensureGuobaJumpLink({ pluginRoot, logger }), 1000)
+    timer = setTimeout(() => ensureGuobaJumpLink({ pluginRoot, token, logger }), 1000)
   })
   return true
 }

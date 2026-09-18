@@ -528,6 +528,11 @@ export class GoogleImageEditTool extends AbstractTool {
         else console.warn(...args);
     }
 
+    logError(...args) {
+        if (typeof logger !== "undefined" && logger?.error) logger.error(...args);
+        else console.error(...args);
+    }
+
     async sendProgress(e, { config = {}, opts = {}, signal } = {}) {
         if (!e?.reply || signal?.aborted) return false;
         try {

@@ -14,6 +14,7 @@ export function logDeliveryOutcome(logger, {
   channel,
   groupId = "",
   userId = "",
+  turnId = "",
   messageId = null,
   parts = 1,
   error = ""
@@ -22,5 +23,5 @@ export function logDeliveryOutcome(logger, {
   const suffix = status === "sent"
     ? `message=${messageId ?? ""}`
     : `error=${compactError(error)}`
-  logger?.[level]?.(`[Delivery] status=${status || "unknown"} channel=${channel || "unknown"} group=${groupId || ""} user=${userId || ""} parts=${Math.max(1, Number(parts) || 1)} ${suffix}`)
+  logger?.[level]?.(`[Delivery] turn=${turnId || ""} status=${status || "unknown"} channel=${channel || "unknown"} group=${groupId || ""} user=${userId || ""} parts=${Math.max(1, Number(parts) || 1)} ${suffix}`)
 }

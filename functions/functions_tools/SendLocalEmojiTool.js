@@ -98,7 +98,12 @@ export class SendLocalEmojiTool extends AbstractTool {
 
     const { item, strategy, score, criteria: matchedCriteria } = await emojiPackManager.selectEmoji(criteria, { groupId })
     if (!item) {
-      return "error: 本地表情包库为空，请先通过 #表情包导入 添加表情包"
+      // 无匹配/库空不是失败：返回文字引导（非 error: 前缀），让后续轮次用纯文字自然回应，
+      // 不走失败道歉路径——限流/发送失败才是 error，由失败策略静默处理
+      if (strategy === "no_match") {
+        return "本地表情包里没有匹配这个情绪的表情，本轮请用纯文字回复，不要提及或描述表情内容"
+      }
+      return "本地表情包库是空的（还没有导入任何表情），请用文字回应用户，可以顺便说表情库还没建起来"
     }
 
     const absPath = emojiPackManager.getAbsoluteFilePath(item)

@@ -1,5 +1,6 @@
 import { AbstractTool } from './AbstractTool.js';
 import { buildVisibleFailureDetail } from '../../utils/visibleFailure.js';
+import { sendLongTaskOpening } from '../../utils/longTaskFeedbackPolicy.js';
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url);
 const puppeteer = require('puppeteer');
@@ -359,6 +360,9 @@ export class WebParserTool extends AbstractTool {
     if (!processedUrl) {
       return '请提供有效的网页链接。';
     }
+
+    // puppeteer 抓取动辄 30s+，先按长任务反馈契约立即回一句本地开场，再去抓
+    await sendLongTaskOpening(e, 'web');
 
     try {
       const result = await this.fetchAndCleanContent(processedUrl);

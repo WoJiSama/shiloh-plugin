@@ -8,6 +8,7 @@ import {
   writeCommandsMarkdown
 } from "./commandRegistry.js"
 import { ensureGuobaJumpLink, watchGuobaJumpLink } from "./guobaJumpLink.js"
+import { buildDiceReplyPayload } from "../domains/dice/diceReplyCatalog.js"
 import fs2 from "fs"
 import path2 from "path"
 import YAML2 from "yaml"
@@ -46,7 +47,8 @@ function buildPageHtml() {
 <title>命令管理 · shiloh-plugin</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f3f5f9; color: #1f2430; }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f3f5f9; color: #1f2430; display: flex; flex-direction: column; }
   header { background: #fff; border-bottom: 1px solid #e5e9f0; padding: 14px 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   header h1 { font-size: 18px; }
   header .spacer { flex: 1; }
@@ -56,8 +58,8 @@ function buildPageHtml() {
   button.danger { background: #fff; color: #e03131; border-color: #f1c1c1; }
   button:disabled { opacity: .5; cursor: not-allowed; }
   #token { width: 220px; }
-  main { display: flex; min-height: calc(100vh - 61px); }
-  #domains { width: 230px; background: #fff; border-right: 1px solid #e5e9f0; padding: 14px 10px; }
+  main { display: flex; flex: 1; min-height: 0; }
+  #domains { width: 230px; background: #fff; border-right: 1px solid #e5e9f0; padding: 14px 10px; overflow-y: auto; flex-shrink: 0; }
   #domains .item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; }
   #domains .item:hover { background: #f1f4fb; }
   #domains .item.active { background: #e3e9fd; }
@@ -77,6 +79,29 @@ function buildPageHtml() {
   #status.err { background: #a61e4d; }
   .lock { max-width: 460px; margin: 12vh auto; background: #fff; border: 1px solid #e5e9f0; border-radius: 14px; padding: 30px; text-align: center; }
   .lock p { color: #6b7280; font-size: 14px; margin: 12px 0 18px; }
+  .section-title { font-size: 15px; font-weight: 600; margin: 24px 0 10px; }
+  .card { background: #fff; border: 1px solid #e5e9f0; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; }
+  .card-head:hover { background: #fafbfd; }
+  .card-head .title { font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .card-head .desc { font-size: 12px; color: #8a93a5; flex: 1; }
+  .card-head .toggle { font-size: 12px; color: #4c6ef5; white-space: nowrap; }
+  .card.open .card-head { background: #fafbfd; border-bottom: 1px solid #e5e9f0; }
+  .card-body { display: none; padding: 14px; }
+  .card.open .card-body { display: block; }
+  .chips { padding: 0 14px 10px; }
+  .card.open .chips { display: none; }
+  .chip { display: inline-block; background: #eef2ff; color: #4c6ef5; border-radius: 6px; padding: 2px 8px; font-size: 12px; margin: 0 6px 0 0; }
+  .sub-title { font-size: 14px; font-weight: 600; margin: 14px 0 8px; }
+  .sub-title:first-child { margin-top: 0; }
+  .hint { font-size: 12px; color: #8a93a5; margin: 4px 0 8px; }
+  .grid-row { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: start; margin-bottom: 6px; }
+  .grid-row .label { font-size: 13px; color: #6b7280; padding-top: 8px; }
+  .grid-row textarea { width: 100%; min-height: 42px; font-size: 13px; resize: vertical; line-height: 1.4; }
+  .cmd-group { margin: 10px 0 14px; padding: 10px 12px; background: #f7f9fc; border-radius: 10px; }
+  .cmd-group .cmd { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .save-bar { position: sticky; bottom: 12px; background: #fff; border: 1px solid #e5e9f0; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; margin-top: 16px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+  .save-bar .hint { margin: 0; flex: 1; }
 </style>
 </head>
 <body>
@@ -103,7 +128,7 @@ function buildPageHtml() {
 </main>
 <div id="status"></div>
 <script>
-const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {} }
+const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceBuiltin: [], diceLevelMeta: [] }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
@@ -198,83 +223,194 @@ function renderEditor() {
     tr.querySelector("button").onclick = () => { d.commands.splice(i, 1); state.dirty = true; renderDomains(); renderEditor() }
     tbody.appendChild(tr)
   })
-  box.appendChild(table)
-
   const addCmd = document.createElement("button")
   addCmd.className = "ghost"
   addCmd.style.marginTop = "10px"
   addCmd.textContent = "+ 新增命令"
   addCmd.onclick = () => { d.commands.push({ usage: "#新命令", desc: "", perm: "all", src: "" }); state.dirty = true; renderDomains(); renderEditor() }
-  box.appendChild(addCmd)
 
   if (d.key === "dice") {
-// 判定档位名
-      const lvlTitle = document.createElement("h3")
-      lvlTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
-      lvlTitle.textContent = "🎯 判定档位名（改完点保存骰子模板生效）"
-      box.appendChild(lvlTitle)
-      const lvlTable = document.createElement("table")
-      lvlTable.innerHTML = "<thead><tr><th>档位</th><th>显示文字</th></tr></thead><tbody></tbody>"
-      const lvlBody = lvlTable.querySelector("tbody")
-      for (const [key, value] of Object.entries(state.diceCheckLevels)) {
-        const tr = document.createElement("tr")
-        tr.innerHTML = '<td style="width:100px">' + key + '</td><td><input data-lvl="' + key + '"></td>'
-        const input = tr.querySelector("input")
-        input.value = value
-        input.oninput = () => { state.diceCheckLevels[key] = input.value }
-        lvlBody.appendChild(tr)
-      }
-      box.appendChild(lvlTable)
+    // 内置规则：可折叠卡片，点开编辑回复内容/档位/疯狂表
+    const blSection = document.createElement("div")
+    blSection.className = "section-title"
+    blSection.textContent = "✅ 内置规则（引擎原生，点开卡片编辑，保存后热生效）"
+    box.appendChild(blSection)
 
-      // 疯狂表
-      const insTitle = document.createElement("h3")
-      insTitle.style.cssText = "margin:14px 0 8px;font-size:15px"
-      insTitle.textContent = "🧠 疯狂表（.ti 临时 / .li 总结，每行一条）"
-      box.appendChild(insTitle)
-      for (const tableKey of ["temp", "indefinite"]) {
+    const cardHost = document.createElement("div")
+    box.appendChild(cardHost)
+    const mappedTplKeys = new Set()
+
+    const makeTplRows = (items, host) => {
+      for (const item of items) {
+        const key = typeof item === "string" ? item : item.key
+        const labelText = typeof item === "string" ? item : (item.label || item.key)
+        const hint = typeof item === "string" ? "" : (item.hint || "")
+        mappedTplKeys.add(key)
+        if (!(key in state.diceTemplates)) state.diceTemplates[key] = ""
+        const row = document.createElement("div")
+        row.className = "grid-row"
         const label = document.createElement("div")
-        label.style.cssText = "font-size:13px;color:#6b7280;margin:8px 0 4px"
-        label.textContent = tableKey === "temp" ? "临时疯狂表（.ti）" : "总结疯狂表（.li）"
-        box.appendChild(label)
-        const ta = document.createElement("textarea")
-        ta.style.cssText = "width:100%;height:150px;font-size:13px;border:1px solid #d4dae3;border-radius:8px;padding:8px;font-family:inherit"
-        ta.value = (state.diceInsanity[tableKey] || []).join("\n")
-        ta.dataset.insanity = tableKey
-        ta.oninput = () => { state.diceInsanity[tableKey] = ta.value.split("\n").filter(Boolean) }
-        box.appendChild(ta)
+        label.className = "label"
+        label.textContent = labelText
+        const input = document.createElement("textarea")
+        input.rows = 2
+        input.value = state.diceTemplates[key]
+        const fallback = (key.indexOf("check_") === 0 && state.diceTemplates.check) ? state.diceTemplates.check : ""
+        input.placeholder = hint || (fallback ? ("留空则发送： " + fallback) : "")
+        input.oninput = () => { state.diceTemplates[key] = input.value }
+        row.appendChild(label); row.appendChild(input)
+        host.appendChild(row)
       }
-
-    const tplTitle = document.createElement("h3")
-    tplTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
-    tplTitle.textContent = "🎲 回复模板（保存即热生效，改的是 message.yaml diceSystem.templates）"
-    box.appendChild(tplTitle)
-    const tplTable = document.createElement("table")
-    tplTable.innerHTML = "<thead><tr><th style='width:110px'>模板名</th><th>内容（支持 {name} {roll} 等变量）</th></tr></thead><tbody></tbody>"
-    const tplBody = tplTable.querySelector("tbody")
-    for (const [key, value] of Object.entries(state.diceTemplates)) {
-      const tr = document.createElement("tr")
-      tr.innerHTML = '<td class="num">' + key + '</td><td><input data-tpl="' + key + '"></td>'
-      const input = tr.querySelector("input")
-      input.value = value
-      input.oninput = () => { state.diceTemplates[key] = input.value }
-      tplBody.appendChild(tr)
     }
-    box.appendChild(tplTable)
-    const tplSave = document.createElement("button")
-    tplSave.style.marginTop = "10px"
-    tplSave.textContent = "保存骰子模板"
-    tplSave.onclick = async () => {
+
+    const makeCard = (title, desc, commands, open) => {
+      const card = document.createElement("div")
+      card.className = "card" + (open ? " open" : "")
+      const head = document.createElement("div")
+      head.className = "card-head"
+      const t = document.createElement("div")
+      t.className = "title"; t.textContent = title
+      const dEl = document.createElement("div")
+      dEl.className = "desc"; dEl.textContent = desc || ""
+      const toggle = document.createElement("div")
+      toggle.className = "toggle"; toggle.textContent = open ? "收起 ▲" : "编辑 ▼"
+      head.appendChild(t); head.appendChild(dEl); head.appendChild(toggle)
+      head.onclick = () => {
+        card.classList.toggle("open")
+        toggle.textContent = card.classList.contains("open") ? "收起 ▲" : "编辑 ▼"
+      }
+      const chips = document.createElement("div")
+      chips.className = "chips"
+      for (const c of (commands || [])) {
+        const chip = document.createElement("span")
+        chip.className = "chip"; chip.textContent = c
+        chips.appendChild(chip)
+      }
+      const body = document.createElement("div")
+      body.className = "card-body"
+      card.appendChild(head); card.appendChild(chips); card.appendChild(body)
+      cardHost.appendChild(card)
+      return body
+    }
+
+    let firstCard = true
+    for (const b of state.diceBuiltin) {
+      const body = makeCard(b.name, b.desc, b.commands, firstCard)
+      firstCard = false
+      const groups = Array.isArray(b.groups) ? b.groups : []
+      if (groups.length) {
+        const st = document.createElement("div")
+        st.className = "sub-title"; st.textContent = "💬 回复内容（按命令编辑，保存后热生效）"
+        body.appendChild(st)
+        for (const g of groups) {
+          const box = document.createElement("div")
+          box.className = "cmd-group"
+          const cmd = document.createElement("div")
+          cmd.className = "cmd"
+          cmd.textContent = g.title || g.command || ""
+          box.appendChild(cmd)
+          if (g.hint) {
+            const hint = document.createElement("div")
+            hint.className = "hint"
+            hint.textContent = g.hint
+            box.appendChild(hint)
+          }
+          if ((g.templates || []).length) makeTplRows(g.templates, box)
+          body.appendChild(box)
+        }
+      } else if ((b.templateKeys || []).length) {
+        const st = document.createElement("div")
+        st.className = "sub-title"; st.textContent = "💬 回复内容（保存后热生效）"
+        body.appendChild(st)
+        makeTplRows(b.templateKeys, body)
+      }
+      if (b.hasLevels) {
+        const st = document.createElement("div")
+        st.className = "sub-title"; st.textContent = "🎯 判定档位短名（插入 {level} 的字，不是整句）"
+        body.appendChild(st)
+        const hint = document.createElement("div")
+        hint.className = "hint"
+        hint.textContent = "这里只改插入到 {level} 的两个字。要改失败/大失败整句发送，去上面「.ra 检定」里「失败」「大失败」两行。"
+        body.appendChild(hint)
+        const meta = (state.diceLevelMeta && state.diceLevelMeta.length)
+          ? state.diceLevelMeta
+          : [
+              { key: "critical", label: "大成功" },
+              { key: "extreme", label: "极难成功" },
+              { key: "hard", label: "困难成功" },
+              { key: "success", label: "成功" },
+              { key: "fail", label: "失败" },
+              { key: "fumble", label: "大失败" }
+            ]
+        for (const item of meta) {
+          if (!(item.key in state.diceCheckLevels)) state.diceCheckLevels[item.key] = item.label
+          const row = document.createElement("div")
+          row.className = "grid-row"
+          const label = document.createElement("div")
+          label.className = "label"; label.textContent = item.label
+          const input = document.createElement("input")
+          input.value = state.diceCheckLevels[item.key]
+          input.oninput = () => { state.diceCheckLevels[item.key] = input.value }
+          row.appendChild(label); row.appendChild(input)
+          body.appendChild(row)
+        }
+      }
+      if (b.hasInsanity) {
+        const st = document.createElement("div")
+        st.className = "sub-title"; st.textContent = "🧠 疯狂表（每行一条）"
+        body.appendChild(st)
+        for (const tableKey of ["temp", "indefinite"]) {
+          const label = document.createElement("div")
+          label.className = "hint"
+          label.textContent = tableKey === "temp" ? "临时疯狂表（.ti）" : "总结疯狂表（.li）"
+          body.appendChild(label)
+          const ta = document.createElement("textarea")
+          ta.style.cssText = "width:100%;height:150px;font-size:13px;margin-bottom:10px"
+          ta.value = (state.diceInsanity[tableKey] || []).join("\\n")
+          ta.dataset.insanity = tableKey
+          ta.oninput = () => { state.diceInsanity[tableKey] = ta.value.split("\\n").filter(Boolean) }
+          body.appendChild(ta)
+        }
+      }
+      if (!groups.length && !(b.templateKeys || []).length && !b.hasLevels && !b.hasInsanity) {
+        const hint = document.createElement("div")
+        hint.className = "hint"
+        hint.textContent = "此规则无需配置模板，命令行为见上方命令表；牌堆文件放服务器 config/decks/ 目录。"
+        body.appendChild(hint)
+      }
+    }
+
+    // 未归组的模板 → 通用卡片
+    const leftoverKeys = Object.keys(state.diceTemplates).filter(k => !mappedTplKeys.has(k))
+    if (leftoverKeys.length) {
+      const body = makeCard("通用模板", "未归类到具体规则的回复模板", [], false)
+      const st = document.createElement("div")
+      st.className = "sub-title"; st.textContent = "💬 回复内容（保存后热生效）"
+      body.appendChild(st)
+      makeTplRows(leftoverKeys, body)
+    }
+
+    // 吸底保存条
+    const saveBar = document.createElement("div")
+    saveBar.className = "save-bar"
+    const saveHint = document.createElement("div")
+    saveHint.className = "hint"
+    saveHint.textContent = "修改回复模板 / 档位名 / 疯狂表后点保存，立即热生效（写入 message.yaml）"
+    const saveBtn = document.createElement("button")
+    saveBtn.textContent = "💾 保存骰子设置"
+    saveBtn.onclick = async () => {
       try {
-        const r = await api("api/dice-templates", { templates: state.diceTemplates })
-        toast("骰子模板已保存并热生效：" + r.saved + " 条")
+        const r = await api("api/dice-templates", { templates: state.diceTemplates, checkLevels: state.diceCheckLevels, insanityTables: state.diceInsanity })
+        toast("骰子设置已保存并热生效：模板 " + r.saved + " 条、档位 " + r.savedLevels + " 项、疯狂表 " + r.savedInsanity + " 条")
       } catch (e) { toast(e.message, true) }
     }
-    box.appendChild(tplSave)
+    saveBar.appendChild(saveHint); saveBar.appendChild(saveBtn)
+    box.appendChild(saveBar)
 
     if (state.dicePacks.length) {
-      const packTitle = document.createElement("h3")
-      packTitle.style.cssText = "margin:18px 0 8px;font-size:15px"
-      packTitle.textContent = "📦 当前规则包/海豹扩展（群里发 .骰规则列表 查看；.骰规则启用/禁用 <包名> 切换）"
+      const packTitle = document.createElement("div")
+      packTitle.className = "section-title"
+      packTitle.textContent = "📦 已导入的规则包/海豹扩展（群里发 .骰规则列表 查看；.骰规则启用/禁用 <包名> 切换）"
       box.appendChild(packTitle)
       const packTable = document.createElement("table")
       packTable.innerHTML = "<thead><tr><th>包名</th><th>ID</th><th>版本</th><th>启用群数</th><th>命令</th><th></th></tr></thead><tbody></tbody>"
@@ -322,7 +458,14 @@ function renderEditor() {
         }
       })
     }
+    const helpTitle = document.createElement("div")
+    helpTitle.className = "section-title"
+    helpTitle.textContent = "命令帮助（只改说明书，不改群里实际发送的话）"
+    box.appendChild(helpTitle)
   }
+
+  box.appendChild(table)
+  box.appendChild(addCmd)
 }
 
 async function loadDiceExtras() {
@@ -330,12 +473,16 @@ async function loadDiceExtras() {
     const data = await api("api/dice-data")
     state.diceTemplates = data.templates || {}
     state.dicePacks = data.packs || []
+    state.diceCheckLevels = data.checkLevels || {}
+    state.diceInsanity = data.insanityTables || {}
+    state.diceBuiltin = data.builtin || []
+    state.diceLevelMeta = data.checkLevelMeta || []
   } catch (e) { toast("骰子模板读取失败：" + e.message, true) }
 }
 
 async function load() {
   try {
-    loadDiceExtras()
+    await loadDiceExtras()
     const data = await api("api/data")
     state.domains = data.domains
     state.dirty = false
@@ -347,10 +494,14 @@ async function load() {
 $("unlock").onclick = async () => {
   state.token = $("token2").value.trim()
   $("token").value = state.token
+  $("unlock").disabled = true
+  $("unlock").textContent = "正在加载..."
   try {
     await load()
     localStorage.setItem("bl-commands-token", state.token)
   } catch {}
+  $("unlock").disabled = false
+  $("unlock").textContent = "进入管理"
 }
 $("token").onchange = () => { state.token = $("token").value.trim(); localStorage.setItem("bl-commands-token", state.token); load() }
 $("reload").onclick = () => { if (state.dirty && !confirm("有未保存修改，重新加载将丢弃，确定？")) return; load() }
@@ -391,6 +542,7 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
 
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate")
       res.type("html").send(buildPageHtml())
       return
     }
@@ -429,9 +581,12 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           const defaultsPath = path2.join(pluginRootDir, "config_default", "message.yaml")
           const cfgPath = fs2.existsSync(settingsPath) ? settingsPath : defaultsPath
           const settings = YAML2.parse(fs2.readFileSync(cfgPath, "utf8")).pluginSettings || {}
-          const templates = settings.diceSystem?.templates || {}
-          const checkLevels = settings.diceSystem?.checkLevels || {}
-          const insanityTables = settings.diceSystem?.insanityTables || {}
+          const reply = buildDiceReplyPayload(settings.diceSystem || {})
+          const templates = reply.templates
+          const checkLevels = reply.checkLevels
+          const insanityTables = reply.insanityTables
+          const builtin = reply.builtin
+          const checkLevelMeta = reply.checkLevelMeta
           let packs = []
           try {
             const { DiceRulePackManager } = await import("../domains/dice/DiceRulePackManager.js")
@@ -447,7 +602,8 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           } catch (packError) {
             logger?.warn?.(`[命令管理页] 规则包列表读取失败: ${packError?.message || packError}`)
           }
-          res.json({ templates, checkLevels, insanityTables, packs })
+          res.json({ templates, checkLevels, insanityTables, packs, builtin, checkLevelMeta })
+
         } catch (error) {
           res.status(500).json({ error: error?.message || String(error) })
         }
@@ -463,11 +619,42 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           const cleaned = {}
           for (const [key, value] of Object.entries(templates)) {
             if (!/^[a-zA-Z][a-zA-Z0-9_]{0,30}$/.test(key)) continue
-            cleaned[key] = String(value ?? "").slice(0, 500)
+            cleaned[key] = String(value ?? "").slice(0, 2000)
           }
           if (!Object.keys(cleaned).length) {
             res.status(400).json({ error: "没有合法模板" })
             return
+          }
+          // 档位名（可选，仅允许六个已知档位键）
+          let levels = null
+          if (req.body?.checkLevels != null) {
+            const rawLevels = req.body.checkLevels
+            if (typeof rawLevels !== "object" || Array.isArray(rawLevels)) {
+              res.status(400).json({ error: "checkLevels 必须是对象" })
+              return
+            }
+            levels = {}
+            for (const key of ["critical", "extreme", "hard", "success", "fail", "fumble"]) {
+              if (rawLevels[key] != null) levels[key] = String(rawLevels[key]).slice(0, 30)
+            }
+            if (!Object.keys(levels).length) {
+              res.status(400).json({ error: "checkLevels 没有合法档位" })
+              return
+            }
+          }
+          // 疯狂表（可选，temp/indefinite 两张，每行限长、限条数）
+          let insanity = null
+          if (req.body?.insanityTables != null) {
+            const rawTables = req.body.insanityTables
+            if (typeof rawTables !== "object" || Array.isArray(rawTables)) {
+              res.status(400).json({ error: "insanityTables 必须是对象" })
+              return
+            }
+            insanity = {}
+            for (const tableKey of ["temp", "indefinite"]) {
+              const rows = Array.isArray(rawTables[tableKey]) ? rawTables[tableKey] : []
+              insanity[tableKey] = rows.slice(0, 50).map(v => String(v ?? "").slice(0, 200)).filter(Boolean)
+            }
           }
           const settingsPath = path2.join(pluginRoot, "config", "message.yaml")
           const source = fs2.existsSync(settingsPath)
@@ -477,10 +664,12 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           doc.pluginSettings ||= {}
           doc.pluginSettings.diceSystem ||= {}
           doc.pluginSettings.diceSystem.templates = { ...(doc.pluginSettings.diceSystem.templates || {}), ...cleaned }
+          if (levels) doc.pluginSettings.diceSystem.checkLevels = levels
+          if (insanity) doc.pluginSettings.diceSystem.insanityTables = insanity
           if (!fs2.existsSync(settingsPath)) fs2.copyFileSync(source, settingsPath)
           fs2.writeFileSync(settingsPath, YAML2.stringify(doc), "utf8")
-          logger?.info?.(`[命令管理页] 已保存骰子回复模板 ${Object.keys(cleaned).length} 条（配置热更新自动生效）`)
-          res.json({ ok: true, saved: Object.keys(cleaned).length })
+          logger?.info?.(`[命令管理页] 已保存骰子设置：模板 ${Object.keys(cleaned).length} 条${levels ? "、档位 " + Object.keys(levels).length + " 项" : ""}${insanity ? "、疯狂表 " + (insanity.temp.length + insanity.indefinite.length) + " 条" : ""}（配置热更新自动生效）`)
+          res.json({ ok: true, saved: Object.keys(cleaned).length, savedLevels: levels ? Object.keys(levels).length : 0, savedInsanity: insanity ? insanity.temp.length + insanity.indefinite.length : 0 })
         } catch (error) {
           res.status(400).json({ error: error?.message || String(error) })
         }
@@ -548,6 +737,7 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
     ensureGuobaJumpLink({ pluginRoot, token })
     watchGuobaJumpLink({
       pluginRoot,
+      token,
       watchImpl: (file, cb) => chokidar.watch(file).on("all", (event) => {
         if (event === "change" || event === "add") cb()
       })

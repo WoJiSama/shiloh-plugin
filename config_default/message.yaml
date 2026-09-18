@@ -141,6 +141,13 @@ pluginSettings:
     templates:
       roll: "{name} 掷骰：{expr}={detail}={total}"
       check: "{name} 进行 {skill} 检定：{diceText}={roll}/{target} {level}"
+      # 下面 6 个留空则用 check 默认模板；填了就会按档位整句发送
+      check_critical: ""
+      check_extreme: ""
+      check_hard: ""
+      check_success: ""
+      check_fail: ""
+      check_fumble: ""
       hiddenPublic: "{name} 进行了一次暗骰，结果已私聊发送。"
       hiddenPrivate: "暗骰结果：\n{result}"
       san: "{name} SAN Check：{diceText}={roll}/{target} {level}，理智损失 {loss}，剩余 {sanAfter}{insanity}"
@@ -151,6 +158,9 @@ pluginSettings:
       opposed: "对抗检定：\n{left}\n{right}\n结果：{winner}"
       jrrp: "{name} 今日人品：{value}"
       db: "{name} 体格 {build}，伤害加值 {db}"
+      dnd: "DND5E 属性：\n{attributes}"
+      bonus: "{name} 掷{kind}：{diceText}={value}"
+      insanity: "{kind}：{index}. {text}"
       error: "{message}"
   maxToolRounds: 2
   agentIntelligence:
@@ -169,7 +179,10 @@ pluginSettings:
     complexMaxToolRounds: 3
   replyRhythm:
     enabled: true
-    maxTextMessages: 2
+    # 闲聊回复最多拆成几条消息（单段多句会按句拆条：两三句完整短句各自成一条）
+    maxTextMessages: 3
+    sentenceMaxChars: 70
+    sentenceTotalMaxChars: 220
     maxEmojiReplyMessages: 3
     allowThreePartEmojiReply: true
     maxEmojiTextChars: 80
@@ -488,6 +501,14 @@ pluginSettings:
     intentAiUrl: ""
     intentAiModel: ""
     intentAiApikey: ""
+    # 意图快路：零工具信号的短闲聊跳过意图分类；被跳过的消息按此比例抽样跑影子意图验证漏判率（0~1，默认 0.1）。
+    skippedShadowSampleRate: 0.1
+  # 每回合一条结构化 [TurnTrace] 日志；archiveEnabled 开启时按天落盘 NDJSON（data/turn_trace/），保留 retentionDays 天。
+  # 聚合查看：npm run trace:report
+  turnTrace:
+    archiveEnabled: true
+    archiveDir: ""
+    retentionDays: 7
   toolsAiConfig: {
     toolsAiUrl: https://api.openai.com/v1/chat/completions,
     toolsAiModel: gemini-2.5-flash,

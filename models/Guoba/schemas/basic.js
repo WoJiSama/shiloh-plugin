@@ -7,7 +7,7 @@ export default [
     field: "enabled",
     label: "插件总开关",
     component: "Switch",
-    bottomHelpMessage: "false 时完全关闭 AI 对话功能"
+    bottomHelpMessage: "关闭后本插件不再进行 AI 对话，包括 @/前缀、smart 续话、复读跟读和主动搭话。骰子、视频搬运、群管不受影响"
   },
   {
     field: "groupHistory",

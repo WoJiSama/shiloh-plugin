@@ -46,7 +46,7 @@ test("card replies acknowledge before generation and keep the card body free of 
   assert.match(source, /session\.cardPresentation = resolveCardPresentation/)
   assert.match(source, /const cardRequestText = \[args, msg, userContent\]/)
   assert.doesNotMatch(source, /isEducationalExplanationRequest\(currentIntentText\) \? "knowledge" : "chat"\n\s*\)\n\s*\? \[/)
-  assert.match(source, /已发送即时确认/)
+  assert.match(source, /承诺类确认已入队/)
   assert.match(source, /卡面正文边界/)
   assert.match(source, /已剥离模型开场/)
   const acknowledgement = source.indexOf("const acknowledgement = cardAcknowledgement")

@@ -10,20 +10,11 @@ const EXPLICIT_EMOJI_REQUEST_PATTERNS = [
   /(?:表情|梗图|反应图).{0,8}(?:来一个|来一张|发一个|发一张|整一个|整一张|配一个|配一张)/i
 ]
 
-const CASUAL_EMOJI_REACTION_PATTERNS = [
-  /笑死|笑不活|绷不住|蚌埠住|太逗|会谢|绝了|真行啊|还真敢|离谱|无语|好怪|尴尬|社死|破防|认怂|装无辜|害羞|得意|救命|乐死|乐疯|哈哈哈+|哈哈+|嘿嘿嘿+|卧槽|我超|666|寄了|急了|典中典|好好好/i,
-  /不是吧|真的假的|逆天|我服了|什么鬼|看傻|傻眼|看懵|懵了/i,
-  /困死|累死|不想动|烦死|气死|裂开|崩溃|委屈死/i,
-  /脚趾.{0,12}(?:三室一厅|抠地)|可怜巴巴|好耶|太好了|牛啊|哼[，,。！？!?~～\s]/i,
-  /(?:^|[，,。！？!?~～\s])草(?:了|啊|死|率|$|[，,。！？!?~～\s])/i,
-  /(?:^|[，,。！？!?~～\s])(?:摸摸|抱抱|贴贴)(?:我|你|他|她|一下|吧|嘛|呀|$|[，,。！？!?~～\s])/i,
-  /(?:安慰一下我|哄哄我|哄我一下)/i,
-  /(?:^|[，,。！!~～\s])啊[?？](?:$|[，,。！？!?~～\s])/i
-]
-
-// 这些短反应一张表情包就能完整表达。仅在已排除任务、提问和严肃内容后使用，
-// 避免表情包成为对正式消息的机械前缀或尾缀。
-const FORCED_REACTION_EMOJI_RULES = [
+// 表情反应单一规则源：每条规则 = 识别正则 + 可选的强制 tags/useCases。
+// 带 tags 的规则命中时走强制路径（模型无参与）；不带 tags 的规则只参与 exposure 分类。
+// CASUAL_EMOJI_REACTION_PATTERNS 与 FORCED_REACTION_EMOJI_RULES 均由此派生，
+// 不再手工维护两份必须同步的词表（此前同一批情绪词写了两遍，已经漂移过）。
+export const EMOJI_REACTION_RULES = [
   {
     pattern: /笑死|笑不活|绷不住|蚌埠住|太逗|会谢|乐死|乐疯|哈哈+|嘿嘿+/i,
     tags: ["笑死", "吐槽"],
@@ -63,8 +54,15 @@ const FORCED_REACTION_EMOJI_RULES = [
     pattern: /好耶|太好了|牛啊|666|得意|好好好/i,
     tags: ["开心", "得意"],
     useCases: ["分享快乐", "被人夸奖"]
-  }
+  },
+  // 以下只参与识别，不触发强制路径
+  { pattern: /绝了|真行啊|还真敢|好怪|害羞|不是吧|真的假的|哼[，,。！？!?~～\s]/i },
+  { pattern: /(?:^|[，,。！？!?~～\s])草(?:了|啊|死|率|$|[，,。！？!?~～\s])/i },
+  { pattern: /(?:^|[，,。！!~～\s])啊[?？](?:$|[，,。！？!?~～\s])/i }
 ]
+
+const CASUAL_EMOJI_REACTION_PATTERNS = EMOJI_REACTION_RULES.map(rule => rule.pattern)
+const FORCED_REACTION_EMOJI_RULES = EMOJI_REACTION_RULES.filter(rule => Array.isArray(rule.tags) && rule.tags.length)
 
 const SERIOUS_OR_OPERATIONAL_PATTERNS = [
   /```|https?:\/\/|www\.|(?:^|\s)(?:class|function|const|let|var|public|private|SELECT|INSERT|UPDATE|DELETE)\b/i,

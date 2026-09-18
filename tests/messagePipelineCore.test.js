@@ -145,5 +145,5 @@ test("delivery gateway emits the shared delivery receipt log", async () => {
     logger: { info: line => lines.push(line), warn: line => lines.push(line) }
   })
   await gateway.sendGroupForward({ botId: "1", groupId: "2", nodes: [{ message: ["ok"] }] })
-  assert.ok(lines.some(line => line.includes("[Delivery] status=sent channel=group_forward group=2") && line.includes("message=123")))
+  assert.ok(lines.some(line => line.includes("[Delivery] turn= status=sent channel=group_forward group=2") && line.includes("message=123")))
 })

@@ -35,7 +35,7 @@ function needsDeliberateReasoning(text = "") {
   return /(严格证明|完整推导|逐步推导|严谨分析|多步推理|证明(?:一下|下)?|计算过程)/.test(String(text || ""))
 }
 
-function isCasualChatTurn(text = "") {
+export function isCasualChatTurn(text = "") {
   const content = String(text || "").replace(/\s+/g, " ").trim()
   if (!content || content.length > 48) return false
   return !/(为什么|为啥|怎么回事|怎么做|如何|解释|讲解|分析|比较|总结|规划|代码|报错|配置|接口|API|算法|推导|证明|搜索|查询)/i.test(content)

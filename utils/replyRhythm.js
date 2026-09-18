@@ -20,29 +20,50 @@ function isCompleteBeat(text = "") {
   return /[。！？!?…~～]$/.test(value) || codePointLength(value) <= 14
 }
 
+function splitSentences(text = "") {
+  return (String(text || "").match(/[^。！？!?…～~]+[。！？!?…～~]*/g) || [])
+    .map(compact)
+    .filter(Boolean)
+}
+
+// 单段多句的闲聊式回复按句拆条：人不会把两三句完整的话憋成一条消息。
+// 只对无结构、每句都完整收尾、总量不长的内容生效，避免把正式回答拆碎。
+function planSentenceBeat(raw, options = {}, maxMessages = 2) {
+  if (looksStructuredOrFormal(raw, options.userText)) return null
+  const sentences = splitSentences(raw)
+  if (sentences.length < 2 || sentences.length > Math.min(3, maxMessages)) return null
+  const perSentenceMax = Math.max(20, Number(options.sentenceMaxChars) || 70)
+  const totalMax = Math.max(80, Number(options.sentenceTotalMaxChars) || 220)
+  if (codePointLength(sentences.join("")) > totalMax) return null
+  if (sentences.some(part => codePointLength(part) > perSentenceMax || !isCompleteBeat(part))) return null
+  return sentences
+}
+
 export function planTextReplyMessages(text = "", options = {}) {
   const raw = String(text || "").trim()
   if (!raw) return { mode: "empty", messages: [] }
   const enabled = options.enabled !== false
-  const maxMessages = Math.max(1, Math.min(2, Number(options.maxTextMessages) || 2))
+  const maxMessages = Math.max(1, Math.min(3, Number(options.maxTextMessages) || 2))
   if (!enabled || maxMessages < 2) return { mode: "single", messages: [raw] }
 
   const paragraphs = raw.split(/\n{2,}/).map(compact).filter(Boolean)
-  if (paragraphs.length !== 2) return { mode: "single", messages: [raw] }
-  const [lead, follow] = paragraphs
-  const leadLimit = Math.max(12, Number(options.naturalLeadMaxChars) || 42)
-  const followLimit = Math.max(30, Number(options.naturalFollowMaxChars) || 130)
-  const totalLimit = Math.max(60, Number(options.naturalTotalMaxChars) || 170)
-  const natural = codePointLength(lead) <= leadLimit &&
-    codePointLength(follow) <= followLimit &&
-    codePointLength(`${lead}${follow}`) <= totalLimit &&
-    isCompleteBeat(lead) &&
-    isCompleteBeat(follow) &&
-    !looksStructuredOrFormal(raw, options.userText)
+  if (paragraphs.length === 2) {
+    const [lead, follow] = paragraphs
+    const leadLimit = Math.max(12, Number(options.naturalLeadMaxChars) || 42)
+    const followLimit = Math.max(30, Number(options.naturalFollowMaxChars) || 130)
+    const totalLimit = Math.max(60, Number(options.naturalTotalMaxChars) || 170)
+    const natural = codePointLength(lead) <= leadLimit &&
+      codePointLength(follow) <= followLimit &&
+      codePointLength(`${lead}${follow}`) <= totalLimit &&
+      isCompleteBeat(lead) &&
+      isCompleteBeat(follow) &&
+      !looksStructuredOrFormal(raw, options.userText)
 
-  return natural
-    ? { mode: "two_beat", messages: [lead, follow] }
-    : { mode: "single", messages: [raw] }
+    if (natural) return { mode: "two_beat", messages: [lead, follow] }
+  }
+  const sentenceBeat = planSentenceBeat(raw, options, maxMessages)
+  if (sentenceBeat) return { mode: "sentence_beat", messages: sentenceBeat }
+  return { mode: "single", messages: [raw] }
 }
 
 function normalizeForComparison(text = "") {
