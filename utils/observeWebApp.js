@@ -66,18 +66,20 @@ function checkToken(req, token) {
   return Boolean(provided) && provided === token
 }
 
-export function registerObserveWebApp(expressApp, pluginRoot, token, logger = globalThis.logger) {
+export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logger = globalThis.logger) {
+  const token = tokens?.token || tokens
+  const observeToken = tokens?.observeToken || token
   if (!expressApp || registered) return
   registered = true
 
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
       res.set("Cache-Control", "no-cache, no-store, must-revalidate")
-      res.type("html").send(buildPageHtml())
+      res.type("html").send(buildPageHtml(observeToken))
       return
     }
     if (req.path === "/api/stats") {
-      if (!checkToken(req, token)) {
+      if (!checkToken(req, token) && !checkToken(req, observeToken)) {
         res.status(401).json({ error: "访问令牌无效" })
         return
       }
@@ -109,7 +111,7 @@ function bar(value, max) {
   return `<div class="bar"><div class="fill" style="width:${Math.max(pct, value > 0 ? 4 : 0)}%"></div><span>${value}</span></div>`
 }
 
-function buildPageHtml() {
+function buildPageHtml(observeToken = "") {
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -150,32 +152,25 @@ function buildPageHtml() {
   <h1>📈 运行观测</h1>
   <a href="/bl-chat/commands/">← 命令管理</a>
   <span class="spacer"></span>
-  <input id="token" type="password" placeholder="访问令牌" style="width:200px">
   <button id="reload">刷新</button>
 </header>
 <div id="app" style="display:none"></div>
-<div id="lock">
-  <h2>需要访问令牌</h2>
-  <p style="color:#6b7280;font-size:14px;margin:10px 0 14px">与命令管理页同一份令牌（config/commands-web.json）</p>
-  <input id="token2" type="password" placeholder="输入令牌" style="width:70%">
-  <br><br>
-  <button id="unlock">进入</button>
-</div>
 <div id="status"></div>
 <script>
+window.__OBSERVE_TOKEN__ = ${JSON.stringify(String(observeToken || ""))}
 const $ = id => document.getElementById(id)
-const state = { token: localStorage.getItem("bl-commands-token") || "" }
+// 观测令牌由服务端内嵌（只读，不能用于命令管理接口）；URL 带主令牌时优先进 localStorage
+const state = { token: window.__OBSERVE_TOKEN__ || "" }
 function toast(msg) { const el = $("status"); el.textContent = msg; el.style.display = "block"; setTimeout(() => el.style.display = "none", 3000) }
 async function load() {
   try {
     const res = await fetch("api/stats?token=" + encodeURIComponent(state.token))
-    if (res.status === 401) { showLock(); throw new Error("令牌无效") }
+    if (res.status === 401) throw new Error("令牌无效")
     const data = await res.json()
     render(data)
-    $("lock").style.display = "none"; $("app").style.display = "block"
+    $("app").style.display = "block"
   } catch (e) { toast(e.message) }
 }
-function showLock() { $("lock").style.display = "block"; $("app").style.display = "none" }
 function tallyRows(list) {
   return list.map(([k, v]) => "<tr><td>" + k + "</td><td>" + bar(v, list[0][1]) + "</td></tr>").join("") || "<tr><td colspan=2 class=empty>暂无</td></tr>"
 }
@@ -199,17 +194,10 @@ function render(d) {
     '<section><h2>最近回合</h2><table><tr><th>时间</th><th>群</th><th>意图</th><th>触发</th><th>工具</th><th>出站</th><th>耗时</th></tr>' + recent + '</table></section>' +
     '<div style="color:#8a93a5;font-size:12px">生成于 ' + d.generatedAt + ' · 数据源 data/turn_trace/（保留 7 天）</div>'
 }
-$("unlock").onclick = async () => {
-  state.token = $("token2").value.trim()
-  $("token").value = state.token
-  localStorage.setItem("bl-commands-token", state.token)
-  await load()
-}
 $("reload").onclick = () => load()
-$("token").onchange = () => { state.token = $("token").value.trim(); localStorage.setItem("bl-commands-token", state.token); load() }
 const urlToken = new URLSearchParams(location.search).get("token")
-if (urlToken) { state.token = urlToken; localStorage.setItem("bl-commands-token", urlToken); $("token").value = urlToken; history.replaceState(null, "", location.pathname) }
-if (state.token) load(); else showLock()
+if (urlToken) { state.token = urlToken; history.replaceState(null, "", location.pathname) }
+load()
 </script>
 </body>
 </html>`

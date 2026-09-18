@@ -21,15 +21,30 @@ const TOKEN_FILE = "commands-web.json"
 let registered = false
 
 function readOrCreateToken(pluginRoot) {
+  return readOrCreateTokens(pluginRoot).token
+}
+
+/** 命令页主令牌 + 观测页只读令牌（观测令牌不能用于管理接口） */
+function readOrCreateTokens(pluginRoot) {
   const tokenPath = path.join(pluginRoot, "config", TOKEN_FILE)
+  let parsed = {}
   try {
-    const parsed = JSON.parse(fs.readFileSync(tokenPath, "utf8"))
-    if (parsed?.token && String(parsed.token).length >= 8) return String(parsed.token)
+    parsed = JSON.parse(fs.readFileSync(tokenPath, "utf8")) || {}
   } catch {}
-  const token = crypto.randomBytes(12).toString("hex")
-  fs.mkdirSync(path.dirname(tokenPath), { recursive: true })
-  fs.writeFileSync(tokenPath, JSON.stringify({ token, createdAt: new Date().toISOString() }, null, 2), "utf8")
-  return token
+  let changed = false
+  if (!parsed?.token || String(parsed.token).length < 8) {
+    parsed.token = crypto.randomBytes(12).toString("hex")
+    changed = true
+  }
+  if (!parsed?.observeToken || String(parsed.observeToken).length < 8) {
+    parsed.observeToken = crypto.randomBytes(12).toString("hex")
+    changed = true
+  }
+  if (changed) {
+    fs.mkdirSync(path.dirname(tokenPath), { recursive: true })
+    fs.writeFileSync(tokenPath, JSON.stringify({ ...parsed, createdAt: parsed.createdAt || new Date().toISOString() }, null, 2), "utf8")
+  }
+  return { token: String(parsed.token), observeToken: String(parsed.observeToken) }
 }
 
 async function readRawBody(req, maxBytes = 4 * 1024 * 1024) {
@@ -170,7 +185,7 @@ function buildPageHtml() {
 <header>
   <h1>📖 命令管理</h1>
   <a href="/guoba/" target="_blank" style="color:#4c6ef5;text-decoration:none;font-size:14px">返回锅巴 →</a>
-  <a href="/bl-chat/observe/?token=" onclick="this.href='/bl-chat/observe/?token='+encodeURIComponent(localStorage.getItem('bl-commands-token')||'')" target="_blank" style="color:#4c6ef5;text-decoration:none;font-size:14px">📈 运行观测 →</a>
+  <a href="/bl-chat/observe/" target="_blank" style="color:#4c6ef5;text-decoration:none;font-size:14px">📈 运行观测 →</a>
   <span id="summary" style="color:#8a93a5;font-size:13px"></span>
   <div class="spacer"></div>
   <input id="token" type="password" placeholder="访问令牌">
@@ -795,7 +810,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
 
   try {
     const { registerObserveWebApp } = await import("./observeWebApp.js")
-    registerObserveWebApp(expressApp, pluginRoot, token, logger)
+    registerObserveWebApp(expressApp, pluginRoot, readOrCreateTokens(pluginRoot), logger)
   } catch (observeError) {
     logger?.warn?.(`[运行观测页] 挂载失败: ${observeError?.message || observeError}`)
   }

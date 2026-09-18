@@ -3102,6 +3102,10 @@ export class ExamplePlugin extends plugin {
     const promptHintBusyGroupRate = Number(smartCfg.promptHintBusyGroupRate) || 30
     const promptHintRateLimitWarn = Number(smartCfg.promptHintRateLimitWarn) || 5
 
+    const gatePersonaTone = buildPersonaTonePrompt({
+      userText: currentText,
+      persona: this.config.persona
+    })
     const systemPrompt = `你是 QQ 群聊节奏判断助手。机器人名字叫"${botName}"。
 当前北京时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
 你需要判断 ${botName} 是否应该现在插话、保持沉默、或稍后再说。
@@ -3132,10 +3136,6 @@ ${gatePersonaTone ? `\n${gatePersonaTone}\n` : ""}
 只返回严格的 JSON，格式：{"decision":"continue|no_action|wait","wait_seconds":3,"reason":"简短理由"}
 wait 时 wait_seconds 取 3-15 之间。不要任何其他文字、不要 markdown、不要代码块包装。`
 
-    const gatePersonaTone = buildPersonaTonePrompt({
-      userText: currentText,
-      persona: this.config.persona
-    })
     const specialSignals = []
     if (addressedToOther) specialSignals.push('⚠ 当前消息 @ 了别人，谨慎插话')
     if (currentMsgQuotesBot) specialSignals.push(`✓ 当前消息引用了 ${botName} 的某条消息`)
