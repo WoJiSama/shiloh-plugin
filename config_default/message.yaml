@@ -92,6 +92,20 @@ pluginSettings:
     participationPoints: 1
     rankLimit: 10
     baseDir: data/uma_race
+  turnTrace:
+    # 回合 trace NDJSON 落盘（观测页数据源）
+    archiveEnabled: true
+    archiveDir: ""
+    retentionDays: 7
+  groupContextState:
+    # 话题关键词 + 人际互动状态（Gate 与主链路共用，零模型调用）
+    topicEnabled: true
+    socialEnabled: true
+  episodicMemory:
+    # 跨天情节日志：回合尾声记录，时间指代（上次/昨天）触发回放
+    enabled: true
+    maxPerGroup: 200
+    recallDays: 7
   diceSystem:
     enabled: true
     customRulesEnabled: true
@@ -505,10 +519,6 @@ pluginSettings:
     skippedShadowSampleRate: 0.1
   # 每回合一条结构化 [TurnTrace] 日志；archiveEnabled 开启时按天落盘 NDJSON（data/turn_trace/），保留 retentionDays 天。
   # 聚合查看：npm run trace:report
-  turnTrace:
-    archiveEnabled: true
-    archiveDir: ""
-    retentionDays: 7
   toolsAiConfig: {
     toolsAiUrl: https://api.openai.com/v1/chat/completions,
     toolsAiModel: gemini-2.5-flash,
@@ -648,6 +658,8 @@ pluginSettings:
     selectionTopK: 5
     embeddingThreshold: 0.55
     contentFiltration: true
+    # emoji-only 回复后的冷却毫秒数（期间不再递表情工具给模型；explicit 请求不受限）
+    emojiCooldownMs: 120000
     doReplace: false
     enableMaintenance: false
     checkIntervalMinutes: 10

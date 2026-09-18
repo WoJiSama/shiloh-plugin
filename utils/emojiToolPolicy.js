@@ -117,11 +117,45 @@ export function resolveForcedReactionEmoji(text = "") {
   }
 }
 
-export function filterToolsForEmojiExposure(tools = [], text = "") {
+export function filterToolsForEmojiExposure(tools = [], text = "", { groupId = "", cooldownMs = 120000 } = {}) {
   if (!shouldExposeEmojiToolForMessage(text)) return null
+  if (suppressEmojiByCooldown(text, groupId, cooldownMs)) return []
   return (Array.isArray(tools) ? tools : []).filter(tool =>
     tool?.function?.name === LOCAL_EMOJI_TOOL_NAME
   )
+}
+
+const emojiCooldownUntil = new Map()
+
+/** emoji-only 回复发送后开启冷却（ms，0 关闭）。explicit 请求不受冷却影响。 */
+export function recordEmojiOnlySend(groupId = "", cooldownMs = 120000) {
+  const ms = Math.max(0, Number(cooldownMs) || 0)
+  const key = String(groupId || "")
+  if (!key || !ms) return
+  emojiCooldownUntil.set(key, Date.now() + ms)
+}
+
+export function emojiCooldownActive(groupId = "") {
+  const until = emojiCooldownUntil.get(String(groupId || ""))
+  if (!until) return false
+  if (Date.now() >= until) {
+    emojiCooldownUntil.delete(String(groupId || ""))
+    return false
+  }
+  return true
+}
+
+export function resetEmojiCooldownForTests() {
+  emojiCooldownUntil.clear()
+}
+
+/** 冷却期间抑制 casual 暴露/强制反应；explicit 请求永远可用 */
+export function suppressEmojiByCooldown(text = "", groupId = "", cooldownMs = 120000) {
+  if (!emojiCooldownActive(groupId)) return false
+  const kind = classifyEmojiToolExposure(text)
+  if (kind === "explicit") return false
+  void cooldownMs
+  return true
 }
 
 export function getEmojiToolIntentPatterns() {

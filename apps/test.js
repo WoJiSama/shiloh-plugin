@@ -42,7 +42,9 @@ import { isAiConversationEnabled } from "../utils/aiConversationGate.js"
 import { shouldSkipIntentModel } from "../utils/intentFastPath.js"
 import { computeAddresseeSignal, buildAddresseePrompt } from "../utils/addresseeSignals.js"
 import { recordTurnContinuity, loadTurnContinuity, buildTurnContinuityPrompt } from "../utils/turnContinuity.js"
-import { createTurnTrace } from "../utils/turnTrace.js"
+import { updateGroupTopic, updateGroupSocial, getGroupTopicPrompt, getGroupSocialPrompt } from "../utils/groupContextState.js"
+import { recordEpisode, recallEpisodes, buildEpisodicPrompt, hasTemporalDeixis } from "../utils/episodicMemory.js"
+import { createTurnTrace, resolveTurnTraceArchiveDir } from "../utils/turnTrace.js"
 import { createOutboundArbiter } from "../utils/messagePipeline/outboundArbiter.js"
 import { resolveLongTaskFeedbackPolicy } from "../utils/longTaskFeedbackPolicy.js"
 import { resolvePromptLayerProfile, applyPromptLayerProfile } from "../utils/promptLayers.js"
@@ -60,7 +62,7 @@ import { markProactiveReply, shouldCancelProactiveReply } from "../utils/proacti
 import { extractDeliveryMessageId, logDeliveryOutcome } from "../utils/deliveryObservability.js"
 import { classifyChatRequestFailure, executeChatRequestWithRecovery } from "../utils/chatRequestRecovery.js"
 import { safeTruncateUnicode, splitUnicodeText } from "../utils/unicodeText.js"
-import { classifyEmojiToolExposure, filterToolsForEmojiExposure, resolveForcedReactionEmoji, shouldExposeEmojiToolForMessage } from "../utils/emojiToolPolicy.js"
+import { classifyEmojiToolExposure, filterToolsForEmojiExposure, resolveForcedReactionEmoji, shouldExposeEmojiToolForMessage, recordEmojiOnlySend, suppressEmojiByCooldown } from "../utils/emojiToolPolicy.js"
 import { buildExcelToolParams, hasExcelWorkbookContext, shouldBypassMergeForExcel, shouldUseExcelWorkbookTool } from "../utils/excelRequestPolicy.js"
 import { containsCodeFence, flattenCodeFences } from "../utils/qqCodeFenceText.js"
 import { armSmartLockWatchdog, clearSmartLockWatchdog } from "../utils/smartLockPolicy.js"
@@ -1362,7 +1364,7 @@ function shouldExposeToolsForMessage(e = {}, text = "") {
   return isRealtimeInfoRequest(content) || isExplicitSearchRequest(content) || isExplicitToolIntent(content)
 }
 
-function filterToolsForMessageIntent(tools = [], e = {}, text = "", options = {}) {
+function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearch = false, emojiCooldownMs = 120000 } = {}) {
   if (!Array.isArray(tools) || !tools.length) return []
   const content = normalizeIntentText(text || e?.msg || "")
   if (options.allowSearch) return tools.filter(tool => tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content))
@@ -1375,11 +1377,13 @@ function filterToolsForMessageIntent(tools = [], e = {}, text = "", options = {}
     tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content)
   )
 
-  const emojiOnlyTools = filterToolsForEmojiExposure(tools, content)
+  const emojiOnlyTools = filterToolsForEmojiExposure(tools, content, {
+    groupId: String(e?.group_id || ""),
+    cooldownMs
+  })
   if (emojiOnlyTools) return emojiOnlyTools
 
-  const allowSearch = isRealtimeInfoRequest(content) || isExplicitSearchRequest(content)
-  if (allowSearch) return tools
+  if (allowSearch || isRealtimeInfoRequest(content) || isExplicitSearchRequest(content)) return tools
 
   return tools.filter(tool => {
     const name = tool?.function?.name
@@ -2718,6 +2722,18 @@ export class ExamplePlugin extends plugin {
         state.recentMessages = (state.recentMessages || []).slice(-9)
         state.recentMessages.push({ userId: e.user_id, text: repeatText, at: Date.now() })
       }
+      // 轻量上下文状态：话题关键词 + 人际互动边（Gate 与主链路共用，零模型调用）
+      if (this.config?.groupContextState?.topicEnabled !== false && repeatText) {
+        updateGroupTopic({ groupId, text: repeatText })
+      }
+      if (this.config?.groupContextState?.socialEnabled !== false) {
+        updateGroupSocial({
+          groupId,
+          fromUserId: e.user_id,
+          atTargetIds: collectMentionTargetIds(e, e?.bot?.uin || Bot.uin),
+          replyToUserId: (() => { try { return getReplySender(e?.source || e?.reply) || "" } catch { return "" } })()
+        })
+      }
     }
     // 入口锁：该群已经有一个 handleRandomReplySmart 正在跑（Gate / debounce / handleTool 任一阶段）→ 让步本条
     // 必须在任何 await 之前同步检查并 set，防止 await checkTriggers 期间多个调用并发通过
@@ -3138,6 +3154,8 @@ ${e.sender?.card || e.sender?.nickname || '用户'}: ${e.msg || ''}
 - 群最近 5 分钟消息数：${groupMsgRate5min}
 - 当前时段：${hhmm}（${isLateNight ? '深夜' : '日间'}）
 
+${getGroupTopicPrompt(e?.group_id) ? "\n【群话题】" + getGroupTopicPrompt(e?.group_id).replace("【群话题】", "") : ""}
+${getGroupSocialPrompt(e?.group_id)}
 【对话状态】
 - 当前焦点：${phase}（focus=刚参与话题中；fading=余热；cold=未参与）
 - 触发原因：${triggerReason}
@@ -4616,13 +4634,15 @@ ${recentHistory || '(无)'}
     const session = this.getOrCreateSession(sessionId, this.tools)
     session.taskContext = taskContext
     // 一个回合一条 trace + 一个出站仲裁：回合内所有出站消息过同一个有序队列
-    const turnTrace = createTurnTrace({ groupId, userId, sessionId, logger })
+    const turnTrace = createTurnTrace({ groupId, userId, sessionId, logger, archive: { enabled: this.config?.turnTrace?.archiveEnabled !== false, dir: String(this.config?.turnTrace?.archiveDir || "") || resolveTurnTraceArchiveDir(), retentionDays: Number(this.config?.turnTrace?.retentionDays) || 7 } })
     e._turnId = turnTrace.id
     if (e?._triggerContext) turnTrace.setTrigger(e._triggerContext.mode, e._triggerContext)
     const outboundArbiter = createOutboundArbiter({ logger, trace: turnTrace })
     session.outboundArbiter = outboundArbiter
     session.turnTrace = turnTrace
     e = outboundArbiter.wrapEvent(e)
+    // Tool stages share one optional progress message for the whole turn.
+    e._progressReplyState = { sent: false, reserved: false }
     const groupLimiter = getOrCreateGroupLimiter(this._groupLimiters, groupId, this.config.concurrentLimit || 5)
 
     let groupUserMessages = session.groupUserMessages
@@ -5023,7 +5043,19 @@ ${recentHistory || '(无)'}
           memberLookup: memberLookupPrompt,
           personProfile: personProfilePrompt
         })
-        const enhancedPrompts = [promptLayers.prompt, addresseePrompt, turnContinuityPrompt].filter(Boolean).join('\n')
+        const groupTopicPrompt = getGroupTopicPrompt(groupId)
+        const groupSocialPrompt = getGroupSocialPrompt(groupId)
+        // 时间指代（上次/昨天/那天…）触发情节回放，接住跨天指代
+        const episodicPrompt = this.config?.episodicMemory?.enabled !== false && hasTemporalDeixis(currentIntentText)
+          ? buildEpisodicPrompt(recallEpisodes({
+              groupId,
+              terms: extractChatKeywords(currentIntentText, 6),
+              days: Number(this.config?.episodicMemory?.recallDays) || 7,
+              limit: 5
+            }))
+          : ""
+        if (episodicPrompt) logger.info(`[情节回忆] group=${groupId} 命中时间指代，注入近期情节`)
+        const enhancedPrompts = [promptLayers.prompt, addresseePrompt, turnContinuityPrompt, groupTopicPrompt, groupSocialPrompt, episodicPrompt].filter(Boolean).join('\n')
         const runtimeGroupInfo = {
           group_id: groupContext.groupId,
           group_name: groupContext.groupName
@@ -5242,7 +5274,9 @@ ${mcpPrompts}
           }
         }
         const forcedReactionEmoji = resolveForcedReactionEmoji(currentIntentText)
-        if (!toolScopeLocked && toolChoice === "auto" && forcedReactionEmoji) {
+        const emojiCooldownMs = Number(this.config?.emojiSystem?.emojiCooldownMs ?? 120000)
+        if (!toolScopeLocked && toolChoice === "auto" && forcedReactionEmoji &&
+            !suppressEmojiByCooldown(currentIntentText, groupId, emojiCooldownMs)) {
           session.tools = this.getToolsByName(["sendLocalEmojiTool"])
           if (session.tools?.length) {
             toolChoice = { type: "function", function: { name: "sendLocalEmojiTool" } }
@@ -5495,7 +5529,7 @@ ${mcpPrompts}
 
         if (!toolScopeLocked && toolChoice === "auto") {
           const beforeToolCount = session.tools?.length || 0
-          session.tools = filterToolsForMessageIntent(session.tools, e, args, { allowSearch: modelIntentDecision?.intent === "search" })
+          session.tools = filterToolsForMessageIntent(session.tools, e, args, { allowSearch: modelIntentDecision?.intent === "search", emojiCooldownMs: Number(this.config?.emojiSystem?.emojiCooldownMs ?? 120000) })
           if (!session.tools.length) {
             toolChoice = "none"
           } else if (session.tools.length === 1 && session.tools[0]?.function?.name === "sendLocalEmojiTool") {
@@ -6966,6 +7000,10 @@ ${mcpPrompts}
 	          return
 	        }
 	        logger.info(`[工具调用] 本轮全部为终态工具(${validResults.map(r => r.toolName).join(',')})且执行成功，跳过最终文本回复`)
+	        if (validResults.every(r => r.toolName === LOCAL_EMOJI_TOOL_NAME) && e?.group_id) {
+	          recordEmojiOnlySend(e.group_id, Number(this.config?.emojiSystem?.emojiCooldownMs ?? 120000))
+	          logger.info(`[表情包] emoji-only 回复完成，开启冷却 ${Math.round((Number(this.config?.emojiSystem?.emojiCooldownMs ?? 120000)) / 1000)}s（explicit 请求不受限）`)
+	        }
 	        return
 	      }
 
@@ -7210,6 +7248,16 @@ ${mcpPrompts}
 
     // 轮末延续摘要：同用户 10 分钟内再来说话时注入上一轮做了什么、回了什么
     session.lastFinalReply = String(output || "").slice(0, 240)
+    if (this.config?.episodicMemory?.enabled !== false && e?.group_id) {
+      recordEpisode({
+        groupId: e.group_id,
+        userId: e?.user_id,
+        userName: e?.sender?.card || e?.sender?.nickname || "",
+        summary: String(session?.userContent || e?.msg || "").slice(0, 120),
+        reply: session.lastFinalReply,
+        maxPerGroup: Number(this.config?.episodicMemory?.maxPerGroup) || 200
+      })
+    }
     await recordTurnContinuity({
       redis: globalThis.redis,
       groupId: e?.group_id,

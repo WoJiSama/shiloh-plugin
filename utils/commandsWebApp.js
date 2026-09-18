@@ -170,6 +170,7 @@ function buildPageHtml() {
 <header>
   <h1>📖 命令管理</h1>
   <a href="/guoba/" target="_blank" style="color:#4c6ef5;text-decoration:none;font-size:14px">返回锅巴 →</a>
+  <a href="/bl-chat/observe/?token=" onclick="this.href='/bl-chat/observe/?token='+encodeURIComponent(localStorage.getItem('bl-commands-token')||'')" target="_blank" style="color:#4c6ef5;text-decoration:none;font-size:14px">📈 运行观测 →</a>
   <span id="summary" style="color:#8a93a5;font-size:13px"></span>
   <div class="spacer"></div>
   <input id="token" type="password" placeholder="访问令牌">
@@ -783,7 +784,7 @@ if (state.token) load(); else showLock()
 }
 
 /** 在 Yunzai 的 express 上挂载命令管理页（幂等） */
-export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = globalThis.logger } = {}) {
+export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = globalThis.logger } = {}) {
   if (registered) return { mounted: true, already: true }
   const expressApp = globalThis.Bot?.express
   if (!expressApp?.use) {
@@ -791,6 +792,13 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
     return { mounted: false }
   }
   const token = readOrCreateToken(pluginRoot)
+
+  try {
+    const { registerObserveWebApp } = await import("./observeWebApp.js")
+    registerObserveWebApp(expressApp, pluginRoot, token, logger)
+  } catch (observeError) {
+    logger?.warn?.(`[运行观测页] 挂载失败: ${observeError?.message || observeError}`)
+  }
 
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
