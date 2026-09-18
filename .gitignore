@@ -15,3 +15,5 @@ custom_tools/**/*.cjs
 .idea/
 reports/
 torrent-tool-*/
+plugins/
+data/

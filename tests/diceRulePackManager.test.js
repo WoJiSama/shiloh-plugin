@@ -1036,3 +1036,27 @@ test("JS 规则包：名称提示生效且未知函数报错可读", async t => 
   assert.equal(staged.ok, true, staged.report)
   assert.equal(staged.pack.name, "匕首之心")
 })
+
+test("规则包：nameHint 全链路一致——暂存后可确认、可加载", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const source = `version: 1
+id: hint-chain
+name: 包内原名
+aliases: [hc]
+commands:
+  - id: roll
+    aliases: [roll]
+    output: "结果"
+`
+  const staged = await runtime.manager.stageImport(source, "master", { nameHint: "外部提示名" })
+  assert.equal(staged.ok, true, staged.report)
+  assert.equal(staged.pack.name, "外部提示名", "nameHint 覆盖包内名（QQ 文件名优先设计）")
+  const confirmed = await runtime.manager.confirmImport(staged.pending.id, "master")
+  assert.equal(confirmed.id, "hint-chain")
+  const listed = runtime.manager.listPackages().find(p => p.id === "hint-chain")
+  assert.ok(listed, "确认后包出现在列表")
+  // 加载路径（loadPack 重校验）不得因 nameHint 缺失报“与规范化文件不一致”
+  const loaded = await runtime.manager.loadPack("hint-chain", { groupId: "g1" })
+  assert.equal(loaded.pack.name, "外部提示名")
+})

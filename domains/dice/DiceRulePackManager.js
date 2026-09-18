@@ -822,6 +822,7 @@ export class DiceRulePackManager {
       id: pack.id,
       actorId: String(actorId || ""),
       createdAt: Date.now(),
+      nameHint: String(options.nameHint || ""),
       kind: jsLoaded ? "js" : "yaml",
       functionNames: jsLoaded ? jsLoaded.functionNames : [],
       sourceFile,
@@ -876,6 +877,7 @@ export class DiceRulePackManager {
           version,
           packageVersion: "1.0.0",
           createdAt: Date.now(),
+          nameHint: String(pending.nameHint || ""),
           kind: "seal-ext",
           functionNames: [],
           sourceFile,
@@ -896,7 +898,7 @@ export class DiceRulePackManager {
           throw new Error("待确认 JS 规则包的自定义函数列表与预检时不一致")
         }
       }
-      const validation = this.parseAndValidate(source, { jsPack: jsLoaded?.packObject || null, extraFunctions: jsLoaded?.functionNames || [] })
+      const validation = this.parseAndValidate(source, { jsPack: jsLoaded?.packObject || null, nameHint: String(pending.nameHint || ""), extraFunctions: jsLoaded?.functionNames || [] })
       if (!validation.ok) throw new Error(`待确认规则包重新校验失败：${validation.errors.slice(0, 3).join("；")}`)
       const pack = validation.pack
       if (pack.id !== packId) throw new Error(`待确认规则包 ID 已改变：期望 ${packId}，实际 ${pack.id}`)
@@ -914,6 +916,7 @@ export class DiceRulePackManager {
         version,
         packageVersion: pack.compatibility?.package_version || "1.0.0",
         createdAt: Date.now(),
+        nameHint: String(pending.nameHint || ""),
         kind: isJs ? "js" : "yaml",
         functionNames: jsLoaded ? jsLoaded.functionNames : [],
         sourceFile,
@@ -986,7 +989,7 @@ export class DiceRulePackManager {
         jsFunctions = warmed.functions
         jsPackObject = warmed.packObject
       }
-      const sourceValidation = this.parseAndValidate(source, { jsPack: jsPackObject, extraFunctions: Object.keys(jsFunctions || {}) })
+      const sourceValidation = this.parseAndValidate(source, { jsPack: jsPackObject, nameHint: String(record.nameHint || ""), extraFunctions: Object.keys(jsFunctions || {}) })
       if (!sourceValidation.ok) throw new Error(sourceValidation.errors.slice(0, 3).join("；"))
       const pack = JSON.parse(normalized)
       const validation = validateDiceRulePack(pack, { maxDiceCount: this.diceManager.getConfig().maxDiceCount, extraFunctions: Object.keys(jsFunctions || {}) })
@@ -1176,7 +1179,7 @@ export class DiceRulePackManager {
         const normalized = fs.readFileSync(this.resolveRulePath(pending.normalizedFile), "utf8")
         verifyHash(source, pending.sourceHash, "待确认 YAML ")
         verifyHash(normalized, pending.normalizedHash, "待确认规范化文件 ")
-        const validation = this.parseAndValidate(source)
+        const validation = this.parseAndValidate(source, { nameHint: String(pending.nameHint || "") })
         if (validation.ok && serializePack(validation.pack) !== normalized) throw new Error("待确认 YAML 与规范化文件不一致")
         const sample = validation.ok ? this.buildDryRunPreview(validation.pack) : ""
         return formatValidationReport(validation, pending, sample)

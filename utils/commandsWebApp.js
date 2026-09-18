@@ -32,6 +32,65 @@ function readOrCreateToken(pluginRoot) {
   return token
 }
 
+async function readRawBody(req, maxBytes = 4 * 1024 * 1024) {
+  // 上传走自定义 Content-Type 原始流：Yunzai 全局挂了 express.json/raw/text（各 100KB 限制），
+  // 自定义类型它们都不认，流原样到达这里；若已被 text() 读走则退回 req.body
+  const chunks = []
+  let size = 0
+  for await (const chunk of req) {
+    size += chunk.length
+    if (size > maxBytes) throw new Error("内容超过 4MB 上限")
+    chunks.push(chunk)
+  }
+  const raw = Buffer.concat(chunks).toString("utf8")
+  if (raw.trim()) return raw
+  if (typeof req.body === "string" && req.body.trim()) return req.body
+  return raw
+}
+
+function sanitizeDeckFileName(fileName = "") {
+  const safe = String(fileName || "").replace(/[\\/:*?"<>|]/g, "").trim()
+  if (!/^[\w\u4e00-\u9fa5][\w\u4e00-\u9fa5 .-]{0,80}\.(json|ya?ml)$/i.test(safe)) return ""
+  return safe
+}
+
+function sanitizeUploadFileName(fileName = "") {
+  const safe = String(fileName || "").replace(/[\\/:*?"<>|]/g, "").trim()
+  if (!/^[\w\u4e00-\u9fa5][\w\u4e00-\u9fa5 .-]{0,80}\.(json|ya?ml|js|cjs|mjs)$/i.test(safe)) return ""
+  return safe
+}
+
+function detectUploadKind(fileName = "", source = "") {
+  const ext = (String(fileName).split(".").pop() || "").toLowerCase()
+  if (["js", "cjs", "mjs"].includes(ext)) return "rule"
+  if (ext === "json") return "deck"
+  let parsed = null
+  try { parsed = YAML2.parse(source) } catch { return "deck" }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return "deck"
+  const keys = Object.keys(parsed)
+  if (keys.some(k => ["rolls", "branches", "rules", "commands", "identity", "character"].includes(k))) return "rule"
+  return "deck"
+}
+
+async function importDeckSource({ fileName, source, decksDir }) {
+  const { deckManager } = await import("../domains/dice/DeckManager.js")
+  let data = null
+  try {
+    data = /\.json$/i.test(fileName) ? JSON.parse(source.replace(/^\uFEFF/, "")) : YAML2.parse(source)
+  } catch (error) {
+    throw new Error(`文件解析失败：${error?.message || error}`)
+  }
+  const deck = deckManager.normalizeDeck(data, fileName)
+  if (!deck) throw new Error("没有识别到任何牌组：顶层键的值必须是字符串数组")
+  const target = path2.join(decksDir, fileName)
+  const replaced = fs2.existsSync(target)
+  fs2.mkdirSync(decksDir, { recursive: true })
+  fs2.writeFileSync(target, source, "utf8")
+  const count = deckManager.reload()
+  const visible = Object.keys(deck.command).filter(k => deck.command[k]).length
+  return { replaced, deckName: deck.name, visibleCount: visible, totalDecks: count }
+}
+
 function checkToken(req, token) {
   const provided = String(req?.query?.token || req?.headers?.["x-commands-token"] || "")
   if (!provided || provided !== token) return false
@@ -100,6 +159,9 @@ function buildPageHtml() {
   .grid-row textarea { width: 100%; min-height: 42px; font-size: 13px; resize: vertical; line-height: 1.4; }
   .cmd-group { margin: 10px 0 14px; padding: 10px 12px; background: #f7f9fc; border-radius: 10px; }
   .cmd-group .cmd { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  #drop-overlay { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center; background: rgba(76,110,245,.12); border: 3px dashed #4c6ef5; border-radius: 14px; font-size: 18px; color: #3b5bdb; pointer-events: none; }
+  .import-panel { margin-top: 12px; background: #fff; border: 1px solid #e5e9f0; border-radius: 12px; padding: 12px 14px; }
+  .import-panel pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; background: #fafbfd; border: 1px solid #eef1f6; border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto; margin: 8px 0; }
   .save-bar { position: sticky; bottom: 12px; background: #fff; border: 1px solid #e5e9f0; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; margin-top: 16px; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
   .save-bar .hint { margin: 0; flex: 1; }
 </style>
@@ -127,8 +189,9 @@ function buildPageHtml() {
   <section id="editor"></section>
 </main>
 <div id="status"></div>
+<div id="drop-overlay">📎 松开导入：牌堆(.json/.yaml) · 规则包(.yaml/.js/.cjs)</div>
 <script>
-const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceBuiltin: [], diceLevelMeta: [] }
+const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceBuiltin: [], diceLevelMeta: [], diceDecks: [] }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
@@ -148,6 +211,78 @@ async function api(path, body) {
   if (!res.ok) throw new Error(data.error || ("HTTP " + res.status))
   return data
 }
+async function apiRaw(pathname, text) {
+  const res = await fetch(pathname + (pathname.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(state.token), {
+    method: "POST",
+    headers: { "Content-Type": "text/x-shiloh-upload" },
+    body: text
+  })
+  if (res.status === 401) { showLock(); throw new Error("令牌无效") }
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status))
+  return data
+}
+
+async function uploadDiceFile(file, kind) {
+  if (file.size > 4 * 1024 * 1024) { toast("文件超过 4MB 上限", true); return }
+  toast("正在导入 " + file.name + " …")
+  try {
+    const text = await file.text()
+    const r = await apiRaw("api/upload?fileName=" + encodeURIComponent(file.name) + "&kind=" + encodeURIComponent(kind || "auto"), text)
+    if (r.kind === "deck") {
+      toast("牌堆「" + r.deckName + "」已" + (r.replaced ? "更新" : "导入") + "：" + r.visibleCount + " 个牌组，热生效（.draw 抽取）")
+      await refreshDiceData()
+    } else {
+      showRuleImportResult(r)
+    }
+  } catch (e) { toast("导入失败：" + e.message, true) }
+}
+
+async function refreshDiceData() {
+  try {
+    const data = await api("api/dice-data")
+    state.diceTemplates = data.templates || {}
+    state.dicePacks = data.packs || []
+    state.diceCheckLevels = data.checkLevels || {}
+    state.diceInsanity = data.insanityTables || {}
+    state.diceBuiltin = data.builtin || []
+    state.diceLevelMeta = data.checkLevelMeta || []
+    state.diceDecks = data.decks || []
+  } catch (e) { toast("骰子数据刷新失败：" + e.message, true); return }
+  if (state.activeKey !== "dice") {
+    state.activeKey = "dice"
+    state.domains = state.domains.length ? state.domains : [{ key: "dice" }]
+  }
+  renderDomains(); renderEditor()
+}
+
+function showRuleImportResult(r) {
+  const host = document.getElementById("rule-import-result")
+  if (!host) { toast(r.ok ? "已暂存规则包 " + (r.packName || r.packId) + "，请到骰子模块完成确认" : "规则包校验未通过：" + (r.report || "").slice(0, 80), !r.ok); return }
+  host.style.display = "block"
+  host.innerHTML = ""
+  const title = document.createElement("div")
+  title.style.cssText = "font-weight:600;margin-bottom:4px"
+  title.textContent = (r.ok ? "✅ " : "❌ ") + "规则包预检" + (r.packName ? "：" + r.packName : "")
+  host.appendChild(title)
+  const pre = document.createElement("pre")
+  pre.textContent = r.report || "(无报告)"
+  host.appendChild(pre)
+  if (r.staged) {
+    const confirmBtn = document.createElement("button")
+    confirmBtn.textContent = "确认导入 " + r.packId
+    confirmBtn.onclick = async () => {
+      try {
+        const c = await api("api/rule-confirm", { id: r.packId })
+        toast("已导入：" + (c.message || (c.name ? c.name + "（" + c.id + "）" : "完成")) + "；群里发 .骰规则启用 " + r.packId + " 后生效")
+        host.style.display = "none"
+        await refreshDiceData()
+      } catch (e) { toast(e.message, true) }
+    }
+    host.appendChild(confirmBtn)
+  }
+}
+
 function showLock() { $("lock").style.display = "block"; $("app").style.display = "none"; $("save").disabled = true }
 function showApp() { $("lock").style.display = "none"; $("app").style.display = "flex"; $("save").disabled = false }
 
@@ -375,7 +510,7 @@ function renderEditor() {
       if (!groups.length && !(b.templateKeys || []).length && !b.hasLevels && !b.hasInsanity) {
         const hint = document.createElement("div")
         hint.className = "hint"
-        hint.textContent = "此规则无需配置模板，命令行为见上方命令表；牌堆文件放服务器 config/decks/ 目录。"
+        hint.textContent = "此规则无需配置模板；牌堆在下方「牌堆管理」区在线上传/编辑，也可把文件直接拖进本页面。"
         body.appendChild(hint)
       }
     }
@@ -389,6 +524,88 @@ function renderEditor() {
       body.appendChild(st)
       makeTplRows(leftoverKeys, body)
     }
+
+    // ── 牌堆管理（.draw 抽取；拖文件到页面任意处也能导入） ──
+    const deckTitle = document.createElement("div")
+    deckTitle.className = "section-title"
+    deckTitle.textContent = "🃏 牌堆管理（config/decks/；群里 .draw <牌组> 抽取，.draw keys 列出全部）"
+    box.appendChild(deckTitle)
+    const deckTable = document.createElement("table")
+    deckTable.innerHTML = "<thead><tr><th>牌堆</th><th style='width:130px'>文件</th><th style='width:70px'>牌组数</th><th style='width:70px'>条目数</th><th style='width:110px'>作者/版本</th><th style='width:150px'></th></tr></thead><tbody></tbody>"
+    const deckBody = deckTable.querySelector("tbody")
+    if (!state.diceDecks.length) {
+      const tr = document.createElement("tr")
+      tr.innerHTML = "<td colspan='6' class='empty'>还没有牌堆：把 json/yaml 拖进本页面，或点下方按钮上传</td>"
+      deckBody.appendChild(tr)
+    }
+    for (const deck of state.diceDecks) {
+      const tr = document.createElement("tr")
+      const meta = [deck.author, deck.version].filter(Boolean).join(" / ") || "-"
+      tr.innerHTML = "<td style='font-weight:600'>" + deck.name + "</td><td class='num'>" + deck.fileName + "</td><td>" + deck.visibleCount + "</td><td>" + deck.entryCount + "</td><td style='font-size:12px'>" + meta + "</td><td><button class='ghost' data-edit-deck='" + deck.fileName + "'>编辑源码</button> <button class='danger' data-del-deck='" + deck.fileName + "'>删除</button></td>"
+      deckBody.appendChild(tr)
+    }
+    box.appendChild(deckTable)
+
+    const deckUploadBtn = document.createElement("button")
+    deckUploadBtn.className = "ghost"
+    deckUploadBtn.style.marginTop = "10px"
+    deckUploadBtn.textContent = "📤 上传牌堆文件"
+    deckUploadBtn.onclick = () => pickAndUpload("deck")
+    box.appendChild(deckUploadBtn)
+
+    const ruleUploadBtn = document.createElement("button")
+    ruleUploadBtn.className = "ghost"
+    ruleUploadBtn.style.margin = "10px 0 0 8px"
+    ruleUploadBtn.textContent = "📥 导入规则包文件"
+    ruleUploadBtn.onclick = () => pickAndUpload("rule")
+    box.appendChild(ruleUploadBtn)
+
+    // 牌堆源码编辑器
+    const deckEditorDiv = document.createElement("div")
+    deckEditorDiv.id = "deck-source-editor"
+    deckEditorDiv.style.cssText = "display:none;margin-top:14px"
+    box.appendChild(deckEditorDiv)
+
+    deckTable.addEventListener("click", async e => {
+      const editBtn = e.target.closest("[data-edit-deck]")
+      const delBtn = e.target.closest("[data-del-deck]")
+      if (editBtn) {
+        const fileName = editBtn.dataset.editDeck
+        try {
+          const data = await api("api/deck-source/" + encodeURIComponent(fileName))
+          deckEditorDiv.style.display = "block"
+          deckEditorDiv.innerHTML = ""
+          const title = document.createElement("h4")
+          title.textContent = "📝 " + fileName + "（保存即热生效，格式错误会被拒绝）"
+          deckEditorDiv.appendChild(title)
+          const ta = document.createElement("textarea")
+          ta.style.cssText = "width:100%;height:400px;font-family:monospace;font-size:12px;border:1px solid #d4dae3;border-radius:8px;padding:8px"
+          ta.value = data.source
+          deckEditorDiv.appendChild(ta)
+          const saveBtn = document.createElement("button")
+          saveBtn.style.marginTop = "8px"
+          saveBtn.textContent = "保存牌堆"
+          saveBtn.onclick = async () => {
+            try {
+              const r = await apiRaw("api/deck-source/" + encodeURIComponent(fileName), ta.value)
+              toast("牌堆「" + r.deckName + "」已保存并热重载（" + r.visibleCount + " 个牌组）")
+              await refreshDiceData()
+            } catch (e2) { toast(e2.message, true) }
+          }
+          deckEditorDiv.appendChild(saveBtn)
+          deckEditorDiv.scrollIntoView({ behavior: "smooth", block: "start" })
+        } catch (e2) { toast(e2.message, true) }
+      }
+      if (delBtn) {
+        const fileName = delBtn.dataset.delDeck
+        if (!confirm("确定删除牌堆文件 " + fileName + "？此操作不可恢复。")) return
+        try {
+          await api("api/deck-delete", { fileName })
+          toast("已删除 " + fileName)
+          await refreshDiceData()
+        } catch (e2) { toast(e2.message, true) }
+      }
+    })
 
     // 吸底保存条
     const saveBar = document.createElement("div")
@@ -421,6 +638,13 @@ function renderEditor() {
         packBody.appendChild(tr)
       }
       box.appendChild(packTable)
+
+      // 导入规则包（文件选择器）+ 导入结果面板
+      const importPanel = document.createElement("div")
+      importPanel.id = "rule-import-result"
+      importPanel.className = "import-panel"
+      importPanel.style.display = "none"
+      box.appendChild(importPanel)
 
       // 海豹扩展源码编辑器
       const editorDiv = document.createElement("div")
@@ -477,6 +701,7 @@ async function loadDiceExtras() {
     state.diceInsanity = data.insanityTables || {}
     state.diceBuiltin = data.builtin || []
     state.diceLevelMeta = data.checkLevelMeta || []
+    state.diceDecks = data.decks || []
   } catch (e) { toast("骰子模板读取失败：" + e.message, true) }
 }
 
@@ -517,6 +742,33 @@ $("export").onclick = async () => {
   if (state.dirty && !confirm("有未保存修改，导出的将是已保存版本，继续？")) return
   try { const data = await api("api/export", {}); toast("文档已导出：" + data.docPath) } catch (e) { toast(e.message, true) }
 }
+function pickAndUpload(kind) {
+  const input = document.createElement("input")
+  input.type = "file"
+  input.accept = kind === "deck" ? ".json,.yaml,.yml" : ".yaml,.yml,.js,.cjs,.mjs"
+  input.multiple = true
+  input.onchange = async () => { for (const file of input.files) await uploadDiceFile(file, kind) }
+  input.click()
+}
+
+let dragDepth = 0
+document.addEventListener("dragenter", e => {
+  e.preventDefault()
+  dragDepth += 1
+  $("drop-overlay").style.display = "flex"
+})
+document.addEventListener("dragleave", () => {
+  dragDepth -= 1
+  if (dragDepth <= 0) { dragDepth = 0; $("drop-overlay").style.display = "none" }
+})
+document.addEventListener("dragover", e => e.preventDefault())
+document.addEventListener("drop", async e => {
+  e.preventDefault()
+  dragDepth = 0
+  $("drop-overlay").style.display = "none"
+  for (const file of (e.dataTransfer?.files || [])) await uploadDiceFile(file, "auto")
+})
+
 const urlToken = new URLSearchParams(location.search).get("token")
 if (urlToken) {
   state.token = urlToken
@@ -602,7 +854,25 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           } catch (packError) {
             logger?.warn?.(`[命令管理页] 规则包列表读取失败: ${packError?.message || packError}`)
           }
-          res.json({ templates, checkLevels, insanityTables, packs, builtin, checkLevelMeta })
+          let decks = []
+          let deckError = ""
+          try {
+            const { deckManager } = await import("../domains/dice/DeckManager.js")
+            deckManager.reload()
+            deckError = deckManager.lastError || ""
+            decks = deckManager.decks.map(d => ({
+              name: d.name,
+              fileName: d.fileName,
+              author: d.author || "",
+              version: d.version || "",
+              visibleCount: Object.keys(d.command).filter(k => d.command[k]).length,
+              entryCount: Object.values(d.items).reduce((n, arr) => n + arr.length, 0),
+              keys: Object.keys(d.command).filter(k => d.command[k]).slice(0, 40)
+            }))
+          } catch (deckListError) {
+            deckError = deckListError?.message || String(deckListError)
+          }
+          res.json({ templates, checkLevels, insanityTables, packs, builtin, checkLevelMeta, decks, deckError })
 
         } catch (error) {
           res.status(500).json({ error: error?.message || String(error) })
@@ -714,6 +984,98 @@ export function registerCommandsWebApp(pluginRoot = process.cwd(), { logger = gl
           // 清运行时缓存（下次命令自动用新源码）
           logger?.info?.(`[命令管理页] 已保存海豹扩展 ${packId} 源码（${source.length} 字符，${testResult.commands.length} 命令），运行时缓存已刷新`)
           res.json({ ok: true, commands: testResult.commands.map(c => c.name) })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      // ── 牌堆管理 ────────────────────────────────────────────
+      if (req.path.startsWith("/api/deck-source/") && req.method === "GET") {
+        try {
+          const fileName = sanitizeDeckFileName(decodeURIComponent(req.path.slice("/api/deck-source/".length)))
+          if (!fileName) { res.status(400).json({ error: "非法文件名" }); return }
+          const decksDir = path2.join(pluginRoot, "config", "decks")
+          const target = path2.join(decksDir, fileName)
+          if (!fs2.existsSync(target)) { res.status(404).json({ error: `没有找到牌堆文件 ${fileName}` }); return }
+          res.json({ source: fs2.readFileSync(target, "utf8"), fileName })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path.startsWith("/api/deck-source/") && req.method === "POST") {
+        try {
+          const fileName = sanitizeDeckFileName(decodeURIComponent(req.path.slice("/api/deck-source/".length)))
+          if (!fileName) { res.status(400).json({ error: "非法文件名" }); return }
+          const source = await readRawBody(req)
+          if (!source.trim()) { res.status(400).json({ error: "内容为空" }); return }
+          const result = await importDeckSource({ fileName, source, decksDir: path2.join(pluginRoot, "config", "decks") })
+          logger?.info?.(`[命令管理页] 已保存牌堆 ${result.deckName}（${fileName}，${result.visibleCount} 个牌组），已热重载`)
+          res.json({ ok: true, kind: "deck", ...result })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/deck-delete" && req.method === "POST") {
+        try {
+          const fileName = sanitizeDeckFileName(String(req.body?.fileName || ""))
+          if (!fileName) { res.status(400).json({ error: "非法文件名" }); return }
+          const target = path2.join(pluginRoot, "config", "decks", fileName)
+          if (!fs2.existsSync(target)) { res.status(404).json({ error: `没有找到牌堆文件 ${fileName}` }); return }
+          fs2.unlinkSync(target)
+          const { deckManager } = await import("../domains/dice/DeckManager.js")
+          const count = deckManager.reload()
+          logger?.info?.(`[命令管理页] 已删除牌堆文件 ${fileName}，剩余 ${count} 个牌堆`)
+          res.json({ ok: true, totalDecks: count })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      // ── 拖拽/按钮上传：自动识别牌堆 vs 规则包 ────────────────
+      if (req.path === "/api/upload" && req.method === "POST") {
+        try {
+          const fileName = sanitizeUploadFileName(String(req.query?.fileName || ""))
+          if (!fileName) { res.status(400).json({ error: "文件名只支持 json/yaml/yml/js/cjs/mjs，且不能包含路径" }); return }
+          const source = await readRawBody(req)
+          if (!source.trim()) { res.status(400).json({ error: "文件内容为空" }); return }
+          let kind = String(req.query?.kind || "auto")
+          if (kind !== "deck" && kind !== "rule") kind = detectUploadKind(fileName, source)
+          if (kind === "deck") {
+            const result = await importDeckSource({ fileName, source, decksDir: path2.join(pluginRoot, "config", "decks") })
+            logger?.info?.(`[命令管理页] 拖拽导入牌堆 ${result.deckName}（${fileName}，${result.visibleCount} 个牌组）`)
+            res.json({ ok: true, kind: "deck", ...result })
+            return
+          }
+          const { DiceRulePackManager } = await import("../domains/dice/DiceRulePackManager.js")
+          const { diceManager } = await import("../domains/dice/DiceManager.js")
+          const manager = new DiceRulePackManager({ diceManager, logger })
+          const staged = await manager.stageImport(source, "web-import", { nameHint: fileName.replace(/\.[^.]+$/, "") })
+          res.json({
+            ok: Boolean(staged.ok),
+            kind: "rule",
+            packId: staged.pending?.id || "",
+            packName: staged.pack?.name || "",
+            report: staged.report || staged.errors?.join("\n") || "",
+            staged: Boolean(staged.pending)
+          })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/rule-confirm" && req.method === "POST") {
+        try {
+          const id = String(req.body?.id || "").trim()
+          if (!id) { res.status(400).json({ error: "缺少规则包 ID" }); return }
+          const { DiceRulePackManager } = await import("../domains/dice/DiceRulePackManager.js")
+          const { diceManager } = await import("../domains/dice/DiceManager.js")
+          const manager = new DiceRulePackManager({ diceManager, logger })
+          const result = await manager.confirmImport(id, "web-import")
+          const message = typeof result === "string" ? result : `${result.name}（${result.id}）v${result.version}`
+          logger?.info?.(`[命令管理页] 网页确认导入规则包 ${id}`)
+          res.json({ ok: true, message })
         } catch (error) {
           res.status(400).json({ error: error?.message || String(error) })
         }
