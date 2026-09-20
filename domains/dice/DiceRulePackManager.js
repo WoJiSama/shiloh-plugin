@@ -1361,8 +1361,26 @@ export class DiceRulePackManager {
       const status = activeVersion ? "已启用" : `未启用 · 发送 .骰规则启用 ${record.id}`
       lines.push(`| ${record.name}（${record.id}） | ${status} | ${commands} | ${usage} |`)
     }
-    lines.push("")
-    lines.push(`说明与人物卡字段：.骰规则查看 ${records[0]?.id || "包id"}；本群速览：.dice help`)
+    const firstId = records[0]?.id || "包id"
+    const tryCommand = (() => {
+      for (const record of records) {
+        const kind = record.versions[record.versions.length - 1]?.kind
+        const activeVersion = active[record.id]
+        try {
+          const pack = this.loadPack(record.id, activeVersion || 0, index)?.pack
+          const cmd = this.packCommandSummary(pack, kind).split(" ")[0].replace(/^·\s*/, "")
+          if (!cmd || cmd === "—") continue
+          // seal-ext 直发命令带 help 看用法；YAML 发前缀直接出命令菜单
+          return kind === "seal-ext" ? `${cmd} help` : cmd
+        } catch {}
+      }
+      return ""
+    })()
+    lines.push("", `### 快速上手`, "")
+    lines.push(`- 启用：.骰规则启用 ${firstId}（id 就是上表括号里的字母名）`)
+    lines.push(tryCommand ? `- 试用：启用后直接发 ${tryCommand} 试试` : "- 试用：启用后发上表「命令」列里的命令")
+    lines.push(`- 看全部规则：.骰规则查看 ${firstId}（命令 → 参数 → 分支逐级列出）`)
+    lines.push("- 停用：.骰规则禁用 包id（人物卡数据保留）；本群速览：.dice help")
     return lines.join("\n")
   }
 

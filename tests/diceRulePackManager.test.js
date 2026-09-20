@@ -1086,3 +1086,19 @@ test("describePackage expands every rule level: commands, arguments, branches an
   assert.match(text, /### 其它所属规则/)
   assert.match(text, /人物卡字段（4）：name、hp、injury、effective_hp/)
 })
+
+test("listText footer carries a quick-start tutorial with real ids", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const staged = await runtime.manager.stageImport(statefulRule, "master")
+  assert.equal(staged.ok, true, staged.errors?.join("; "))
+  await runtime.manager.confirmImport("state-pack", "master")
+  const text = runtime.manager.listText("10001")
+
+  assert.match(text, /### 快速上手/)
+  assert.match(text, /- 启用：\.骰规则启用 state-pack（id 就是上表括号里的字母名）/)
+  // YAML 包：发前缀直接出命令菜单（不带 help 后缀）
+  assert.match(text, /- 试用：启用后直接发 \.state 试试/)
+  assert.match(text, /- 看全部规则：\.骰规则查看 state-pack（命令 → 参数 → 分支逐级列出）/)
+  assert.match(text, /- 停用：\.骰规则禁用 包id（人物卡数据保留）/)
+})
