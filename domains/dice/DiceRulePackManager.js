@@ -1204,7 +1204,7 @@ export class DiceRulePackManager {
   packEntryHint(pack, kind = "seal-ext") {
     if (kind === "seal-ext") {
       const first = (pack.commands || [])[0]?.id
-      return first ? `发 .${first} help 看该命令用法，发 .帮助（或 .dice help）里也有本群包速览` : ""
+      return first ? `发 .${first} help 看该命令用法；.dice help 末尾也有本群包速览` : ""
     }
     return `发 .${pack.aliases?.[0] || pack.id} 看完整命令菜单`
   }
@@ -1214,7 +1214,8 @@ export class DiceRulePackManager {
     const active = index.groups[String(groupId || "")]?.active || {}
     const records = Object.values(index.packages)
     if (!records.length) return "还没有导入任何自定义规则包。\n导入方式：网页命令管理页拖入文件，或群里发文件并引用它发送 .骰规则导入。"
-    const lines = [`自定义骰娘规则包（${records.length} 个）——详情：.骰规则查看 <id>`]
+    const firstId = records[0]?.id || "包id"
+    const lines = [`自定义骰娘规则包（${records.length} 个）——详情：.骰规则查看 ${firstId}（id 就是括号里的字母名）`]
     for (const record of records) {
       const activeVersion = active[record.id]
       const latest = record.versions[record.versions.length - 1] || {}
@@ -1225,7 +1226,7 @@ export class DiceRulePackManager {
       const commands = pack ? this.packCommandSummary(pack, latest.kind) : ""
       const entry = pack ? this.packEntryHint(pack, latest.kind) : ""
       lines.push("")
-      lines.push(`■ ${record.name}（${record.id}）${activeVersion ? ` · ✅本群已启用 v${activeVersion}` : " · 本群未启用"}`)
+      lines.push(`■ ${record.name}（${record.id}）${activeVersion ? ` · [本群已启用]` : " · [本群未启用]"}`)
       if (pack?.description) lines.push(`  说明：${String(pack.description).slice(0, 60)}`)
       if (commands) lines.push(`  命令：${commands}`)
       if (entry) lines.push(`  ${entry}`)
