@@ -218,9 +218,9 @@ test("new versions are immutable and a group can roll back", async t => {
   const confirmed = await runtime.manager.confirmImport("state-pack", "master")
   assert.equal(confirmed.version, 2)
   await runtime.manager.enableForGroup("10001", "state-pack", 2)
-  assert.match(runtime.manager.listText("10001"), /当前群启用 @2/)
+  assert.match(runtime.manager.listText("10001"), /✅本群已启用 v2/)
   await runtime.manager.rollbackForGroup("10001", "state-pack", 1)
-  assert.match(runtime.manager.listText("10001"), /当前群启用 @1/)
+  assert.match(runtime.manager.listText("10001"), /✅本群已启用 v1/)
   assert.ok(fs.existsSync(runtime.manager.getExportFile("state-pack", 2).file))
 })
 

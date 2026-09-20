@@ -99,13 +99,14 @@ export class DicePlugin extends plugin {
 
   async reply(e, output, options = {}) {
     const userId = e?.user_id || e?.sender?.user_id
+    const forceText = diceManager.isLogRecording(e?.group_id)
     const senderOptions = userId
       ? {
           nickname: e?.sender?.card || e?.sender?.nickname || String(userId),
           avatarUrl: `https://q1.qlogo.cn/g?b=qq&nk=${userId}&s=100`
         }
       : {}
-    return await sendSmartReply(e, output, { ...senderOptions, ...options })
+    return await sendSmartReply(e, output, { ...senderOptions, ...options, forceText })
   }
 
   async runStateCommand(e, work) {
@@ -118,7 +119,9 @@ export class DicePlugin extends plugin {
   }
 
   async help(e) {
-    await this.reply(e, diceManager.showHelp(this.strip(e, "(help|帮助)")), { kind: "diceLong" })
+    const base = diceManager.showHelp(this.strip(e, "(help|帮助)"))
+    const packs = diceRulePackManager.activePacksHelpText?.(e.group_id || "private") || ""
+    await this.reply(e, packs ? `${base}\n\n【本群已启用的规则包】\n${packs}\n完整命令列表：.骰规则列表` : base, { kind: "diceLong" })
     return true
   }
 
@@ -207,15 +210,26 @@ export class DicePlugin extends plugin {
       if (["启用", "enable"].includes(action)) {
         if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以在当前群启用规则包")
         const ref = parseRuleReference(args)
-        if (!ref) throw new Error("格式：.骰规则启用 <id[@版本]>")
+        if (!ref) {
+          const packages = diceRulePackManager.listPackages()
+          const ids = packages.map(item => `${item.id}（${item.name}）`).join("、") || "（还没有导入任何包）"
+          const hint = /^\d+$/.test(String(args).trim())
+            ? `「${args}」是版本号，不是包 ID——要用字母包名。`
+            : `ID 是列表里括号中的字母名。`
+          throw new Error(`${hint}可用规则包：${ids}\n例：.骰规则启用 ${packages[0]?.id || "包id"}`)
+        }
         const result = await diceRulePackManager.enableForGroup(e.group_id, ref.id, ref.version)
-        await this.reply(e, `当前群已启用 ${result.name}（${result.id}@${result.version}）。发送 .${result.id} 查看规则命令。`)
+        const entry = diceRulePackManager.packEntryHintForGroup(e.group_id, result.id) || `发送 .${result.id} 查看规则命令。`
+        await this.reply(e, `当前群已启用 ${result.name}（${result.id}@${result.version}）。\n${entry}\n完整命令列表：.骰规则列表`)
         return true
       }
       if (["禁用", "disable"].includes(action)) {
         if (!canManageGroupDice(e)) throw new Error("只有主人或群管理员可以在当前群禁用规则包")
         const ref = parseRuleReference(args)
-        if (!ref || ref.version) throw new Error("格式：.骰规则禁用 <id>")
+        if (!ref || ref.version) {
+          const ids = diceRulePackManager.listPackages().map(item => item.id).join("、") || "（无）"
+          throw new Error(`格式：.骰规则禁用 <id>（只用字母包名，不带版本）。可用：${ids}`)
+        }
         await diceRulePackManager.disableForGroup(e.group_id, ref.id)
         await this.reply(e, `当前群已禁用规则包 ${ref.id}；人物卡数据仍然保留。`)
         return true

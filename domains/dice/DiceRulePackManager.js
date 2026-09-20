@@ -1190,17 +1190,70 @@ export class DiceRulePackManager {
     return this.describePackage(packId)
   }
 
+  /** 单个包的命令速览：seal-ext 直发命令；声明式包给前缀入口 */
+  packCommandSummary(pack, kind = "yaml") {
+    if (kind === "seal-ext") {
+      const names = (pack.commands || []).map(command => "." + String(command.id || "")).filter(Boolean)
+      return names.slice(0, 10).join(" · ") + (names.length > 10 ? ` 等${names.length}个` : "")
+    }
+    const names = (pack.commands || []).map(command => `.${pack.aliases?.[0] || pack.id} ${command.aliases?.[0] || command.id}`).filter(Boolean)
+    return names.slice(0, 10).join(" · ") + (names.length > 10 ? ` 等${names.length}个` : "")
+  }
+
+  /** 规则包入口提示：告诉用户第一发什么能马上看到效果 */
+  packEntryHint(pack, kind = "seal-ext") {
+    if (kind === "seal-ext") {
+      const first = (pack.commands || [])[0]?.id
+      return first ? `发 .${first} help 看该命令用法，发 .帮助（或 .dice help）里也有本群包速览` : ""
+    }
+    return `发 .${pack.aliases?.[0] || pack.id} 看完整命令菜单`
+  }
+
   listText(groupId = "") {
-    const packages = this.listPackages()
-    if (!packages.length) return "还没有导入任何自定义规则包。"
-    const active = this.readIndex().groups[String(groupId || "")]?.active || {}
-    return [
-      "自定义骰娘规则包：",
-      ...packages.map(item => {
-        const activeVersion = active[item.id]
-        return `${item.name}（${item.id}）版本 ${item.versions.join("/")}；最新 ${item.latestVersion}；启用群 ${item.enabledGroups}${activeVersion ? `；当前群启用 @${activeVersion}` : ""}`
-      })
-    ].join("\n")
+    const index = this.readIndex()
+    const active = index.groups[String(groupId || "")]?.active || {}
+    const records = Object.values(index.packages)
+    if (!records.length) return "还没有导入任何自定义规则包。\n导入方式：网页命令管理页拖入文件，或群里发文件并引用它发送 .骰规则导入。"
+    const lines = [`自定义骰娘规则包（${records.length} 个）——详情：.骰规则查看 <id>`]
+    for (const record of records) {
+      const activeVersion = active[record.id]
+      const latest = record.versions[record.versions.length - 1] || {}
+      let pack = null
+      try {
+        pack = this.loadPack(record.id, activeVersion || 0, index)?.pack
+      } catch {}
+      const commands = pack ? this.packCommandSummary(pack, latest.kind) : ""
+      const entry = pack ? this.packEntryHint(pack, latest.kind) : ""
+      lines.push("")
+      lines.push(`■ ${record.name}（${record.id}）${activeVersion ? ` · ✅本群已启用 v${activeVersion}` : " · 本群未启用"}`)
+      if (pack?.description) lines.push(`  说明：${String(pack.description).slice(0, 60)}`)
+      if (commands) lines.push(`  命令：${commands}`)
+      if (entry) lines.push(`  ${entry}`)
+      if (!activeVersion) lines.push(`  启用：发送 .骰规则启用 ${record.id}`)
+    }
+    return lines.join("\n")
+  }
+
+  /** 启用后的入口提示（按本群激活版本的类型给真实可用命令） */
+  packEntryHintForGroup(groupId, id) {
+    const index = this.readIndex()
+    const version = index.groups[String(groupId || "")]?.active?.[String(id || "")]
+    if (!version) return ""
+    const loaded = this.loadPack(id, version, index)
+    if (!loaded) return ""
+    const kind = this.getVersionRecord(id, version, index)?.kind
+    return this.packEntryHint(loaded.pack, kind)
+  }
+
+  /** 帮助用的本群包速览（一段紧凑文本） */
+  activePacksHelpText(groupId = "") {
+    const loaded = this.getActivePacks(groupId)
+    if (!loaded.length) return ""
+    return loaded.map(({ pack, record }) => {
+      const kind = record?.kind
+      const commands = this.packCommandSummary(pack, kind)
+      return `◆ 规则包 ${pack.name}：${commands}`
+    }).join("\n")
   }
 
   getActivePacks(groupId) {
