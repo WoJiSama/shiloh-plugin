@@ -62,7 +62,7 @@ import { markProactiveReply, shouldCancelProactiveReply } from "../utils/proacti
 import { extractDeliveryMessageId, logDeliveryOutcome } from "../utils/deliveryObservability.js"
 import { classifyChatRequestFailure, executeChatRequestWithRecovery } from "../utils/chatRequestRecovery.js"
 import { safeTruncateUnicode, splitUnicodeText } from "../utils/unicodeText.js"
-import { classifyEmojiToolExposure, filterToolsForEmojiExposure, resolveForcedReactionEmoji, shouldExposeEmojiToolForMessage, recordEmojiOnlySend, suppressEmojiByCooldown } from "../utils/emojiToolPolicy.js"
+import { classifyEmojiToolExposure, filterToolsForEmojiExposure, resolveForcedReactionEmoji, shouldExposeEmojiToolForMessage, recordEmojiOnlySend, suppressEmojiByCooldown, pickForcedReplyLayout, adaptForcedReplyTextRate } from "../utils/emojiToolPolicy.js"
 import { buildExcelToolParams, hasExcelWorkbookContext, shouldBypassMergeForExcel, shouldUseExcelWorkbookTool } from "../utils/excelRequestPolicy.js"
 import { containsCodeFence, flattenCodeFences } from "../utils/qqCodeFenceText.js"
 import { armSmartLockWatchdog, clearSmartLockWatchdog } from "../utils/smartLockPolicy.js"
@@ -1367,7 +1367,7 @@ function shouldExposeToolsForMessage(e = {}, text = "") {
 function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearch = false, emojiCooldownMs = 120000 } = {}) {
   if (!Array.isArray(tools) || !tools.length) return []
   const content = normalizeIntentText(text || e?.msg || "")
-  if (options.allowSearch) return tools.filter(tool => tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content))
+  if (allowSearch) return tools.filter(tool => tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content))
   if (!shouldExposeToolsForMessage(e, content)) return []
 
   // The all-admin tool is deliberately unavailable unless the user used
@@ -5279,10 +5279,17 @@ ${mcpPrompts}
             !suppressEmojiByCooldown(currentIntentText, groupId, emojiCooldownMs)) {
           session.tools = this.getToolsByName(["sendLocalEmojiTool"])
           if (session.tools?.length) {
+            // 强制路配文：从规则配文池抽样（不加模型调用）；该群裸表情占比高时配文率自适应下降
+            const forcedTextRate = await this.resolveForcedReplyTextRate(groupId)
+            const forcedLayout = pickForcedReplyLayout({ replies: forcedReactionEmoji.replies, textRate: forcedTextRate })
+            forcedToolCall = this.buildForcedToolCall("sendLocalEmojiTool", {
+              tags: forcedReactionEmoji.tags,
+              useCases: forcedReactionEmoji.useCases,
+              leadText: forcedLayout.leadText
+            })
             toolChoice = { type: "function", function: { name: "sendLocalEmojiTool" } }
-            forcedToolCall = this.buildForcedToolCall("sendLocalEmojiTool", forcedReactionEmoji)
             toolScopeLocked = true
-            logger.info(`[表情包快路] group=${groupId} 强制发送反应表情 tags=${forcedReactionEmoji.tags.join(",")}`)
+            logger.info(`[表情包快路] group=${groupId} 强制发送反应表情 tags=${forcedReactionEmoji.tags.join(",")} layout=${forcedLayout.layout}${forcedLayout.leadText ? ` lead="${forcedLayout.leadText}"` : ""}`)
           }
         }
         const hasExcelContext = hasExcelWorkbookContext({
@@ -7000,7 +7007,9 @@ ${mcpPrompts}
 	          return
 	        }
 	        logger.info(`[工具调用] 本轮全部为终态工具(${validResults.map(r => r.toolName).join(',')})且执行成功，跳过最终文本回复`)
-	        if (validResults.every(r => r.toolName === LOCAL_EMOJI_TOOL_NAME) && e?.group_id) {
+	        // emoji-only 冷却只在"真的只发了图"时开启；强制路带 leadText 的回合不算 emoji-only
+	        if (validResults.every(r => r.toolName === LOCAL_EMOJI_TOOL_NAME) && e?.group_id &&
+	            !validResults.some(r => String(r.result || "").includes("段文字"))) {
 	          recordEmojiOnlySend(e.group_id, Number(this.config?.emojiSystem?.emojiCooldownMs ?? 120000))
 	          logger.info(`[表情包] emoji-only 回复完成，开启冷却 ${Math.round((Number(this.config?.emojiSystem?.emojiCooldownMs ?? 120000)) / 1000)}s（explicit 请求不受限）`)
 	        }

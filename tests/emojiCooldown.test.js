@@ -41,3 +41,11 @@ test("test.js 已接线：终态表情后记录冷却、暴露过滤传冷却参
   assert.ok(src.includes("emojiCooldownMs: Number(this.config?.emojiSystem?.emojiCooldownMs"), "暴露过滤带冷却配置")
   assert.ok(src.includes("!suppressEmojiByCooldown(currentIntentText, groupId, emojiCooldownMs)"), "强制快路尊重冷却")
 })
+
+test("filterToolsForMessageIntent 解构参数后不得残留 options 引用", () => {
+  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const start = src.indexOf("function filterToolsForMessageIntent")
+  const end = src.indexOf("\n}", start)
+  const body = src.slice(start, end)
+  assert.ok(!body.includes("options."), "函数签名已解构，函数体内不得再引用 options（曾致每轮 ReferenceError 无回复）")
+})
