@@ -97,7 +97,7 @@ function softenIdentityDenial(text = "", context = {}) {
     .replace(CANNED_IDENTITY_MARKER_RE, " ")
     .replace(/([，,、;；])[，,、;；\s]*([。.!！?？…])/g, "$2")
     .replace(/[，,、;；]{2,}/g, "，")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
     .replace(LEAD_NOISE_RE, "")
     .replace(/[，,、;；~～\s]+$/g, "")
     .trim()
@@ -123,7 +123,7 @@ function deescalateToneCorrection(text = "", context = {}) {
 
   const cleaned = String(text || "")
     .replace(/[😋❤♥💗💕💞😘🥰]+/gu, "")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
     .trim()
   const sincerelyAcknowledges = /(?:你说得对|你说的对|确实|刚才).{0,30}(?:不对|过了|不舒服|顶着|收一下|改|注意)/.test(cleaned) ||
     /(?:我收一下|我改|我注意|不该这样|听着确实不舒服)/.test(cleaned)
@@ -135,10 +135,12 @@ function deescalateToneCorrection(text = "", context = {}) {
 
 function removeUnpromptedIntimacy(text = "") {
   return String(text || "")
-    .replace(/(?:宝宝|宝贝|亲爱的|老婆|老公|哥哥|妹妹)[，,、\s]*/g, "你")
-    .replace(/(?:欸|嗯嗯?|诶)[，,、\s]*别突然这么叫呀[，,、\s]*/g, "叫我希洛就好。")
+    // 只吞昵称后的行内空白，保留换行——\s 会把空行吞成空格，
+    // 连 markdown 表格/多段文本的行结构都会被压扁
+    .replace(/(?:宝宝|宝贝|亲爱的|老婆|老公|哥哥|妹妹)[，,、 \t]*/g, "你")
+    .replace(/(?:欸|嗯嗯?|诶)[，,、 \t]*别突然这么叫呀[，,、 \t]*/g, "叫我希洛就好。")
     .replace(/(?:我)?有点不好意思(?:啦|欸)?[。！？!?…]*/g, "谢谢。")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
     .trim()
 }
 

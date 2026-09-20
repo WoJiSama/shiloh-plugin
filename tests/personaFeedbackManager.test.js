@@ -106,6 +106,22 @@ test('removes unprompted intimate nicknames and shy flirt framing', () => {
   assert.match(output, /叫我希洛就好/)
 })
 
+test('keeps blank lines and markdown table structure intact', () => {
+  const manager = new PersonaFeedbackManager({ logger: null })
+  const text = [
+    '自定义骰娘规则包（1 个）——id 就是下表括号里的字母名',
+    '',
+    '| 规则包 | 本群状态 | 命令 | 看用法 |',
+    '| --- | --- | --- | --- |',
+    '| Daggerheart二元骰（daggerheart） | 已启用 | .dd .ddr | 发 .dd help 看用法 |',
+    '',
+    '说明与人物卡字段：.骰规则查看 daggerheart'
+  ].join('\n')
+
+  // 换行被吞成空格会把表头黏到标题行、表尾黏进数据行，表格直接废掉
+  assert.equal(manager.guardReply(text, { enabled: true }, {}), text)
+})
+
 test('only explicit master feedback is exposed for semantic style learning', async () => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-feedback-'))
   const manager = new PersonaFeedbackManager({ cwd, logger: null })

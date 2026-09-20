@@ -1214,8 +1214,12 @@ export class DiceRulePackManager {
     const active = index.groups[String(groupId || "")]?.active || {}
     const records = Object.values(index.packages)
     if (!records.length) return "还没有导入任何自定义规则包。\n导入方式：网页命令管理页拖入文件，或群里发文件并引用它发送 .骰规则导入。"
-    const firstId = records[0]?.id || "包id"
-    const lines = [`自定义骰娘规则包（${records.length} 个）——详情：.骰规则查看 ${firstId}（id 就是括号里的字母名）`]
+    const lines = [
+      `自定义骰娘规则包（${records.length} 个）——id 就是下表括号里的字母名`,
+      "",
+      "| 规则包 | 本群状态 | 命令 | 看用法 |",
+      "| --- | --- | --- | --- |"
+    ]
     for (const record of records) {
       const activeVersion = active[record.id]
       const latest = record.versions[record.versions.length - 1] || {}
@@ -1223,15 +1227,13 @@ export class DiceRulePackManager {
       try {
         pack = this.loadPack(record.id, activeVersion || 0, index)?.pack
       } catch {}
-      const commands = pack ? this.packCommandSummary(pack, latest.kind) : ""
-      const entry = pack ? this.packEntryHint(pack, latest.kind) : ""
-      lines.push("")
-      lines.push(`■ ${record.name}（${record.id}）${activeVersion ? ` · [本群已启用]` : " · [本群未启用]"}`)
-      if (pack?.description) lines.push(`  说明：${String(pack.description).slice(0, 60)}`)
-      if (commands) lines.push(`  命令：${commands}`)
-      if (entry) lines.push(`  ${entry}`)
-      if (!activeVersion) lines.push(`  启用：发送 .骰规则启用 ${record.id}`)
+      const commands = pack ? this.packCommandSummary(pack, latest.kind).replace(/ · /g, " ") : "—"
+      const usage = pack ? (this.packEntryHint(pack, latest.kind).split("；")[0] || "—") : "—"
+      const status = activeVersion ? "已启用" : `未启用 · 发送 .骰规则启用 ${record.id}`
+      lines.push(`| ${record.name}（${record.id}） | ${status} | ${commands} | ${usage} |`)
     }
+    lines.push("")
+    lines.push(`说明与人物卡字段：.骰规则查看 ${records[0]?.id || "包id"}；本群速览：.dice help`)
     return lines.join("\n")
   }
 

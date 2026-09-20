@@ -887,7 +887,32 @@ export function markdownToDocumentHtml(text = "") {
     codeLanguage = ""
   }
 
+  let tableLines = []
+  const flushTable = () => {
+    if (!tableLines.length) return
+    const rows = tableLines
+      .map(line => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(cell => cell.trim()))
+      .filter(cells => !cells.every(cell => /^:?-{2,}:?$/.test(cell) || cell === ""))
+    tableLines = []
+    if (!rows.length) return
+    const [header, ...body] = rows
+    const width = Math.max(header.length, ...body.map(r => r.length))
+    const th = header.map(cell => `<th>${renderInlineMarkdownHtml(cell)}</th>`).join("")
+    const trs = body.map(row => {
+      const tds = []
+      for (let i = 0; i < width; i++) tds.push(`<td>${renderInlineMarkdownHtml(row[i] || "")}</td>`)
+      return `<tr>${tds.join("")}</tr>`
+    }).join("")
+    html.push(`<table class="md-table"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`)
+  }
+
   for (const rawLine of normalizedText.split(/\r?\n/)) {
+    if (/^\|.*\|$/.test(rawLine.trim())) {
+      flushParagraph()
+      tableLines.push(rawLine)
+      continue
+    }
+    flushTable()
     const fence = rawLine.match(/^```\s*([^`]*)$/)
     if (fence) {
       if (inCode) {
@@ -931,6 +956,7 @@ export function markdownToDocumentHtml(text = "") {
 
   if (inCode) flushCode()
   flushParagraph()
+  flushTable()
   return html.join("\n") || "<p></p>"
 }
 
@@ -1084,6 +1110,9 @@ function buildDocumentHtml(text = "") {
         : "0 14px 30px rgba(27, 39, 63, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.7)"};
       overflow: hidden;
     }
+    .md-table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; }
+    .md-table th, .md-table td { border: 1px solid #d8dee9; padding: 6px 10px; text-align: left; vertical-align: top; }
+    .md-table th { background: #f1f4fb; font-weight: 600; }
     .document::before {
       content: "";
       position: absolute;
