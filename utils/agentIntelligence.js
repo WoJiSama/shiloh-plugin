@@ -223,6 +223,7 @@ export function resolveAgentBackend(config = {}, requestData = {}) {
     apiKey: config.chatAiConfig?.chatApiKey,
     model: config.chatAiConfig?.chatApiModel,
     label: "fast",
+    reasoningEffort: config.chatAiConfig?.chatReasoningEffort || "",
     complexity
   }
 }

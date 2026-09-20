@@ -291,7 +291,8 @@ function resolveConfiguredChatBackend(config = {}) {
         apiUrl: chat.chatApiUrl,
         model: chat.chatApiModel,
         apiKey: chat.chatApiKey,
-        label: "chat"
+        label: "chat",
+        reasoningEffort: chat.chatReasoningEffort || ""
     }
 }
 

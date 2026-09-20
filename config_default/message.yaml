@@ -525,6 +525,8 @@ pluginSettings:
     toolsAiApikey: sk-xxxxx
   }
   chatAiConfig: {
+    # 主模型默认思考档（minimal/low/medium/high）：普通对话可压 low 提速；复杂升档走 toolsAiConfig 不受影响
+    chatReasoningEffort: ""
     chatApiUrl: https://api.openai.com/v1/chat/completions,
     chatApiModel: gemini-2.5-pro,
     chatApiKey: sk-xxxxx
@@ -660,6 +662,10 @@ pluginSettings:
     contentFiltration: true
     # emoji-only 回复后的冷却毫秒数（期间不再递表情工具给模型；explicit 请求不受限）
     emojiCooldownMs: 120000
+    # 强制反应表情（"笑死/离谱/累死"等快路）的配文：从规则配文池抽样一句 leadText，
+    # rate 为带文字的概率（0~0.8）；该群样本足够时按观察到的裸表情占比自适应（夹在 0.15~0.6）
+    forcedReplyTextEnabled: true
+    forcedReplyTextRate: 0.4
     doReplace: false
     enableMaintenance: false
     checkIntervalMinutes: 10

@@ -1379,7 +1379,7 @@ function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearc
 
   const emojiOnlyTools = filterToolsForEmojiExposure(tools, content, {
     groupId: String(e?.group_id || ""),
-    cooldownMs
+    cooldownMs: emojiCooldownMs
   })
   if (emojiOnlyTools) return emojiOnlyTools
 
@@ -5819,6 +5819,18 @@ ${mcpPrompts}
       return result
     } catch {
       return null
+    }
+  }
+
+  /** 强制反应表情的配文概率：配置值 + 该群裸表情占比自适应（样本不足用默认） */
+  async resolveForcedReplyTextRate(groupId = "") {
+    if (this.config?.emojiSystem?.forcedReplyTextEnabled === false) return 0
+    const configured = Math.max(0, Math.min(0.8, Number(this.config?.emojiSystem?.forcedReplyTextRate ?? 0.4)))
+    try {
+      const stats = await this.expressionLearner?.getGroupEmojiLayoutStats?.(groupId)
+      return adaptForcedReplyTextRate(stats, configured)
+    } catch {
+      return configured
     }
   }
 
