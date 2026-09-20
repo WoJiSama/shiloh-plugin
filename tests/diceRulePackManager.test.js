@@ -1060,3 +1060,29 @@ commands:
   const loaded = await runtime.manager.loadPack("hint-chain", { groupId: "g1" })
   assert.equal(loaded.pack.name, "外部提示名")
 })
+
+test("describePackage expands every rule level: commands, arguments, branches and actions", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const staged = await runtime.manager.stageImport(statefulRule, "master")
+  assert.equal(staged.ok, true, staged.errors?.join("; "))
+  await runtime.manager.confirmImport("state-pack", "master")
+  const text = runtime.manager.describePackage("state-pack")
+
+  // 一级规则：命令标题（不带说明的命令也要把子级带上）
+  assert.match(text, /### 命令（一级规则 · 1 条）/)
+  assert.match(text, /#### \.state hit/)
+  // 二级规则：参数表
+  assert.match(text, /参数（二级规则 · 1 个）/)
+  assert.match(text, /\| damage \| integer \| 是 \|/)
+  // 二级规则：命名掷骰
+  assert.match(text, /掷骰（二级规则）：amount=arg\.damage/)
+  // 二级规则：分支，其下再列三级动作
+  assert.match(text, /分支（二级规则 · 2 个/)
+  assert.match(text, /「受伤」当 roll\.amount\.total > 0/)
+  assert.match(text, /动作（三级）：subtract hp=roll\.amount\.total；clamp hp/)
+  assert.match(text, /「无事」其余情况/)
+  // 同样挂在包下的其它规则集合
+  assert.match(text, /### 其它所属规则/)
+  assert.match(text, /人物卡字段（4）：name、hp、injury、effective_hp/)
+})

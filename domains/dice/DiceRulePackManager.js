@@ -213,6 +213,42 @@ function formatValidationReport(result, pending = null, sample = "") {
   ].filter(Boolean).join("\n")
 }
 
+/** 动作摘要：一行说清 op + 作用对象，详情留给 .骰规则查看 的完整层级 */
+function summarizeRuleAction(action = {}) {
+  const op = String(action.op || "?")
+  const bits = []
+  if (action.field) bits.push(`${action.field}${action.value !== undefined ? `=${action.value}` : ""}`)
+  if (action.status) bits.push(`状态 ${action.status}${action.duration !== undefined ? ` ${action.duration}轮` : ""}`)
+  if (action.item) bits.push(`物品 ${action.item}${action.quantity !== undefined ? `×${action.quantity}` : ""}`)
+  if (action.ability) bits.push(`能力 ${action.ability}${action.rank !== undefined ? ` Lv${action.rank}` : ""}`)
+  if (action.scope === "group") bits.push("写群字段")
+  else if (action.scope === "target") bits.push(`作用于 ${action.target || "?"}`)
+  if (!bits.length && action.value !== undefined) bits.push(String(action.value))
+  return `${op} ${bits.join(" ")}`.trim()
+}
+
+/** 输出模板取第一段有内容的文本做预览 */
+function firstTemplateLine(template = "") {
+  const text = String(template || "").replace(/\s+/g, " ").trim()
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text || "（空）"
+}
+
+/** seal-ext 帮助文本压到可放进卡片的长度，保留行结构 */
+function compactSealHelp(help = "") {
+  const lines = String(help || "").split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  const kept = []
+  let total = 0
+  for (const line of lines) {
+    if (total + line.length > 320 || kept.length >= 10) {
+      kept.push("…（完整说明发送该命令的 help 查看）")
+      break
+    }
+    kept.push(line)
+    total += line.length
+  }
+  return kept.length ? kept : ["（无帮助文本）"]
+}
+
 function resolveDefaultValue(value, sender) {
   if (typeof value !== "string") return value
   return value
@@ -1155,18 +1191,111 @@ export class DiceRulePackManager {
     return { file, record: loaded.record }
   }
 
+  /** 规则包详情：一级规则（命令）后面必须跟它的二级规则（参数/分支/掷骰），
+   * 分支下再列三级内容（动作/输出），每一级都展开，不留"看不见的子规则" */
   describePackage(id, version = 0) {
     const loaded = this.loadPack(id, version)
     if (!loaded) throw new Error(`没有找到规则包：${id}`)
     const pack = loaded.pack
-    return [
-      `${pack.name}（${pack.id}@${loaded.record.version}）`,
-      pack.description || "无说明",
-      `包版本：${pack.compatibility?.package_version || "1.0.0"}`,
-      `前缀：${pack.aliases.join("、")}`,
-      `命令：${pack.commands.map(command => `${command.label || command.id}(${command.aliases.join("/")})`).join("，")}`,
-      `字段：${Object.keys(pack.character?.fields || {}).join("、") || "无"}`
-    ].join("\n")
+    const commands = Array.isArray(pack.commands) ? pack.commands : []
+    const kindLabel = loaded.record.kind === "seal-ext" ? "海豹 JS 扩展" : loaded.record.kind === "js" ? "JS 规则包" : "YAML 声明式"
+    const lines = [
+      `## ${pack.name}（${pack.id}@${loaded.record.version}）`,
+      "",
+      String(pack.description || "无说明"),
+      "",
+      "| 包版本 | 前缀 | 类型 | 命令数 |",
+      "| --- | --- | --- | --- |",
+      `| ${pack.compatibility?.package_version || "1.0.0"} | ${(pack.aliases || []).join("、") || "无"} | ${kindLabel} | ${commands.length} |`
+    ]
+
+    // seal-ext：从沙箱运行时取每个命令注册时声明的帮助文本（包清单里没存）
+    let sealHelp = new Map()
+    if (loaded.record.kind === "seal-ext") {
+      try {
+        sealHelp = new Map(this.getSealRuntime(pack, loaded.record).listCommands().map(cmd => [cmd.name, cmd.help]))
+      } catch {}
+    }
+
+    lines.push("", `### 命令（一级规则 · ${commands.length} 条）`)
+    const prefix = pack.aliases?.[0] || pack.id
+    for (const command of commands) {
+      const extraAliases = (command.aliases || []).filter(alias => alias !== command.id)
+      const title = loaded.record.kind === "seal-ext"
+        ? `.${command.id}`
+        : `.${prefix} ${command.id}`
+      const tags = []
+      // seal-ext 的 label 常以命令名开头（"dd（可代骰）"），去掉重复的命令名只留修饰
+      const label = String(command.label || "")
+      const shortLabel = label.startsWith(command.id) ? label.slice(command.id.length).replace(/^[（(]|[）)]$/g, "").trim() : label
+      if (shortLabel) tags.push(shortLabel)
+      if (extraAliases.length) tags.push(`别名 ${extraAliases.join("/")}`)
+      if (command.permission && command.permission !== "all") tags.push(`权限 ${command.permission}`)
+      if (command.visibility && command.visibility !== "public") tags.push(command.visibility === "private" ? "结果私发" : `可见性 ${command.visibility}`)
+      lines.push("", `#### ${title}${tags.length ? `（${tags.join(" · ")}）` : ""}`)
+      if (command.description) lines.push(command.description)
+
+      if (loaded.record.kind === "seal-ext") {
+        const help = String(sealHelp.get(command.id) || "").trim()
+        lines.push(...(help ? compactSealHelp(help) : ["（无帮助文本；直接发送该命令试试）"]))
+        continue
+      }
+
+      // 二级规则：参数
+      const args = Array.isArray(command.arguments) ? command.arguments : []
+      if (args.length) {
+        lines.push("", `参数（二级规则 · ${args.length} 个）：`, "", "| 参数 | 类型 | 必填 | 默认 | 说明 |", "| --- | --- | --- | --- | --- |")
+        for (const arg of args) {
+          const note = [arg.description, Array.isArray(arg.enum) ? `可选：${arg.enum.join("/")}` : ""].filter(Boolean).join("；")
+          lines.push(`| ${arg.rest ? "…" : ""}${arg.id} | ${arg.type || "string"}${arg.multiple ? "（可多个）" : ""} | ${arg.required ? "是" : "否"} | ${arg.default ?? "—"} | ${note || "—"} |`)
+        }
+      }
+
+      // 二级规则：命名掷骰 / 抽表 / 对抗
+      const rolls = Object.entries(command.rolls || {})
+      if (rolls.length) lines.push("", `掷骰（二级规则）：${rolls.map(([rollId, expr]) => `${rollId}=${expr}`).join("，")}`)
+      const draws = Object.entries(command.draws || {})
+      if (draws.length) lines.push("", `抽表（二级规则）：${draws.map(([drawId, tableId]) => `${drawId}←${tableId}`).join("，")}`)
+      if (command.opposed) lines.push("", `对抗（二级规则）：${command.opposed.actor || "?"} vs ${command.opposed.target || "?"}`)
+
+      // 二级规则：分支（每个分支下再列三级动作/输出）
+      const branches = Array.isArray(command.branches) ? command.branches : []
+      if (branches.length) {
+        lines.push("", `分支（二级规则 · ${branches.length} 个，自上而下取第一个命中的）：`)
+        branches.forEach((branch, index) => {
+          const name = branch.result ? `「${branch.result}」` : branch.when === undefined ? "「默认」" : `「分支${index + 1}」`
+          const cond = branch.when === undefined ? "其余情况" : `当 ${branch.when}`
+          lines.push(`- ${name}${cond}`)
+          // 三级：条件分支内的动作与输出
+          const actions = Array.isArray(branch.actions) ? branch.actions : []
+          if (actions.length) lines.push(`  - 动作（三级）：${actions.slice(0, 4).map(summarizeRuleAction).join("；")}${actions.length > 4 ? ` 等${actions.length}个` : ""}`)
+          if (branch.output) lines.push(`  - 输出（三级）：${firstTemplateLine(branch.output)}`)
+        })
+      }
+      const commandActions = Array.isArray(command.actions) ? command.actions : []
+      if (commandActions.length) lines.push("", `命令动作（三级）：${commandActions.slice(0, 4).map(summarizeRuleAction).join("；")}${commandActions.length > 4 ? ` 等${commandActions.length}个` : ""}`)
+
+      if (!args.length && !branches.length && !rolls.length && !draws.length && !command.opposed && !commandActions.length && !command.description) {
+        lines.push("（无二级规则，发送即触发）")
+      }
+    }
+
+    // 同样挂在包下的其它规则集合
+    const collections = [
+      ["随机表", Object.keys(pack.tables || {})],
+      ["自定义骰", Object.keys(pack.dice_sets || {})],
+      ["状态", Object.keys(pack.statuses || {})],
+      ["物品", Object.keys(pack.items || {})],
+      ["能力", Object.keys(pack.abilities || {})],
+      ["事件", Object.keys(pack.events || {})],
+      ["输出模板", Object.keys(pack.templates || {})],
+      ["人物卡字段", Object.keys(pack.character?.fields || {})]
+    ].filter(([, keys]) => keys.length)
+    if (collections.length) {
+      lines.push("", "### 其它所属规则", "")
+      for (const [label, keys] of collections) lines.push(`- ${label}（${keys.length}）：${keys.join("、")}`)
+    }
+    return lines.join("\n")
   }
 
   previewPackage(id) {

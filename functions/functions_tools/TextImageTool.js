@@ -936,10 +936,10 @@ export function markdownToDocumentHtml(text = "") {
       continue
     }
 
-    const heading = rawLine.match(/^\s*(#{1,3})\s+(.+)$/)
+    const heading = rawLine.match(/^\s*(#{1,4})\s+(.+)$/)
     if (heading) {
       flushParagraph()
-      const level = Math.min(3, heading[1].length)
+      const level = Math.min(4, heading[1].length)
       html.push(`<h${level}>${renderInlineMarkdownHtml(heading[2].trim())}</h${level}>`)
       continue
     }
@@ -1134,6 +1134,7 @@ function buildDocumentHtml(text = "") {
     h1 { font-size: 34px; padding-bottom: 14px; border-bottom: 2px solid ${theme.mode === "night" ? "#26344d" : "#dde4ee"}; }
     h2 { margin-top: 26px; font-size: 31px; }
     h3 { margin-top: 22px; font-size: 28px; }
+    h4 { margin-top: 18px; font-size: 26px; color: ${theme.muted}; }
     p { margin: 0 0 16px; white-space: normal; overflow-wrap: anywhere; }
     ul { margin: 0 0 18px; padding-left: 32px; }
     li { margin: 0 0 8px; padding-left: 4px; overflow-wrap: anywhere; }
