@@ -27,10 +27,11 @@ function readPixivRelayConfig() {
     return {
       enabled: relay.enabled !== false,
       proxyUrl: String(relay.proxyUrl || "").trim(),
+      cookieHeader: String(relay.cookieHeader || "").trim(),
       allowRestricted: relay.allowRestricted === true
     }
   } catch {
-    return { enabled: true, proxyUrl: "", allowRestricted: false }
+    return { enabled: true, proxyUrl: "", cookieHeader: "", allowRestricted: false }
   }
 }
 
@@ -44,12 +45,17 @@ export class PixivSearchTool extends AbstractTool {
       properties: {
         keyword: {
           type: "string",
-          description: "搜索关键词,支持画师名、角色名或标签,例如 wlop、海琴烟、東方Project"
+          description: "搜索关键词,支持画师名、角色名或标签,例如 wlop、海琴烟、初音未来"
         },
         searchType: {
           type: "string",
           enum: ["artworks", "artist"],
           description: "artworks=按关键词搜作品(默认);artist=用户想看某位画师本人的作品时,优先按画师名匹配并返回该画师最近的作品"
+        },
+        orderBy: {
+          type: "string",
+          enum: ["newest", "oldest", "popular"],
+          description: "排序:newest=最新(默认);oldest=最早;popular=人气(按收藏数重排)。用户说热门/人气/收藏最多时要传 popular"
         }
       },
       required: ["keyword"],
@@ -58,25 +64,25 @@ export class PixivSearchTool extends AbstractTool {
   }
 
   async func(opts, e) {
-    const { keyword, searchType } = opts
+    const { keyword, searchType, orderBy } = opts
     const config = readPixivRelayConfig()
     if (!config.enabled) return "error: Pixiv 功能当前已在配置中关闭"
 
+    const order = ["newest", "oldest", "popular"].includes(orderBy) ? orderBy : "newest"
     let session
     try {
+      const result = await searchPixivArtworks(keyword, { order, proxyUrl: config.proxyUrl, cookieHeader: config.cookieHeader })
       if (searchType === "artist") {
-        // 画师意图:先关键词搜索,从结果里按画师名匹配;匹配到就切换为该画师最近作品列表
-        const result = await searchPixivArtworks(keyword, { proxyUrl: config.proxyUrl })
+        // 画师意图:从结果里按画师名匹配;匹配到就切换为该画师最近作品列表
         const artist = resolvePixivArtistFromItems(result.items, keyword)
         if (artist) {
-          const works = await listPixivArtistRecentWorks(artist.userId, { proxyUrl: config.proxyUrl })
-          session = { keyword, mode: "artist", artist, total: works.items.length, items: works.items }
+          const works = await listPixivArtistRecentWorks(artist.userId, { proxyUrl: config.proxyUrl, cookieHeader: config.cookieHeader })
+          session = { keyword, mode: "artist", order: "newest", orderSource: "native", artist, total: works.items.length, items: works.items }
         } else {
-          session = { keyword, mode: "artworks", total: result.total, items: result.items }
+          session = { keyword, mode: "artworks", order, orderSource: result.orderSource, total: result.total, items: result.items }
         }
       } else {
-        const result = await searchPixivArtworks(keyword, { proxyUrl: config.proxyUrl })
-        session = { keyword, mode: "artworks", total: result.total, items: result.items }
+        session = { keyword, mode: "artworks", order, orderSource: result.orderSource, total: result.total, items: result.items }
       }
     } catch (error) {
       return `error: Pixiv 搜索失败: ${String(error?.message || error).slice(0, 160)}`

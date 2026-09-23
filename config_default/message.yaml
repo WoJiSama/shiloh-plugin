@@ -61,6 +61,7 @@ pluginSettings:
   pixivRelay:
     enabled: true
     proxyUrl: http://127.0.0.1:7890 # 仅 Pixiv 元数据与图片下载使用的本机 Mihomo HTTP 代理
+    cookieHeader: ""               # 可选，Pixiv 登录后的浏览器 Cookie 请求头；提供后解锁全站热门排序(popular)
     maxPages: 5
     maxImageBytes: 16777216       # bytes，单张最大 16 MiB
     maxTotalBytes: 41943040       # bytes，单次作品图片总计最大 40 MiB

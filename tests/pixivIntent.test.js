@@ -7,11 +7,22 @@ import { hasRecentPixivSearch, savePixivSearchSession } from "../utils/pixivSear
 const AVAILABLE = ["pixivSearchTool", "pixivDownloadTool", "torrentDownloadTool", "searchInformationTool"]
 
 test("parsePixivSearchRequest 识别画师/关键词找图并抽取 keyword", () => {
-  assert.deepEqual(parsePixivSearchRequest("查一下wlop的作品"), { keyword: "wlop", searchType: "artist" })
-  assert.deepEqual(parsePixivSearchRequest("希洛 查查海琴烟的画作"), { keyword: "海琴烟", searchType: "artist" })
-  assert.deepEqual(parsePixivSearchRequest("搜搜初音未来的图"), { keyword: "初音未来", searchType: "artworks" })
-  assert.deepEqual(parsePixivSearchRequest("p站搜海琴烟"), { keyword: "海琴烟", searchType: "artworks" })
-  assert.deepEqual(parsePixivSearchRequest("来点海琴烟的插画"), { keyword: "海琴烟", searchType: "artworks" })
+  assert.deepEqual(parsePixivSearchRequest("查一下wlop的作品"), { keyword: "wlop", searchType: "artist", order: "newest" })
+  assert.deepEqual(parsePixivSearchRequest("希洛 查查海琴烟的画作"), { keyword: "海琴烟", searchType: "artist", order: "newest" })
+  assert.deepEqual(parsePixivSearchRequest("搜搜初音未来的图"), { keyword: "初音未来", searchType: "artworks", order: "newest" })
+  assert.deepEqual(parsePixivSearchRequest("p站搜海琴烟"), { keyword: "海琴烟", searchType: "artworks", order: "newest" })
+  assert.deepEqual(parsePixivSearchRequest("来点海琴烟的插画"), { keyword: "海琴烟", searchType: "artworks", order: "newest" })
+})
+
+test("排序意图:热门/人气 → popular,最早 → oldest", () => {
+  const popular1 = parsePixivSearchRequest("搜一些热门的初音未来同人图")
+  assert.equal(popular1.order, "popular")
+  assert.equal(popular1.keyword, "初音未来", "排序噪声词应从 keyword 中剥离")
+  assert.equal(parsePixivSearchRequest("找初音未来的图,要人气最高的").order, "popular")
+  assert.equal(parsePixivSearchRequest("查海琴烟的图 要收藏最多的").order, "popular")
+  assert.equal(parsePixivSearchRequest("搜最早的海琴烟同人图").order, "oldest")
+  assert.equal(parsePixivSearchRequest("搜最新的海琴烟同人图").order, "newest")
+  assert.equal(parsePixivSearchRequest("搜新版初音未来的图").keyword, "新版初音未来", "正常的「新版」不能被排序词规则误杀")
 })
 
 test("parsePixivSearchRequest 不吞画图/识图/表情包/磁链意图", () => {
@@ -37,11 +48,11 @@ test("找图意图命中 pixivSearchTool 并可确定性解析参数", () => {
   assert.deepEqual(selectToolIntentCandidates("查一下wlop的作品", AVAILABLE), ["pixivSearchTool"])
   assert.deepEqual(
     resolveDeterministicToolIntent("查一下wlop的作品", AVAILABLE),
-    { intent: "tool", toolName: "pixivSearchTool", params: { keyword: "wlop", searchType: "artist" }, reason: "deterministic_manifest" }
+    { intent: "tool", toolName: "pixivSearchTool", params: { keyword: "wlop", searchType: "artist", order: "newest" }, reason: "deterministic_manifest" }
   )
   assert.deepEqual(
     resolveDeterministicToolIntent("搜搜初音未来的图", AVAILABLE).params,
-    { keyword: "初音未来", searchType: "artworks" }
+    { keyword: "初音未来", searchType: "artworks", order: "newest" }
   )
 })
 

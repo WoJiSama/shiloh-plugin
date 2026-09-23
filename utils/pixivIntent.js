@@ -34,13 +34,23 @@ const DOWNLOAD_INDEX_PATTERN = /(?:下载|下|搬运)\s*(?:第\s*)?(\d{1,2})\s*(
 const DOWNLOAD_ID_PATTERN = /(?:下载|下|搬运)\s*(?:id|ID|Id)?\s*(\d{5,12})\s*(?:\s*$|\s*[。!！?？])/
 const TORRENT_MULTI_SELECTION_PATTERN = /(?:下载|下|选择|选)\s*(?:第\s*)?\d+(?:\s*(?:,|，|、)\s*(?:第\s*)?\d+)+/
 
+// 排序意图:热门/人气(收藏数重排) > 最早 > 最新(默认)
+const POPULAR_ORDER_PATTERN = /热门|人气|最受欢迎|最火|收藏最多|点赞最多|赞最多|最多收藏/
+const OLDEST_ORDER_PATTERN = /最早|最旧|最老/
+
 const LEADING_VERB_PATTERN = new RegExp(`^(?:帮我|给我|替我|麻烦|能不能|可以|想要|要|${SEARCH_VERB_SOURCE})\\s*`)
 
 // "p站"出现在句尾补充说明里时("先从 p 站那边翻翻看~"),捕获到的是垃圾词
 const SITE_JUNK_PATTERN = /^(?:那边|这里|一下|看看|看下|翻翻|找找|搜搜|查查|翻翻看)/
 
+// 排序意图词不构成关键词本身("一些热门的初音未来" -> "初音未来");
+// 单字排序词必须带"最"前缀,避免误杀"新版"这类正常词
+const SORT_NOISE_PATTERN = /(?:一些|一点|几个|几组)|(?:热门|人气最高|最受欢迎|最火|收藏最多|点赞最多|赞最多|最新|最早|最旧)(?:的)?/g
+
 function cleanKeyword(value = "") {
-  const text = String(value || "").replace(/\s+/g, " ").replace(/[~～!！。]+$/g, "").trim()
+  let text = String(value || "").replace(/\s+/g, " ").trim()
+  if (!text) return ""
+  text = text.replace(SORT_NOISE_PATTERN, " ").replace(/\s+/g, " ").trim()
   if (!text) return ""
   // 捕获组可能带上残留的引导动词("帮我找找猫"类句式),再剥一层
   const stripped = text.replace(LEADING_VERB_PATTERN, "").trim()
@@ -48,29 +58,31 @@ function cleanKeyword(value = "") {
   return keyword || ""
 }
 
-/** "查一下wlop的作品" -> {keyword:"wlop", searchType:"artist"};不是找图请求返回 null */
+/** "查一下wlop的作品" -> {keyword:"wlop", searchType:"artist", order:"popular"};
+ *  排序词缺省为 newest;不是找图请求返回 null */
 export function parsePixivSearchRequest(text = "") {
   const content = String(text || "").trim()
   if (!content) return null
   if (GENERATION_GUARD.test(content) || EMOJI_GUARD.test(content) || ANALYSIS_GUARD.test(content)) return null
   if (/magnet:\?|磁链|磁力链接/.test(content)) return null
+  const order = POPULAR_ORDER_PATTERN.test(content) ? "popular" : OLDEST_ORDER_PATTERN.test(content) ? "oldest" : "newest"
 
   // 显式的"动词+关键词+的图/的作品"句式优先;纯站点句式("p站搜XX")兜底
   const artistMatch = content.match(ARTIST_WORKS_PATTERN)
   if (artistMatch) {
     const keyword = cleanKeyword(artistMatch[1])
-    if (keyword) return { keyword, searchType: "artist" }
+    if (keyword) return { keyword, searchType: "artist", order }
   }
   const keywordMatch = content.match(KEYWORD_IMAGE_PATTERN)
   if (keywordMatch) {
     const keyword = cleanKeyword(keywordMatch[1])
-    if (keyword) return { keyword, searchType: "artworks" }
+    if (keyword) return { keyword, searchType: "artworks", order }
   }
   const siteMatch = content.match(PIXIV_SITE_PATTERN)
   if (siteMatch) {
     const keyword = cleanKeyword(siteMatch[1])
     if (keyword && !SITE_JUNK_PATTERN.test(keyword)) {
-      return { keyword, searchType: /的作品|画作/.test(content) ? "artist" : "artworks" }
+      return { keyword, searchType: /的作品|画作/.test(content) ? "artist" : "artworks", order }
     }
   }
   return null

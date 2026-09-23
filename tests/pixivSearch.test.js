@@ -135,3 +135,25 @@ test("resolvePixivDownloadTarget 支持序号、#序号和直接作品ID", async
   assert.equal(resolvePixivDownloadTarget("abc", session).id, "")
   assert.equal(resolvePixivDownloadTarget("3", null).id, "")
 })
+
+test("popular 排序:无 Cookie 降级为近期重排,有 Cookie 走原生 popular_d", async () => {
+  const urls = []
+  const fetchImpl = async url => {
+    urls.push(url)
+    const id = url.match(/illust\/(\d+)/)?.[1]
+    if (url.includes("/profile/all")) return jsonResponse({ error: false, body: { illusts: {} } })
+    if (id) return jsonResponse({ error: false, body: { id, bookmarkCount: Number(id) % 100 } })
+    return jsonResponse({ error: false, body: { illustManga: { total: 3, data: [
+      { id: "101", title: "a", userName: "u", userId: "1", pageCount: 1, xRestrict: 0, url: "https://i.pximg.net/a.jpg" },
+      { id: "250", title: "b", userName: "u", userId: "1", pageCount: 1, xRestrict: 0, url: "https://i.pximg.net/b.jpg" },
+      { id: "180", title: "c", userName: "u", userId: "1", pageCount: 1, xRestrict: 0, url: "https://i.pximg.net/c.jpg" }
+    ] } } })
+  }
+  const anon = await searchPixivArtworks("wlop", { order: "popular", fetchImpl })
+  assert.equal(anon.orderSource, "rerank", "无 Cookie 应回退近期重排")
+  assert.deepEqual(anon.items.map(i => i.id), ["180", "250", "101"], "按收藏数重排(80>50>1)")
+  urls.length = 0
+  const authed = await searchPixivArtworks("wlop", { order: "popular", fetchImpl, cookieHeader: "PHPSESSID=xxx" })
+  assert.equal(authed.orderSource, "native", "有 Cookie 走原生排序")
+  assert.match(urls[0], /order=popular_d/, "请求应带原生 popular_d")
+})

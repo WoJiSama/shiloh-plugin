@@ -331,10 +331,12 @@ const TOOL_INTENT_MANIFESTS = {
       "参数规则：",
       "- keyword 是画师名/角色名/标签,例如 wlop、海琴烟、初音未来;不要把「查一下/搜搜/的作品」这类词放进 keyword。",
       "- searchType:用户想看某位画师本人的作品(如「查wlop的作品」「看看XX画师」)传 artist;一般找图/找角色传 artworks(默认)。",
+      "- orderBy:默认 newest(最新);用户说热门/人气/最受欢迎/收藏最多传 popular;说最早/最旧传 oldest。",
       "等价例子：",
       "- “查一下wlop的作品” -> {\"keyword\":\"wlop\",\"searchType\":\"artist\"}",
       "- “搜搜初音未来的图” -> {\"keyword\":\"初音未来\",\"searchType\":\"artworks\"}",
       "- “p站搜海琴烟” -> {\"keyword\":\"海琴烟\",\"searchType\":\"artworks\"}",
+      "- “搜一些热门的初音未来同人图” -> {\"keyword\":\"初音未来 同人\",\"searchType\":\"artworks\",\"orderBy\":\"popular\"}",
       "搜索后引导用户:回复「下载 序号」(如 下载 1)或「下载 作品ID」即可搬运对应作品。"
     ].join("\n")
   },

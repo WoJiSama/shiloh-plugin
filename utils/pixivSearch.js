@@ -37,28 +37,69 @@ export function normalizePixivSearchItem(item = {}) {
   }
 }
 
-/** 关键词搜索 Pixiv 插画/漫画,匿名 ajax 接口,自动经代理。 */
+/**
+ * 关键词搜索 Pixiv 插画/漫画,匿名 ajax 接口,自动经代理。
+ * order: "newest"(默认,时间倒序) | "oldest"(时间正序) | "popular"(人气)。
+ * 匿名接口会静默忽略 popular_* 排序,人气排序通过并行取详情的收藏数重排实现。
+ */
+export const PIXIV_SEARCH_ORDERS = new Set(["newest", "oldest", "popular"])
+const NATIVE_ORDER_MAP = { newest: "date_d", oldest: "date" }
+const POPULAR_CANDIDATES = 24
+
 export async function searchPixivArtworks(keyword = "", {
+  order = "newest",
   page = 1,
   mode = "safe",
   fetchImpl = null,
   proxyUrl = "",
+  cookieHeader = "",
   timeoutMs = SEARCH_TIMEOUT_MS
 } = {}) {
   const word = cleanText(keyword, 80)
   if (!word) throw new Error("缺少搜索关键词")
+  const sortBy = PIXIV_SEARCH_ORDERS.has(order) ? order : "newest"
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(3000, Number(timeoutMs) || SEARCH_TIMEOUT_MS))
   try {
-    const url = `https://www.pixiv.net/ajax/search/artworks/${encodeURIComponent(word)}?word=${encodeURIComponent(word)}&order=date_d&mode=${encodeURIComponent(mode)}&p=${Math.max(1, Math.round(page) || 1)}&type=all&lang=zh`
-    const body = await fetchPixivJson(url, { fetchImpl, proxyUrl, signal: controller.signal })
+    // 匿名接口会静默忽略 popular_* 排序;带登录 Cookie 才能用原生全站热门
+    const nativeOrder = sortBy === "popular"
+      ? (cookieHeader ? "popular_d" : "date_d")
+      : (NATIVE_ORDER_MAP[sortBy] || "date_d")
+    const url = `https://www.pixiv.net/ajax/search/artworks/${encodeURIComponent(word)}?word=${encodeURIComponent(word)}&order=${nativeOrder}&mode=${encodeURIComponent(mode)}&p=${Math.max(1, Math.round(page) || 1)}&type=all&lang=zh`
+    const body = await fetchPixivJson(url, { fetchImpl, proxyUrl, cookieHeader, signal: controller.signal })
     const raw = body?.illustManga?.data || body?.illust?.data || []
-    const items = raw.map(normalizePixivSearchItem).filter(Boolean)
+    let items = raw.map(normalizePixivSearchItem).filter(Boolean)
     if (!items.length) throw new Error(`Pixiv 没有返回「${word}」的搜索结果`)
-    return { keyword: word, total: Number(body?.illustManga?.total || items.length) || items.length, items }
+    let total = Number(body?.illustManga?.total || items.length) || items.length
+    let orderSource = "native"
+    if (sortBy === "popular" && !cookieHeader) {
+      // 无 Cookie 降级:并行取最近候选的收藏数重排,只代表近期人气
+      const ranked = await rankPixivItemsByBookmarks(items.slice(0, POPULAR_CANDIDATES), { fetchImpl, proxyUrl, signal: controller.signal })
+      if (ranked.length) {
+        items = ranked
+        total = Math.min(total, POPULAR_CANDIDATES)
+        orderSource = "rerank"
+      }
+    }
+    return { keyword: word, order: sortBy, orderSource, total, items }
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** 匿名接口拿不到收藏数:并行取详情接口的 bookmarkCount 给候选重排 */
+async function rankPixivItemsByBookmarks(items = [], { fetchImpl = null, proxyUrl = "", signal } = {}) {
+  const ranked = await Promise.all(items.map(async item => {
+    try {
+      const body = await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(item.id)}?lang=zh`, { fetchImpl, proxyUrl, signal })
+      return { ...item, bookmarkCount: Math.max(0, Math.round(Number(body?.bookmarkCount) || 0)) }
+    } catch {
+      return { ...item, bookmarkCount: -1 }
+    }
+  }))
+  const withCount = ranked.filter(item => item.bookmarkCount >= 0)
+  if (!withCount.length) return []
+  return withCount.sort((a, b) => b.bookmarkCount - a.bookmarkCount)
 }
 
 /**
@@ -86,13 +127,14 @@ export async function listPixivArtistRecentWorks(userId = "", {
   limit = ARTIST_RECENT_LIMIT,
   fetchImpl = null,
   proxyUrl = "",
+  cookieHeader = "",
   timeoutMs = SEARCH_TIMEOUT_MS
 } = {}) {
   const uid = String(userId || "").trim()
   if (!/^\d{3,12}$/.test(uid)) throw new Error("画师 ID 不合法")
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(6000, Number(timeoutMs) * 2 || SEARCH_TIMEOUT_MS * 2))
-  const request = { fetchImpl, proxyUrl, signal: controller.signal }
+  const request = { fetchImpl, proxyUrl, cookieHeader, signal: controller.signal }
   try {
     const profile = await fetchPixivJson(`https://www.pixiv.net/ajax/user/${encodeURIComponent(uid)}/profile/all?lang=zh`, request)
     const illustIds = Object.keys(profile?.illusts || {})
@@ -137,8 +179,10 @@ export async function savePixivSearchSession(e = {}, session = {}, { redis = glo
   const record = {
     keyword: String(session.keyword || ""),
     mode: String(session.mode || "artworks"),
+    order: PIXIV_SEARCH_ORDERS.has(session.order) ? session.order : "newest",
+    orderSource: session.orderSource === "rerank" ? "rerank" : "native",
     artist: session.artist && typeof session.artist === "object" ? { userId: session.artist.userId, userName: session.artist.userName } : null,
-    items: session.items.slice(0, 20).map(({ id, title, userName, pageCount, xRestrict }) => ({ id, title, userName, pageCount, xRestrict })),
+    items: session.items.slice(0, 20).map(({ id, title, userName, pageCount, xRestrict, bookmarkCount }) => ({ id, title, userName, pageCount, xRestrict, bookmarkCount })),
     savedAt
   }
   localSessions.set(key, record)
@@ -234,6 +278,12 @@ async function imageDataUri(filePath = "") {
   }
 }
 
+function formatCount(value = 0) {
+  const number = Math.max(0, Math.round(Number(value) || 0))
+  if (number >= 10000) return `${(number / 10000).toFixed(1)}万`
+  return String(number)
+}
+
 async function buildPixivListHtml(data = {}) {
   const rows = (await Promise.all(data.items.map(async (item, offset) => {
     const dataUri = await imageDataUri(item.thumbPath)
@@ -243,7 +293,7 @@ async function buildPixivListHtml(data = {}) {
       <td class="thumb">${dataUri ? `<img src="${dataUri}" />` : "<div class='thumb ph'>无图</div>"}</td>
       <td class="info">
         <div class="title">${escapeHtml(item.title)}</div>
-        <div class="author">${escapeHtml(item.userName)}${item.pageCount > 1 ? ` · ${item.pageCount}张` : ""}${item.xRestrict > 0 ? " · R-18" : ""}</div>
+        <div class="author">${escapeHtml(item.userName)}${item.pageCount > 1 ? ` · ${item.pageCount}张` : ""}${Number(item.bookmarkCount) > 0 ? ` · ♥${formatCount(item.bookmarkCount)}` : ""}${item.xRestrict > 0 ? " · R-18" : ""}</div>
       </td>
       <td class="id">${escapeHtml(item.id)}</td>
     </tr>`
@@ -307,9 +357,15 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
     return { ...item, thumbPath }
   }))
   const total = Number(session.total || items.length) || items.length
+  const orderLabel = {
+    newest: "按时间·最新",
+    oldest: "按时间·最早",
+    "popular-native": "按人气·全站收藏排序",
+    "popular-rerank": "按近期人气(最新上传中收藏最多,登录Cookie可解锁全站)"
+  }[session.orderSource === "rerank" ? "popular-rerank" : session.order === "popular" ? "popular-native" : PIXIV_SEARCH_ORDERS.has(session.order) ? session.order : "newest"]
   const subtitle = session.mode === "artist" && session.artist?.userName
-    ? `画师 ${session.artist.userName} 的最近作品 · 共 ${items.length} 张`
-    : `共 ${total} 个结果,展示前 ${items.length} 个 · 按时间排序`
+    ? `画师 ${session.artist.userName} 的最近作品 · 共 ${items.length} 张 · ${orderLabel}`
+    : `共 ${total} 个结果,展示前 ${items.length} 个 · ${orderLabel}`
   const outputDir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-cards")
   await fs.promises.mkdir(outputDir, { recursive: true })
   const outputPath = path.join(outputDir, `pixiv-list-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`)

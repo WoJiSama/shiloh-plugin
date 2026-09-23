@@ -64,8 +64,9 @@ function pixivHeaders() {
   return { Referer: "https://www.pixiv.net/", "User-Agent": "Mozilla/5.0 (compatible; XiloMediaRelay/1.0)", Accept: "application/json" }
 }
 
-export async function fetchPixivJson(url, { fetchImpl = null, proxyUrl = "", signal } = {}) {
+export async function fetchPixivJson(url, { fetchImpl = null, proxyUrl = "", cookieHeader = "", signal } = {}) {
   const headers = pixivHeaders()
+  if (cookieHeader) headers.Cookie = String(cookieHeader).replace(/^\s*cookie\s*:\s*/i, "").trim()
   const readPayload = async response => {
     if (!response?.ok) throw new Error(`Pixiv 接口返回 ${response?.status || "未知状态"}`)
     const payload = await response.json()
