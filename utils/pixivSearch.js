@@ -143,7 +143,13 @@ export async function savePixivSearchSession(e = {}, session = {}, { redis = glo
   }
   localSessions.set(key, record)
   pruneLocalSessions()
-  if (redis?.set) await redis.set(key, JSON.stringify(record), "PX", Math.max(1000, PIXIV_SEARCH_SESSION_TTL_MS - (Date.now() - savedAt))).catch(() => {})
+  if (redis?.set) {
+    // set+pexpire 分离:node-redis/ioredis 对 SET 的可选参数写法不兼容,
+    // pexpire(key, ms) 两者都支持位置参数。
+    const ttlMs = Math.max(1000, PIXIV_SEARCH_SESSION_TTL_MS - (Date.now() - savedAt))
+    await redis.set(key, JSON.stringify(record)).catch(() => {})
+    await redis.pexpire?.(key, ttlMs).catch(() => {})
+  }
   return record
 }
 
@@ -267,7 +273,11 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
   const withThumbs = await Promise.all(items.map(async item => {
     let thumbPath = ""
     if (item.thumbUrl) {
+      // 8 张并发走代理偶发单张失败,补一次重试再降级占位
       thumbPath = await downloadPixivArchiveImage(item.thumbUrl, { maxBytes: 3 * 1024 * 1024, timeoutMs: 12_000, proxyUrl, fetchImpl })
+      if (!thumbPath) {
+        thumbPath = await downloadPixivArchiveImage(item.thumbUrl, { maxBytes: 3 * 1024 * 1024, timeoutMs: 12_000, proxyUrl, fetchImpl })
+      }
       if (thumbPath) tempFiles.push(thumbPath)
     }
     return { ...item, thumbPath }

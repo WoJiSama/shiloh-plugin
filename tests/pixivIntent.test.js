@@ -81,3 +81,24 @@ test("普通聊天不误触发 Pixiv 工具", () => {
   assert.deepEqual(selectToolIntentCandidates("今天中午吃什么", AVAILABLE), [])
   assert.deepEqual(selectToolIntentCandidates("帮我画一张猫", AVAILABLE).includes("pixivSearchTool"), false)
 })
+
+test("Pixiv 两个工具是终态工具:卡面/图片即回复,不进入 LLM 续轮", async () => {
+  const { TERMINAL_TOOL_NAMES } = await import("../core/intent/messageIntent.js")
+  assert.equal(TERMINAL_TOOL_NAMES.has("pixivSearchTool"), true, "搜索卡面发出后不应再让模型续轮(否则会二次调用工具)")
+  assert.equal(TERMINAL_TOOL_NAMES.has("pixivDownloadTool"), true)
+})
+
+test("Redis 会话用 set+pexpire 写入,TTL 与 5 分钟窗口对齐", async () => {
+  const calls = []
+  const fakeRedis = {
+    set: async (key, value) => { calls.push(["set", key, value.length > 0]) },
+    pexpire: async (key, ms) => { calls.push(["pexpire", key, ms]) }
+  }
+  const e = { group_id: 424242 }
+  await savePixivSearchSession(e, { keyword: "wlop", items: [{ id: "1", title: "t" }] }, { redis: fakeRedis })
+  const setCall = calls.find(call => call[0] === "set")
+  const expireCall = calls.find(call => call[0] === "pexpire")
+  assert.ok(setCall, "应写入 redis")
+  assert.ok(expireCall, "应设置过期时间")
+  assert.ok(expireCall[2] > 290_000 && expireCall[2] <= 300_000, "TTL 应接近 5 分钟")
+})

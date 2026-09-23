@@ -4,7 +4,7 @@ import { hasExplicitImageGenerationRequest, hasExplicitImageEditAction, shouldTr
 import { looksLikeVisualInspectionRequest, looksLikeImageVerificationRequest, looksLikeImageAuthenticityRequest } from "../../utils/imageRequestGuard.js"
 
 // 终态工具：本轮调用后不再请求 LLM 续话（工具的执行结果本身即为最终输出）
-const TERMINAL_TOOL_NAMES = new Set(['sendLocalEmojiTool', 'waitTool', 'bananaTool', 'googleImageEditTool', 'voiceTool', 'deltaForceTool', 'mentionAdminsTool', 'mentionMembersTool', 'torrentDownloadTool'])
+const TERMINAL_TOOL_NAMES = new Set(['sendLocalEmojiTool', 'waitTool', 'bananaTool', 'googleImageEditTool', 'voiceTool', 'deltaForceTool', 'mentionAdminsTool', 'mentionMembersTool', 'torrentDownloadTool', 'pixivSearchTool', 'pixivDownloadTool'])
 
 const BACKGROUND_TERMINAL_TOOL_NAMES = new Set(['bananaTool', 'googleImageEditTool', 'torrentDownloadTool'])
 
