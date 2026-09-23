@@ -12,6 +12,18 @@ export const AI_PROVIDER_DEFINITIONS = [
     usageHint: "用于会话追踪时判断用户是否在和 bot 继续对话，推荐快速小模型"
   },
   {
+    configKey: "intentAiConfig",
+    title: "意图分类 intentAiConfig",
+    listLabel: "意图分类模型列表",
+    urlField: "intentAiUrl",
+    modelField: "intentAiModel",
+    keyField: "intentAiApikey",
+    priorityField: "intentAiPriority",
+    urlPlaceholder: "https://api.deepseek.com/chat/completions",
+    modelPlaceholder: "deepseek-v4-flash",
+    usageHint: "每条消息都要过的前置意图分类与语义工具分类，延迟直接决定响应速度，必须用 flash 级快模型；留空时回退工具决策模型"
+  },
+  {
     configKey: "toolsAiConfig",
     title: "工具决策 toolsAiConfig",
     listLabel: "工具决策模型列表",
