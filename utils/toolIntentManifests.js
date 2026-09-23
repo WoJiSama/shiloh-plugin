@@ -109,5 +109,8 @@ export function resolveToolRequestMergeMs(text = "", availableToolNames = [], op
   const defaultMs = Number.isFinite(defaultValue) ? Math.max(0, defaultValue) : 3000
   const fastValue = Number(options.fastMs)
   const fastMs = Number.isFinite(fastValue) ? Math.max(0, fastValue) : 600
-  return resolveDeterministicToolIntent(text, availableToolNames, options) ? fastMs : defaultMs
+  if (resolveDeterministicToolIntent(text, availableToolNames, options)) return fastMs
+  // 句尾已是完结标点(。!?)大概率说完了,缩短等待;悬着的半句才等满窗口
+  if (Number.isFinite(defaultValue)) return defaultMs
+  return /[。．.!！?？~～]$|\n\s*$/.test(String(text || "").trimEnd()) ? 1200 : defaultMs
 }

@@ -4,7 +4,7 @@ import { makeFact } from './entityModel.js'
 import { memStats } from './stats.js'
 
 const DAY_MS = 86400000
-const CHAT_TIMEOUT_MS = 8000
+const CHAT_TIMEOUT_MS = 20000
 
 // 把 refs 过滤为纯数字字符串数组（防 AI 幻觉非数字/非法 QQ）。
 // 入参可为任意值；逐项 String 化后只保留全数字的，去重。

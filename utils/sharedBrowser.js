@@ -1,6 +1,6 @@
 import puppeteer from "puppeteer"
 
-const SHARED_BROWSER_IDLE_MS = 60_000
+const SHARED_BROWSER_IDLE_MS = 10 * 60_000
 const PUPPETEER_LAUNCH_OPTIONS = {
   headless: "new",
   args: [

@@ -88,7 +88,7 @@ import { analyzeReplyText } from "../utils/SmartReply.js"
 import { buildMissingImageAnalysisReply, looksLikeImageAuthenticityRequest, looksLikeImageVerificationRequest, looksLikeVisualInspectionRequest, shouldAskForMissingImageForVisualRequest } from "../utils/imageRequestGuard.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../utils/chatCompletionUrl.js"
 import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLines, selectMergedImagePromptTexts } from "../utils/promptCompiler.js"
-import { buildToolIntentDisclosure, resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
+import { buildToolIntentDisclosure, resolveDeterministicToolIntent, resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
 import { extractValidBtihMagnetUri } from "../utils/torrentDownload.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../utils/toolSkills.js"
 import { formatGroupWorkflowTeachingPrompt } from "../domains/memory/engine/groupWorkflow.js"
@@ -3774,6 +3774,16 @@ ${recentHistory || '(无)'}
           toolCandidates: intentToolCandidates
         })
         let modelIntentDecision = null
+        const availableToolNamesNow = (this.toolInstances ? Object.keys(this.toolInstances) : [])
+        const deterministicIntentReady = Boolean(resolveDeterministicToolIntent(currentIntentText, availableToolNamesNow, {
+          hasExcelContext,
+          hasPixivSearchSession: hasRecentPixivSearch({ group_id: groupId, user_id: userId })
+        }))
+        if (deterministicIntentReady) {
+          turnTrace.setIntent("tool", null, "deterministic_skip")
+          logger.info(`[意图快路] group=${groupId} 确定性候选已命中，跳过意图模型`)
+          skipIntentModel = true
+        }
         if (skipIntentModel) {
           turnTrace.setIntent("chat", null, "fast_path_skip")
           logger.info(`[意图快路] group=${groupId} 无工具信号的短闲聊，跳过意图模型`)

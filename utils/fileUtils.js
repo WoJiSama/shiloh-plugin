@@ -4,7 +4,12 @@ import mimeTypes from 'mime-types';
 import fs from "fs";
 import path from "path";
 import crypto from 'crypto';
-import common from '../../../lib/common/common.js';
+let common = { makeForwardMsg: null }
+try {
+  common = (await import('../../../lib/common/common.js')).default
+} catch {
+  // 上游仓库遗留的宿主本地路径;运行环境没有时保持可用占位
+}
 import { splitUnicodeText } from './unicodeText.js';
 import { classifyMessageSegmentMedia } from './mediaTypePolicy.js';
 import { buildVisibleFailureDetail } from './visibleFailure.js';
@@ -1206,7 +1211,7 @@ export async function sendLongMessage(e, messages, forwardMsg, maxLength = 1000)
     msgArray.forEach(msg => directForwardMsg.push(msg));
 
     // 尝试一次性发送所有消息
-    const jsonPart = await common.makeForwardMsg(e, directForwardMsg, 'Preview');
+    const jsonPart = await common.makeForwardMsg?.(e, directForwardMsg, 'Preview');
     await e.reply(jsonPart);
     logger.info('消息已成功一次性发送');
 
@@ -1236,7 +1241,7 @@ export async function sendLongMessage(e, messages, forwardMsg, maxLength = 1000)
       }
 
       // 生成转发消息并发送
-      const jsonPart = await common.makeForwardMsg(e, segmentedForwardMsg, 'Preview');
+      const jsonPart = await common.makeForwardMsg?.(e, segmentedForwardMsg, 'Preview');
       await e.reply(jsonPart);
       logger.info('消息已成功分段发送');
 
