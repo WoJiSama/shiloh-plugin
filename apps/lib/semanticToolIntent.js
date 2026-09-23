@@ -120,10 +120,13 @@ export function extractJsonObject(host, text = "") {
   }
 
 export async function classifySemanticToolIntent(host, context = {}) {
+    // 分类需要低延迟:优先独立的 intentAiConfig(可指向快速模型),回落 tools 模型。
+    // 实测 gpt-5.6-sol 单次 14-48s(必超时),deepseek-v4-flash 稳定 ~4s。
+    const fastIntent = host.config?.intentAiConfig || {}
     const cfg = host.config.toolsAiConfig || {}
-    const apiUrl = cfg.toolsAiUrl
-    const apiKey = cfg.toolsAiApikey
-    const model = cfg.toolsAiModel
+    const apiUrl = fastIntent.intentAiUrl || cfg.toolsAiUrl
+    const apiKey = fastIntent.intentAiApikey || cfg.toolsAiApikey
+    const model = fastIntent.intentAiModel || cfg.toolsAiModel
     if (!apiUrl || !apiKey || !model || String(apiKey).includes("sk-xxx")) return null
 
     const url = host.resolveChatCompletionUrl(apiUrl)
