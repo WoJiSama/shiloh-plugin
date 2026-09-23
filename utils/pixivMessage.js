@@ -1,6 +1,16 @@
+import { fetchWithProxy } from "./proxiedFetch.js"
+
 const CACHE_TTL_MS = 30 * 60 * 1000
 const CACHE_MAX = 100
 const metadataCache = new Map()
+// 同 key 在途请求合并:outbox 预刷新(cacheTtlMs:0)与消息富化并发时共享一次 Pixiv 请求。
+const inflightEnrichments = new Map()
+// pixiv.net 在国内不可达;元数据请求默认走启动时注入的代理(runtime 从 pixivRelay.proxyUrl 读取)。
+let pixivProxyUrl = ""
+
+export function setPixivFetchProxy(proxyUrl = "") {
+  pixivProxyUrl = String(proxyUrl || "").trim()
+}
 
 function cleanText(value = "", maxLength = 1000) {
   const text = String(value || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
@@ -54,12 +64,16 @@ function pixivHeaders() {
   return { Referer: "https://www.pixiv.net/", "User-Agent": "Mozilla/5.0 (compatible; XiloMediaRelay/1.0)", Accept: "application/json" }
 }
 
-async function fetchJson(fetchImpl, url, signal) {
-  const response = await fetchImpl(url, { headers: pixivHeaders(), signal })
-  if (!response?.ok) throw new Error(`Pixiv 接口返回 ${response?.status || "未知状态"}`)
-  const payload = await response.json()
-  if (payload?.error || !payload?.body) throw new Error(cleanText(payload?.message || "Pixiv 未返回公开作品信息", 120))
-  return payload.body
+export async function fetchPixivJson(url, { fetchImpl = null, proxyUrl = "", signal } = {}) {
+  const headers = pixivHeaders()
+  const readPayload = async response => {
+    if (!response?.ok) throw new Error(`Pixiv 接口返回 ${response?.status || "未知状态"}`)
+    const payload = await response.json()
+    if (payload?.error || !payload?.body) throw new Error(cleanText(payload?.message || "Pixiv 未返回公开作品信息", 120))
+    return payload.body
+  }
+  if (typeof fetchImpl === "function") return await readPayload(await fetchImpl(url, { headers, signal }))
+  return await fetchWithProxy(url, { proxyUrl: proxyUrl || pixivProxyUrl, headers, signal }, readPayload)
 }
 
 function normalizeTags(tags = []) {
@@ -74,18 +88,18 @@ function normalizePages(pages = []) {
   }).filter(Boolean)
 }
 
-async function requestPixivArtwork(card = {}, { fetchImpl, timeoutMs = 7000 } = {}) {
-  if (typeof fetchImpl !== "function") throw new Error("Pixiv 请求能力不可用")
+async function requestPixivArtwork(card = {}, { fetchImpl = null, proxyUrl = "", timeoutMs = 7000 } = {}) {
   const artworkId = String(card.artwork_id || extractPixivArtworkId(card.page_url || card.short_url) || "").trim()
   if (!artworkId) throw new Error("未识别到 Pixiv 作品 ID")
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(500, Number(timeoutMs) || 7000))
+  const request = { fetchImpl, proxyUrl, signal: controller.signal }
   try {
-    const body = await fetchJson(fetchImpl, `https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}`, controller.signal)
+    const body = await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}`, request)
     const pageCount = Math.max(1, numberOrNull(body.pageCount) || 1)
     let pages = []
     try {
-      const pageBody = await fetchJson(fetchImpl, `https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}/pages`, controller.signal)
+      const pageBody = await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}/pages`, request)
       pages = normalizePages(pageBody)
     } catch {
       const url = String(body.urls?.regular || body.urls?.small || body.urls?.original || "")
@@ -130,9 +144,21 @@ export async function enrichPixivShare(card = {}, options = {}) {
   pruneCache()
   const cached = metadataCache.get(key)
   if (cached?.expiresAt > Date.now()) return await cached.promise
-  const promise = requestPixivArtwork(card, { fetchImpl: options.fetchImpl || globalThis.fetch, timeoutMs: options.timeoutMs }).catch(() => ({ ...card, metadata_status: card.metadata_status || "identified" }))
-  metadataCache.set(key, { promise, expiresAt: Date.now() + CACHE_TTL_MS })
-  return await promise
+  const inflight = inflightEnrichments.get(key)
+  if (inflight) return await inflight.promise
+  const promise = requestPixivArtwork(card, {
+    fetchImpl: options.fetchImpl || null,
+    proxyUrl: options.proxyUrl || "",
+    timeoutMs: options.timeoutMs
+  }).catch(() => ({ ...card, metadata_status: card.metadata_status || "identified" }))
+  const inflightRecord = { promise }
+  inflightEnrichments.set(key, inflightRecord)
+  metadataCache.set(key, { promise, expiresAt: Date.now() + Math.max(0, Number(options.cacheTtlMs ?? CACHE_TTL_MS) || 0) })
+  try {
+    return await promise
+  } finally {
+    if (inflightEnrichments.get(key) === inflightRecord) inflightEnrichments.delete(key)
+  }
 }
 
 export async function enrichPixivMessageSegments(segments = [], rawMessage = "", options = {}) {
@@ -165,4 +191,5 @@ export function formatPixivHistoryLinks(card = {}) {
 
 export function clearPixivMetadataCache() {
   metadataCache.clear()
+  inflightEnrichments.clear()
 }

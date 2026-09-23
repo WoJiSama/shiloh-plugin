@@ -283,7 +283,7 @@ export class MediaOutbox {
         formatText: formatPixivHistoryText,
         formatLinks: formatPixivHistoryLinks,
         relayOptions: { pixivRelay: this.pixivRelay },
-        enrichOptions: {},
+        enrichOptions: { proxyUrl: this.pixivRelay.proxyUrl },
         enabled: this.pixivRelay.enabled !== false,
         resolvedStatuses: ["resolved"]
       }

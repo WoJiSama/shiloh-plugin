@@ -283,15 +283,18 @@ test("casual emoji exposure only keeps sendLocalEmojiTool", () => {
 test("forces emoji-only replies for high-confidence short reactions", () => {
   assert.deepEqual(resolveForcedReactionEmoji("绷不住了哈哈哈哈"), {
     tags: ["笑死", "吐槽"],
-    useCases: ["接梗吐槽"]
+    useCases: ["接梗吐槽"],
+    replies: ["哈哈哈哈哈", "笑死我了", "这也太逗了"]
   })
   assert.deepEqual(resolveForcedReactionEmoji("这也太离谱了"), {
     tags: ["无语", "震惊", "吐槽"],
-    useCases: ["无言以对", "看到离谱"]
+    useCases: ["无言以对", "看到离谱"],
+    replies: ["不是吧", "这什么操作", "我直接看傻"]
   })
   assert.deepEqual(resolveForcedReactionEmoji("抱抱我"), {
     tags: ["安慰", "委屈"],
-    useCases: ["安慰对方", "接梗摸头"]
+    useCases: ["安慰对方", "接梗摸头"],
+    replies: ["摸摸", "抱一下", "来，安慰你"]
   })
   assert.equal(resolveForcedReactionEmoji("查一下这个离谱新闻"), null)
   assert.equal(resolveForcedReactionEmoji("你觉得这个方案是不是很离谱"), null)

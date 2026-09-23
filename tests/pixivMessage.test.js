@@ -45,3 +45,31 @@ test("Pixiv relay downloads bounded images and skips restricted works by default
   assert.match(restricted.segments.join(""), /受限内容/)
 })
 
+test("outbox 预刷新与消息富化并发时只发一次 Pixiv 请求", async () => {
+  clearPixivMetadataCache()
+  let fetchCalls = 0
+  const fetchImpl = async url => {
+    fetchCalls += 1
+    return new Response(JSON.stringify(url.endsWith("/pages")
+      ? { error: false, body: [] }
+      : { error: false, body: { title: "art", userName: "artist", pageCount: 1 } }), { status: 200, headers: { "content-type": "application/json" } })
+  }
+  const card = { type: "pixiv", artwork_id: "98765", page_url: "https://www.pixiv.net/artworks/98765" }
+  const [prewarm, enriched] = await Promise.all([
+    enrichPixivShare({ ...card }, { fetchImpl, cacheTtlMs: 0 }),
+    enrichPixivShare({ ...card }, { fetchImpl })
+  ])
+  assert.equal(fetchCalls, 2, "元数据+分页各一次,在途请求应合并")
+  assert.equal(prewarm.metadata_status, "resolved")
+  assert.equal(enriched.metadata_status, "resolved")
+  assert.equal(prewarm.title, enriched.title)
+})
+
+test("MediaOutbox 的 Pixiv 适配器把代理配置传给元数据刷新", async () => {
+  const { MediaOutbox } = await import("../utils/messagePipeline/mediaOutbox.js")
+  const outbox = new MediaOutbox({ store: {}, gateway: {}, logger: null, pixivRelay: { proxyUrl: "http://127.0.0.1:7890" } })
+  const adapter = outbox.platformAdapter("pixiv")
+  assert.equal(adapter.enrichOptions.proxyUrl, "http://127.0.0.1:7890")
+  assert.equal(adapter.relayOptions.pixivRelay.proxyUrl, "http://127.0.0.1:7890")
+})
+

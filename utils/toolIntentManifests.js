@@ -3,6 +3,7 @@ import { buildExcelToolParams } from "./excelRequestPolicy.js"
 import { parseModrinthRequestOptions } from "./modrinth.js"
 import { extractGroupKnowledgeForgetTarget, isExplicitGroupKnowledgeForgetRequest } from "./groupKnowledgeForgetPolicy.js"
 import { extractValidBtihMagnetUri } from "./torrentDownload.js"
+import { parsePixivDownloadRequest, parsePixivSearchRequest } from "./pixivIntent.js"
 
 function normalizeText(text = "") {
   return String(text || "")
@@ -314,6 +315,47 @@ const TOOL_INTENT_MANIFESTS = {
       "- ‘Modrinth 最近更新的机械模组前 3 个’ -> {\"sort\":\"updated\",\"limit\":3,\"query\":\"technology\"}"
     ].join("\n")
   },
+  pixivSearchTool: {
+    triggers: [
+      /p站|pixiv/i,
+      /(?:查|搜|找|寻|看看|看下)[^，,。！!？?\n]{0,6}(?:的)?(?:插画|作品|画师|同人图|美图|图集)/i,
+      /(?:来点|来几张)[^，,。！!？?\n]{0,12}(?:的)?(?:图|插画|作品|立绘)/i,
+      /(?:搜|查|找)[^，,。！!？?\n]{0,14}(?:的)?(?:图|插画|立绘)/i
+    ],
+    disclosure: [
+      "【pixivSearchTool 详细用法】",
+      "用途：搜索 Pixiv 插画并发送带缩略图的结果列表卡面。",
+      "调用边界：",
+      "- 用户想找现成的插画/作品/某画师的作品时调用；不是画图(画/生成新图走生图工具)、不是看图识图。",
+      "- 找表情包时不要调用(走表情包工具)。",
+      "参数规则：",
+      "- keyword 是画师名/角色名/标签,例如 wlop、海琴烟、初音未来;不要把「查一下/搜搜/的作品」这类词放进 keyword。",
+      "- searchType:用户想看某位画师本人的作品(如「查wlop的作品」「看看XX画师」)传 artist;一般找图/找角色传 artworks(默认)。",
+      "等价例子：",
+      "- “查一下wlop的作品” -> {\"keyword\":\"wlop\",\"searchType\":\"artist\"}",
+      "- “搜搜初音未来的图” -> {\"keyword\":\"初音未来\",\"searchType\":\"artworks\"}",
+      "- “p站搜海琴烟” -> {\"keyword\":\"海琴烟\",\"searchType\":\"artworks\"}",
+      "搜索后引导用户:回复「下载 序号」(如 下载 1)或「下载 作品ID」即可搬运对应作品。"
+    ].join("\n")
+  },
+  pixivDownloadTool: {
+    triggers: [
+      /(?:下载|下|搬运)\s*(?:第\s*)?\d{1,2}\s*(?:张|个|幅|图)?\s*(?:$|[。!！?？])/i,
+      /(?:下载|下|搬运)\s*(?:id|ID|Id)?\s*\d{5,12}/i
+    ],
+    disclosure: [
+      "【pixivDownloadTool 详细用法】",
+      "用途：下载并搬运一张 Pixiv 插画到群里。",
+      "调用边界：",
+      "- 只在用户针对 Pixiv 搜索列表说「下载 N」「下载 作品ID」时调用。",
+      "- 磁链、BT、多选编号(下载 1,3)走磁链下载工具,与本工具无关。",
+      "参数规则：",
+      "- target 是搜索列表里的序号(如 3)或作品ID(纯数字);不要带「下载/id」等字样。",
+      "等价例子：",
+      "- 搜索列表后“下载 2” -> {\"target\":\"2\"}",
+      "- “下载 126649495” -> {\"target\":\"126649495\"}"
+    ].join("\n")
+  },
   torrentDownloadTool: {
     triggers: [
       /magnet:\?xt=urn:btih:/i,
@@ -419,7 +461,7 @@ const TOOL_INTENT_MANIFESTS = {
   }
 }
 
-export function selectToolIntentCandidates(text = "", availableToolNames = []) {
+export function selectToolIntentCandidates(text = "", availableToolNames = [], context = {}) {
   const content = normalizeText(text)
   if (!content) return []
   const available = new Set(availableToolNames)
@@ -432,10 +474,10 @@ export function selectToolIntentCandidates(text = "", availableToolNames = []) {
     }
     if (manifest.triggers.some(pattern => pattern.test(content))) candidates.push(toolName)
   }
-  return resolveCandidateConflicts(candidates, content)
+  return resolveCandidateConflicts(candidates, content, context)
 }
 
-function resolveCandidateConflicts(candidates = [], content = "") {
+function resolveCandidateConflicts(candidates = [], content = "", context = {}) {
   let resolved = [...candidates]
 
   // A reaction image must never turn an explicit operational request back into
@@ -445,6 +487,17 @@ function resolveCandidateConflicts(candidates = [], content = "") {
     if (hasOperationalTool) {
       resolved = resolved.filter(name => name !== "sendLocalEmojiTool")
     }
+  }
+
+  // 「下载 N」在磁链选择与 Pixiv 列表之间有歧义:
+  // - 磁链或多选编号始终归磁链工具;
+  // - 5 位以上纯数字更像 Pixiv 作品ID;
+  // - 短序号看哪边有活跃会话( Pixiv 侧用进程内存同步检查)。
+  if (resolved.includes("pixivDownloadTool") && resolved.includes("torrentDownloadTool")) {
+    const looksTorrent = /magnet:\?|磁链|磁力链接/.test(content) || /(?:下载|下|选择|选)\s*(?:第\s*)?\d+(?:\s*(?:,|，|、)\s*(?:第\s*)?\d+)+/.test(content)
+    const looksPixivId = /(?:下载|下|搬运)\s*(?:id|ID)?\s*\d{5,12}/i.test(content)
+    const preferPixiv = !looksTorrent && (looksPixivId || context.hasPixivSearchSession === true)
+    resolved = resolved.filter(name => (preferPixiv ? name !== "torrentDownloadTool" : name !== "pixivDownloadTool"))
   }
 
   if (resolved.includes("githubRepoTool")) {
@@ -494,6 +547,8 @@ const DETERMINISTIC_TOOL_RESOLVERS = {
       .filter(value => Number.isSafeInteger(value) && value >= 1)
     return indexes.length ? { selection: indexes } : null
   },
+  pixivSearchTool: text => parsePixivSearchRequest(text),
+  pixivDownloadTool: text => parsePixivDownloadRequest(text),
   forgetGroupKnowledgeTool: text => {
     const memory = extractGroupKnowledgeForgetTarget(text)
     return memory ? { memory } : null
@@ -513,7 +568,7 @@ const DETERMINISTIC_TOOL_RESOLVERS = {
 }
 
 export function resolveDeterministicToolIntent(text = "", availableToolNames = [], context = {}) {
-  const candidates = selectToolIntentCandidates(text, availableToolNames)
+  const candidates = selectToolIntentCandidates(text, availableToolNames, context)
   if (candidates.length !== 1) return null
   const toolName = candidates[0]
   const resolver = DETERMINISTIC_TOOL_RESOLVERS[toolName]

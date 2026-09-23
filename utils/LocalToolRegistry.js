@@ -36,6 +36,8 @@ import { MentionAdminsTool } from "../functions/functions_tools/MentionAdminsToo
 import { MentionMembersTool } from "../functions/functions_tools/MentionMembersTool.js"
 import { ForgetGroupKnowledgeTool } from "../functions/functions_tools/ForgetGroupKnowledgeTool.js"
 import { TorrentDownloadTool } from "../functions/functions_tools/TorrentDownloadTool.js"
+import { PixivSearchTool } from "../functions/functions_tools/PixivSearchTool.js"
+import { PixivDownloadTool } from "../functions/functions_tools/PixivDownloadTool.js"
 import { resolveToolSkill } from "./toolSkills.js"
 
 const PLUGIN_NAME = "shiloh-plugin"
@@ -79,6 +81,8 @@ const BUILT_IN_TOOL_FACTORIES = [
   () => new MentionMembersTool(),
   () => new ForgetGroupKnowledgeTool(),
   () => new TorrentDownloadTool(),
+  () => new PixivSearchTool(),
+  () => new PixivDownloadTool(),
 ]
 
 function logInfo(message) {

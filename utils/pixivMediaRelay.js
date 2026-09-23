@@ -5,6 +5,7 @@ import { Readable, Transform } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { isTrustedPixivImageUrl } from "./pixivMessage.js"
 import { buildMediaArtifactKey } from "./messagePipeline/mediaArtifactStore.js"
+import { fetchWithProxy } from "./proxiedFetch.js"
 
 export const PIXIV_ARCHIVE_MAX_PAGES = 5
 export const PIXIV_ARCHIVE_MAX_IMAGE_BYTES = 16 * 1024 * 1024
@@ -20,16 +21,16 @@ function extensionForUrl(url = "") {
   }
 }
 
-export async function downloadPixivArchiveImage(imageUrl, { maxBytes = PIXIV_ARCHIVE_MAX_IMAGE_BYTES, timeoutMs = DOWNLOAD_TIMEOUT_MS, fetchImpl = globalThis.fetch } = {}) {
+export async function downloadPixivArchiveImage(imageUrl, { maxBytes = PIXIV_ARCHIVE_MAX_IMAGE_BYTES, timeoutMs = DOWNLOAD_TIMEOUT_MS, fetchImpl = null, proxyUrl = "" } = {}) {
   if (!isTrustedPixivImageUrl(imageUrl)) return ""
-  if (typeof fetchImpl !== "function") return ""
   const dir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-archive")
   await fs.promises.mkdir(dir, { recursive: true })
   const filePath = path.join(dir, `${Date.now()}-${Math.random().toString(16).slice(2)}${extensionForUrl(imageUrl)}`)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(1_000, Number(timeoutMs) || DOWNLOAD_TIMEOUT_MS))
-  try {
-    const response = await fetchImpl(imageUrl, { headers: { Referer: "https://www.pixiv.net/", "User-Agent": "Mozilla/5.0 (compatible; XiloMediaRelay/1.0)" }, signal: controller.signal })
+  // i.pximg.net 在国内不可达,默认经代理下载;响应体必须在回调内消费完(代理连接随回调结束关闭)。
+  const headers = { Referer: "https://www.pixiv.net/", "User-Agent": "Mozilla/5.0 (compatible; XiloMediaRelay/1.0)" }
+  const writeBody = async response => {
     if (!response?.ok || !response.body) return ""
     if (Number(response.headers.get("content-length") || 0) > maxBytes) return ""
     let size = 0
@@ -43,6 +44,11 @@ export async function downloadPixivArchiveImage(imageUrl, { maxBytes = PIXIV_ARC
     await pipeline(Readable.fromWeb(response.body), limiter, fs.createWriteStream(filePath))
     const stat = await fs.promises.stat(filePath)
     return stat.size > 0 && stat.size <= maxBytes ? filePath : ""
+  }
+  try {
+    return typeof fetchImpl === "function"
+      ? await writeBody(await fetchImpl(imageUrl, { headers, signal: controller.signal }))
+      : await fetchWithProxy(imageUrl, { proxyUrl, headers, signal: controller.signal }, writeBody)
   } catch {
     return ""
   } finally {
@@ -84,9 +90,9 @@ export async function buildPixivArchiveRelaySegments(card = {}, {
     const startedAt = Date.now()
     const key = buildMediaArtifactKey("pixiv", { artwork_id: card.artwork_id, page: page.page })
     const lease = artifactStore && key
-      ? await artifactStore.acquire(key, () => downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl }))
+      ? await artifactStore.acquire(key, () => downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl || null, proxyUrl: pixivRelay.proxyUrl }))
       : null
-    const filePath = lease?.filePath || (!artifactStore ? await downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl }) : "")
+    const filePath = lease?.filePath || (!artifactStore ? await downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl || null, proxyUrl: pixivRelay.proxyUrl }) : "")
     onTiming?.("download", Date.now() - startedAt)
     if (!filePath) {
       failedPages++

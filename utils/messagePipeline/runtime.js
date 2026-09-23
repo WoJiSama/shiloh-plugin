@@ -1,5 +1,6 @@
 import { MessageManager } from "../MessageManager.js"
 import { messageArchiveManager } from "../MessageArchiveManager.js"
+import { setPixivFetchProxy } from "../pixivMessage.js"
 import { DeliveryGateway } from "./deliveryGateway.js"
 import { MediaOutbox } from "./mediaOutbox.js"
 import { MediaArtifactStore } from "./mediaArtifactStore.js"
@@ -181,6 +182,9 @@ export function installMessagePipeline({
 } = {}) {
   const previous = globalThis[RUNTIME_KEY]
   previous?.pipeline?.stop?.()
+
+  // pixiv.net/pximg.net 国内不可达:所有 Pixiv 富化路径统一走 pixivRelay.proxyUrl 指定的代理。
+  setPixivFetchProxy(String(pluginSettings.pixivRelay?.proxyUrl || "").trim())
 
   const config = normalizeMessagePipelineConfig(pluginSettings.messagePipeline)
   if (!config.enabled) {

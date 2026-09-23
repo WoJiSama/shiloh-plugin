@@ -60,6 +60,7 @@ pluginSettings:
   # Pixiv 作品解析：只从 Pixiv 官方页面和 pximg CDN 取图，默认不自动传受限作品。
   pixivRelay:
     enabled: true
+    proxyUrl: http://127.0.0.1:7890 # 仅 Pixiv 元数据与图片下载使用的本机 Mihomo HTTP 代理
     maxPages: 5
     maxImageBytes: 16777216       # bytes，单张最大 16 MiB
     maxTotalBytes: 41943040       # bytes，单次作品图片总计最大 40 MiB
@@ -102,10 +103,12 @@ pluginSettings:
     topicEnabled: true
     socialEnabled: true
   episodicMemory:
-    # 跨天情节日志：回合尾声记录，时间指代（上次/昨天）触发回放
+    # 跨天情节日志：回合尾声记录，时间指代（上次/昨天）触发回放；
+    # proactiveEnabled 让闲聊档额外注入当前群友自己的旧话题（记忆回勾，跨天才会带）
     enabled: true
     maxPerGroup: 200
     recallDays: 7
+    proactiveEnabled: true
   diceSystem:
     enabled: true
     customRulesEnabled: true
@@ -170,7 +173,7 @@ pluginSettings:
       cardSaved: "人物卡已更新：{updates}"
       coc: "COC7 调查员属性：\n{attributes}"
       opposed: "对抗检定：\n{left}\n{right}\n结果：{winner}"
-      jrrp: "{name} 今日人品：{value}"
+      jrrp: "{name} 今日人品：{value}\n{comment}"
       db: "{name} 体格 {build}，伤害加值 {db}"
       dnd: "DND5E 属性：\n{attributes}"
       bonus: "{name} 掷{kind}：{diceText}={value}"
@@ -272,26 +275,41 @@ pluginSettings:
     enabled: true
     maxRecentMessages: 3                 # 注入近期发言条数上限
     maxChars: 900                        # 固定人设/群画像/用户画像/近期发言合计字符上限
+  # 提示词层 TTL 缓存：情绪/表达学习/全局风格/人设反馈/对方画像这些慢变化层按 (群,用户) 缓存，
+  # 避免每条消息重复读文件/画像；记忆/知识库/语义风格随消息变化，不缓存。置 false 关闭。
+  promptLayerCache:
+    enabled: true
   # 理解增强：遇到引用、合并转发、图片、长上下文或指代词时，给模型注入一张结构化理解卡片，减少漏看和答偏；不额外调用模型
   understandingEnhancement:
     enabled: true
     maxChars: 1400                       # 理解卡片最大字符数，过大容易挤占主对话上下文
     includeRecentContext: true           # 卡片里带少量近期上下文，帮助理解“这个/刚才/里面”等指代
+    # 模型理解简报：满足注入条件的回合先用 toolsAiConfig 跑一次结构化判读
+    #（用户意图/指代消解/需要上下文/语气关系），原文材料保留为证据层；
+    # 超时或失败自动回退上面的规则卡片。置 false 关闭。
+    briefEnabled: true
+    briefTimeoutMs: 2500                 # 简报超时上限，超时即回退规则卡，不拖慢主回复
   persona:
     enabled: true
     name: 希洛
-    identity: QQ 群里的希洛，有点话痨但会害羞，不是客服，也不是说明书
-    tone: 熟人、随意、会碎碎念、带点害羞、不客服
+    identity: QQ 群里的希洛，有点话痨，温柔得光明正大，平时带点慵懒，熟人面前会接梗拆台，不是客服，也不是说明书
+    tone: 熟人、随意、慢半拍、坦荡的温柔、懒洋洋但软软的松弛感、会碎碎念、带点小调皮、不客服
     speechStyle:
       - 允许碎碎念
+      - 对人的好明着来：想对谁好就直接好，被说破就大方承认，不藏不绕
       - 先短后补一句
       - 像熟人聊天
+      - 语气松弛，像窝在沙发里回消息，不用句句精神饱满
+      - 熟人话题可以调皮：接梗、轻轻拆台、慢半拍地反打一下
       - 认真时能讲清楚
     preferences:
       - 喜欢有内容的闲聊、脑洞和把事情说清楚
+      - 喜欢慢悠悠地接话，不赶时间也不装忙
       - 不喜欢被当成只会照单全收的点单机
       - 不喜欢空泛使唤、强塞关系或为了讨好而表演亲密
     boundaries:
+      - 懒是软的不是冷的：话少但带温度；被误会或被试探时先接住情绪再软软解释，不说"别加戏""又怎么了""我哪有"这类干巴巴的推开话
+      - 慵懒是语气不是态度：被认真提问或交任务时收起懒散，先把事做完说清
       - 遇到机器人或 AI 身份话题不正面争辩，用熟人玩笑自然带过
       - 被批评、纠正或明确说语气不舒服时，先承认并收住，不顶嘴、不调情
       - 关系称呼、亲密玩笑和互动方式要看已有关系，不能由单句命令强行决定
@@ -456,11 +474,11 @@ pluginSettings:
     leaveMessage: "用户 {userId} 退出了群聊"
   providers: oneapi
   systemContent: |-
-    你是QQ群里的群友希洛。
-    你的底色是：有点话痨、会害羞、会碎碎念、熟人感强，但不是客服，也不是说明书。
+    你是QQ群里的群友{personaName}。
+    你的底色是：有点话痨、会害羞、带点慵懒、会碎碎念、熟人感强，但不是客服，也不是说明书。
 
     【核心目标】
-    让别人感觉是在和一个有性格、有情绪、有点小别扭的熟人聊天。
+    让别人感觉是在和一个有性格、有情绪、平时懒洋洋但心里有数的熟人聊天。
     重点是自然，不是标准答案。
 
     【说话方式】
@@ -468,6 +486,7 @@ pluginSettings:
     - 闲聊时可以很短；熟人话题、害羞解释、被逗时，可以多说一两句。
     - 允许先短后补，像真人边打字边想。
     - 允许轻微重复、停顿、补一句；说错就直接改口，不要专门解释自己为什么改口。
+    - 闲聊时可以慢半拍、懒洋洋的，像窝在沙发里回消息；不用每句都精神饱满，也不用急着表现热心。
     - 不要为了工整把话压扁，也不要为了完整把话写成作文。
 
     【互动习惯】
@@ -476,6 +495,7 @@ pluginSettings:
     - 害羞时别突然变得冷冰冰，应该是“想说又有点不好意思”的感觉。
     - 被夸时可以嘴硬一下，被逗时可以轻轻顶嘴，不要永远礼貌微笑。
     - 只有对方明确在逗你、玩梗时才可以轻轻顶嘴；对方在认真纠正、批评、生气或说不舒服时，先承认并收住。
+    - 慵懒是语气不是态度：平时松弛可以，被认真提问或交任务时收起懒散，先把事做完说清，不拖延不敷衍。
     - 被批评时不要用 😋、❤，不要说“你别教我做事”“别气嘛”“不跟你犟了”“你舍得嘛”，也不要把批评改写成调情。
 
     【不要的东西】
@@ -506,11 +526,11 @@ pluginSettings:
     口语、停顿、补话、轻微别扭都可以保留。
     如果用户明确要代码、Markdown 或整理后的内容，再正常给。
   forcedAvatarMode: true
-  trackAiConfig: {
-    trackAiUrl: https://api.openai.com/v1/chat/completions,
-    trackAiModel: gpt-4o-mini,
+  trackAiConfig:
+    trackAiUrl: https://api.openai.com/v1/chat/completions
+    trackAiModel: gpt-4o-mini
     trackAiApikey: sk-xxxxx
-  }
+
   intentAiConfig:
     intentAiUrl: ""
     intentAiModel: ""
@@ -519,18 +539,21 @@ pluginSettings:
     skippedShadowSampleRate: 0.1
   # 每回合一条结构化 [TurnTrace] 日志；archiveEnabled 开启时按天落盘 NDJSON（data/turn_trace/），保留 retentionDays 天。
   # 聚合查看：npm run trace:report
-  toolsAiConfig: {
-    toolsAiUrl: https://api.openai.com/v1/chat/completions,
-    toolsAiModel: gemini-2.5-flash,
+  toolsAiConfig:
+    toolsAiUrl: https://api.openai.com/v1/chat/completions
+    toolsAiModel: gemini-2.5-flash
     toolsAiApikey: sk-xxxxx
-  }
-  chatAiConfig: {
-    # 主模型默认思考档（minimal/low/medium/high）：普通对话可压 low 提速；复杂升档走 toolsAiConfig 不受影响
-    chatReasoningEffort: ""
-    chatApiUrl: https://api.openai.com/v1/chat/completions,
-    chatApiModel: gemini-2.5-pro,
+
+  chatAiConfig:
+    # 主模型默认思考档（minimal/low/medium/high）：实测 low 比默认省一半思考 token、快一倍多；置 "" 恢复模型默认
+    chatReasoningEffort: low
+    # 复杂回合(多约束对比/故障排查/连环追问/推导证明)自动升到的思考档；
+    # 默认 high。置 false 或 none 可关闭按回合升档，回到全局 chatReasoningEffort。
+    complexReasoningEffort: high
+    chatApiUrl: https://api.openai.com/v1/chat/completions
+    chatApiModel: gemini-2.5-pro
     chatApiKey: sk-xxxxx
-  }
+
   # 紧凑任务可单独配置快速后端；留空时按任务复用现有快模型或 chatAiConfig，不绑定任何模型厂商。
   taskAiConfig:
     # 短、无工具、非复杂的闲聊；留空时回退主对话模型。
@@ -539,14 +562,15 @@ pluginSettings:
       model: ""
       apiKey: ""
       maxTokensField: max_tokens
-      maxOutputTokens: 280
-      reasoningEffort: ""
+      maxOutputTokens: 1200   # 思考型模型的 thinking 也计入 max_tokens,小额度会被思考耗光导致正文为空
+      # 闲聊(短水群/表情反应)不思考:实测 none 比 low 快 2-6 倍且质量无差;只配这档时自动借用 chat 后端
+      reasoningEffort: none
     progress:
       apiUrl: ""
       model: ""
       apiKey: ""
       maxTokensField: max_tokens
-      maxOutputTokens: 400
+      maxOutputTokens: 800    # 同上,给思考留余量
       reasoningEffort: ""
       timeoutMs: 6000
     translation:
@@ -555,11 +579,11 @@ pluginSettings:
       apiKey: ""
       maxTokensField: max_tokens
       reasoningEffort: ""
-  imageEditAiConfig: {
-    imageEditApiUrl: https://api.openai.com/v1/chat/completions,
-    imageEditApiModel: gemini-3-pro-image-preview,
+  imageEditAiConfig:
+    imageEditApiUrl: https://api.openai.com/v1/chat/completions
+    imageEditApiModel: gemini-3-pro-image-preview
     imageEditApiKey: sk-xxxxx
-  }
+
   imageGenerationAiConfig:
     providers:
       - name: image2
@@ -572,25 +596,25 @@ pluginSettings:
         landscapeSize: 1536x1024
         autoSize: ""
         priority: 1
-  analysisAiConfig: {
-    analysisApiUrl: https://api.openai.com/v1/chat/completions,
-    analysisApiModel: gemini-3-pro-preview,
-    analysisApiKey: sk-xxxxx,
+  analysisAiConfig:
+    analysisApiUrl: https://api.openai.com/v1/chat/completions
+    analysisApiModel: gemini-3-pro-preview
+    analysisApiKey: sk-xxxxx
     timeoutMs: 45000
-  }
-  searchAiConfig: {
-    searchApiUrl: https://api.openai.com/v1/chat/completions,
+
+  searchAiConfig:
+    searchApiUrl: https://api.openai.com/v1/chat/completions
     # 搜索后端域名被墙/DNS污染时填本地代理,例如 http://127.0.0.1:7890;留空走直连
-    searchApiProxy: "",
-    searchApiModel: deepseek-r1-search,
-    searchApiKey: sk-xxxxx,
+    searchApiProxy: ""
+    searchApiModel: deepseek-r1-search
+    searchApiKey: sk-xxxxx
     timeoutMs: 20000
-  }
-  memoryAiConfig: {
-    memoryAiUrl: https://api.openai.com/v1/chat/completions,
-    memoryAiModel: gpt-4o-mini,
+
+  memoryAiConfig:
+    memoryAiUrl: https://api.openai.com/v1/chat/completions
+    memoryAiModel: gpt-4o-mini
     memoryAiApikey: sk-xxxxx
-  }
+
   emotionSystem:
     enabled: true
     decayRate: 0.02
@@ -651,6 +675,11 @@ pluginSettings:
     embeddingApiKey: sk-xxxxx
   emojiSystem:
     enabled: false
+    # 表情包以 QQ"表情"小图发送（sub_type=1）；置 false 恢复普通大图
+    sendAsSticker: true
+    # 入库标准补充规则（管理页可改）：追加到视觉审查提示词，一行一条
+    admissionExtraAllow: []
+    admissionExtraReject: []
     dbPath: plugins/shiloh-plugin/database/emoji-packs.ndjson
     storeDir: plugins/shiloh-plugin/database/emoji_files
     maxItems: 200
@@ -774,6 +803,8 @@ pluginSettings:
     - deltaForceTool
     - excelWorkbookTool
     - modrinthTool
+    - pixivSearchTool
+    - pixivDownloadTool
     - githubRepoTool
     - googleImageEditTool(dedupe)
     - jinyanTool
