@@ -190,10 +190,11 @@ test("确定性解析兜底:规划器返回 null 后按清单解析并锁定", a
   assert.ok(route === null || typeof route.toolChoice !== "undefined")
 })
 
-test("确定性快路先于语义规划器:找图请求直接命中 pixivSearchTool 且不发起语义分类", async () => {
+test("确定性快路先于语义规划器:命中即锁定且不发起语义分类", async () => {
   const ctx = buildCtx()
-  ctx.intentText = "希洛帮我搜搜初音未来的图 先从 p 站那边翻翻看~"
-  ctx.availableTools.push("pixivSearchTool", "pixivDownloadTool", "torrentDownloadTool", "searchInformationTool")
+  // 用无歧义的磁链下载样例(搜索类关键词抽取已改为交给语义规划器的低模型)
+  ctx.intentText = "帮我下载 magnet:?xt=urn:btih:AF4B684892182408E4AE9DF0C8FFE9E49CCBF171"
+  ctx.availableTools.push("torrentDownloadTool", "searchInformationTool")
   ctx.session.tools = ctx.availableTools.map(name => ({ type: "function", function: { name } }))
   ctx.helpers.buildToolCallFromDecision = decision => ({
     tools: [{ type: "function", function: { name: decision.toolName } }],
@@ -203,8 +204,7 @@ test("确定性快路先于语义规划器:找图请求直接命中 pixivSearchT
   })
   const route = await resolveToolRoute(ctx)
 
-  assert.equal(route.toolChoice.function.name, "pixivSearchTool")
-  assert.match(route.forcedToolCall.function.arguments, /初音未来/)
+  assert.equal(route.toolChoice.function.name, "torrentDownloadTool")
   assert.equal(ctx.classifierCalls.length, 0, "确定性命中后语义规划器不应再发起 LLM 分类")
   assert.ok(route.applied.includes("deterministicManifest"))
 })

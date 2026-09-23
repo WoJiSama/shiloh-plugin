@@ -44,15 +44,17 @@ test("parsePixivDownloadRequest 识别序号与作品ID,多选/磁链让位给�
   assert.equal(parsePixivDownloadRequest("下载 magnet:?xt=urn:btih:ABC"), null)
 })
 
-test("找图意图命中 pixivSearchTool 并可确定性解析参数", () => {
+test("找图意图命中候选,参数拆解交给语义规划器的低模型(不走正则确定性)", () => {
   assert.deepEqual(selectToolIntentCandidates("查一下wlop的作品", AVAILABLE), ["pixivSearchTool"])
-  assert.deepEqual(
+  assert.equal(
     resolveDeterministicToolIntent("查一下wlop的作品", AVAILABLE),
-    { intent: "tool", toolName: "pixivSearchTool", params: { keyword: "wlop", searchType: "artist", order: "newest" }, reason: "deterministic_manifest" }
+    null,
+    "搜索类关键词抽取措辞多变,不提供确定性解析,由低模型按披露规则拆解"
   )
+  // 下载序号无歧义,保留确定性快路
   assert.deepEqual(
-    resolveDeterministicToolIntent("搜搜初音未来的图", AVAILABLE).params,
-    { keyword: "初音未来", searchType: "artworks", order: "newest" }
+    resolveDeterministicToolIntent("下载 2", AVAILABLE, { hasPixivSearchSession: true }),
+    { intent: "tool", toolName: "pixivDownloadTool", params: { target: "2" }, reason: "deterministic_manifest" }
   )
 })
 

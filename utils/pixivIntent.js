@@ -47,10 +47,16 @@ const SITE_JUNK_PATTERN = /^(?:那边|这里|一下|看看|看下|翻翻|找找|
 // 单字排序词必须带"最"前缀,避免误杀"新版"这类正常词
 const SORT_NOISE_PATTERN = /(?:一些|一点|几个|几组)|(?:热门|人气最高|最受欢迎|最火|收藏最多|点赞最多|赞最多|最新|最早|最旧)(?:的)?/g
 
+// "跟翠月有关的图"类关系框架:只保留主体("翠月")
+const RELATED_FRAME_PATTERN = /^(?:跟|和|与|关于)?\s*(.{1,30}?)\s*(?:有关|相关)$/
+
 function cleanKeyword(value = "") {
   let text = String(value || "").replace(/\s+/g, " ").trim()
   if (!text) return ""
   text = text.replace(SORT_NOISE_PATTERN, " ").replace(/\s+/g, " ").trim()
+  const framed = text.match(RELATED_FRAME_PATTERN)
+  if (framed && framed[1].trim()) text = framed[1].trim()
+  text = text.replace(/^(?:关于|跟|和|与)\s*/, "").trim()
   if (!text) return ""
   // 捕获组可能带上残留的引导动词("帮我找找猫"类句式),再剥一层
   const stripped = text.replace(LEADING_VERB_PATTERN, "").trim()

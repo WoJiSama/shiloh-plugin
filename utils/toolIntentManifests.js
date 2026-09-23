@@ -3,7 +3,7 @@ import { buildExcelToolParams } from "./excelRequestPolicy.js"
 import { parseModrinthRequestOptions } from "./modrinth.js"
 import { extractGroupKnowledgeForgetTarget, isExplicitGroupKnowledgeForgetRequest } from "./groupKnowledgeForgetPolicy.js"
 import { extractValidBtihMagnetUri } from "./torrentDownload.js"
-import { parsePixivDownloadRequest, parsePixivSearchRequest } from "./pixivIntent.js"
+import { parsePixivDownloadRequest } from "./pixivIntent.js"
 
 function normalizeText(text = "") {
   return String(text || "")
@@ -328,13 +328,16 @@ const TOOL_INTENT_MANIFESTS = {
       "调用边界：",
       "- 用户想找现成的插画/作品/某画师的作品时调用；不是画图(画/生成新图走生图工具)、不是看图识图。",
       "- 找表情包时不要调用(走表情包工具)。",
-      "参数规则：",
-      "- keyword 是画师名/角色名/标签,例如 wlop、海琴烟、初音未来;不要把「查一下/搜搜/的作品」这类词放进 keyword。",
-      "- searchType:用户想看某位画师本人的作品(如「查wlop的作品」「看看XX画师」)传 artist;一般找图/找角色传 artworks(默认)。",
-      "- orderBy:默认 newest(最新);用户说热门/人气/最受欢迎/收藏最多传 popular;说最早/最旧传 oldest。",
+      "keyword 抽取规则(最重要,逐条检查):",
+      "- keyword 只保留搜索主体本身:角色名/画师名/作品名/标签,例如 wlop、海琴烟、初音未来、翠月。",
+      "- 去掉所有框架词:「查一下/搜搜/帮我找/来点/看看」等动词、「跟X有关的图」只留X、「关于X」只留X、「的图/的作品/的插画」后缀、「一些/热门的/人气最高的」等修饰。",
+      "- “找一下跟翠月有关的图” -> keyword=翠月;“来几张热门的海琴烟” -> keyword=海琴烟;“搜搜初音未来的图” -> keyword=初音未来。",
+      "- 用户原话里的角色叫法优先保留(翠月/海琴烟/中文名都可以,搜索端会自动翻译匹配)。",
+      "searchType:用户想看某位画师本人的作品(如「查wlop的作品」「看看XX画师」)传 artist;一般找图/找角色传 artworks(默认)。",
+      "orderBy:默认 newest(最新);用户说热门/人气/最受欢迎/收藏最多传 popular;说最早/最旧传 oldest。",
       "等价例子：",
       "- “查一下wlop的作品” -> {\"keyword\":\"wlop\",\"searchType\":\"artist\"}",
-      "- “搜搜初音未来的图” -> {\"keyword\":\"初音未来\",\"searchType\":\"artworks\"}",
+      "- “找一下跟翠月有关的图” -> {\"keyword\":\"翠月\",\"searchType\":\"artworks\"}",
       "- “p站搜海琴烟” -> {\"keyword\":\"海琴烟\",\"searchType\":\"artworks\"}",
       "- “搜一些热门的初音未来同人图” -> {\"keyword\":\"初音未来 同人\",\"searchType\":\"artworks\",\"orderBy\":\"popular\"}",
       "搜索后引导用户:回复「下载 序号」(如 下载 1)或「下载 作品ID」即可搬运对应作品。"
@@ -549,7 +552,8 @@ const DETERMINISTIC_TOOL_RESOLVERS = {
       .filter(value => Number.isSafeInteger(value) && value >= 1)
     return indexes.length ? { selection: indexes } : null
   },
-  pixivSearchTool: text => parsePixivSearchRequest(text),
+  // pixivSearchTool 的关键词抽取不走正则快路:自然语言措辞无穷多
+  // ("跟翠月有关的图"),统一交给语义规划器的低模型按下面的详细规则拆解。
   pixivDownloadTool: text => parsePixivDownloadRequest(text),
   forgetGroupKnowledgeTool: text => {
     const memory = extractGroupKnowledgeForgetTarget(text)
