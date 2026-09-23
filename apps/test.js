@@ -49,7 +49,7 @@ import { analyzeReplyText } from "../utils/SmartReply.js"
 import { buildMissingImageAnalysisReply, looksLikeImageAuthenticityRequest, looksLikeImageVerificationRequest, looksLikeVisualInspectionRequest, shouldAskForMissingImageForVisualRequest } from "../utils/imageRequestGuard.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../utils/chatCompletionUrl.js"
 import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLines, selectMergedImagePromptTexts } from "../utils/promptCompiler.js"
-import { resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
+import { buildToolIntentDisclosure, resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
 import { extractValidBtihMagnetUri } from "../utils/torrentDownload.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../utils/toolSkills.js"
 import { formatGroupWorkflowTeachingPrompt } from "../domains/memory/engine/groupWorkflow.js"
@@ -4700,7 +4700,15 @@ ${recentHistory || '(无)'}
           logger.info(`[卡面呈现] 承诺类确认已入队（工具结果决出后放行） kind=${session.cardPresentation}`)
         }
 
-	        const requestData = buildChatRequestData(this.config, session.groupUserMessages, session.tools, toolChoice)
+	        // 语义规划器没强制调用时,主模型是唯一决策者——但它平时看不到任何工具
+	        // 抽取规则,不同群的上下文会让它摇摆(反问澄清/换错工具)。把候选工具的
+	        // 披露说明注入本轮请求,让主模型和规划器看到同一套规则。
+	        const toolNamesForRequest = (session.tools || []).map(tool => tool?.function?.name).filter(Boolean)
+	        const disclosureForMainModel = buildToolIntentDisclosure(toolNamesForRequest)
+	        const requestMessages = disclosureForMainModel
+	          ? [...session.groupUserMessages, { role: "system", content: disclosureForMainModel }]
+	          : session.groupUserMessages
+	        const requestData = buildChatRequestData(this.config, requestMessages, session.tools, toolChoice)
             const initialModelStartedAt = Date.now()
 	        let response = await this.retryRequest(requestData, session.toolContent, 1, undefined, turnPlanRequest.requestOptions)
 	        session?.turnTrace?.addModelCall("main", Date.now() - initialModelStartedAt)
