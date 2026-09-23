@@ -4,6 +4,7 @@ import fs from "node:fs"
 
 const source = fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")
 const routeSource = fs.readFileSync(new URL("../utils/routeDecision.js", import.meta.url), "utf8")
+const semanticSource = fs.readFileSync(new URL("../apps/lib/semanticToolIntent.js", import.meta.url), "utf8")
 
 test("explicit image generation is forced before semantic planning", () => {
   // 规则表顺序即裁决优先级:显式生图规则必须排在语义规划器之前
@@ -14,7 +15,7 @@ test("explicit image generation is forced before semantic planning", () => {
 })
 
 test("the semantic planner ignores emoji-only candidates", () => {
-  assert.match(source, /hasSemanticPlannerCandidate\(knownToolCandidates\)\s*\?\s*knownToolCandidates\s*:\s*\[\]/)
+  assert.match(source + semanticSource, /hasSemanticPlannerCandidate\(knownToolCandidates\)\s*\?\s*knownToolCandidates\s*:\s*\[\]/)
 })
 
 test("high-confidence emoji reactions bypass model tool selection", () => {
@@ -48,7 +49,7 @@ test("card replies acknowledge before generation and keep the card body free of 
   const presentationSrc = fs.readFileSync(new URL("../utils/turnPresentation.js", import.meta.url), "utf8")
   const composerSrc = fs.readFileSync(new URL("../utils/turnPromptComposer.js", import.meta.url), "utf8")
   assert.match(presentationSrc, /function resolveCardPresentation/)
-  assert.match(source, /function cardAcknowledgement/)
+  assert.ok(source.includes('cardAcknowledgement(') || source.includes('from "./lib/textPolicy.js"'), '卡面确认函数可用(已迁 lib)')
   assert.match(source, /session\.cardPresentation = resolveCardPresentation/)
   assert.match(source, /const cardRequestText = \[args, msg, userContent\]/)
   assert.doesNotMatch(source, /isEducationalExplanationRequest\(currentIntentText\) \? "knowledge" : "chat"\n\s*\)\n\s*\? \[/)

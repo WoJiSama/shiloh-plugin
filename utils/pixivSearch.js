@@ -257,16 +257,16 @@ function sessionKey(e = {}) {
   return id ? `${SESSION_KEY_PREFIX}${String(id)}` : ""
 }
 
-export async function savePixivSearchSession(e = {}, session = {}, { redis = globalThis.redis, savedAt = Date.now() } = {}) {
+export async function savePixivSearchSession(e = {}, searchSession = {}, { redis = globalThis.redis, savedAt = Date.now() } = {}) {
   const key = sessionKey(e)
-  if (!key || !session?.items?.length) return
+  if (!key || !searchSession?.items?.length) return
   const record = {
-    keyword: String(session.keyword || ""),
-    mode: String(session.mode || "artworks"),
-    order: PIXIV_SEARCH_ORDERS.has(session.order) ? session.order : "newest",
-    orderSource: session.orderSource === "rerank" ? "rerank" : "native",
-    artist: session.artist && typeof session.artist === "object" ? { userId: session.artist.userId, userName: session.artist.userName } : null,
-    items: session.items.slice(0, 20).map(({ id, title, userName, pageCount, xRestrict, bookmarkCount }) => ({ id, title, userName, pageCount, xRestrict, bookmarkCount })),
+    keyword: String(searchSession.keyword || ""),
+    mode: String(searchSession.mode || "artworks"),
+    order: PIXIV_SEARCH_ORDERS.has(searchSession.order) ? searchSession.order : "newest",
+    orderSource: searchSession.orderSource === "rerank" ? "rerank" : "native",
+    artist: searchSession.artist && typeof searchSession.artist === "object" ? { userId: searchSession.artist.userId, userName: searchSession.artist.userName } : null,
+    items: searchSession.items.slice(0, 20).map(({ id, title, userName, pageCount, xRestrict, bookmarkCount }) => ({ id, title, userName, pageCount, xRestrict, bookmarkCount })),
     savedAt
   }
   localSessions.set(key, record)
@@ -328,13 +328,13 @@ function pruneLocalSessions() {
 }
 
 /** 「下载 3」或「下载 126649495」→ 作品 ID;找不到返回空串 */
-export function resolvePixivDownloadTarget(target = "", session = null) {
+export function resolvePixivDownloadTarget(target = "", searchSession = null) {
   const text = String(target || "").trim()
   const directId = text.match(/^\d{5,12}$/)?.[0]
-  if (directId) return { id: directId, item: session?.items?.find(item => item.id === directId) || null }
+  if (directId) return { id: directId, item: searchSession?.items?.find(item => item.id === directId) || null }
   const index = Number(text.match(/^(?:#|No\.?|第)?(\d{1,2})$/i)?.[1] || 0)
-  if (index >= 1 && session?.items?.length) {
-    const item = session.items.slice(0, LIST_MAX_ITEMS)[index - 1]
+  if (index >= 1 && searchSession?.items?.length) {
+    const item = searchSession.items.slice(0, LIST_MAX_ITEMS)[index - 1]
     if (item) return { id: item.id, item }
   }
   return { id: "", item: null }
@@ -423,8 +423,8 @@ async function buildPixivListHtml(data = {}) {
  * 渲染搜索结果卡面(缩略图先经代理落盘,再以 file:// 嵌入)。
  * 返回 { imagePath, tempFiles };发送后由调用方删除 tempFiles。
  */
-export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchImpl = null, logger = globalThis.logger } = {}) {
-  const items = (session.items || []).slice(0, LIST_MAX_ITEMS)
+export async function renderPixivListCard(searchSession = {}, { proxyUrl = "", fetchImpl = null, logger = globalThis.logger } = {}) {
+  const items = (searchSession.items || []).slice(0, LIST_MAX_ITEMS)
   const tempFiles = []
   // 浏览器冷启动与缩略图下载并行,谁慢等谁
   const browserPromise = getSharedBrowser()
@@ -440,16 +440,16 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
     }
     return { ...item, thumbPath }
   }))
-  const total = Number(session.total || items.length) || items.length
+  const total = Number(searchSession.total || items.length) || items.length
   const orderLabel = {
     newest: "按时间·最新",
     oldest: "按时间·最早",
     "popular-native": "按人气·全站收藏排序",
     "popular-ranking": "按人气·官方排行榜(日/周榜)匹配",
     "popular-rerank": "按近期人气(最新上传中收藏最多,登录Cookie可解锁全站)"
-  }[session.orderSource === "rerank" ? "popular-rerank" : session.orderSource === "ranking" ? "popular-ranking" : session.order === "popular" ? "popular-native" : PIXIV_SEARCH_ORDERS.has(session.order) ? session.order : "newest"]
-  const subtitle = session.mode === "artist" && session.artist?.userName
-    ? `画师 ${session.artist.userName} 的最近作品 · 共 ${items.length} 张 · ${orderLabel}`
+  }[searchSession.orderSource === "rerank" ? "popular-rerank" : searchSession.orderSource === "ranking" ? "popular-ranking" : searchSession.order === "popular" ? "popular-native" : PIXIV_SEARCH_ORDERS.has(searchSession.order) ? searchSession.order : "newest"]
+  const subtitle = searchSession.mode === "artist" && searchSession.artist?.userName
+    ? `画师 ${searchSession.artist.userName} 的最近作品 · 共 ${items.length} 张 · ${orderLabel}`
     : `共 ${total} 个结果,展示前 ${items.length} 个 · ${orderLabel}`
   const outputDir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-cards")
   await fs.promises.mkdir(outputDir, { recursive: true })
@@ -459,7 +459,7 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
   const page = await browser.newPage()
   try {
     await page.setViewport({ width: 760, height: 900, deviceScaleFactor: 2 })
-    await page.setContent(await buildPixivListHtml({ keyword: session.keyword, mode: session.mode, subtitle, items: withThumbs }), { waitUntil: "domcontentloaded", timeout: 30_000 })
+    await page.setContent(await buildPixivListHtml({ keyword: searchSession.keyword, mode: searchSession.mode, subtitle, items: withThumbs }), { waitUntil: "domcontentloaded", timeout: 30_000 })
     await page.evaluate(async () => {
       await Promise.all([...document.images].map(img => img.complete ? null : new Promise(resolve => { img.onload = img.onerror = resolve })))
     }).catch(() => {})

@@ -75,8 +75,12 @@ test("漂移防护:主链路与 utils 里所有 session.X 字段访问都已登�
   const sources = [
     path.join(root, "apps/test.js"),
     ...fs.readdirSync(path.join(root, "utils"))
-      .filter(file => file.endsWith(".js") && file !== "turnSession.js")
+      .filter(file => file.endsWith(".js"))
       .map(file => path.join(root, "utils", file))
+      .filter(file => path.basename(file) !== "turnSession.js"),
+    ...fs.readdirSync(path.join(root, "apps/lib"))
+      .filter(file => file.endsWith(".js"))
+      .map(file => path.join(root, "apps/lib", file))
   ]
   const registered = new Set(TURN_SESSION_FIELDS.map(field => field.name))
   const accessed = new Set()
