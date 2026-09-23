@@ -39,6 +39,7 @@ import { TorrentDownloadTool } from "../functions/functions_tools/TorrentDownloa
 import { PixivSearchTool } from "../functions/functions_tools/PixivSearchTool.js"
 import { PixivDownloadTool } from "../functions/functions_tools/PixivDownloadTool.js"
 import { resolveToolSkill } from "./toolSkills.js"
+import { registerToolManifests } from "./toolManifestRegistry.js"
 
 const PLUGIN_NAME = "shiloh-plugin"
 const CUSTOM_TOOL_EXTENSIONS = new Set([".js", ".mjs", ".cjs"])
@@ -159,6 +160,7 @@ export class LocalToolRegistry {
 
   createBuiltInToolInstances() {
     const instances = {}
+    const manifests = []
 
     for (const factory of BUILT_IN_TOOL_FACTORIES) {
       try {
@@ -173,11 +175,13 @@ export class LocalToolRegistry {
           continue
         }
         instances[tool.name] = tool
+        if (tool.manifest && typeof tool.manifest === "object") manifests.push(tool.manifest)
       } catch (error) {
         logError("创建内置工具失败", error)
       }
     }
 
+    registerToolManifests(manifests)
     return instances
   }
 

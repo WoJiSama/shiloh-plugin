@@ -1237,7 +1237,19 @@ export class ExamplePlugin extends plugin {
     }
 
     this.syncDedupeToolConfig(this.config.oneapi_tools || [])
-    const localTools = this.getToolsByName(toolConfig[provider] || this.config.openai_tools, {
+    // 白名单缺省 = 全部已注册工具:新增工具不再要求同步改配置,漏改白名单的
+    // 事故类型(工具静默不可见)从根上消除。配置了白名单时对排除项打告警提示。
+    const configuredList = toolConfig[provider] || this.config.openai_tools
+    const allRegisteredNames = Object.keys(this.toolInstances || {})
+    const effectiveList = Array.isArray(configuredList) && configuredList.length ? configuredList : allRegisteredNames
+    if (Array.isArray(configuredList) && configuredList.length) {
+      const configuredNames = new Set(configuredList.map(entry => String(entry).replace(/\s*\(dedupe\)\s*$/i, "").trim()).filter(Boolean))
+      const excluded = allRegisteredNames.filter(name => !configuredNames.has(name))
+      if (excluded.length) {
+        logger.warn(`[工具清单] oneapi_tools 白名单未包含以下已注册工具(如需启用请补进配置): ${excluded.join(", ")}`)
+      }
+    }
+    const localTools = this.getToolsByName(effectiveList, {
       warnMissing: this.localToolsReady !== false
     })
     const mcpTools = mcpManager.getAllTools() || []

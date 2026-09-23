@@ -5,6 +5,7 @@ import { AbstractTool } from "./AbstractTool.js"
 import { enrichPixivShare } from "../../utils/pixivMessage.js"
 import { buildPixivArchiveRelaySegments, cleanupPixivArchiveRelayFiles } from "../../utils/pixivMediaRelay.js"
 import { loadPixivSearchSession, resolvePixivDownloadTarget, touchPixivSearchSession } from "../../utils/pixivSearch.js"
+import { PIXIV_DOWNLOAD_TOOL_MANIFEST } from "../../utils/pixivIntent.js"
 
 function findConfigPath() {
   const cwd = process.cwd()
@@ -33,8 +34,11 @@ function readPixivRelayConfig() {
 export class PixivDownloadTool extends AbstractTool {
   constructor() {
     super()
-    this.name = "pixivDownloadTool"
-    this.description = "下载并搬运一张 Pixiv 插画到群里。用户在搜索列表后回复「下载 3」「下载 126649495」「下个载 id=xxx」之类时调用。"
+    this.name = PIXIV_DOWNLOAD_TOOL_MANIFEST.name
+    this.description = PIXIV_DOWNLOAD_TOOL_MANIFEST.description
+    this.skill = PIXIV_DOWNLOAD_TOOL_MANIFEST.skill
+    // 单一声明点:终态/触发词/确定性解析器全部由 manifest 派生
+    this.manifest = PIXIV_DOWNLOAD_TOOL_MANIFEST
     this.parameters = {
       type: "object",
       properties: {

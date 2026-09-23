@@ -10,7 +10,7 @@ import {
   savePixivSearchSession,
   searchPixivArtworks
 } from "../../utils/pixivSearch.js"
-import { normalizePixivKeyword, normalizePixivOrderBy, normalizePixivSearchType } from "../../utils/pixivIntent.js"
+import { PIXIV_SEARCH_TOOL_MANIFEST, normalizePixivKeyword, normalizePixivOrderBy, normalizePixivSearchType } from "../../utils/pixivIntent.js"
 
 function findConfigPath() {
   const cwd = process.cwd()
@@ -39,15 +39,11 @@ function readPixivRelayConfig() {
 export class PixivSearchTool extends AbstractTool {
   constructor() {
     super()
-    this.name = "pixivSearchTool"
-    this.description = "搜索 Pixiv 插画并发送带缩略图的结果卡面。群友说「找图/搜图/来张XX的图/找跟XX有关的图/查画师作品」想要插画或二次元作品时,优先用本工具而不是 bingImageSearchTool(必应适合找照片/截图/素材,P站适合插画作品)。用户回复「下载 序号」时改用 pixivDownloadTool。"
-    this.skill = {
-      name: "pixivSearchTool",
-      purpose: "在 Pixiv 搜索插画并发送带缩略图与收藏数的结果列表卡面。",
-      whenToUse: "用户想找插画/二次元图/某画师作品/某角色的同人图时。「跟XX有关的图」「来点XX的图」「查XX画师」都算。找照片、实拍、截图素材应改用 bingImageSearchTool。",
-      boundaries: "不是画图(生图)、不是看图识图、不是表情包。磁链下载与本工具无关。",
-      instructions: "keyword 只留搜索主体(角色名/画师名/标签),剥掉「跟…有关的图/查一下/来点/一些热门的」等框架词;searchType 只能 artworks 或 artist(看某画师本人作品时用 artist);orderBy 只能 newest/oldest/popular(热门/人气/收藏最多 → popular)。"
-    }
+    this.name = PIXIV_SEARCH_TOOL_MANIFEST.name
+    this.description = PIXIV_SEARCH_TOOL_MANIFEST.description
+    this.skill = PIXIV_SEARCH_TOOL_MANIFEST.skill
+    // 单一声明点:终态/触发词/披露规则等全部由 manifest 派生(LocalToolRegistry 注册)
+    this.manifest = PIXIV_SEARCH_TOOL_MANIFEST
     this.parameters = {
       type: "object",
       properties: {

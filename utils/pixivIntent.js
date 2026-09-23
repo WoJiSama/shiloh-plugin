@@ -123,3 +123,77 @@ export function parsePixivDownloadRequest(text = "") {
   if (indexMatch) return { target: indexMatch[1] }
   return null
 }
+
+// ── 工具清单(单一声明点):本文件是轻量模块,路由各层从这里取 Pixiv 的全部声明 ──
+
+export const PIXIV_SEARCH_TOOL_MANIFEST = {
+  name: "pixivSearchTool",
+  terminal: true,
+  description: "搜索 Pixiv 插画并发送带缩略图的结果卡面。群友说「找图/搜图/来张XX的图/找跟XX有关的图/查画师作品」想要插画或二次元作品时,优先用本工具而不是 bingImageSearchTool(必应适合找照片/截图/素材,P站适合插画作品)。用户回复「下载 序号」时改用 pixivDownloadTool。",
+  skill: {
+    name: "pixivSearchTool",
+    purpose: "在 Pixiv 搜索插画并发送带缩略图与收藏数的结果列表卡面。",
+    whenToUse: "用户想找插画/二次元图/某画师作品/某角色的同人图时。「跟XX有关的图」「来点XX的图」「查XX画师」都算。找照片、实拍、截图素材应改用 bingImageSearchTool。",
+    boundaries: "不是画图(生图)、不是看图识图、不是表情包。磁链下载与本工具无关。",
+    instructions: "keyword 只留搜索主体(角色名/画师名/标签),剥掉「跟…有关的图/查一下/来点/一些热门的」等框架词;searchType 只能 artworks 或 artist(看某画师本人作品时用 artist);orderBy 只能 newest/oldest/popular(热门/人气/收藏最多 → popular)。"
+  },
+  triggers: [
+    /p\s*站|pixiv/i,
+    /(?:查|搜|找|寻|看看|看下)[^，,。！!？?\n]{0,6}(?:的)?(?:插画|作品|画师|同人图|美图|图集)/i,
+    /(?:来点|来几张)[^，,。！!？?\n]{0,12}(?:的)?(?:图|插画|作品|立绘)/i,
+    /(?:搜|查|找)[^，,。！!？?\n]{0,14}(?:的)?(?:图|插画|立绘)/i
+  ],
+  disclosure: [
+    "【pixivSearchTool 详细用法】",
+    "用途：搜索 Pixiv 插画并发送带缩略图的结果列表卡面。",
+    "与必应图搜的分工(重要)：用户要插画/二次元图/同人图/画师作品时必须选本工具;bingImageSearchTool 只用于照片/实拍/截图/素材类找图。",
+    "调用边界：",
+    "- 用户想找现成的插画/作品/某画师的作品时调用；不是画图(画/生成新图走生图工具)、不是看图识图。",
+    "- 找表情包时不要调用(走表情包工具)。",
+    "keyword 抽取规则(最重要,逐条检查):",
+    "- keyword 只保留搜索主体本身:角色名/画师名/作品名/标签,例如 wlop、海琴烟、初音未来、翠月。",
+    "- 去掉所有框架词:「查一下/搜搜/帮我找/来点/看看」等动词、「跟X有关的图」只留X、「关于X」只留X、「的图/的作品/的插画」后缀、「一些/热门的/人气最高的」等修饰。",
+    "- “找一下跟翠月有关的图” -> keyword=翠月;“来几张热门的海琴烟” -> keyword=海琴烟;“搜搜初音未来的图” -> keyword=初音未来。",
+    "- 用户原话里的角色叫法优先保留(翠月/海琴烟/中文名都可以,搜索端会自动翻译匹配)。",
+    "searchType:必须填英文枚举 artworks(默认)或 artist(看某画师本人作品)。",
+    "orderBy:必须填英文枚举 newest(默认)/oldest(最早)/popular(热门/人气/收藏最多)。",
+    "等价例子：",
+    "- “查一下wlop的作品” -> {\"keyword\":\"wlop\",\"searchType\":\"artist\"}",
+    "- “找一下跟翠月有关的图” -> {\"keyword\":\"翠月\",\"searchType\":\"artworks\"}",
+    "- “p站搜海琴烟” -> {\"keyword\":\"海琴烟\",\"searchType\":\"artworks\"}",
+    "- “搜一些热门的初音未来同人图” -> {\"keyword\":\"初音未来 同人\",\"searchType\":\"artworks\",\"orderBy\":\"popular\"}",
+    "搜索后引导用户:回复「下载 序号」(如 下载 1)或「下载 作品ID」即可搬运对应作品。"
+  ].join("\n"),
+  // 搜索类关键词措辞无穷多变,不提供确定性解析,统一交给语义规划器的低模型拆解
+  deterministicResolver: null
+}
+
+export const PIXIV_DOWNLOAD_TOOL_MANIFEST = {
+  name: "pixivDownloadTool",
+  terminal: true,
+  description: "下载并搬运一张 Pixiv 插画到群里。用户在搜索列表后回复「下载 3」「下载 126649495」「下个载 id=xxx」之类时调用。",
+  skill: {
+    name: "pixivDownloadTool",
+    purpose: "下载并搬运一张 Pixiv 插画到群里。",
+    whenToUse: "用户针对 Pixiv 搜索列表说「下载 N」「下载 作品ID」时。",
+    boundaries: "磁链、BT、多选编号(下载 1,3)走磁链下载工具,与本工具无关。",
+    instructions: "target 是搜索列表里的序号(如 3)或作品ID(纯数字);不要带「下载/id」等字样。"
+  },
+  triggers: [
+    /(?:下载|下|搬运)\s*(?:第\s*)?\d{1,2}\s*(?:张|个|幅|图)?\s*(?:$|[。!！?？])/i,
+    /(?:下载|下|搬运)\s*(?:id|ID|Id)?\s*\d{5,12}/i
+  ],
+  disclosure: [
+    "【pixivDownloadTool 详细用法】",
+    "用途：下载并搬运一张 Pixiv 插画到群里。",
+    "调用边界：",
+    "- 只在用户针对 Pixiv 搜索列表说「下载 N」「下载 作品ID」时调用。",
+    "- 磁链、BT、多选编号(下载 1,3)走磁链下载工具,与本工具无关。",
+    "参数规则：",
+    "- target 是搜索列表里的序号(如 3)或作品ID(纯数字);不要带「下载/id」等字样。",
+    "等价例子：",
+    "- 搜索列表后“下载 2” -> {\"target\":\"2\"}",
+    "- “下载 126649495” -> {\"target\":\"126649495\"}"
+  ].join("\n"),
+  deterministicResolver: parsePixivDownloadRequest
+}

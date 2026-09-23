@@ -2,11 +2,14 @@
 // 从 apps/test.js 原样迁出（P2 切片一），行为不变；P4 将在此之上重做统一意图入口。
 import { hasExplicitImageGenerationRequest, hasExplicitImageEditAction, shouldTreatAsAvatarInspection } from "../../utils/imageTaskPolicy.js"
 import { looksLikeVisualInspectionRequest, looksLikeImageVerificationRequest, looksLikeImageAuthenticityRequest } from "../../utils/imageRequestGuard.js"
+import { getTerminalToolSet, getBackgroundTerminalToolSet } from "../../utils/toolManifestRegistry.js"
 
-// 终态工具：本轮调用后不再请求 LLM 续话（工具的执行结果本身即为最终输出）
-const TERMINAL_TOOL_NAMES = new Set(['sendLocalEmojiTool', 'waitTool', 'bananaTool', 'googleImageEditTool', 'voiceTool', 'deltaForceTool', 'mentionAdminsTool', 'mentionMembersTool', 'torrentDownloadTool', 'pixivSearchTool', 'pixivDownloadTool'])
+// 终态工具：本轮调用后不再请求 LLM 续话（工具的执行结果本身即为最终输出）。
+// 活集合:工具在自己的 manifest 里声明 terminal:true,由 LocalToolRegistry
+// 启动时注册进集合,这里不再逐工具登记。
+const TERMINAL_TOOL_NAMES = getTerminalToolSet()
 
-const BACKGROUND_TERMINAL_TOOL_NAMES = new Set(['bananaTool', 'googleImageEditTool', 'torrentDownloadTool'])
+const BACKGROUND_TERMINAL_TOOL_NAMES = getBackgroundTerminalToolSet()
 
 const PSEUDO_TOOL_MARKERS = [
   "tool", "tools", "tool_call", "toolcall", "function", "function_call", "functioncall", "func", "call", "voice", "audio", "tts", "image", "img",
