@@ -10,6 +10,7 @@ import {
   savePixivSearchSession,
   searchPixivArtworks
 } from "../../utils/pixivSearch.js"
+import { normalizePixivKeyword, normalizePixivOrderBy, normalizePixivSearchType } from "../../utils/pixivIntent.js"
 
 function findConfigPath() {
   const cwd = process.cwd()
@@ -50,17 +51,29 @@ export class PixivSearchTool extends AbstractTool {
         searchType: {
           type: "string",
           enum: ["artworks", "artist"],
-          description: "artworks=按关键词搜作品(默认);artist=用户想看某位画师本人的作品时,优先按画师名匹配并返回该画师最近的作品"
+          description: "必须填英文枚举:artworks=按关键词搜作品(默认);artist=用户想看某位画师本人的作品。不要填中文(插画/画师等会被自动纠正,但请优先直接用枚举值)"
         },
         orderBy: {
           type: "string",
           enum: ["newest", "oldest", "popular"],
-          description: "排序:newest=最新(默认);oldest=最早;popular=人气(按收藏数重排)。用户说热门/人气/收藏最多时要传 popular"
+          description: "必须填英文枚举:newest=最新(默认);oldest=最早;popular=人气(热门/收藏最多)。不要填中文(相关度/热门等会被自动纠正,但请优先直接用枚举值)"
         }
       },
       required: ["keyword"],
       additionalProperties: false
     }
+  }
+
+  /**
+   * 低模型偶发用自然语言填枚举(searchType:"插画"、orderBy:"相关度"),
+   * 这里统一归一化,避免参数校验拒绝后大模型临场换错工具。
+   */
+  normalizeParameters(params) {
+    const next = { ...(params || {}) }
+    if (next.keyword != null) next.keyword = normalizePixivKeyword(next.keyword)
+    if (next.searchType != null) next.searchType = normalizePixivSearchType(next.searchType)
+    if (next.orderBy != null) next.orderBy = normalizePixivOrderBy(next.orderBy)
+    return next
   }
 
   async func(opts, e) {

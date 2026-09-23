@@ -64,6 +64,23 @@ function cleanKeyword(value = "") {
   return keyword || ""
 }
 
+/** 供工具的参数归一化复用:剥框架词/排序词后的纯搜索主体 */
+export function normalizePixivKeyword(value = "") {
+  return cleanKeyword(value)
+}
+
+/** 低模型可能用自然语言填写枚举(如 searchType:"插画"、orderBy:"相关度"),统一映射到合法值 */
+export function normalizePixivSearchType(value = "") {
+  return /画师|作者|artist/i.test(String(value || "")) ? "artist" : "artworks"
+}
+
+export function normalizePixivOrderBy(value = "") {
+  const text = String(value || "")
+  if (/人气|热门|最热|收藏|赞|popular/i.test(text)) return "popular"
+  if (/最早|最旧|最老|oldest/i.test(text)) return "oldest"
+  return "newest"
+}
+
 /** "查一下wlop的作品" -> {keyword:"wlop", searchType:"artist", order:"popular"};
  *  排序词缺省为 newest;不是找图请求返回 null */
 export function parsePixivSearchRequest(text = "") {
