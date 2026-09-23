@@ -64,12 +64,13 @@ function pixivHeaders() {
   return { Referer: "https://www.pixiv.net/", "User-Agent": "Mozilla/5.0 (compatible; XiloMediaRelay/1.0)", Accept: "application/json" }
 }
 
-export async function fetchPixivJson(url, { fetchImpl = null, proxyUrl = "", cookieHeader = "", signal } = {}) {
+export async function fetchPixivJson(url, { fetchImpl = null, proxyUrl = "", cookieHeader = "", raw = false, signal } = {}) {
   const headers = pixivHeaders()
   if (cookieHeader) headers.Cookie = String(cookieHeader).replace(/^\s*cookie\s*:\s*/i, "").trim()
   const readPayload = async response => {
     if (!response?.ok) throw new Error(`Pixiv 接口返回 ${response?.status || "未知状态"}`)
     const payload = await response.json()
+    if (raw) return payload
     if (payload?.error || !payload?.body) throw new Error(cleanText(payload?.message || "Pixiv 未返回公开作品信息", 120))
     return payload.body
   }

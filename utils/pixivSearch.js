@@ -73,18 +73,102 @@ export async function searchPixivArtworks(keyword = "", {
     let total = Number(body?.illustManga?.total || items.length) || items.length
     let orderSource = "native"
     if (sortBy === "popular" && !cookieHeader) {
-      // 无 Cookie 降级:并行取最近候选的收藏数重排,只代表近期人气
-      const ranked = await rankPixivItemsByBookmarks(items.slice(0, POPULAR_CANDIDATES), { fetchImpl, proxyUrl, signal: controller.signal })
-      if (ranked.length) {
-        items = ranked
-        total = Math.min(total, POPULAR_CANDIDATES)
-        orderSource = "rerank"
+      // 无 Cookie 降级:官方排行榜匿名可访问,按关键词过滤日/周榜;
+      // 搜索响应的 tagTranslation 可把中文关键词映射回日文标签再匹配。
+      const aliases = expandPixivKeywordAliases(word, body?.tagTranslation)
+      const ranking = await collectPixivRankingMatches(aliases, { fetchImpl, proxyUrl, signal: controller.signal })
+      if (ranking.items.length) {
+        const seen = new Set(ranking.items.map(item => item.id))
+        const reranked = await rankPixivItemsByBookmarks(items.slice(0, POPULAR_CANDIDATES), { fetchImpl, proxyUrl, signal: controller.signal })
+        items = [...ranking.items, ...reranked.filter(item => !seen.has(item.id))].slice(0, Math.max(LIST_MAX_ITEMS, POPULAR_CANDIDATES))
+        total = ranking.total
+        orderSource = "ranking"
+      } else {
+        const ranked = await rankPixivItemsByBookmarks(items.slice(0, POPULAR_CANDIDATES), { fetchImpl, proxyUrl, signal: controller.signal })
+        if (ranked.length) {
+          items = ranked
+          total = Math.min(total, POPULAR_CANDIDATES)
+          orderSource = "rerank"
+        }
       }
     }
     return { keyword: word, order: sortBy, orderSource, total, items }
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** 搜索响应的 tagTranslation 是 {日文标签:{zh:中文译名}} 映射:
+ *  中文关键词经它映射回日文标签,用于排行榜匹配 */
+export function expandPixivKeywordAliases(keyword = "", tagTranslation = null) {
+  const aliases = new Set([String(keyword || "").toLowerCase().replace(/\s+/g, "")])
+  const entries = Array.isArray(tagTranslation)
+    ? tagTranslation.flatMap(entry => Object.entries(entry || {}))
+    : Object.entries(tagTranslation && typeof tagTranslation === "object" ? tagTranslation : {})
+  for (const [jaTag, translations] of entries) {
+    const zh = String(translations?.zh || "").toLowerCase().replace(/\s+/g, "")
+    const ja = String(jaTag || "").toLowerCase().replace(/\s+/g, "")
+    if (!zh || !ja) continue
+    for (const alias of aliases) {
+      if (zh === alias || zh.includes(alias) || alias.includes(zh)) {
+        aliases.add(ja)
+        break
+      }
+    }
+  }
+  return [...aliases].filter(Boolean)
+}
+
+/**
+ * 官方排行榜(ranking.php format=json)匿名可访问且自带收藏数。
+ * 拉日榜+周榜前几页,按关键词列表匹配 tag/标题(小写子串双向)。
+ */
+async function collectPixivRankingMatches(keywords = [], { fetchImpl = null, proxyUrl = "", signal } = {}) {
+  const words = [...new Set((Array.isArray(keywords) ? keywords : [keywords]).map(word => String(word || "").toLowerCase().replace(/\s+/g, "")))].filter(Boolean)
+  if (!words.length) return { items: [], total: 0 }
+  const requests = []
+  for (const mode of ["daily", "weekly"]) {
+    for (const page of [1, 2]) {
+      requests.push({ mode, page })
+    }
+  }
+  const pages = await Promise.all(requests.map(async ({ mode, page }) => {
+    try {
+      // ranking.php 的 JSON 是裸结构(无 body 信封),走 raw 模式
+      const payload = await fetchPixivJson(`https://www.pixiv.net/ranking.php?mode=${mode}&content=all&format=json&p=${page}`, { fetchImpl, proxyUrl, signal, raw: true })
+      return (Array.isArray(payload?.contents) ? payload.contents : []).map(entry => normalizePixivRankingEntry(entry))
+    } catch {
+      return []
+    }
+  }))
+  const seen = new Set()
+  const matched = []
+  for (const entry of pages.flat()) {
+    if (!entry || seen.has(entry.id)) continue
+    const haystacks = [entry.title, entry.userName, ...(entry.tags || [])]
+      .map(value => String(value || "").toLowerCase().replace(/\s+/g, ""))
+      .filter(Boolean)
+    const hit = haystacks.some(text => words.some(word => text.includes(word) || (word.length >= 2 && word.includes(text) && text.length >= 2)))
+    if (hit) {
+      seen.add(entry.id)
+      matched.push(entry)
+    }
+  }
+  matched.sort((a, b) => b.bookmarkCount - a.bookmarkCount)
+  return { items: matched.slice(0, POPULAR_CANDIDATES), total: matched.length }
+}
+
+function normalizePixivRankingEntry(entry = {}) {
+  const item = normalizePixivSearchItem({
+    id: entry.illust_id,
+    title: entry.title,
+    userName: entry.user_name,
+    userId: entry.user_id,
+    pageCount: 1,
+    xRestrict: 0,
+    url: entry.url
+  })
+  return item ? { ...item, bookmarkCount: Math.max(0, Math.round(Number(entry.rating_count) || 0)), tags: Array.isArray(entry.tags) ? entry.tags.slice(0, 8) : [] } : null
 }
 
 /** 匿名接口拿不到收藏数:并行取详情接口的 bookmarkCount 给候选重排 */
@@ -361,8 +445,9 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
     newest: "按时间·最新",
     oldest: "按时间·最早",
     "popular-native": "按人气·全站收藏排序",
+    "popular-ranking": "按人气·官方排行榜(日/周榜)匹配",
     "popular-rerank": "按近期人气(最新上传中收藏最多,登录Cookie可解锁全站)"
-  }[session.orderSource === "rerank" ? "popular-rerank" : session.order === "popular" ? "popular-native" : PIXIV_SEARCH_ORDERS.has(session.order) ? session.order : "newest"]
+  }[session.orderSource === "rerank" ? "popular-rerank" : session.orderSource === "ranking" ? "popular-ranking" : session.order === "popular" ? "popular-native" : PIXIV_SEARCH_ORDERS.has(session.order) ? session.order : "newest"]
   const subtitle = session.mode === "artist" && session.artist?.userName
     ? `画师 ${session.artist.userName} 的最近作品 · 共 ${items.length} 张 · ${orderLabel}`
     : `共 ${total} 个结果,展示前 ${items.length} 个 · ${orderLabel}`
