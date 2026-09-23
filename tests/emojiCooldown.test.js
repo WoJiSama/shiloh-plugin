@@ -10,6 +10,15 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
+function readPluginSources() {
+  const libDir = new URL("../apps/lib/", import.meta.url)
+  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
+  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
+    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
+  }
+  return parts.join("\n")
+}
+
 test("emoji-only 回复后进入冷却，explicit 请求不受限", () => {
   resetEmojiCooldownForTests()
   assert.equal(emojiCooldownActive("g1"), false)
@@ -36,17 +45,17 @@ test("冷却期间 casual 暴露返回空工具列表", () => {
 })
 
 test("test.js 已接线：终态表情后记录冷却、暴露过滤传冷却参数", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const pluginSource = readPluginSources()
   const routeSrc = fs.readFileSync(path.join(root, "utils/routeDecision.js"), "utf8")
-  assert.ok(src.includes("recordEmojiOnlySend(e.group_id"), "终态表情回复记录冷却")
-  assert.ok(src.includes("emojiCooldownMs: Number(this.config?.emojiSystem?.emojiCooldownMs"), "暴露过滤带冷却配置")
+  assert.ok(pluginSource.includes("recordEmojiOnlySend(e.group_id"), "终态表情回复记录冷却")
+  assert.ok(pluginSource.includes("emojiCooldownMs: Number(this.config?.emojiSystem?.emojiCooldownMs"), "暴露过滤带冷却配置")
   assert.ok(routeSrc.includes("suppressEmojiByCooldown(ctx.intentText, ctx.groupId, ctx.emojiCooldownMs)"), "强制快路尊重冷却")
 })
 
 test("filterToolsForMessageIntent 解构参数后不得残留 options 引用", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
-  const start = src.indexOf("function filterToolsForMessageIntent")
-  const end = src.indexOf("\n}", start)
-  const body = src.slice(start, end)
+  const pluginSource = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const start = pluginSource.indexOf("function filterToolsForMessageIntent")
+  const end = pluginSource.indexOf("\n}", start)
+  const body = pluginSource.slice(start, end)
   assert.ok(!body.includes("options."), "函数签名已解构，函数体内不得再引用 options（曾致每轮 ReferenceError 无回复）")
 })

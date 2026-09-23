@@ -119,7 +119,10 @@ test("最终卡片:简报在前、原文材料为证据层、总长受 maxChars 
 })
 
 test("主链路接线:简报优先 + 失败回退规则卡 + 配置开关", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = [
+    fs.readFileSync(path.join(root, "apps/test.js"), "utf8"),
+    fs.readFileSync(path.join(root, "apps/lib/promptContext.js"), "utf8")
+  ].join("\n")
   assert.ok(src.includes("await this.resolveUnderstandingPrompt({"), "注入点改为异步简报解析")
   assert.ok(src.includes("requestUnderstandingBrief({"), "模型简报调用已接线")
   assert.ok(src.includes("回退规则卡 reason="), "回退有观测日志")

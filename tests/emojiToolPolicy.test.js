@@ -24,6 +24,15 @@ const LEGACY_CASUAL_PHRASES = [
   "安慰一下我", "哄哄我", "啊？"
 ]
 
+function readPluginSources() {
+  const libDir = new URL("../apps/lib/", import.meta.url)
+  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
+  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
+    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
+  }
+  return parts.join("\n")
+}
+
 test("legacy casual reaction phrases still classify as casual_reaction", () => {
   for (const phrase of LEGACY_CASUAL_PHRASES) {
     assert.equal(classifyEmojiToolExposure(phrase), "casual_reaction", `漏词: ${phrase}`)
@@ -79,14 +88,14 @@ test("forced reply text rate adapts to the group's bare-emoji share", () => {
 
 test("forced fast path wires the reply pool and cooldown respects lead text", () => {
   // 表情强制路已迁入 utils/routeDecision.js;群自适应统计与 emoji-only 判定仍在主链路
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const pluginSource = readPluginSources()
   const routeSrc = fs.readFileSync(path.join(root, "utils/routeDecision.js"), "utf8")
   assert.ok(routeSrc.includes("const forcedLayout = pickForcedReplyLayout({"), "强制路接入配文采样")
   assert.ok(routeSrc.includes("leadText: forcedLayout.leadText"), "配文进入工具参数")
   assert.ok(routeSrc.includes("await ctx.helpers.resolveForcedReplyTextRate(ctx.groupId)"), "配文率走群自适应助手")
-  assert.ok(src.includes("getGroupEmojiLayoutStats?.(groupId)"), "自适应读取表达学习统计")
+  assert.ok(pluginSource.includes("getGroupEmojiLayoutStats?.(groupId)"), "自适应读取表达学习统计")
   assert.ok(
-    src.includes('!validResults.some(r => String(r.result || "").includes("段文字"))'),
+    pluginSource.includes('!validResults.some(r => String(r.result || "").includes("段文字"))'),
     "带 leadText 的回合不得记为 emoji-only 冷却"
   )
 })
@@ -100,12 +109,12 @@ test("reaction rules are the single source: casual set derives from the rule arr
 })
 
 test("emoji failures fall silent instead of triggering an apology model call", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const pluginSource = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
   assert.ok(
-    src.includes("if (toolName === LOCAL_EMOJI_TOOL_NAME) {"),
+    pluginSource.includes("if (toolName === LOCAL_EMOJI_TOOL_NAME) {"),
     "表情工具失败必须静默跳过"
   )
-  assert.ok(src.includes("发送未完成，本轮静默跳过"), "静默跳过有日志可查")
+  assert.ok(pluginSource.includes("发送未完成，本轮静默跳过"), "静默跳过有日志可查")
 })
 
 test("selection no longer falls back to a random image on specific misses", () => {

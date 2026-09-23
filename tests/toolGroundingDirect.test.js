@@ -5,6 +5,16 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { decideToolContinuation, formatDirectToolResult } from "../utils/toolContinuationPolicy.js"
 
+function readPluginSources() {
+  const libDir = path.join(root, "apps/lib")
+  const parts = [fs.readFileSync(path.join(root, "apps/test.js"), "utf8")]
+  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
+    parts.push(fs.readFileSync(path.join(libDir, file), "utf8"))
+  }
+  return parts.join("\n")
+}
+
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 test("member info is a known-fact tool that bypasses the polish model", () => {
@@ -52,7 +62,7 @@ test("member info direct result is formatted as readable facts without a model",
 })
 
 test("rewrite chain no longer re-guards pre-guarded final replies", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = readPluginSources()
   assert.ok(src.includes("{ alreadyGuarded = false } = {}"), "sendSegmentedMessage 需要已守卫标记")
   assert.ok(src.includes("typeof output === \"string\" && !alreadyGuarded"), "守卫只在未预处理文本上执行")
   assert.ok(src.includes("this.sendSegmentedMessage(e, output, 0.5, { alreadyGuarded: true })"), "handleTextResponse 最终发送必须声明已守卫")

@@ -4,8 +4,18 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
+function readPluginSources() {
+  const libDir = path.join(root, "apps/lib")
+  const parts = [fs.readFileSync(path.join(root, "apps/test.js"), "utf8")]
+  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
+    parts.push(fs.readFileSync(path.join(libDir, file), "utf8"))
+  }
+  return parts.join("\n")
+}
+
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+const src = readPluginSources()
 
 test("half-width parens and semicolons no longer count as code signals", () => {
   // 此前 /\\[{}();\\]/ 让含 "(笑)" 颜文字或英文缩写的普通回复被判成代码 → 整条变文档卡面

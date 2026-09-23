@@ -13,6 +13,15 @@ function recorder() {
   return { sent, reply: async text => { sent.push(text) } }
 }
 
+function readPluginSources() {
+  const libDir = new URL("../apps/lib/", import.meta.url)
+  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
+  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
+    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
+  }
+  return parts.join("\n")
+}
+
 test("outbound sends are serialized in enqueue order", async () => {
   const state = { gate: Promise.resolve() }
   const sent = []
@@ -110,7 +119,7 @@ test("turn trace assembles one structured record", () => {
 })
 
 test("handleTool wires trace and arbiter into the turn", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const pluginSource = readPluginSources()
   for (const marker of [
     "const turnTrace = createTurnTrace({",
     "e = outboundArbiter.wrapEvent(e)",
@@ -121,6 +130,6 @@ test("handleTool wires trace and arbiter into the turn", () => {
     "turnTrace.finish()",
     "turnId: e?._turnId"
   ]) {
-    assert.ok(src.includes(marker), `missing wiring: ${marker}`)
+    assert.ok(pluginSource.includes(marker), `missing wiring: ${marker}`)
   }
 })
