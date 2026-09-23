@@ -12,6 +12,7 @@ custom_tools/**/*.cjs
 !custom_tools/*.example
 .DS_Store
 .remote-edit/
+.remote-edit-backup-*.tar.gz
 .idea/
 reports/
 torrent-tool-*/

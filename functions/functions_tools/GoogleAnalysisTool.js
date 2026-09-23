@@ -8,6 +8,7 @@ import path from "path";
 import { resolveChatCompletionUrl } from '../../utils/chatCompletionUrl.js';
 import { generateContextualProgressReply } from '../../utils/contextualProgressReply.js';
 import { personaFeedbackManager } from '../../domains/memory/PersonaFeedbackManager.js';
+import { reserveProgressReply } from '../../utils/progressReplyBudget.js';
 const DEFAULT_ANALYSIS_TIMEOUT_MS = 45000;
 
 function redactErrorMessage(error) {
@@ -44,6 +45,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
         fetchImpl = globalThis.fetch,
         progressFetchImpl = globalThis.fetch,
         progressReplyFactory = generateContextualProgressReply,
+        progressDelayMs = 2500,
         imageLoader = getBase64Image
     } = {}) {
         super();
@@ -86,6 +88,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
         this.fetchImpl = fetchImpl;
         this.progressFetchImpl = progressFetchImpl;
         this.progressReplyFactory = progressReplyFactory;
+        this.progressDelayMs = Math.max(0, Number(progressDelayMs) || 0);
         this.imageLoader = imageLoader;
 
     }
@@ -202,6 +205,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
 
     async func(opts, e) {
         let progressController = null;
+        let progressTimer = null;
         try {
             // 配置路径
             // 配置路径
@@ -216,12 +220,14 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 return { error: '未检测到有效的图片链接' };
             }
 
-            progressController = new AbortController();
-            void this.sendProgress(e, {
-                config,
-                opts,
-                signal: progressController.signal
-            });
+            progressTimer = setTimeout(() => {
+                progressController = new AbortController();
+                void this.sendProgress(e, {
+                    config,
+                    opts,
+                    signal: progressController.signal
+                });
+            }, this.progressDelayMs);
 
             // 处理所有图片URL
             const images = dedupeImageUrls(await normalizeImageUrls(rawImages));
@@ -286,7 +292,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                                 signal: controller.signal
                             });
                             const raw = await response.text();
-                            if (!response.ok) throw Object.assign(new Error(`vision HTTP ${response.status}`), { code: 'vision_http', status: response.status });
+                            if (!response.ok) throw Object.assign(new Error(`vision HTTP ${response.status}: ${raw.replace(/\s+/g, " ").slice(0, 140)}`), { code: 'vision_http', status: response.status });
                             let analysis;
                             try { analysis = JSON.parse(raw); } catch { throw Object.assign(new Error('vision response is not JSON'), { code: 'vision_invalid_response' }); }
                             const result = analysis?.choices?.[0]?.message?.content;
@@ -299,6 +305,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                                 provider: candidate.label,
                                 code,
                                 ...(Number.isFinite(Number(error?.status)) ? { status: Number(error.status) } : {}),
+                                message: String(error?.message || '').slice(0, 160),
                                 elapsedMs: Date.now() - attemptStartedAt
                             });
                             this.logWarn(`[图片识别] provider=${candidate.label} model=${candidate.model} images=${imageCount} index=${imageIndex ?? 0} code=${code} error=${redactErrorMessage(error)}`);
@@ -384,6 +391,7 @@ export class GoogleImageAnalysisTool extends AbstractTool {
             return { error: `图片分析失败: ${error.message}` };
         }
         finally {
+            if (progressTimer) clearTimeout(progressTimer);
             progressController?.abort?.();
         }
     }
@@ -395,6 +403,8 @@ export class GoogleImageAnalysisTool extends AbstractTool {
 
     async sendProgress(e, { config = {}, opts = {}, signal } = {}) {
         if (!e?.reply || signal?.aborted) return false;
+        const reservation = reserveProgressReply(e);
+        if (!reservation) return false;
         try {
             const text = await this.progressReplyFactory({
                 config,
@@ -406,15 +416,23 @@ export class GoogleImageAnalysisTool extends AbstractTool {
                 fetchImpl: this.progressFetchImpl,
                 signal
             });
-            if (!text || signal?.aborted) return false;
+            if (!text || signal?.aborted) {
+                reservation.release();
+                return false;
+            }
             const guardedText = personaFeedbackManager.guardReply(text, config?.personaGuard, {
                 userText: e?.msg || e?.raw_message || opts?.prompt || '',
                 botNames: [config?.persona?.name]
             });
-            if (!guardedText) return false;
+            if (!guardedText) {
+                reservation.release();
+                return false;
+            }
             await e.reply(guardedText);
+            reservation.commit();
             return true;
         } catch (error) {
+            reservation.release();
             this.logWarn(`[图片分析] 发送进度提示失败: ${error.message}`);
             return false;
         }

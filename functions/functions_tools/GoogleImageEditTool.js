@@ -20,6 +20,7 @@ import {
 } from "../../utils/imageGenerationFallback.js";
 import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
 import { personaFeedbackManager } from "../../domains/memory/PersonaFeedbackManager.js";
+import { reserveProgressReply } from "../../utils/progressReplyBudget.js";
 
 const { mimeTypes, FormData } = dependencies;
 const DEFAULT_CHAT_IMAGE_EDIT_URL = 'https://api.openai.com/v1/chat/completions';
@@ -535,6 +536,8 @@ export class GoogleImageEditTool extends AbstractTool {
 
     async sendProgress(e, { config = {}, opts = {}, signal } = {}) {
         if (!e?.reply || signal?.aborted) return false;
+        const reservation = reserveProgressReply(e);
+        if (!reservation) return false;
         try {
             const text = await this.progressReplyFactory({
                 config,
@@ -547,15 +550,23 @@ export class GoogleImageEditTool extends AbstractTool {
                 fetchImpl: this.progressFetchImpl,
                 signal
             });
-            if (!text || signal?.aborted) return false;
+            if (!text || signal?.aborted) {
+                reservation.release();
+                return false;
+            }
             const guardedText = personaFeedbackManager.guardReply(text, config?.personaGuard, {
                 userText: e?.msg || e?.raw_message || opts?.prompt || "",
                 botNames: [config?.persona?.name]
             });
-            if (!guardedText) return false;
+            if (!guardedText) {
+                reservation.release();
+                return false;
+            }
             await e.reply(guardedText);
+            reservation.commit();
             return true;
         } catch (error) {
+            reservation.release();
             this.logWarn(`[图片编辑] 发送进度提示失败: ${error.message}`);
             return false;
         }

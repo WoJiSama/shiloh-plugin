@@ -156,7 +156,7 @@ test("builds metadata-only and payload download commands without shell interpola
 })
 
 test("offers an over-limit multi-file torrent for selection and downloads only the chosen file", async () => {
-  const dirName = `torrent-tool-select-${randomUUID()}`
+  const dirName = path.join(os.tmpdir(), `torrent-tool-select-${randomUUID()}`)
   const torrent = multiEntryTorrent([
     { name: "one.bin", size: 4 },
     { name: "two.bin", size: 5 }
@@ -216,12 +216,12 @@ test("offers an over-limit multi-file torrent for selection and downloads only t
     assert.equal(sent[0].event.user_id, event.user_id)
     assert.match(String(notices.at(-1)), /已私发给发起人/)
   } finally {
-    await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
+    await fs.promises.rm(dirName, { recursive: true, force: true })
   }
 })
 
 test("磁链清单统一渲染成卡面图片发送", async () => {
-  const dirName = `torrent-tool-card-${randomUUID()}`
+  const dirName = path.join(os.tmpdir(), `torrent-tool-card-${randomUUID()}`)
   const torrent = multiEntryTorrent([
     { name: "one.bin", size: 4 },
     { name: "two.bin", size: 5 }
@@ -265,7 +265,7 @@ test("磁链清单统一渲染成卡面图片发送", async () => {
   } finally {
     if (originalSegment === undefined) delete globalThis.segment
     else globalThis.segment = originalSegment
-    await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
+    await fs.promises.rm(dirName, { recursive: true, force: true })
   }
 })
 
@@ -287,7 +287,7 @@ test("renders the downloaded directory listing for the first forward node", () =
 })
 
 test("downloads only after metadata passes limits and sends verified files", async () => {
-  const dirName = `torrent-tool-test-${randomUUID()}`
+  const dirName = path.join(os.tmpdir(), `torrent-tool-test-${randomUUID()}`)
   const torrent = singleFileTorrent()
   const magnet = `magnet:?xt=urn:btih:${getTorrentInfoHash(torrent)}`
   const notices = []
@@ -329,12 +329,12 @@ test("downloads only after metadata passes limits and sends verified files", asy
     assert.equal(sent[0].event.user_id, 9528)
     assert.match(String(notices.at(-1)), /已私发给发起人/)
   } finally {
-    await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
+    await fs.promises.rm(dirName, { recursive: true, force: true })
   }
 })
 
 test("does not start payload download when metadata exceeds the configured limit", async () => {
-  const dirName = `torrent-tool-limit-${randomUUID()}`
+  const dirName = path.join(os.tmpdir(), `torrent-tool-limit-${randomUUID()}`)
   const torrent = singleFileTorrent("large.bin", 2 * 1024 * 1024)
   const magnet = `magnet:?xt=urn:btih:${getTorrentInfoHash(torrent)}`
   let calls = 0
@@ -353,12 +353,12 @@ test("does not start payload download when metadata exceeds the configured limit
     assert.match(result, /总大小/)
     assert.equal(calls, 1)
   } finally {
-    await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
+    await fs.promises.rm(dirName, { recursive: true, force: true })
   }
 })
 
 test("does not start payload download when the archive upload limit would be exceeded", async () => {
-  const dirName = `torrent-tool-archive-limit-${randomUUID()}`
+  const dirName = path.join(os.tmpdir(), `torrent-tool-archive-limit-${randomUUID()}`)
   const torrent = singleFileTorrent("large.bin", 2 * 1024 * 1024)
   const magnet = `magnet:?xt=urn:btih:${getTorrentInfoHash(torrent)}`
   let calls = 0
@@ -377,13 +377,13 @@ test("does not start payload download when the archive upload limit would be exc
     assert.match(result, /压缩包上传上限/)
     assert.equal(calls, 1)
   } finally {
-    await fs.promises.rm(path.resolve(process.cwd(), dirName), { recursive: true, force: true })
+    await fs.promises.rm(dirName, { recursive: true, force: true })
   }
 })
 
 test("reports a missing aria2 binary without pretending the download started", async () => {
   const tool = new TorrentDownloadTool({
-    configProvider: () => normalizeTorrentDownloadConfig({ enabled: true, downloadDir: `torrent-tool-missing-${randomUUID()}` }),
+    configProvider: () => normalizeTorrentDownloadConfig({ enabled: true, downloadDir: path.join(os.tmpdir(), `torrent-tool-missing-${randomUUID()}`) }),
     commandRunner: async () => {
       const error = new Error("spawn aria2c ENOENT")
       error.code = "ENOENT"
@@ -400,7 +400,7 @@ test("retries metadata discovery through tracker-assisted P2P without claiming p
   const calls = []
   const notices = []
   const tool = new TorrentDownloadTool({
-    configProvider: () => normalizeTorrentDownloadConfig({ enabled: true, downloadDir: `torrent-tool-timeout-${randomUUID()}` }),
+    configProvider: () => normalizeTorrentDownloadConfig({ enabled: true, downloadDir: path.join(os.tmpdir(), `torrent-tool-timeout-${randomUUID()}`) }),
     commandRunner: async (_command, args) => {
       calls.push(args)
       const error = new Error("timed out")
@@ -427,7 +427,7 @@ test("uses a verified HTTPS metadata cache before attempting P2P discovery", asy
   const tool = new TorrentDownloadTool({
     configProvider: () => normalizeTorrentDownloadConfig({
       enabled: true,
-      downloadDir: `torrent-tool-cache-${randomUUID()}`,
+      downloadDir: path.join(os.tmpdir(), `torrent-tool-cache-${randomUUID()}`),
       metadataHttpSources: ["https://cache.example/{infoHash}.torrent"]
     }),
     commandRunner: async (command, args) => {
@@ -459,7 +459,7 @@ test("uses a verified HTTPS metadata cache before attempting P2P discovery", asy
 
 test("does not expose a tracker URL when both metadata discovery attempts fail", async () => {
   const tool = new TorrentDownloadTool({
-    configProvider: () => normalizeTorrentDownloadConfig({ enabled: true, downloadDir: `torrent-tool-redaction-${randomUUID()}` }),
+    configProvider: () => normalizeTorrentDownloadConfig({ enabled: true, downloadDir: path.join(os.tmpdir(), `torrent-tool-redaction-${randomUUID()}`) }),
     commandRunner: async () => {
       throw new Error("tracker failed: https://tracker.example/announce?token=secret")
     },

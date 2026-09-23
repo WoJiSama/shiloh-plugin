@@ -31,8 +31,18 @@ function inferIntent(responseKind, requiredCapabilities) {
   return responseKind === "knowledge" ? "knowledge" : "chat"
 }
 
-function needsDeliberateReasoning(text = "") {
-  return /(严格证明|完整推导|逐步推导|严谨分析|多步推理|证明(?:一下|下)?|计算过程)/.test(String(text || ""))
+// 复杂度判定:命中即升 reasoning 档(换档位而非换人)。除学术推导类原有关键词外,
+// 覆盖群里真实发生的复杂问法——多约束对比、故障排查、方案规划;
+// 连环追问(疑问信号 ≥3)也算。注意门槛靠 isCasualChatTurn 反向兜底:
+// 命中这些模式的回合不可能是 casual,不会误伤短闲聊的提速路径。
+const DELIBERATE_REASONING_RE = /严格证明|完整推导|逐步推导|严谨分析|多步推理|证明(?:一下|下)?|计算过程|(?:对比|比较|区别|差异|优劣).{0,24}(?:和|还是|与)|(?:和|还是|与).{0,24}(?:哪个更|怎么选|选哪个|哪个好)|(?:对比|比较)一下.{0,24}(?:选哪个|哪个好|哪个更|怎么选)|(?:报错|失败|异常|崩了|崩溃|卡住|没反应|连不上|不生效|没用).{0,24}(?:为什么|为啥|怎么回事|怎么办|怎么|如何)|(?:为什么|为啥|怎么回事).{0,24}(?:报错|失败|异常|崩了|崩溃|卡住|没反应)|(?:方案|计划|规划|步骤|流程).{0,16}(?:怎么|如何|怎么做|怎么排)/
+
+export function needsDeliberateReasoning(text = "") {
+  const content = String(text || "")
+  if (DELIBERATE_REASONING_RE.test(content)) return true
+  const questionSignals = (content.match(/为什么|为啥|怎么回事|怎么办|如何/g) || []).length +
+    (content.match(/[?？]/g) || []).length
+  return questionSignals >= 3
 }
 
 export function isCasualChatTurn(text = "") {
@@ -81,7 +91,9 @@ export function createTurnPlan({
   // the emoji tool is silently stripped before the request is made.
   const hasOptionalReaction = casual && optional.some(name => OPTIONAL_CAPABILITIES.has(name))
   const executionMode = hasRequiredAction || hasOptionalReaction ? "tool" : "chat"
-  const reasoning = executionMode === "chat" && responseKind === "knowledge" && needsDeliberateReasoning(intentText)
+  // 升档不再要求 knowledge 档:技术性追问常被 responseKind 判成 chat(排障类被显式排除在
+  // 教育讲解之外),它们同样值得高思考档;casual 已被 isCasualChatTurn 排除,不受影响
+  const reasoning = executionMode === "chat" && needsDeliberateReasoning(intentText)
   const modelProfile = hasOptionalReaction
     ? "casual"
     : executionMode === "tool"
@@ -130,14 +142,22 @@ export function recordTurnPlanToolOutcome(plan, { toolName = "", success = false
   return plan
 }
 
-export function deriveTurnPlanRequest(plan = {}) {
+export function deriveTurnPlanRequest(plan = {}, config = {}) {
   const profile = plan?.execution?.modelProfile || "adaptive"
+  // reasoning 档真正升 thinking 档位:effort 经 options.generation 直达请求体
+  // (apiClient: generation.reasoningEffort 优先于 backend.reasoningEffort)。
+  // 配置 complexReasoningEffort 可改档(minimal/low/medium/high);置 false/none 关闭升档。
+  const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "high").trim().toLowerCase()
+  const escalateEffort = ["minimal", "low", "medium", "high"].includes(configuredEffort) ? configuredEffort : ""
   return {
     toolChoice: plan?.execution?.toolChoice || "none",
     requestOptions: profile === "fast"
       ? { forceChatBackend: true, routeLabel: "快速知识回复" }
       : profile === "reasoning"
-        ? { routeLabel: "复杂知识推理" }
+        ? {
+            routeLabel: "复杂知识推理",
+            ...(escalateEffort ? { generation: { reasoningEffort: escalateEffort } } : {})
+          }
         : profile === "casual"
           ? { taskBackend: "casual", routeLabel: "短闲聊模型" }
         : {}

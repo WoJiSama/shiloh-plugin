@@ -6,6 +6,7 @@ import path from "path";
 import { safeTruncateUnicode } from "../../utils/unicodeText.js";
 import { resolveChatCompletionUrl } from "../../utils/chatCompletionUrl.js";
 import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
+import { reserveProgressReply } from "../../utils/progressReplyBudget.js";
 /**
  * Search 工具类，用于自由搜索并控制返回结果的大小
  */
@@ -65,6 +66,8 @@ export class SearchInformationTool extends AbstractTool {
   }
 
   async sendContextualProgress({ config, opts, e, query, signal, isActive }) {
+    const reservation = reserveProgressReply(e)
+    if (!reservation) return
     try {
       const text = await this.progressReplyFactory({
         config,
@@ -76,9 +79,14 @@ export class SearchInformationTool extends AbstractTool {
         fetchImpl: this.progressFetchImpl,
         signal
       });
-      if (!text || !isActive() || signal?.aborted) return;
+      if (!text || !isActive() || signal?.aborted) {
+        reservation.release()
+        return
+      }
       await e?.reply?.(text);
+      reservation.commit()
     } catch (error) {
+      reservation.release()
       globalThis.logger?.debug?.(`[搜索进度] 生成或发送失败: ${error?.name || 'Error'}`);
     }
   }

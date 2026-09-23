@@ -1,7 +1,6 @@
 import fs from "fs"
 import path from "path"
 import yaml from "js-yaml"
-import { renderUmaRaceReport } from "./UmaRaceReportRenderer.js"
 import { sendSmartReply } from "../../../utils/SmartReply.js"
 
 const DEFAULT_CONFIG = {
@@ -3179,6 +3178,9 @@ export class UmaRaceManager {
 
   async renderRaceReportOrFallback(e, report, fallbackText) {
     try {
+      // 懒加载渲染器:它静态依赖 Yunzai 运行时的 lib/puppeteer,非 Yunzai 环境
+      // (单测/独立工具)下加载失败会落到这里的文本兜底,而不是让整个模块崩掉
+      const { renderUmaRaceReport } = await import("./UmaRaceReportRenderer.js")
       const image = await renderUmaRaceReport(e, report)
       if (!image) throw new Error("empty render result")
       return image

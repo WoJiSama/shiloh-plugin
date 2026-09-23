@@ -338,7 +338,7 @@ function resolveToolsBackendFallbacks(config = {}) {
     });
 }
 
-function resolveConfiguredTaskBackend(config = {}, taskName = "") {
+export function resolveConfiguredTaskBackend(config = {}, taskName = "") {
     const task = config?.taskAiConfig?.[String(taskName || "").trim()] || {}
     if (task.apiUrl && task.model && task.apiKey?.length) {
         return {
@@ -351,7 +351,13 @@ function resolveConfiguredTaskBackend(config = {}, taskName = "") {
             reasoningEffort: task.reasoningEffort
         }
     }
-    return { ...resolveConfiguredChatBackend(config), label: `task:${taskName}:chat-fallback` }
+    const chatBackend = resolveConfiguredChatBackend(config)
+    // 只配置思考档、不另配地址时：沿用 chat 后端但覆盖 effort
+    // （闲聊档用 none 关思考、全局 chat 保持 low、复杂升档走 generation 覆盖，三者互不干扰）
+    if (task.reasoningEffort !== undefined && String(task.reasoningEffort).trim() !== "") {
+        return { ...chatBackend, label: `task:${taskName}:chat-effort`, reasoningEffort: String(task.reasoningEffort).trim() }
+    }
+    return { ...chatBackend, label: `task:${taskName}:chat-fallback` }
 }
 
 function buildGenerationOptions(requestData = {}, options = {}, backend = {}) {

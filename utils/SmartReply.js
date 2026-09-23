@@ -65,6 +65,9 @@ export async function sendSmartReply(e, output, options = {}) {
 
   const text = output.trim()
   if (!text) return null
+  // Some consumers (notably dice logs) need the actual outbound text. A
+  // rendered card only reaches message listeners as an image segment.
+  if (options.forceText === true) return await e.reply(text, options.quote)
   const analysis = analyzeReplyText(text, options)
   if (!analysis.shouldRender) return await e.reply(text, options.quote)
 

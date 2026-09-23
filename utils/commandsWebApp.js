@@ -207,7 +207,7 @@ function buildPageHtml() {
 <div id="status"></div>
 <div id="drop-overlay">📎 松开导入：牌堆(.json/.yaml) · 规则包(.yaml/.js/.cjs)</div>
 <script>
-const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceBuiltin: [], diceLevelMeta: [], diceDecks: [] }
+const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceJrrp: [], diceBuiltin: [], diceLevelMeta: [], diceDecks: [], emojiItems: [], emojiStats: null, emojiSelection: {}, emojiAdmission: null }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
@@ -258,6 +258,7 @@ async function refreshDiceData() {
   try {
     const data = await api("api/dice-data")
     state.diceTemplates = data.templates || {}
+    state.diceJrrp = data.jrrpComments || []
     state.dicePacks = data.packs || []
     state.diceCheckLevels = data.checkLevels || {}
     state.diceInsanity = data.insanityTables || {}
@@ -380,6 +381,163 @@ function renderEditor() {
   addCmd.textContent = "+ 新增命令"
   addCmd.onclick = () => { d.commands.push({ usage: "#新命令", desc: "", perm: "all", src: "" }); state.dirty = true; renderDomains(); renderEditor() }
 
+  if (d.key === "emoji") {
+    // 入库标准：什么样的图有资格进表情包库（追加到视觉审查提示词）
+    const admitTitle = document.createElement("div")
+    admitTitle.className = "section-title"
+    admitTitle.textContent = "📥 入库标准（群里发图自动收藏前，视觉模型按此判定）"
+    box.appendChild(admitTitle)
+    const admitHint = document.createElement("div")
+    admitHint.style.cssText = "font-size:12px;color:#888;margin:4px 0 8px"
+    admitHint.textContent = "内置标准（从严）：梗图/二次元表情、夸张情绪动作、自带梗字、拟人化反应可入库；宠物日常照、插画立绘、风景、真人照片、各类截图默认拒绝。下面两栏按行填写补充规则，保存后立即对新收藏生效。"
+    box.appendChild(admitHint)
+    const admitGrid = document.createElement("div")
+    admitGrid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:10px"
+    const makeAdmitArea = (labelText, key, placeholder) => {
+      const wrap = document.createElement("div")
+      const label = document.createElement("div")
+      label.style.cssText = "font-size:12px;color:#666;margin-bottom:3px"
+      label.textContent = labelText
+      const area = document.createElement("textarea")
+      area.rows = 4
+      area.style.cssText = "width:100%;box-sizing:border-box"
+      area.placeholder = placeholder
+      area.value = (state.emojiAdmission && state.emojiAdmission[key] || []).join("\n")
+      area.oninput = () => {
+        state.emojiAdmission ||= {}
+        state.emojiAdmission[key] = area.value.split("\n").map(s => s.trim()).filter(Boolean)
+      }
+      wrap.appendChild(label)
+      wrap.appendChild(area)
+      return wrap
+    }
+    admitGrid.appendChild(makeAdmitArea("补充放行（一行一条，命中可入库）", "allow", "例：猫狗搞怪表情只要够夸张就放行\n例：允许经典影视梗图"))
+    admitGrid.appendChild(makeAdmitArea("补充拒绝（一行一条，命中直接拒）", "reject", "例：不要任何带明星脸的\n例：不要政治相关图"))
+    box.appendChild(admitGrid)
+    const admitBar = document.createElement("div")
+    admitBar.style.cssText = "display:flex;gap:8px;margin:8px 0 18px"
+    const admitSave = document.createElement("button")
+    admitSave.textContent = "💾 保存入库标准"
+    admitSave.onclick = async () => {
+      try {
+        const r = await api("api/emoji-admission", state.emojiAdmission || { allow: [], reject: [] })
+        toast("入库标准已保存并热生效：放行 " + r.allow.length + " 条、拒绝 " + r.reject.length + " 条")
+      } catch (e) { toast(e.message, true) }
+    }
+    admitBar.appendChild(admitSave)
+    box.appendChild(admitBar)
+
+    // 表情包图库：展示/删除/保留（保留=不点删除就行）
+    const galleryTitle = document.createElement("div")
+    galleryTitle.className = "section-title"
+    galleryTitle.textContent = "😎 表情包图库（群里自动收藏的都在这；删除会同时删掉文件，保留就不管它）"
+    box.appendChild(galleryTitle)
+    const selectedCount = Object.values(state.emojiSelection).filter(Boolean).length
+    const galleryBar = document.createElement("div")
+    galleryBar.style.cssText = "display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap"
+    const refreshBtn = document.createElement("button")
+    refreshBtn.className = "ghost"
+    refreshBtn.textContent = "↻ 刷新"
+    refreshBtn.onclick = () => { state.emojiSelection = {}; loadEmojiGallery().then(renderEditor) }
+    const selectAllBtn = document.createElement("button")
+    selectAllBtn.className = "ghost"
+    selectAllBtn.textContent = state.emojiItems.length && selectedCount === state.emojiItems.length ? "取消全选" : "全选"
+    selectAllBtn.onclick = () => {
+      const allOn = selectedCount === state.emojiItems.length && state.emojiItems.length > 0
+      state.emojiSelection = {}
+      if (!allOn) for (const it of state.emojiItems) state.emojiSelection[it.hash] = true
+      renderDomains(); renderEditor()
+    }
+    const clearSelBtn = document.createElement("button")
+    clearSelBtn.className = "ghost"
+    clearSelBtn.textContent = "清空选择"
+    clearSelBtn.disabled = selectedCount === 0
+    clearSelBtn.onclick = () => { state.emojiSelection = {}; renderDomains(); renderEditor() }
+    const batchDelBtn = document.createElement("button")
+    batchDelBtn.className = "danger"
+    batchDelBtn.textContent = "删除所选 (" + selectedCount + ")"
+    batchDelBtn.disabled = selectedCount === 0
+    batchDelBtn.onclick = async () => {
+      const hashes = Object.keys(state.emojiSelection).filter(h => state.emojiSelection[h])
+      if (!hashes.length) return
+      if (!confirm("删除选中的 " + hashes.length + " 张表情包？文件也会一起删掉，不可恢复。")) return
+      batchDelBtn.disabled = true
+      batchDelBtn.textContent = "删除中…"
+      try {
+        const r = await api("api/emoji-delete-batch", { hashes })
+        state.emojiSelection = {}
+        toast("已删除 " + r.removed + " 张" + (r.missing ? "（" + r.missing + " 张未找到）" : ""))
+        await loadEmojiGallery()
+      } catch (e) { toast(e.message, true) }
+      renderDomains(); renderEditor()
+    }
+    const statEl = document.createElement("span")
+    statEl.style.cssText = "font-size:12px;color:#888"
+    if (state.emojiStats) statEl.textContent = "共 " + state.emojiStats.total + " 张 · 停用 " + state.emojiStats.banned + " 张 · 已选 " + selectedCount + " 张"
+    galleryBar.appendChild(refreshBtn)
+    galleryBar.appendChild(selectAllBtn)
+    galleryBar.appendChild(clearSelBtn)
+    galleryBar.appendChild(batchDelBtn)
+    galleryBar.appendChild(statEl)
+    box.appendChild(galleryBar)
+    const grid = document.createElement("div")
+    grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 16px"
+    if (!state.emojiItems.length) {
+      const empty = document.createElement("div")
+      empty.className = "empty"
+      empty.textContent = "还没有表情包（群里发图会自动收藏，或等希洛自己攒）"
+      grid.appendChild(empty)
+    }
+    for (const item of state.emojiItems) {
+      const cell = document.createElement("div")
+      const isSelected = !!state.emojiSelection[item.hash]
+      cell.style.cssText = "border:2px solid " + (isSelected ? "#e74c3c" : "#e0e0e0") + ";border-radius:8px;padding:6px;text-align:center;cursor:pointer;position:relative;user-select:none" + (isSelected ? ";background:#fff5f5" : "")
+      // 整卡点击即选中，不搞小勾选框
+      cell.onclick = () => {
+        if (state.emojiSelection[item.hash]) delete state.emojiSelection[item.hash]
+        else state.emojiSelection[item.hash] = true
+        renderDomains(); renderEditor()
+      }
+      const badge = document.createElement("div")
+      badge.textContent = "✓ 已选"
+      badge.style.cssText = "position:absolute;top:8px;right:8px;background:#e74c3c;color:#fff;font-size:11px;padding:1px 7px;border-radius:10px" + (isSelected ? "" : ";display:none")
+      const img = document.createElement("img")
+      img.src = "api/emoji-file/" + item.hash + "?token=" + encodeURIComponent(state.token)
+      img.style.cssText = "max-width:100%;height:110px;object-fit:contain;border-radius:4px"
+      img.loading = "lazy"
+      img.alt = (item.tags || []).join(",")
+      const tags = document.createElement("div")
+      tags.style.cssText = "font-size:11px;color:#666;margin:4px 0;min-height:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+      tags.title = (item.tags || []).join(" / ") + (item.isBanned ? "（已停用）" : "")
+      tags.textContent = (item.tags || []).join(" / ") + (item.isBanned ? " ⛔" : "")
+      const meta = document.createElement("div")
+      meta.style.cssText = "font-size:10px;color:#aaa"
+      meta.textContent = "用过" + item.usedCount + "次" + (item.registeredAt ? " · " + item.registeredAt.slice(5, 10) : "")
+      const del = document.createElement("button")
+      del.className = "danger"
+      del.style.cssText = "margin-top:4px;font-size:11px;padding:2px 10px"
+      del.textContent = "删除"
+      del.onclick = async ev => {
+        ev.stopPropagation()
+        if (!confirm("删除这张表情包？文件也会一起删掉，不可恢复。")) return
+        try {
+          await api("api/emoji-delete", { hash: item.hash })
+          state.emojiItems = state.emojiItems.filter(x => x.hash !== item.hash)
+          if (state.emojiStats) state.emojiStats.total = Math.max(0, state.emojiStats.total - 1)
+          toast("已删除")
+          renderDomains(); renderEditor()
+        } catch (e) { toast(e.message, true) }
+      }
+      cell.appendChild(img)
+      cell.appendChild(tags)
+      cell.appendChild(meta)
+      cell.appendChild(badge)
+      cell.appendChild(del)
+      grid.appendChild(cell)
+    }
+    box.appendChild(grid)
+  }
+
   if (d.key === "dice") {
     // 内置规则：可折叠卡片，点开编辑回复内容/档位/疯狂表
     const blSection = document.createElement("div")
@@ -444,10 +602,9 @@ function renderEditor() {
       return body
     }
 
-    let firstCard = true
+    // 所有卡片默认收起：进页面不自动展开任何一组，想改哪组点哪组
     for (const b of state.diceBuiltin) {
-      const body = makeCard(b.name, b.desc, b.commands, firstCard)
-      firstCard = false
+      const body = makeCard(b.name, b.desc, b.commands, false)
       const groups = Array.isArray(b.groups) ? b.groups : []
       if (groups.length) {
         const st = document.createElement("div")
@@ -539,6 +696,30 @@ function renderEditor() {
       st.className = "sub-title"; st.textContent = "💬 回复内容（保存后热生效）"
       body.appendChild(st)
       makeTplRows(leftoverKeys, body)
+    }
+
+    // ── .jrrp 分数段文案（固定 6 段，只改每段的话） ──
+    {
+      const jrrpRanges = ["1-10 分", "11-30 分", "31-50 分", "51-70 分", "71-90 分", "91-100 分"]
+      if (state.diceJrrp.length !== 6) state.diceJrrp = jrrpRanges.map(() => "")
+      const body = makeCard("🍀 .jrrp 分数段文案", "今日人品按分数段自动带的评语；整句格式在「D&D 5e / 通用掷骰」卡片的 .jrrp 行改", [], false)
+      const st = document.createElement("div")
+      st.className = "sub-title"; st.textContent = "💬 各分数段评语（留空用默认，保存后热生效）"
+      body.appendChild(st)
+      jrrpRanges.forEach((rangeLabel, index) => {
+        const row = document.createElement("div")
+        row.className = "grid-row"
+        const label = document.createElement("div")
+        label.className = "label"
+        label.textContent = rangeLabel
+        const input = document.createElement("input")
+        input.type = "text"
+        input.value = state.diceJrrp[index] || ""
+        input.placeholder = "默认：" + ["有点背哦…今天别硬冲了，乖乖窝着，坏运气赖一会儿就自己走了", "水逆就水逆吧，躺着等它过去，急也没用，想做的事留到明天也一样", "平平淡淡的一天嘛，这种日子最适合窝着刷刷手机，不亏的", "顺顺的哦，不算惊艳但也不添堵，慢慢来，该有的都会有", "欧气在攒着发光呢~今天遇到的事可以稍微期待一下，会顺的", "神明都站你这边啦！想做什么就去做吧，今天的你说了算"][index]
+        input.oninput = () => { state.diceJrrp[index] = input.value }
+        row.appendChild(label); row.appendChild(input)
+        body.appendChild(row)
+      })
     }
 
     // ── 牌堆管理（.draw 抽取；拖文件到页面任意处也能导入） ──
@@ -633,7 +814,7 @@ function renderEditor() {
     saveBtn.textContent = "💾 保存骰子设置"
     saveBtn.onclick = async () => {
       try {
-        const r = await api("api/dice-templates", { templates: state.diceTemplates, checkLevels: state.diceCheckLevels, insanityTables: state.diceInsanity })
+        const r = await api("api/dice-templates", { templates: state.diceTemplates, checkLevels: state.diceCheckLevels, insanityTables: state.diceInsanity, jrrpComments: state.diceJrrp })
         toast("骰子设置已保存并热生效：模板 " + r.saved + " 条、档位 " + r.savedLevels + " 项、疯狂表 " + r.savedInsanity + " 条")
       } catch (e) { toast(e.message, true) }
     }
@@ -700,7 +881,7 @@ function renderEditor() {
     }
     const helpTitle = document.createElement("div")
     helpTitle.className = "section-title"
-    helpTitle.textContent = "命令帮助（只改说明书，不改群里实际发送的话）"
+    helpTitle.textContent = "命令帮助（这里的说明只进 .帮助 菜单和文档；群里实际发送的回复在上面各卡片里改，保存即热生效）"
     box.appendChild(helpTitle)
   }
 
@@ -712,6 +893,7 @@ async function loadDiceExtras() {
   try {
     const data = await api("api/dice-data")
     state.diceTemplates = data.templates || {}
+    state.diceJrrp = data.jrrpComments || []
     state.dicePacks = data.packs || []
     state.diceCheckLevels = data.checkLevels || {}
     state.diceInsanity = data.insanityTables || {}
@@ -721,9 +903,22 @@ async function loadDiceExtras() {
   } catch (e) { toast("骰子模板读取失败：" + e.message, true) }
 }
 
+async function loadEmojiGallery() {
+  try {
+    const data = await api("api/emoji-data")
+    state.emojiItems = data.items || []
+    state.emojiStats = data.stats || null
+    try {
+      state.emojiAdmission = await api("api/emoji-admission")
+    } catch (e2) { state.emojiAdmission = { allow: [], reject: [] } }
+  } catch (e) { toast("表情包读取失败：" + e.message, true); return false }
+  return true
+}
+
 async function load() {
   try {
     await loadDiceExtras()
+    loadEmojiGallery().catch(() => {})
     const data = await api("api/data")
     state.domains = data.domains
     state.dirty = false
@@ -849,6 +1044,118 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
         }
         return
       }
+      if (req.path === "/api/emoji-data") {
+        try {
+          const { emojiPackManager } = await import("../domains/emoji/EmojiPackManager.js")
+          const [items, stats] = await Promise.all([emojiPackManager.listForAdmin(), emojiPackManager.stats()])
+          res.json({ items, stats })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path.startsWith("/api/emoji-file/")) {
+        try {
+          const hash = req.path.slice("/api/emoji-file/".length).replace(/[^a-f0-9]/gi, "")
+          if (!/^[a-f0-9]{6,64}$/i.test(hash)) {
+            res.status(400).json({ error: "invalid hash" })
+            return
+          }
+          const { emojiPackManager } = await import("../domains/emoji/EmojiPackManager.js")
+          const items = await emojiPackManager.loadItems()
+          const item = items.find(i => String(i.hash).toLowerCase() === hash.toLowerCase())
+          if (!item) {
+            res.status(404).json({ error: "not found" })
+            return
+          }
+          const abs = emojiPackManager.getAbsoluteFilePath(item)
+          if (!fs2.existsSync(abs)) {
+            res.status(404).json({ error: "file missing" })
+            return
+          }
+          const ext = path2.extname(abs).slice(1).toLowerCase()
+          const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }[ext] || "application/octet-stream"
+          res.set("Cache-Control", "private, max-age=3600")
+          res.type(mime).send(fs2.readFileSync(abs))
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/emoji-delete" && req.method === "POST") {
+        try {
+          const hash = String(req.body?.hash || "")
+          if (!/^[a-f0-9]{6,64}$/.test(hash)) {
+            res.status(400).json({ error: "hash 不合法" })
+            return
+          }
+          const { emojiPackManager } = await import("../domains/emoji/EmojiPackManager.js")
+          const result = await emojiPackManager.removeItem(hash)
+          if (!result.ok) {
+            res.status(404).json({ error: "表情不存在或已删除" })
+            return
+          }
+          logger?.info?.(`[命令管理页] 已删除表情 ${hash.slice(0, 8)}`)
+          res.json({ ok: true })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/emoji-admission" && req.method === "GET") {
+        try {
+          const { emojiPackManager } = await import("../domains/emoji/EmojiPackManager.js")
+          emojiPackManager.refreshConfig?.()
+          res.json({
+            allow: emojiPackManager.config?.admissionExtraAllow || [],
+            reject: emojiPackManager.config?.admissionExtraReject || []
+          })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/emoji-admission" && req.method === "POST") {
+        try {
+          const clean = key => (Array.isArray(req.body?.[key]) ? req.body[key] : [])
+            .map(v => String(v ?? "").trim().slice(0, 80)).filter(Boolean).slice(0, 20)
+          const payload = { allow: clean("allow"), reject: clean("reject") }
+          const settingsPath = path2.join(pluginRoot, "config", "message.yaml")
+          const source = fs2.existsSync(settingsPath)
+            ? settingsPath
+            : path2.join(pluginRoot, "config_default", "message.yaml")
+          const doc = YAML2.parse(fs2.readFileSync(source, "utf8"))
+          doc.pluginSettings ||= {}
+          doc.pluginSettings.emojiSystem ||= {}
+          doc.pluginSettings.emojiSystem.admissionExtraAllow = payload.allow
+          doc.pluginSettings.emojiSystem.admissionExtraReject = payload.reject
+          if (!fs2.existsSync(settingsPath)) fs2.copyFileSync(source, settingsPath)
+          fs2.writeFileSync(settingsPath, YAML2.stringify(doc), "utf8")
+          logger?.info?.(`[命令管理页] 已保存表情入库标准：放行 ${payload.allow.length} 条、拒绝 ${payload.reject.length} 条（热生效）`)
+          res.json({ ok: true, ...payload })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/emoji-delete-batch" && req.method === "POST") {
+        try {
+          const hashes = (Array.isArray(req.body?.hashes) ? req.body.hashes : []).map(String)
+            .filter(h => /^[a-f0-9]{6,64}$/.test(h))
+            .slice(0, 500)
+          if (!hashes.length) {
+            res.status(400).json({ error: "没有合法的表情 hash" })
+            return
+          }
+          const { emojiPackManager } = await import("../domains/emoji/EmojiPackManager.js")
+          const result = await emojiPackManager.removeItems(hashes)
+          logger?.info?.(`[命令管理页] 批量删除表情 ${result.removed} 张（未找到 ${result.missing} 张）`)
+          res.json({ ok: true, ...result })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
       if (req.path === "/api/dice-data") {
         try {
           const pluginRootDir = pluginRoot
@@ -859,6 +1166,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
           const reply = buildDiceReplyPayload(settings.diceSystem || {})
           const templates = reply.templates
           const checkLevels = reply.checkLevels
+          const jrrpComments = reply.jrrpComments
           const insanityTables = reply.insanityTables
           const builtin = reply.builtin
           const checkLevelMeta = reply.checkLevelMeta
@@ -895,7 +1203,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
           } catch (deckListError) {
             deckError = deckListError?.message || String(deckListError)
           }
-          res.json({ templates, checkLevels, insanityTables, packs, builtin, checkLevelMeta, decks, deckError })
+          res.json({ templates, checkLevels, jrrpComments, insanityTables, packs, builtin, checkLevelMeta, decks, deckError })
 
         } catch (error) {
           res.status(500).json({ error: error?.message || String(error) })
@@ -949,6 +1257,16 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
               insanity[tableKey] = rows.slice(0, 50).map(v => String(v ?? "").slice(0, 200)).filter(Boolean)
             }
           }
+          // .jrrp 分数段文案（可选，固定 6 段；留空表示用默认）
+          let jrrpComments = null
+          if (req.body?.jrrpComments != null) {
+            const rawJrrp = req.body.jrrpComments
+            if (!Array.isArray(rawJrrp) || rawJrrp.length !== 6) {
+              res.status(400).json({ error: "jrrpComments 必须是 6 段" })
+              return
+            }
+            jrrpComments = rawJrrp.map(v => String(v ?? "").trim().slice(0, 100))
+          }
           const settingsPath = path2.join(pluginRoot, "config", "message.yaml")
           const source = fs2.existsSync(settingsPath)
             ? settingsPath
@@ -959,6 +1277,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
           doc.pluginSettings.diceSystem.templates = { ...(doc.pluginSettings.diceSystem.templates || {}), ...cleaned }
           if (levels) doc.pluginSettings.diceSystem.checkLevels = levels
           if (insanity) doc.pluginSettings.diceSystem.insanityTables = insanity
+          if (jrrpComments) doc.pluginSettings.diceSystem.jrrpComments = jrrpComments
           if (!fs2.existsSync(settingsPath)) fs2.copyFileSync(source, settingsPath)
           fs2.writeFileSync(settingsPath, YAML2.stringify(doc), "utf8")
           logger?.info?.(`[命令管理页] 已保存骰子设置：模板 ${Object.keys(cleaned).length} 条${levels ? "、档位 " + Object.keys(levels).length + " 项" : ""}${insanity ? "、疯狂表 " + (insanity.temp.length + insanity.indefinite.length) + " 条" : ""}（配置热更新自动生效）`)

@@ -312,6 +312,26 @@ export class ExpressionLearner {
     await this.saveGroupExpressions(groupId, expressions)
   }
 
+  /**
+   * 群级表情布局统计：裸表情 vs 带文字的占比，供发送编排自适应
+   * （观察到的节奏驱动行为：某群习惯纯图，强制反应就少配文）。
+   */
+  async getGroupEmojiLayoutStats(groupId) {
+    try {
+      const expressions = await this.getGroupExpressions(groupId)
+      const rhythm = expressions?.rhythmPatterns || {}
+      const emojiOnly = Number(rhythm.emojiOnly) || 0
+      const withText = (Number(rhythm.textEmoji) || 0) +
+        (Number(rhythm.emojiText) || 0) +
+        (Number(rhythm.textEmojiText) || 0)
+      const samples = emojiOnly + withText
+      if (!samples) return null
+      return { samples, emojiOnlyShare: emojiOnly / samples, emojiOnly, withText }
+    } catch {
+      return null
+    }
+  }
+
   async learnStyleWithAI(groupId, messages) {
     const { memoryAiUrl, memoryAiModel, memoryAiApikey } = this.config.memoryAiConfig || {}
     if (!memoryAiUrl || !memoryAiApikey) return

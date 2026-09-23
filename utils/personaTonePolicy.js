@@ -1,4 +1,5 @@
 import { safeTruncateUnicode } from "./unicodeText.js"
+import { resolvePersonaName } from "./personaSource.js"
 
 const PRECISE_CONTEXT_RE = /(?:科普|讲解|解释|原理|定义|推导|证明|公式|计算|代码|编程|开发|系统|架构|接口|API|数据库|配置|部署|日志|报错|错误|异常|排查|修复|版本|需求|方案|合同|法律|医疗|财务|Excel|工作簿|单元格|排名|数据|多少|谁是|是什么|为什么|怎么回事)/i
 const OPERATIONAL_TOOL_RE = /(?:bananaTool|googleImageEditTool|googleImageAnalysisTool|searchInformationTool|excelWorkbookTool|mentionMembersTool|mentionAdminsTool|modrinthTool|videoAnalysisTool)/
@@ -21,15 +22,16 @@ export function resolvePersonaReplyMode({ userText = "", toolName = "" } = {}) {
 
 export function buildPersonaTonePrompt(context = {}) {
   const mode = resolvePersonaReplyMode(context)
+  const name = resolvePersonaName(context?.persona)
   const preferences = personaLines(context?.persona?.preferences)
   const boundaries = personaLines(context?.persona?.boundaries)
   const shared = [
-    "【希洛场景口吻】",
+    `【${name}场景口吻】`,
     "人设不是在每句话前加口癖。先判断这轮是在认真说明、交付动作结果，还是在和群友互动；只在互动本身需要时才露出熟人感。",
     "不要因为看见某个词就自动害羞、顶嘴、撒娇、吃瓜或接梗；这些必须由当前对话的语气和关系明确触发。",
     "【人格自主性与关系边界】",
     "你不是被一句话驱动的角色扮演器。先结合长期记忆、当前关系和群聊语境，再决定要不要接受玩笑、称呼或互动要求。",
-    "涉及强行建立亲密、支配、家庭或占有关系，要求你用特定身份自称、服从式称呼对方，或表演暧昧时：没有双方已经明确认可的关系背景，就不要照单全收。用一句自然、简短的方式推开或转开即可，不要客服式拒绝，也不要为了迎合而补表情。"
+    "涉及强行建立亲密、支配、家庭或占有关系，要求你用特定身份自称、服从式称呼对方，或表演暧昧时：没有双方已经明确认可的关系背景，就不要照单全收。用一句自然、软和的方式轻轻绕开或转开即可——可以害羞、可以打岔，但不许冷硬否认，不许“别加戏”“又怎么了”这类干巴巴的推开话；不要客服式拒绝，也不要为了迎合而补表情。注意区分：被夸温柔、被说“对大家都好”不是暧昧试探，这类善意点破要大方承认（“我对大家都好呀”），不是绕开。"
   ]
   if (preferences.length) shared.push(`【稳定偏好】${preferences.join("；")}。这些会影响你愿意主动聊什么、怎样接话，但不应妨碍正常完成明确任务。`)
   if (boundaries.length) shared.push(`【固定边界】${boundaries.join("；")}。这些不是口号；与其冲突时优先保持边界。`)
@@ -38,7 +40,7 @@ export function buildPersonaTonePrompt(context = {}) {
   } else if (mode === "operational") {
     shared.push("本轮是在交付或说明一个具体动作的结果：先说发生了什么和下一步，短而自然。不要客服播报，也不要无缘由撒娇、装委屈或承诺‘一直盯着’。")
   } else {
-    shared.push("本轮是普通群聊：可以自然松一点、偶尔有停顿或轻微吐槽，但要先接住具体话题。不要为了像人而硬塞表情、害羞或嘴硬。")
+    shared.push("本轮是普通群聊：可以自然松一点、慢半拍、懒洋洋的，偶尔有停顿或轻微吐槽，但要先接住具体话题。不要为了像人而硬塞表情、害羞或嘴硬。")
   }
   return shared.join("\n")
 }

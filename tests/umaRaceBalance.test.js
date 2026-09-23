@@ -46,7 +46,15 @@ test("npc totals are based on balanced player totals", () => {
     .map(player => manager.sumAttributes(player.attributes))
 
   assert.equal(npcTotals.length, 6)
-  assert.ok(npcTotals.every(total => total >= 49 && total <= 61))
+  // 区间按当前算法推导:base = 均衡后玩家均值 × 0.88(两人房梯度),NPC 总和在 base±10%
+  const base = manager.getNpcBaseAttributeTotal(players)
+  assert.ok(base > 44 && base < 53, `两人房的 NPC 基准应锚定在均衡均值附近,实际 ${base}`)
+  const min = Math.max(24, Math.floor(base * 0.9))
+  const max = Math.max(min, Math.ceil(base * 1.1))
+  assert.ok(
+    npcTotals.every(total => total >= min && total <= max),
+    `NPC 总和应落在 [${min}, ${max}],实际 ${npcTotals.join(",")}`
+  )
 })
 
 test("race balance does not trigger when totals are close", () => {

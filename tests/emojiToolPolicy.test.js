@@ -5,9 +5,10 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import {
   EMOJI_REACTION_RULES,
+  adaptForcedReplyTextRate,
   classifyEmojiToolExposure,
-  resolveForcedReactionEmoji
-} from "../utils/emojiToolPolicy.js"
+  pickForcedReplyLayout,
+  resolveForcedReactionEmoji, looksLikeDirectPersonalQuestion, resolveEmojiTurnSkips } from "../utils/emojiToolPolicy.js"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -46,6 +47,50 @@ test("forced rules only fire for tag-bearing rules", () => {
   assert.deepEqual(resolveForcedReactionEmoji("来个表情包"), null, "explicit 不走强制路径")
 })
 
+test("every forced rule carries a reply pool for the fast path", () => {
+  const tagRules = EMOJI_REACTION_RULES.filter(rule => rule.tags?.length)
+  assert.equal(tagRules.length, 8)
+  for (const rule of tagRules) {
+    assert.ok(rule.replies?.length >= 2, `规则 ${rule.tags[0]} 缺配文池`)
+  }
+  assert.deepEqual(resolveForcedReactionEmoji("累死").replies, ["累麻了", "不想动了", "让我躺会儿"])
+})
+
+test("forced reply layout samples text from the pool at the configured rate", () => {
+  // draw < rate → 带配文；同一 draw 决定选哪句（确定性可测）
+  const withText = pickForcedReplyLayout({ replies: ["哈哈哈哈", "笑死"], textRate: 0.4, random: () => 0.2 })
+  assert.equal(withText.layout, "text_emoji")
+  assert.ok(["哈哈哈哈", "笑死"].includes(withText.leadText))
+  const emojiOnly = pickForcedReplyLayout({ replies: ["哈哈哈哈"], textRate: 0.4, random: () => 0.5 })
+  assert.equal(emojiOnly.layout, "emoji")
+  assert.equal(emojiOnly.leadText, "")
+  // 空池/零概率 → 永远纯图
+  assert.equal(pickForcedReplyLayout({ replies: [], textRate: 1, random: () => 0 }).layout, "emoji")
+  assert.equal(pickForcedReplyLayout({ replies: ["x"], textRate: 0, random: () => 0 }).layout, "emoji")
+})
+
+test("forced reply text rate adapts to the group's bare-emoji share", () => {
+  assert.equal(adaptForcedReplyTextRate(null, 0.4), 0.4, "无统计用默认")
+  assert.equal(adaptForcedReplyTextRate({ samples: 19, emojiOnlyShare: 0.9 }, 0.4), 0.4, "样本不足用默认")
+  assert.equal(adaptForcedReplyTextRate({ samples: 100, emojiOnlyShare: 0.9 }, 0.4), 0.15, "裸表情占比 90% → 配文率夹到下限")
+  assert.equal(adaptForcedReplyTextRate({ samples: 100, emojiOnlyShare: 0.1 }, 0.4), 0.6, "几乎都带文字 → 夹到上限")
+  assert.equal(adaptForcedReplyTextRate({ samples: 100, emojiOnlyShare: 0.6 }, 0.4), 0.4)
+})
+
+test("forced fast path wires the reply pool and cooldown respects lead text", () => {
+  // 表情强制路已迁入 utils/routeDecision.js;群自适应统计与 emoji-only 判定仍在主链路
+  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const routeSrc = fs.readFileSync(path.join(root, "utils/routeDecision.js"), "utf8")
+  assert.ok(routeSrc.includes("const forcedLayout = pickForcedReplyLayout({"), "强制路接入配文采样")
+  assert.ok(routeSrc.includes("leadText: forcedLayout.leadText"), "配文进入工具参数")
+  assert.ok(routeSrc.includes("await ctx.helpers.resolveForcedReplyTextRate(ctx.groupId)"), "配文率走群自适应助手")
+  assert.ok(src.includes("getGroupEmojiLayoutStats?.(groupId)"), "自适应读取表达学习统计")
+  assert.ok(
+    src.includes('!validResults.some(r => String(r.result || "").includes("段文字"))'),
+    "带 leadText 的回合不得记为 emoji-only 冷却"
+  )
+})
+
 test("reaction rules are the single source: casual set derives from the rule array", () => {
   assert.ok(EMOJI_REACTION_RULES.length >= 10)
   const tagRules = EMOJI_REACTION_RULES.filter(rule => rule.tags?.length)
@@ -75,4 +120,53 @@ test("clearAll goes through the manager, not external field pokes", () => {
   const appSrc = fs.readFileSync(path.join(root, "domains/emoji/app.js"), "utf8")
   assert.ok(appSrc.includes("emojiPackManager.clearAllData()"), "命令层只调用 manager 方法")
   assert.ok(!appSrc.includes("emojiPackManager.recentPicksByGroup.clear()"), "不再越过封装清内部状态")
+})
+
+test("直接个人提问识别:表情包不得独占这类回复", () => {
+  assert.equal(looksLikeDirectPersonalQuestion("希洛你现在在干嘛呀"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("在吗"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("睡了没"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("希洛 还好吗"), true)
+  // 情感试探问句也算直接个人提问,不能用一张表情包打发
+  assert.equal(looksLikeDirectPersonalQuestion("你爱不爱我"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("希洛你喜欢我吗"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("想不想我"), true)
+  // 问的不是 bot 本人,或长文本,不算
+  assert.equal(looksLikeDirectPersonalQuestion("大家在干嘛呢"), false)
+  assert.equal(looksLikeDirectPersonalQuestion("你们那边在干嘛"), false)
+  assert.equal(looksLikeDirectPersonalQuestion("他们在忙吗"), false)
+  // 求夸/求表扬是对 bot 的直接请求,不能用一张表情包打发
+  assert.equal(looksLikeDirectPersonalQuestion("那你夸啊"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("夸夸我"), true)
+  assert.equal(looksLikeDirectPersonalQuestion("来点彩虹屁"), true)
+  // 夸第三方不算直接个人请求
+  assert.equal(looksLikeDirectPersonalQuestion("你夸夸他"), false)
+  assert.equal(looksLikeDirectPersonalQuestion("夸她两句"), false)
+  assert.equal(looksLikeDirectPersonalQuestion("你爱不爱吃辣"), false)
+  assert.equal(looksLikeDirectPersonalQuestion("这个东西的原理是怎么回事,为什么大家都在说这个方案不行,我看不懂而且想弄明白每个细节,能展开讲讲吗"), false)
+})
+
+test("表情包每轮上限:一轮并行的重复 emoji 调用只放行第一张", () => {
+  assert.deepEqual(
+    resolveEmojiTurnSkips(["sendLocalEmojiTool", "sendLocalEmojiTool"]),
+    [false, true]
+  )
+  assert.deepEqual(
+    resolveEmojiTurnSkips(["bananaTool", "sendLocalEmojiTool", "sendLocalEmojiTool"]),
+    [false, false, true]
+  )
+  assert.deepEqual(
+    resolveEmojiTurnSkips(["sendLocalEmojiTool", "bananaTool"]),
+    [false, false]
+  )
+  // 跨轮沿用 session 计数:本轮已发过,再调用直接跳过
+  assert.deepEqual(
+    resolveEmojiTurnSkips(["sendLocalEmojiTool"], 1),
+    [true]
+  )
+  // 配置上限可调
+  assert.deepEqual(
+    resolveEmojiTurnSkips(["sendLocalEmojiTool", "sendLocalEmojiTool"], 0, 2),
+    [false, false]
+  )
 })

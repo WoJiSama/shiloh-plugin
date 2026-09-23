@@ -15,11 +15,16 @@ export const DEFAULT_TEMPLATES = {
   cardSaved: "人物卡已更新：{updates}",
   coc: "COC7 调查员属性：\n{attributes}",
   opposed: "对抗检定：\n{left}\n{right}\n结果：{winner}",
-  jrrp: "{name} 今日人品：{value}",
+  jrrp: "{name} 今日人品：{value}\n{comment}",
   db: "{name} 体格 {build}，伤害加值 {db}",
   dnd: "DND5E 属性：\n{attributes}",
   bonus: "{name} 掷{kind}：{diceText}={value}",
   insanity: "{kind}：{index}. {text}",
+  logStarted: "跑团 log 已开启：{title}\n期间本群 AI 对话会暂时静默，骰娘命令仍可使用。\n结束：.log end（关闭并导出）或 .log off（只关闭）",
+  logAlreadyOpen: "log 已经开启：{title}",
+  logStopped: "跑团 log 已结束：{title}\nAI 对话已恢复。导出：.log export",
+  logNotActive: "当前群没有开启 log。",
+  logPermDenied: "只有主人、群主或管理员可以{action}跑团 log。",
   error: "{message}"
 }
 
@@ -64,6 +69,22 @@ export const DEFAULT_INDEFINITE_INSANITY = [
 
 function tpl(key, label, hint) {
   return { key, label, hint }
+}
+
+// .jrrp 分数段文案：固定 6 段（1-10 / 11-30 / 31-50 / 51-70 / 71-90 / 91-100），文案可改
+export const DEFAULT_JRRP_COMMENTS = [
+  "有点背哦…今天别硬冲了，乖乖窝着，坏运气赖一会儿就自己走了",
+  "水逆就水逆吧，躺着等它过去，急也没用，想做的事留到明天也一样",
+  "平平淡淡的一天嘛，这种日子最适合窝着刷刷手机，不亏的",
+  "顺顺的哦，不算惊艳但也不添堵，慢慢来，该有的都会有",
+  "欧气在攒着发光呢~今天遇到的事可以稍微期待一下，会顺的",
+  "神明都站你这边啦！想做什么就去做吧，今天的你说了算"
+]
+
+export function pickJrrpComment(value = 0, comments = DEFAULT_JRRP_COMMENTS) {
+  const score = Number(value) || 0
+  const index = score <= 10 ? 0 : score <= 30 ? 1 : score <= 50 ? 2 : score <= 70 ? 3 : score <= 90 ? 4 : 5
+  return String((comments || [])[index] || "")
 }
 
 export const BUILTIN_RULES = [
@@ -173,7 +194,7 @@ export const BUILTIN_RULES = [
       {
         command: ".jrrp",
         title: ".jrrp 今日人品",
-        templates: [tpl("jrrp", "发送文案", "{name} {value}")]
+        templates: [tpl("jrrp", "发送文案", "{name} {value} {comment}（comment=按分数段自动带的评语，段文案在下方专属卡片改）")]
       }
     ]
   },
@@ -188,6 +209,37 @@ export const BUILTIN_RULES = [
       templates: [],
       hint: "这两条改的是骰娘显示名和自动群名片，不是掷骰发送文案。"
     }]
+  },
+  {
+    id: "trpglog",
+    name: "跑团日志（.log）",
+    desc: "开团记录与 AI 静默提示；off/end 可带团名尾巴",
+    commands: [".log on", ".log off", ".log end", ".log export", ".log status"],
+    groups: [
+      {
+        command: ".log on",
+        title: ".log on 开启提示",
+        templates: [
+          tpl("logStarted", "开启提示（群里实际发送）", "变量 {title}=团名；这三行是提示怎么结束，建议保留"),
+          tpl("logAlreadyOpen", "已开启时的提示", "变量 {title}=团名")
+        ]
+      },
+      {
+        command: ".log off / .log end",
+        title: ".log off / .log end 结束提示",
+        templates: [
+          tpl("logStopped", "结束提示（群里实际发送）", "变量 {title}=团名"),
+          tpl("logNotActive", "没开 log 却想关时的提示", "")
+        ]
+      },
+      {
+        command: "权限",
+        title: "权限不足提示",
+        templates: [
+          tpl("logPermDenied", "非管理员操作 log 时的提示", "变量 {action}=开启/停止")
+        ]
+      }
+    ]
   },
   {
     id: "deck",
@@ -211,9 +263,15 @@ export function mergeDiceReplyConfig(raw = {}) {
     if (rawLevels[key] != null && String(rawLevels[key]).trim()) checkLevels[key] = String(rawLevels[key])
   }
   const rawTables = raw.insanityTables && typeof raw.insanityTables === "object" ? raw.insanityTables : {}
+  const rawJrrp = Array.isArray(raw.jrrpComments) ? raw.jrrpComments : []
+  const jrrpComments = DEFAULT_JRRP_COMMENTS.map((fallback, index) => {
+    const custom = rawJrrp[index]
+    return typeof custom === "string" && custom.trim() ? custom.trim().slice(0, 100) : fallback
+  })
   return {
     templates,
     checkLevels,
+    jrrpComments,
     insanityTables: {
       temp: Array.isArray(rawTables.temp) ? rawTables.temp : DEFAULT_TEMP_INSANITY,
       indefinite: Array.isArray(rawTables.indefinite) ? rawTables.indefinite : DEFAULT_INDEFINITE_INSANITY
@@ -247,6 +305,7 @@ export function buildDiceReplyPayload(diceSystem = {}) {
   return {
     templates: merged.templates,
     checkLevels: merged.checkLevels,
+    jrrpComments: merged.jrrpComments,
     insanityTables: merged.insanityTables,
     builtin: BUILTIN_RULES,
     checkLevelMeta: CHECK_LEVEL_KEYS.map(key => ({ key, label: CHECK_LEVEL_LABELS[key] }))

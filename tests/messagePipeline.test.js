@@ -62,9 +62,14 @@ test("raw listener captures identical cross-group events before business throttl
   pipeline.start(bot)
   bot.emit("message", rawEvent(609235590, 201))
   bot.emit("message", rawEvent(953676639, 202))
-  await new Promise(resolve => setTimeout(resolve, 100))
+  // 40ms 任务留 100ms 余量在全量套件负载下偶发不够;轮询等到完成再断言,上限 2s
+  const deadline = Date.now() + 2000
+  let jobs = []
+  do {
+    await new Promise(resolve => setTimeout(resolve, 50))
+    jobs = await store.list("event")
+  } while (!(jobs.length === 2 && jobs.every(job => job.state === "completed")) && Date.now() < deadline)
 
-  const jobs = await store.list("event")
   assert.equal(jobs.length, 2)
   assert.ok(jobs.every(job => job.state === "completed"))
   assert.deepEqual(recent.map(item => String(item.group_id)).sort(), ["609235590", "953676639"])

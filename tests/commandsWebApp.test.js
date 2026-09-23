@@ -75,6 +75,17 @@ test("骰子面板按命令展示 .st 和失败/大失败发送文案", async ()
   assert.ok(src.includes("cmd-group"), "卡片内应按命令分组")
   assert.ok(src.includes("g.title"), "分组标题来自规则目录")
   assert.ok(src.includes("失败/大失败整句发送") || src.includes("整句发送"), "失败/大失败应能改整句发送")
-  assert.ok(src.includes("命令帮助（只改说明书，不改群里实际发送的话）"), "骰子帮助表应标成说明书，避免和发送文案混淆")
+  assert.ok(
+    src.includes("这里的说明只进 .帮助 菜单和文档；群里实际发送的回复在上面各卡片里改"),
+    "骰子帮助表应标成说明书，并指明实际发送文案的编辑位置"
+  )
   assert.ok(src.indexOf("内置规则") < src.indexOf("box.appendChild(table)"), "骰子卡片应排在命令帮助表前面")
+  assert.ok(!src.includes("firstCard"), "进入骰子页不应自动展开任何卡片（含 COC）")
+  assert.ok(src.includes("jrrpComments"), "管理页应支持编辑 .jrrp 分数段文案")
+  assert.ok(src.includes("jrrpComments 必须是 6 段"), "保存端应校验分数段数量")
+  assert.ok(src.includes("/api/emoji-data"), "管理页应提供表情包清单接口")
+  assert.ok(src.includes("/api/emoji-file/"), "管理页应提供表情包图片预览接口")
+  assert.ok(src.includes("/api/emoji-delete"), "管理页应提供表情包删除接口")
+  assert.ok(src.includes("/api/emoji-delete-batch"), "管理页应提供表情包批量删除接口")
+  assert.ok(src.includes("/api/emoji-admission"), "管理页应提供表情入库标准编辑接口")
 })

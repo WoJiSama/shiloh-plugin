@@ -108,6 +108,27 @@ export function recallEpisodes({ groupId = "", terms = [], days = 7, limit = 5, 
     .map(item => item.episode)
 }
 
+/**
+ * 记忆回勾：按用户召回他自己的旧情节（跨天/跨会话的"她记得我"）。
+ * minAgeMs 排除太新鲜的记录——半小时内的内容聊天历史里本来就有，
+ * 回勾的价值在跨天，不值得重复注入。
+ */
+export function recallUserEpisodes({ groupId = "", userId = "", days = 7, limit = 2, minAgeMs = 30 * 60 * 1000, baseDir = "" } = {}) {
+  const key = String(groupId || "")
+  const uid = String(userId || "")
+  if (!key || !uid) return []
+  const episodes = loadEpisodes(key, baseDir)
+  if (!episodes.length) return []
+  const now = Date.now()
+  const cutoff = now - Math.max(1, Number(days) || 7) * 24 * 60 * 60 * 1000
+  const minAge = Math.max(0, Number(minAgeMs) || 0)
+  return episodes
+    .filter(e => String(e.userId || "") === uid)
+    .filter(e => now - Number(e.at || 0) >= minAge && Number(e.at || 0) >= cutoff)
+    .slice(-Math.max(1, Number(limit) || 2))
+    .reverse()
+}
+
 function describeWhen(at = 0) {
   const dayMs = 24 * 60 * 60 * 1000
   const days = Math.floor((Date.now() - Number(at || 0)) / dayMs)
@@ -127,6 +148,22 @@ export function buildEpisodicPrompt(episodes = []) {
     lines.push(`- ${describeWhen(e.at)} ${who}：${e.summary}${e.reply ? `；你回了：「${e.reply}」` : ""}`)
   }
   lines.push("用户提到之前的事时优先对照上面的时间线，别张冠李戴。")
+  return lines.join("\n")
+}
+
+/**
+ * 记忆回勾卡片：这位群友自己的旧情节，作为背景感知注入闲聊。
+ * 关键是框定用法——可提可不提，禁止刻意汇报"我记得你说过"。
+ */
+export function buildUserCallbackPrompt(episodes = [], { userName = "" } = {}) {
+  const list = (Array.isArray(episodes) ? episodes : []).slice(0, 3)
+  if (!list.length) return ""
+  const who = String(userName || "").trim() || "这位群友"
+  const lines = [`【${who}的旧话题】（背景记忆，不是必聊素材）`]
+  for (const e of list) {
+    lines.push(`- ${describeWhen(e.at)} 说过：${e.summary}${e.reply ? `，你当时回：「${e.reply}」` : ""}`)
+  }
+  lines.push("只有当前话题自然接得上时才轻轻提一嘴（像熟人想起旧账那样顺口带过）；接不上就当没有，禁止刻意汇报你记得什么。")
   return lines.join("\n")
 }
 

@@ -49,3 +49,19 @@ test("custom level names still map to the matching outcome template", () => {
   assert.equal(pickCheckTemplate(merged.templates, "没过", merged.checkLevels), "FAIL-MSG")
   assert.equal(pickCheckTemplate(merged.templates, "炸了", merged.checkLevels), "FUMBLE-MSG")
 })
+
+test("jrrp 分数段:落段边界与自定义覆盖", async () => {
+  const { pickJrrpComment, DEFAULT_JRRP_COMMENTS, mergeDiceReplyConfig } = await import("../domains/dice/diceReplyCatalog.js")
+  assert.equal(DEFAULT_JRRP_COMMENTS.length, 6)
+  assert.equal(pickJrrpComment(1, ["a", "b", "c", "d", "e", "f"]), "a")
+  assert.equal(pickJrrpComment(10, ["a", "b", "c", "d", "e", "f"]), "a")
+  assert.equal(pickJrrpComment(11, ["a", "b", "c", "d", "e", "f"]), "b")
+  assert.equal(pickJrrpComment(50, ["a", "b", "c", "d", "e", "f"]), "c")
+  assert.equal(pickJrrpComment(70, ["a", "b", "c", "d", "e", "f"]), "d")
+  assert.equal(pickJrrpComment(90, ["a", "b", "c", "d", "e", "f"]), "e")
+  assert.equal(pickJrrpComment(100, ["a", "b", "c", "d", "e", "f"]), "f")
+  // 空位回落默认，不整段替换
+  const merged = mergeDiceReplyConfig({ jrrpComments: ["自定义凶", "", "", "", "", ""] })
+  assert.equal(merged.jrrpComments[0], "自定义凶")
+  assert.equal(merged.jrrpComments[1], DEFAULT_JRRP_COMMENTS[1])
+})

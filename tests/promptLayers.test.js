@@ -60,30 +60,34 @@ test("apply keeps declared order and reports omitted layers", () => {
 
 test("handleTool resolves the layer profile before assembling prompts", () => {
   const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  // 层拼装已迁入 utils/turnPromptComposer.js;主链路改为调用 composeTurnPromptLayers
+  const composerSrc = fs.readFileSync(path.join(root, "utils/turnPromptComposer.js"), "utf8")
   const intentPos = src.indexOf("modelIntentDecision = await this.resolvePrimaryModelIntent(currentIntentText")
   const profilePos = src.indexOf("session.promptLayerProfile = resolvePromptLayerProfile")
-  const joinPos = src.indexOf("applyPromptLayerProfile(session.promptLayerProfile")
-  assert.ok(intentPos > 0 && profilePos > intentPos && joinPos > profilePos, "意图判定必须先于分层画像，分层画像先于拼接")
+  const composePos = src.indexOf("await composeTurnPromptLayers({")
+  assert.ok(intentPos > 0 && profilePos > intentPos && composePos > profilePos, "意图判定必须先于分层画像，分层画像先于组装")
+  assert.ok(composerSrc.includes("applyPromptLayerProfile(profile, layerMap)"), "组装器内按画像裁剪层")
   assert.ok(src.includes("profile === \"chat\"\n          ? \"\""), "闲聊回合跳过理解卡片")
   assert.ok(!src.includes("runShadowIntent"), "影子意图已随 P4 转正移除，不再有并行模型调用")
 })
 
 test("model image intent outranks conflicting regex routing", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  // 图像路由条件已迁入 utils/routeDecision.js(规则表)
+  const routeSrc = fs.readFileSync(path.join(root, "utils/routeDecision.js"), "utf8")
   assert.ok(
-    src.includes("images?.length && (isImageAnalysisRequest(currentIntentText) || modelIntentDecision?.intent === \"image_analysis\")"),
+    routeSrc.includes("ctx.images?.length && (isImageAnalysisRequest(ctx.intentText) || ctx.modelIntent === \"image_analysis\")"),
     "识图路由：模型意图路径也要求有图，正则路径并入同一条件"
   )
   assert.ok(
-    src.includes("images?.length && (isImageCompositionEditRequest(currentIntentText) || modelIntentDecision?.intent === \"image_edit\")"),
+    routeSrc.includes("ctx.images?.length && (isImageCompositionEditRequest(ctx.intentText) || ctx.modelIntent === \"image_edit\")"),
     "改图路由同上"
   )
   assert.ok(
-    src.includes("modelImageIntentConflictsGeneration"),
-    "高置信改图/识图时生图正则不得抢路由"
+    routeSrc.includes("!(ctx.modelIntent === \"image_edit\" || ctx.modelIntent === \"image_analysis\")"),
+    "高置信改图/识图时生图正则不得抢路由(原 modelImageIntentConflictsGeneration 的内联等价)"
   )
   assert.ok(
-    src.includes("session.recentImageContinuation?.image && modelIntentDecision?.intent !== \"image_analysis\""),
+    routeSrc.includes("ctx.session?.recentImageContinuation?.image && ctx.modelIntent !== \"image_analysis\""),
     "成图续改不得抢走识图意图"
   )
 })

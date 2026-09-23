@@ -92,7 +92,10 @@ test("NDJSON archive appends one line for the same durable event", async t => {
     "  messageArchive:",
     "    enabled: true",
     "    includePrivate: false",
-    "    baseDir: data/message_archive"
+    "    baseDir: data/message_archive",
+    // 事件时间戳是固定旧日期(2026-07-20);保留期必须覆盖它,
+    // 否则写后异步触发的 cleanupExpired 会把"刚写的过期文件"删掉,读断言变成竞态
+    "    retentionDays: 3650"
   ].join("\n"))
   try {
     const manager = new MessageArchiveManager({ cwd, logger: globalThis.logger })

@@ -183,6 +183,62 @@ domains:
         desc: 导入 YAML/JS/海豹扩展三种格式规则包（主人）
         perm: master
         src: "domains/dice/app.js manageDiceRules"
+      - usage: ".log on <团名>"
+        desc: 开启跑团日志：期间本群 AI 对话静默，骰娘命令可用；结束用 .log end（关闭并导出）或 .log off（只关闭），均可带团名
+        perm: admin
+        src: "domains/dice/app.js logStart"
+      - usage: ".log new <团名>"
+        desc: 新建一份跑团日志（与 .log on 等价）
+        perm: admin
+        src: "domains/dice/app.js logNew"
+      - usage: ".log off [团名]"
+        desc: 关闭跑团日志，恢复本群 AI 对话（不导出）
+        perm: admin
+        src: "domains/dice/app.js logStop"
+      - usage: ".log end [团名]"
+        desc: 关闭跑团日志并导出记录文件；.log 结束并导出 同义
+        perm: admin
+        src: "domains/dice/app.js logEnd"
+      - usage: ".log export"
+        desc: 导出最近一份跑团日志（历史会话也可导出）
+        perm: admin
+        src: "domains/dice/app.js logExport"
+      - usage: ".log [status]"
+        desc: 查看当前群跑团日志状态
+        perm: all
+        src: "domains/dice/app.js logStatus"
+      - usage: ".ri <表达式> / .init <list|clear>"
+        desc: 先攻骰与先攻表管理（.ri 1d20+3 / .init list）
+        perm: all
+        src: "domains/dice/app.js initiativeRoll|initiative"
+      - usage: ".rb/.rp [数量]"
+        desc: 奖励/惩罚检定骰
+        perm: all
+        src: "domains/dice/app.js bonusCheck|penaltyCheck"
+      - usage: ".rsr/.ww/.dx/.ek/.ekgen <参数>"
+        desc: 掷骰扩展：无限恐怖 rsr / 骰池 ww / 无限 dx / 暗狂 ek
+        perm: all
+        src: "domains/dice/app.js rsr|ww|dx|ek|ekgen"
+      - usage: ".buff/.ss/.cast/.longrest/.ds"
+        desc: DND 法术位与增益管理
+        perm: all
+        src: "domains/dice/app.js dndUtility"
+      - usage: ".namednd <名字>"
+        desc: DND 名字生成
+        perm: all
+        src: "domains/dice/app.js nameDnd"
+      - usage: ".send <留言> / .find <关键词>"
+        desc: 给主人留言 / 查询词条
+        perm: all
+        src: "domains/dice/app.js sendToMaster|findEntry"
+      - usage: ".bot on|off|bye / .reply on|off"
+        desc: 骰娘兼容开关（.bot 只做受控响应，不退群）
+        perm: all
+        src: "domains/dice/app.js botControl|replyControl"
+      - usage: ".dice"
+        desc: 骰娘命令中心菜单
+        perm: all
+        src: "domains/dice/app.js diceHubMenu"
       - usage: ".<规则包命令> / .<海豹扩展命令>"
         desc: 已启用规则包与海豹扩展注册的命令（在命令管理页「骰子扩展」可见）
         perm: all

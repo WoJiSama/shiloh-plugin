@@ -4,7 +4,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import {
-  recordEpisode, recallEpisodes, buildEpisodicPrompt, hasTemporalDeixis,
+  recordEpisode, recallEpisodes, recallUserEpisodes, buildEpisodicPrompt, buildUserCallbackPrompt, hasTemporalDeixis,
   resetEpisodicMemoryForTests
 } from "../utils/episodicMemory.js"
 
@@ -34,4 +34,29 @@ test("超出召回天数的不返回", () => {
   resetEpisodicMemoryForTests()
   recordEpisode({ groupId: "g2", userId: "1", summary: "很老的事", at: Date.now() - 30 * 24 * 60 * 60 * 1000, baseDir })
   assert.equal(recallEpisodes({ groupId: "g2", terms: [], days: 7, baseDir }).length, 0)
+})
+
+
+test("记忆回勾:按用户召回旧情节,新鲜的不要", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "episodic-callback-"))
+  const day = 24 * 60 * 60 * 1000
+  const now = Date.now()
+  resetEpisodicMemoryForTests()
+  recordEpisode({ groupId: "g1", userId: "u1", userName: "阿七", summary: "说要早睡", reply: "早点睡呀", at: now - 2 * day, baseDir: dir })
+  recordEpisode({ groupId: "g1", userId: "u2", userName: "别人", summary: "查了mod", at: now - 3 * day, baseDir: dir })
+  recordEpisode({ groupId: "g1", userId: "u1", userName: "阿七", summary: "刚问完天气", reply: "晴", at: now - 5 * 60 * 1000, baseDir: dir })
+
+  const recalled = recallUserEpisodes({ groupId: "g1", userId: "u1", days: 7, limit: 2, minAgeMs: 30 * 60 * 1000, baseDir: dir })
+  // 只剩跨天的旧账:半小时内的(聊天历史已有)和别人(u2)都被排除
+  assert.equal(recalled.length, 1)
+  assert.match(recalled[0].summary, /早睡/)
+
+  const card = buildUserCallbackPrompt(recalled, { userName: "阿七" })
+  assert.match(card, /阿七的旧话题/)
+  assert.match(card, /早睡/)
+  assert.match(card, /禁止刻意汇报/)
+  // 空列表不出卡
+  assert.equal(buildUserCallbackPrompt([], { userName: "阿七" }), "")
+  // 没记录的用户返回空
+  assert.deepEqual(recallUserEpisodes({ groupId: "g1", userId: "u3", baseDir: dir }), [])
 })

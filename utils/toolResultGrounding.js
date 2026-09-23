@@ -55,13 +55,25 @@ export function buildUnavailableToolReply(results = []) {
   const imageFailure = classified.find(result => result.toolName === "googleImageAnalysisTool" && result.state.kind !== "success")
   if (imageFailure) {
     const code = String(imageFailure.state.parsed?.error?.code || "")
-    const status = Number(imageFailure.state.parsed?.error?.status || imageFailure.state.parsed?.evidence?.attempts?.at?.(-1)?.status || 0)
+    const lastAttempt = imageFailure.state.parsed?.evidence?.attempts?.at?.(-1) || imageFailure.state.parsed?.error?.evidence?.attempts?.at?.(-1) || null
+    const status = Number(imageFailure.state.parsed?.error?.status || lastAttempt?.status || 0)
     if (code === "image_link_expired") return "图片我收到了，但这张图的下载链接已经过期了。你重新发一次原图，我再看。"
     if (code === "image_download_failed") return "图片收到了，不过这次没能把原图读下来。我还没看到里面的内容，先不乱猜。"
     if (code === "vision_timeout") return "图片收到了，不过这次看图等太久，最后没有读到内容。我先不乱猜图里的问题。"
     if (code === "vision_http" && [401, 403].includes(status)) return "图片收到了，不过识图渠道的授权没有通过，所以我还没读到图里的内容。"
     if (code === "vision_http" && status === 429) return "图片收到了，不过识图渠道现在请求太多，暂时没有返回内容。"
-    if (code === "vision_http" && status >= 500) return "图片收到了，不过识图渠道这次临时出错了，我还没读到图里的内容。"
+    if (code === "vision_http" && status >= 500) {
+      // 渠道整体趴了(auth池被污染/上游全挂)和单张图被拒是两种病,给用户的建议必须不同:
+      // 前者重发没用要等恢复,后者重发别的图就能过
+      const detail = String(lastAttempt?.message || imageFailure.state.parsed?.error?.message || "")
+      if (/auth_unavailable|no auth available/i.test(detail)) {
+        return "图片我收到了——这次不是图的问题，是识图通道那边整体掉线了，重发图片也没用；等几分钟再叫我一次，应该就恢复了。"
+      }
+      if (/can'?t help|cannot help|refus|policy/i.test(detail)) {
+        return "图片收到了，不过识图渠道那边不肯看这张图，我读不到里面的内容；换一张图或稍后再试试。"
+      }
+      return "图片收到了，不过识图渠道这次临时出错，我还没读到里面的内容；稍等几分钟再试一次。"
+    }
     if (code === "vision_http") return "图片收到了，不过识图渠道没有正常接住这次请求，我还没读到图里的内容。"
     return "图片收到了，不过这次没有读到可用内容。我先不乱猜图里的问题。"
   }

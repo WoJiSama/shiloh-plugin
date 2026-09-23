@@ -324,6 +324,8 @@ export class EmojiPackPlugin extends plugin {
   async reloadEmoji(e) {
     emojiPackManager.refreshConfig()
     const items = await emojiPackManager.loadItems(true)
+    // 重载后立刻让工具 schema 吃到新词表（不等防抖），模型无需重启即可看到新标签
+    emojiPackManager.notifyCatalogChanged()
     return e.reply(`已重载，当前 ${items.length} 张表情包`)
   }
 

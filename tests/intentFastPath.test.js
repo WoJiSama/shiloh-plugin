@@ -38,13 +38,15 @@ test("skipped turns sample shadow verification at a bounded rate", () => {
 
 test("handleTool wires the fast path with shadow sampling", () => {
   const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  // 闲聊快路的层裁剪已迁入 utils/turnPromptComposer.js(提示词组装重构)
+  const composerSrc = fs.readFileSync(path.join(root, "utils/turnPromptComposer.js"), "utf8")
   assert.ok(src.includes("const skipIntentModel = shouldSkipIntentModel({"), "快路判定接入")
   assert.ok(src.includes('turnTrace.setIntent("chat", null, "fast_path_skip")'), "快路来源写入 trace")
   // P4 已转正：影子抽样验证随之移除，快路跳过不再并行跑模型
   assert.ok(!src.includes("shouldSampleSkippedIntent"), "影子抽样已随转正移除")
   assert.ok(!src.includes("runShadowIntent"), "不再有并行影子意图调用")
-  // 闲聊快路径的层计算裁剪
-  assert.ok(src.includes("const chatFastPath = session.promptLayerProfile?.profile === \"chat\""), "层计算按画像裁剪")
-  assert.ok(src.includes("this.knowledgeSearcher && e.msg && !chatFastPath"), "知识库检索跳过")
-  assert.ok(src.includes("chatFastPath\n          ? null\n          : globalStyleLearnerManager.buildRelevantPrompt"), "语义风格检索跳过")
+  // 闲聊快路径的层计算裁剪(在 composer 内按回合画像判定)
+  assert.ok(composerSrc.includes("const chatFastPath = profile?.profile === \"chat\""), "层计算按画像裁剪")
+  assert.ok(composerSrc.includes("!knowledgeSearcher || !rawMessageText || chatFastPath"), "知识库检索跳过")
+  assert.ok(composerSrc.includes("chatFastPath || !globalStyleLearnerManager\n    ? null\n    : globalStyleLearnerManager.buildRelevantPrompt"), "语义风格检索跳过")
 })

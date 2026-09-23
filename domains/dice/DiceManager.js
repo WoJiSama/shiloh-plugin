@@ -13,6 +13,7 @@ import {
   DEFAULT_INDEFINITE_INSANITY,
   mergeDiceReplyConfig,
   pickCheckTemplate,
+  pickJrrpComment,
   cocRankToCompareRank
 } from "./diceReplyCatalog.js"
 
@@ -463,6 +464,11 @@ export class DiceManager {
 
   isLogActive(groupId, config = this.getConfig()) {
     if (!groupId || !config.enabled || config.logAiSilent === false) return false
+    return this.isLogRecording(groupId, config)
+  }
+
+  isLogRecording(groupId, config = this.getConfig()) {
+    if (!groupId || !config.enabled) return false
     const state = this.readState(config)
     return Boolean(state.groups?.[String(groupId)]?.log?.active)
   }
@@ -545,12 +551,14 @@ export class DiceManager {
   prepareStartLog(e, state, raw = "", config = this.getConfig(), { authorized = false } = {}) {
     if (!config.enabled) return { changed: false, text: "骰娘模块现在没开。", log: null }
     if (!e?.group_id) return { changed: false, text: "log 只能在群聊中开启。", log: null }
-    if (!authorized && !this.canManageGroupDice(e)) return { changed: false, text: "只有主人、群主或管理员可以开启跑团 log。", log: null }
+    if (!authorized && !this.canManageGroupDice(e)) {
+      return { changed: false, text: renderTemplate(config.templates.logPermDenied, { action: "开启" }), log: null }
+    }
     const groupId = String(e.group_id)
     state.groups[groupId] ||= {}
     state.groups[groupId].logs ||= []
     const current = state.groups[groupId].log
-    if (current?.active) return { changed: false, text: `log 已经开启：${current.title || "未命名"}`, log: current }
+    if (current?.active) return { changed: false, text: renderTemplate(config.templates.logAlreadyOpen, { title: current.title || "未命名" }), log: current }
     if (current?.file && !state.groups[groupId].logs.some(item => item.file === current.file)) {
       state.groups[groupId].logs.push({ ...current })
     }
@@ -567,7 +575,7 @@ export class DiceManager {
     return {
       changed: true,
       log: state.groups[groupId].log,
-      text: `跑团 log 已开启：${state.groups[groupId].log.title}\n期间本群 AI 对话会暂时静默，骰娘命令仍可使用。`
+      text: renderTemplate(config.templates.logStarted, { title: state.groups[groupId].log.title })
     }
   }
 
@@ -581,10 +589,12 @@ export class DiceManager {
 
   prepareStopLog(e, state, config = this.getConfig(), { authorized = false } = {}) {
     if (!e?.group_id) return { changed: false, text: "log 只能在群聊中使用。", log: null }
-    if (!authorized && !this.canManageGroupDice(e)) return { changed: false, text: "只有主人、群主或管理员可以停止跑团 log。", log: null }
+    if (!authorized && !this.canManageGroupDice(e)) {
+      return { changed: false, text: renderTemplate(config.templates.logPermDenied, { action: "停止" }), log: null }
+    }
     const groupId = String(e.group_id)
     const log = state.groups?.[groupId]?.log
-    if (!log?.active) return { changed: false, text: "当前群没有开启 log。", log: null }
+    if (!log?.active) return { changed: false, text: renderTemplate(config.templates.logNotActive), log: null }
     log.active = false
     log.endedAt = new Date().toISOString()
     state.groups[groupId].logs ||= []
@@ -594,7 +604,7 @@ export class DiceManager {
     return {
       changed: true,
       log,
-      text: `跑团 log 已结束：${log.title || "未命名"}\nAI 对话已恢复。导出：.log export`
+      text: renderTemplate(config.templates.logStopped, { title: log.title || "未命名" })
     }
   }
 
@@ -1704,7 +1714,11 @@ export class DiceManager {
       hash = Math.imul(hash, 16777619)
     }
     const value = (hash >>> 0) % 100 + 1
-    return renderTemplate(config.templates.jrrp, { name: this.getUserName(e), value })
+    return renderTemplate(config.templates.jrrp, {
+      name: this.getUserName(e),
+      value,
+      comment: pickJrrpComment(value, config.jrrpComments)
+    })
   }
 
   handleDb(e, raw = "") {

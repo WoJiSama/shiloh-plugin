@@ -76,3 +76,25 @@ test("allows mixed tool rounds to continue only from their usable results", () =
   assert.match(instruction, /googleImageAnalysisTool=success/)
   assert.match(instruction, /searchInformationTool=not_found/)
 })
+
+test("识图失败提示按故障类别给建议:渠道趴了不让用户白重发", async () => {
+  const { buildUnavailableToolReply } = await import("../utils/toolResultGrounding.js")
+  const make = (code, status, attempts) => ({
+    toolName: "googleImageAnalysisTool",
+    result: JSON.stringify({ kind: "tool_outcome", status: "error", error: { code, ...(status ? { status } : {}), message: "图片识别没有返回可用内容" }, evidence: { attempts } })
+  })
+  // 中转auth池被污染(线上事故形态):必须明说重发没用
+  const channelDown = buildUnavailableToolReply([make("vision_http", 503, [{ code: "vision_http", status: 503, message: "vision HTTP 503: auth_unavailable: no auth available (providers=xai, model=grok-4.6; last upstream error: I can't help with that request.)" }])])
+  assert.match(channelDown, /不是图的问题|整体掉线/)
+  assert.match(channelDown, /重发图片也没用|重发也没用/)
+  // 上游拒图:换图/稍后再试
+  const refused = buildUnavailableToolReply([make("vision_http", 503, [{ code: "vision_http", status: 503, message: "vision HTTP 503: upstream refused: can't help with this image" }])])
+  assert.match(refused, /不肯看这张图|拒绝/)
+  // 普通5xx:稍等再试,不提重发原图
+  const generic = buildUnavailableToolReply([make("vision_http", 502, [{ code: "vision_http", status: 502, message: "vision HTTP 502: bad gateway" }])])
+  assert.match(generic, /临时出错/)
+  assert.doesNotMatch(generic, /重新发一次原图/)
+  // 链接过期:才让重发原图
+  const expired = buildUnavailableToolReply([make("image_link_expired", 0, [])])
+  assert.match(expired, /重新发一次原图/)
+})

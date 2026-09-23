@@ -198,11 +198,15 @@ function extractChatKeywords(text, maxCount = 5) {
 }
 
 /**
- * 判断消息是否是问句（含 ? / ？ 或末尾 5 字含问句尾字）
+ * 判断消息是否是问句（含 ? / ？ 或末尾 5 字含问句尾字，或"爱不爱/好不好"这类正反问）
  */
+const A_NOT_A_QUESTION_RE = /([\u4e00-\u9fa5]{1,2})(?:不|没)\1/
+
 function isQuestionMessage(text) {
   if (!text || typeof text !== "string") return false
   if (/[?？]/.test(text)) return true
+  // 正反问（爱不爱/好不好/是不是）。"对不起"里的"对不对"子串不是问句，单独排除。
+  if (A_NOT_A_QUESTION_RE.test(text) && !/对不起/.test(text)) return true
   const tail = text.slice(-5)
   for (const ch of QUESTION_TAIL_CHARS) {
     if (tail.includes(ch)) return true

@@ -77,6 +77,8 @@ test("the model chooses emoji-only or mixed reply through followUpText", async t
 
     assert.equal(emojiOnlyReplies.length, 1)
     assert.equal(emojiOnlyReplies[0].type, "image")
+    // 默认以表情小图发送（sub_type=1），避免满屏大图
+    assert.equal(emojiOnlyReplies[0].sub_type ?? emojiOnlyReplies[0].data?.sub_type, 1)
     assert.match(emojiOnlyResult, /回复模式: emoji_only/)
     assert.deepEqual(receivedCriteria[0].tags, ["无语", "震惊"])
 

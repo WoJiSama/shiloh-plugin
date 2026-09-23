@@ -15,6 +15,7 @@ function createRuntime(overrides = {}) {
     "pluginSettings:",
     "  diceSystem:",
     `    enabled: ${overrides.enabled === false ? "false" : "true"}`,
+    `    logAiSilent: ${overrides.logAiSilent === false ? "false" : "true"}`,
     "    customRulesEnabled: true",
     "    maxDiceCount: 100",
     "    baseDir: data/dice",
@@ -192,7 +193,10 @@ test("ordinary members cannot mutate group-wide dice state", async () => {
     const admin = event("admin")
     assert.match(await runtime.manager.handleSetOption(admin, "d20"), /d20/)
     assert.match(await runtime.manager.handleSetCoc(admin, "1"), /已设置/)
-    assert.match(await runtime.manager.startLog(admin, "测试团"), /已开启/)
+    // 开启提示必须告诉群友怎么结束，否则静默期间无从恢复 AI 对话
+    const logStartedText = await runtime.manager.startLog(admin, "测试团")
+    assert.match(logStartedText, /已开启/)
+    assert.match(logStartedText, /\.log end|\.log off/)
   } finally {
     runtime.cleanup()
   }
@@ -344,6 +348,7 @@ test("log export uploads complete text by base64 and keeps historical sessions a
       }
     })
     await runtime.manager.startLog(e, "第一团")
+    assert.equal(runtime.manager.isLogRecording(e.group_id), true)
     await runtime.manager.recordLogMessage(e)
     await runtime.manager.stopLog(e)
     await runtime.manager.startLog({ ...e, msg: "第二条" }, "第二团")
@@ -358,6 +363,18 @@ test("log export uploads complete text by base64 and keeps historical sessions a
     const decoded = Buffer.from(uploads[0].payload.file.slice("base64://".length), "base64").toString("utf8")
     assert.match(decoded, /# 第一团/)
     assert.match(decoded, /第一条/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("active log remains detectable for text preservation when AI silence is disabled", async () => {
+  const runtime = createRuntime({ logAiSilent: false })
+  try {
+    const e = event("admin", { msg: ".log new 文本团录" })
+    await runtime.manager.startLog(e, "文本团录")
+    assert.equal(runtime.manager.isLogActive(e.group_id), false, "AI 对话不因 log 静默")
+    assert.equal(runtime.manager.isLogRecording(e.group_id), true, "回复仍需保留为可记录文本")
   } finally {
     runtime.cleanup()
   }
@@ -489,6 +506,69 @@ test("custom level names still drive SAN success and fumble logic", async () => 
     runtime.manager.rollD100 = () => ({ value: 100, diceText: "1D100" })
     const fumble = await runtime.manager.handleSan(event(), "1/1d3")
     assert.match(fumble, /炸了/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("跑团 log 提示文案走模板，可在配置里改实际发送的话", async () => {
+  const runtime = createRuntime()
+  const admin = event("admin")
+  try {
+    const started = await runtime.manager.startLog(admin, "模板团")
+    assert.match(started, /跑团 log 已开启：模板团/)
+    assert.match(started, /\.log end|\.log off/)
+    // 覆盖模板后，群里实际发送的就是覆盖后的文案
+    const base = runtime.manager.getConfig()
+    runtime.manager.getConfig = () => ({
+      ...base,
+      enabled: true,
+      templates: { ...base.templates, logStarted: "开团啦：{title}，AI 先闭嘴咯", logStopped: "收工：{title}" }
+    })
+    await runtime.manager.stopLog(admin)
+    assert.equal(await runtime.manager.startLog(admin, "自定义团"), "开团啦：自定义团，AI 先闭嘴咯")
+    assert.equal(await runtime.manager.stopLog(admin), "收工：自定义团")
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("海豹扩展顶级命令(.dd)能过门禁：启用回执宣传的短名必须可用", () => {
+  const ruleManager = {
+    findInvocation: () => null,
+    matchesSealExtCommand: (groupId, message) => String(message || "").startsWith(".dd")
+  }
+  const manager = {
+    getConfig: () => ({ enabled: true, customRulesEnabled: true }),
+    isReplyEnabled: () => true
+  }
+  const gate = getCustomDiceCommandGate({ manager, ruleManager, e: { group_id: "1", msg: ".dd help" } })
+  assert.equal(gate.matched, true, "seal-ext 顶级命令应视为规则包命令")
+  assert.equal(gate.allowed, true)
+  assert.equal(gate.consume, true)
+  // 未注册的命令仍然不吞消息
+  assert.equal(getCustomDiceCommandGate({ manager, ruleManager, e: { group_id: "1", msg: ".zzz" } }).matched, false)
+  // 两段式包名调用仍走 findInvocation 原路径
+  assert.equal(getCustomDiceCommandGate({ manager, ruleManager, e: { group_id: "1", msg: ".team show" } }).matched, false)
+  // 模块关闭时顶级命令也要被拦下并提示
+  const disabled = { getConfig: () => ({ enabled: false, customRulesEnabled: true }), isReplyEnabled: () => true }
+  assert.equal(getCustomDiceCommandGate({ manager: disabled, ruleManager, e: { group_id: "1", msg: ".dd help" } }).response, "骰娘模块现在没开。")
+})
+
+test("jrrp 分数段评语按分值落段，模板带 {comment}", async () => {
+  const runtime = createRuntime()
+  try {
+    const text = runtime.manager.handleJrrp({ user_id: 42, sender: { nickname: "阿七" } })
+    assert.match(text, /阿七 今日人品：\d+\n.+/)
+    // 自定义段文案会出现在实际发送里
+    const base = runtime.manager.getConfig()
+    runtime.manager.getConfig = () => ({
+      ...base,
+      templates: { ...base.templates, jrrp: "{name} 人品 {value} 「{comment}」" },
+      jrrpComments: ["a", "b", "c", "d", "e", "f"]
+    })
+    const custom = runtime.manager.handleJrrp({ user_id: 42, sender: { nickname: "阿七" } })
+    assert.match(custom, /人品 \d+ 「[a-f]」/)
   } finally {
     runtime.cleanup()
   }

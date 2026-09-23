@@ -10,9 +10,32 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// 词表随 catalog 活起来：注册表 functions[].parameters 引用的是同一个对象，
+// 原地刷新即可对后续请求生效（description 是拷贝，靠注册表周期 rebuild 自然跟上）
+const liveInstances = new Set()
+let schemaRefreshTimer = null
+function scheduleSchemaRefresh() {
+  if (schemaRefreshTimer) return
+  schemaRefreshTimer = setTimeout(() => {
+    schemaRefreshTimer = null
+    for (const instance of liveInstances) {
+      try { instance.refreshSchema() } catch {}
+    }
+  }, 10_000)
+}
+
 export class SendLocalEmojiTool extends AbstractTool {
   constructor() {
     super()
+    this.name = "sendLocalEmojiTool"
+    this.description = ""
+    this.parameters = { type: "object", properties: {}, required: ["tags"], additionalProperties: false }
+    this.refreshSchema()
+    liveInstances.add(this)
+    emojiPackManager.onCatalogChanged(scheduleSchemaRefresh)
+  }
+
+  buildSchema() {
     const vocabulary = emojiPackManager.getSelectionVocabularySync()
     const importantUseCases = [
       "接梗吐槽", "群友翻车", "无言以对", "看到离谱", "轻微嘲讽", "想装无辜",
@@ -32,17 +55,20 @@ export class SendLocalEmojiTool extends AbstractTool {
       type: "string",
       ...(useCaseOptions.length ? { enum: useCaseOptions } : {})
     }
-    this.name = "sendLocalEmojiTool"
-    this.description = [
-      "此工具你可以积极主动调用",
+    // 优先标签从真实库词表生成（按词表顺序取前 30），不再硬编码一份会过期的清单
+    const recommendedTags = vocabulary.tags.length
+      ? `优先使用线上库真实标签：${vocabulary.tags.slice(0, 30).join("、")}。`
+      : "优先使用线上库真实标签（当前库为空，先通过 #表情包导入 添加表情）。"
+    const description = [
       "从本地表情包库挑选一张合适的表情包发送到当前会话。",
-      "表情包是整轮对话的一部分：不调用=只回文字；不填配文=只发表情；leadText 在表情前说，followUpText 在表情后补。",
-      "适合场景：轻松短闲聊里的情绪共鸣（笑/无奈/惊讶/共鸣）、玩笑接梗、表达态度；不要机械地每轮都调用。",
-      "不适合场景：严肃问答、技术讨论、对方在咨询正式问题或寻求帮助。",
-      "当一张表情包已经足够表达当前反应时，可以只发表情包，不要再用 followUpText 重复同一句情绪。",
-      "默认整轮只发一张表情。只有短反应或表情无法承载的关键信息，才加 leadText 或 followUpText；极少数确有转折的场景才两边都填。"
+      "你的回复以文字为主：先用嘴把话说完，表情包是偶尔的点缀，不是主要回复方式。大多数闲聊回合直接用文字回，不要调用本工具。",
+      "表情包只在它真的加分时用：梗图接梗（表情本身就是笑点）、情绪放大（笑死/无语/破防时配一张）、气氛调剂。拿不准就不发。",
+      "调用规则：leadText 在表情前把话说了，followUpText 在表情后补；只有纯玩梗接梗（表情本身就是完整回应）才可以不填配文只发表情，这种情况一轮最多一次。",
+      "不适合场景：严肃问答、技术讨论、对方在咨询正式问题、寻求帮助、情绪低落找你倾诉。",
+      "用户直接向你提问或找你说话（在干嘛/在吗/问你状态/喊你名字/问你爱不爱他/让你夸他求表扬）时，表情包不算“已经足够”：必须填 leadText 真的把话说出来（如“窝着呢”“在的在的”“欸？怎么突然问这个呀”），求夸就真的夸两句，表情只作搭配。",
+      "默认整轮最多发一张表情，绝对不要在一轮里调用两次本工具。"
     ].join("\n")
-    this.parameters = {
+    const parameters = {
       type: "object",
       properties: {
         tags: {
@@ -50,14 +76,16 @@ export class SendLocalEmojiTool extends AbstractTool {
           items: tagItemSchema,
           description: [
             "按相关度从高到低填写 1-5 个库内情绪/反应标签，第一个是最想表达的主情绪。",
-            "优先使用线上库真实标签：吐槽、得意、无奈、卖萌、嘲讽、崩溃、无语、敷衍、震惊、委屈、傲娇、心动、嫌弃、摆烂、尴尬、无辜、开心、笑死、疑惑、绝望、惊讶、懵逼、认怂、自嘲、心虚、害羞、疲惫、破防、兴奋、安慰。",
+            recommendedTags,
             "不要填写画风、角色、动物等物体词。"
           ].join("\n")
         },
         useCases: {
           type: "array",
           items: useCaseItemSchema,
-          description: "可选，按相关度填写 1-4 个具体使用场景。优先使用库内真实场景，如：接梗吐槽、群友翻车、无言以对、看到离谱、轻微嘲讽、想装无辜、被人夸奖、场面尴尬、认怂求饶、安慰对方、拒绝加班。"
+          description: vocabulary.useCases.length
+            ? `可选，按相关度填写 1-4 个具体使用场景。优先使用库内真实场景，如：${vocabulary.useCases.slice(0, 15).join("、")}。`
+            : "可选，按相关度填写 1-4 个具体使用场景。优先使用库内真实场景，如：接梗吐槽、群友翻车、无言以对、看到离谱、轻微嘲讽、想装无辜、被人夸奖、场面尴尬、认怂求饶、安慰对方、拒绝加班。"
         },
         query: {
           type: "string",
@@ -75,6 +103,17 @@ export class SendLocalEmojiTool extends AbstractTool {
       required: ["tags"],
       additionalProperties: false
     }
+    return { description, parameters }
+  }
+
+  /** 用当前 catalog 词表重建 schema；导入/删除/打标后由 onCatalogChanged 防抖触发 */
+  refreshSchema() {
+    const { description, parameters } = this.buildSchema()
+    this.description = description
+    this.parameters.properties = parameters.properties
+    this.parameters.required = parameters.required
+    this.parameters.additionalProperties = parameters.additionalProperties
+    this.parameters.type = parameters.type
   }
 
   async func(opts, e) {
@@ -137,7 +176,13 @@ export class SendLocalEmojiTool extends AbstractTool {
           }
           textSent = true
         } else {
-          await e.reply(segment.image(`file://${absPath}`))
+          const imageSegment = segment.image(`file://${absPath}`)
+          // sub_type=1 让 QQ 按"表情"小图渲染而不是满屏大图（NapCat 支持；不识别的适配器会忽略该字段）
+          if (cfg?.sendAsSticker !== false && imageSegment && typeof imageSegment === "object") {
+            if (imageSegment.data && typeof imageSegment.data === "object") imageSegment.data.sub_type = 1
+            else imageSegment.sub_type = 1
+          }
+          await e.reply(imageSegment)
           emojiSent = true
         }
         if (index < rhythm.sequence.length - 1) {

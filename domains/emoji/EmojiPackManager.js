@@ -508,6 +508,15 @@ export class EmojiPackManager {
     }
   }
 
+  admissionExtrasText() {
+    const allow = (this.config?.admissionExtraAllow || []).map(s => String(s).trim()).filter(Boolean)
+    const reject = (this.config?.admissionExtraReject || []).map(s => String(s).trim()).filter(Boolean)
+    let extra = ""
+    if (allow.length) extra += "\n【站长补充放行】（满足任一同样可判 true）：\n" + allow.map(r => "- " + r).join("\n") + "\n"
+    if (reject.length) extra += "\n【站长补充拒绝】（命中任一直接判 false，优先级最高）：\n" + reject.map(r => "- " + r).join("\n") + "\n"
+    return extra
+  }
+
   async contentFilterWithVLM(buffer, ext) {
     const cfg = this.analysisAiConfig
     if (!cfg?.analysisApiUrl || !cfg?.analysisApiKey || cfg.analysisApiKey.includes("sk-xxx")) {
@@ -536,7 +545,7 @@ export class EmojiPackManager {
 
 **关键测试**：把这张图发到群里，群友能立刻明白"这是在表达 XX 情绪/梗"吗？不能就是 false。
 
-仅输出严格 JSON（不要 markdown 代码块）：{"is_emoji": true 或 false, "reason": "简短理由"}`
+仅输出严格 JSON（不要 markdown 代码块）：{"is_emoji": true 或 false, "reason": "简短理由"}${this.admissionExtrasText()}`
 
     const json = await this.callOpenAIChat(
       cfg, "analysisApiUrl", "analysisApiKey",
@@ -871,6 +880,21 @@ ${list}
     return pool[pool.length - 1]
   }
 
+  /** 订阅 catalog 变化（导入/删除/打标/清空后触发）；返回取消订阅函数 */
+  onCatalogChanged(callback) {
+    if (typeof callback !== "function") return () => {}
+    this.catalogChangedCallbacks ??= new Set()
+    this.catalogChangedCallbacks.add(callback)
+    return () => this.catalogChangedCallbacks.delete(callback)
+  }
+
+  notifyCatalogChanged() {
+    if (!this.catalogChangedCallbacks?.size) return
+    for (const callback of this.catalogChangedCallbacks) {
+      try { callback() } catch (error) { logWarn(`catalog 变更回调失败: ${error?.message || error}`) }
+    }
+  }
+
   /** 清空全部数据（ndjson + 图片文件 + 内存缓存 + 反重复/限流状态），返回删除的图片文件数 */
   async clearAllData() {
     let deletedFiles = 0
@@ -891,6 +915,7 @@ ${list}
     this.cache = { mtimeMs: 0, items: [], loaded: true }
     this.recentPicksByGroup.clear()
     this.recentSendsByGroup.clear()
+    this.notifyCatalogChanged()
     return deletedFiles
   }
 
@@ -983,7 +1008,9 @@ ${list}
       const toSave = this.pendingItems
       this.pendingItems = null
       this.pendingWriteTimer = null
-      this.saveItems(toSave).catch(err => logWarn(`节流写入失败: ${err.message}`))
+      this.saveItems(toSave)
+        .then(() => this.notifyCatalogChanged())
+        .catch(err => logWarn(`节流写入失败: ${err.message}`))
     }, 2000)
   }
 
@@ -1053,6 +1080,63 @@ ${list}
 
   getAbsoluteFilePath(item) {
     return path.join(this.storeDir, path.basename(item.file))
+  }
+
+  /** 管理页清单：轻字段投影，embedding 等大字段不出网 */
+  async listForAdmin() {
+    const items = await this.loadItems()
+    return items.map(i => ({
+      hash: i.hash,
+      file: path.basename(String(i.file || "")),
+      tags: (i.tags || []).slice(0, 6),
+      useCases: (i.useCases || []).slice(0, 4),
+      usedCount: Number(i.usedCount) || 0,
+      lastUsedAt: i.lastUsedAt || null,
+      registeredAt: i.registeredAt || "",
+      isBanned: !!i.isBanned
+    }))
+  }
+
+  /** 管理页删除：记录与文件一起删；文件删失败只记日志（库里不再引用） */
+  async removeItem(hash) {
+    const wanted = String(hash || "")
+    if (!/^[a-f0-9]{6,64}$/.test(wanted)) return { ok: false, error: "invalid_hash" }
+    const items = await this.loadItems()
+    const target = items.find(i => i.hash === wanted)
+    if (!target) return { ok: false, error: "not_found" }
+    await this.saveItems(items.filter(i => i.hash !== wanted))
+    try {
+      await fsp.unlink(this.getAbsoluteFilePath(target))
+    } catch (err) {
+      logWarn(`删除表情文件失败 (${wanted.slice(0, 8)}): ${err.message}`)
+    }
+    logInfo(`管理页删除表情包: ${wanted.slice(0, 8)} tags=[${(target.tags || []).join(",")}]`)
+    return { ok: true, hash: wanted }
+  }
+
+  /** 管理页批量删除：一次读、一次写，逐个清理文件；返回删掉/未找到计数 */
+  async removeItems(hashes = []) {
+    const wanted = new Set((Array.isArray(hashes) ? hashes : []).map(String).filter(h => /^[a-f0-9]{6,64}$/.test(h)))
+    if (!wanted.size) return { removed: 0, missing: 0 }
+    const items = await this.loadItems()
+    const keep = []
+    const targets = []
+    for (const item of items) {
+      if (wanted.has(item.hash)) targets.push(item)
+      else keep.push(item)
+    }
+    if (targets.length) {
+      await this.saveItems(keep)
+      for (const target of targets) {
+        try {
+          await fsp.unlink(this.getAbsoluteFilePath(target))
+        } catch (err) {
+          logWarn(`删除表情文件失败 (${target.hash.slice(0, 8)}): ${err.message}`)
+        }
+      }
+      logInfo(`管理页批量删除表情包: ${targets.length} 张`)
+    }
+    return { removed: targets.length, missing: wanted.size - targets.length }
   }
 
   async stats() {

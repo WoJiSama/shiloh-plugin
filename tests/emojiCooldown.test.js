@@ -37,9 +37,10 @@ test("冷却期间 casual 暴露返回空工具列表", () => {
 
 test("test.js 已接线：终态表情后记录冷却、暴露过滤传冷却参数", () => {
   const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const routeSrc = fs.readFileSync(path.join(root, "utils/routeDecision.js"), "utf8")
   assert.ok(src.includes("recordEmojiOnlySend(e.group_id"), "终态表情回复记录冷却")
   assert.ok(src.includes("emojiCooldownMs: Number(this.config?.emojiSystem?.emojiCooldownMs"), "暴露过滤带冷却配置")
-  assert.ok(src.includes("!suppressEmojiByCooldown(currentIntentText, groupId, emojiCooldownMs)"), "强制快路尊重冷却")
+  assert.ok(routeSrc.includes("suppressEmojiByCooldown(ctx.intentText, ctx.groupId, ctx.emojiCooldownMs)"), "强制快路尊重冷却")
 })
 
 test("filterToolsForMessageIntent 解构参数后不得残留 options 引用", () => {

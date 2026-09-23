@@ -67,3 +67,27 @@ test("suppresses a generated progress reply when the search finishes first", asy
   assert.deepEqual(replies, [])
 })
 
+test("does not send another progress reply after an earlier tool stage used the turn budget", async () => {
+  const replies = []
+  const tool = new SearchInformationTool({
+    progressDelayMs: 500,
+    configLoader: () => CONFIG,
+    progressReplyFactory: async () => "搜索阶段不该再追加这句。",
+    fetchImpl: async () => {
+      await wait(650)
+      return {
+        ok: true,
+        status: 200,
+        async json() { return { choices: [{ message: { content: "搜索完成" } }] } }
+      }
+    }
+  })
+  const event = {
+    msg: "识图后再查一下",
+    _progressReplyState: { sent: true, reserved: false },
+    async reply(text) { replies.push(text) }
+  }
+
+  await tool.func({ query: "核实图片内容" }, event)
+  assert.deepEqual(replies, [])
+})

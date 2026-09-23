@@ -28,6 +28,12 @@ test("意图层核心模块：分类函数行为锁定（从 apps/test.js 迁出
   assert.equal(intent.isQuestionMessage("你是谁？"), true)
   assert.equal(intent.isQuestionMessage("今天天气怎么样"), true)
   assert.equal(intent.isQuestionMessage("好的收到"), false)
+  // 正反问（A-not-A）：无问号无"吗"也要认出来，否则接续识别会丢消息
+  assert.equal(intent.isQuestionMessage("你爱不爱我"), true)
+  assert.equal(intent.isQuestionMessage("好不好"), true)
+  assert.equal(intent.isQuestionMessage("去没去上课"), true)
+  assert.equal(intent.isQuestionMessage("对不起"), false)
+  assert.equal(intent.isQuestionMessage("差不多得了"), false)
   assert.equal(intent.isFeedbackMessage("没错，就是这样"), true)
   assert.equal(intent.isFeedbackMessage("帮我写个脚本"), false)
   assert.equal(intent.isCasualBotGreeting("希洛在吗"), true)

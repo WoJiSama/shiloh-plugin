@@ -1,7 +1,7 @@
 # 命令总表
 
 > 本文档由 `config_default/commands.yaml` 生成（`.命令 导出` 或运行 scripts/gen-commands-doc.mjs）。
-> 生成时间：2026-09-17 02:10:48 ｜ 共 100 条命令 / 11 个模块
+> 生成时间：2026-09-21 06:41:10 ｜ 共 114 条命令 / 11 个模块
 
 ## 🧠 记忆与表达
 
@@ -61,6 +61,20 @@ COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；
 | `.骰规则列表` | 查看当前群已导入与已启用的规则包列表 | 群管理 | `domains/dice/app.js manageDiceRules` |
 | `.骰规则启用 <包名> / .骰规则禁用 <包名>` | 在当前群切换启用/停用某个规则包 | 群管理 | `domains/dice/app.js manageDiceRules` |
 | `.骰规则导入 <文件> / .骰规则确认 <包名>` | 导入 YAML/JS/海豹扩展三种格式规则包（主人） | 仅主人 | `domains/dice/app.js manageDiceRules` |
+| `.log on <团名>` | 开启跑团日志：期间本群 AI 对话静默，骰娘命令可用；结束用 .log end（关闭并导出）或 .log off（只关闭），均可带团名 | 群管理 | `domains/dice/app.js logStart` |
+| `.log new <团名>` | 新建一份跑团日志（与 .log on 等价） | 群管理 | `domains/dice/app.js logNew` |
+| `.log off [团名]` | 关闭跑团日志，恢复本群 AI 对话（不导出） | 群管理 | `domains/dice/app.js logStop` |
+| `.log end [团名]` | 关闭跑团日志并导出记录文件；.log 结束并导出 同义 | 群管理 | `domains/dice/app.js logEnd` |
+| `.log export` | 导出最近一份跑团日志（历史会话也可导出） | 群管理 | `domains/dice/app.js logExport` |
+| `.log [status]` | 查看当前群跑团日志状态 | 所有人 | `domains/dice/app.js logStatus` |
+| `.ri <表达式> / .init <list|clear>` | 先攻骰与先攻表管理（.ri 1d20+3 / .init list） | 所有人 | `domains/dice/app.js initiativeRoll|initiative` |
+| `.rb/.rp [数量]` | 奖励/惩罚检定骰 | 所有人 | `domains/dice/app.js bonusCheck|penaltyCheck` |
+| `.rsr/.ww/.dx/.ek/.ekgen <参数>` | 掷骰扩展：无限恐怖 rsr / 骰池 ww / 无限 dx / 暗狂 ek | 所有人 | `domains/dice/app.js rsr|ww|dx|ek|ekgen` |
+| `.buff/.ss/.cast/.longrest/.ds` | DND 法术位与增益管理 | 所有人 | `domains/dice/app.js dndUtility` |
+| `.namednd <名字>` | DND 名字生成 | 所有人 | `domains/dice/app.js nameDnd` |
+| `.send <留言> / .find <关键词>` | 给主人留言 / 查询词条 | 所有人 | `domains/dice/app.js sendToMaster|findEntry` |
+| `.bot on|off|bye / .reply on|off` | 骰娘兼容开关（.bot 只做受控响应，不退群） | 所有人 | `domains/dice/app.js botControl|replyControl` |
+| `.dice` | 骰娘命令中心菜单 | 所有人 | `domains/dice/app.js diceHubMenu` |
 | `.<规则包命令> / .<海豹扩展命令>` | 已启用规则包与海豹扩展注册的命令（在命令管理页「骰子扩展」可见） | 所有人 | `动态注册` |
 
 ## 🔫 三角洲

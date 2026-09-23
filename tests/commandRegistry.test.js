@@ -40,3 +40,21 @@ test("markdown 快照生成", async () => {
   assert.match(markdown, /## 🧠 记忆与表达/)
   assert.match(markdown, /\| `\.命令 \[域名\] \/ \.帮助`/)
 })
+
+test("骰娘命令总表覆盖 log 家族与常用命令", async () => {
+  const { getCommandRegistry } = await import("../utils/commandRegistry.js")
+  const registry = getCommandRegistry(pluginRoot)
+  const usages = new Set(registry.domains.flatMap(domain => domain.commands.map(command => command.usage)))
+  // .log 命令曾整族缺失：开启提示让用户发 .log off，命令管理页里却查不到
+  for (const required of [
+    ".log on <团名>",
+    ".log off [团名]",
+    ".log end [团名]",
+    ".log export",
+    ".log [status]",
+    ".r <表达式>",
+    ".ri <表达式> / .init <list|clear>"
+  ]) {
+    assert.ok(usages.has(required), `命令总表缺少：${required}`)
+  }
+})

@@ -21,12 +21,14 @@ test("knowledge cards require substance in the actual output", () => {
 })
 
 test("short knowledge questions no longer promise a card", () => {
+  // resolveCardPresentation 已迁至 utils/turnPresentation.js(提示词组装重构)
+  const presentationSrc = fs.readFileSync(path.join(root, "utils/turnPresentation.js"), "utf8")
   assert.ok(
-    src.includes('responseKind === "knowledge" && normalizeIntentText(userText).length >= 12'),
+    presentationSrc.includes('responseKind === "knowledge" && normalizeIntentText(userText).length >= 12'),
     "短问句（如\"什么是黑洞\"）不再发\"整理成卡片\"承诺"
   )
   assert.ok(
-    /表情包\|表情\|插件\|机器人\|文件\|导入\|删除\|重启\|禁言\|群名片/.test(src),
+    /表情包\|表情\|插件\|机器人\|文件\|导入\|删除\|重启\|禁言\|群名片/.test(presentationSrc),
     "运营/管理类内容（\"整理一下表情包\"）不再误判为知识讲解"
   )
 })

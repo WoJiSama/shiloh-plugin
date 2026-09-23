@@ -3,7 +3,9 @@ import path from "path"
 import { isToneCorrectionMessage } from "../../utils/chatFailureReply.js"
 import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 
-const DEFAULT_BAD_PATTERNS = [
+// 代码侧兜底坏模式表;config_default/message.yaml 的 personaGuard.badPatterns
+// 是配置侧同名表,tests/personaPromptCharacterization.test.js 有漂移防护测试钉住两者一致。
+export const DEFAULT_BAD_PATTERNS = [
   "我是不是太啰嗦",
   "是不是说多了",
   "好像有点啰嗦",
@@ -275,7 +277,7 @@ export class PersonaFeedbackManager {
     fs.writeFileSync(this.getSummaryPath(), JSON.stringify(summary, null, 2), "utf8")
   }
 
-  buildFeedbackPrompt(config = {}) {
+  buildFeedbackPrompt(config = {}, { personaName } = {}) {
     const guard = normalizeConfig(config)
     if (!guard.enabled || guard.maxPromptItems <= 0) return ""
     const summary = this.readSummary()
@@ -284,16 +286,17 @@ export class PersonaFeedbackManager {
       .slice(0, guard.maxPromptItems)
     if (!sorted.length) return ""
 
+    const name = String(personaName || "希洛").trim() || "希洛"
     const lines = [
-      "【希洛近期微雕反馈】",
-      "这些是主人对希洛回复风格的长期修正，回复时自然遵守，不要提到这些规则本身。"
+      `【${name}近期微雕反馈】`,
+      `这些是主人对${name}回复风格的长期修正，回复时自然遵守，不要提到这些规则本身。`
     ]
     for (const item of sorted) {
       if (item.key === "too_hard") lines.push(`- ${item.label}：拒绝时别冷冰冰，不要直接甩“不能/无法”；先接住意图，再给替代做法。`)
       else if (item.key === "too_verbose") lines.push(`- ${item.label}：少铺垫，能短就短，别在结尾自我评价啰嗦。`)
       else if (item.key === "too_customer") lines.push(`- ${item.label}：不要客服腔、汇报腔、说明书腔，像熟人自然说。`)
       else if (item.key === "good_tone") lines.push(`- ${item.label}：保持最近被认可的自然、熟人感表达。`)
-      else if (item.key === "bad_tone") lines.push(`- ${item.label}：语气要更贴近希洛，不要突然生硬或阴阳怪气。`)
+      else if (item.key === "bad_tone") lines.push(`- ${item.label}：语气要更贴近${name}，不要突然生硬或阴阳怪气。`)
       else lines.push(`- ${item.label}：参考主人最近反馈，优先自然和有用。`)
     }
     return lines.join("\n")
@@ -340,6 +343,10 @@ export class PersonaFeedbackManager {
       if (!needle) continue
       if (output.includes(needle)) {
         output = output.split(needle).join("")
+        // 可选命中回调:输出守卫管线用它做逐模式触发统计,作为规则退役依据;不传则零开销
+        if (typeof context.onPatternHit === "function") {
+          try { context.onPatternHit(needle) } catch { /* 统计回调不允许影响清理 */ }
+        }
       }
     }
 

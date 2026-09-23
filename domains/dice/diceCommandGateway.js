@@ -67,8 +67,10 @@ export function getCustomDiceCommandGate({ manager, ruleManager, e } = {}) {
     return { matched: false, allowed: false, consume: false, response: "" }
   }
   const groupId = e?.group_id || "private"
-  const invocation = ruleManager?.findInvocation?.(groupId, e?.msg)
-  if (!invocation) return { matched: false, allowed: false, consume: false, response: "" }
+  const invocation = ruleManager?.findInvocation?.(groupId, e?.msg) || null
+  // 海豹扩展命令是顶级命令(.dd/.cook)，findInvocation 只认「包名 命令」两段式，会漏掉它们
+  const sealCommandMatched = invocation ? false : (ruleManager?.matchesSealExtCommand?.(groupId, e?.msg) === true)
+  if (!invocation && !sealCommandMatched) return { matched: false, allowed: false, consume: false, response: "" }
   const config = manager?.getConfig?.() || {}
   if (config.enabled === false) {
     return { matched: true, allowed: false, consume: true, response: "骰娘模块现在没开。" }

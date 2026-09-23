@@ -41,8 +41,10 @@ export const DICE_COMMAND_RULES = Object.freeze([
   { reg: knownCompactLatinRule("sn", ["on", "off"]), fnc: "sn" },
   { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:on|start|开始|开启)(?![A-Za-z])[\\s\\S]*$`, fnc: "logStart" },
   { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:new|新建|create)(?![A-Za-z])[\\s\\S]*$`, fnc: "logNew" },
-  { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:off|stop|结束|关闭)\\s*$`, fnc: "logStop" },
-  { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:end|结束并导出)\\s*$`, fnc: "logEnd" },
+  // off/end 容忍尾部参数：群里习惯带团名（.log off 至死方休），锚死结尾会静默吞掉命令。
+  // end 必须排在 off/结束 之前，否则「结束并导出」会被 off 的「结束」前缀截走。
+  { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:end|结束并导出)(?![A-Za-z])[\\s\\S]*$`, fnc: "logEnd" },
+  { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:off|stop|结束|关闭)(?![A-Za-z])[\\s\\S]*$`, fnc: "logStop" },
   { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:status|状态)?\\s*$`, fnc: "logStatus" },
   { reg: `^${DICE_COMMAND_PREFIX_PATTERN}log\\s*(?:export|get|导出|获取)(?![A-Za-z])[\\s\\S]*$`, fnc: "logExport" },
   { reg: argumentRule("ri"), fnc: "initiativeRoll" },

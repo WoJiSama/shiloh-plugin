@@ -31,6 +31,7 @@ import {
   resolveImageAspectRatioIntent
 } from "../../utils/imageAspectRatio.js";
 import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
+import { reserveProgressReply } from "../../utils/progressReplyBudget.js";
 
 const { mimeTypes, FormData } = dependencies;
 const DEFAULT_CHAT_IMAGE_URL = 'https://api.openai.com/v1/chat/completions';
@@ -867,8 +868,13 @@ export class BananaTool extends AbstractTool {
   }
 
   async sendProgress(e, { config = {}, opts = {}, hasReferenceImages = false, signal } = {}) {
+    const reservation = reserveProgressReply(e);
+    if (!reservation) return false;
     try {
-      if (!e?.reply || signal?.aborted) return false;
+      if (!e?.reply || signal?.aborted) {
+        reservation.release();
+        return false;
+      }
       const progress = this.resolveProgressContext(opts, hasReferenceImages);
       const message = await this.progressReplyFactory({
         config,
@@ -879,20 +885,29 @@ export class BananaTool extends AbstractTool {
         fetchImpl: this.progressFetchImpl,
         signal
       });
-      if (!message || signal?.aborted) return false;
+      if (!message || signal?.aborted) {
+        reservation.release();
+        return false;
+      }
       const guardedMessage = personaFeedbackManager.guardReply(message, pluginBridge.instance?.config?.personaGuard, {
         userText: e?.msg || "",
         botNames: [e?.bot?.nickname, pluginBridge.instance?.config?.persona?.name]
       });
-      if (!guardedMessage) return false;
+      if (!guardedMessage) {
+        reservation.release();
+        return false;
+      }
       const result = await e.reply(guardedMessage);
       if (this.isReplySendFailed(result)) {
+        reservation.release();
         this.logWarn(`[图片进度提示] 发送失败: ${this.formatReplySendFailure(result)}`);
         return false;
       }
+      reservation.commit();
       this.logInfo(`[图片进度提示] 已发送 requester=${this.getRequesterDisplayName(e)}`);
       return true;
     } catch (error) {
+      reservation.release();
       this.logWarn(`[图片进度提示] 发送异常: ${error?.message || error}`);
       return false;
     }

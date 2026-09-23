@@ -1417,6 +1417,18 @@ export class DiceRulePackManager {
     return result
   }
 
+  /** 海豹扩展命令是顶级命令（.dd/.cook），不走「包名 命令」两段式；门禁用它识别这类消息 */
+  matchesSealExtCommand(groupId, message) {
+    const text = normalizeCommandText(message || "")
+    if (!text.startsWith(".")) return false
+    const cmdName = String(text.slice(1).split(/\s+/)[0] || "").toLowerCase()
+    if (!cmdName) return false
+    return this.getActivePacks(String(groupId || "private")).some(loaded =>
+      loaded.pack?.kind === "seal-ext" &&
+      (loaded.pack.commands || []).some(command => String(command.id).toLowerCase() === cmdName)
+    )
+  }
+
   findInvocation(groupId, message) {
     const text = normalizeCommandText(message)
     if (!text.startsWith(".")) return null
@@ -2702,7 +2714,7 @@ export class DiceRulePackManager {
         if (!preparedLog.changed) throw new Error(preparedLog.text)
         ruleState.session.logOwned = true
         ruleState.session.logFile = preparedLog.log?.file || ""
-        logMessage = "团录已开启，并与本次团务绑定。"
+        logMessage = "团录已开启，并与本次团务绑定；结束团务时会自动停止团录并提示导出。"
       }
       ruleState.session.active = true
       ruleState.session.campaignId = campaign.id
