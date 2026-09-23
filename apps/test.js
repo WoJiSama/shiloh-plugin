@@ -99,6 +99,7 @@ import { isExplicitAdminCollectionMentionRequest, resolveSingularOwnerMention } 
 import { resolveRecentBotImage, resolveRecentUserImage, findRecentBotImage } from "../utils/recentImageContinuation.js"
 import { recordDrawTextFallback, clearDrawFailureNote, takeDrawFailureNote, buildDrawFailureNoteMessage, isImageDeliveryToolName } from "../utils/drawFailureNote.js"
 import { shouldSkipNicknameAvatarReference } from "../utils/avatarReferencePolicy.js"
+import { installObservabilityLog } from "../utils/obsLog.js"
 import { createConfigStore, mergeDeepConfig } from "../core/config/configStore.js"
 import { classifyIntentWithModel } from "../core/intent/modelIntentClassifier.js"
 import { isAiConversationEnabled } from "../utils/aiConversationGate.js"
@@ -273,6 +274,11 @@ const FORWARD_CONTEXT_MAX_TEXT = 9000
 let activeChatLruTimer = null // 全局 24h LRU 扫描定时器，进程内单例
 let durableToolRecoveryStarted = false
 
+
+let sharedConfigStore = null
+let pluginInitialized = false
+let sharedState = null
+let mcpInitPromise = null
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -593,6 +599,11 @@ export class ExamplePlugin extends plugin {
     })
 
     this.initConfig()
+    // 观测日志:关键 info(工具调用/路由决策/模型耗时)tee 到 logs/shiloh-obs/
+    installObservabilityLog({
+      enabled: this.config?.observabilityLog?.enabled !== false,
+      retentionDays: this.config?.observabilityLog?.retentionDays
+    })
     const state = initializeSharedState(this.config)
 
     this.messageManager = state.messageManager
