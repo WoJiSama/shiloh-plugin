@@ -144,11 +144,18 @@ export async function savePixivSearchSession(e = {}, session = {}, { redis = glo
   localSessions.set(key, record)
   pruneLocalSessions()
   if (redis?.set) {
-    // set+pexpire 分离:node-redis/ioredis 对 SET 的可选参数写法不兼容,
-    // pexpire(key, ms) 两者都支持位置参数。
+    // 客户端兼容:node-redis v4 只认对象参数 {PX} 且命令是驼峰 pExpire;
+    // 位置参数 "PX" 会被静默忽略导致键永不过期。对象形式失败再退回分离设置。
     const ttlMs = Math.max(1000, PIXIV_SEARCH_SESSION_TTL_MS - (Date.now() - savedAt))
-    await redis.set(key, JSON.stringify(record)).catch(() => {})
-    await redis.pexpire?.(key, ttlMs).catch(() => {})
+    try {
+      await redis.set(key, JSON.stringify(record), { PX: ttlMs })
+    } catch {
+      await redis.set(key, JSON.stringify(record)).catch(() => {})
+      const expire = typeof redis.pExpire === "function" ? redis.pExpire.bind(redis)
+        : typeof redis.pexpire === "function" ? redis.pexpire.bind(redis)
+        : null
+      await expire?.(key, ttlMs).catch?.(() => {})
+    }
   }
   return record
 }
@@ -215,17 +222,32 @@ function escapeHtml(value = "") {
     .replaceAll('"', "&quot;")
 }
 
-function buildPixivListHtml(data = {}) {
-  const rows = data.items.map((item, offset) => `
+// Chromium 在 setContent 页面里默认禁止 file:// 子资源,缩略图必须以 data URI 内嵌
+async function imageDataUri(filePath = "") {
+  if (!filePath) return ""
+  try {
+    const buffer = await fs.promises.readFile(filePath)
+    const mime = buffer[0] === 0x89 && buffer[1] === 0x50 ? "image/png" : "image/jpeg"
+    return `data:${mime};base64,${buffer.toString("base64")}`
+  } catch {
+    return ""
+  }
+}
+
+async function buildPixivListHtml(data = {}) {
+  const rows = (await Promise.all(data.items.map(async (item, offset) => {
+    const dataUri = await imageDataUri(item.thumbPath)
+    return `
     <tr class="${item.xRestrict > 0 ? "restricted" : "ok"}">
       <td class="num">${offset + 1}</td>
-      <td class="thumb">${item.thumbPath ? `<img src="file://${item.thumbPath}" />` : "<div class='thumb ph'>无图</div>"}</td>
+      <td class="thumb">${dataUri ? `<img src="${dataUri}" />` : "<div class='thumb ph'>无图</div>"}</td>
       <td class="info">
         <div class="title">${escapeHtml(item.title)}</div>
         <div class="author">${escapeHtml(item.userName)}${item.pageCount > 1 ? ` · ${item.pageCount}张` : ""}${item.xRestrict > 0 ? " · R-18" : ""}</div>
       </td>
       <td class="id">${escapeHtml(item.id)}</td>
-    </tr>`).join("")
+    </tr>`
+  }))).join("")
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8" />
 <style>
@@ -294,7 +316,7 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
   const page = await browser.newPage()
   try {
     await page.setViewport({ width: 760, height: 900, deviceScaleFactor: 2 })
-    await page.setContent(buildPixivListHtml({ keyword: session.keyword, mode: session.mode, subtitle, items: withThumbs }), { waitUntil: "domcontentloaded", timeout: 30_000 })
+    await page.setContent(await buildPixivListHtml({ keyword: session.keyword, mode: session.mode, subtitle, items: withThumbs }), { waitUntil: "domcontentloaded", timeout: 30_000 })
     await page.evaluate(async () => {
       await Promise.all([...document.images].map(img => img.complete ? null : new Promise(resolve => { img.onload = img.onerror = resolve })))
     }).catch(() => {})

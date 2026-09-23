@@ -88,17 +88,22 @@ test("Pixiv 两个工具是终态工具:卡面/图片即回复,不进入 LLM 续
   assert.equal(TERMINAL_TOOL_NAMES.has("pixivDownloadTool"), true)
 })
 
-test("Redis 会话用 set+pexpire 写入,TTL 与 5 分钟窗口对齐", async () => {
-  const calls = []
-  const fakeRedis = {
-    set: async (key, value) => { calls.push(["set", key, value.length > 0]) },
-    pexpire: async (key, ms) => { calls.push(["pexpire", key, ms]) }
-  }
+test("Redis 会话 TTL 写入:对象形式 PX 优先,不支持时回退 pExpire", async () => {
   const e = { group_id: 424242 }
+  // 主路径:客户端支持 SET 的对象参数(node-redis v4 / ioredis v5)
+  const setOptions = []
+  const fakeRedis = { set: async (key, value, options) => { if (options) setOptions.push(options.PX) } }
   await savePixivSearchSession(e, { keyword: "wlop", items: [{ id: "1", title: "t" }] }, { redis: fakeRedis })
-  const setCall = calls.find(call => call[0] === "set")
-  const expireCall = calls.find(call => call[0] === "pexpire")
-  assert.ok(setCall, "应写入 redis")
-  assert.ok(expireCall, "应设置过期时间")
-  assert.ok(expireCall[2] > 290_000 && expireCall[2] <= 300_000, "TTL 应接近 5 分钟")
+  assert.equal(setOptions.length, 1, "应以对象形式写入 PX")
+  assert.ok(setOptions[0] > 290_000 && setOptions[0] <= 300_000, "TTL 应接近 5 分钟")
+
+  // 回退路径:对象参数抛错(老客户端),用驼峰 pExpire 单独设置
+  const expireCalls = []
+  const legacyRedis = {
+    set: async (key, value, options) => { if (options) throw new TypeError("options not supported") },
+    pExpire: async (key, ms) => { expireCalls.push([key, ms]) }
+  }
+  await savePixivSearchSession(e, { keyword: "wlop", items: [{ id: "1", title: "t" }] }, { redis: legacyRedis })
+  assert.equal(expireCalls.length, 1, "回退路径应调用 pExpire")
+  assert.ok(expireCalls[0][1] > 290_000 && expireCalls[0][1] <= 300_000)
 })
