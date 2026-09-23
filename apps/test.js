@@ -3194,7 +3194,7 @@ ${specialSignalsBlock}
         ? chatHistory.map(h => `[${h.role === 'bot' ? '机器人' : '用户'}] ${h.content}`).join('\n')
         : '(无历史记录)'
 
-      const response = await fetch(this.config.trackAiConfig.trackAiUrl, {
+      const response = await fetch(this.resolveChatCompletionUrl(this.config.trackAiConfig.trackAiUrl), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.trackAiConfig.trackAiApikey}`,
@@ -3304,7 +3304,7 @@ ${recentHistory || '(无)'}
 ---`
       }).join('\n\n')
 
-      const response = await fetch(this.config.trackAiConfig.trackAiUrl, {
+      const response = await fetch(this.resolveChatCompletionUrl(this.config.trackAiConfig.trackAiUrl), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.config.trackAiConfig.trackAiApikey}`,
