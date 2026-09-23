@@ -2,14 +2,14 @@
 // 从 apps/test.js 原样迁出(P2),行为不变;this 依赖以 host(插件实例)注入,
 // 类上保留同名委托方法。
 import { normalizeIntentText, isRealtimeInfoRequest, isExplicitSearchRequest, isExplicitToolIntent, isImageGenerationRequest, isImageAnalysisRequest, isImageCompositionEditRequest, hasToolCommitmentText, SEMANTIC_TOOL_INTENTS, SEMANTIC_TOOL_INTENT_MIN_CONFIDENCE, SEMANTIC_TOOL_INTENT_TIMEOUT_MS } from "../../core/intent/messageIntent.js"
-import { isExplicitAdminCollectionMentionRequest } from "../../utils/mentionTargets.js"
+import { isExplicitAdminCollectionMentionRequest } from "../../utils/mentionRoleRouting.js"
 import { selectToolIntentCandidates } from "../../utils/toolIntentManifests.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../../utils/toolSkills.js"
 import { fetchWithTimeout } from "../../utils/modelGateway.js"
 import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 import { joinIntentParts } from "../../utils/messageContext.js"
-import { resolvePersonaName } from "../../utils/personaTonePolicy.js"
-import { normalizeChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
+import { resolvePersonaName } from "../../utils/personaSource.js"
+import { resolveChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
 import { hasSemanticPlannerCandidate } from "../../utils/semanticToolPolicy.js"
 
 export function shouldUseSemanticToolIntent(host, e = {}, text = "", images = [], videos = [], options = {}) {
@@ -95,10 +95,6 @@ export function normalizeToolDecision(host, decision = {}, context = {}) {
       return { intent, toolName: "searchInformationTool", params: { query } }
     }
     return { intent: "chat" }
-  }
-
-export function resolveChatCompletionUrl(host, apiUrl = "") {
-    return normalizeChatCompletionUrl(apiUrl)
   }
 
 export function extractJsonObject(host, text = "") {
