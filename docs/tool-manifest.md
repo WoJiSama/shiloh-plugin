@@ -55,11 +55,18 @@ export const XXX_TOOL_MANIFEST = {
 
 ## 迁移状态
 
-- 已迁移:pixivSearchTool / pixivDownloadTool(参照实现,manifest 在
-  `utils/pixivIntent.js`)
-- 未迁移(仍在旧位置,行为不变):表情包/磁链/三角洲/提醒等;迁移时把对应
-  条目从 `TOOL_INTENT_MANIFESTS`/`TERMINAL_TOOL_NAMES` 字面量挪进各自的
-  manifest 即可,合并视图保证过渡期两套共存。
+全部内置工具已迁移(2026-09-23 第二批):
+
+- 21 个意图条目(触发词+披露+确定性解析器)整体迁至
+  `utils/builtinToolManifests.js`,行为逐字保真
+- 终态/后台终态集合不再有本地默认,注册中心模块加载时自注册内置清单,
+  任何导入入口都不存在注册时序问题;`resetToolManifestRegistry()`
+  恢复的也是完整内置集
+- `toolIntentManifests.js` 只保留跨工具策略:emoji 特判、候选消歧
+  (github/modrinth/mentionAdmins/pixiv-vs-磁链)、合并视图入口(556 行 → 113 行)
+
+新增工具的三步不变:轻量模块(或 builtinToolManifests.js)声明 manifest →
+加入 `BUILTIN_TOOL_MANIFESTS` → LocalToolRegistry 工厂列表加一行。
 
 ## 配套测试
 

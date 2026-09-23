@@ -19,16 +19,15 @@
  *   }
  */
 
-// legacy 静态默认:尚未迁移到 manifest 声明的老工具保持原行为
-const DEFAULT_TERMINAL_TOOLS = [
-  "sendLocalEmojiTool", "waitTool", "bananaTool", "googleImageEditTool",
-  "voiceTool", "deltaForceTool", "mentionAdminsTool", "mentionMembersTool", "torrentDownloadTool"
-]
-const DEFAULT_BACKGROUND_TERMINAL_TOOLS = ["bananaTool", "googleImageEditTool", "torrentDownloadTool"]
+import { BUILTIN_TOOL_MANIFESTS } from "./builtinToolManifests.js"
 
-const terminalTools = new Set(DEFAULT_TERMINAL_TOOLS)
-const backgroundTerminalTools = new Set(DEFAULT_BACKGROUND_TERMINAL_TOOLS)
+const terminalTools = new Set()
+const backgroundTerminalTools = new Set()
 const intentManifests = new Map()
+
+// 内置工具清单在模块加载时自注册:任何入口(messageIntent/工具/测试)导入本模块
+// 即获得完整的终态集合与意图清单,不存在注册时序问题。
+registerToolManifests(BUILTIN_TOOL_MANIFESTS)
 
 export function registerToolManifest(manifest = {}) {
   const name = String(manifest.name || "").trim()
@@ -73,11 +72,10 @@ export function getAllRegisteredIntentManifests() {
   return Object.fromEntries(intentManifests)
 }
 
-/** 测试辅助:清空注册,恢复 legacy 默认 */
+/** 测试辅助:清空注册,恢复内置清单 */
 export function resetToolManifestRegistry() {
   terminalTools.clear()
-  for (const name of DEFAULT_TERMINAL_TOOLS) terminalTools.add(name)
   backgroundTerminalTools.clear()
-  for (const name of DEFAULT_BACKGROUND_TERMINAL_TOOLS) backgroundTerminalTools.add(name)
   intentManifests.clear()
+  registerToolManifests(BUILTIN_TOOL_MANIFESTS)
 }

@@ -1,0 +1,590 @@
+import { getEmojiToolIntentPatterns } from "./emojiToolPolicy.js"
+import { buildExcelToolParams } from "./excelRequestPolicy.js"
+import { parseModrinthRequestOptions } from "./modrinth.js"
+import { extractGroupKnowledgeForgetTarget } from "./groupKnowledgeForgetPolicy.js"
+import { extractValidBtihMagnetUri } from "./torrentDownload.js"
+import { PIXIV_DOWNLOAD_TOOL_MANIFEST, PIXIV_SEARCH_TOOL_MANIFEST } from "./pixivIntent.js"
+
+// 确定性快路解析器(措辞无歧义才提供;搜索类交给语义规划器的低模型)
+function resolveTorrentDownloadIntent(text) {
+  const magnet = extractValidBtihMagnetUri(text)
+  if (magnet) return { magnet }
+  const selectionText = String(text || "").match(/(?:下载|下|选择|选)\s*([\s\S]{1,80})$/i)?.[1] || ""
+  const indexes = [...selectionText.matchAll(/(?:^|[,，、\s])(?:第\s*)?(\d+)(?:个|项|号)?/g)]
+    .map(match => Number(match[1]))
+    .filter(value => Number.isSafeInteger(value) && value >= 1)
+  return indexes.length ? { selection: indexes } : null
+}
+
+function resolveForgetKnowledgeIntent(text) {
+  const memory = extractGroupKnowledgeForgetTarget(text)
+  return memory ? { memory } : null
+}
+
+function resolveExcelIntent(text, context) {
+  return buildExcelToolParams(text, { hasExcelContext: context.hasExcelContext === true })
+}
+
+function resolveGithubRepoIntent(text) {
+  const match = String(text || "").match(/https?:\/\/github\.com\/[^\/\s]+\/[^\/\s]+/i)
+  return match ? { repoUrl: match[0] } : null
+}
+
+function resolveWebParserIntent(text) {
+  const urls = String(text || "").match(/https?:\/\/[^\s<>"']+/gi) || []
+  if (urls.length !== 1) return null
+  const url = urls[0].replace(/[，。！？、；：,.!?;:]+$/u, "")
+  return /(?:解析|总结|读取|看看|看下|提取|网页|页面|链接)/i.test(text) ? { url } : null
+}
+
+/**
+ * 内置工具的 manifest 单一声明点(从 toolIntentManifests 旧表整体迁移,行为逐字保真)。
+ * 终态/后台终态从 messageIntent 旧集合同步;确定性解析器从旧
+ * DETERMINISTIC_TOOL_RESOLVERS 同步。新增工具:在对应轻量模块声明 manifest
+ * 后加入 BUILTIN_TOOL_MANIFESTS,并在 LocalToolRegistry 的工厂列表注册。
+ */
+
+export const DELTA_FORCE_TOOL_MANIFEST = {
+  name: "deltaForceTool",
+  terminal: true,
+
+    triggers: [
+      /三角洲/,
+      /改枪码|改枪方案|方案码|枪码/,
+      /特勤处|制造利润|利润排行/,
+      /价格历史|历史价格|价格走势|折线图|趋势图/,
+      /今日密码|每日密码/
+    ],
+    disclosure: [
+      "【deltaForceTool 详细用法】",
+      "用途：查询三角洲行动相关接口数据。",
+      "不要被“今天的/最新的/发一下”干扰，先看用户真正要查的子功能。",
+      "operation 选择规则：",
+      "- 改枪码、改枪方案、方案码、枪码 -> operation=solution_list",
+      "- 价格历史、历史价格、价格走势、价格曲线、折线图、趋势图 -> operation=price_history",
+      "- 物品价值、价格、多少钱、值多少 -> operation=object_value",
+      "- 特勤处利润、制造利润 -> operation=place_profit",
+      "- 利润排行、利润榜 -> operation=profit_rank",
+      "- 今日密码、每日密码、口令 -> operation=daily_keyword",
+      "keyword 抽取规则：",
+      "- “我要和277有关的”“关于 H70 的”“查 M4A1 相关”里的 277/H70/M4A1 是 keyword。",
+      "- “名字有 非洲 的物品价格”“名称包含 非洲 的物品价值”里的 非洲 是 keyword；不要把“名字有/物品/价格”放进 keyword。",
+      "- 对 solution_list，keyword 可选但有关键词就必须填写。",
+      "- 对 object_value，keyword 必填；缺关键词时不要乱填，应选择 chat 追问。",
+      "- 对 price_history，keyword 必填；days 默认 30；limit 表示要给几个匹配物品画图，默认 5。",
+      "等价例子：",
+      "- “希洛发一下今天的三角洲的改枪码，我要和277有关的” -> {\"operation\":\"solution_list\",\"keyword\":\"277\"}",
+      "- “三角洲 H70 现在多少钱” -> {\"operation\":\"object_value\",\"keyword\":\"H70\"}",
+      "- “三角洲显卡最近价格走势折线图” -> {\"operation\":\"price_history\",\"keyword\":\"显卡\"}",
+      "- “希洛告诉我今天的三角洲的名字有 非洲 的物品的价格” -> {\"operation\":\"object_value\",\"keyword\":\"非洲\"}",
+      "- “看下三角洲工作台利润排行前5” -> {\"operation\":\"profit_rank\",\"place\":\"工作台\",\"limit\":5}",
+      "- “三角洲今日密码” -> {\"operation\":\"daily_keyword\"}"
+    ].join("\n")
+}
+
+
+export const REMINDER_TOOL_MANIFEST = {
+  name: "reminderTool",
+
+    triggers: [
+      /提醒我|叫我|到点|定个?闹钟|设个?提醒|别忘了|待会儿|过\d+秒|过\d+分钟|过\d+小时|\d+点.*提醒/
+    ],
+    disclosure: [
+      "【reminderTool 详细用法】",
+      "用途：创建、查看、取消定时提醒。",
+      "operation/action 选择规则：",
+      "- 用户说“提醒我/叫我/到点告诉我/定个提醒” -> action=create",
+      "- 用户说“我的提醒/提醒列表/有哪些提醒” -> action=list",
+      "- 用户说“取消提醒/删掉提醒” -> action=cancel；没有 reminder_id 时选 chat 追问。",
+      "时间抽取规则：",
+      "- 相对时间必须根据当前北京时间换算成 ISO 8601，并带 +08:00。",
+      "- “10分钟后提醒我喝水” -> reminder_time 为当前时间 +10 分钟，content=喝水。",
+      "- reminder_message 要像群友自然提醒，不要写成正式系统通知。",
+      "等价例子：",
+      "- “半小时后提醒我收菜” -> {\"action\":\"create\",\"content\":\"收菜\",\"reminder_message\":\"该收菜啦\",\"reminder_time\":\"按当前北京时间+30分钟\"}",
+      "- “看看我的提醒” -> {\"action\":\"list\"}"
+    ].join("\n")
+}
+
+
+export const SEARCH_MUSIC_TOOL_MANIFEST = {
+  name: "searchMusicTool",
+
+    triggers: [
+      /点歌|放首|听歌|来首|唱一首|播放.+歌|想听|随机.*歌/
+    ],
+    disclosure: [
+      "【searchMusicTool 详细用法】",
+      "用途：搜索并发送 QQ 音乐卡片。",
+      "keyword 抽取规则：",
+      "- 指定歌曲时 keyword=歌曲名或 歌曲名+歌手。",
+      "- 只给歌手名或“来首周杰伦的歌”时 isArtistOnly=true，keyword=歌手名。",
+      "- 不要把“放首/点歌/想听”等动词放入 keyword。",
+      "等价例子：",
+      "- “希洛点一首晴天” -> {\"keyword\":\"晴天\",\"isArtistOnly\":false}",
+      "- “来首周杰伦的” -> {\"keyword\":\"周杰伦\",\"isArtistOnly\":true}"
+    ].join("\n")
+}
+
+
+export const VOICE_TOOL_MANIFEST = {
+  name: "voiceTool",
+  terminal: true,
+
+    triggers: [
+      /语音|发条语音|用语音|念出来|读出来|说给我听|录一段/
+    ],
+    disclosure: [
+      "【voiceTool 详细用法】",
+      "用途：发送短 QQ 语音。",
+      "调用边界：",
+      "- 只有用户明确要求语音/念出来/读出来时调用。",
+      "- 不要用它读长文、代码、列表、搜索结果或工具结果。",
+      "参数规则：",
+      "- text 必须是短句、纯口播文字，不要 Markdown、代码或动作描写。",
+      "- style 可选 normal/shy/tease/serious/sleepy；不确定就省略。",
+      "等价例子：",
+      "- “希洛用语音说晚安” -> {\"text\":\"晚安，早点睡哦\",\"style\":\"sleepy\"}"
+    ].join("\n")
+}
+
+
+export const SEND_LOCAL_EMOJI_TOOL_MANIFEST = {
+  name: "sendLocalEmojiTool",
+  terminal: true,
+
+    triggers: getEmojiToolIntentPatterns(),
+    disclosure: [
+      "【sendLocalEmojiTool 详细用法】",
+      "用途：从本地表情包库挑一张合适的表情包发送。",
+      "它是主对话的一种回复形态：不调用=纯文字；不填配文=纯表情；leadText 在表情前说，followUpText 在表情后补。请先规划整轮节奏，不要机械地每轮调用。",
+      "调用边界：",
+      "- 用户明确要表情包/斗图/发个表情时优先调用。",
+      "- 普通轻松闲聊中，如果表情比文字更自然，可以主动调用。",
+      "- 表情已经足够表达当前情绪时，只发表情包，不要填写任何配文。",
+      "- 需要先抛一句再甩图时填 leadText；表情之后仍有事实、行动或转折必须补充时填 followUpText。",
+      "- leadText 和 followUpText 默认只选一个；只有两段含义不同且表情放在中间明显更自然时才两边都填。",
+      "- 严肃问答、技术排查、长说明、工具结果汇报、群管理处理时不要调用。",
+      "参数规则：",
+      "- tags 按相关度填写 1-5 个真实情绪标签，第一个是主情绪；例如无语、震惊、笑死、吐槽、尴尬、疲惫、委屈、安慰。",
+      "- useCases 可补 1-4 个真实场景；例如无言以对、看到离谱、接梗吐槽、群友翻车、场面尴尬、安慰对方。",
+      "- query 只补充标签未覆盖的短关键词，不要写完整场景长句。",
+      "- leadText/followUpText 都不超过 80 字，不要把一个句子的主谓宾拆到表情两侧。",
+      "- 一次只发一张，别连发刷屏。",
+      "等价例子：",
+      "- “来个无语表情包” -> {\"tags\":[\"无语\",\"震惊\"],\"useCases\":[\"无言以对\",\"看到离谱\"]}",
+      "- 群友翻车时只想甩图 -> {\"tags\":[\"笑死\",\"吐槽\"],\"useCases\":[\"群友翻车\",\"接梗吐槽\"]}",
+      "- 先吐槽再甩图 -> {\"tags\":[\"无语\",\"吐槽\"],\"leadText\":\"你又来了\"}",
+      "- 甩图后补充到达信息 -> {\"tags\":[\"认怂\",\"无奈\"],\"useCases\":[\"认怂求饶\"],\"followUpText\":\"我马上到\"}"
+    ].join("\n")
+}
+
+
+export const MENTION_MEMBERS_TOOL_MANIFEST = {
+  name: "mentionMembersTool",
+  terminal: true,
+
+    triggers: [
+      /(?:帮(?:我|忙)?|麻烦|请|可以|能不能)?[^\n]{0,40}(?:艾特|@|通知|喊(?:一下|人)?|叫(?:一下|人)?)/i
+    ],
+    disclosure: [
+      "【mentionMembersTool 详细用法】",
+      "用途：在当前群里真实艾特指定成员并发送通知。",
+      "调用边界：",
+      "- 只在用户明确要求通知/@具体成员，或已教会的群工作流明确匹配且当前用户要求执行时调用。",
+      "- targets 优先填可靠上下文给出的 QQ 号；没有明确对象时不要猜。",
+      "- 不要把普通讨论当作通知命令。",
+      "等价例子：",
+      "- ‘有人要挂团，帮我艾特’ -> 按群工作流提供的 targets 通知",
+      "- ‘通知 @小明和@小红开会’ -> targets=[小明,小红], message=开会"
+    ].join("\n")
+}
+
+
+export const MENTION_ADMINS_TOOL_MANIFEST = {
+  name: "mentionAdminsTool",
+  terminal: true,
+
+    triggers: [
+      /(?:艾特|@|通知|喊(?:一下|人)?|叫(?:一下|人)?).{0,32}(?:(?:所有|全部|全体).{0,8}(?:管理员|管理|群管)|(?:管理员|管理|群管)(?:们|全体)|(?:管理们|群管们)|(?:除了?|除去).{0,40}(?:管理员|管理|群管))/iu
+    ],
+    disclosure: [
+      "【mentionAdminsTool 详细用法】",
+      "用途：在当前群真实艾特一个管理员集合并发送通知。",
+      "调用边界：",
+      "- 只有‘所有管理员’‘管理员们’‘管理们’‘全体群管’或明确排除一部分管理员等集合措辞才能调用。",
+      "- ‘群主’是唯一角色，绝不能用此工具；应由 mentionMembersTool 精确艾特当前群主。",
+      "- message 只保留要传达的通知内容；includeOwner 仅在用户明确说管理员集合还要包含群主时为 true。",
+      "等价例子：",
+      "- ‘艾特所有管理员说有人要挂团’ -> {\"message\":\"有人要挂团\",\"includeOwner\":false}",
+      "- ‘通知全体群管和群主开会’ -> {\"message\":\"开会\",\"includeOwner\":true}"
+    ].join("\n")
+}
+
+
+export const FORGET_GROUP_KNOWLEDGE_TOOL_MANIFEST = {
+  name: "forgetGroupKnowledgeTool",
+  deterministicResolver: resolveForgetKnowledgeIntent,
+
+    triggers: [
+      /(?:忘(?:掉|记)?|删(?:掉|除)?|清除|移除).{0,48}(?:记忆|群知识|记住|教会|定义|我的|我之前)/u,
+      /(?:我的|我之前|群里的?).{0,48}(?:记忆|群知识|记住|教会|定义)?.{0,24}(?:忘(?:掉|记)?|删(?:掉|除)?|清除|移除)/u
+    ],
+    disclosure: [
+      "【forgetGroupKnowledgeTool 详细用法】",
+      "用途：删除当前群由语义教学提交的某一条群知识、别名或通知规则。",
+      "调用边界：",
+      "- 只有用户明确说忘掉、删除、清除自己之前教会的群知识时调用。",
+      "- memory 填用户要忘掉的称呼；‘我的星怒’里的‘我的’必须保留。",
+      "- 普通成员只删除自己创建的唯一匹配项；群主、管理员或主人可处理其他人的精确条目。找不到或多条候选时不会删除。",
+      "- 不能用于聊天记录、群文件本体、其他人的记忆或泛泛的‘忘了吧’。",
+      "等价例子：",
+      "- ‘忘掉我的星怒’ -> {\"memory\":\"我的星怒\"}",
+      "- ‘把我之前教你的地图删掉’ -> {\"memory\":\"地图\"}"
+    ].join("\n")
+}
+
+
+export const EMOJI_SEARCH_TOOL_MANIFEST = {
+  name: "emojiSearchTool",
+
+    triggers: [
+      /搜.*表情包|网上.*表情包|堆糖.*表情/
+    ],
+    disclosure: [
+      "【emojiSearchTool 详细用法】",
+      "用途：从远程网站按关键词搜索表情包。只有用户明确要网上搜索表情包时使用；普通发图优先 sendLocalEmojiTool。",
+      "参数规则：",
+      "- keyword 是表情主题，如 猫猫、无语、开心、抱抱。",
+      "- count 默认 1；范围 1-10。"
+    ].join("\n")
+}
+
+
+export const SEARCH_INFORMATION_TOOL_MANIFEST = {
+  name: "searchInformationTool",
+
+    triggers: [
+      /搜索|查一下|搜一下|最新|今天.*新闻|现在.*(?:价格|天气|政策|消息)|实时|资料|百科/
+    ],
+    disclosure: [
+      "【searchInformationTool 详细用法】",
+      "用途：需要实时信息、外部资料、新闻、政策、当前价格、搜索结果时调用。",
+      "调用边界：",
+      "- 普通知识、闲聊、已有上下文能回答时不要调用。",
+      "- 用户给了具体网页 URL 并要解析网页内容，优先 webParserTool。",
+      "- 用户给了 GitHub 仓库链接并问仓库信息，优先 githubRepoTool。",
+      "参数规则：",
+      "- query 写完整搜索词，保留关键限定词，如日期、地区、产品名。",
+      "等价例子：",
+      "- “查一下今天 OpenAI 有什么新闻” -> {\"query\":\"今天 OpenAI 新闻\"}"
+    ].join("\n")
+}
+
+
+export const WEB_PARSER_TOOL_MANIFEST = {
+  name: "webParserTool",
+  deterministicResolver: resolveWebParserIntent,
+
+    triggers: [
+      /https?:\/\/\S+|www\.\S+|解析.*网页|总结.*链接|看看.*链接|这个网址/
+    ],
+    disclosure: [
+      "【webParserTool 详细用法】",
+      "用途：解析用户给出的网页链接内容并提取关键信息。",
+      "调用边界：",
+      "- 用户只给搜索需求但没有 URL 时不要调用，改用 searchInformationTool。",
+      "- GitHub 仓库 URL 且用户问仓库信息时优先 githubRepoTool。",
+      "参数规则：",
+      "- url 只填写单个网页 URL；如果用户给多个链接，优先处理最相关的一个或选 chat 追问。",
+      "等价例子：",
+      "- “帮我总结 https://example.com 这个页面” -> {\"url\":\"https://example.com\"}"
+    ].join("\n")
+}
+
+
+export const GITHUB_REPO_TOOL_MANIFEST = {
+  name: "githubRepoTool",
+  deterministicResolver: resolveGithubRepoIntent,
+
+    triggers: [
+      /github\.com\/[^/\s]+\/[^/\s]+|GitHub.*仓库|仓库.*star|repo/
+    ],
+    disclosure: [
+      "【githubRepoTool 详细用法】",
+      "用途：获取 GitHub 仓库基本信息、提交、issue、PR、贡献者等。",
+      "调用边界：",
+      "- 只有明确是 GitHub 仓库 URL 或询问仓库信息时调用。",
+      "- 普通网页链接不要调用，改用 webParserTool。",
+      "参数规则：",
+      "- repoUrl 必须是 GitHub 仓库 URL，不要填 issue、release、文件路径以外的普通网页。",
+      "等价例子：",
+      "- “看看 https://github.com/user/repo 这个仓库怎么样” -> {\"repoUrl\":\"https://github.com/user/repo\"}"
+    ].join("\n")
+}
+
+
+export const AI_MIND_MAP_TOOL_MANIFEST = {
+  name: "aiMindMapTool",
+
+    triggers: [
+      /思维导图|脑图|mind ?map|整理成导图|生成导图|知识结构图/
+    ],
+    disclosure: [
+      "【aiMindMapTool 详细用法】",
+      "用途：把主题、材料或说明整理成 Markmap 思维导图图片。",
+      "参数规则：",
+      "- prompt 写要整理成导图的主题和内容。",
+      "- 不确定尺寸时不要填 width/height。",
+      "- 用户只是要普通总结/列表，不要调用；明确要导图/脑图才调用。",
+      "等价例子：",
+      "- “把这段 Java 学习路线做成思维导图” -> {\"prompt\":\"Java 学习路线...\"}"
+    ].join("\n")
+}
+
+
+export const EXCEL_WORKBOOK_TOOL_MANIFEST = {
+  name: "excelWorkbookTool",
+  deterministicResolver: resolveExcelIntent,
+
+    triggers: [
+      /Excel|\.xlsx\b|\.xlsm\b|工作簿|工作表|sheet|tab页|单元格/i,
+      /(?:表格|文件).{0,24}\b[A-Z]{1,3}[1-9]\d{0,6}\b/i,
+      /(?:查|看|读|告诉我).{0,20}\b[A-Z]{1,3}[1-9]\d{0,6}\b/i,
+      /(?:附近|周围|相邻).{0,20}(?:单元格|格子)|(?:单元格|格子).{0,30}(?:开头|结尾|包含|等于)/i
+    ],
+    disclosure: [
+      "【excelWorkbookTool 详细用法】",
+      "用途：读取用户当前、引用、最近上传或当前群文件仓库中的 .xlsx/.xlsm 工作簿；查询 tab、单元格、区域或搜索内容。",
+      "操作选择：",
+      "- 问群文件里有哪些 Excel/列出群文件表格 -> operation=list_group_excels，可用 query 过滤文件名",
+      "- 问有哪些 tab/sheet/工作表 -> operation=list_sheets",
+      "- 问某个格子（如 Sheet1 的 B7） -> operation=read_cell，sheetName=Sheet1，cell=B7",
+      "- 问一小块区域 -> operation=read_range，range=A1:D10",
+      "- 在某个 tab 里找文字、数字或公式 -> operation=find，query=关键词，可填 sheetName",
+      "- 用户说‘开头是/结尾是/完全等于/包含’时，把语义分别映射为 matchMode=starts_with/ends_with/exact/contains。不要要求用户改成固定格式。",
+      "- 用户说‘某个单元格附近/周围’时，从当前对话和上一轮 Excel 结果理解中心格，使用 operation=find + anchorCell；rowRadius/columnRadius 控制邻域。若用户明确给区域则改填 range。",
+      "- 用户只说‘附近’但上下文没有任何中心单元格时，不要编一个地址；省略 anchorCell，搜索指定 sheet 或整个工作簿。",
+      "- sheetName 既可填名称，也可填从 1 开始的序号；用户说第二个 tab 时直接填 sheetName=2，不要先 list_sheets。",
+      "- 用户问“与某概念相关”且原词可能不会字面出现时，可填写 relatedTerms；工具会区分原词精确命中与关联词命中。",
+      "结果规则：",
+      "- read_cell 会返回精确公式、工作簿保存的计算值和显示值；最终回复必须原样列出公式和值，禁止自行改写公式或猜计算结果。",
+      "- 用户上传/引用了文件时不要填写 fileUrl；工具会自动找文件。用户说“群文件里的预算.xlsx”时填写 fileName=预算.xlsx；同名时再填 folderPath。",
+      "- 只有用户明确给 HTTP/HTTPS Excel 链接时才填写 fileUrl。",
+      "- 如果用户既没说 sheet 名也没说序号，且工作簿有多个 tab，才先 list_sheets；明确说第几个时直接用序号。",
+      "- 旧版 .xls 不支持，提示另存为 .xlsx。",
+      "等价例子：",
+      "- “查一下预算表这个 tab 的 C12，公式和值都给我” -> {\"operation\":\"read_cell\",\"sheetName\":\"预算表\",\"cell\":\"C12\"}",
+      "- “在明细这个 sheet 里找订单 20260715” -> {\"operation\":\"find\",\"sheetName\":\"明细\",\"query\":\"20260715\",\"searchIn\":\"all\"}",
+      "- “这个 Excel 有哪些 tab” -> {\"operation\":\"list_sheets\"}",
+      "- “群文件里有哪些 Excel” -> {\"operation\":\"list_group_excels\"}",
+      "- “第二个 tab 里找跟 .st 有关的内容” -> {\"operation\":\"find\",\"sheetName\":\"2\",\"query\":\".st\",\"relatedTerms\":[\"属性\",\"技能\",\"STR\",\"CON\",\"DEX\",\"POW\",\"EDU\",\"SAN\"]}",
+      "- 上一轮刚查过 B40，用户接着说‘看附近有没有一个是尚虹叙开头的，告诉我单元格’ -> {\"operation\":\"find\",\"query\":\"尚虹叙\",\"matchMode\":\"starts_with\",\"anchorCell\":\"B40\",\"rowRadius\":10,\"columnRadius\":5}",
+      "- “查群文件预算.xlsx里预算表的 C12” -> {\"operation\":\"read_cell\",\"fileName\":\"预算.xlsx\",\"sheetName\":\"预算表\",\"cell\":\"C12\"}"
+    ].join("\n")
+}
+
+
+export const MODRINTH_TOOL_MANIFEST = {
+  name: "modrinthTool",
+  deterministicResolver: parseModrinthRequestOptions,
+
+    triggers: [
+      /(?:^|[\s（(，,])Modrinth(?=.{0,36}(?:模组|mods?|排行|排名|前\s*\d+|热门|下载量|关注|版本|Fabric|Forge|NeoForge|Quilt))/i,
+      /(?:查|看|搜|告诉我|给我说|发我).{0,6}Modrinth(?=.{0,36}(?:模组|mods?|排行|排名|前\s*\d+|热门|下载量|关注|版本|Fabric|Forge|NeoForge|Quilt))/i,
+      /(?:MC|Minecraft|我的世界).{0,24}(?:模组|mod).{0,24}(?:排行|排名|前\s*\d+|热门|下载量|关注)/i,
+      /(?:MC|Minecraft|我的世界).{0,24}(?:榜|排行|排名|前\s*\d+|热门|下载量|关注).{0,24}(?:模组|mod)/i,
+      /(?:名字|名称).{0,24}(?:带有|包含|含有|有).{0,48}(?:MC|Minecraft).{0,8}(?:模组|mod)/i,
+      /(?:模组|mod).{0,24}(?:排行|排名|前\s*\d+|热门|下载量|关注).{0,24}(?:MC|Minecraft|我的世界|Fabric|Forge|NeoForge|Quilt)/i
+    ],
+    disclosure: [
+      "【modrinthTool 详细用法】",
+      "用途：查询 Modrinth Minecraft 模组公开排名和英文原始简介。",
+      "参数规则：",
+      "- 默认 sort=downloads、limit=5。用户说下载量最高/热门前几 -> sort=downloads；关注最多 -> follows；最新发布 -> newest；最近更新 -> updated；带关键词找模组 -> relevance + query。",
+      "- 用户给出 MC 版本时填写 gameVersion，例如 1.21.1；给出 Fabric/Forge/NeoForge/Quilt 时填写 loader。",
+      "- 用户要求优化、冒险、装饰等分类时填写 Modrinth category slug，例如 optimization/adventure/decoration。",
+      "- 工具返回的是英文官方简介。最终每个项目必须同时展示英文简介和‘中文翻译（希洛）’，中文只能忠实翻译英文，不能自行补充功能或兼容结论。",
+      "- 只发项目页，绝不自动下载或发送 jar 文件。",
+      "等价例子：",
+      "- ‘查一下 Modrinth 1.21.1 Fabric 下载量前五的优化模组’ -> {\"sort\":\"downloads\",\"limit\":5,\"gameVersion\":\"1.21.1\",\"loader\":\"fabric\",\"category\":\"optimization\"}",
+      "- ‘Modrinth 最近更新的机械模组前 3 个’ -> {\"sort\":\"updated\",\"limit\":3,\"query\":\"technology\"}"
+    ].join("\n")
+}
+
+
+export const TORRENT_DOWNLOAD_TOOL_MANIFEST = {
+  name: "torrentDownloadTool",
+  terminal: true,
+  background: true,
+  deterministicResolver: resolveTorrentDownloadIntent,
+
+    triggers: [
+      /magnet:\?xt=urn:btih:/i,
+      /(?:下载|下下来|搬运|发我|传我).{0,48}(?:磁链|磁力链接)/i,
+      /(?:下载|下|选择|选)\s*(?:第\s*)?\d+(?:\s*(?:,|，|、)\s*(?:第\s*)?\d+)*/i
+    ],
+    disclosure: [
+      "【torrentDownloadTool 详细用法】",
+      "用途：下载用户当前消息中明确提供的 BT magnet 磁链，将符合限制的内容打成一个 ZIP 上传，并发送目录与压缩包说明的合并转发。若完整磁链超限，发起人可从工具列出的文件清单中选择部分文件。",
+      "调用边界：",
+      "- 只接受当前用户原样给出的 magnet:?xt=urn:btih: 磁链；HTTP 链接、种子网址、口头 hash 或猜测内容都不能用。",
+      "- 群里出现有效 BTIH 磁链时会自动处理，行为与视频分享一致；无效磁链不调用。",
+      "- 工具会先读取元数据并强制检查总大小、单文件大小、文件数和 ZIP 上传上限。超限时正文下载不会开始；无元数据、下载超时、打包或发送失败时不要声称已下载。",
+      "参数规则：",
+      "- magnet 逐字复制用户当前消息中的完整 magnet URI；不得缩短、改写或替换 tracker 参数。",
+      "- 只有当前群内同一发起人在 30 分钟内收到过文件清单时，才可传 selection（1 起始编号数组）；例如用户说‘下载 1,3’则传 {\"selection\":[1,3]}。没有清单时不猜文件。",
+      "等价例子：",
+      "- ‘帮我下载 magnet:?xt=urn:btih:AF4B684892182408E4AE9DF0C8FFE9E49CCBF171’ -> {\"magnet\":\"用户原样磁链\"}",
+      "- 已收到清单后：‘下载第2个’ -> {\"selection\":[2]}"
+    ].join("\n")
+}
+
+
+export const TEXT_IMAGE_TOOL_MANIFEST = {
+  name: "textImageTool",
+
+    triggers: [
+      /转成图片|生成图片版|长图|发成图|做成图|代码.*图片|Markdown.*图片|避免刷屏/
+    ],
+    disclosure: [
+      "【textImageTool 详细用法】",
+      "用途：把文字、Markdown、代码、长篇讲解渲染成图片发送。",
+      "调用边界：",
+      "- 用户要求写代码、Markdown 文档、长篇结构化内容时，适合调用。",
+      "- 普通短回复不要调用。",
+      "参数规则：",
+      "- text 放完整要渲染的内容。",
+      "- template: 短聊天气泡用 chat；长文、讲解、代码、Markdown 用 document。",
+      "等价例子：",
+      "- “把这段代码发成图片” -> {\"text\":\"完整代码\",\"template\":\"document\"}"
+    ].join("\n")
+}
+
+
+export const POKE_TOOL_MANIFEST = {
+  name: "pokeTool",
+
+    triggers: [
+      /戳一戳|戳戳|戳一下|poke/
+    ],
+    disclosure: [
+      "【pokeTool 详细用法】",
+      "用途：对群成员发送戳一戳。",
+      "参数规则：",
+      "- target 是 QQ 号、群名片或昵称数组；被 @ 时优先用被 @ 人。",
+      "- times 默认 1，最大 10。",
+      "- 用户说随机戳人时 random=true。",
+      "等价例子：",
+      "- “戳一下小明” -> {\"target\":[\"小明\"],\"times\":1}"
+    ].join("\n")
+}
+
+
+export const LIKE_TOOL_MANIFEST = {
+  name: "likeTool",
+
+    triggers: [
+      /点赞|给.*赞|赞一下|QQ赞|名片赞/
+    ],
+    disclosure: [
+      "【likeTool 详细用法】",
+      "用途：给 QQ 用户点赞。",
+      "参数规则：",
+      "- qq 留空时默认给发送者或 @ 对象点赞。",
+      "- count 默认 10，最多 20。",
+      "- 随机点赞时 random=true。",
+      "等价例子：",
+      "- “给我点20个赞” -> {\"count\":20}"
+    ].join("\n")
+}
+
+
+export const CHANGE_CARD_TOOL_MANIFEST = {
+  name: "changeCardTool",
+
+    triggers: [
+      /改群名片|改名片|改昵称|群昵称|把.*名字改成|改.*群名|群名片.{0,12}(?:改成|改为|换成|换为)/
+    ],
+    disclosure: [
+      "【changeCardTool 详细用法】",
+      "用途：修改群名片/群昵称。",
+      "参数规则：",
+      "- target 是目标用户；“把我改成X”时 target 填发送者/我。",
+      "- cardName 是要改成的新群名片。",
+      "- senderRole 按当前发送者身份 owner/admin/member 填写。",
+      "等价例子：",
+      "- “把我群名片改成小希” -> {\"target\":\"我\",\"cardName\":\"小希\",\"senderRole\":\"按发送者身份\"}"
+    ].join("\n")
+}
+
+
+export const JINYAN_TOOL_MANIFEST = {
+  name: "jinyanTool",
+
+    triggers: [
+      /禁言|闭嘴|解除禁言|解禁|mute|全体禁言/
+    ],
+    disclosure: [
+      "【jinyanTool 详细用法】",
+      "用途：群禁言/解禁，属于权限敏感操作。",
+      "调用边界：",
+      "- 用户明确要求禁言/解禁，或明显违规且需要自主处理时才调用。",
+      "- 不要因为普通玩笑、争论或轻微情绪就自主禁言。",
+      "参数规则：",
+      "- target 是目标 QQ/昵称数组；不要把时间词混进 target。",
+      "- time 单位秒；解除禁言 time=0。",
+      "- 被用户要求执行时 selfDecision=false；机器人自主处理违规时 selfDecision=true。",
+      "- 全体禁言必须有明确请求和 confirm=true。",
+      "等价例子：",
+      "- “禁言小明一分钟” -> {\"target\":[\"小明\"],\"time\":60,\"selfDecision\":false}",
+      "- “解除小明禁言” -> {\"target\":[\"小明\"],\"time\":0,\"selfDecision\":false}"
+    ].join("\n")
+}
+
+
+export const BANANA_TOOL_MANIFEST = {
+  name: "bananaTool",
+  terminal: true,
+  background: true
+}
+
+export const GOOGLE_IMAGE_EDIT_TOOL_MANIFEST = {
+  name: "googleImageEditTool",
+  terminal: true,
+  background: true
+}
+
+export const WAIT_TOOL_MANIFEST = {
+  name: "waitTool",
+  terminal: true
+}
+
+export const BUILTIN_TOOL_MANIFESTS = [
+  DELTA_FORCE_TOOL_MANIFEST,
+  REMINDER_TOOL_MANIFEST,
+  SEARCH_MUSIC_TOOL_MANIFEST,
+  VOICE_TOOL_MANIFEST,
+  SEND_LOCAL_EMOJI_TOOL_MANIFEST,
+  MENTION_MEMBERS_TOOL_MANIFEST,
+  MENTION_ADMINS_TOOL_MANIFEST,
+  FORGET_GROUP_KNOWLEDGE_TOOL_MANIFEST,
+  EMOJI_SEARCH_TOOL_MANIFEST,
+  SEARCH_INFORMATION_TOOL_MANIFEST,
+  WEB_PARSER_TOOL_MANIFEST,
+  GITHUB_REPO_TOOL_MANIFEST,
+  AI_MIND_MAP_TOOL_MANIFEST,
+  EXCEL_WORKBOOK_TOOL_MANIFEST,
+  MODRINTH_TOOL_MANIFEST,
+  TORRENT_DOWNLOAD_TOOL_MANIFEST,
+  TEXT_IMAGE_TOOL_MANIFEST,
+  POKE_TOOL_MANIFEST,
+  LIKE_TOOL_MANIFEST,
+  CHANGE_CARD_TOOL_MANIFEST,
+  JINYAN_TOOL_MANIFEST,
+  BANANA_TOOL_MANIFEST,
+  GOOGLE_IMAGE_EDIT_TOOL_MANIFEST,
+  WAIT_TOOL_MANIFEST,
+  PIXIV_SEARCH_TOOL_MANIFEST,
+  PIXIV_DOWNLOAD_TOOL_MANIFEST
+]
