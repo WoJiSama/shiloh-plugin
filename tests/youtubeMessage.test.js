@@ -71,6 +71,26 @@ test("keeps a concrete metadata failure reason when yt-dlp times out", async () 
   assert.equal(card.metadata_failure_reason, "YouTube 元数据请求超时")
 })
 
+test("outbox 预刷新与消息富化并发时只跑一次 yt-dlp", async () => {
+  clearYoutubeMetadataCache()
+  let runs = 0
+  const options = {
+    runCommand: async () => {
+      runs += 1
+      return { stdout: JSON.stringify({ id: "inflight123", title: "inflight", duration: 12 }) }
+    }
+  }
+  const [prewarm, enriched] = await Promise.all([
+    enrichYoutubeShare(extractYoutubeShareFromText("https://youtu.be/inflight123"), { ...options, cacheTtlMs: 0 }),
+    enrichYoutubeShare(extractYoutubeShareFromText("https://youtu.be/inflight123"), options)
+  ])
+  assert.equal(runs, 1, "在途请求应合并,yt-dlp 只执行一次")
+  assert.equal(prewarm.metadata_status, "resolved")
+  assert.equal(enriched.metadata_status, "resolved")
+  assert.equal(prewarm.video_id, "inflight123")
+  assert.equal(enriched.video_id, "inflight123")
+})
+
 test("reports YouTube bot verification as a Cookie requirement instead of a member-only video", async () => {
   clearYoutubeMetadataCache()
   const botVerificationError = Object.assign(new Error("yt-dlp failed"), {
@@ -108,6 +128,53 @@ test("YouTube relay only accepts an actual lowest single-file MP4", async () => 
   assert.equal(relay.segments.some(item => item?.type === "video"), true)
   assert.equal(relay.tempFiles.length, 1)
   assert.deepEqual(downloadArgs.slice(-3), ["--proxy", "http://127.0.0.1:7890", "https://www.youtube.com/watch?v=relay123"])
+  await cleanupYoutubeArchiveRelayFiles(relay.tempFiles)
+  assert.equal(fs.existsSync(outputPath), false)
+})
+
+test("YouTube 封面下载为本地文件,不把 ytimg URL 透传给适配器", async () => {
+  const coverBytes = Buffer.from("fake-jpeg-bytes")
+  const relay = await buildYoutubeArchiveRelaySegments({
+    type: "youtube", video_id: "cover123", duration: 10,
+    cover_url: "https://i.ytimg.com/vi/cover123/hqdefault.jpg",
+    page_url: "https://www.youtube.com/watch?v=cover123"
+  }, {
+    segmentApi: { video: file => ({ type: "video", file }), image: file => ({ type: "image", file }) },
+    youtubeRelay: {
+      fetchImpl: async url => {
+        assert.match(url, /^https:\/\/i\.ytimg\.com\//)
+        return { ok: true, body: new ReadableStream({ start(controller) { controller.enqueue(coverBytes); controller.close() } }) }
+      }
+    }
+  })
+  const image = relay.segments.find(item => item?.type === "image")
+  assert.ok(image, "应有封面图节点")
+  assert.doesNotMatch(String(image.file), /^https?:\/\//, "封面必须是本地文件")
+  assert.ok(fs.existsSync(image.file), "封面文件应已落盘")
+  await cleanupYoutubeArchiveRelayFiles(relay.tempFiles)
+  assert.equal(fs.existsSync(image.file), false, "封面临时文件应被清理")
+})
+
+test("封面下载失败时跳过封面,不影响其余节点且不透传 URL", async () => {
+  let outputPath = ""
+  const relay = await buildYoutubeArchiveRelaySegments({
+    type: "youtube", video_id: "nocover123", duration: 10,
+    cover_url: "https://i.ytimg.com/vi/nocover123/hqdefault.jpg",
+    page_url: "https://www.youtube.com/watch?v=nocover123"
+  }, {
+    segmentApi: { video: file => ({ type: "video", file }), image: file => ({ type: "image", file }) },
+    youtubeRelay: {
+      fetchImpl: async () => ({ ok: false, body: null }),
+      runCommand: async args => {
+        outputPath = args[args.indexOf("-o") + 1].replace("%(ext)s", "mp4")
+        await fs.promises.writeFile(outputPath, "mp4")
+        return { stdout: "" }
+      }
+    }
+  })
+  assert.equal(relay.segments.some(item => item?.type === "image"), false, "封面失败应直接跳过")
+  assert.equal(relay.segments.some(item => String(item?.file || "").startsWith("https://i.ytimg.com")), false, "不得透传封面 URL")
+  assert.equal(relay.segments.some(item => item?.type === "video"), true, "视频节点不受影响")
   await cleanupYoutubeArchiveRelayFiles(relay.tempFiles)
   assert.equal(fs.existsSync(outputPath), false)
 })

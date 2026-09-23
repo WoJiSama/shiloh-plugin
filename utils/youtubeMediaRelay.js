@@ -1,15 +1,20 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { Readable, Transform } from "node:stream"
+import { pipeline } from "node:stream/promises"
 import { execFile as execFileCallback } from "node:child_process"
 import { promisify } from "node:util"
 import { YOUTUBE_ARCHIVE_VIDEO_MAX_SECONDS, shouldAttachYoutubeVideo, youtubeAccessFailureReason } from "./youtubeMessage.js"
 import { buildMediaArtifactKey } from "./messagePipeline/mediaArtifactStore.js"
 import { withYoutubeYtDlpAuth } from "./youtubeAuth.js"
+import { fetchWithProxy } from "./proxiedFetch.js"
 
 const execFile = promisify(execFileCallback)
 export const YOUTUBE_ARCHIVE_VIDEO_MAX_BYTES = 512 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
+const COVER_MAX_BYTES = 8 * 1024 * 1024
+const COVER_TIMEOUT_MS = 15_000
 
 function safeName(value = "video") {
   return String(value || "video").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 120) || "video"
@@ -77,6 +82,52 @@ export async function downloadYoutubeArchiveVideo(card = {}, options = {}) {
   }
 }
 
+/**
+ * 封面图必须下载成本地文件再交给适配器:ytimg.com 在国内不可达,
+ * 把 URL 直接透传会让 NapCat 拉图失败,进而拖垮整条合并转发消息。
+ */
+export async function downloadYoutubeCoverImage(coverUrl = "", {
+  proxyUrl = "",
+  timeoutMs = COVER_TIMEOUT_MS,
+  maxBytes = COVER_MAX_BYTES,
+  fetchImpl = null,
+  logger = globalThis.logger
+} = {}) {
+  const url = String(coverUrl || "").trim()
+  if (!/^https?:\/\//i.test(url)) return ""
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-youtube-archive")
+  await fs.promises.mkdir(dir, { recursive: true })
+  const filePath = path.join(dir, `cover-${Date.now()}-${Math.random().toString(16).slice(2)}.jpg`)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), Math.max(2000, Number(timeoutMs) || COVER_TIMEOUT_MS))
+  const writeCover = async response => {
+    if (!response?.ok || !response.body) return ""
+    let receivedBytes = 0
+    const limitStream = new Transform({
+      transform(chunk, encoding, callback) {
+        receivedBytes += chunk.length
+        if (receivedBytes > Math.max(1, Number(maxBytes) || COVER_MAX_BYTES)) {
+          callback(new Error("封面图超过大小上限"))
+          return
+        }
+        callback(null, chunk)
+      }
+    })
+    await pipeline(Readable.fromWeb(response.body), limitStream, fs.createWriteStream(filePath))
+    const stat = await fs.promises.stat(filePath)
+    return stat.size > 0 ? filePath : ""
+  }
+  try {
+    if (typeof fetchImpl === "function") return await writeCover(await fetchImpl(url, { signal: controller.signal }))
+    return await fetchWithProxy(url, { proxyUrl, signal: controller.signal }, writeCover)
+  } catch (error) {
+    logger?.warn?.(`[YouTube] 封面图下载失败: ${String(error?.message || error).slice(0, 120)}`)
+    return ""
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function buildYoutubeArchiveRelaySegments(card = {}, {
   segmentApi = globalThis.segment,
   logger = globalThis.logger,
@@ -88,7 +139,14 @@ export async function buildYoutubeArchiveRelaySegments(card = {}, {
   const tempFiles = []
   const artifactLeases = []
   if (!card || card.type !== "youtube") return { segments, tempFiles, artifactLeases }
-  if (card.cover_url && segmentApi?.image) segments.push("\n", segmentApi.image(card.cover_url))
+  if (card.cover_url && segmentApi?.image) {
+    // ytimg.com 走代理下载为本地文件;失败就跳过封面,绝不能把远端 URL 透传给适配器
+    const coverFile = await downloadYoutubeCoverImage(card.cover_url, { ...youtubeRelay, logger })
+    if (coverFile) {
+      tempFiles.push(coverFile)
+      segments.push("\n", segmentApi.image(coverFile))
+    }
+  }
   const maxSeconds = Math.min(YOUTUBE_ARCHIVE_VIDEO_MAX_SECONDS, Math.max(1, Number(youtubeRelay.maxSeconds) || YOUTUBE_ARCHIVE_VIDEO_MAX_SECONDS))
   if (!shouldAttachYoutubeVideo(card, maxSeconds)) {
     if (Number(card.duration || 0) > maxSeconds) segments.push("\n（视频超过30分钟，未附带视频本体）")

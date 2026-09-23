@@ -122,6 +122,31 @@ test("浏览器兜底也拿不到地址时保持 link 降级且不抛错", async
   assert.ok(!card.play_url)
 })
 
+test("outbox 预刷新与消息富化并发时只触发一次解析", async () => {
+  clearDouyinMetadataCache()
+  let fetchCalls = 0
+  let resolverCalls = 0
+  const failingFetch = async () => {
+    fetchCalls += 1
+    return { ok: false, url: "https://www.iesdouyin.com/share/video/7461/", status: 403 }
+  }
+  const browserResolver = async () => {
+    resolverCalls += 1
+    return { play_url: "https://v26.douyinvod.com/x.mp4", title: "并发", aweme_id: "7461", duration: 10 }
+  }
+  const card = { type: "douyin", short_url: "https://v.douyin.com/abc123/", aweme_id: "7461", page_url: "https://www.iesdouyin.com/share/video/7461/" }
+  // 复刻生产时序:MediaOutbox 预刷新(cacheTtlMs:0)先发起,消息富化(默认 TTL)紧随其后
+  const [prewarm, enriched] = await Promise.all([
+    enrichDouyinShare({ ...card }, { fetchImpl: failingFetch, browserResolver, cacheTtlMs: 0, logger: null }),
+    enrichDouyinShare({ ...card }, { fetchImpl: failingFetch, browserResolver, logger: null })
+  ])
+  assert.equal(fetchCalls, 1, "在途请求应合并,静态请求只发一次")
+  assert.equal(resolverCalls, 1, "浏览器兜底只跑一次")
+  assert.equal(prewarm.metadata_status, "resolved")
+  assert.equal(enriched.metadata_status, "resolved")
+  assert.equal(prewarm.play_url, enriched.play_url)
+})
+
 test("extractPlayUrlFromJson 深找各版本 detail 响应结构", async () => {
   const { extractPlayUrlFromJson } = await import("../utils/douyinBrowserResolver.js")
   assert.equal(

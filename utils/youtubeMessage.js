@@ -7,6 +7,8 @@ const CACHE_TTL_MS = 30 * 60 * 1000
 const CACHE_MAX = 100
 export const YOUTUBE_ARCHIVE_VIDEO_MAX_SECONDS = 30 * 60
 const metadataCache = new Map()
+// 同 key 在途请求合并:outbox 预刷新(cacheTtlMs:0)与消息富化并发时共享一次 yt-dlp 调用。
+const inflightEnrichments = new Map()
 
 function cleanText(value = "", maxLength = 1000) {
   const text = String(value || "").replace(/\s+/g, " ").trim()
@@ -168,13 +170,21 @@ export async function enrichYoutubeShare(card = {}, options = {}) {
   pruneCache()
   const cached = metadataCache.get(key)
   if (cached?.expiresAt > Date.now()) return await cached.promise
+  const inflight = inflightEnrichments.get(key)
+  if (inflight) return await inflight.promise
   const promise = requestYoutubeMetadata(card, options).catch(error => ({
     ...card,
     metadata_status: "unavailable",
     metadata_failure_reason: metadataFailureReason(error)
   }))
+  const inflightRecord = { promise }
+  inflightEnrichments.set(key, inflightRecord)
   metadataCache.set(key, { promise, expiresAt: Date.now() + cacheTtlMs })
-  return await promise
+  try {
+    return await promise
+  } finally {
+    if (inflightEnrichments.get(key) === inflightRecord) inflightEnrichments.delete(key)
+  }
 }
 
 export async function enrichYoutubeMessageSegments(segments = [], rawMessage = "", options = {}) {
@@ -222,4 +232,5 @@ export function shouldAttachYoutubeVideo(card = {}, maxSeconds = YOUTUBE_ARCHIVE
 
 export function clearYoutubeMetadataCache() {
   metadataCache.clear()
+  inflightEnrichments.clear()
 }

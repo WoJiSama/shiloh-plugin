@@ -3,6 +3,9 @@ const DOUYIN_CACHE_TTL_MS = 30 * 1000
 const DOUYIN_CACHE_MAX = 100
 export const DOUYIN_ARCHIVE_VIDEO_MAX_SECONDS = 30 * 60
 const metadataCache = new Map()
+// 同 key 的在途富化请求合并:outbox 预刷新(cacheTtlMs:0)与消息富化几乎同时到达,
+// 若各自发起会并发触发两次浏览器兜底,反而被抖音反爬判罚。落地结果仍按 TTL 缓存。
+const inflightEnrichments = new Map()
 
 function cleanText(value = "", maxLength = 1000) {
   const text = String(value || "").replace(/&amp;/gi, "&").replace(/\\\//g, "/").replace(/\s+/g, " ").trim()
@@ -169,6 +172,8 @@ export async function enrichDouyinShare(card = {}, options = {}) {
   pruneCache()
   const cached = metadataCache.get(key)
   if (cached?.expiresAt > Date.now()) return await cached.promise
+  const inflight = inflightEnrichments.get(key)
+  if (inflight) return await inflight.promise
   const promise = requestDouyinShare(card, { fetchImpl, timeoutMs: options.timeoutMs || 7000 })
     .catch(async error => {
       // 分享页静态解析失败(抖音改版常见):告警不再静默,并尝试浏览器兜底
@@ -198,8 +203,14 @@ export async function enrichDouyinShare(card = {}, options = {}) {
       }
       return { ...card, metadata_status: card.metadata_status || "link" }
     })
+  const inflightRecord = { promise }
+  inflightEnrichments.set(key, inflightRecord)
   metadataCache.set(key, { promise, expiresAt: Date.now() + cacheTtlMs })
-  return await promise
+  try {
+    return await promise
+  } finally {
+    if (inflightEnrichments.get(key) === inflightRecord) inflightEnrichments.delete(key)
+  }
 }
 
 export async function enrichDouyinMessageSegments(segments = [], rawMessage = "", options = {}) {
@@ -249,4 +260,5 @@ export function shouldAttachDouyinVideo(card = {}, maxSeconds = DOUYIN_ARCHIVE_V
 
 export function clearDouyinMetadataCache() {
   metadataCache.clear()
+  inflightEnrichments.clear()
 }

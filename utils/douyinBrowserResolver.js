@@ -1,4 +1,5 @@
 import { getSharedBrowser, scheduleSharedBrowserClose } from "./sharedBrowser.js"
+import { createSingleFlightResolver } from "./singleFlightResolver.js"
 
 const RESOLVE_TIMEOUT_MS = 25_000
 const DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
@@ -65,7 +66,22 @@ async function resolveAwemeId(page, card) {
   }).catch(() => "") || ""
 }
 
-export async function resolveDouyinShareViaBrowser(card = {}, { timeoutMs = RESOLVE_TIMEOUT_MS, logger = globalThis.logger } = {}) {
+const RESOLVE_RESULT_TTL_MS = 60_000
+// 同一时刻只开一个抖音页面:并发打开相同/相近页面会触发反爬,导致部分页面静默拿不到数据。
+// 成功结果保留 60s(play_url 实际有效期远长于此),失败不缓存可立即重试。
+const resolveAwemeViaBrowserPage = createSingleFlightResolver(
+  (card, options) => resolveDouyinShareInPage(card, options),
+  { ttlMs: RESOLVE_RESULT_TTL_MS }
+)
+
+export function resolveDouyinShareViaBrowser(card = {}, options = {}) {
+  const entry = String(card?.page_url || card?.short_url || "").trim()
+  if (!/^https?:\/\//i.test(entry)) return Promise.resolve(null)
+  const key = String(card?.aweme_id || "").trim() || entry
+  return resolveAwemeViaBrowserPage(key, card, options)
+}
+
+async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT_MS, logger = globalThis.logger } = {}) {
   const entry = String(card.page_url || card.short_url || "").trim()
   if (!/^https?:\/\//i.test(entry)) return null
 
@@ -134,7 +150,10 @@ export async function resolveDouyinShareViaBrowser(card = {}, { timeoutMs = RESO
     // 桌面页标题带 " - 抖音" 后缀
     result.title = result.title.replace(/\s*[-|]\s*抖音\s*$/u, "").trim() || result.title
 
-    if (!/^https?:\/\//i.test(result.play_url)) return null
+    if (!/^https?:\/\//i.test(result.play_url)) {
+      logger?.warn?.(`[抖音] 浏览器解析未取得播放地址 aweme=${result.aweme_id || "?"} 页面=${page.url()}`)
+      return null
+    }
     logger?.info?.(`[抖音] 浏览器解析成功 aweme=${result.aweme_id || "?"} duration=${result.duration}s 来源=${domInfo && /^https?:/.test(domInfo.src) ? "video元素" : "detail响应"}`)
     return result
   } catch (error) {
