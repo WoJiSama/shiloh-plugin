@@ -83,33 +83,65 @@ export async function buildPixivArchiveRelaySegments(card = {}, {
   let totalBytes = 0
   let sentPages = 0
   let failedPages = 0
-  for (const page of pages) {
-    const remaining = maxTotalBytes - totalBytes
-    if (remaining <= 0) break
-    const perImageLimit = Math.min(maxImageBytes, remaining)
-    const startedAt = Date.now()
-    const key = buildMediaArtifactKey("pixiv", { artwork_id: card.artwork_id, page: page.page })
-    const lease = artifactStore && key
-      ? await artifactStore.acquire(key, () => downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl || null, proxyUrl: pixivRelay.proxyUrl }))
-      : null
-    const filePath = lease?.filePath || (!artifactStore ? await downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl || null, proxyUrl: pixivRelay.proxyUrl }) : "")
-    onTiming?.("download", Date.now() - startedAt)
-    if (!filePath) {
-      failedPages++
-      continue
+  if (artifactStore) {
+    // 自动搬运路径:走产物缓存的串行获取(命中缓存时零下载,租约由调用方统一释放)
+    for (const page of pages) {
+      const remaining = maxTotalBytes - totalBytes
+      if (remaining <= 0) break
+      const perImageLimit = Math.min(maxImageBytes, remaining)
+      const startedAt = Date.now()
+      const key = buildMediaArtifactKey("pixiv", { artwork_id: card.artwork_id, page: page.page })
+      const lease = artifactStore && key
+        ? await artifactStore.acquire(key, () => downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl || null, proxyUrl: pixivRelay.proxyUrl }))
+        : null
+      const filePath = lease?.filePath || ""
+      onTiming?.("download", Date.now() - startedAt)
+      if (!filePath) {
+        failedPages++
+        continue
+      }
+      const stat = await fs.promises.stat(filePath).catch(() => null)
+      if (!stat || stat.size > remaining) {
+        if (lease) await lease.release?.()
+        failedPages++
+        continue
+      }
+      totalBytes += stat.size
+      sentPages++
+      artifactLeases.push(lease)
+      if (segmentApi?.image) segments.push("\n", segmentApi.image(filePath))
     }
-    const stat = await fs.promises.stat(filePath).catch(() => null)
-    if (!stat || stat.size > remaining) {
-      if (lease) await lease.release?.()
-      else await fs.promises.unlink(filePath).catch(() => {})
-      failedPages++
-      continue
+  } else {
+    // 交互式下载路径:并行下载,总大小约束在完成后按页序裁剪,超额的页删除不发
+    const downloadStartedAt = Date.now()
+    const downloads = await Promise.all(pages.map(async page => ({
+      page,
+      filePath: await downloadPixivArchiveImage(page.image_url, {
+        maxBytes: maxImageBytes,
+        timeoutMs: pixivRelay.downloadTimeoutMs,
+        fetchImpl: pixivRelay.fetchImpl || null,
+        proxyUrl: pixivRelay.proxyUrl
+      })
+    })))
+    onTiming?.("download", Date.now() - downloadStartedAt)
+    for (const { filePath } of downloads) {
+      const remaining = maxTotalBytes - totalBytes
+      if (!filePath || remaining <= 0) {
+        if (filePath) await fs.promises.unlink(filePath).catch(() => {})
+        failedPages++
+        continue
+      }
+      const stat = await fs.promises.stat(filePath).catch(() => null)
+      if (!stat || stat.size > remaining) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        failedPages++
+        continue
+      }
+      totalBytes += stat.size
+      sentPages++
+      tempFiles.push(filePath)
+      if (segmentApi?.image) segments.push("\n", segmentApi.image(filePath))
     }
-    totalBytes += stat.size
-    sentPages++
-    if (lease) artifactLeases.push(lease)
-    else tempFiles.push(filePath)
-    if (segmentApi?.image) segments.push("\n", segmentApi.image(filePath))
   }
   if (!sentPages) segments.push("\n（作品图片暂时获取失败，已保留作品页面）")
   else if (failedPages || Number(card.page_count || pages.length) > sentPages) segments.push(`\n（已附带 ${sentPages} 张图片；其余图片因页数或大小限制未附带）`)

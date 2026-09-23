@@ -95,13 +95,20 @@ async function requestPixivArtwork(card = {}, { fetchImpl = null, proxyUrl = "",
   const timer = setTimeout(() => controller.abort(), Math.max(500, Number(timeoutMs) || 7000))
   const request = { fetchImpl, proxyUrl, signal: controller.signal }
   try {
-    const body = await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}`, request)
+    const illustUrl = `https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}`
+    // 详情与分页两个请求互不依赖,并行发出;分页失败时回退单页
+    const [bodyResult, pageBodyResult] = await Promise.allSettled([
+      fetchPixivJson(illustUrl, request),
+      fetchPixivJson(`${illustUrl}/pages`, request)
+    ])
+    if (bodyResult.status === "rejected") throw bodyResult.reason
+    const body = bodyResult.value
     const pageCount = Math.max(1, numberOrNull(body.pageCount) || 1)
     let pages = []
-    try {
-      const pageBody = await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(artworkId)}/pages`, request)
-      pages = normalizePages(pageBody)
-    } catch {
+    if (pageBodyResult.status === "fulfilled") {
+      pages = normalizePages(pageBodyResult.value)
+    }
+    if (!pages.length) {
       const url = String(body.urls?.regular || body.urls?.small || body.urls?.original || "")
       if (isTrustedPixivImageUrl(url)) pages = [{ page: 0, image_url: url, width: numberOrNull(body.width), height: numberOrNull(body.height) }]
     }

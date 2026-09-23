@@ -292,6 +292,8 @@ async function buildPixivListHtml(data = {}) {
 export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchImpl = null, logger = globalThis.logger } = {}) {
   const items = (session.items || []).slice(0, LIST_MAX_ITEMS)
   const tempFiles = []
+  // 浏览器冷启动与缩略图下载并行,谁慢等谁
+  const browserPromise = getSharedBrowser()
   const withThumbs = await Promise.all(items.map(async item => {
     let thumbPath = ""
     if (item.thumbUrl) {
@@ -310,9 +312,9 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
     : `共 ${total} 个结果,展示前 ${items.length} 个 · 按时间排序`
   const outputDir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-cards")
   await fs.promises.mkdir(outputDir, { recursive: true })
-  const outputPath = path.join(outputDir, `pixiv-list-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`)
+  const outputPath = path.join(outputDir, `pixiv-list-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`)
 
-  const browser = await getSharedBrowser()
+  const browser = await browserPromise
   const page = await browser.newPage()
   try {
     await page.setViewport({ width: 760, height: 900, deviceScaleFactor: 2 })
@@ -321,7 +323,8 @@ export async function renderPixivListCard(session = {}, { proxyUrl = "", fetchIm
       await Promise.all([...document.images].map(img => img.complete ? null : new Promise(resolve => { img.onload = img.onerror = resolve })))
     }).catch(() => {})
     const height = await page.evaluate(() => Math.ceil(document.body.getBoundingClientRect().height))
-    await page.screenshot({ path: outputPath, clip: { x: 0, y: 0, width: 760, height: Math.max(1, height) }, type: "png" })
+    // JPEG 截图:比 PNG 小一个量级,大幅缩短随后的 QQ 上传耗时
+    await page.screenshot({ path: outputPath, clip: { x: 0, y: 0, width: 760, height: Math.max(1, height) }, type: "jpeg", quality: 88 })
     return { imagePath: outputPath, tempFiles }
   } catch (error) {
     logger?.warn?.(`[Pixiv] 列表卡面渲染失败: ${String(error?.message || error).slice(0, 120)}`)
