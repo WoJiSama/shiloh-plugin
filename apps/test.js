@@ -3607,10 +3607,23 @@ ${recentHistory || '(无)'}
     // Tool stages share one optional progress message for the whole turn.
     e._progressReplyState = { sent: false, reserved: false }
     const groupLimiter = getOrCreateGroupLimiter(this._groupLimiters, groupId, this.config.concurrentLimit || 5)
+    // 回合瀑布观测:关键阶段耗时一览,随[对话耗时]输出,定位串行浪费
+    e._receivedAt ||= Date.now()
+    const waterfall = {}
+    const wfMark = {}
+    const runStage = async (name, fn) => {
+      const startedAt = Date.now()
+      try {
+        return await fn()
+      } finally {
+        waterfall[name] = Date.now() - startedAt
+      }
+    }
 
     let groupUserMessages = session.groupUserMessages
 
     return await groupLimiter(async () => {
+      waterfall.queue = Date.now() - e._receivedAt
       try {
         const args = msg?.replace(/^#tool\s*/, "").trim() || ""
         const atQq = collectMentionTargetIds(e, Bot.uin)
@@ -3803,13 +3816,23 @@ ${recentHistory || '(无)'}
           logger.info(`[意图快路] group=${groupId} 确定性候选已命中，跳过意图模型`)
           skipIntentModel = true
         }
+        // 上下文构建(连续性redis+消息体)不依赖意图模型结果:并行发起,
+        // 意图模型慢时(最长6s超时)这段时间不再是纯串行等待
+        const contextBuildPromise = (async () => {
+          const lastTurnContinuity = await loadTurnContinuity({ redis: globalThis.redis, groupId, userId }).catch(() => null)
+          const builtUserContent = await this.buildMessageContent(e.sender, args, images, atQq, e.group, e)
+          return { lastTurnContinuity, builtUserContent }
+        })()
+        const intentPromise = skipIntentModel
+          ? null
+          : runStage("intent", () => this.resolvePrimaryModelIntent(currentIntentText, { hasImages: Boolean(images?.length) }))
         if (skipIntentModel) {
           turnTrace.setIntent("chat", null, "fast_path_skip")
           logger.info(`[意图快路] group=${groupId} 无工具信号的短闲聊，跳过意图模型`)
         } else {
-          const intentModelStartedAt = Date.now()
-          modelIntentDecision = await this.resolvePrimaryModelIntent(currentIntentText, { hasImages: Boolean(images?.length) })
-          turnTrace.addModelCall("intent", Date.now() - intentModelStartedAt)
+          const intentStartedAt = Date.now()
+          modelIntentDecision = await intentPromise
+          turnTrace.addModelCall("intent", Date.now() - intentStartedAt)
           if (modelIntentDecision) turnTrace.setIntent(modelIntentDecision.intent, modelIntentDecision.confidence, "model")
         }
         session.modelIntentDecision = modelIntentDecision
@@ -3837,11 +3860,11 @@ ${recentHistory || '(无)'}
         })
 
         // 上一轮任务摘要：同一用户 10 分钟内的工具/回复延续，防止反复认图、反复确认
-        const lastTurnContinuity = await loadTurnContinuity({ redis: globalThis.redis, groupId, userId }).catch(() => null)
+        const { lastTurnContinuity, builtUserContent } = await runStage("context", () => contextBuildPromise)
         const turnContinuityPrompt = buildTurnContinuityPrompt(lastTurnContinuity)
         if (lastTurnContinuity) logger.info(`[任务延续] group=${groupId} user=${userId} 注入上一轮摘要 intent=${lastTurnContinuity.intent} tools=${(lastTurnContinuity.tools || []).length}`)
 
-        const userContent = await this.buildMessageContent(e.sender, args, images, atQq, e.group, e)
+        const userContent = builtUserContent
         const knowledgeContext = {
           text: e.msg || args,
           messageSegments: e.message || [],
@@ -4080,7 +4103,7 @@ ${recentHistory || '(无)'}
 
         const understandingPrompt = session.promptLayerProfile?.profile === "chat"
           ? ""
-          : await this.resolveUnderstandingPrompt({
+          : await runStage("brief", () => this.resolveUnderstandingPrompt({
           e,
           args,
           msg,
@@ -4090,7 +4113,7 @@ ${recentHistory || '(无)'}
           session,
           currentIntentText: joinIntentParts(args, msg),
           groupUserMessages
-        })
+        }))
 
         groupUserMessages = groupUserMessages.filter(m => m.role !== "system")
         groupUserMessages.unshift({ role: "system", content: systemContent })
@@ -4368,7 +4391,7 @@ ${recentHistory || '(无)'}
 	        const traceRecord = turnTrace.finish()
 	        await this.finishConversationTask(taskContext, session)
 	        const totalElapsed = Date.now() - handleToolStartAt
-	        logger.info(`[对话耗时] group=${e?.group_id || ""} user=${e?.user_id || ""} ${formatTurnPlanLog(session.turnPlan)} total=${totalElapsed}ms merged=${e?._mergedMessageCount || 0}`, { turnId: e?._turnId })
+	        logger.info(`[对话耗时] group=${e?.group_id || ""} user=${e?.user_id || ""} ${formatTurnPlanLog(session.turnPlan)} total=${totalElapsed}ms merged=${e?._mergedMessageCount || 0} 瀑布=${Object.entries(waterfall).filter(([key]) => key !== "queued").map(([key, ms]) => `${key}=${ms}ms`).join(" ")}${waterfall.queued > 500 ? ` 队列等待=${waterfall.queued}ms` : ""}`, { turnId: e?._turnId })
 	        if (e.group_id && !e._longRunningToolTask) this.recordReplyLatency(e.group_id, totalElapsed)
 	        // 回合诊断留存:供 #希洛调试 命令回显(纯观测,不影响主链路)
 	        recordTurnDiagnostics({

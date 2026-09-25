@@ -123,7 +123,7 @@ test("主链路接线:简报优先 + 失败回退规则卡 + 配置开关", () =
     fs.readFileSync(path.join(root, "apps/test.js"), "utf8"),
     fs.readFileSync(path.join(root, "apps/lib/promptContext.js"), "utf8")
   ].join("\n")
-  assert.ok(src.includes("await this.resolveUnderstandingPrompt({"), "注入点改为异步简报解析")
+  assert.ok(src.includes("this.resolveUnderstandingPrompt({"), "注入点改为异步简报解析(现为瀑布stage包裹)")
   assert.ok(src.includes("requestUnderstandingBrief({"), "模型简报调用已接线")
   assert.ok(src.includes("回退规则卡 reason="), "回退有观测日志")
   assert.ok(src.includes("briefEnabled: cfg.briefEnabled !== false"), "配置开关默认开启")

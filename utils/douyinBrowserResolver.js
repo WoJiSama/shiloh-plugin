@@ -99,6 +99,30 @@ async function applyStealth(page) {
   await page.evaluateOnNewDocument(STEALTH_INIT_SCRIPT)
 }
 
+// 短链(v.douyin.com/xxx)用纯 HTTP 跟随重定向即可解析出最终地址,
+// 不必让浏览器先加载分享页再被客户端跳转(省 0.5-1.5s 与一次二次导航)
+async function resolveShortLinkTarget(entry, { timeoutMs = 5000 } = {}) {
+  try {
+    let url = String(entry || "")
+    for (let hop = 0; hop < 3; hop++) {
+      const response = await fetch(url, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: { "User-Agent": "Mozilla/5.0 (Linux; Android 10; K)" }
+      })
+      const location = response.headers.get("location")
+      if (response.status >= 300 && response.status < 400 && location) {
+        url = new URL(location, url).href
+        continue
+      }
+      return url
+    }
+    return url
+  } catch {
+    return ""
+  }
+}
+
 async function resolveAwemeId(page, card) {
   const known = String(card.aweme_id || "").trim()
   if (known && /^\d{6,}$/.test(known)) return known
@@ -137,6 +161,17 @@ async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT
   let detailJson = null
   try {
     await applyStealth(page)
+    // 拦截纯浪费的流量:页面自播的视频流(media/m4s,MB级)、字体、埋点上报。
+    // 播放地址只从 video 元素 src 属性与 detail 接口取,不依赖页面真的播放
+    await page.setRequestInterception(true).catch(() => {})
+    page.on("request", request => {
+      const type = request.resourceType()
+      const url = request.url()
+      if (type === "media" || type === "font") return request.abort("blockedbyclient").catch(() => {})
+      if (/\.(woff2?|ttf|otf|m4s|ts|mp4)(\?|$)/i.test(url)) return request.abort("blockedbyclient").catch(() => {})
+      if (/\/(webmssdk|mcs|slardar|tnc|collect|beacon|applog)[/?]|\/log\//i.test(url)) return request.abort("blockedbyclient").catch(() => {})
+      return request.continue().catch(() => {})
+    })
     const timing = { start: Date.now() }
     const mark = label => { timing[label] = Date.now() - timing.start }
     mark("init")
@@ -151,7 +186,12 @@ async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT
       } catch {}
     })
 
-    await page.goto(entry, { waitUntil: "domcontentloaded", timeout: Math.min(deadline - Date.now(), 15000) })
+    // 预解析短链:能直接得到 /video|note/<id> 就跳过分享页直进桌面页
+    const resolvedTarget = await resolveShortLinkTarget(entry)
+    const directDesktop = /\/(?:video|note)\/\d+/.test(resolvedTarget || "")
+      ? resolvedTarget.replace(/^(https?:\/\/[^\/]+)\/(?:share\/)?((?:video|note)\/\d+)[^\s]*$/, "$1/$2")
+      : ""
+    await page.goto(directDesktop || entry, { waitUntil: "domcontentloaded", timeout: Math.min(deadline - Date.now(), 15000) })
     mark("goto1")
     // 图文作品:短链可能落在 /share/note/<id>(移动分享页)或 /note/<id>(桌面页)
     const isNoteShare = /\/(?:share\/)?note\/\d+/i.test(page.url()) || card.media_kind === "note"

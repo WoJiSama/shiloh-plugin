@@ -164,10 +164,16 @@ async function requestDouyinShare(card = {}, { fetchImpl, timeoutMs }) {
   }
 }
 
+// 抖音 2026-09 改版后分享页 SSR 恢复无期,静态解析持续失败:失败后 30 分钟内
+// 直接跳过这步(每轮省 ~0.7s 白跑),成功则恢复快路
+let lastSharePageFailAt = 0
+const SHARE_PAGE_FAIL_SKIP_MS = 30 * 60 * 1000
+
 export async function enrichDouyinShare(card = {}, options = {}) {
   if (!card || card.type !== "douyin") return card
   const fetchImpl = options.fetchImpl || globalThis.fetch
   if (typeof fetchImpl !== "function") return card
+  const skipStaticParse = !options.forceStaticParse && Date.now() - lastSharePageFailAt < SHARE_PAGE_FAIL_SKIP_MS
   const key = card.aweme_id || card.short_url || card.page_url
   if (!key) return card
   const cacheTtlMs = Math.max(0, Number(options.cacheTtlMs ?? DOUYIN_CACHE_TTL_MS) || 0)
@@ -176,8 +182,11 @@ export async function enrichDouyinShare(card = {}, options = {}) {
   if (cached?.expiresAt > Date.now()) return await cached.promise
   const inflight = inflightEnrichments.get(key)
   if (inflight) return await inflight.promise
-  const promise = requestDouyinShare(card, { fetchImpl, timeoutMs: options.timeoutMs || 7000 })
+  const promise = (skipStaticParse
+    ? Promise.reject(new Error("分享页静态解析近期失败,跳过"))
+    : requestDouyinShare(card, { fetchImpl, timeoutMs: options.timeoutMs || 7000 }))
     .catch(async error => {
+      lastSharePageFailAt = Date.now()
       // 分享页静态解析失败(抖音改版常见):告警不再静默,并尝试浏览器兜底
       ;(options.logger || globalThis.logger)?.warn?.(`[抖音] 分享页解析失败(${error.message}),尝试浏览器兜底: ${key}`)
       try {
@@ -209,11 +218,15 @@ export async function enrichDouyinShare(card = {}, options = {}) {
       }
       return { ...card, metadata_status: card.metadata_status || "link" }
     })
-  const inflightRecord = { promise }
+  const wrapped = promise.then(result => {
+    lastSharePageFailAt = 0
+    return result
+  })
+  const inflightRecord = { promise: wrapped }
   inflightEnrichments.set(key, inflightRecord)
-  metadataCache.set(key, { promise, expiresAt: Date.now() + cacheTtlMs })
+  metadataCache.set(key, { promise: wrapped, expiresAt: Date.now() + cacheTtlMs })
   try {
-    return await promise
+    return await wrapped
   } finally {
     if (inflightEnrichments.get(key) === inflightRecord) inflightEnrichments.delete(key)
   }

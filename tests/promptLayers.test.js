@@ -62,7 +62,7 @@ test("handleTool resolves the layer profile before assembling prompts", () => {
   const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
   // 层拼装已迁入 utils/turnPromptComposer.js;主链路改为调用 composeTurnPromptLayers
   const composerSrc = fs.readFileSync(path.join(root, "utils/turnPromptComposer.js"), "utf8")
-  const intentPos = src.indexOf("modelIntentDecision = await this.resolvePrimaryModelIntent(currentIntentText")
+  const intentPos = src.indexOf("modelIntentDecision = await intentPromise")
   const profilePos = src.indexOf("session.promptLayerProfile = resolvePromptLayerProfile")
   const composePos = src.indexOf("await composeTurnPromptLayers({")
   assert.ok(intentPos > 0 && profilePos > intentPos && composePos > profilePos, "意图判定必须先于分层画像，分层画像先于组装")
