@@ -106,8 +106,10 @@ function getDouyinItem(html = "") {
   return item && typeof item === "object" ? item : null
 }
 
-function canonicalPageUrl(awemeId, fallback = "") {
-  return awemeId ? `https://www.iesdouyin.com/share/video/${awemeId}/` : normalizeUrl(fallback)
+function canonicalPageUrl(awemeId, fallback = "", kind = "") {
+  if (!awemeId) return normalizeUrl(fallback)
+  const path = kind === "note" ? "note" : "video"
+  return `https://www.iesdouyin.com/share/${path}/${awemeId}/`
 }
 
 function buildDouyinCard(base = {}, item = {}, finalUrl = "") {
@@ -181,9 +183,11 @@ export async function enrichDouyinShare(card = {}, options = {}) {
       try {
         const resolver = options.browserResolver || (await import("./douyinBrowserResolver.js")).resolveDouyinShareViaBrowser
         const resolved = await resolver(card, { logger: options.logger || globalThis.logger })
-        if (resolved?.play_url) {
+        // 图文作品的 play_url 可能为空,但有图集 images;两者都算解析成功
+        if (resolved?.play_url || resolved?.images?.length) {
           const awemeId = String(resolved.aweme_id || card.aweme_id || "").trim()
-          const pageUrl = canonicalPageUrl(awemeId, resolved.final_url || card.page_url || card.short_url)
+          const mediaKind = resolved.media_kind === "note" || (!resolved.play_url && resolved.images?.length) ? "note" : "video"
+          const pageUrl = canonicalPageUrl(awemeId, resolved.final_url || card.page_url || card.short_url, mediaKind)
           return {
             ...card,
             title: cleanText(resolved.title || card.title || "抖音视频", 300),
@@ -193,6 +197,8 @@ export async function enrichDouyinShare(card = {}, options = {}) {
             duration: normalizeDuration(resolved.duration || card.duration),
             cover_url: resolved.cover_url || card.cover_url || "",
             play_url: resolved.play_url,
+            images: Array.isArray(resolved.images) ? resolved.images.filter(url => /^https?:\/\//i.test(String(url))) : [],
+            media_kind: mediaKind,
             page_url: pageUrl,
             video_url: pageUrl,
             metadata_status: "resolved"
@@ -231,10 +237,12 @@ export function formatDouyinDuration(seconds = 0) {
 }
 
 export function formatDouyinHistoryText(card = {}) {
-  const lines = [`分享了抖音视频《${card.title || "未命名视频"}》`]
+  const imageCount = Array.isArray(card.images) ? card.images.length : 0
+  const lines = [imageCount ? `分享了抖音图文《${card.title || "未命名作品"}》` : `分享了抖音视频《${card.title || "未命名视频"}》`]
   const basic = []
   if (card.author) basic.push(`作者:${card.author}`)
   if (card.aweme_id) basic.push(`作品:${card.aweme_id}`)
+  if (imageCount) basic.push(`图集:${imageCount}张`)
   if (card.duration) basic.push(`时长:${formatDouyinDuration(card.duration)}`)
   if (basic.length) lines.push(basic.join(" | "))
   if (card.stats) {

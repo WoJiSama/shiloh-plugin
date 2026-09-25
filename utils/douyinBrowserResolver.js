@@ -31,6 +31,52 @@ export function extractPlayUrlFromJson(value, visited = new Set()) {
   return ""
 }
 
+/**
+ * 从 detail JSON 里提取图集(图文作品)的图片列表:先定位作品节点
+ * (带 aweme_id 的 item),只取该节点自己的 images——页面数据里还有
+ * 推荐流/评论区/贴纸等结构也带 images 数组,全局深挖会把杂图收进来。
+ */
+export function extractNoteImagesFromJson(value) {
+  const item = deepFind(value, node =>
+    node && typeof node === "object" &&
+    /^\d{6,}$/.test(String(node.aweme_id || "")) &&
+    Array.isArray(node.images) && node.images.length > 0
+  )
+  if (!item) return []
+  return dedupeUrls(item.images.map(image => firstHttpUrlOf(image?.url_list)))
+}
+
+function firstHttpUrlOf(list) {
+  const url = Array.isArray(list) ? list.find(Boolean) : list
+  return url && /^https?:\/\//i.test(String(url)) ? String(url) : ""
+}
+
+function dedupeUrls(list = []) {
+  const seen = new Set()
+  const out = []
+  for (const url of list) {
+    if (!url || seen.has(url)) continue
+    seen.add(url)
+    out.push(url)
+  }
+  return out
+}
+
+// 同一张图的 CDN 变体(不同主机/签名)按图床对象 ID 去重:
+// URL 路径里的 /tos-cn-xxx/<文件id>~tplv-... 是图片本体标识。
+function dedupeByTosKey(list = []) {
+  const seen = new Set()
+  const out = []
+  for (const url of list) {
+    const text = String(url || "")
+    const key = text.match(/\/(tos-cn-[^/?]+)\/([^?~]+)/)?.slice(1).join("/") || text.split("?")[0]
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(text)
+  }
+  return out
+}
+
 // 抖音 2026-09 改版:分享页不再 SSR 视频数据,mobile 版对无头浏览器返回"抱歉出错了"。
 // 验证可行的路径:反检测补丁 + 桌面页 www.douyin.com/video/<id>,页面自己的 JS 会
 // 完成 a_bogus 签名并请求 /aweme/v1/web/aweme/detail/,从 <video> 元素和网络响应截取。
@@ -56,9 +102,9 @@ async function applyStealth(page) {
 async function resolveAwemeId(page, card) {
   const known = String(card.aweme_id || "").trim()
   if (known && /^\d{6,}$/.test(known)) return known
-  // 短链跳转后的分享页 URL 是 /share/video/<id>/
+  // 短链跳转后的分享页 URL 是 /share/video/<id>/ 或 /share/note/<id>/(图文)
   const current = page.url()
-  const fromUrl = current.match(/\/(?:share\/)?video\/(\d{6,})/)?.[1]
+  const fromUrl = current.match(/\/(?:share\/)?(?:video|note)\/(\d{6,})/)?.[1]
   if (fromUrl) return fromUrl
   return await page.evaluate(() => {
     const router = window._ROUTER_DATA?.loaderData?.["video_(id)/page"]
@@ -91,6 +137,9 @@ async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT
   let detailJson = null
   try {
     await applyStealth(page)
+    const timing = { start: Date.now() }
+    const mark = label => { timing[label] = Date.now() - timing.start }
+    mark("init")
     page.on("response", async response => {
       try {
         if (detailJson) return
@@ -98,18 +147,41 @@ async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT
         if (!/\/aweme\/v1\/web\/aweme\/detail/.test(url)) return
         if (!/json/i.test(String(response.headers()?.["content-type"] || ""))) return
         const json = await response.json()
-        if (json && extractPlayUrlFromJson(json)) detailJson = json
+        if (json && (extractPlayUrlFromJson(json) || extractNoteImagesFromJson(json).length)) detailJson = json
       } catch {}
     })
 
     await page.goto(entry, { waitUntil: "domcontentloaded", timeout: Math.min(deadline - Date.now(), 15000) })
+    mark("goto1")
+    // 图文作品:短链可能落在 /share/note/<id>(移动分享页)或 /note/<id>(桌面页)
+    const isNoteShare = /\/(?:share\/)?note\/\d+/i.test(page.url()) || card.media_kind === "note"
     const awemeId = await resolveAwemeId(page, card)
+    mark("awemeId")
     if (awemeId && !page.url().includes(`/${awemeId}`)) {
-      await page.goto(`https://www.douyin.com/video/${awemeId}`, { waitUntil: "domcontentloaded", timeout: Math.min(deadline - Date.now(), 15000) })
+      await page.goto(`https://www.douyin.com/${isNoteShare ? "note" : "video"}/${awemeId}`, { waitUntil: "domcontentloaded", timeout: Math.min(deadline - Date.now(), 15000) })
     }
-    // 页面 JS 需要 1-3 秒完成签名请求和播放器挂载
-    await page.waitForSelector("video", { timeout: Math.min(deadline - Date.now(), 10000) }).catch(() => {})
-    await page.waitForFunction(() => Boolean(detailJson), { timeout: Math.min(deadline - Date.now(), 6000) }).catch(() => {})
+    mark("goto2")
+    // 视频页等播放器挂载和 detail 响应(1-3s)。图文(图集)页:作品图片由轮播
+    // 播放器渲染(feed-active-video/player-container 容器,带作品图床标记),
+    // 实测约 5-6s 出现——等它出现即取,不空耗 video/detail 等待。
+    if (isNoteShare) {
+      // 期望张数 = .xgplayer-slider 子元素数(挂载即有);到位判据用播放器容器内
+      // 标记图按图床对象ID去重后的数量——海报随容器 ~6s 全齐,而 slider 每张
+      // slide 的 img 是逐张懒加载(~12s),用后者会白等。凑齐即走。
+      await page.waitForFunction(() => {
+        const slider = document.querySelector(".xgplayer-slider")
+        if (!slider || !slider.childElementCount) return false
+        const seen = new Set()
+        for (const img of document.querySelectorAll('[data-e2e="feed-active-video"] img[src*="douyinpic"], [data-e2e="player-container"] img[src*="douyinpic"], .xgplayer-slider img[src*="douyinpic"]')) {
+          seen.add((img.src.match(/\/(tos-cn-[^/?]+)\/([^?~]+)/) || [])[0] || img.src.split("?")[0])
+        }
+        return seen.size >= slider.childElementCount
+      }, { timeout: Math.min(deadline - Date.now(), 12000), polling: 300 }).catch(() => {})
+    } else {
+      await page.waitForSelector("video", { timeout: Math.min(deadline - Date.now(), 10000) }).catch(() => {})
+      await page.waitForFunction(() => Boolean(detailJson), { timeout: Math.min(deadline - Date.now(), 6000) }).catch(() => {})
+    }
+    mark("waits")
 
     const domInfo = await page.evaluate(awemeId => {
       const video = document.querySelector("video")
@@ -119,14 +191,43 @@ async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT
       const title = ogTitle || document.querySelector("h1")?.textContent || document.title || ""
       const poster = video?.poster || document.querySelector('meta[property="og:image"]')?.content || ""
       const jsonLd = document.querySelector('script[type="application/ld+json"]')?.textContent || ""
-      return { src: String(src || ""), poster: String(poster || ""), title: String(title || "").trim(), ogTitle: String(ogTitle || "").trim(), jsonLd, awemeId }
+      // 图集图片:slider 图 ∪ 播放器容器标记图(两者在等待退出时已凑齐,
+      // 下游按图床对象ID去重),再退到"非评论区带标记"、全部 douyinpic
+      const inPlayer = img => Boolean(img.closest('[data-e2e="feed-active-video"], [data-e2e="player-container"]'))
+      const notComment = img => (img.closest("[data-e2e]")?.getAttribute("data-e2e") || "") !== "comment-item"
+      const hasMark = url => /biz_tag=aweme_images|PackSourceEnum_AWEME_DETAIL|tplv-dy-aweme-images/i.test(String(url))
+      const douyinpicSrc = img => String(img.src || img.getAttribute("data-src") || "")
+      const douyinpicImages = [...document.querySelectorAll('img[src*="douyinpic"]')].map(douyinpicSrc).filter(Boolean)
+      const sliderImages = [...document.querySelectorAll(".xgplayer-slider img")]
+        .map(douyinpicSrc)
+        .filter(url => /douyinpic\./i.test(String(url)))
+      const inPlayerMarked = [...document.querySelectorAll('img[src*="douyinpic"]')]
+        .filter(img => inPlayer(img) && hasMark(img.src))
+        .map(douyinpicSrc)
+      const byMarker = [...document.querySelectorAll('img[src*="douyinpic"]')]
+        .filter(img => notComment(img) && hasMark(img.src))
+        .map(douyinpicSrc)
+      const gallerySet = [...sliderImages, ...inPlayerMarked]
+      const galleryImages = gallerySet.length ? gallerySet
+        : byMarker.length ? byMarker
+        : douyinpicImages
+      return { src: String(src || ""), poster: String(poster || ""), title: String(title || "").trim(), ogTitle: String(ogTitle || "").trim(), jsonLd, galleryImages, awemeId }
     }, awemeId).catch(() => null)
 
+    const domGalleryImages = dedupeByTosKey((domInfo?.galleryImages || []).map(String))
+    const noteImages = detailJson
+      ? dedupeByTosKey(extractNoteImagesFromJson(detailJson))
+      : domGalleryImages
+    const playUrl = (domInfo && /^https?:\/\//i.test(domInfo.src) ? domInfo.src : "") || (detailJson ? extractPlayUrlFromJson(detailJson) : "")
     const result = {
-      play_url: domInfo && /^https?:\/\//i.test(domInfo.src) ? domInfo.src : (detailJson ? extractPlayUrlFromJson(detailJson) : ""),
+      play_url: playUrl,
+      images: noteImages,
+      media_kind: playUrl ? (isNoteShare ? "note" : "video") : (noteImages.length ? "note" : "video"),
       cover_url: domInfo?.poster || "",
       title: domInfo?.title || "",
       author: "",
+      // 图文作品不搬轮播视频(要的是图集本身);duration 保持 0,
+      // shouldAttachDouyinVideo 会拦下视频路径,relay 走图集图片。
       duration: 0,
       aweme_id: awemeId || card.aweme_id || "",
       final_url: page.url()
@@ -150,11 +251,12 @@ async function resolveDouyinShareInPage(card = {}, { timeoutMs = RESOLVE_TIMEOUT
     // 桌面页标题带 " - 抖音" 后缀
     result.title = result.title.replace(/\s*[-|]\s*抖音\s*$/u, "").trim() || result.title
 
-    if (!/^https?:\/\//i.test(result.play_url)) {
+    if (!/^https?:\/\//i.test(result.play_url) && !result.images.length) {
       logger?.warn?.(`[抖音] 浏览器解析未取得播放地址 aweme=${result.aweme_id || "?"} 页面=${page.url()}`)
       return null
     }
-    logger?.info?.(`[抖音] 浏览器解析成功 aweme=${result.aweme_id || "?"} duration=${result.duration}s 来源=${domInfo && /^https?:/.test(domInfo.src) ? "video元素" : "detail响应"}`)
+    mark("done")
+    logger?.info?.(`[抖音] 浏览器解析成功 aweme=${result.aweme_id || "?"} ${result.images.length ? `图集${result.images.length}张` : `duration=${result.duration}s`} 来源=${detailJson ? "detail响应" : domInfo && /^https?:/.test(domInfo.src) ? "video元素" : "页面图片"} note=${isNoteShare ? 1 : 0} 分段=${JSON.stringify(timing)}`)
     return result
   } catch (error) {
     logger?.warn?.(`[抖音] 浏览器解析异常: ${error.message}`)

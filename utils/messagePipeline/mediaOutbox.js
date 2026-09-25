@@ -456,13 +456,21 @@ export class MediaOutbox {
           inlineSegments.push(item)
         }
       }
+      // 图集(图文作品)节点:与视频节点同构,每张图一个节点,全部进同一条合并转发
+      const galleryImages = []
+      for (const image of Array.isArray(relay.imageNodes) ? relay.imageNodes : []) {
+        if (image?.type !== "image") continue
+        relay.sharedMediaFiles ||= []
+        galleryImages.push(await inlineForwardLocalFileSegment(image, { artifactStore: this.artifactStore, sharedMedia: this.sharedMedia, sharedMediaFiles: relay.sharedMediaFiles }))
+      }
       timings.encode += Date.now() - encodeStartedAt
       const botRoot = globalThis.Bot
       const senderId = Number(job.botId || botRoot?.uin || 0) || 0
       const senderName = botRoot?.bots?.[String(job.botId)]?.nickname || botRoot?.nickname || "希洛"
       const nodes = [
         { user_id: senderId, nickname: senderName, message: [this.formatInfo(job, card), ...inlineSegments] },
-        ...videos.map(video => ({ user_id: senderId, nickname: senderName, message: [video] }))
+        ...videos.map(video => ({ user_id: senderId, nickname: senderName, message: [video] })),
+        ...galleryImages.map(image => ({ user_id: senderId, nickname: senderName, message: [image] }))
       ]
       await heartbeat.assertOwned()
       this.logger?.info?.(`[MediaOutbox] 发送 group=${job.groupId} id=${job.id} attempt=${job.attempts} nodes=${nodes.length}`)
