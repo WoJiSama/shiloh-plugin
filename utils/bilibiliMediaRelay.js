@@ -1,14 +1,13 @@
 import fs from "fs"
 import os from "os"
 import path from "path"
-import { Readable, Transform } from "stream"
-import { pipeline } from "stream/promises"
 import {
   BILIBILI_ARCHIVE_VIDEO_MAX_SECONDS,
   resolveBilibiliPlaybackResult,
   shouldAttachBilibiliVideo
 } from "./bilibiliMessage.js"
 import { buildMediaArtifactKey } from "./messagePipeline/mediaArtifactStore.js"
+import { fetchDownloadToFile } from "./parallelDownload.js"
 
 export const BILIBILI_ARCHIVE_VIDEO_MAX_BYTES = 512 * 1024 * 1024
 const BILIBILI_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
@@ -27,40 +26,24 @@ export async function downloadBilibiliArchiveVideo(resource = {}, { logger = glo
   const filePath = path.join(dir, `${safeBvid}-p${Number(resource.page || 1)}-${Date.now()}-${Math.random().toString(16).slice(2)}.mp4`)
 
   for (const url of candidates) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), BILIBILI_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS)
     try {
       const headers = {
           Referer: "https://www.bilibili.com/",
           "User-Agent": "Mozilla/5.0"
         }
       if (authCookie) headers.Cookie = String(authCookie)
-      const response = await fetch(url, {
+      // B站 CDN 对单连接限速(~1MB/s 实测),Range 分片并发可快一个数量级;
+      // 不支持 Range 的线路自动退回单流
+      await fetchDownloadToFile(url, filePath, {
         headers,
-        signal: controller.signal
+        maxBytes: BILIBILI_ARCHIVE_VIDEO_MAX_BYTES,
+        timeoutMs: BILIBILI_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS,
+        logger: getLogger(logger)
       })
-      if (!response.ok || !response.body) continue
-      const contentLength = Number(response.headers.get("content-length") || 0)
-      if (contentLength > BILIBILI_ARCHIVE_VIDEO_MAX_BYTES) continue
-
-      let downloadedBytes = 0
-      const limitStream = new Transform({
-        transform(chunk, encoding, callback) {
-          downloadedBytes += chunk.length
-          if (downloadedBytes > BILIBILI_ARCHIVE_VIDEO_MAX_BYTES) {
-            callback(new Error("B站视频本体超过512MB安全上限"))
-            return
-          }
-          callback(null, chunk)
-        }
-      })
-      await pipeline(Readable.fromWeb(response.body), limitStream, fs.createWriteStream(filePath))
       const stat = await fs.promises.stat(filePath)
       if (stat.size > 0 && stat.size <= BILIBILI_ARCHIVE_VIDEO_MAX_BYTES) return filePath
     } catch (error) {
       getLogger(logger).warn?.(`[MessageArchive] B站视频本体下载失败: ${error.message}`)
-    } finally {
-      clearTimeout(timer)
     }
     await fs.promises.unlink(filePath).catch(() => {})
   }
