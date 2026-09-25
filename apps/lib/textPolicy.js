@@ -1,5 +1,6 @@
 // 回复文本策略:卡面确认语、教学型解释识别、长提示压缩等纯函数。
 // 从 apps/test.js 原样迁出(P2),行为不变。
+import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 
 export function cardAcknowledgement(presentation = "") {
   if (presentation === "narrative") return "好，我先写，正文整理成一张完整卡片发你。"
@@ -37,4 +38,32 @@ export function compactDrawPromptText(text = "", maxLength = 3800) {
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
     .trim(), maxLength)
+}
+
+// 判断回复是否含代码/markdown 结构(用于决定转卡面渲染)。除了围栏/标题/表格,
+// 还认中文说明里常见的行内标记:成对 **加粗**、反引号、`-` 列表——QQ 纯文本
+// 会把它们原样带星号发出去,必须进卡面。
+export function looksLikeCodeOrMarkdown(text = "") {
+  const content = String(text || "")
+  if (/```[\s\S]*```/.test(content)) return true
+  if (/^\s{0,3}#{1,4}\s+\S/m.test(content) && content.split(/\r?\n/).length >= 3) return true
+  if (/^\s*\|.+\|\s*$/m.test(content) && /^\s*\|[-:\s|]+\|\s*$/m.test(content)) return true
+
+  const lines = content.split(/\r?\n/)
+  const nonEmptyLines = lines.filter(line => line.trim())
+  if (nonEmptyLines.length < 3) return false
+
+  const boldCount = (content.match(/\*\*[^*\n]+\*\*/g) || []).length
+  const inlineCodeCount = (content.match(/`[^`\n]+`/g) || []).length
+  const bulletLines = nonEmptyLines.filter(line => /^\s*[-*+]\s+\S/.test(line)).length
+  if ((boldCount >= 2 || inlineCodeCount >= 2 || bulletLines >= 3) && nonEmptyLines.length >= 3) return true
+
+  const codeLineCount = nonEmptyLines.filter(line =>
+    /^\s*(def|class|for|if|elif|else|while|return|import|from|print|break|continue|const|let|var|function|class|export|switch|try|catch|public|private|static|package|func|fn)\b/.test(line) ||
+    /^\s{2,}\S/.test(line) ||
+    /[A-Za-z_$][\w$.\[\]]*\s*(?:=|==|===|>|<|\+|-|\*|\/)/.test(line) ||
+    /[{}]/.test(line)
+  ).length
+
+  return codeLineCount >= 2
 }

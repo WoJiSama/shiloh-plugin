@@ -157,10 +157,28 @@ export function sanitizePseudoToolLine(line) {
   return rawLine
 }
 
+// 字面 \n 展开是为模型把换行写成 "\n" 文本兜底的;
+// 但 \nabla、\neq、\nu 这类以 n 开头的 LaTeX 命令会被劈成换行+残词。
+// 数学片段先整体摘出,展开时再跳过后跟 ASCII 字母的 \n(命令形态)。
+function expandLiteralNewlines(text) {
+  const masked = []
+  const stashSegment = whole => {
+    masked.push(whole)
+    return `\ue004${masked.length - 1}\ue005`
+  }
+  let out = text
+    .replace(/\\\[([\s\S]+?)\\\]/g, stashSegment)
+    .replace(/\$\$([\s\S]+?)\$\$/g, stashSegment)
+    .replace(/\\\(([\s\S]+?)\\\)/g, stashSegment)
+  out = out.replace(/\\n(?![a-zA-Z])/g, "\n")
+  out = out.replace(/(?<!\w)\/n(?!\w)/g, "\n")
+  if (masked.length) out = out.replace(/\ue004(\d+)\ue005/g, (_, index) => masked[Number(index)] ?? "")
+  return out
+}
+
 export function sanitizeFinalReplyText(content) {
   let output = String(content || "").replace(/\r\n/g, "\n")
-  if (output.includes("\\n")) output = output.split("\\n").join("\n")
-  output = output.replace(/(?<!\w)\/n(?!\w)/g, "\n").trim()
+  output = expandLiteralNewlines(output).trim()
   if (!output) return ""
 
   output = ThinkingProcessor.removeThinking(output).trim()

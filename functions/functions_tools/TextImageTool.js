@@ -1,4 +1,6 @@
 import fs from "fs"
+import { createRequire } from "node:module"
+import { pathToFileURL } from "node:url"
 import { getSharedBrowser, scheduleSharedBrowserClose } from "../../utils/sharedBrowser.js"
 import path from "path"
 import sharp from "sharp"
@@ -249,6 +251,120 @@ function escapeXml(text = "") {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;")
 }
+
+// ── LaTeX 数学渲染(katex) ──
+// 模型输出的推导/科普回复带 \( ... \)、\[ ... \]、$...$、$$...$$ 定界符,
+// 不做数学排版会把 \frac 等源码原样排进卡面。katex 由 markmap 生态传递引入,
+// 缺失时回退为纯文本源码,不影响既有渲染。
+const requireFromHere = createRequire(import.meta.url)
+let katexModule
+function loadKatex() {
+  if (katexModule !== undefined) return katexModule
+  try {
+    katexModule = requireFromHere("katex")
+  } catch {
+    katexModule = null
+  }
+  return katexModule
+}
+
+let katexCssHrefCache
+function getKatexCssHref() {
+  if (katexCssHrefCache !== undefined) return katexCssHrefCache
+  try {
+    katexCssHrefCache = pathToFileURL(requireFromHere.resolve("katex/dist/katex.min.css")).href
+  } catch {
+    katexCssHrefCache = ""
+  }
+  return katexCssHrefCache
+}
+
+const MATH_TOKEN_START = "\ue000"
+const MATH_TOKEN_END = "\ue001"
+const MATH_TOKEN_PATTERN = /\ue000(\d+)\ue001/g
+const MATH_TOKEN_ONLY_PATTERN = /^\ue000(\d+)\ue001$/
+
+// 单美元 $...$ 极易和金额/货币混淆(如"花了 $5"),只有内容带数学信号时才认定
+function looksLikeInlineDollarMath(inner = "") {
+  if (!inner || inner !== inner.trim()) return false
+  if (/^\d[\d,.]*\s*(元|块|美元|美金|刀|rmb|usd)?$/i.test(inner)) return false
+  return /\\[a-zA-Z]+|[{}^_]|[a-zA-Z)]\s*[=<>≈≤≥]|\d\s*[+\-*/×÷]\s*\d/.test(inner)
+}
+
+export function hasLatexMath(text = "") {
+  const src = String(text || "")
+  if (!src) return false
+  if (/\\\([\s\S]*?\\\)/.test(src)) return true
+  if (/\\\[[\s\S]*?\\\]/.test(src)) return true
+  if (/\$\$[\s\S]+?\$\$/.test(src)) return true
+  return (src.match(/\$[^$\n]{1,200}\$/g) || []).some(match => looksLikeInlineDollarMath(match.slice(1, -1)))
+}
+
+// 把数学片段替换为私有区占位符,HTML 骨架生成完再回填 katex 结果;
+// 占位符不含 markdown/转义敏感字符,可安全穿过 escapeXml 与内联 markdown 处理
+export function extractLatexMath(text = "") {
+  const math = []
+  const stash = (tex, display, raw) => {
+    const id = math.length
+    math.push({ tex: tex.trim(), display, raw })
+    return `${MATH_TOKEN_START}${id}${MATH_TOKEN_END}`
+  }
+  // 围栏代码块内的 $$ 是 bash 进程号等代码语义,先整块摘出去不做公式提取
+  const fences = []
+  let out = String(text || "").replace(/```[\s\S]*?(?:```|$)/g, whole => {
+    fences.push(whole)
+    return `\ue002${fences.length - 1}\ue003`
+  })
+  out = out.replace(/\\\[([\s\S]+?)\\\]/g, (whole, tex) => stash(tex, true, whole))
+  out = out.replace(/\$\$([\s\S]+?)\$\$/g, (whole, tex) => stash(tex, true, whole))
+  out = out.replace(/\\\(([\s\S]+?)\\\)/g, (whole, tex) => stash(tex, false, whole))
+  out = out.replace(/\$([^$\n]{1,200})\$/g, (whole, tex) => (looksLikeInlineDollarMath(tex) ? stash(tex, false, whole) : whole))
+  if (fences.length) out = out.replace(/\ue002(\d+)\ue003/g, (_, id) => fences[Number(id)] ?? "")
+  return { text: out, math }
+}
+
+function renderMathTokenHtml(entry) {
+  const katex = loadKatex()
+  if (!katex) return ""
+  try {
+    return katex.renderToString(entry.tex, {
+      displayMode: entry.display,
+      throwOnError: false,
+      strict: false,
+      output: "html"
+    })
+  } catch {
+    return ""
+  }
+}
+
+function fillMathTokens(html, math) {
+  if (!math?.length) return html
+  return html.replace(MATH_TOKEN_PATTERN, (_, id) => {
+    const entry = math[Number(id)]
+    if (!entry) return ""
+    if (entry.html === undefined) {
+      entry.html = renderMathTokenHtml(entry) || escapeXml(entry.raw)
+    }
+    return entry.html
+  })
+}
+
+function isDisplayMathLine(line, math) {
+  const match = String(line || "").trim().match(MATH_TOKEN_ONLY_PATTERN)
+  return Boolean(match && math[Number(match[1])]?.display)
+}
+
+function katexStylesheetLink(text = "") {
+  if (!hasLatexMath(text) || !loadKatex()) return ""
+  const href = getKatexCssHref()
+  return href ? `\n  <link rel="stylesheet" href="${href}">` : ""
+}
+
+const KATEX_CARD_CSS = `
+    .math-display { margin: 14px 0 20px; padding: 2px 0; text-align: center; overflow-x: auto; }
+    .math-display .katex-display { margin: 0; }
+    .katex { font-size: 1.18em; }`
 
 function stripInlineMarkdown(text = "") {
   return String(text)
@@ -691,8 +807,9 @@ function getPlainCodeBlock(text) {
 }
 
 export function shouldUseDocumentTemplateForTextImage(text = "") {
-  const content = String(text || "")
+  const content = normalizeMarkdownHeadings(String(text || ""))
   if (!content.trim()) return false
+  if (hasLatexMath(content)) return true
   if (/```[\s\S]*```/.test(content)) return true
   if (normalizeImplicitCodeFences(content) !== content.replace(/\r\n/g, "\n")) return true
   if (looksLikeMarkdown(content)) return true
@@ -747,7 +864,7 @@ function flushMarkdownLines(blocks, lines) {
 }
 
 function parseMarkdown(text) {
-  const normalizedText = normalizeImplicitCodeFences(text)
+  const normalizedText = normalizeImplicitCodeFences(normalizeMarkdownHeadings(text))
   const plainCodeBlock = getPlainCodeBlock(normalizedText)
   if (plainCodeBlock) return [plainCodeBlock]
 
@@ -836,11 +953,14 @@ async function deleteGeneratedFile(filePath) {
   }
 }
 
-function renderInlineMarkdownHtml(text = "") {
-  return escapeXml(text)
-    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/__([^_]+)__/g, "<strong>$1</strong>")
+function renderInlineMarkdownHtml(text = "", math = null) {
+  return fillMathTokens(
+    escapeXml(text)
+      .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/__([^_]+)__/g, "<strong>$1</strong>"),
+    math
+  )
 }
 
 function renderHighlightedCodeHtml(line, language = "") {
@@ -849,8 +969,23 @@ function renderHighlightedCodeHtml(line, language = "") {
     .join("") || " "
 }
 
+// 中文模型常输出 "##2工艺流程设计" 这种 # 后紧跟内容的标题(标准 markdown
+// 要求 # 后有空格,渲染层不认就整行掉成普通文字)。统一在入口补一个空格。
+// 只处理行首 2-3 个 #:单个 # 无空格的形态与 bash/python 行注释无法区分,保持原样;
+// 围栏代码块内的内容原样保留。
+export function normalizeMarkdownHeadings(text = "") {
+  const src = String(text || "")
+  if (!src.includes("#")) return src
+  return src
+    .split(/(```[\s\S]*?```)/g)
+    .map((segment, index) => index % 2 === 1 ? segment : segment.replace(/^(#{2,3})(?=\S)/gm, "$1 "))
+    .join("")
+}
+
 export function markdownToDocumentHtml(text = "") {
-  const normalizedText = normalizeImplicitCodeFences(text)
+  const prepared = extractLatexMath(normalizeImplicitCodeFences(normalizeMarkdownHeadings(text)))
+  const normalizedText = prepared.text
+  const math = prepared.math
   const html = []
   const paragraphLines = []
   let inCode = false
@@ -868,12 +1003,12 @@ export function markdownToDocumentHtml(text = "") {
     if (allList) {
       html.push(`<ul>${lines.map(line => {
         const item = line.replace(/^\s*(?:[-*+•]|\d+\.)\s+/, "")
-        return `<li>${renderInlineMarkdownHtml(item)}</li>`
+        return `<li>${renderInlineMarkdownHtml(item, math)}</li>`
       }).join("")}</ul>`)
       return
     }
 
-    html.push(`<p>${renderInlineMarkdownHtml(joined).replace(/\n+/g, "<br>")}</p>`)
+    html.push(`<p>${renderInlineMarkdownHtml(joined, math).replace(/\n+/g, "<br>")}</p>`)
   }
 
   const flushCode = () => {
@@ -897,10 +1032,10 @@ export function markdownToDocumentHtml(text = "") {
     if (!rows.length) return
     const [header, ...body] = rows
     const width = Math.max(header.length, ...body.map(r => r.length))
-    const th = header.map(cell => `<th>${renderInlineMarkdownHtml(cell)}</th>`).join("")
+    const th = header.map(cell => `<th>${renderInlineMarkdownHtml(cell, math)}</th>`).join("")
     const trs = body.map(row => {
       const tds = []
-      for (let i = 0; i < width; i++) tds.push(`<td>${renderInlineMarkdownHtml(row[i] || "")}</td>`)
+      for (let i = 0; i < width; i++) tds.push(`<td>${renderInlineMarkdownHtml(row[i] || "", math)}</td>`)
       return `<tr>${tds.join("")}</tr>`
     }).join("")
     html.push(`<table class="md-table"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`)
@@ -936,18 +1071,24 @@ export function markdownToDocumentHtml(text = "") {
       continue
     }
 
+    if (isDisplayMathLine(rawLine, math)) {
+      flushParagraph()
+      html.push(`<div class="math-display">${fillMathTokens(rawLine.trim(), math)}</div>`)
+      continue
+    }
+
     const heading = rawLine.match(/^\s*(#{1,4})\s+(.+)$/)
     if (heading) {
       flushParagraph()
       const level = Math.min(4, heading[1].length)
-      html.push(`<h${level}>${renderInlineMarkdownHtml(heading[2].trim())}</h${level}>`)
+      html.push(`<h${level}>${renderInlineMarkdownHtml(heading[2].trim(), math)}</h${level}>`)
       continue
     }
 
     const quote = rawLine.match(/^\s*>\s+(.+)$/)
     if (quote) {
       flushParagraph()
-      html.push(`<blockquote>${renderInlineMarkdownHtml(quote[1].trim())}</blockquote>`)
+      html.push(`<blockquote>${renderInlineMarkdownHtml(quote[1].trim(), math)}</blockquote>`)
       continue
     }
 
@@ -961,7 +1102,9 @@ export function markdownToDocumentHtml(text = "") {
 }
 
 export function markdownToKnowledgeHtml(text = "") {
-  const normalizedText = normalizeImplicitCodeFences(text)
+  const prepared = extractLatexMath(normalizeImplicitCodeFences(text))
+  const normalizedText = prepared.text
+  const math = prepared.math
   const html = []
   const paragraphLines = []
   let inCode = false
@@ -982,19 +1125,19 @@ export function markdownToKnowledgeHtml(text = "") {
     const keyValue = lines.map(line => line.match(/^(?:[-*+•]\s+)?(?:\*\*)?([^:：*]{1,28})(?:\*\*)?\s*[：:]\s*(.+)$/))
 
     if (ordered) {
-      html.push(`<ol class="knowledge-steps">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^\d+[.、]\s+/, ""))}</li>`).join("")}</ol>`)
+      html.push(`<ol class="knowledge-steps">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^\d+[.、]\s+/, ""), math)}</li>`).join("")}</ol>`)
       return
     }
     if (unordered) {
-      html.push(`<ul class="knowledge-checklist">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^(?:[-*+•])\s+/, ""))}</li>`).join("")}</ul>`)
+      html.push(`<ul class="knowledge-checklist">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^(?:[-*+•])\s+/, ""), math)}</li>`).join("")}</ul>`)
       return
     }
     if (keyValue.every(Boolean) && keyValue.length >= 2) {
-      html.push(`<dl class="knowledge-facts">${keyValue.map(match => `<div><dt>${renderInlineMarkdownHtml(match[1].trim())}</dt><dd>${renderInlineMarkdownHtml(match[2].trim())}</dd></div>`).join("")}</dl>`)
+      html.push(`<dl class="knowledge-facts">${keyValue.map(match => `<div><dt>${renderInlineMarkdownHtml(match[1].trim(), math)}</dt><dd>${renderInlineMarkdownHtml(match[2].trim(), math)}</dd></div>`).join("")}</dl>`)
       return
     }
 
-    const content = renderInlineMarkdownHtml(lines.join("\n")).replace(/\n+/g, "<br>")
+    const content = renderInlineMarkdownHtml(lines.join("\n"), math).replace(/\n+/g, "<br>")
     const className = hasTitle && !hasLead ? "knowledge-lead" : "knowledge-paragraph"
     html.push(`<p class="${className}">${content}</p>`)
     hasLead ||= hasTitle
@@ -1033,11 +1176,17 @@ export function markdownToKnowledgeHtml(text = "") {
       continue
     }
 
+    if (isDisplayMathLine(rawLine, math)) {
+      flushParagraph()
+      html.push(`<div class="math-display">${fillMathTokens(rawLine.trim(), math)}</div>`)
+      continue
+    }
+
     const heading = rawLine.match(/^\s*(#{1,3})\s+(.+)$/)
     if (heading) {
       flushParagraph()
       const level = heading[1].length
-      const title = renderInlineMarkdownHtml(heading[2].trim())
+      const title = renderInlineMarkdownHtml(heading[2].trim(), math)
       if (!hasTitle && level === 1) {
         html.push(`<header class="knowledge-header"><div class="knowledge-kicker">知识说明</div><h1>${title}</h1></header>`)
         hasTitle = true
@@ -1052,7 +1201,7 @@ export function markdownToKnowledgeHtml(text = "") {
     const quote = rawLine.match(/^\s*>\s+(.+)$/)
     if (quote) {
       flushParagraph()
-      html.push(`<aside class="knowledge-note"><span>提示</span><p>${renderInlineMarkdownHtml(quote[1].trim())}</p></aside>`)
+      html.push(`<aside class="knowledge-note"><span>提示</span><p>${renderInlineMarkdownHtml(quote[1].trim(), math)}</p></aside>`)
       continue
     }
     paragraphLines.push(rawLine)
@@ -1187,8 +1336,8 @@ function buildDocumentHtml(text = "") {
     .token.literal { color: #f472b6; }
     .token.function { color: #93c5fd; }
     .token.operator { color: #f9a8d4; }
-    .token.punctuation { color: #94a3b8; }
-  </style>
+    .token.punctuation { color: #94a3b8; }${KATEX_CARD_CSS}
+  </style>${katexStylesheetLink(text)}
 </head>
 <body>
   <main class="document">
@@ -1237,8 +1386,8 @@ function buildKnowledgeHtml(text = "") {
     .code-block { position: relative; margin: 12px 0 22px; padding: 44px 20px 18px; overflow: hidden; border-radius: 6px; background: #111827; color: #e5e7eb; font-family: Consolas, "SFMono-Regular", Menlo, monospace; font-size: 20px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
     .code-label { position: absolute; top: 12px; left: 18px; color: #9ca3af; font-size: 15px; font-weight: 700; text-transform: uppercase; }
     .code-line { min-height: 31px; }
-    .token.keyword { color: #c084fc; } .token.string { color: #86efac; } .token.number { color: #fbbf24; } .token.comment { color: #7dd3fc; } .token.literal { color: #f472b6; } .token.function { color: #93c5fd; } .token.operator { color: #f9a8d4; } .token.punctuation { color: #94a3b8; }
-  </style>
+    .token.keyword { color: #c084fc; } .token.string { color: #86efac; } .token.number { color: #fbbf24; } .token.comment { color: #7dd3fc; } .token.literal { color: #f472b6; } .token.function { color: #93c5fd; } .token.operator { color: #f9a8d4; } .token.punctuation { color: #94a3b8; }${KATEX_CARD_CSS}
+  </style>${katexStylesheetLink(text)}
 </head>
 <body>
   <main class="knowledge">${markdownToKnowledgeHtml(text)}</main>
@@ -1251,7 +1400,7 @@ export class TextImageTool extends AbstractTool {
     super()
     this.name = "textImageTool"
     this.description =
-      "把文字、Markdown 或代码内容渲染成图片并发送。普通短文本使用 QQ 聊天气泡；代码、Markdown 用 document 文档卡；科普、技术讲解、推导和入门路线用 knowledge 知识卡，它会把标题、结论、步骤、清单、提示和代码块排成易读的层级。用户明确要求纯文本、Markdown 原文或代码原文时不要擅自转图。"
+      "把文字、Markdown 或代码内容渲染成图片并发送。普通短文本使用 QQ 聊天气泡；代码、Markdown 用 document 文档卡；科普、技术讲解、推导和入门路线用 knowledge 知识卡，它会把标题、结论、步骤、清单、提示和代码块排成易读的层级。数学公式直接写 LaTeX（行内 \\( ... \\)、独立行 \\[ ... \\] 或 $$ ... $$），会渲染成排版公式而不是源码。用户明确要求纯文本、Markdown 原文或代码原文时不要擅自转图。"
     this.parameters = {
       type: "object",
       properties: {
@@ -1325,6 +1474,9 @@ export class TextImageTool extends AbstractTool {
       outputDir,
       `safe_text_${template}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
     )
+    // 卡面可能引用 file:// 的 katex 样式与字体;setContent 的 about:blank 页面
+    // 会拦截 file:// 子资源,必须落盘成临时 HTML 再以 file:// 打开
+    const htmlPath = outputPath.replace(/\.png$/, ".html")
 
     let page
     try {
@@ -1332,7 +1484,9 @@ export class TextImageTool extends AbstractTool {
       page = await browser.newPage()
       await page.setViewport({ width: 980, height: 1200, deviceScaleFactor: 2 })
       const html = template === "knowledge" ? buildKnowledgeHtml(text) : buildDocumentHtml(text)
-      await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 })
+      await fs.promises.writeFile(htmlPath, html)
+      await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load", timeout: 60000 })
+      await page.evaluate(() => document.fonts.ready)
       const clip = await page.evaluate(() => {
         const body = document.body
         const height = Math.ceil(body.getBoundingClientRect().height)
@@ -1345,6 +1499,7 @@ export class TextImageTool extends AbstractTool {
       throw error
     } finally {
       if (page) await page.close().catch(() => {})
+      await deleteGeneratedFile(htmlPath)
       scheduleSharedBrowserClose()
     }
   }
