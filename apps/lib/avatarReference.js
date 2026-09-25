@@ -1,7 +1,8 @@
 // 头像检查/头像生图引用的解析:从文本与艾特里定位目标成员与参考图。
 // 从 apps/test.js 原样迁出(P2),行为不变。
-import { removeBotAnchors } from "../../utils/messageContext.js"
-import { isImageGenerationRequest } from "../../core/intent/messageIntent.js"
+import { removeBotAnchors, buildQqAvatarUrl, formatMemberDisplayName, getMemberNames, matchGroupMembersByTerms, uniqText } from "../../utils/messageContext.js"
+import { isImageGenerationRequest, isAvatarInspectionRequest, normalizeIntentText } from "../../core/intent/messageIntent.js"
+import { shouldSkipNicknameAvatarReference } from "../../utils/avatarReferencePolicy.js"
 import { normalizeForContainment, getReplyTargetUserId } from "./messageSegments.js"
 
 export function extractAvatarLookupTerms(text = "", botName = "", prefixes = []) {
@@ -167,4 +168,61 @@ export function resolveAvatarDrawReference({ e = {}, text = "", atQq = [], membe
 export function formatAvatarDrawReferencePrompt(reference = null) {
   if (!reference?.images?.length) return ""
   return reference.promptHint || ""
+}
+
+// LLM 头像参考规划的机械校验/落地:模型输出的 references 只允许指认本轮
+// 真实提及的成员(@列表/发送者/回复目标),幻觉 qq 一律丢弃;合法项解析出
+// 展示名与头像 URL,供调用方直接拼 prompt 与 images。
+export function resolveMemberAvatarReferences(references = [], { memberMap = null, atQq = [], currentUserId = null, replyTargetUserId = null } = {}) {
+  const allowed = new Set()
+  for (const qq of Array.isArray(atQq) ? atQq : []) {
+    const digits = String(qq || "").replace(/\D/g, "")
+    if (digits) allowed.add(digits)
+  }
+  for (const qq of [currentUserId, replyTargetUserId]) {
+    const digits = String(qq || "").replace(/\D/g, "")
+    if (digits) allowed.add(digits)
+  }
+  if (!allowed.size) return []
+
+  const seen = new Set()
+  const resolved = []
+  for (const item of references) {
+    if (!item || typeof item !== "object") continue
+    const qq = String(item.qq || "").replace(/\D/g, "")
+    const role = String(item.role || "").trim().slice(0, 80)
+    if (!qq || !allowed.has(qq) || seen.has(qq)) continue
+    seen.add(qq)
+    const member = memberMap?.get?.(Number(qq))
+    resolved.push({
+      qq,
+      role: role || "画面角色",
+      label: `${member ? formatMemberDisplayName(member, `用户${qq}`) : `用户${qq}`}(QQ:${qq})`,
+      image: buildQqAvatarUrl(qq)
+    })
+  }
+  return resolved
+}
+
+// 组装画图请求的参考图集:单一事实源——images 数组与编号清单在同一次调用里
+// 派生,结构上不可能再出现"清单编号与附件顺序错位"(踩过的坑)。
+// existingRole 由 LLM 声明用户图的作用:style(画风参考,默认)/compose(内容需
+// 保留)/ignore(调用方应已丢弃用户图)。输入图超过通道上限时不做拼接,直接
+// 透传,由上游报错(如 grok 的 "at most 3 input image(s)")暴露给用户。
+export function assembleReferenceImages({ existingImages = [], resolved = [], existingRole = "style" } = {}) {
+  const existing = (Array.isArray(existingImages) ? existingImages : []).map(String)
+  const roleText = existingRole === "compose" ? "内容/主体需保留在画面中" : "画风/内容参考"
+  const images = [...existing, ...resolved.map(item => item.image)]
+  const userImageCount = existing.length
+  const lines = []
+  if (userImageCount > 0) {
+    lines.push(`参考图1~${userImageCount}: 用户提供的图片(${roleText})，不属于成员头像。`)
+  }
+  resolved.forEach((item, index) => {
+    lines.push(`参考图${userImageCount + index + 1}(按附加顺序): ${item.label} → 角色:${item.role}`)
+  })
+  const manifest = resolved.length || userImageCount
+    ? `【参考图清单(按附加顺序)】\n${lines.join("\n")}\n${resolved.length ? "请把每张头像参考图对应的人物画进所指派的角色，保留头像可见的发型、瞳色、脸部观感、服饰/配色与整体气质；不要把角色安错人。\n" : ""}请严格按编号对应附图，不要把用户图片错认成成员头像。`
+    : ""
+  return { images, manifest }
 }

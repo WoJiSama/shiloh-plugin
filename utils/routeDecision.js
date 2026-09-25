@@ -232,6 +232,12 @@ export const ROUTE_RULES = [
         })
       )
       if (!preferImageGeneration) return null
+      // 提及了群成员(@了某人/回复某人)时让路给语义规划器:
+      // 由 LLM 判断是否挂成员头像参考并分配画面角色,正则快路不再抢注。
+      const mentionedMember =
+        (Array.isArray(ctx.session?.atQq) && ctx.session.atQq.length > 0) ||
+        Boolean(ctx.session?.groupContextAssets?.replyTargetUserId)
+      if (mentionedMember) return null
       const tools = ctx.applyTools(["bananaTool"])
       if (!tools?.length) {
         // 原块 4819-4825:显式生图但没有可用渠道 → 发失败提示并终止本回合(由主链路执行)
@@ -285,6 +291,10 @@ export const ROUTE_RULES = [
         images: ctx.images,
         videos: ctx.videos,
         avatarDrawReference: ctx.session.avatarDrawReference,
+        memberMap: ctx.session.memberMap,
+        atQq: ctx.session.atQq,
+        currentUserId: ctx.userId,
+        replyTargetUserId: ctx.session?.groupContextAssets?.replyTargetUserId,
         groupWorkflowPrompt: ctx.groupWorkflowPrompt,
         sessionTools: ctx.helpers.semanticSessionTools()
       })

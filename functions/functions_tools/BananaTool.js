@@ -94,6 +94,24 @@ export class BananaTool extends AbstractTool {
         progressText: {
           type: 'string',
           description: '可选：结合当前绘图要求生成一句自然开场；必须符合真实任务类型，不能把文生图说成看图或改图'
+        },
+        references: {
+          type: 'array',
+          description: '群成员头像参考：用户想让群友形象出现在画面里时按角色列出；qq 必须取自消息中真实被@/被指认的成员，绝不编造；系统会自动下载头像并按本数组顺序附加',
+          items: {
+            type: 'object',
+            properties: {
+              qq: { type: 'string', description: '群成员QQ号（纯数字）' },
+              role: { type: 'string', description: '该成员在画面中的角色/位置描述，如"画面中央的主体""左侧的恶魔""右侧的天使"' }
+            },
+            required: ['qq', 'role'],
+            additionalProperties: false
+          }
+        },
+        userImagesRole: {
+          type: 'string',
+          enum: ['style', 'ignore', 'compose'],
+          description: '可选：用户已提供图片（引用/上传）在本次绘图中的作用。style=画风/内容参考（默认）；ignore=忽略用户图，只按成员头像与文字画；compose=用户图内容本身要保留在画面（图生图）。仅在携带 images 且与 references 配合时填写'
         }
       },
       required: ['prompt'],

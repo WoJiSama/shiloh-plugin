@@ -34,9 +34,12 @@ export function registerToolManifest(manifest = {}) {
   if (!name) return
   if (manifest.terminal === true) terminalTools.add(name)
   if (manifest.background === true) backgroundTerminalTools.add(name)
-  if (Array.isArray(manifest.triggers) && manifest.triggers.length) {
+  // triggers 或 disclosure 任一存在即登记:无 triggers 的清单只提供披露说明,
+  // 不参与候选选择(selectToolIntentCandidates 对无 triggers 的清单跳过)。
+  const hasTriggers = Array.isArray(manifest.triggers) && manifest.triggers.length > 0
+  if (hasTriggers || manifest.disclosure) {
     intentManifests.set(name, {
-      triggers: manifest.triggers,
+      triggers: hasTriggers ? manifest.triggers : [],
       disclosure: String(manifest.disclosure || ""),
       deterministicResolver: typeof manifest.deterministicResolver === "function" ? manifest.deterministicResolver : null
     })

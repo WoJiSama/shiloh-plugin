@@ -25,6 +25,8 @@ export const TURN_SESSION_FIELDS = [
   { name: "editAssets", owner: "改图参考素材(editReferencePipeline)" },
   { name: "avatarEditBase", owner: "头像改图底图" },
   { name: "avatarDrawReference", owner: "头像绘制参考" },
+  { name: "memberMap", owner: "本轮群成员表(供语义分类器成员候选与 references 幻觉校验)" },
+  { name: "atQq", owner: "本轮被@成员QQ列表(同上,LLM 头像参考规划的机械候选)" },
   { name: "avatarInspection", owner: "头像检查目标" },
   { name: "imageVerificationMode", owner: "图片核实模式" },
   { name: "imageVerificationNeedsSearch", owner: "图片核实是否需要搜索" },

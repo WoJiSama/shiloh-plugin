@@ -1,4 +1,5 @@
 import { EmotionManager } from "../domains/memory/EmotionManager.js"
+import { lastIncomingMsgAt, activeDedupeToolRuns, LOCAL_EMOJI_TOOL_NAME } from "./lib/splitState.js"
 import {
   hasExplicitRememberSignal,
   cleanTeachingAlias,
@@ -37,12 +38,13 @@ import {
   looksLikeEducationalExplanation,
   looksLikeDiagnosticExplanation,
   compactDrawPromptText
-} from "./lib/textPolicy.js"
+, looksLikeCodeOrMarkdown } from "./lib/textPolicy.js"
 import { MemoryManager } from "../domains/memory/MemoryManager.js"
 import { ExpressionLearner } from "../domains/memory/ExpressionLearner.js"
 import KnowledgeSearcher from "../domains/knowledge/KnowledgeSearcher.js"
 import KnowledgeExpander from "../domains/knowledge/KnowledgeExpander.js"
 import { checkPendingReminders } from "../functions/functions_tools/ReminderTool.js"
+import { hasLatexMath } from "../functions/functions_tools/TextImageTool.js"
 import { TakeImages } from "../utils/fileUtils.js"
 import { loadData, saveData } from "../utils/redisClient.js"
 import { YTapi } from "../utils/apiClient.js"
@@ -88,7 +90,7 @@ import { analyzeReplyText } from "../utils/SmartReply.js"
 import { buildMissingImageAnalysisReply, looksLikeImageAuthenticityRequest, looksLikeImageVerificationRequest, looksLikeVisualInspectionRequest, shouldAskForMissingImageForVisualRequest } from "../utils/imageRequestGuard.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../utils/chatCompletionUrl.js"
 import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLines, selectMergedImagePromptTexts } from "../utils/promptCompiler.js"
-import { buildToolIntentDisclosure, resolveDeterministicToolIntent, resolveToolRequestMergeMs, selectToolIntentCandidates } from "../utils/toolIntentManifests.js"
+import { buildToolIntentDisclosure, resolveDeterministicToolIntent, resolveToolRequestMergeMs, selectToolIntentCandidates, extractEmbeddedToolCalls } from "../utils/toolIntentManifests.js"
 import { extractValidBtihMagnetUri } from "../utils/torrentDownload.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../utils/toolSkills.js"
 import { formatGroupWorkflowTeachingPrompt } from "../domains/memory/engine/groupWorkflow.js"
@@ -168,7 +170,8 @@ import {
   normalizeToolDecision,
   classifySemanticToolIntent,
   buildToolCallFromDecision,
-  buildMissingToolCommitmentCall
+  buildMissingToolCommitmentCall,
+  extractJsonObject
 } from "./lib/semanticToolIntent.js"
 import {
   getQuotedPromptContextText,
@@ -228,7 +231,6 @@ const redBagCooldowns = new Map() // 红包冷却记录: key: groupId, value: la
 
 // 清空群记忆二次确认（P0-1）：进程内 pending，key: `${groupId}_${userId}`, value: 过期时间戳。
 
-const activeDedupeToolRuns = new Map()
 const taskStatusCache = new Map()
 const activeUserToolTaskCache = new Map()
 const directTriggerMergeTimers = new Map()
@@ -239,8 +241,6 @@ const pendingJudgments = [] // 批量判断队列
 let batchTimer = null // 批量处理定时器
 // smart 模式：每群独立的频率状态，进程内 Map，重启清零
 const trackingChatStates = new Map() // groupId -> { pendingCount, lastMsgAt, replyLatencies: [{at, ms}], forceContinue, forceGateCheck, lastGateNoActionAt, inFlight, waitTimers: Map<userKey, timeoutId> }
-// 群最后一条新消息到达时间戳，用于"准备回复前 debounce 看有没有新消息"（仅 smart 模式 set/读）
-const lastIncomingMsgAt = new Map() // groupId -> ts
 // 群连续被新消息打断的累计计数（达到上限后下一轮强制走完不再让步）
 const consecutiveInterrupts = new Map() // groupId -> count
 // smart 锁持有令牌：看门狗强制释放后旧轮次的 finally 不得误释放新轮次的锁
@@ -305,8 +305,6 @@ function parseToolConfigEntry(entry) {
   }
 }
 
-const LOCAL_EMOJI_TOOL_NAME = "sendLocalEmojiTool"
-
 function toolConfigHasName(toolNames, name) {
   return Array.isArray(toolNames) && toolNames.some(item => parseToolConfigEntry(item).name === name)
 }
@@ -363,25 +361,6 @@ function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearc
   })
 }
 
-function looksLikeCodeOrMarkdown(text = "") {
-  const content = String(text || "")
-  if (/```[\s\S]*```/.test(content)) return true
-  if (/^\s{0,3}#{1,4}\s+\S/m.test(content) && content.split(/\r?\n/).length >= 3) return true
-  if (/^\s*\|.+\|\s*$/m.test(content) && /^\s*\|[-:\s|]+\|\s*$/m.test(content)) return true
-
-  const lines = content.split(/\r?\n/)
-  const nonEmptyLines = lines.filter(line => line.trim())
-  if (nonEmptyLines.length < 3) return false
-
-  const codeLineCount = nonEmptyLines.filter(line =>
-    /^\s*(def|class|for|if|elif|else|while|return|import|from|print|break|continue|const|let|var|function|class|export|switch|try|catch|public|private|static|package|func|fn)\b/.test(line) ||
-    /^\s{2,}\S/.test(line) ||
-    /[A-Za-z_$][\w$.\[\]]*\s*(?:=|==|===|>|<|\+|-|\*|\/)/.test(line) ||
-    /[{}]/.test(line)
-  ).length
-
-  return codeLineCount >= 2
-}
 
 function applyToolRegistrySnapshot(state, snapshot = localToolRegistry.getSnapshot()) {
   state.toolInstances = snapshot.toolInstances
@@ -963,6 +942,8 @@ export class ExamplePlugin extends plugin {
     if (replyLooksLikeCodeOrMarkdown || (userAskedForCodeOrMarkdown && String(output || "").trim().length > 30)) {
       return "document"
     }
+    // 带 LaTeX 公式的回复直接铺在 QQ 纯文本里是满屏 \frac 源码,统一进知识卡做数学排版
+    if (hasLatexMath(output) || hasLatexMath(content)) return "knowledge"
     const longReply = analyzeReplyText(output)
     if (longReply.shouldRender) {
       return longReply.template
@@ -1548,7 +1529,22 @@ export class ExamplePlugin extends plugin {
       : textLines.join("\n")
     merged.msg = mergedText
     merged.raw_message = mergedText
-    merged.message = [{ type: "text", text: mergedText }]
+    // 合并不能丢 @:重建 message 时把各条消息的 at 段按出现顺序补回,
+    // 否则下游(头像参考/成员指认)只能看到最后一个 @ (e.at)。
+    const atTargets = []
+    for (const item of messages) {
+      for (const qq of collectMentionTargetIds(item.event || {}, latest.self_id)) {
+        if (!atTargets.includes(String(qq))) atTargets.push(String(qq))
+      }
+    }
+    merged.message = [
+      { type: "text", text: mergedText },
+      ...atTargets.map(qq => ({ type: "at", qq }))
+    ]
+    // 保留各条原始 CQ 文本(e.msg 已被剥掉 @,无法还原位置),供语义分类器做 @ 注解
+    merged._mergedRawCqTexts = messages
+      .map(item => String(item.event?.raw_message || ""))
+      .filter(text => text.includes("[CQ:at"))
     merged._directTriggerMerged = true
     merged._mergedMessageCount = totalCount
     merged._mergedRetainedMessageCount = textLines.length
@@ -2033,7 +2029,7 @@ export class ExamplePlugin extends plugin {
     // Gate 子代理复用 trackAiConfig（同样是"轻量 LLM 决策回不回话"用途，不再单独配置一份模型）
     const trackCfg = this.config.trackAiConfig
     const useCfg = {
-      url: trackCfg?.trackAiUrl,
+      url: normalizeChatCompletionUrl(trackCfg?.trackAiUrl),
       model: trackCfg?.trackAiModel || 'gpt-4o-mini',
       apikey: trackCfg?.trackAiApikey
     }
@@ -3622,7 +3618,22 @@ ${recentHistory || '(无)'}
         if (e.getReply) {
           try {
             repliedMessage = await e.getReply()
-          } catch {}
+          } catch (error) {
+            logger.warn(`[引用解析] getReply 异常 group=${groupId}: ${error?.message || error}`)
+          }
+          // NapCat 的 get_msg 存在间歇性失败(同一 reply_id 一成一败实测过);
+          // 静默吞掉会让"引用图当画风参考"整轮退化成纯文生图,补一次重试
+          if (!repliedMessage && e?.reply_id) {
+            await new Promise(resolve => setTimeout(resolve, 600))
+            try {
+              repliedMessage = await e.getReply()
+            } catch {}
+            if (repliedMessage) {
+              logger.info(`[引用解析] 重试成功 group=${groupId} reply_id=${e.reply_id}`)
+            } else {
+              logger.warn(`[引用解析] 重试仍失败 group=${groupId} reply_id=${e.reply_id}，本轮无引用上下文`)
+            }
+          }
         }
         const groupContextAssets = await resolveGroupContextAssets({
           e,
@@ -3680,6 +3691,9 @@ ${recentHistory || '(无)'}
         try {
           memberMap = e.group ? await e.group.getMemberMap() : null
         } catch {}
+        // 成员上下文供下游复用:语义分类器的头像参考候选、工具执行层的 references 校验
+        session.memberMap = memberMap
+        session.atQq = atQq
         const avatarEditBase = !images.length
           ? resolveAvatarEditBase({
               text: args || msg || "",
@@ -3776,7 +3790,12 @@ ${recentHistory || '(无)'}
         let modelIntentDecision = null
         const availableToolNamesNow = (this.toolInstances ? Object.keys(this.toolInstances) : [])
         const deterministicIntentReady = Boolean(resolveDeterministicToolIntent(currentIntentText, availableToolNamesNow, {
-          hasExcelContext,
+          // 意图快路先于 userContent 构建,这里用意图文本就地探测;
+          // 不能引用后面 const hasExcelContext(路由段),否则 TDZ 必崩
+          hasExcelContext: hasExcelWorkbookContext({
+            text: currentIntentText,
+            media: groupContextAssets?.media
+          }),
           hasPixivSearchSession: hasRecentPixivSearch({ group_id: groupId, user_id: userId })
         }))
         if (deterministicIntentReady) {
@@ -4261,6 +4280,23 @@ ${recentHistory || '(无)'}
           if (target.tool_calls?.length) {
             await this.processToolCalls(target, e, session, session.groupUserMessages, atQq, senderRole)
           } else if (target.content) {
+            // 降级链路兜底:聊天模型把工具调用写成 ```json 文本块时,转成真正的
+            // 工具调用执行(否则这段中间产物会被渲染成卡面,用户只看到黑块)
+            const embedded = extractEmbeddedToolCalls(target.content)
+            if (embedded.calls.length) {
+              const availableTools = new Set((session.tools || []).map(tool => tool?.function?.name).filter(Boolean))
+              const runnable = embedded.calls.find(call => availableTools.has(call.name))
+              if (runnable) {
+                logger.warn(`[降级兜底] 模型以文本形式输出工具调用，转正执行 tool=${runnable.name}`)
+                await this.processToolCalls({ role: "assistant", tool_calls: [this.buildForcedToolCall(runnable.name, runnable.params)] }, e, session, session.groupUserMessages, atQq, senderRole, { syntheticToolCall: true })
+                return true
+              }
+              if (!embedded.remainder.trim()) {
+                logger.warn(`[降级兜底] 回复只含不可执行的工具调用文本，跳过发送 names=${embedded.calls.map(call => call.name).join(",")}`)
+                return true
+              }
+              target = { ...target, content: embedded.remainder }
+            }
             const missingToolCall = this.buildMissingToolCommitmentCall(target.content, {
               e,
               args,
@@ -4562,7 +4598,7 @@ ${recentHistory || '(无)'}
 
   shouldUseSemanticToolIntent(...args) { return shouldUseSemanticToolIntent(this, ...args) }
   normalizeToolDecision(...args) { return normalizeToolDecision(this, ...args) }
-  resolveChatCompletionUrl(...args) { return resolveChatCompletionUrl(this, ...args) }
+  resolveChatCompletionUrl(...args) { return normalizeChatCompletionUrl(...args) }
   extractJsonObject(...args) { return extractJsonObject(this, ...args) }
   async classifySemanticToolIntent(...args) { return await classifySemanticToolIntent(this, ...args) }
   buildToolCallFromDecision(...args) { return buildToolCallFromDecision(this, ...args) }

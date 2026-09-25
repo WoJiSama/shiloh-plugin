@@ -1,9 +1,9 @@
 // 工具执行循环:消息规范化/终态判定/后台终态/图片核验接力/单次调用/
 // 多轮循环/最终执行。从 apps/test.js 原样迁出(P2),行为不变;
 // this 依赖以 host(插件实例)注入。
-import { TERMINAL_TOOL_NAMES, BACKGROUND_TERMINAL_TOOL_NAMES, getImageVerificationMode } from "../../core/intent/messageIntent.js"
-import { resolveEmojiTurnSkips } from "../../utils/emojiToolPolicy.js"
-import { buildModrinthBilingualReplyInstruction, parseModrinthRankingData, collectModrinthTranslations, cacheModrinthTranslations } from "../../utils/modrinth.js"
+import { TERMINAL_TOOL_NAMES, BACKGROUND_TERMINAL_TOOL_NAMES, getImageVerificationMode, isExplicitSearchRequest, isRealtimeInfoRequest } from "../../core/intent/messageIntent.js"
+import { resolveEmojiTurnSkips, looksLikeDirectPersonalQuestion, recordEmojiOnlySend } from "../../utils/emojiToolPolicy.js"
+import { buildModrinthBilingualReplyInstruction, parseModrinthRankingData, collectModrinthTranslations, cacheModrinthTranslations, buildModrinthCardItemsFromData, buildModrinthForwardItemsFromData, buildModrinthTranslationMessages, parseModrinthTranslationResponse, wrapModrinthForwardItems } from "../../utils/modrinth.js"
 import { buildToolGroundingInstruction, hasUsableToolResult, buildUnavailableToolReply } from "../../utils/toolResultGrounding.js"
 import { decideToolContinuation } from "../../utils/toolContinuationPolicy.js"
 import { resolveToolRoundLimit } from "../../utils/agentIntelligence.js"
@@ -11,6 +11,16 @@ import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 import { joinIntentParts } from "../../utils/messageContext.js"
 import { normalizeIntentText } from "../../core/intent/messageIntent.js"
 import { buildVisibleFailureDetail } from "../../utils/visibleFailure.js"
+import { isExplicitAdminCollectionMentionRequest } from "../../utils/mentionRoleRouting.js"
+import { mcpManager } from "../../utils/MCPClient.js"
+import { buildAgentProgressContext } from "../../utils/agentReplyComposer.js"
+import { buildChatRequestData, fetchWithTimeout } from "../../utils/modelGateway.js"
+import { clearDrawFailureNote, isImageDeliveryToolName, recordDrawTextFallback } from "../../utils/drawFailureNote.js"
+import { formatTurnPlanLog, recordTurnPlanToolOutcome } from "../../utils/turnPlan.js"
+import { looksLikeImageVerificationRequest } from "../../utils/imageRequestGuard.js"
+import { activeDedupeToolRuns, LOCAL_EMOJI_TOOL_NAME } from "./splitState.js"
+import { resolveMemberAvatarReferences, assembleReferenceImages } from "./avatarReference.js"
+import { replaceCqMentions } from "../../utils/mentionTargets.js"
 
 export function normalizeAssistantToolMessage(host, message) {
     const normalized = {
@@ -279,6 +289,56 @@ export async function runToolCall(host, toolCall, e, session, senderRole) {
     }
     if (toolName === "bananaTool") {
       if (!params.prompt && session.rawArgs) params.prompt = session.rawArgs
+      // LLM 头像参考规划落地:references(模型输出) → 头像 URL + 与数组同源的编号清单。
+      // 校验只认本轮真实提及的成员,幻觉 qq 在 resolveMemberAvatarReferences 内滤除。
+      // 注意:下方 buildImageGenerationPrompt 会用 args 重建 prompt 并丢弃这里对
+      // params.prompt 的追加,所以清单必须走 avatarDrawReference 通道传入。
+      const llmReferences = Array.isArray(params.references) ? params.references : []
+      let llmAvatarDrawReference = null
+      let llmAnnotatedArgs = ""
+      if (llmReferences.length) {
+        const resolved = resolveMemberAvatarReferences(llmReferences, {
+          memberMap: session.memberMap,
+          atQq: session.atQq,
+          currentUserId: e?.user_id,
+          replyTargetUserId: session.groupContextAssets?.replyTargetUserId
+        })
+        // LLM 声明的用户图作用:ignore=丢弃用户图只按头像画(仅在有头像时)
+        const declaredRole = String(params.userImagesRole || "").trim().toLowerCase()
+        const userImagesRole = ["style", "ignore", "compose"].includes(declaredRole) ? declaredRole : "style"
+        let existingImages = Array.isArray(params.images) ? [...params.images] : []
+        if (userImagesRole === "ignore" && resolved.length && existingImages.length) {
+          logger.info(`[头像参考] group=${e?.group_id || ""} LLM 声明忽略用户图,仅按成员头像绘制 count=${existingImages.length}`)
+          existingImages = []
+        }
+        if (resolved.length) {
+          // 单一事实源:数组与编号清单在同一次调用里派生,不会再错位
+          const { images, manifest } = assembleReferenceImages({ existingImages, resolved, existingRole: userImagesRole })
+          llmAvatarDrawReference = {
+            images: resolved.map(item => item.image),
+            targets: resolved.map(item => ({ userId: item.qq, label: item.label })),
+            promptHint: manifest
+          }
+          params.images = images
+          params.referencePurpose = "member_avatar"
+          // 原话里 @ 是空槽("中间是的头像"),把原始 CQ 文本注解成 @名字 作为基础文本,
+          // 画图模型才能把"位置词"和参考图对上
+          const rawCqText = String(e?._mergedRawCqTexts?.at(-1) || "")
+            || (String(e?.raw_message || "").includes("[CQ:at") ? String(e.raw_message) : "")
+          if (rawCqText) {
+            llmAnnotatedArgs = replaceCqMentions(rawCqText, qq => {
+              const member = session.memberMap?.get?.(Number(qq))
+              const hit = resolved.find(item => item.qq === String(qq).replace(/\D/g, ""))
+              return `@${hit ? hit.label.replace(/\(QQ:\d+\)$/, "") : (member ? "群友" : `QQ:${qq}`)}`
+            })
+          }
+          logger.info(`[头像参考] group=${e?.group_id || ""} LLM 头像参考规划生效 targets=${resolved.map(item => `${item.qq}(${item.role})`).join(",")}`)
+        } else {
+          logger.warn(`[头像参考] group=${e?.group_id || ""} references 全部未通过成员校验，已忽略 count=${llmReferences.length}`)
+        }
+        delete params.references
+        delete params.userImagesRole
+      }
       const imageGenerationReferenceImages = host.getImageGenerationReferenceImages(params.images, session)
       if ((!Array.isArray(params.images) || !params.images.length) && imageGenerationReferenceImages.length) {
         params.images = imageGenerationReferenceImages
@@ -289,12 +349,12 @@ export async function runToolCall(host, toolCall, e, session, senderRole) {
       params.prompt = host.buildImageGenerationPrompt({
         e,
         prompt: params.prompt,
-        args: session.rawArgs,
-        msg: e?.msg,
+        args: llmAnnotatedArgs || session.rawArgs,
+        msg: llmAnnotatedArgs || e?.msg,
         currentIntentText: [session.rawArgs, e?.msg].filter(Boolean).join("\n"),
         userContent: session.userContent,
         images: params.images,
-        avatarDrawReference: session.avatarDrawReference
+        avatarDrawReference: llmAvatarDrawReference || session.avatarDrawReference
       }) || params.prompt
     }
 

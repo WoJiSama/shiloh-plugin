@@ -449,7 +449,7 @@ export const TEXT_IMAGE_TOOL_MANIFEST = {
     ],
     disclosure: [
       "【textImageTool 详细用法】",
-      "用途：把文字、Markdown、代码、长篇讲解渲染成图片发送。",
+      "用途：把文字、Markdown、代码、长篇讲解渲染成图片发送；LaTeX 公式（\\( ... \\)、\\[ ... \\)、$$ ... $$）会渲染成排版公式。",
       "调用边界：",
       "- 用户要求写代码、Markdown 文档、长篇结构化内容时，适合调用。",
       "- 普通短回复不要调用。",
@@ -546,7 +546,21 @@ export const JINYAN_TOOL_MANIFEST = {
 export const BANANA_TOOL_MANIFEST = {
   name: "bananaTool",
   terminal: true,
-  background: true
+  background: true,
+  // 只有 disclosure、没有 triggers:候选/路由语义保持原样(画图意图由
+  // explicitImageGeneration/语义规划器判定,不走清单候选);这份说明进
+  // 主模型请求,声明"群友头像可作参考图"的 references 用法。
+  disclosure: [
+    "【bananaTool 画图与群友头像参考】",
+    "用途：根据提示词生成或编辑图片。",
+    "用户想让群友形象出现在画面里时（例如\"画@某人\"\"中间是A两边恶魔B天使C\"\"用他的头像\"，无论有没有说出\"画/生成\"字样）：",
+    "- 在 references 参数里按角色列出成员：[{\"qq\":\"QQ号\",\"role\":\"画面角色/位置\"}]。",
+    "- qq 只能取消息中真实被@或被指认的成员（含发送者自己、被回复消息的人），绝不编造 QQ 号。",
+    "- 消息开头回复自带的 @ 只是QQ的称呼标记，不是让TA入画；消息已带参考图（引用图片）时，优先只把引用图作为画风参考（默认），除非用户点名要某位群友的形象才加 references，避免污染画风。",
+    "- 携带图片时可用 userImagesRole 声明用户图作用：style（画风参考，默认）/ignore（忽略用户图，只按头像画）/compose（用户图内容要保留，图生图）。",
+    "- role 用一句中文描述该成员在画面中的角色/位置，如\"画面中央的主体\"\"左侧的恶魔\"\"右侧的天使\"。",
+    "- 系统会自动下载这些成员的头像并按 references 顺序附加为参考图，prompt 里保留用户原话即可，不要自己描述头像长相。"
+  ].join("\n")
 }
 
 export const GOOGLE_IMAGE_EDIT_TOOL_MANIFEST = {

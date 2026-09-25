@@ -7,10 +7,12 @@ import { selectToolIntentCandidates } from "../../utils/toolIntentManifests.js"
 import { buildToolSkillCatalog, normalizeToolSkillParams } from "../../utils/toolSkills.js"
 import { fetchWithTimeout } from "../../utils/modelGateway.js"
 import { safeTruncateUnicode } from "../../utils/unicodeText.js"
-import { joinIntentParts } from "../../utils/messageContext.js"
+import { joinIntentParts, formatMemberDisplayName } from "../../utils/messageContext.js"
+import { replaceCqMentions } from "../../utils/mentionTargets.js"
 import { resolvePersonaName } from "../../utils/personaSource.js"
 import { resolveChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
-import { hasSemanticPlannerCandidate } from "../../utils/semanticToolPolicy.js"
+import { hasSemanticPlannerCandidate, shouldRunSemanticToolPlanner } from "../../utils/semanticToolPolicy.js"
+import { resolveMemberAvatarReferences } from "./avatarReference.js"
 
 export function shouldUseSemanticToolIntent(host, e = {}, text = "", images = [], videos = [], options = {}) {
     const content = normalizeIntentText(text || e?.msg || "")
@@ -19,7 +21,8 @@ export function shouldUseSemanticToolIntent(host, e = {}, text = "", images = []
       hasKnownToolCandidate: Array.isArray(options.knownToolCandidates) && options.knownToolCandidates.length > 0,
       hasExplicitToolIntent: isExplicitToolIntent(content),
       hasRealtimeRequest: isRealtimeInfoRequest(content),
-      hasExplicitSearchRequest: isExplicitSearchRequest(content)
+      hasExplicitSearchRequest: isExplicitSearchRequest(content),
+      hasMemberMentions: options.hasMemberMentions === true
     })
   }
 
@@ -34,6 +37,18 @@ export function normalizeToolDecision(host, decision = {}, context = {}) {
       logger.warn("[语义工具分类] 拒绝非集合措辞的 mentionAdminsTool 请求")
       return null
     }
+    // 头像参考规划:模型输出只认本轮真实提及的成员,幻觉 qq 在此滤除
+    const avatarReferences = resolveMemberAvatarReferences(decision.references, {
+      memberMap: context.memberMap,
+      atQq: context.atQq,
+      currentUserId: context.currentUserId,
+      replyTargetUserId: context.replyTargetUserId
+    })
+    // 用户图作用(LLM 声明):style 默认;ignore/compose 仅在有头像参考时才有意义
+    const declaredRole = String(decision.userImagesRole || decision.user_images_role || "").trim().toLowerCase()
+    const userImagesRole = ["style", "ignore", "compose"].includes(declaredRole)
+      ? declaredRole
+      : "style"
     if (requestedToolName && availableToolNames.has(requestedToolName)) {
       const params = decision.params && typeof decision.params === "object"
         ? decision.params
@@ -49,6 +64,10 @@ export function normalizeToolDecision(host, decision = {}, context = {}) {
       } catch (error) {
         logger.warn(`[ToolSkill] 参数规范化失败 tool=${requestedToolName}: ${error.message}`)
         return null
+      }
+      if (requestedToolName === "bananaTool" && avatarReferences.length) {
+        normalizedParams.references = avatarReferences.map(item => ({ qq: item.qq, role: item.role }))
+        if (userImagesRole !== "style") normalizedParams.userImagesRole = userImagesRole
       }
       return {
         intent: "tool",
@@ -73,7 +92,11 @@ export function normalizeToolDecision(host, decision = {}, context = {}) {
         toolName: "bananaTool",
         params: {
           prompt: host.buildImageGenerationPrompt({ ...context, prompt }),
-          images
+          images,
+          ...(avatarReferences.length ? {
+            references: avatarReferences.map(item => ({ qq: item.qq, role: item.role })),
+            ...(userImagesRole !== "style" ? { userImagesRole } : {})
+          } : {})
         }
       }
     }
@@ -96,6 +119,63 @@ export function normalizeToolDecision(host, decision = {}, context = {}) {
     }
     return { intent: "chat" }
   }
+
+// 成员候选行:把本轮机械可知的提及对象格式化成给分类模型的名单。
+function buildMemberCandidateLines({ atQq = [], memberMap = null, currentUserId = null, replyTargetUserId = null, replyPrefixAtName = "", replyPrefixBodyRename = false } = {}) {
+  const formatOne = qq => {
+    const digits = String(qq || "").replace(/\D/g, "")
+    if (!digits) return ""
+    const member = memberMap?.get?.(Number(digits))
+    const name = member ? formatMemberDisplayName(member, `QQ:${digits}`) : `QQ:${digits}`
+    return `${name}(QQ:${digits})`
+  }
+  const lines = []
+  const atList = (Array.isArray(atQq) ? atQq : []).map(formatOne).filter(Boolean)
+  if (atList.length) lines.push(`【成员候选】被@成员: ${atList.join("、")}`)
+  if (replyPrefixAtName) {
+    lines.push(replyPrefixBodyRename
+      ? `点名提示: 开头对 @${replyPrefixAtName} 的艾特虽来自QQ回复,但正文再次@了TA(如"画一张@TA风格的图")——这是明确的点名,必须为TA输出 references,把TA的头像形象画进画面`
+      : `回复提示: 仅开头这条对 @${replyPrefixAtName} 的艾特来自QQ回复自带的称呼标记,不是让TA入画;若正文里再次@TA或明确要TA的形象(如"画TA风格的图""TA的头像"),那就是点名,照常输出 references`)
+  }
+  const extra = []
+  if (currentUserId) {
+    const self = formatOne(currentUserId)
+    if (self) extra.push(`发送者(说"我"时指此人): ${self}`)
+  }
+  if (replyTargetUserId) {
+    const reply = formatOne(replyTargetUserId)
+    if (reply) extra.push(`被回复消息的人(说"他/她"时可能指此人): ${reply}`)
+  }
+  if (extra.length) lines.push(extra.join(";"))
+  return lines
+}
+
+// 给分类器的当前文本做 @ 注解:CQ 码对模型是不透明记号,替换成 @名字 后
+// 模型才能像人一样读到"谁被@在哪个位置"。QQ"回复消息"会在开头自动插一条
+// @被回复人 的称呼标记——那不是指名入画,渲染成"(回复了@XX的消息)"前缀,
+// 并返回该成员名供候选名单附加提示。
+export function buildAnnotatedClassifierText(rawCqText = "", context = {}) {
+  const memberMap = context.memberMap
+  const displayName = qq => {
+    const member = memberMap?.get?.(Number(qq))
+    return member ? formatMemberDisplayName(member, `QQ:${qq}`) : `QQ:${qq}`
+  }
+  const rawUserText = safeTruncateUnicode(String(rawCqText || "") || context.currentIntentText || "", 1200)
+  const replyPrefixAt = rawUserText.match(/^\s*\[CQ:reply[^\]]*\]\s*\[CQ:at[^\]]*(?:qq|user_id)=(\d+)[^\]]*\]/)
+  const stripped = replyPrefixAt
+    ? rawUserText.replace(/^\s*\[CQ:reply[^\]]*\]\s*\[CQ:at[^\]]*\]\s*/, "")
+    : rawUserText
+  const annotatedBody = replaceCqMentions(stripped, qq => `@${displayName(qq)}`)
+  // 正文(剥掉回复前缀后)是否再次@了同一人:是则说明用户在点名,而非回复残留
+  const bodyMentionsReplyTarget = replyPrefixAt
+    ? new RegExp(`\\[CQ:at[^\\]]*(?:qq|user_id)=${replyPrefixAt[1]}[^\\]]*\\]`).test(stripped)
+    : false
+  return {
+    userText: replyPrefixAt ? `(回复了 @${displayName(replyPrefixAt[1])} 的消息) ${annotatedBody}` : annotatedBody,
+    replyPrefixName: replyPrefixAt ? displayName(replyPrefixAt[1]) : "",
+    bodyMentionsReplyTarget
+  }
+}
 
 export function extractJsonObject(host, text = "") {
     const content = String(text || "").trim()
@@ -126,7 +206,13 @@ export async function classifySemanticToolIntent(host, context = {}) {
     if (!apiUrl || !apiKey || !model || String(apiKey).includes("sk-xxx")) return null
 
     const url = host.resolveChatCompletionUrl(apiUrl)
-    const userText = safeTruncateUnicode(context.currentIntentText || "", 1200)
+    // 当前文本做 @ 注解:CQ 码对模型是不透明记号,替换成 @名字 后
+    // 模型才能像人一样读到"谁被@在哪个位置",references 的角色指派才有依据。
+    // 注解源优先用带 CQ 的原文(e.msg 会被合并层剥掉 @):合并事件取最后一条
+    // 原始 CQ 文本,非合并事件回退 e.raw_message,最后才回退意图文本。
+    const rawCqText = String(context.e?._mergedRawCqTexts?.at(-1) || "")
+      || (String(context.e?.raw_message || "").includes("[CQ:at") ? String(context.e.raw_message) : "")
+    const { userText, replyPrefixName, bodyMentionsReplyTarget } = buildAnnotatedClassifierText(rawCqText, context)
     const hasImages = Array.isArray(context.images) && context.images.length > 0
     const hasVideos = Array.isArray(context.videos) && context.videos.length > 0
     const quoted = safeTruncateUnicode(context.userContent || "", 1600)
@@ -136,9 +222,19 @@ export async function classifySemanticToolIntent(host, context = {}) {
     const availableToolNames = availableTools.map(tool => tool.name)
     const knownToolCandidates = selectToolIntentCandidates(context.currentIntentText || "", availableToolNames)
     if (!host.shouldUseSemanticToolIntent(context.e, context.currentIntentText, context.images, context.videos, {
-      knownToolCandidates: hasSemanticPlannerCandidate(knownToolCandidates) ? knownToolCandidates : []
+      knownToolCandidates: hasSemanticPlannerCandidate(knownToolCandidates) ? knownToolCandidates : [],
+      hasMemberMentions: Boolean((Array.isArray(context.atQq) && context.atQq.length) || context.replyTargetUserId)
     })) return null
     const toolCatalog = buildToolSkillCatalog(host.toolInstances, availableToolNames)
+    // 成员候选:机械组装(被@名单/发送者/回复目标),不做任何语义判断
+    const memberCandidateLines = buildMemberCandidateLines({
+      atQq: context.atQq,
+      memberMap: context.memberMap,
+      currentUserId: context.currentUserId,
+      replyTargetUserId: context.replyTargetUserId,
+      replyPrefixAtName: replyPrefixName,
+      replyPrefixBodyRename: bodyMentionsReplyTarget
+    })
 
     const classifyStartedAt = Date.now()
     try {
@@ -172,8 +268,11 @@ export async function classifySemanticToolIntent(host, context = {}) {
                 "带指代词“这个/这张/里面/上面/刚才/他说的”时，必须结合格式化消息、引用和媒体判断指代对象。",
                 "不要受角色人设影响；只判断用户真实语义。用户明确要求做图时，不要因为角色说不会画而选 chat。",
                 "prompt 字段只用于缺少原文时兜底；不要为了委婉、安全或总结而改写用户的画图/修图原话，真正给绘图工具的文本会优先使用用户原话。",
+                "用户想让群友本人形象出现在画面里时(例如'画@某人''中间是A两边恶魔B天使C''用@某人的头像'),除选 image_generate 外,还要输出 references 数组:按当前文本里每个 @名字 出现的位置给对应成员指派画面角色/位置;qq 只能取【成员候选】里真实存在的 QQ 号,绝不编造;role 用一句中文描述,如'画面中央的主体''左侧的恶魔''右侧的天使'。文本里每个被@的成员都应出现在 references 中,除非用户明确只让其中一部分入画。",
+                "references 判定:正文里(非开头)出现的 @ 是用户手打的指名,'画一张@某人风格的图''@某人风格的''@某人的头像''把@某人画进去'都算点名该成员入画,必须为其输出 references(角色写'画面主体,按其头像形象呈现')。开头回复自带的 @ 只是称呼,不算。消息已带参考图(引用图片)且用户没有点名任何群友时,不要把成员头像追加进 references,避免污染画风。",
+                "消息带图片(引用/上传)且选 image_generate 时,输出 userImagesRole 声明用户图的作用:\"style\"=作画风/内容参考(默认,拿不准就选它);\"ignore\"=忽略用户图,只按成员头像与文字画;\"compose\"=用户图本身的内容/主体要保留在画面(图生图/改图)。没有图片时不要输出该字段。",
                 "reason 只写简短依据，不要输出完整思维链。",
-                "输出格式: {\"intent\":\"...\",\"confidence\":0到1,\"toolName\":\"可选工具名\",\"params\":{},\"prompt\":\"给工具用的中文任务文本\",\"query\":\"搜索词或空字符串\",\"reason\":\"简短原因\"}",
+                "输出格式: {\"intent\":\"...\",\"confidence\":0到1,\"toolName\":\"可选工具名\",\"params\":{},\"references\":[{\"qq\":\"成员QQ\",\"role\":\"画面角色/位置\"}],\"userImagesRole\":\"style|ignore|compose(带图时)\",\"prompt\":\"给工具用的中文任务文本\",\"query\":\"搜索词或空字符串\",\"reason\":\"简短原因\"}",
                 "",
                 "【已注册 Agent Skills】",
                 toolCatalog || "(无)",
@@ -187,6 +286,7 @@ export async function classifySemanticToolIntent(host, context = {}) {
                 `是否带图片: ${hasImages ? "是" : "否"}`,
                 `是否带视频: ${hasVideos ? "是" : "否"}`,
                 `格式化消息: ${quoted || "(空)"}`,
+                ...memberCandidateLines,
                 context.groupWorkflowPrompt ? `可执行群工作流: ${safeTruncateUnicode(context.groupWorkflowPrompt, 1800)}` : ""
               ].join("\n")
             }

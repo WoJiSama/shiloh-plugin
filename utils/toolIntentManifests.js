@@ -28,7 +28,7 @@ export function selectToolIntentCandidates(text = "", availableToolNames = [], c
       if (classifyEmojiToolExposure(content) !== "none") candidates.push(toolName)
       continue
     }
-    if (manifest.triggers.some(pattern => pattern.test(content))) candidates.push(toolName)
+    if (Array.isArray(manifest.triggers) && manifest.triggers.some(pattern => pattern.test(content))) candidates.push(toolName)
   }
   return resolveCandidateConflicts(candidates, content, context)
 }
@@ -113,4 +113,24 @@ export function resolveToolRequestMergeMs(text = "", availableToolNames = [], op
   // 句尾已是完结标点(。!?)大概率说完了,缩短等待;悬着的半句才等满窗口
   if (Number.isFinite(defaultValue)) return defaultMs
   return /[。．.!！?？~～]$|\n\s*$/.test(String(text || "").trimEnd()) ? 1200 : defaultMs
+}
+
+// 工具模型不可用降级到聊天模型时,模型常把工具调用写成 ```json 文本块而不是
+// 原生 tool_calls。这段中间产物一旦被当作最终回复渲染成卡面,用户只会看到
+// 一块巨大的深色代码块。解析出这些内嵌调用供执行,剩余文本用于兜底回复。
+export function extractEmbeddedToolCalls(content = "") {
+  const text = String(content || "")
+  const calls = []
+  let remainder = text
+  for (const match of text.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/g)) {
+    let parsed = null
+    try { parsed = JSON.parse(match[1]) } catch { continue }
+    const name = String(parsed?.name || parsed?.toolName || parsed?.tool_name || "").trim()
+    if (!name || typeof name !== "string") continue
+    if (!/Tool$|^(searchInformationTool)$/.test(name) && !/[a-zA-Z]+Tool/.test(name)) continue
+    calls.push({ name, params: parsed?.params && typeof parsed.params === "object" ? parsed.params : (parsed?.arguments || {}), raw: match[0] })
+    remainder = remainder.replace(match[0], "")
+  }
+  remainder = remainder.replace(/\n{3,}/g, "\n\n").trim()
+  return { calls, remainder }
 }
