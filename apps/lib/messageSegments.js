@@ -1,5 +1,8 @@
 // 消息段/合并转发解析:JSON payload、转发 ID、可读文本、发送者名等纯函数。
 // 从 apps/test.js 原样迁出(P2),行为不变。
+import { getMentionTargetId } from "../../utils/mentionTargets.js"
+import { getReplySender } from "../../utils/messageContext.js"
+import { normalizeIntentText } from "../../core/intent/messageIntent.js"
 
 export function parseForwardJsonPayload(value) {
   if (!value) return null

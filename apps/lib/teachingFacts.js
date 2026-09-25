@@ -1,6 +1,7 @@
 // 群教学事实抽取:从消息/艾特/文本里提取“把X叫Y”类教学指令与身份绑定。
 // 从 apps/test.js 原样迁出(P2),行为不变。
-import { removeBotAnchors } from "../../utils/messageContext.js"
+import { removeBotAnchors, formatMemberDisplayName, getMemberNames, uniqText } from "../../utils/messageContext.js"
+import { getMentionTargetId, replaceCqMentions } from "../../utils/mentionTargets.js"
 
 export function hasExplicitRememberSignal(text = "") {
   return /(?:记住|记一下|记着|记得|记好|记下来|别忘|以后|下次|告诉你|你要知道)/.test(String(text || ""))

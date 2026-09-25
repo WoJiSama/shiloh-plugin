@@ -1,8 +1,15 @@
 // 提示上下文构建:引用/近景/生图连续性/理解增强/生图修图 prompt。
 // 从 apps/test.js 原样迁出(P2),行为不变;this 依赖以 host(插件实例)注入。
-import { normalizeIntentText, isImageGenerationRequest, isImageEditRequest, isImageCompositionEditRequest } from "../../core/intent/messageIntent.js"
+import { normalizeIntentText, isImageGenerationRequest, isImageEditRequest, isImageCompositionEditRequest, COMIC_DRAW_PATTERN, hasToolCommitmentText, isDrawContextContinuationRequest, isDrawTaskStatusInquiry } from "../../core/intent/messageIntent.js"
 import { safeTruncateUnicode } from "../../utils/unicodeText.js"
 import { joinIntentParts } from "../../utils/messageContext.js"
+import { compactDrawPromptText } from "./textPolicy.js"
+import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLines, selectMergedImagePromptTexts } from "../../utils/promptCompiler.js"
+import { composeModelBriefCard, requestUnderstandingBrief } from "../../utils/understandingBrief.js"
+import { fetchWithTimeout } from "../../utils/modelGateway.js"
+import { formatAvatarDrawReferencePrompt } from "./avatarReference.js"
+import { normalizeForContainment } from "./messageSegments.js"
+import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
 
 export function getQuotedPromptContextText(host, e = {}, userContent = "") {
     const context = e?._quotedPromptContext

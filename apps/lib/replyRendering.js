@@ -1,5 +1,15 @@
 // 回复渲染:分段发送/长文切分/@转换/工具专属后处理。
 // 从 apps/test.js 原样迁出(P2),行为不变;this 依赖以 host(插件实例)注入。
+import { logDeliveryOutcome, extractDeliveryMessageId } from "../../utils/deliveryObservability.js"
+import { shouldCancelProactiveReply } from "../../utils/proactiveReplyFreshness.js"
+import { lastIncomingMsgAt } from "./splitState.js"
+import { applyOutputPersonaGuards } from "../../utils/outputGuardPipeline.js"
+import { sanitizeFinalReplyText, stripChatLogSpeakerPrefixes } from "../../utils/replySanitizer.js"
+import { containsCodeFence, flattenCodeFences } from "../../utils/qqCodeFenceText.js"
+import { extractChatKeywords } from "../../core/intent/messageIntent.js"
+import { planTextReplyMessages } from "../../utils/replyRhythm.js"
+import { TotalTokens } from "../../functions/tools/CalculateToken.js"
+import { ThinkingProcessor } from "../../utils/providers/ThinkingProcessor.js"
 
 export async function sendObservedReply(host, e, payload, quote = false, channel = "command") {
     try {

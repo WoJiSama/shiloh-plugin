@@ -4,6 +4,7 @@ import { globalStyleLearnerManager } from "./GlobalStyleLearnerManager.js"
 import { personaFeedbackManager } from "./PersonaFeedbackManager.js"
 import { getSharedMemoryManager, getSharedConfig } from "../../core/runtime/sharedRuntime.js"
 import { extractDeliveryMessageId, logDeliveryOutcome } from "../../utils/deliveryObservability.js"
+import { memStats } from "./engine/stats.js"
 
 const clearGroupMemoryPending = new Map()
 const CLEAR_GROUP_MEMORY_CONFIRM_TTL_MS = 30000
