@@ -840,16 +840,28 @@ export class DiceRulePackManager {
     return null
   }
 
-  /** 按记忆模板重刷海豹名片(.st 录属性后调用);返回是否至少刷新了一张 */
-  refreshSealCard(e) {
+  /** 重刷海豹名片:按名字(如 dh/gm)从模板注册表找,或按运行时记忆;返回是否刷新 */
+  refreshSealCard(e, templateName = "") {
     const groupKey = String(e?.group_id || "private")
     const userId = String(e?.user_id || e?.sender?.user_id || "")
     if (!e?.group_id || !userId) return false
     let refreshed = false
+    const wanted = String(templateName || "").trim().toLowerCase()
     for (const loaded of this.getActivePacks(groupKey)) {
       if (loaded.pack?.kind !== "seal-ext") continue
       const runtime = this.getSealRuntime(loaded.pack, loaded.record)
-      if (runtime?.refreshCardFromMemory?.(e, userId)) refreshed = true
+      if (!runtime) continue
+      if (wanted) {
+        // 按名字找:模板 JSON 的 nameTemplate.<名>.template(如 dh/gm)
+        for (const template of runtime.templateRegistry || []) {
+          const named = template?.nameTemplate?.[wanted]
+          if (named?.template) {
+            const ctx = runtime.makeContext({ event: e, userId, name: "", groupId: e.group_id })
+            if (runtime.applyGroupCardByTemplate(ctx, named.template)) refreshed = true
+          }
+        }
+      }
+      if (!refreshed && runtime.refreshCardFromMemory?.(e, userId)) refreshed = true
     }
     return refreshed
   }

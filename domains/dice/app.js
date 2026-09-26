@@ -397,13 +397,15 @@ export class DicePlugin extends plugin {
   async sn(e) {
     const raw = this.strip(e, "sn")
     const text = String(raw || "").trim()
-    // .sn <模板名>(如 .sn dh):交给海豹名片模板层——有记忆模板则重刷
+    // .sn <模板名>(如 .sn dh/.sn gm):从包的 nameTemplate 按名应用
     if (text && !/^(on|off|开启|关闭)$/i.test(text)) {
-      const refreshed = diceRulePackManager.refreshSealCard(e)
+      const refreshed = diceRulePackManager.refreshSealCard(e, text)
       if (refreshed) {
-        await this.reply(e, `已按规则包名片模板刷新（${text}）。`)
+        await this.reply(e, `已按名片模板 ${text} 应用。`)
         return true
       }
+      await this.reply(e, `没有找到名为「${text}」的名片模板。可用模板名请看规则包帮助(如 dh/gm),或先掷一次对应命令建立模板。`)
+      return true
     }
     await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSn(e, raw)))
     return true
