@@ -573,3 +573,32 @@ test("jrrp 分数段评语按分值落段，模板带 {comment}", async () => {
     runtime.cleanup()
   }
 })
+
+test("紧凑中文 .st(无分隔符)逐段解析:敏捷0力量-1生命6 全部正确落卡", async () => {
+  const runtime = createRuntime()
+  try {
+    const e = event()
+    const text = "敏捷0力量-1本能0知识2风度3灵巧1生命6生命上限6压力0压力上限6希望0希望上限6护甲0护甲上限3"
+    const reply = await runtime.manager.handleSt(e, text)
+    const card = runtime.manager.readState(runtime.manager.getConfig()).users[String(e.user_id)]
+    const active = card.cards[card.activeCard]
+    const all = { ...active.attrs, ...active.skills }
+    assert.equal(all["DEX"], 0, "敏捷走别名 DEX")
+    assert.equal(all["STR"], -1, "力量负值紧凑格式正确(别名 STR)")
+    assert.equal(all["本能"], 0)
+    assert.equal(all["知识"], 2)
+    assert.equal(all["风度"], 3)
+    assert.equal(all["灵巧"], 1)
+    assert.equal(all["生命"], 6, "非别名中文属性记入 skills")
+    assert.equal(all["生命上限"], 6)
+    assert.equal(all["压力"], 0)
+    assert.equal(all["压力上限"], 6)
+    assert.equal(all["希望"], 0)
+    assert.equal(all["希望上限"], 6)
+    assert.equal(all["护甲"], 0)
+    assert.equal(all["护甲上限"], 3)
+    assert.match(String(reply), /更新|人物卡/)
+  } finally {
+    runtime.cleanup()
+  }
+})

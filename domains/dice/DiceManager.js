@@ -1843,12 +1843,19 @@ export class DiceManager {
     }
     const pairs = text.match(/[^,\s，]+(?:\s*[:=：]\s*|\s+)[+\-]?\d+|[^,\s，]+[+\-]\d+/g) || []
     const compactPairs = []
-    if (!pairs.length) {
+    // 紧凑中文格式「.st 敏捷0力量-1本能0生命6」(无分隔符):逐段"名+带符号数值"。
+    // 必须先于 pairs 判定——贪婪的 [+-]\d+ 配对会把整串误切成"敏捷0力量=-1"这种垃圾键
+    const isCompactCjkStats = !/[\s,，]/.test(text) && /[\u4e00-\u9fa5][+\-]?\d/.test(text) && !/[:=：]/.test(text)
+    if (isCompactCjkStats) {
+      const compactRe = /([A-Za-z\u4e00-\u9fa5_·•]+?)([+\-]?\d+)/g
+      let match
+      while ((match = compactRe.exec(text))) compactPairs.push(`${match[1]}=${match[2]}`)
+    } else if (!pairs.length) {
       const compactRe = /([^\d\s,，:=：]+)(\d+)/g
       let match
       while ((match = compactRe.exec(text))) compactPairs.push(`${match[1]}=${match[2]}`)
     }
-    for (const pair of (pairs.length ? pairs : compactPairs)) {
+    for (const pair of (compactPairs.length ? compactPairs : pairs)) {
       const m = pair.match(/^(.+?)(?:\s*[:=：]\s*|\s+)([+\-]?\d+)$/) || pair.match(/^(.+?)([+\-]\d+)$/)
       if (!m) continue
       const keyRaw = m[1].trim()

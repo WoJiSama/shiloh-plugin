@@ -758,7 +758,9 @@ export class DiceRulePackManager {
       get: (groupId, userId, name) => {
         const { state } = readCardState()
         const card = cardOf(state, groupId, userId)
-        const raw = card?.attrs?.[name]
+        // attrs ∪ skills:标准 .st 对不在别名表里的中文属性(生命/压力/希望等)
+        // 记入 skills;只查 attrs 会让海豹名片模板永远解析不到这些变量
+        const raw = card?.attrs?.[name] !== undefined ? card.attrs[name] : card?.skills?.[name]
         if (raw === undefined) return [0, false]
         return [Number(raw) || 0, true]
       },
