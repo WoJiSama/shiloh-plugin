@@ -294,6 +294,12 @@ export class SealExtRuntime {
   dispatch(cmdName, { event, userId, userName, groupId, isPrivate, args = [], kwargs = [], at = [], rawArgs = "", command = "" } = {}) {
     const cmd = this.findCommand(cmdName)
     if (!cmd) return { matched: false, solved: false, showHelp: false, replies: [] }
+    // 海豹约定: `<命令> help/帮助` 由框架直接显示命令帮助,不进入 solve。
+    // 缺了这层,.dd help 会把 help 当参数投骰(实测踩过)
+    const firstArg = String(args[0] || "").toLowerCase()
+    if (firstArg === "help" || firstArg === "帮助" || firstArg === "-h" || firstArg === "--help") {
+      return { matched: true, solved: true, showHelp: true, replies: [] }
+    }
     const ctx = this.makeContext({ event, userId, name: userName, groupId, isPrivate })
     const msg = { __event: event }
     const cmdArgs = { command: command || cmdName, args, kwargs, at, rawArgs }

@@ -161,3 +161,32 @@ test("真实 Daggerheart 扩展可加载并注册全部命令", async () => {
   assert.match(critical.replies[0].text, /关键成功|总点数/)
   assert.equal(runtime.unsupportedCalls.length, 0, "调用的 API 均已支持")
 })
+
+test("海豹约定:命令后跟 help/帮助 直接显示帮助,不进入 solve", async () => {
+  const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
+  const statePath = tmpStatePath()
+  const runtime = new SealExtRuntime({ packId: "helpconv", statePath })
+  runtime.run(`
+    let ext = seal.ext.find('helpconv')
+    if (!ext) {
+      ext = seal.ext.new('helpconv', 'tester', '1.0.0')
+      seal.ext.register(ext)
+    }
+    const cmd = seal.ext.newCmdItemInfo()
+    cmd.name = 'dd'
+    cmd.help = '.dd [n/m] 检定 // 二元骰'
+    cmd.solve = function (ctx, msg) { seal.replyToSender(ctx, msg, 'ROLLED'); return seal.ext.newCmdExecuteResult() }
+    ext.cmdMap['dd'] = cmd
+  `)
+  const withHelp = runtime.dispatch("dd", { args: ["help"], rawArgs: "help", userId: "u1", groupId: "g1" })
+  assert.equal(withHelp.matched, true)
+  assert.equal(withHelp.showHelp, true, ".dd help 应显示帮助")
+  assert.deepEqual(withHelp.replies, [], "help 不进入 solve(无掷骰回复)")
+  const withChinese = runtime.dispatch("dd", { args: ["帮助"], rawArgs: "帮助", userId: "u1", groupId: "g1" })
+  assert.equal(withChinese.showHelp, true, ".dd 帮助 同样显示帮助")
+  // 正常参数仍进 solve
+  const rolled = runtime.dispatch("dd", { args: ["12/20"], rawArgs: "12/20", userId: "u1", groupId: "g1" })
+  assert.equal(rolled.showHelp, false, "正常参数不触发帮助")
+  assert.equal(rolled.matched, true)
+  assert.ok(rolled.replies.some(reply => String(reply.text || "").includes("ROLLED")), "正常参数应进入 solve 掷骰")
+})
