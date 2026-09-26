@@ -75,6 +75,57 @@ export class SealExtRuntime {
     }
   }
 
+  /** 已实现的 seal API 面(静态审计对照用);值为降级说明则标记为部分支持 */
+  static get SUPPORTED_SEAL_APIS() {
+    return {
+      "seal.ext.new": true, "seal.ext.find": true, "seal.ext.register": true,
+      "seal.ext.newCmdItemInfo": true, "seal.ext.newCmdExecuteResult": true,
+      "seal.ext.registerStringInterceptor": "返回空拦截器,不真正拦截",
+      "seal.replyToSender": true, "seal.replyToChannel": "降级为 replyToSender",
+      "seal.format": true, "seal.getCtxProxyFirst": true,
+      "seal.applyPlayerGroupCardByTemplate": true,
+      "seal.vars.intGet": true, "seal.vars.intSet": true,
+      "seal.vars.strGet": true, "seal.vars.strSet": true,
+      "seal.vars.getVar": true, "seal.vars.setVar": true,
+      "seal.gameSystem.newTemplate": true, "seal.gameSystem.findTemplate": "恒返回 null",
+      "seal.setRule": true,
+      "seal.deck": "桩:不支持牌堆操作",
+      "seal.cud": "桩:不支持自定义指令",
+      "seal.tsl": "桩:不支持翻译",
+      "seal.ban": "桩:不支持封禁",
+      "seal.censor": "桩:不支持敏感词"
+    }
+  }
+
+  /** 静态审计:从源码提取 seal.* 调用并按实现面分类 */
+  auditApiUsage(source = "") {
+    const used = new Set()
+    for (const match of String(source || "").matchAll(/seal\.([a-zA-Z]+(?:\.[a-zA-Z]+)?)/g)) {
+      used.add(`seal.${match[1]}`)
+    }
+    // 两段式调用(seal.deck.draw)按一段式前缀(seal.deck)归并到桩分类,
+    // 但明确声明的两段式(如 vars.intGet)保持精确匹配
+    const surface = this.constructor.SUPPORTED_SEAL_APIS
+    for (const api of [...used]) {
+      if (surface[api] !== undefined) continue
+      const parts = api.split(".")
+      if (parts.length === 3) {
+        const prefix = parts.slice(0, 2).join(".")
+        if (surface[prefix] !== undefined) used.delete(api), used.add(prefix)
+      }
+    }
+    const supported = []
+    const degraded = []
+    const missing = []
+    for (const api of [...used].sort()) {
+      const status = this.constructor.SUPPORTED_SEAL_APIS[api]
+      if (status === true) supported.push(api)
+      else if (typeof status === "string") degraded.push(`${api}(${status})`)
+      else missing.push(api)
+    }
+    return { supported, degraded, missing, total: used.size }
+  }
+
   noteUnsupported(api, fallback) {
     const note = `${api}（已降级${fallback ? `：${fallback}` : ""}）`
     if (!this.unsupportedCalls.includes(note)) this.unsupportedCalls.push(note)

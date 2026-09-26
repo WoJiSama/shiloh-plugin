@@ -783,6 +783,34 @@ export class DiceRulePackManager {
     return runtime
   }
 
+  /** 兼容性报告:每个启用海豹包的 API 使用/命令/契约/运行时降级一览 */
+  compatReport(groupId) {
+    const groupKey = String(groupId || "private")
+    const reports = []
+    for (const loaded of this.getActivePacks(groupKey)) {
+      if (loaded.pack?.kind !== "seal-ext") continue
+      const runtime = this.getSealRuntime(loaded.pack, loaded.record)
+      if (!runtime) continue
+      let source = ""
+      try {
+        source = fs.readFileSync(path.join(this.getRulesDir(), loaded.record?.sourceFile || ""), "utf8")
+      } catch {}
+      const audit = runtime.auditApiUsage?.(source) || { supported: [], degraded: [], missing: [], total: 0 }
+      const commands = runtime.listCommands?.() || []
+      const ruleKeys = (runtime.ruleRegistry || []).flatMap(entry => entry.keys || [])
+      const templates = runtime.templateRegistry || []
+      reports.push({
+        packName: loaded.pack?.name || loaded.pack?.id,
+        commands: commands.map(cmd => cmd.name),
+        ruleKeys,
+        templateCount: templates.length,
+        apiAudit: audit,
+        runtimeDegraded: [...(runtime.unsupportedCalls || [])]
+      })
+    }
+    return reports
+  }
+
   /** 按规则键查找本群活跃海豹包的 .set 契约(如 dh/daggerheart/匕首心) */
   findSealRuleByKey(groupId, key) {
     const wanted = String(key || "").trim().toLowerCase()

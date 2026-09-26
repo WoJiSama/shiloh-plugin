@@ -244,3 +244,35 @@ test("setConfig 收割:newTemplate JSON 声明的规则键进 ruleRegistry", asy
   assert.equal(runtime.ruleRegistry[0].diceSides, 20)
   assert.equal(runtime.ruleRegistry[0].enableTip, "已切换至20面骰")
 })
+
+test("兼容性审计:API 使用提取与分类(支持/降级/未实现)", async () => {
+  const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
+  const runtime = new SealExtRuntime({ packId: "audit", statePath: tmpStatePath() })
+  const source = `
+    seal.replyToSender(ctx, msg, 'hi')
+    seal.vars.intGet(ctx, '希望')
+    seal.vars.intSet(ctx, '希望', 5)
+    seal.format(ctx, '{d20}')
+    seal.ext.newCmdItemInfo()
+    seal.replyToChannel(ctx, msg, 'ch')
+    seal.deck.draw(ctx, '牌堆')
+    seal.someFutureApi(ctx)
+  `
+  const audit = runtime.auditApiUsage(source)
+  assert.equal(audit.total, 8)
+  assert.ok(audit.supported.includes("seal.replyToSender"))
+  assert.ok(audit.supported.includes("seal.vars.intGet"))
+  assert.ok(audit.degraded.some(d => d.startsWith("seal.replyToChannel")))
+  assert.ok(audit.degraded.some(d => d.startsWith("seal.deck")))
+  assert.ok(audit.missing.includes("seal.someFutureApi"))
+  // 匕首心实际用量全兼容
+  const daggerSource = `
+    seal.ext.newCmdExecuteResult(); seal.replyToSender(); seal.vars.intGet()
+    seal.ext.newCmdItemInfo(); seal.format(); seal.vars.intSet()
+    seal.getCtxProxyFirst(); seal.vars.strSet(); seal.gameSystem.newTemplate()
+    seal.ext.register(); seal.ext.new(); seal.ext.find(); seal.applyPlayerGroupCardByTemplate()
+  `
+  const daggerAudit = runtime.auditApiUsage(daggerSource)
+  assert.equal(daggerAudit.missing.length, 0, "匕首心包API全部已实现")
+  assert.equal(daggerAudit.degraded.length, 0)
+})

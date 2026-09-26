@@ -170,7 +170,7 @@ export class DicePlugin extends plugin {
     }
     try {
       // .dice rule 匕首之心（引用 JS/YAML 文件）→ 以名称提示导入
-      const knownActions = ["导入", "import", "确认", "confirm", "列表", "list", "预览", "preview", "查看", "view", "启用", "enable", "禁用", "disable", "导出", "export", "回滚", "rollback", "删除", "delete", "恢复", "restore"]
+      const knownActions = ["导入", "import", "确认", "confirm", "列表", "list", "预览", "preview", "查看", "view", "启用", "enable", "禁用", "disable", "导出", "export", "回滚", "rollback", "删除", "delete", "恢复", "restore", "兼容", "compat"]
       if (!knownActions.includes(action) && !["rule", "规则"].includes(action) && action !== "帮助") {
         if (!e.isMaster) throw new Error("只有主人可以导入规则包")
         const source = await resolveDiceRuleImportSource(e, "", { fetchImpl: globalThis.fetch })
@@ -198,6 +198,29 @@ export class DicePlugin extends plugin {
         const result = await diceRulePackManager.confirmImport(args, e.user_id)
         const cardTip = result.wantsGroupCard ? "\n这套规则声明了群名片同步：启用后群成员各自发送 .sn on 开启（机器人需为群管理）。" : ""
         await this.reply(e, `规则包已保存：${result.name}（${result.id}@${result.version}）\n它不会自动影响任何群；请在目标群发送 .骰规则启用 ${result.id}@${result.version}${cardTip}`)
+        return true
+      }
+      if (["兼容", "compat"].includes(action)) {
+        const reports = diceRulePackManager.compatReport(e.group_id || "private")
+        if (!reports.length) {
+          await this.reply(e, "本群没有启用海豹扩展规则包。")
+          return true
+        }
+        const lines = ["【海豹扩展兼容性报告】"]
+        for (const report of reports) {
+          lines.push(`\n◆ ${report.packName}`)
+          lines.push(`  命令(${report.commands.length}): ${report.commands.join(", ") || "无"}`)
+          lines.push(`  .set 规则键: ${report.ruleKeys.join(", ") || "未声明"}`)
+          lines.push(`  名片模板: ${report.templateCount} 张`)
+          const audit = report.apiAudit
+          lines.push(`  seal API(${audit.total} 种): ${audit.supported.length} 完整支持`)
+          if (audit.degraded.length) lines.push(`  ⚠ 降级(${audit.degraded.length}): ${audit.degraded.join("; ")}`)
+          if (audit.missing.length) lines.push(`  ✗ 未实现(${audit.missing.length}): ${audit.missing.join(", ")}`)
+          if (report.runtimeDegraded.length) lines.push(`  ⚠ 运行时降级: ${report.runtimeDegraded.join("; ")}`)
+          if (!audit.degraded.length && !audit.missing.length && !report.runtimeDegraded.length) lines.push("  ✓ 全部兼容")
+        }
+        lines.push("\n降级/未实现的 API 对应包内功能可能不完整;导入新包后先跑一次此命令确认。")
+        await this.reply(e, lines.join("\n"), { kind: "diceLong" })
         return true
       }
       if (["列表", "list"].includes(action)) {
