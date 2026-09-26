@@ -119,7 +119,18 @@ export class DicePlugin extends plugin {
   }
 
   async help(e) {
-    const base = diceManager.showHelp(this.strip(e, "(help|帮助)"))
+    const helpArg = String(this.strip(e, "(help|帮助)") || "").trim()
+    // .help <海豹命令>(如 .help dd):显示该命令的详细帮助
+    if (helpArg) {
+      const sealCommand = diceRulePackManager.findSealCommandHelp(e.group_id, helpArg)
+      if (sealCommand) {
+        await this.reply(e, `${sealCommand.command.help}
+
+—— 来自规则包:${sealCommand.loaded.pack?.name || sealCommand.loaded.pack?.id}`, { kind: "diceLong" })
+        return true
+      }
+    }
+    const base = diceManager.showHelp(helpArg)
     const packs = diceRulePackManager.activePacksHelpText?.(e.group_id || "private") || ""
     await this.reply(e, packs ? `${base}\n\n【本群已启用的规则包】\n${packs}\n完整命令列表：.骰规则列表` : base, { kind: "diceLong" })
     return true
@@ -344,6 +355,18 @@ export class DicePlugin extends plugin {
   }
 
   async setDiceOption(e) {
+    const key = String(this.strip(e, "set") || "").trim()
+    // 海豹包声明的规则键(.set dh / .set 匕首心):按 setConfig 契约应答
+    const sealRule = key ? diceRulePackManager.findSealRuleByKey(e.group_id, key) : null
+    if (sealRule) {
+      if (sealRule.entry.diceSides > 0) {
+        try {
+          await this.runStateCommand(e, () => diceManager.handleSetOption(e, `d${sealRule.entry.diceSides}`))
+        } catch {}
+      }
+      await this.reply(e, sealRule.entry.enableTip || `已切换至 ${key} 规则。`)
+      return true
+    }
     await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSetOption(e, this.strip(e, "set"))))
     return true
   }

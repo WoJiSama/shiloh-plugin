@@ -48,6 +48,8 @@ export class SealExtRuntime {
     this.storage = this.loadStorage()
     this.extensions = new Map()
     this.pendingReplies = []
+    // 规则键注册表:包声明的 .set 可用规则键(dh/daggerheart/匕首心等)
+    this.ruleRegistry = []
     // 群名片模板记忆:groupId:userId -> 最近一次应用的模板原文。
     // .st 改属性后按记忆重渲染,让名片立刻反映新数值(不必等下一次 .dd)
     this.cardTemplateMemory = new Map()
@@ -182,10 +184,36 @@ export class SealExtRuntime {
               }
               runtime.saveStorage()
             }
+            // 收割模板 JSON 的 setConfig:海豹包以 {setConfig:{keys,enableTip,
+            // diceSides}} 声明 .set 契约(如 daggerheart 的 dh/匕首心),
+            // 平台 .set 命令据此识别规则键,无需改包
+            const setConfig = template?.setConfig || template?.setRule
+            if (setConfig && Array.isArray(setConfig.keys) && setConfig.keys.length) {
+              runtime.ruleRegistry.push({
+                keys: setConfig.keys.map(String),
+                enableTip: String(setConfig.enableTip || ""),
+                diceSides: Number(setConfig.diceSides) || 0,
+                templateName: String(template?.name || "")
+              })
+            }
           } catch {}
           return true
         },
         findTemplate: () => null
+      },
+      // setRule:海豹的规则切换注册(.set <key>)。包在模板 JSON 的
+      // setRule/keys 字段声明可用规则键;平台 .set 命令据此识别并回调
+      setRule: (rule) => {
+        try {
+          const entry = {
+            keys: Array.isArray(rule?.keys) ? rule.keys.map(String) : [],
+            enableTip: String(rule?.enableTip || ""),
+            relatedExt: Array.isArray(rule?.relatedExt) ? rule.relatedExt.map(String) : [],
+            templateName: rule?.templateName ? String(rule.templateName) : ""
+          }
+          if (entry.keys.length) runtime.ruleRegistry.push(entry)
+        } catch {}
+        return true
       },
       st: {},
       deck: {},

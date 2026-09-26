@@ -783,6 +783,35 @@ export class DiceRulePackManager {
     return runtime
   }
 
+  /** 按规则键查找本群活跃海豹包的 .set 契约(如 dh/daggerheart/匕首心) */
+  findSealRuleByKey(groupId, key) {
+    const wanted = String(key || "").trim().toLowerCase()
+    if (!wanted) return null
+    for (const loaded of this.getActivePacks(String(groupId || "private"))) {
+      if (loaded.pack?.kind !== "seal-ext") continue
+      const runtime = this.getSealRuntime(loaded.pack, loaded.record)
+      for (const entry of runtime?.ruleRegistry || []) {
+        if ((entry.keys || []).some(k => String(k).toLowerCase() === wanted)) {
+          return { loaded, runtime, entry }
+        }
+      }
+    }
+    return null
+  }
+
+  /** 查本群活跃海豹包的命令帮助(.help dd) */
+  findSealCommandHelp(groupId, commandName) {
+    const wanted = String(commandName || "").trim().toLowerCase()
+    if (!wanted) return null
+    for (const loaded of this.getActivePacks(String(groupId || "private"))) {
+      if (loaded.pack?.kind !== "seal-ext") continue
+      const runtime = this.getSealRuntime(loaded.pack, loaded.record)
+      const command = (runtime?.listCommands?.() || []).find(cmd => String(cmd?.name || "").toLowerCase() === wanted)
+      if (command?.help) return { loaded, command }
+    }
+    return null
+  }
+
   /** 按记忆模板重刷海豹名片(.st 录属性后调用);返回是否至少刷新了一张 */
   refreshSealCard(e) {
     const groupKey = String(e?.group_id || "private")

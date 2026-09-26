@@ -223,3 +223,24 @@ test("名片模板记忆:.dd 应用后 .st 变更可按记忆重渲染", async (
   // 无记忆用户返回 false
   assert.equal(runtime.refreshCardFromMemory(event, "999"), false)
 })
+
+test("setConfig 收割:newTemplate JSON 声明的规则键进 ruleRegistry", async () => {
+  const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
+  const runtime = new SealExtRuntime({ packId: "setcfg", statePath: tmpStatePath() })
+  runtime.run(`
+    let ext = seal.ext.find('setcfg')
+    if (!ext) { ext = seal.ext.new('setcfg', 't', '1'); seal.ext.register(ext) }
+    seal.gameSystem.newTemplate(JSON.stringify({
+      name: 'daggerheart',
+      setConfig: {
+        diceSides: 20,
+        enableTip: '已切换至20面骰',
+        keys: ['daggerheart', 'dh', '匕首心']
+      }
+    }))
+  `)
+  assert.equal(runtime.ruleRegistry.length, 1)
+  assert.deepEqual(runtime.ruleRegistry[0].keys, ["daggerheart", "dh", "匕首心"])
+  assert.equal(runtime.ruleRegistry[0].diceSides, 20)
+  assert.equal(runtime.ruleRegistry[0].enableTip, "已切换至20面骰")
+})
