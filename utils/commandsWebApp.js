@@ -8,6 +8,7 @@ import {
   writeCommandsMarkdown
 } from "./commandRegistry.js"
 import { ensureGuobaJumpLink, watchGuobaJumpLink } from "./guobaJumpLink.js"
+import { checkGuobaLoginToken } from "./guobaLoginTrust.js"
 import { buildDiceReplyPayload } from "../domains/dice/diceReplyCatalog.js"
 import fs2 from "fs"
 import path2 from "path"
@@ -110,6 +111,12 @@ function checkToken(req, token) {
   const provided = String(req?.query?.token || req?.headers?.["x-commands-token"] || "")
   if (!provided || provided !== token) return false
   return true
+}
+
+async function checkAnyCredential(req, token, pluginRoot) {
+  if (checkToken(req, token)) return true
+  const guobaToken = String(req?.query?.guoba_token || req?.headers?.["x-guoba-token"] || "")
+  return await checkGuobaLoginToken(guobaToken, pluginRoot)
 }
 
 function buildPageHtml() {
@@ -218,10 +225,13 @@ function toast(msg, isErr = false) {
   clearTimeout(el._t)
   el._t = setTimeout(() => el.style.display = "none", 3500)
 }
+function guobaHeaders() {
+  return state.guobaToken ? { "x-guoba-token": state.guobaToken } : {}
+}
 async function api(path, body) {
   const res = await fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(state.token), body
-    ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
-    : {})
+    ? { method: "POST", headers: { "Content-Type": "application/json", ...guobaHeaders() }, body: JSON.stringify(body) }
+    : { headers: guobaHeaders() })
   if (res.status === 401) { showLock(); throw new Error("令牌无效") }
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || ("HTTP " + res.status))
@@ -230,7 +240,7 @@ async function api(path, body) {
 async function apiRaw(pathname, text) {
   const res = await fetch(pathname + (pathname.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(state.token), {
     method: "POST",
-    headers: { "Content-Type": "text/x-shiloh-upload" },
+    headers: { "Content-Type": "text/x-shiloh-upload", ...guobaHeaders() },
     body: text
   })
   if (res.status === 401) { showLock(); throw new Error("令牌无效") }
@@ -987,7 +997,24 @@ if (urlToken) {
   $("token").value = urlToken
   history.replaceState(null, "", location.pathname)
 }
-if (state.token) load(); else showLock()
+const urlGuobaToken = new URLSearchParams(location.search).get("guoba_token")
+if (urlGuobaToken) {
+  state.guobaToken = urlGuobaToken
+  localStorage.setItem("bl-guoba-token", urlGuobaToken)
+  history.replaceState(null, "", location.pathname)
+}
+if (!state.guobaToken) state.guobaToken = localStorage.getItem("bl-guoba-token") || ""
+if (state.token) load(); else if (state.guobaToken) tryGuobaEntry(); else showLock()
+
+async function tryGuobaEntry() {
+  try {
+    const res = await fetch("/bl-chat/commands/api/data", { headers: guobaHeaders() })
+    if (res.ok) { load(); return }
+    localStorage.removeItem("bl-guoba-token")
+    state.guobaToken = ""
+  } catch {}
+  showLock()
+}
 </script>
 </body>
 </html>`
@@ -1017,7 +1044,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
       return
     }
     if (req.path.startsWith("/api/")) {
-      if (!checkToken(req, token)) {
+      if (!(await checkAnyCredential(req, token, pluginRoot))) {
         res.status(401).json({ error: "访问令牌无效" })
         return
       }
