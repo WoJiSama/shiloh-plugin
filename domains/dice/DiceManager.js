@@ -610,10 +610,47 @@ export class DiceManager {
 
   async handleBotControl(e, raw = "") {
     const text = String(raw || "").trim().toLowerCase()
-    if (/^(on|off|bye|dismiss|退出|开启|关闭)/.test(text) || !text) {
-      return "希洛不是独立骰娘实例，`.bot on/off/bye` 已做兼容响应；不会执行退群或关闭主机器人。"
+
+    // .bot bye / .bot dismiss:真正退群(仅主人或群主/管理员)
+    if (/^(bye|dismiss|退出)$/.test(text)) {
+      const isMaster = Boolean(e?.isMaster)
+      const senderRole = String(e?.sender?.role || "").toLowerCase()
+      const isAdmin = senderRole === "admin" || senderRole === "owner"
+      if (!isMaster && !isAdmin) {
+        return "只有主人或群主/管理员可以让希洛退群。"
+      }
+      if (!e?.group_id) {
+        return "退群只能在群聊中使用。"
+      }
+      const groupName = e?.group?.group_name || `群${e.group_id}`
+      try {
+        // 发告别语后退群
+        await this.replyText(e, "好的，希洛先走了。有需要再拉我进来～")
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        const bot = e?.bot || globalThis.Bot
+        if (typeof bot?.sendApi === "function") {
+          await bot.sendApi("set_group_leave", { group_id: Number(e.group_id) })
+          globalThis.logger?.info?.(`[bot] 已退出群 ${groupName}(${e.group_id})，操作者=${e?.sender?.card || e?.sender?.nickname || e?.user_id}`)
+        } else {
+          return "当前适配器不支持退群操作。"
+        }
+        return "" // 已发告别语,不再重复回复
+      } catch (error) {
+        globalThis.logger?.warn?.(`[bot] 退群失败: ${error?.message || error}`)
+        return `退群没成功：${error?.message || error}`
+      }
     }
-    return "bot 命令：.bot on / .bot off / .bot bye（当前只做受控兼容，不执行退群）"
+
+    if (/^(on|off|开启|关闭)/.test(text) || !text) {
+      return "希洛不是独立骰娘实例，`.bot on/off` 已做兼容响应。\n`.bot bye` 可以让希洛退出当前群（仅主人或群主/管理员）。"
+    }
+    return "bot 命令：.bot on / .bot off / .bot bye（退群，需主人或管理员）"
+  }
+
+  async replyText(e, text) {
+    if (typeof e?.reply === "function") {
+      await e.reply(text)
+    }
   }
 
   async handleReplyControl(e, raw = "") {
