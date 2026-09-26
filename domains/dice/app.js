@@ -346,6 +346,16 @@ export class DicePlugin extends plugin {
       await diceRulePackManager.settlePrivateDeliveries(e.group_id, result.packId, deliveryOutcomes)
         .catch(error => globalThis.logger?.error?.(`[骰规则] 私密投递状态持久化失败: ${error.message}`))
     }
+    // M3:多条回复逐条发送(海豹语义:每次 replyToSender 一条消息)
+    if (result.multiReply && Array.isArray(result.text)) {
+      for (const line of result.text) {
+        await this.reply(e, String(line || "").trim(), { kind: "diceLong" })
+      }
+      if (failedRecipients.length) {
+        await this.reply(e, `有 ${failedRecipients.length} 条私密结果未能发送，已保留待重试；GM 可使用规则包的「投递 重试」。`)
+      }
+      return true
+    }
     let suffix = failedRecipients.length ? `\n有 ${failedRecipients.length} 条私密结果未能发送，已保留待重试；GM 可使用规则包的「投递 重试」。` : ""
     for (const update of result.groupCardUpdates || []) {
       if (String(update.userId) !== String(e.user_id || "")) continue

@@ -52,7 +52,7 @@ export class SealExtRuntime {
     this.ruleRegistry = []
     // 群名片模板记忆:groupId:userId -> 最近一次应用的模板原文。
     // .st 改属性后按记忆重渲染,让名片立刻反映新数值(不必等下一次 .dd)
-    this.cardTemplateMemory = new Map()
+    this.cardTemplateMemory = new Map(Object.entries(this.storage.__card_tpl || {}))
     this.pendingDelegateText = ""
     this.logs = []
     this.templateRegistry = []
@@ -170,7 +170,11 @@ export class SealExtRuntime {
       // 无前缀且卡作用域:走 varsAdapter(人物卡)
       if (scope === "card" && this.varsAdapter) {
         const [value, exists] = this.varsAdapter.get(ctx.group?.groupId, ctx.player?.userId, name)
-        if (exists) return isStr ? [String(value), true] : [Number(value) || 0, true]
+        if (exists) {
+          // M7 海豹语义:intGet 仅当值类型为数值才 exists=true(字符串值≠0)
+          if (!isStr && typeof value === "string" && !/^-?\d+$/.test(value)) return [0, false]
+          return isStr ? [String(value), true] : [Number(value) || 0, true]
+        }
       }
       return isStr ? ["", false] : [0, false]
     }
@@ -325,7 +329,12 @@ export class SealExtRuntime {
     if (!event?.group_id) return false
     const memoryKey = `${event.group_id}:${ctx.player?.userId || ""}`
     if (memoryKey.endsWith(":")) return false
-    this.cardTemplateMemory.set(memoryKey, String(template || ""))
+    // M8 海豹语义:模板记忆持久化到 storage(重启不丢)
+    const templateStr = String(template || "")
+    this.cardTemplateMemory.set(memoryKey, templateStr)
+    this.storage.__card_tpl ||= {}
+    this.storage.__card_tpl[memoryKey] = templateStr
+    this.saveStorage()
     const bot = event?.bot || globalThis.Bot
     if (typeof bot?.sendApi !== "function") return false
     const rendered = String(template ?? "")
@@ -334,7 +343,11 @@ export class SealExtRuntime {
         const [value, exists] = this.buildVarsApi().intGet(ctx, name)
         return exists ? String(value) : raw
       })
-      .slice(0, 60)
+    // M8 海豹语义:QQ 名片≥60字报错不应用,不静默截断
+    if (rendered.length >= 60) {
+      this.logger?.warn?.(`[海豹扩展] 名片渲染超长(${rendered.length}字),不应用`)
+      return false
+    }
     if (!rendered.trim()) return false
     const targetUser = String(ctx.player?.userId || "")
     Promise.resolve(bot.sendApi("set_group_card", {
@@ -521,8 +534,8 @@ export class SealExtRuntime {
   async dispatch(cmdName, { event, userId, userName, groupId, isPrivate, args = [], kwargs = [], at = [], rawArgs = "", command = "" } = {}) {
     const cmd = this.findCommand(cmdName)
     if (!cmd) return { matched: false, solved: false, showHelp: false, replies: [] }
-    // 海豹约定: `<命令> help/帮助` 由框架直接显示命令帮助,不进入 solve。
-    // 缺了这层,.dd help 会把 help 当参数投骰(实测踩过)
+    // <命令> help 预拦截:有意平台扩展(海豹不预拦截,但社区包普遍不自行处理
+    // help,预拦截是保障帮助可达性的实用方案)。solve 返回 showHelp=true 也走此路。
     const firstArg = String(args[0] || "").toLowerCase()
     if (firstArg === "help" || firstArg === "帮助" || firstArg === "-h" || firstArg === "--help") {
       return { matched: true, solved: true, showHelp: true, replies: [] }
@@ -566,6 +579,7 @@ export class SealExtRuntime {
       }
       // 返回 false → 显式"未处理"
       if (returned === false) result = { matched: false, solved: false, showHelp: false }
+
     } catch (error) {
       this.logger?.warn?.(`[海豹扩展] ${this.packId}/${cmdName} 执行出错: ${error?.message || error}`)
       result = { matched: true, solved: false, showHelp: false, error: String(error?.message || error) }

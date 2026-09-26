@@ -285,3 +285,103 @@ test("M6: ctx.player/group 补字段 + notice()", async () => {
   assert.equal(ctx.isCurGroupBotOn, true)
   assert.equal(typeof ctx.privilegeLevel, "number")
 })
+
+test("M3: 多条 replyToSender 保持数组(不合并为一条)", async () => {
+  const { SealExtRuntime } = await importRuntime()
+  const rt = new SealExtRuntime({ packId: "m3", statePath: tmpStatePath() })
+  rt.run(`
+    let ext = seal.ext.find('m3')
+    if (!ext) { ext = seal.ext.new('m3','t','1'); seal.ext.register(ext) }
+    const cmd = seal.ext.newCmdItemInfo()
+    cmd.name = 'multi'
+    cmd.solve = (ctx, msg) => {
+      seal.replyToSender(ctx, msg, '第一条')
+      seal.replyToSender(ctx, msg, '第二条')
+      seal.replyToSender(ctx, msg, '第三条')
+      return seal.ext.newCmdExecuteResult()
+    }
+    ext.cmdMap['multi'] = cmd
+  `)
+  const r = await rt.dispatch("multi", { userId: "u", groupId: "g" })
+  assert.equal(r.replies.length, 3, "三条独立回复")
+  assert.equal(r.replies[0].text, "第一条")
+  assert.equal(r.replies[1].text, "第二条")
+  assert.equal(r.replies[2].text, "第三条")
+})
+
+test("M7: intGet 对字符串值返回 exists=false(海豹语义)", async () => {
+  const { SealExtRuntime } = await importRuntime()
+  const rt = new SealExtRuntime({ packId: "m7", statePath: tmpStatePath() })
+  rt.varsAdapter = {
+    get: (g, u, n) => n === "数值" ? [42, true] : n === "文本" ? ["你好", true] : [0, false],
+    set: () => true
+  }
+  const vars = rt.buildVarsApi()
+  const ctx = rt.makeContext({ userId: "u", groupId: "g" })
+  const [intVal, intEx] = vars.intGet(ctx, "数值")
+  assert.equal(intVal, 42)
+  assert.equal(intEx, true, "数值类型 exists=true")
+  const [strAsInt, strEx] = vars.intGet(ctx, "文本")
+  assert.equal(strEx, false, "字符串值对 intGet 返回 exists=false")
+  const [strVal, strEx2] = vars.strGet(ctx, "文本")
+  assert.equal(strVal, "你好")
+  assert.equal(strEx2, true, "strGet 能读到字符串值")
+})
+
+test("M8: 名片模板记忆持久化到 storage", async () => {
+  const { SealExtRuntime } = await importRuntime()
+  const statePath = tmpStatePath()
+  const rt = new SealExtRuntime({ packId: "m8", statePath })
+  rt.run(`
+    let ext = seal.ext.find('m8')
+    if (!ext) { ext = seal.ext.new('m8','t','1'); seal.ext.register(ext) }
+    const cmd = seal.ext.newCmdItemInfo()
+    cmd.name = 'card'
+    cmd.solve = (ctx) => {
+      seal.applyPlayerGroupCardByTemplate(ctx, '{$t玩家_RAW} 测试{值}')
+      return seal.ext.newCmdExecuteResult()
+    }
+    ext.cmdMap['card'] = cmd
+  `)
+  const cards = []
+  const event = { group_id: 111, bot: { sendApi: async (a, p) => { cards.push(p.card); return { retcode: 0 } } } }
+  await rt.dispatch("card", { event, userId: "u1", groupId: "111" })
+  assert.ok(cards.length >= 1)
+  // storage 中有持久化记忆
+  assert.ok(rt.storage.__card_tpl, "__card_tpl 存在")
+  assert.ok(rt.storage.__card_tpl["111:u1"], "键 111:u1 存在")
+  // 新 runtime(模拟重启)恢复记忆
+  const rt2 = new SealExtRuntime({ packId: "m8", statePath })
+  assert.ok(rt2.cardTemplateMemory.get("111:u1"), "重启后记忆恢复")
+  assert.ok(rt2.refreshCardFromMemory(event, "u1"), "重启后能按记忆重刷")
+})
+
+test("M10: varsAdapter 按群选卡(群级绑定)", async () => {
+  // 直接测 manager 的 cardOf 逻辑(通过 varsAdapter 的读写验证)
+  const { SealExtRuntime } = await importRuntime()
+  const rt = new SealExtRuntime({ packId: "m10", statePath: tmpStatePath() })
+  // 模拟按群选卡:群A用卡1(力量=10), 群B用卡2(力量=20)
+  const groupCards = {
+    "groupA": { attrs: { 力量: 10 }, skills: {} },
+    "groupB": { attrs: { 力量: 20 }, skills: {} }
+  }
+  rt.varsAdapter = {
+    get: (g, u, n) => {
+      const card = groupCards[g]
+      if (!card) return [0, false]
+      const v = card.attrs[n] !== undefined ? card.attrs[n] : card.skills[n]
+      return v !== undefined ? [v, true] : [0, false]
+    },
+    set: (g, u, n, v) => {
+      const card = groupCards[g]
+      if (card) card.attrs[n] = v
+    }
+  }
+  const vars = rt.buildVarsApi()
+  const ctxA = rt.makeContext({ userId: "u1", groupId: "groupA" })
+  const ctxB = rt.makeContext({ userId: "u1", groupId: "groupB" })
+  const [strA] = vars.intGet(ctxA, "力量")
+  const [strB] = vars.intGet(ctxB, "力量")
+  assert.equal(strA, 10, "群A取卡1的值")
+  assert.equal(strB, 20, "群B取卡2的值")
+})

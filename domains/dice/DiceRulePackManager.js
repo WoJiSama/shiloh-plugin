@@ -748,13 +748,17 @@ export class DiceRulePackManager {
       const state = this.diceManager.readState(config)
       return { config, state }
     }
+    // M10 海豹语义:人物卡按"群+玩家"绑定,同玩家不同群可绑不同卡
+    // 优先取群级绑定,无则回落全局 activeCard
     const cardOf = (state, groupId, userId) => {
       const user = state.users[String(userId)]
       if (!user) return null
       user.cards ||= {}
-      user.activeCard ||= Object.keys(user.cards)[0] || "默认"
-      if (!user.cards[user.activeCard]) user.cards[user.activeCard] = { name: user.nickname || "角色", attrs: {}, skills: {} }
-      return user.cards[user.activeCard]
+      user.groupCards ||= {}
+      const groupKey = String(groupId || "private")
+      const activeName = user.groupCards[groupKey] || user.activeCard || Object.keys(user.cards)[0] || "默认"
+      if (!user.cards[activeName]) user.cards[activeName] = { name: user.nickname || "角色", attrs: {}, skills: {} }
+      return user.cards[activeName]
     }
     runtime.varsAdapter = {
       get: (groupId, userId, name) => {
@@ -910,6 +914,7 @@ export class DiceRulePackManager {
         command: cmdName
       })
       if (!result.matched) continue
+      // M3 海豹语义:每次 replyToSender 独立发一条消息,不合并
       const texts = []
       if (result.showHelp) {
         const help = runtime.listCommands().find(cmd => cmd.name === cmdName)?.help
@@ -920,7 +925,8 @@ export class DiceRulePackManager {
       }
       for (const reply of result.replies) texts.push(reply.text)
       if (result.error) texts.push(`（扩展执行出错：${result.error}）`)
-      return { matched: true, text: texts.join("\n") || "（该命令没有产生输出）" }
+      if (!texts.length) texts.push("（该命令没有产生输出）")
+      return { matched: true, text: texts, multiReply: texts.length > 1 }
     }
     return { matched: false }
   }
@@ -3261,7 +3267,13 @@ export class DiceRulePackManager {
 
   async handleDynamicCommand(e) {
     const sealResult = await this.handleSealExtCommand(e)
-    if (sealResult.matched) return { matched: true, text: sanitizeRuleOutput(sealResult.text) }
+    if (sealResult.matched) {
+      // M3:多条回复时保持数组,单条保持字符串(下游兼容)
+      if (sealResult.multiReply && Array.isArray(sealResult.text)) {
+        return { matched: true, text: sealResult.text.map(t => sanitizeRuleOutput(t)), multiReply: true }
+      }
+      return { matched: true, text: sanitizeRuleOutput(sealResult.text) }
+    }
     const invocation = this.findInvocation(e?.group_id || "private", e?.msg)
     if (!invocation) return { matched: false, text: "" }
     const groupKey = String(e?.group_id || "private")
