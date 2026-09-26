@@ -778,6 +778,16 @@ export class DiceRulePackManager {
         }
       }
     }
+    // 玩家名 resolver:走 DiceManager 的 getUserName(优先 .nn 昵称),
+    // 让 {$t玩家}/{$t玩家_RAW} 等模板变量和海豹语义一致
+    runtime.resolvePlayerName = userId => {
+      try {
+        const fake = { user_id: userId, sender: { user_id: userId } }
+        return this.diceManager.getUserName(fake) || ""
+      } catch {
+        return ""
+      }
+    }
     runtime.run(source || "")
     this.sealRuntimes.set(key, runtime)
     return runtime

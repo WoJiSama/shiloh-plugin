@@ -337,11 +337,20 @@ export class SealExtRuntime {
       __event: event || null,
       __proxied: proxied,
       isPrivate: Boolean(isPrivate),
-      player: { userId: String(userId || ""), name: String(name || userId || "") },
+      player: {
+        userId: String(userId || ""),
+        // 玩家名优先取 .nn 设置的骰娘昵称(海豹语义),而非调用方硬传的 sender 名
+        name: String(this.resolvePlayerName?.(userId) || name || userId || "")
+      },
       group: groupId ? { groupId: String(groupId) } : null,
       endTime: null,
       deckDepth: 0
     }
+  }
+
+  /** 默认按 userId 直返;由 manager 注入 resolver 后走 .nn 昵称 */
+  resolvePlayerName(userId) {
+    return ""
   }
 
   /** 沙箱执行脚本本体（注册期）。返回 { extensions, commands, logs, unsupported } */
