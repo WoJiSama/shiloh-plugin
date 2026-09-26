@@ -77,7 +77,7 @@ test("沙箱运行：命令注册、vars 读写、format 掷骰、storage 持久
   assert.ok(runtime.logs.some(line => line.includes("fixture loaded")), "console.log 被捕获")
   assert.ok(JSON.parse(fs.readFileSync(statePath, "utf-8"))["mini:counter"] === "41", "storage 落盘")
 
-  const dispatch = runtime.dispatch("mini", {
+  const dispatch = await runtime.dispatch("mini", {
     userId: "u1", userName: "阿明", groupId: "g1",
     args: ["+2", "检定"], rawArgs: "+2 检定"
   })
@@ -90,7 +90,7 @@ test("沙箱运行：命令注册、vars 读写、format 掷骰、storage 持久
   assert.match(text, /storage=41/)
 
   // 代骰代理：代理到 u2 后读取 u2 的希望值
-  const proxy = runtime.dispatch("miniproxy", {
+  const proxy = await runtime.dispatch("miniproxy", {
     userId: "u1", userName: "阿明", groupId: "g1",
     at: [{ userId: "u2" }]
   })
@@ -115,7 +115,7 @@ test("沙箱安全：无 require/fs，脚本崩了不伤宿主", async () => {
     ext.cmdMap['boom'] = cmd
   `)
   assert.equal(runResult.commands.length, 1)
-  const result = runtime2.dispatch("boom", { userId: "u", groupId: "g" })
+  const result = await runtime2.dispatch("boom", { userId: "u", groupId: "g" })
   assert.equal(result.matched, true)
   assert.match(result.error, /爆炸/)
 })
@@ -152,12 +152,12 @@ test("真实 Daggerheart 扩展可加载并注册全部命令", async () => {
   const names = runResult.commands.map(c => c.name).sort()
   assert.deepEqual(names, ["cook", "dd", "ddr", "dh", "dhalias", "gm", "gmfearupdate", "test"])
   // 分发 .dd（无 .st 数据也能出结果）
-  const dispatch = runtime.dispatch("dd", { userId: "u1", userName: "阿明", groupId: "g1", args: [], rawArgs: "" })
+  const dispatch = await runtime.dispatch("dd", { userId: "u1", userName: "阿明", groupId: "g1", args: [], rawArgs: "" })
   assert.equal(dispatch.matched, true)
   assert.ok(dispatch.replies.length >= 1)
   assert.match(dispatch.replies[0].text, /希望骰|恐惧骰/)
   // 固定 12/12 触发关键成功的属性更新路径（群名片 API 现已真实现，不再降级）
-  const critical = runtime.dispatch("test", { userId: "u1", userName: "阿明", groupId: "g1", args: ["12", "12"], rawArgs: "12 12" })
+  const critical = await runtime.dispatch("test", { userId: "u1", userName: "阿明", groupId: "g1", args: ["12", "12"], rawArgs: "12 12" })
   assert.match(critical.replies[0].text, /关键成功|总点数/)
   assert.equal(runtime.unsupportedCalls.length, 0, "调用的 API 均已支持")
 })
@@ -178,14 +178,14 @@ test("海豹约定:命令后跟 help/帮助 直接显示帮助,不进入 solve",
     cmd.solve = function (ctx, msg) { seal.replyToSender(ctx, msg, 'ROLLED'); return seal.ext.newCmdExecuteResult() }
     ext.cmdMap['dd'] = cmd
   `)
-  const withHelp = runtime.dispatch("dd", { args: ["help"], rawArgs: "help", userId: "u1", groupId: "g1" })
+  const withHelp = await runtime.dispatch("dd", { args: ["help"], rawArgs: "help", userId: "u1", groupId: "g1" })
   assert.equal(withHelp.matched, true)
   assert.equal(withHelp.showHelp, true, ".dd help 应显示帮助")
   assert.deepEqual(withHelp.replies, [], "help 不进入 solve(无掷骰回复)")
-  const withChinese = runtime.dispatch("dd", { args: ["帮助"], rawArgs: "帮助", userId: "u1", groupId: "g1" })
+  const withChinese = await runtime.dispatch("dd", { args: ["帮助"], rawArgs: "帮助", userId: "u1", groupId: "g1" })
   assert.equal(withChinese.showHelp, true, ".dd 帮助 同样显示帮助")
   // 正常参数仍进 solve
-  const rolled = runtime.dispatch("dd", { args: ["12/20"], rawArgs: "12/20", userId: "u1", groupId: "g1" })
+  const rolled = await runtime.dispatch("dd", { args: ["12/20"], rawArgs: "12/20", userId: "u1", groupId: "g1" })
   assert.equal(rolled.showHelp, false, "正常参数不触发帮助")
   assert.equal(rolled.matched, true)
   assert.ok(rolled.replies.some(reply => String(reply.text || "").includes("ROLLED")), "正常参数应进入 solve 掷骰")
@@ -210,7 +210,7 @@ test("名片模板记忆:.dd 应用后 .st 变更可按记忆重渲染", async (
   `)
   const calls = []
   const event = { group_id: 777, user_id: 42, bot: { sendApi: async (action, params) => { calls.push({ action, params }); return { status: "ok", retcode: 0 } } } }
-  const rolled = runtime.dispatch("roll", { event, userId: "42", userName: "测试员", groupId: "777", args: [], rawArgs: "" })
+  const rolled = await runtime.dispatch("roll", { event, userId: "42", userName: "测试员", groupId: "777", args: [], rawArgs: "" })
   assert.equal(rolled.matched, true)
   assert.equal(calls.length, 1, ".roll 应用名片发出 set_group_card")
   assert.match(calls[0].params.card, /希望2\/\{希望上限\}/)

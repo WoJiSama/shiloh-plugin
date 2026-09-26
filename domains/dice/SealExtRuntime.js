@@ -53,6 +53,7 @@ export class SealExtRuntime {
     // 群名片模板记忆:groupId:userId -> 最近一次应用的模板原文。
     // .st 改属性后按记忆重渲染,让名片立刻反映新数值(不必等下一次 .dd)
     this.cardTemplateMemory = new Map()
+    this.pendingDelegateText = ""
     this.logs = []
     this.templateRegistry = []
     this.unsupportedCalls = []
@@ -132,37 +133,70 @@ export class SealExtRuntime {
     this.logger?.warn?.(`[海豹扩展] 未支持 API：${note}`)
   }
 
+  // 海豹 vars 四层作用域: $t临时(每次dispatch重置) / $m个人全局(跨群) /
+  // $g群变量(按群) / 无前缀=当前群+玩家的绑定人物卡。
+  // 作用域键各异,互不污染。
+  tempVars = new Map()  // dispatch 开始时清空
+
+  scopeOf(name) {
+    if (name.startsWith("$t")) return "temp"
+    if (name.startsWith("$m")) return "personal"
+    if (name.startsWith("$g")) return "group"
+    return "card"
+  }
+
+  scopeKey(ctx, name) {
+    const s = this.scopeOf(name)
+    const groupId = ctx.group?.groupId || "private"
+    const userId = ctx.player?.userId || ""
+    const bare = name.replace(/^\$[tmg]/, "")
+    if (s === "temp") return `__t:${groupId}:${userId}:${bare}`
+    if (s === "personal") return `__m:${userId}:${bare}`
+    if (s === "group") return `__g:${groupId}:${bare}`
+    return `__c:${groupId}:${userId}:${bare}`
+  }
+
   buildVarsApi() {
-    const readVar = (ctx, name) => {
-      if (this.varsAdapter) {
-        const [value, exists] = this.varsAdapter.get(ctx.group?.groupId, ctx.player?.userId, name)
-        if (exists) return [Number(value) || 0, true]
+    const readScoped = (ctx, name, isStr = false) => {
+      const key = this.scopeKey(ctx, name)
+      const scope = this.scopeOf(name)
+      if (scope === "temp") {
+        const store = this.tempVars.get(key)
+        if (store !== undefined) return isStr ? [String(store), true] : [Number(store) || 0, true]
+        return isStr ? ["", false] : [0, false]
       }
-      const store = this.storage.__vars?.[`${ctx.group?.groupId || "private"}:${ctx.player?.userId}:${name}`]
-      if (store !== undefined) return [Number(store) || 0, true]
-      return [0, false]
+      const store = this.storage.__scoped?.[key]
+      if (store !== undefined) return isStr ? [String(store), true] : [Number(store) || 0, true]
+      // 无前缀且卡作用域:走 varsAdapter(人物卡)
+      if (scope === "card" && this.varsAdapter) {
+        const [value, exists] = this.varsAdapter.get(ctx.group?.groupId, ctx.player?.userId, name)
+        if (exists) return isStr ? [String(value), true] : [Number(value) || 0, true]
+      }
+      return isStr ? ["", false] : [0, false]
     }
-    const writeVar = (ctx, name, value) => {
-      if (this.varsAdapter && this.varsAdapter.set(ctx.group?.groupId, ctx.player?.userId, name, value)) return
-      this.storage.__vars ||= {}
-      this.storage.__vars[`${ctx.group?.groupId || "private"}:${ctx.player?.userId}:${name}`] = value
+    const writeScoped = (ctx, name, value) => {
+      const key = this.scopeKey(ctx, name)
+      const scope = this.scopeOf(name)
+      if (scope === "temp") {
+        this.tempVars.set(key, value)
+        return
+      }
+      // 无前缀且卡作用域:写回 varsAdapter(人物卡)
+      if (scope === "card" && this.varsAdapter) {
+        this.varsAdapter.set(ctx.group?.groupId, ctx.player?.userId, name, value)
+        return
+      }
+      this.storage.__scoped ||= {}
+      this.storage.__scoped[key] = value
       this.saveStorage()
     }
-    const readStr = (ctx, name) => {
-      const store = this.storage.__strvars?.[`${ctx.group?.groupId || "private"}:${ctx.player?.userId}:${name}`]
-      return [store === undefined ? "" : String(store), store !== undefined]
-    }
     return {
-      intGet: (ctx, name) => readVar(ctx, name),
-      intSet: (ctx, name, value) => writeVar(ctx, name, Math.trunc(Number(value) || 0)),
-      strGet: (ctx, name) => readStr(ctx, name),
-      strSet: (ctx, name, value) => {
-        this.storage.__strvars ||= {}
-        this.storage.__strvars[`${ctx.group?.groupId || "private"}:${ctx.player?.userId}:${name}`] = String(value)
-        this.saveStorage()
-      },
-      getVar: (ctx, name) => readVar(ctx, name),
-      setVar: (ctx, name, value) => writeVar(ctx, name, value)
+      intGet: (ctx, name) => readScoped(ctx, name, false),
+      intSet: (ctx, name, value) => writeScoped(ctx, name, Math.trunc(Number(value) || 0)),
+      strGet: (ctx, name) => readScoped(ctx, name, true),
+      strSet: (ctx, name, value) => writeScoped(ctx, name, String(value)),
+      getVar: (ctx, name) => readScoped(ctx, name, false),
+      setVar: (ctx, name, value) => writeScoped(ctx, name, value)
     }
   }
 
@@ -193,7 +227,8 @@ export class SealExtRuntime {
         return true
       },
       newCmdItemInfo: () => ({ name: "", help: "", solve: null, allowDelegate: false }),
-      newCmdExecuteResult: (matched = true) => ({ matched: Boolean(matched), solved: true, showHelp: false }),
+      // 海豹语义:首参是 solved(非 matched),matched 恒 true
+      newCmdExecuteResult: (solved = true) => ({ matched: true, solved: Boolean(solved), showHelp: false }),
       registerStringInterceptor: () => {
         runtime.noteUnsupported("seal.ext.registerStringInterceptor", "返回空拦截器")
         return { before: () => "" }
@@ -203,7 +238,8 @@ export class SealExtRuntime {
       ext: extApi,
       vars: this.buildVarsApi(),
       replyToSender: (ctx, msg, text) => {
-        runtime.pendingReplies.push({ target: msg?.__event || ctx?.__event || null, text: String(text ?? "") })
+        const prefix = runtime.pendingReplies.length === 0 ? (runtime.pendingDelegateText || "") : ""
+        runtime.pendingReplies.push({ target: msg?.__event || ctx?.__event || null, text: prefix + String(text ?? "") })
       },
       replyToChannel: (ctx, msg, text) => {
         runtime.noteUnsupported("seal.replyToChannel", "改用 replyToSender")
@@ -211,9 +247,14 @@ export class SealExtRuntime {
       },
       format: (ctx, text) => runtime.formatString(ctx, text),
       getCtxProxyFirst: (ctx, cmdArgs) => {
-        const at = cmdArgs?.at?.[0]
-        if (at?.userId && String(at.userId) !== String(ctx.player?.userId)) {
-          return runtime.makeContext({ event: ctx.__event, userId: String(at.userId), name: at.name || String(at.userId), groupId: ctx.group?.groupId, isPrivate: false, proxied: true })
+        // 海豹语义:取第一个非发送者且非 bot 的 @目标
+        const botId = String(ctx?.__event?.bot?.uin || globalThis.Bot?.uin || "")
+        for (const at of (Array.isArray(cmdArgs?.at) ? cmdArgs.at : [])) {
+          const atId = String(at?.userId || "")
+          if (!atId) continue
+          if (atId === String(ctx.player?.userId)) continue
+          if (botId && atId === botId) continue
+          return runtime.makeContext({ event: ctx.__event, userId: atId, name: at.name || String(atId), groupId: ctx.group?.groupId, isPrivate: false, proxied: true })
         }
         return ctx
       },
@@ -319,32 +360,115 @@ export class SealExtRuntime {
     return this.applyGroupCardByTemplate(ctx, template)
   }
 
-  /** sealdice seal.format 子集：{dN} 掷骰、{$t玩家}、{变量名}（走 vars） */
+  /** sealdice seal.format:{...} 整块求值(骰表达式/算术/变量),外保留原文 */
   formatString(ctx, text = "") {
+    const vars = this.buildVarsApi()
     return String(text ?? "").replace(/\{([^{}]+)\}/g, (raw, name) => {
-      if (/^\$t玩家$/.test(name)) return ctx.player?.name || "玩家"
-      if (/^\$t骰子名字$/.test(name)) return "骰娘"
-      if (/^d\d+$/.test(name)) return String(secureDiceInt(Number(name.slice(1))))
-      const [value, exists] = this.buildVarsApi().intGet(ctx, name)
+      if (/^\$t玩家(_RAW)?$/.test(name)) return ctx.player?.name || "玩家"
+      if (/^\$t骰子(名字|昵称)$/.test(name)) return "骰娘"
+      if (/^\$tQQ昵称$/.test(name)) return ctx.player?.name || "玩家"
+      // 尝试变量替换
+      const [value, exists] = vars.intGet(ctx, name)
       if (exists) return String(value)
+      const [strValue, strExists] = vars.strGet(ctx, name)
+      if (strExists && strValue) return strValue
+      // 尝试骰表达式/算术求值
+      if (/[dD+\-*/()%\d\s]/.test(name) && /\d/.test(name)) {
+        try {
+          const result = this.evalDiceExpression(ctx, name, vars)
+          if (result !== null) return String(result)
+        } catch {}
+      }
       if (/^\d+$/.test(name)) return name
       return raw
     })
   }
 
+  /** 求值 {...} 内的骰表达式:先替换变量为数值,再按骰语法求值 */
+  evalDiceExpression(ctx, expr = "", vars = null) {
+    if (!vars) vars = this.buildVarsApi()
+    // 替换变量名为数值
+    let resolved = String(expr)
+    resolved = resolved.replace(/[\u4e00-\u9fa5A-Za-z_][\u4e00-\u9fa5A-Za-z_0-9]*/g, name => {
+      if (/^[dD]$/.test(name)) return name
+      const [value, exists] = vars.intGet(ctx, name)
+      return exists ? String(value) : name
+    })
+    // 含未解析的变量名则放弃
+    if (/[\u4e00-\u9fa5]/.test(resolved.replace(/\s/g, ""))) return null
+    // 求值:处理 NdM 骰语法
+    let total = 0
+    let hasDice = false
+    const diceOnly = resolved.replace(/(\d*)d(\d+)(kh\d+|kl\d+)?/gi, (_, count, sides, keep) => {
+      hasDice = true
+      const n = Math.min(Number(count) || 1, 100)
+      const s = Math.min(Number(sides), 1000)
+      let rolls = Array.from({ length: n }, () => 1 + Math.floor(Math.random() * s))
+      if (keep) {
+        const k = Math.min(Number(keep.replace(/[a-z]/gi, "")) || 1, n)
+        rolls = keep.startsWith("kh") ? rolls.sort((a, b) => b - a).slice(0, k) : rolls.sort((a, b) => a - b).slice(0, k)
+      }
+      total += rolls.reduce((sum, v) => sum + v, 0)
+      return String(rolls.reduce((sum, v) => sum + v, 0))
+    })
+    // 纯算术部分
+    if (!hasDice) {
+      if (!/^[\d+\-*/()\s.]+$/.test(diceOnly)) return null
+      try {
+        const safe = diceOnly.replace(/\d+\.\d+/g, m => String(Number(m)))
+        if (!/^[\d+\-*/()\s]+$/.test(safe)) return null
+        // eslint-disable-next-line no-new-func
+        total = Function(`"use strict";return (${safe})`)()
+        if (!Number.isFinite(total)) return null
+      } catch { return null }
+    } else {
+      // 骰表达式已替换为数值,再做算术
+      const afterDice = diceOnly.replace(/(\d+)/g, "$1")
+      if (/^[\d+\-*/()\s]+$/.test(afterDice)) {
+        try {
+          // eslint-disable-next-line no-new-func
+          total = Function(`"use strict";return (${afterDice})`)()
+          if (!Number.isFinite(total)) return null
+        } catch {}
+      }
+    }
+    return total
+  }
+
   makeContext({ event, userId, name, groupId, isPrivate = false, proxied = false }) {
+    const uid = String(userId || "")
     return {
       __event: event || null,
       __proxied: proxied,
       isPrivate: Boolean(isPrivate),
       player: {
-        userId: String(userId || ""),
+        userId: uid,
         // 玩家名优先取 .nn 设置的骰娘昵称(海豹语义),而非调用方硬传的 sender 名
-        name: String(this.resolvePlayerName?.(userId) || name || userId || "")
+        name: String(this.resolvePlayerName?.(uid) || name || uid || ""),
+        lastCommandTime: Date.now(),
+        autoSetNameTemplate: ""
       },
-      group: groupId ? { groupId: String(groupId) } : null,
+      group: groupId ? {
+        groupId: String(groupId),
+        groupName: String(event?.group_name || event?.sender?.group_name || ""),
+        active: true,
+        cocRuleIndex: 0,
+        logOn: false,
+        logCurName: "",
+        enteredTime: Date.now(),
+        showGroupWelcome: false,
+        groupWelcomeMessage: ""
+      } : null,
       endTime: null,
-      deckDepth: 0
+      deckDepth: 0,
+      isCurGroupBotOn: true,
+      privilegeLevel: 0,
+      commandHideFlag: false,
+      delegateText: "",
+      notice: (title, body = "") => {
+        this.noteUnsupported( "ctx.notice", "通知已忽略")
+        return true
+      }
     }
   }
 
@@ -394,7 +518,7 @@ export class SealExtRuntime {
   }
 
   /** 分发一条命令。返回 { matched, solved, showHelp, replies } */
-  dispatch(cmdName, { event, userId, userName, groupId, isPrivate, args = [], kwargs = [], at = [], rawArgs = "", command = "" } = {}) {
+  async dispatch(cmdName, { event, userId, userName, groupId, isPrivate, args = [], kwargs = [], at = [], rawArgs = "", command = "" } = {}) {
     const cmd = this.findCommand(cmdName)
     if (!cmd) return { matched: false, solved: false, showHelp: false, replies: [] }
     // 海豹约定: `<命令> help/帮助` 由框架直接显示命令帮助,不进入 solve。
@@ -405,24 +529,100 @@ export class SealExtRuntime {
     }
     const ctx = this.makeContext({ event, userId, name: userName, groupId, isPrivate })
     const msg = { __event: event }
-    const cmdArgs = { command: command || cmdName, args, kwargs, at, rawArgs }
-    this.pendingReplies = []
-    let result = { matched: true, solved: true, showHelp: false }
+    const cmdArgs = this.buildCmdArgs({ command: command || cmdName, args, kwargs, at, rawArgs, userId })
+    this.tempVars.clear()
+    // 海豹代骰:命令 allowDelegate 且有非 bot 的 @目标时,首条回复自动加"由X代骰"前缀
+    let delegateText = ""
+    if (cmd.allowDelegate) {
+      const botId = String(event?.bot?.uin || globalThis.Bot?.uin || "")
+      const proxyAt = (Array.isArray(at) ? at : []).find(item => {
+        const atId = String(item?.userId || "")
+        return atId && atId !== String(userId) && (!botId || atId !== botId)
+      })
+      if (proxyAt) {
+        const proxyName = this.resolvePlayerName?.(proxyAt.userId) || proxyAt.name || proxyAt.userId
+        delegateText = `由${ctx.player?.name || "未知"}代骰：\n`
+      }
+    }
+    this.pendingDelegateText = delegateText
+    let result = { matched: true, solved: false, showHelp: false }
     try {
-      const returned = cmd.solve(ctx, msg, cmdArgs)
+      let returned = cmd.solve(ctx, msg, cmdArgs)
+      // 异步 solve:等待 Promise 完成(海豹语义)
+      if (returned && typeof returned.then === "function") {
+        returned = await Promise.race([
+          returned,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("solve 超时")), SOLVE_TIMEOUT_MS))
+        ])
+      }
+      // 海豹语义:返回空/undefined → 未处理(solved=false,继续尝试其他扩展);
+      // 返回对象 → 按 Solved 字段消费
       if (returned && typeof returned === "object") {
         result = {
-          matched: returned.matched !== false,
-          solved: returned.solved !== false,
+          matched: true,
+          solved: returned.solved !== false && returned.Solved !== false,
           showHelp: Boolean(returned.showHelp)
         }
       }
+      // 返回 false → 显式"未处理"
+      if (returned === false) result = { matched: false, solved: false, showHelp: false }
     } catch (error) {
       this.logger?.warn?.(`[海豹扩展] ${this.packId}/${cmdName} 执行出错: ${error?.message || error}`)
-      result = { matched: true, solved: true, showHelp: false, error: String(error?.message || error) }
+      result = { matched: true, solved: false, showHelp: false, error: String(error?.message || error) }
     }
     const replies = this.pendingReplies.splice(0)
     return { ...result, replies }
+  }
+
+  /** 构建海豹语义的 cmdArgs:带方法套件 + kwargs 解析 */
+  buildCmdArgs({ command = "", args = [], kwargs = [], at = [], rawArgs = "", userId = "" } = {}) {
+    // 解析 --key=value 到 kwargs;过滤出干净 args
+    const parsedKwargs = []
+    const cleanArgs = []
+    for (const arg of (Array.isArray(args) ? args : [])) {
+      const text = String(arg || "")
+      const kw = text.match(/^--([^=]+)(?:=(.+))?$/)
+      if (kw) {
+        parsedKwargs.push({
+          name: kw[1],
+          valueExists: kw[2] !== undefined,
+          value: kw[2] !== undefined ? kw[2] : "",
+          asBool: kw[2] === undefined ? true : (kw[2] === "true" || kw[2] === "1")
+        })
+      } else {
+        cleanArgs.push(text)
+      }
+    }
+    const cmdArgs = {
+      command: String(command),
+      args: cleanArgs,
+      kwargs: parsedKwargs,
+      at: Array.isArray(at) ? at : [],
+      rawArgs: String(rawArgs),
+      // 海豹方法套件
+      getArgN: (n = 1) => cleanArgs[n - 1] ?? "",
+      getRestArgsFrom: (n = 1) => cleanArgs.slice(n - 1).join(" "),
+      getKwarg: (name = "") => parsedKwargs.find(kw => kw.name === name) || null,
+      isArgEqual: (n = 1, value = "") => String(cleanArgs[n - 1] || "").toLowerCase() === String(value).toLowerCase(),
+      eatPrefixWith: (prefix = "") => {
+        const first = String(cleanArgs[0] || "")
+        return first.toLowerCase().startsWith(String(prefix).toLowerCase()) ? first.slice(prefix.length) : null
+      },
+      chopPrefixToArgsWith: (prefix = "") => {
+        const first = String(cleanArgs[0] || "")
+        if (first.toLowerCase().startsWith(String(prefix).toLowerCase())) {
+          const rest = first.slice(prefix.length)
+          return [rest, ...cleanArgs.slice(1)]
+        }
+        return cleanArgs
+      },
+      amIBeMentioned: () => (Array.isArray(at) ? at : []).some(item => String(item?.userId || "") === String(userId || "")),
+      amIBeMentionedFirst: () => String((Array.isArray(at) ? at : [])[0]?.userId || "") === String(userId || ""),
+      cleanArgs: cleanArgs.join(" "),
+      specialExecuteTimes: 1,
+      rawText: String(rawArgs)
+    }
+    return cmdArgs
   }
 
   findCommand(cmdName = "") {

@@ -492,8 +492,10 @@ const SEAL_HELP_FOOTER = [
   "── 常用相关命令 ──",
   ".nn 新名字 - 改自己的骰娘昵称并同步QQ群名片（需先 .sn on 开启同步）",
   ".sn on/off - 开/关「角色卡名自动同步为群名片」",
-  ".st 属性=值 - 录入/增减角色属性；.pc list/new/use/del - 人物卡管理",
-  `.set ${""}规则名 - 切换本群默认规则（如 .set daggerheart）`,
+  ".sn dh - 应用本包名片模板（希望/HP/压力/护甲即时刷新到群名片）",
+  ".sn gm - 应用GM恐惧值名片模板",
+  ".st 属性=值 - 录入/增减角色属性（录入后名片即时刷新）；.pc - 人物卡管理",
+  ".set 规则名 - 切换本群默认规则（如 .set dh）",
   "完整命令列表：.骰娘帮助    本群已启用规则包：.骰规则列表"
 ].join("\n")
 
@@ -895,7 +897,7 @@ export class DiceRulePackManager {
         ? e.message.filter(seg => seg?.type === "at").map(seg => ({ userId: String(seg?.qq ?? seg?.data?.qq ?? "") , name: "" }))
         : []
       const userName = this.diceManager.getUserName?.(e) || String(e?.sender?.card || e?.sender?.nickname || e?.user_id || "")
-      const result = runtime.dispatch(cmdName, {
+      const result = await runtime.dispatch(cmdName, {
         event: e,
         userId: String(e?.user_id || ""),
         userName,
