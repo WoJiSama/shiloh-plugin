@@ -487,6 +487,16 @@ export async function resolveDiceRuleImportSource(e = {}, raw = "", options = {}
   return await downloadYaml(url, options)
 }
 
+// 海豹扩展命令 help 的统一脚注:指路标准命令与完整帮助
+const SEAL_HELP_FOOTER = [
+  "── 常用相关命令 ──",
+  ".nn 新名字 - 改自己的骰娘昵称并同步QQ群名片（需先 .sn on 开启同步）",
+  ".sn on/off - 开/关「角色卡名自动同步为群名片」",
+  ".st 属性=值 - 录入/增减角色属性；.pc list/new/use/del - 人物卡管理",
+  `.set ${""}规则名 - 切换本群默认规则（如 .set daggerheart）`,
+  "完整命令列表：.骰娘帮助    本群已启用规则包：.骰规则列表"
+].join("\n")
+
 export class DiceRulePackManager {
   constructor({ diceManager, cwd = process.cwd(), logger = globalThis.logger, random = null } = {}) {
     if (!diceManager) throw new Error("DiceRulePackManager 需要 DiceManager")
@@ -807,6 +817,9 @@ export class DiceRulePackManager {
       if (result.showHelp) {
         const help = runtime.listCommands().find(cmd => cmd.name === cmdName)?.help
         if (help) texts.push(help)
+        // 逐命令帮助只讲本命令(海豹规范);用户高频追问的改名/名片/录卡属于
+        // 标准命令,统一脚注指路,避免"帮助不全"的观感
+        texts.push(SEAL_HELP_FOOTER)
       }
       for (const reply of result.replies) texts.push(reply.text)
       if (result.error) texts.push(`（扩展执行出错：${result.error}）`)
