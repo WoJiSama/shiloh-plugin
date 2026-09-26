@@ -48,6 +48,9 @@ export class SealExtRuntime {
     this.storage = this.loadStorage()
     this.extensions = new Map()
     this.pendingReplies = []
+    // 群名片模板记忆:groupId:userId -> 最近一次应用的模板原文。
+    // .st 改属性后按记忆重渲染,让名片立刻反映新数值(不必等下一次 .dd)
+    this.cardTemplateMemory = new Map()
     this.logs = []
     this.templateRegistry = []
     this.unsupportedCalls = []
@@ -200,6 +203,9 @@ export class SealExtRuntime {
   applyGroupCardByTemplate(ctx, template = "") {
     const event = ctx?.__event
     if (!event?.group_id) return false
+    const memoryKey = `${event.group_id}:${ctx.player?.userId || ""}`
+    if (memoryKey.endsWith(":")) return false
+    this.cardTemplateMemory.set(memoryKey, String(template || ""))
     const bot = event?.bot || globalThis.Bot
     if (typeof bot?.sendApi !== "function") return false
     const rendered = String(template ?? "")
@@ -223,6 +229,15 @@ export class SealExtRuntime {
       this.logger?.debug?.(`[海豹扩展] 群名片更新失败: ${error?.message || error}`)
     })
     return true
+  }
+
+  /** 按记忆中的模板重渲染群名片(.st 后刷新用);无记忆返回 false */
+  refreshCardFromMemory(event, userId = "") {
+    const key = `${event?.group_id || ""}:${String(userId || "")}`
+    const template = this.cardTemplateMemory.get(key)
+    if (!template) return false
+    const ctx = this.makeContext({ event, userId, name: "", groupId: event?.group_id })
+    return this.applyGroupCardByTemplate(ctx, template)
   }
 
   /** sealdice seal.format 子集：{dN} 掷骰、{$t玩家}、{变量名}（走 vars） */

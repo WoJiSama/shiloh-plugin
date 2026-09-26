@@ -349,7 +349,17 @@ export class DicePlugin extends plugin {
   }
 
   async sn(e) {
-    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSn(e, this.strip(e, "sn"))))
+    const raw = this.strip(e, "sn")
+    const text = String(raw || "").trim()
+    // .sn <模板名>(如 .sn dh):交给海豹名片模板层——有记忆模板则重刷
+    if (text && !/^(on|off|开启|关闭)$/i.test(text)) {
+      const refreshed = diceRulePackManager.refreshSealCard(e)
+      if (refreshed) {
+        await this.reply(e, `已按规则包名片模板刷新（${text}）。`)
+        return true
+      }
+    }
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSn(e, raw)))
     return true
   }
 
@@ -595,7 +605,12 @@ export class DicePlugin extends plugin {
   }
 
   async st(e) {
-    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSt(e, this.strip(e, "st"))))
+    const reply = await this.runStateCommand(e, () => diceManager.handleSt(e, this.strip(e, "st")))
+    // .st 录属性后立即重刷海豹名片模板(若有活跃规则包),让希望/HP等即时反映
+    if (/更新|录入|增加|减少/.test(String(reply || ""))) {
+      try { diceRulePackManager.refreshSealCard(e) } catch {}
+    }
+    await this.reply(e, reply)
     return true
   }
 

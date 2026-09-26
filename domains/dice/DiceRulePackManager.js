@@ -783,6 +783,20 @@ export class DiceRulePackManager {
     return runtime
   }
 
+  /** 按记忆模板重刷海豹名片(.st 录属性后调用);返回是否至少刷新了一张 */
+  refreshSealCard(e) {
+    const groupKey = String(e?.group_id || "private")
+    const userId = String(e?.user_id || e?.sender?.user_id || "")
+    if (!e?.group_id || !userId) return false
+    let refreshed = false
+    for (const loaded of this.getActivePacks(groupKey)) {
+      if (loaded.pack?.kind !== "seal-ext") continue
+      const runtime = this.getSealRuntime(loaded.pack, loaded.record)
+      if (runtime?.refreshCardFromMemory?.(e, userId)) refreshed = true
+    }
+    return refreshed
+  }
+
   /** 海豹扩展命令分发：直接 .命令（无前缀），仅对启用该包的群生效 */
   async handleSealExtCommand(e) {
     const text = normalizeCommandText(e?.msg || "")

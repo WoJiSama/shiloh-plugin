@@ -190,3 +190,36 @@ test("海豹约定:命令后跟 help/帮助 直接显示帮助,不进入 solve",
   assert.equal(rolled.matched, true)
   assert.ok(rolled.replies.some(reply => String(reply.text || "").includes("ROLLED")), "正常参数应进入 solve 掷骰")
 })
+
+test("名片模板记忆:.dd 应用后 .st 变更可按记忆重渲染", async () => {
+  const { SealExtRuntime } = await import("../domains/dice/SealExtRuntime.js")
+  const statePath = tmpStatePath()
+  const runtime = new SealExtRuntime({ packId: "cardmem", statePath })
+  runtime.run(`
+    let ext = seal.ext.find('cardmem')
+    if (!ext) { ext = seal.ext.new('cardmem', 't', '1'); seal.ext.register(ext) }
+    const cmd = seal.ext.newCmdItemInfo()
+    cmd.name = 'roll'
+    cmd.solve = function (ctx, msg) {
+      seal.vars.intSet(ctx, '希望', 2)
+      seal.applyPlayerGroupCardByTemplate(ctx, '{$t玩家_RAW} 希望{希望}/{希望上限}')
+      seal.replyToSender(ctx, msg, 'rolled')
+      return seal.ext.newCmdExecuteResult()
+    }
+    ext.cmdMap['roll'] = cmd
+  `)
+  const calls = []
+  const event = { group_id: 777, user_id: 42, bot: { sendApi: async (action, params) => { calls.push({ action, params }); return { status: "ok", retcode: 0 } } } }
+  const rolled = runtime.dispatch("roll", { event, userId: "42", userName: "测试员", groupId: "777", args: [], rawArgs: "" })
+  assert.equal(rolled.matched, true)
+  assert.equal(calls.length, 1, ".roll 应用名片发出 set_group_card")
+  assert.match(calls[0].params.card, /希望2\/\{希望上限\}/)
+  // .st 变更后按记忆重渲染:上限变为 6
+  runtime.varsAdapter = { get: (g, u, n) => n === "希望" ? [2, true] : n === "希望上限" ? [6, true] : [0, false], set: () => true }
+  const refreshed = runtime.refreshCardFromMemory(event, "42")
+  assert.equal(refreshed, true, "记忆模板重渲染成功")
+  assert.equal(calls.length, 2)
+  assert.match(calls[1].params.card, /希望2\/6/, "新数值进入名片")
+  // 无记忆用户返回 false
+  assert.equal(runtime.refreshCardFromMemory(event, "999"), false)
+})
