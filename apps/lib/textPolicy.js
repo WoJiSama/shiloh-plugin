@@ -51,11 +51,16 @@ export function looksLikeCodeOrMarkdown(text = "") {
 
   const lines = content.split(/\r?\n/)
   const nonEmptyLines = lines.filter(line => line.trim())
-  if (nonEmptyLines.length < 3) return false
 
+  // 粗体检测提前到行数门之前:中文闲聊中 ** 从不是自然输入,
+  // 单行单粗体(如"这个**很重要**")也需要进卡面渲染
   const boldCount = (content.match(/\*\*[^*\n]+\*\*/g) || []).length
   const inlineCodeCount = (content.match(/`[^`\n]+`/g) || []).length
   const bulletLines = nonEmptyLines.filter(line => /^\s*[-*+]\s+\S/.test(line)).length
+  if (boldCount >= 1) return true
+  if (inlineCodeCount >= 2) return true
+
+  if (nonEmptyLines.length < 3) return false
   if ((boldCount >= 2 || inlineCodeCount >= 2 || bulletLines >= 3) && nonEmptyLines.length >= 3) return true
 
   const codeLineCount = nonEmptyLines.filter(line =>

@@ -339,6 +339,6 @@ test("looksLikeCodeOrMarkdown: 中文规则式 markdown(粗体/行内码/列表)
   const cocReply = "CoC 7版里，调查员**一次性损失5点或以上理智**时，要立刻进行一次**智力检定**：\n- **成功**：理解了恐怖真相，陷入临时疯狂，持续 `1D10` 小时。\n- **失败**：大脑暂时压下了这段认知，不会临时疯狂。\n临时疯狂开始时会先触发一次**疯狂发作**，持续 `1D10` 轮。"
   assert.equal(looksLikeCodeOrMarkdown(cocReply), true)
   assert.equal(looksLikeCodeOrMarkdown("哈哈今天天气不错\n出去走走\n买了杯奶茶"), false)
-  assert.equal(looksLikeCodeOrMarkdown("就一句**强调**的话\n第二行\n第三行"), false, "单个粗体不触发")
+  assert.equal(looksLikeCodeOrMarkdown("就一句**强调**的话\n第二行\n第三行"), true, "单个粗体现在也触发(中文闲聊中**从不是自然输入)")
   assert.equal(looksLikeCodeOrMarkdown("如下:\n```js\nconst a = 1\n```"), true, "围栏代码仍触发")
 })
