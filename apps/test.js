@@ -923,7 +923,7 @@ export class ExamplePlugin extends plugin {
       userText,
       output,
       looksDiagnostic: looksLikeDiagnosticExplanation(output) || looksLikeDiagnosticExplanation(content)
-    })) return false
+    }) && !looksLikeCodeOrMarkdown(content) && !looksLikeCodeOrMarkdown(output)) return false
     const userAskedForCodeOrMarkdown = isCodeOrMarkdownRequest(userText)
     const replyLooksLikeCodeOrMarkdown = looksLikeCodeOrMarkdown(content) || looksLikeCodeOrMarkdown(output)
     const userAskedForEducation = isEducationalExplanationRequest(userText)
