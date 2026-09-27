@@ -38,7 +38,7 @@ import {
   looksLikeEducationalExplanation,
   looksLikeDiagnosticExplanation,
   compactDrawPromptText
-, looksLikeCodeOrMarkdown } from "./lib/textPolicy.js"
+, looksLikeCodeOrMarkdown, looksLikeTreeStructure, treeToMarkdown } from "./lib/textPolicy.js"
 import { MemoryManager } from "../domains/memory/MemoryManager.js"
 import { ExpressionLearner } from "../domains/memory/ExpressionLearner.js"
 import KnowledgeSearcher from "../domains/knowledge/KnowledgeSearcher.js"

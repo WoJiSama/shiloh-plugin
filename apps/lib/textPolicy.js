@@ -67,3 +67,31 @@ export function looksLikeCodeOrMarkdown(text = "") {
 
   return codeLineCount >= 2
 }
+
+// 检测树形结构文本(├── │ └── 字符),模型输出流程图/层级关系时常见
+export function looksLikeTreeStructure(text = "") {
+  const lines = String(text || "").split(/\n/).filter(line => line.trim())
+  if (lines.length < 3) return false
+  const treeLines = lines.filter(line => /[│├└][─━┄┈]/.test(line) || /^[\s]*[├└][─━]/.test(line))
+  return treeLines.length >= 3 && treeLines.length >= lines.length * 0.5
+}
+
+// 把树形字符结构转为 markdown 嵌套列表(markmap/导图工具可渲染)
+export function treeToMarkdown(text = "") {
+  const lines = String(text || "").split(/\n/).filter(line => line.trim())
+  const result = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    // 计算缩进深度(每个 │ 或空格组算一层)
+    const indentMatch = line.match(/^([\s│├└─]+)/)
+    const rawIndent = indentMatch ? indentMatch[1] : ""
+    // 深度 = 缩进字符中的 ├──/└── 分支数 + 层级
+    const branches = (rawIndent.match(/[├└]/g) || []).length
+    const depth = Math.max(0, branches)
+    // 提取内容(去掉树形字符)
+    const content = trimmed.replace(/^[│├└─━\s]+/, "").trim()
+    if (!content) continue
+    result.push(`${"  ".repeat(depth)}- ${content}`)
+  }
+  return result.join("\n")
+}
