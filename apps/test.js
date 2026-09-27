@@ -4692,14 +4692,17 @@ ${recentHistory || '(无)'}
       e
     })
     session.responseAttempted = true
+    // 最终出口 markdown 兜底:无论上游路径如何判定,只要最终文本含
+    // markdown 结构(粗体/列表/围栏)就转卡面——绝不让 **星号裸发到 QQ
+    const markdownFallback = !modrinthItems.length && !narrativeReply?.lead && !textImageTemplate && looksLikeCodeOrMarkdown(output)
     const botMessageId = modrinthItems.length
       ? modrinthCardItems.length === modrinthItems.length
         ? await this.sendModrinthForwardCards(e, modrinthCardItems)
         : await this.sendModrinthForwardItems(e, modrinthItems)
       : narrativeReply?.lead
         ? await this.sendFinalReplyAsTextImage(e, output, "document")
-        : textImageTemplate
-        ? await this.sendFinalReplyAsTextImage(e, output, textImageTemplate)
+        : textImageTemplate || markdownFallback
+        ? await this.sendFinalReplyAsTextImage(e, output, textImageTemplate || "document")
         : await this.sendSegmentedMessage(e, output, 0.5, { alreadyGuarded: true })
 
     // 画图请求最终走了纯文字回复且本回合没有出图：给下一轮留失败标记，让模型能接住用户的不满
