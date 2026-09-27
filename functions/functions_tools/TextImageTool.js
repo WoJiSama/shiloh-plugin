@@ -1102,7 +1102,7 @@ export function markdownToDocumentHtml(text = "") {
 }
 
 export function markdownToKnowledgeHtml(text = "") {
-  const prepared = extractLatexMath(normalizeImplicitCodeFences(text))
+  const prepared = extractLatexMath(normalizeImplicitCodeFences(normalizeMarkdownHeadings(text)))
   const normalizedText = prepared.text
   const math = prepared.math
   const html = []
@@ -1120,6 +1120,13 @@ export function markdownToKnowledgeHtml(text = "") {
       .filter(Boolean)
     if (!lines.length) return
 
+    // emoji 编号段(1️⃣ 标题 / ② 要点)视为标题,提前 flush
+    const emojiHeading = lines.length === 1 && /^[\s]*[\u2460-\u24FF\u2776-\u2793 0-9\uFE0F\u20E3]+[\s]*\S+/.test(lines[0]) && lines[0].length <= 60
+if (emojiHeading) {
+      const headingText = renderInlineMarkdownHtml(lines[0].replace(/^[\u2460-\u24FF\u2776-\u2793 0-9\uFE0F\u20E3]+[\s]*/, ""), math)
+      html.push(`<h3>${headingText}</h3>`)
+      return
+    }
     const ordered = lines.every(line => /^\d+[.、]\s+\S/.test(line))
     const unordered = lines.every(line => /^(?:[-*+•])\s+\S/.test(line))
     const keyValue = lines.map(line => line.match(/^(?:[-*+•]\s+)?(?:\*\*)?([^:：*]{1,28})(?:\*\*)?\s*[：:]\s*(.+)$/))
@@ -1130,6 +1137,18 @@ export function markdownToKnowledgeHtml(text = "") {
     }
     if (unordered) {
       html.push(`<ul class="knowledge-checklist">${lines.map(line => `<li>${renderInlineMarkdownHtml(line.replace(/^(?:[-*+•])\s+/, ""), math)}</li>`).join("")}</ul>`)
+      return
+    }
+    // 混合列表:不是所有行都是 - 开头,但多数是 → 按列表渲染,非列表行变普通段
+    const listCount = lines.filter(line => /^(?:[-*+•])\s+\S/.test(line)).length
+    if (listCount >= 2 && listCount >= Math.ceil(lines.length * 0.6)) {
+      for (const line of lines) {
+        if (/^(?:[-*+•])\s+\S/.test(line)) {
+          html.push(`<ul class="knowledge-checklist" style="margin-bottom:4px"><li>${renderInlineMarkdownHtml(line.replace(/^(?:[-*+•])\s+/, ""), math)}</li></ul>`)
+        } else if (line.trim()) {
+          html.push(`<p class="knowledge-paragraph" style="margin-bottom:4px">${renderInlineMarkdownHtml(line, math)}</p>`)
+        }
+      }
       return
     }
     if (keyValue.every(Boolean) && keyValue.length >= 2) {
