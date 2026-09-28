@@ -207,7 +207,7 @@ function buildPageHtml() {
   <br><br>
   <button id="unlock">进入管理</button>
 </div>
-<main id="app" style="display:none">
+<main id="app">
   <nav id="domains"></nav>
   <section id="editor"></section>
 </main>
