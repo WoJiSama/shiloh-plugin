@@ -200,7 +200,7 @@ function buildPageHtml() {
   <button class="ghost" id="export">导出文档</button>
   <button id="save" disabled>保存全部</button>
 </header>
-<div class="lock" id="lock">
+<div class="lock" id="lock" style="display:none">
   <h2>需要访问令牌</h2>
   <p>令牌保存在服务器插件目录 config/commands-web.json</p>
   <input id="token2" type="password" placeholder="输入令牌" style="width:70%">
@@ -926,6 +926,8 @@ async function loadEmojiGallery() {
 }
 
 async function load() {
+  $("lock").style.display = "none"
+  $("app").style.display = "block"
   try {
     await loadDiceExtras()
     loadEmojiGallery().catch(() => {})
@@ -1053,7 +1055,8 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
 
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
-      res.set("Cache-Control", "no-cache, no-store, must-revalidate")
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
+      res.set("ETag", "v3-" + Date.now())
       res.type("html").send(buildPageHtmlWithToken(token))
       return
     }
