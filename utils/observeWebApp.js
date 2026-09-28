@@ -299,7 +299,7 @@ function render(d) {
 
   const dailyRows = (d.daily || []).map(day => "<tr><td>" + day.date.slice(5) + "</td><td>" + bar(day.turns, Math.max(1, ...d.daily.map(x => x.turns))) + "</td><td>" + day.outbound + "</td><td>" + day.emoji + "</td><td>" + (day.failures || 0) + "</td><td>" + (day.avgMs || 0) + "ms</td></tr>").join("") || emptyRow(6)
 
-  const groupRows = (d.groups || []).map(g => "<tr><td title=\"" + g.groupId + "\">" + (g.groupName || "…"+g.groupId.slice(-4)) + "<div style='font-size:11px;color:#8a93a5'>" + g.groupId + "</div></td><td>" + bar(g.turns, Math.max(1, ...d.groups.map(x => x.turns))) + "</td><td>" + g.users + "</td><td>" + g.emoji + "</td><td>" + g.outbound + "</td></tr>").join("") || emptyRow(5)
+  const groupRows = (d.groups || []).map(g => "<tr><td>" + (g.groupName || "…"+g.groupId.slice(-4)) + "<div style='font-size:11px;color:#8a93a5'>" + g.groupId + "</div></td><td>" + bar(g.turns, Math.max(1, ...d.groups.map(x => x.turns))) + "</td><td>" + g.users + "</td><td>" + g.emoji + "</td><td>" + g.outbound + "</td></tr>").join("") || emptyRow(5)
 
   const intentRows = (d.intents || []).map(kv => distRow(kv[0], kv[1], s.turns)).join("") || emptyRow(3)
   const triggerRows = (d.triggers || []).map(kv => distRow(kv[0], kv[1], s.turns)).join("") || emptyRow(3)
@@ -318,7 +318,7 @@ function render(d) {
   for (const g of d.groups || []) groupNameLookup[g.groupId] = g.groupName || ""
   const recent = (d.recentTurns || []).map(t => {
     const gName = groupNameLookup[t.group] || t.group
-    return "<tr><td>" + t.at + "</td><td title=\"" + t.group + "\">" + (gName.length > 8 ? gName.slice(0,8)+"…" : gName) + "</td><td>" + t.intent + "</td><td>" + t.trigger + "</td><td>" + escapeHtml(t.tools) + "</td><td>" + t.outbound + "</td><td>" + t.totalMs + "ms</td></tr>"
+    return "<tr><td>" + t.at + "</td><td>" + (gName.length > 8 ? gName.slice(0,8)+"…" : gName) + "</td><td>" + t.intent + "</td><td>" + t.trigger + "</td><td>" + escapeHtml(t.tools) + "</td><td>" + t.outbound + "</td><td>" + t.totalMs + "ms</td></tr>"
   }).join("") || emptyRow(7)
 
   $("app").innerHTML =
