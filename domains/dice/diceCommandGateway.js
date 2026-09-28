@@ -48,6 +48,9 @@ export function sanitizeDiceCommandError(error) {
   return raw.slice(0, 240) || "未知错误"
 }
 
+// 旁观者仍可用的自身管理命令（.obon/.oboff/.ob list）
+const OBSERVER_SELF_COMMANDS = new Set(["observer"])
+
 export function getDiceCommandGate({ manager, e, commandName = "" } = {}) {
   if (startsWithMentionOfOtherMember(e)) {
     return { allowed: false, consume: false, response: "" }
@@ -55,6 +58,10 @@ export function getDiceCommandGate({ manager, e, commandName = "" } = {}) {
   const config = manager?.getConfig?.() || {}
   if (config.enabled === false) {
     return { allowed: false, consume: true, response: "骰娘模块现在没开。" }
+  }
+  // 旁观模式下静默吞掉其他骰点命令（sealdice .obon 语义）
+  if (!OBSERVER_SELF_COMMANDS.has(commandName) && manager?.isObserver?.(e) === true) {
+    return { allowed: false, consume: true, response: "" }
   }
   if (commandName !== "replyControl" && manager?.isReplyEnabled?.(e, config) === false) {
     return { allowed: false, consume: true, response: "" }

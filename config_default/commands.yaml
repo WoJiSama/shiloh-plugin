@@ -112,7 +112,7 @@ domains:
         perm: all
         src: "domains/dice/app.js roll"
       - usage: ".ra <技能> <值> [困难|极难|大成功]"
-        desc: COC 检定（支持难度前缀与 .ra b/p 奖惩骰）
+        desc: COC 检定（支持难度前缀、.ra b/p 奖惩骰与 #N 多轮，如 .rab#3 技能 60 连掷三次）
         perm: all
         src: "domains/dice/app.js check"
       - usage: ".rav A 60 vs B 50"
@@ -127,12 +127,12 @@ domains:
         desc: SAN Check（大失败时损失骰取最大）
         perm: all
         src: "domains/dice/app.js sanCheck"
-      - usage: ".en <技能> [值]"
-        desc: 成长检定（失败可成长 +1d10，自动写卡）
+      - usage: ".en <技能...> [值]"
+        desc: 成长检定（失败可成长 +1d10，自动写卡；.en 技能1 技能2 批量成长）
         perm: all
         src: "domains/dice/app.js enCheck"
-      - usage: ".st <录入|show|showall|hide|del|clr>"
-        desc: 人物卡管理（侦查=60 / san-1 增减 / 隐藏属性）
+      - usage: ".st <录入|show|showall|hide|del|clr|fmt>"
+        desc: 人物卡管理（侦查=60 / san-1 增减 / 隐藏属性 / fmt 卡模板）
         perm: all
         src: "domains/dice/app.js st"
       - usage: ".pc <list|new|use|del|tag|lock>"
@@ -159,6 +159,14 @@ domains:
         desc: 骰娘显示名 / 自动群名片
         perm: all
         src: "domains/dice/app.js nn|sn"
+      - usage: ".obon / .oboff / .ob list"
+        desc: 旁观模式（旁观期间骰点静默不打扰跑团）
+        perm: all
+        src: "domains/dice/app.js observer"
+      - usage: ".name [zh|en|jp] [数量]"
+        desc: 随机姓名生成（中文/英文/日文）
+        perm: all
+        src: "domains/dice/app.js randomName"
       - usage: ".jrrp / .db [STR SIZ]"
         desc: 今日人品 / 伤害加值
         perm: all
@@ -199,16 +207,20 @@ domains:
         desc: 关闭跑团日志并导出记录文件；.log 结束并导出 同义
         perm: admin
         src: "domains/dice/app.js logEnd"
-      - usage: ".log export"
-        desc: 导出最近一份跑团日志（历史会话也可导出）
+      - usage: ".log export [序号|团名] [html]"
+        desc: 导出跑团日志（默认 txt；带 html 导出美化网页版）
         perm: admin
         src: "domains/dice/app.js logExport"
+      - usage: ".log list"
+        desc: 查看本群全部团录列表与导出序号
+        perm: all
+        src: "domains/dice/app.js logList"
       - usage: ".log [status]"
         desc: 查看当前群跑团日志状态
         perm: all
         src: "domains/dice/app.js logStatus"
-      - usage: ".ri <表达式> / .init <list|clear>"
-        desc: 先攻骰与先攻表管理（.ri 1d20+3 / .init list）
+      - usage: ".ri <表达式> / .init <list|next|clear>"
+        desc: 先攻骰与先攻表管理（.ri 1d20+3 / .init list / .init next 回合轮转）
         perm: all
         src: "domains/dice/app.js initiativeRoll|initiative"
       - usage: ".rb/.rp [数量]"

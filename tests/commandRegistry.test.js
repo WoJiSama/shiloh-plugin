@@ -50,10 +50,13 @@ test("骰娘命令总表覆盖 log 家族与常用命令", async () => {
     ".log on <团名>",
     ".log off [团名]",
     ".log end [团名]",
-    ".log export",
+    ".log export [序号|团名] [html]",
+    ".log list",
     ".log [status]",
     ".r <表达式>",
-    ".ri <表达式> / .init <list|clear>"
+    ".ri <表达式> / .init <list|next|clear>",
+    ".obon / .oboff / .ob list",
+    ".name [zh|en|jp] [数量]"
   ]) {
     assert.ok(usages.has(required), `命令总表缺少：${required}`)
   }

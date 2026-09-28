@@ -102,6 +102,49 @@ test("难度前缀解析：.ra 困难侦查60 / .ra 极难 侦查 60", async () 
   assert.equal(d.difficulty, 0)
 })
 
+test("检定参数奖惩前缀：.ra b/p 与带数量 b2/p3 不再混进技能名", async () => {
+  const m = await getManager()
+  const b = m.parseCheckArgs("b 侦查 60")
+  assert.equal(b.modifier, 1)
+  assert.equal(b.skill, "侦查")
+  assert.equal(b.target, 60)
+  const b2 = m.parseCheckArgs("b2 侦查 60")
+  assert.equal(b2.modifier, 2)
+  assert.equal(b2.skill, "侦查")
+  const p3 = m.parseCheckArgs("p3 侦查 60")
+  assert.equal(p3.modifier, -3)
+  assert.equal(p3.skill, "侦查")
+  const reward = m.parseCheckArgs("奖励2 侦查 60")
+  assert.equal(reward.modifier, 2)
+  assert.equal(reward.skill, "侦查")
+})
+
+test("检定参数多轮前缀：N# / #N / 紧贴式 3#技能 均剥离且不污染技能名", async () => {
+  const m = await getManager()
+  const spaced = m.parseCheckArgs("3# 今天开团 60")
+  assert.equal(spaced.rounds, 3)
+  assert.equal(spaced.skill, "今天开团")
+  assert.equal(spaced.target, 60)
+  const hash = m.parseCheckArgs("#3 今天开团 60")
+  assert.equal(hash.rounds, 3)
+  assert.equal(hash.skill, "今天开团")
+  const compact = m.parseCheckArgs("3#今天开团 60")
+  assert.equal(compact.rounds, 3)
+  assert.equal(compact.skill, "今天开团")
+  const plain = m.parseCheckArgs("侦查 60")
+  assert.equal(plain.rounds, 0)
+})
+
+test("目标值取末位数字：残留前导数字不再劫持检定值", async () => {
+  const m = await getManager()
+  // 曾因取第一个数字 token，被判成对 3 检定并静默丢弃真值 60
+  const poisoned = m.parseCheckArgs("3 今天开团 60")
+  assert.equal(poisoned.target, 60)
+  const compact = m.parseCheckArgs("侦查60")
+  assert.equal(compact.target, 60)
+  assert.equal(compact.skill, "侦查")
+})
+
 test("难度检定展示：极难检定按折算线判通过", async () => {
   const m = await getManager()
   // 20 vs 80：极难线16 → 未通过；rank=3（极难成功）但需 rank≥3? 20>16 rank=2? 20≤40困难 rank2 <3 → 失败

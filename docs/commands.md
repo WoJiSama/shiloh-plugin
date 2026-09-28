@@ -1,7 +1,7 @@
 # 命令总表
 
 > 本文档由 `config_default/commands.yaml` 生成（`.命令 导出` 或运行 scripts/gen-commands-doc.mjs）。
-> 生成时间：2026-09-21 06:41:10 ｜ 共 114 条命令 / 11 个模块
+> 生成时间：2026-09-28 07:22:50 ｜ 共 117 条命令 / 11 个模块
 
 ## 🧠 记忆与表达
 
@@ -43,18 +43,20 @@ COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；
 | 用法 | 说明 | 权限 | 实现位置 |
 | --- | --- | --- | --- |
 | `.r <表达式>` | 掷骰，如 .r1d100 / .r 2d6+3 / .r 3#1d100 / .r 4d6kh3（取高丢低都支持） | 所有人 | `domains/dice/app.js roll` |
-| `.ra <技能> <值> [困难|极难|大成功]` | COC 检定（支持难度前缀与 .ra b/p 奖惩骰） | 所有人 | `domains/dice/app.js check` |
+| `.ra <技能> <值> [困难|极难|大成功]` | COC 检定（支持难度前缀、.ra b/p 奖惩骰与 | 所有人 | `domains/dice/app.js check` |
 | `.rav A 60 vs B 50` | 对抗检定；也可 .rav 斗殴 @对方 | 所有人 | `domains/dice/app.js opposed` |
 | `.rh <技能> <值>` | 暗骰，结果私聊发送 | 所有人 | `domains/dice/app.js hiddenCheck` |
 | `.sc <成功/失败> [SAN] [--half --cap=N]` | SAN Check（大失败时损失骰取最大） | 所有人 | `domains/dice/app.js sanCheck` |
-| `.en <技能> [值]` | 成长检定（失败可成长 +1d10，自动写卡） | 所有人 | `domains/dice/app.js enCheck` |
-| `.st <录入|show|showall|hide|del|clr>` | 人物卡管理（侦查=60 / san-1 增减 / 隐藏属性） | 所有人 | `domains/dice/app.js st` |
+| `.en <技能...> [值]` | 成长检定（失败可成长 +1d10，自动写卡；.en 技能1 技能2 批量成长） | 所有人 | `domains/dice/app.js enCheck` |
+| `.st <录入|show|showall|hide|del|clr|fmt>` | 人物卡管理（侦查=60 / san-1 增减 / 隐藏属性 / fmt 卡模板） | 所有人 | `domains/dice/app.js st` |
 | `.pc <list|new|use|del|tag|lock>` | 多人物卡管理 | 所有人 | `domains/dice/app.js pc` |
 | `.coc7 [数量] / .dnd [数量]` | 生成 COC7/DND 属性 | 所有人 | `domains/dice/app.js coc|dnd` |
 | `.setcoc [0-5|无大失败]` | 查看或设置本群 COC 房规 | 所有人 | `domains/dice/app.js setCoc` |
 | `.bp/.pp [数量]` | 奖励骰/惩罚骰 | 所有人 | `domains/dice/app.js roll` |
 | `.ti / .li` | 临时疯狂/总结疯狂表 | 所有人 | `domains/dice/app.js ti|li` |
 | `.nn <昵称> / .sn on|off` | 骰娘显示名 / 自动群名片 | 所有人 | `domains/dice/app.js nn|sn` |
+| `.obon / .oboff / .ob list` | 旁观模式（旁观期间骰点静默不打扰跑团） | 所有人 | `domains/dice/app.js observer` |
+| `.name [zh|en|jp] [数量]` | 随机姓名生成（中文/英文/日文） | 所有人 | `domains/dice/app.js randomName` |
 | `.jrrp / .db [STR SIZ]` | 今日人品 / 伤害加值 | 所有人 | `domains/dice/app.js jrrp|db` |
 | `.draw <牌组> [keys|list|search|desc|reload]` | 牌堆抽牌与管理（牌堆文件放 config/decks/） | 所有人 | `domains/dice/DeckManager.js` |
 | `.骰规则` | 查看规则包帮助（所有子命令一览） | 所有人 | `domains/dice/app.js manageDiceRules` |
@@ -65,9 +67,10 @@ COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；
 | `.log new <团名>` | 新建一份跑团日志（与 .log on 等价） | 群管理 | `domains/dice/app.js logNew` |
 | `.log off [团名]` | 关闭跑团日志，恢复本群 AI 对话（不导出） | 群管理 | `domains/dice/app.js logStop` |
 | `.log end [团名]` | 关闭跑团日志并导出记录文件；.log 结束并导出 同义 | 群管理 | `domains/dice/app.js logEnd` |
-| `.log export` | 导出最近一份跑团日志（历史会话也可导出） | 群管理 | `domains/dice/app.js logExport` |
+| `.log export [序号|团名] [html]` | 导出跑团日志（默认 txt；带 html 导出美化网页版） | 群管理 | `domains/dice/app.js logExport` |
+| `.log list` | 查看本群全部团录列表与导出序号 | 所有人 | `domains/dice/app.js logList` |
 | `.log [status]` | 查看当前群跑团日志状态 | 所有人 | `domains/dice/app.js logStatus` |
-| `.ri <表达式> / .init <list|clear>` | 先攻骰与先攻表管理（.ri 1d20+3 / .init list） | 所有人 | `domains/dice/app.js initiativeRoll|initiative` |
+| `.ri <表达式> / .init <list|next|clear>` | 先攻骰与先攻表管理（.ri 1d20+3 / .init list / .init next 回合轮转） | 所有人 | `domains/dice/app.js initiativeRoll|initiative` |
 | `.rb/.rp [数量]` | 奖励/惩罚检定骰 | 所有人 | `domains/dice/app.js bonusCheck|penaltyCheck` |
 | `.rsr/.ww/.dx/.ek/.ekgen <参数>` | 掷骰扩展：无限恐怖 rsr / 骰池 ww / 无限 dx / 暗狂 ek | 所有人 | `domains/dice/app.js rsr|ww|dx|ek|ekgen` |
 | `.buff/.ss/.cast/.longrest/.ds` | DND 法术位与增益管理 | 所有人 | `domains/dice/app.js dndUtility` |

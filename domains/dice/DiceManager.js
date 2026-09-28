@@ -76,6 +76,25 @@ const DND_NAMES = [
   "Seren", "Talia", "Ulric", "Vera"
 ]
 
+// .name 随机姓名库（中/英/日）
+const NAME_BANKS = {
+  zh: {
+    label: "中文",
+    first: "伟芳娜秀敏静丽强磊军洋勇艳杰娟涛明超霞平刚玉兰凤洁梅琳云莲真雪荣佳嘉琼勤珍贞莉璐娅琦晶妍茜秋珊莎锦青倩婷婉娴瑾颖露瑶怡雁蓓仪荷丹蓉眉君琴蕊薇菁梦岚苑婕馨瑗韵融园艺咏卿聪澜纯毓悦昭冰爽琬茗羽希宁欣飘育滢馥筠柔竹凝晓欢霄枫芸菲寒伊亚宜可姬舒影荔枝思".split(""),
+    last: "王李张刘陈杨黄赵吴周徐孙马朱胡郭何高林罗郑梁谢宋唐许韩冯邓曹彭曾萧田董袁潘于蒋蔡余杜叶程苏魏吕丁任沈姚卢姜崔钟谭陆汪范金石廖贾夏韦付方白邹孟熊秦邱江尹薛闫段雷侯龙史陶黎贺顾毛郝龚邵万钱严覃武戴莫孔向汤常乔贺赖龚文".split("")
+  },
+  en: {
+    label: "英文",
+    first: ["James", "Mary", "Robert", "Patricia", "John", "Jennifer", "Michael", "Linda", "David", "Elizabeth", "William", "Susan", "Richard", "Jessica", "Joseph", "Sarah", "Thomas", "Karen", "Charles", "Lisa", "Daniel", "Nancy", "Matthew", "Betty", "Anthony", "Sandra", "Mark", "Ashley", "Steven", "Emily", "Andrew", "Donna", "Joshua", "Michelle", "Kevin", "Carol", "Brian", "Amanda", "George", "Melissa", "Timothy", "Deborah", "Ronald", "Stephanie", "Jason", "Rebecca", "Edward", "Sharon", "Jeffrey", "Laura"],
+    last: ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson", "Martin", "Lee", "Thompson", "White", "Harris", "Clark", "Lewis", "Robinson", "Walker", "Young", "Allen", "King", "Wright", "Scott", "Green", "Baker", "Adams", "Nelson", "Hill", "Campbell", "Mitchell", "Roberts", "Carter", "Phillips", "Evans", "Turner", "Parker", "Collins", "Edwards", "Stewart", "Morris", "Murphy", "Cook", "Rogers", "Peterson", "Cooper"]
+  },
+  jp: {
+    label: "日文",
+    last: ["佐藤", "鈴木", "高橋", "田中", "渡辺", "伊藤", "山本", "中村", "小林", "加藤", "吉田", "山田", "佐々木", "中野", "松本", "井上", "木村", "林", "斎藤", "清水", "山口", "森", "阿部", "池田", "橋本", "石川", "山下", "中島", "石井", "小川", "藤田", "岡田", "村上", "長谷川", "近藤", "藤井", "青木", "福田", "西村", "藤本"],
+    first: ["太郎", "花子", "一郎", "美咲", "健太", "陽菜", "翔太", "さくら", "大輔", "愛", "悠真", "結衣", "蓮", "陽菜", "樹", "芽衣", "翼", "千夏", "奏太", "美月", "和也", "朋美", "亮介", "由美", "拓海", "彩", "駿", "凛", "颯太", "智子", "陽介", "麻衣", "裕樹", "千尋", "淳", "奈々", "孝史", "美穂", "剛", "杏"]
+  }
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
 }
@@ -926,6 +945,83 @@ export class DiceManager {
     return `DND 随机姓名：${names.join("、")}`
   }
 
+  // .name [zh|en|jp] [数量] - sealdice 随机姓名
+  handleName(e, raw = "") {
+    const text = String(raw || "").trim()
+    let lang = "zh"
+    let rest = text
+    const langMatch = rest.match(/^(en|english|英文|jp|ja|jpn|日文|日语|zh|cn|chinese|中文)\s*/i)
+    if (langMatch) {
+      const word = langMatch[1].toLowerCase()
+      lang = /^(en|english|英文)/i.test(word) || word === "英文" ? "en" : /^(jp|ja|jpn)/i.test(word) || /日/.test(word) ? "jp" : "zh"
+      rest = rest.slice(langMatch[0].length)
+    }
+    const count = Math.min(20, Math.max(1, Number(rest.match(/\d+/)?.[0]) || 5))
+    const bank = NAME_BANKS[lang] || NAME_BANKS.zh
+    const names = []
+    for (let i = 0; i < count; i += 1) {
+      if (lang === "en") {
+        names.push(`${bank.first[rollInt(bank.first.length) - 1]} ${bank.last[rollInt(bank.last.length) - 1]}`)
+      } else if (lang === "jp") {
+        names.push(`${bank.last[rollInt(bank.last.length) - 1]} ${bank.first[rollInt(bank.first.length) - 1]}`)
+      } else {
+        names.push(`${bank.last[rollInt(bank.last.length) - 1]}${bank.first[rollInt(bank.first.length) - 1]}`)
+      }
+    }
+    return `随机姓名（${bank.label}）：${names.join("、")}`
+  }
+
+  // ── 旁观模式（sealdice .obon/.oboff）──
+  isObserver(e = {}) {
+    if (!e?.group_id) return false
+    const group = this.readState().groups?.[String(e.group_id)]
+    const userId = String(e?.user_id || e?.sender?.user_id || "")
+    return Boolean(userId && (group?.observers || []).includes(userId))
+  }
+
+  async handleObserve(e, action = "") {
+    const config = this.getConfig()
+    if (!e?.group_id) return "旁观模式只能在群聊中使用。"
+    const groupId = String(e.group_id)
+    const userId = String(e.user_id || e.sender?.user_id || "")
+    const name = this.getUserName(e)
+    const state = this.readState(config)
+    state.groups[groupId] ||= {}
+    const group = state.groups[groupId]
+    group.observers ||= []
+    const text = String(action || "").trim().toLowerCase()
+    if (/^(on|obon|进入|加入|旁观)$/.test(text)) {
+      if (group.observers.includes(userId)) return `${name} 已经在旁观中了。`
+      group.observers.push(userId)
+      await this.writeState(state, config)
+      return `${name} 已进入旁观模式。之后你的骰点命令会被静默，不再打扰跑团；用 .oboff 恢复。`
+    }
+    if (/^(off|oboff|exit|退出|取消|恢复)$/.test(text)) {
+      if (!group.observers.includes(userId)) return `${name} 当前不在旁观模式。`
+      group.observers = group.observers.filter(id => id !== userId)
+      await this.writeState(state, config)
+      return `${name} 已退出旁观模式，骰点恢复正常。`
+    }
+    if (/^(list|ls|名单|列表|查看)$/.test(text)) {
+      if (!group.observers.length) return "当前群没有旁观者。"
+      const names = group.observers.map(id => this.readState().users?.[id]?.nickname || id)
+      return `旁观名单（${group.observers.length} 人）：${names.join("、")}`
+    }
+    if (/^(clr|clear|清空)$/.test(text)) {
+      if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以清空旁观名单。"
+      group.observers = []
+      await this.writeState(state, config)
+      return "旁观名单已清空。"
+    }
+    return [
+      "旁观模式：",
+      ".obon - 进入旁观（我的骰点将被静默）",
+      ".oboff - 退出旁观",
+      ".ob list - 查看旁观名单",
+      ".ob clr - 清空名单（管理员）"
+    ].join("\n")
+  }
+
   async handleInitiativeRoll(e, raw = "") {
     const name = this.getUserName(e)
     const bonus = Number(String(raw || "").match(/[+\-]?\d+/)?.[0] || 0)
@@ -960,8 +1056,22 @@ export class DiceManager {
     if (/^(clr|clear|清空)$/i.test(text)) {
       if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以清空先攻列表。"
       state.groups[groupId].initiative = []
+      state.groups[groupId].initiativeTurn = null
       await this.writeState(state, config)
       return "先攻列表已清空。"
+    }
+    if (/^(next|下一位|下一回合)$/i.test(text)) {
+      if (!list.length) return "先攻列表为空，先用 .ri 掷先攻。"
+      list.sort((a, b) => b.value - a.value)
+      const turn = state.groups[groupId].initiativeTurn || {}
+      const cursor = turn.name ? list.findIndex(item => item.name === turn.name) : -1
+      let index = cursor + 1
+      if (index >= list.length) index = 0
+      const round = (Number(turn.round) || 0) + (cursor + 1 >= list.length || cursor < 0 ? 1 : 0)
+      state.groups[groupId].initiativeTurn = { round, name: list[index].name }
+      await this.writeState(state, config)
+      const order = list.map((item, i) => `${i === index ? "▶ " : ""}${i + 1}. ${item.name} ${item.value}`).join("\n")
+      return `先攻 第${round}轮：轮到 ${list[index].name}（先攻 ${list[index].value}）行动\n${order}`
     }
     const del = text.match(/^(del|rm|删除)\s+(.+)$/i)
     if (del) {
@@ -1142,24 +1252,99 @@ export class DiceManager {
     return `${header}${body}\n`
   }
 
+  buildLogHtml(log, lines) {
+    const esc = value => String(value ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    const rows = lines.map(item => {
+      const time = item.at ? item.at.replace("T", " ").slice(0, 19) : ""
+      return [
+        `<div class="msg">`,
+        `  <div class="meta"><span class="name">${esc(item.name || item.userId)}</span><span class="time">${esc(time)}</span></div>`,
+        `  <div class="content">${esc(item.content)}</div>`,
+        `</div>`
+      ].join("\n")
+    }).join("\n")
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(log.title || "COC Log")}</title>
+<style>
+  body { margin: 0; background: #16171f; color: #d7d9e0; font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { border-bottom: 1px solid #2c2e3d; padding-bottom: 14px; margin-bottom: 18px; }
+  h1 { margin: 0 0 6px; font-size: 20px; color: #f0f1f5; }
+  .info { color: #8b8fa3; font-size: 13px; }
+  .msg { background: #1f2130; border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+  .meta { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }
+  .name { color: #8ab4f8; font-weight: 600; }
+  .time { color: #6b6f84; }
+  .content { white-space: pre-wrap; word-break: break-word; }
+  footer { margin-top: 22px; color: #565a6e; font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🎲 ${esc(log.title || "COC Log")}</h1>
+  <div class="info">开始：${esc(log.startedAt || "未知")}${log.endedAt ? ` ｜ 结束：${esc(log.endedAt)}` : ""} ｜ 共 ${lines.length} 条记录</div>
+</header>
+${rows}
+<footer>由跑团骰娘导出</footer>
+</div>
+</body>
+</html>`
+  }
+
+  handleLogList(e) {
+    if (!e?.group_id) return "log 只能在群聊中使用。"
+    const group = this.readState(this.getConfig()).groups?.[String(e.group_id)] || {}
+    const current = group.log?.file ? group.log : null
+    const history = [...(group.logs || [])]
+      .filter(item => item?.file && item.file !== current?.file)
+      .reverse()
+    const rows = []
+    if (current) {
+      const count = this.readLogLines(current.file).length
+      rows.push(`▶ 当前：${current.title || "未命名"}（${current.active ? "记录中" : "已结束"}，${count} 条，导出：.log export）`)
+    }
+    history.slice(0, 10).forEach((item, index) => {
+      const count = this.readLogLines(item.file).length
+      rows.push(`${index + 1}. ${item.title || "未命名"}（已结束，${count} 条，导出：.log export ${index + 1}）`)
+    })
+    if (!rows.length) return "本群还没有任何团录。"
+    const more = history.length > 10 ? `\n（仅显示最近 10 份，共 ${history.length} 份历史）` : ""
+    return `本群团录：\n${rows.join("\n")}${more}`
+  }
+
   async exportLog(e, raw = "") {
     const config = this.getConfig()
     if (!e?.group_id) return "log 只能在群聊中使用。"
     if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以导出跑团 log。"
     const groupId = String(e.group_id)
     const group = this.readState(config).groups?.[groupId] || {}
-    const log = this.resolveLogForExport(group, raw)
-    if (String(raw || "").trim() && !log) return `没有找到团录：${String(raw).trim()}。可先用 .log status 查看历史序号。`
+    // 末尾可带导出格式：.log export [序号|团名] [html]
+    const rawTokens = String(raw || "").trim().split(/\s+/).filter(Boolean)
+    let wantsHtml = false
+    let selector = String(raw || "").trim()
+    if (rawTokens.length && /^(html|htm|网页版?)$/i.test(rawTokens[rawTokens.length - 1])) {
+      wantsHtml = true
+      rawTokens.pop()
+      selector = rawTokens.join(" ")
+    }
+    const log = this.resolveLogForExport(group, selector)
+    if (selector && !log) return `没有找到团录：${selector}。可先用 .log list 查看历史序号。`
     if (!log?.file) return "当前群还没有可导出的 log。"
     const lines = this.readLogLines(log.file)
     if (!lines.length) return "当前 log 还没有记录到消息。"
     const exportDir = path.join(this.getLogDir(groupId, config), "exports")
     ensureDir(exportDir)
     const safeTitle = String(log.title || "coc-log").replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 50)
-    const txtFile = path.join(exportDir, `${safeTitle}-${Date.now()}.txt`)
-    fs.writeFileSync(txtFile, this.buildLogText(log, lines), "utf8")
+    const outFile = path.join(exportDir, `${safeTitle}-${Date.now()}.${wantsHtml ? "html" : "txt"}`)
+    fs.writeFileSync(outFile, wantsHtml ? this.buildLogHtml(log, lines) : this.buildLogText(log, lines), "utf8")
     try {
-      await this.sendLogFile(e, txtFile, config)
+      await this.sendLogFile(e, outFile, config)
       // 文件本身就是导出结果；成功时不再补发一条普通聊天，避免用户
       // 把状态文字误认为导出的日志正文。
       return ""
@@ -1167,7 +1352,7 @@ export class DiceManager {
       this.logger?.warn?.(`[骰娘] log 文件发送失败: ${error.message}`)
       return `log 文本已经生成，但文件发送失败：${sanitizeDiceCommandError(error)}。没有把截断内容当作完整导出。`
     } finally {
-      try { fs.rmSync(txtFile, { force: true }) } catch {}
+      try { fs.rmSync(outFile, { force: true }) } catch {}
     }
   }
 
@@ -1453,21 +1638,46 @@ export class DiceManager {
       }
     }
     const parts = text.split(/\s+/).filter(Boolean)
+    // sealdice 多轮前缀：3#技能 / 3# 技能 / #3 技能（.rab#3 的轮数由命令头解析，
+    // 这里兜参数区写法，防止 N#/#N 混进技能名）
+    let rounds = 0
+    if (/^\d+#$/.test(parts[0] || "")) {
+      rounds = Number(parts[0].slice(0, -1))
+      parts.shift()
+    } else if (/^#\d+$/.test(parts[0] || "")) {
+      rounds = Number(parts[0].slice(1))
+      parts.shift()
+    } else if (parts[0]) {
+      const lead = parts[0].match(/^(\d+)#(?=\S)/)
+      if (lead) {
+        rounds = Number(lead[1])
+        parts[0] = parts[0].slice(lead[0].length)
+      }
+    }
     let modifier = 0
-    if (/^(b|奖励|奖励骰)$/i.test(parts[0])) { modifier = 1; parts.shift() }
-    if (/^(p|惩罚|惩罚骰)$/i.test(parts[0])) { modifier = -1; parts.shift() }
-    const valueIndex = parts.findIndex(p => /^-?\d+$/.test(p))
+    let bonusLead = /^(b|奖励|奖励骰)(\d+)?$/i.exec(parts[0] || "")
+    if (bonusLead) { modifier = Number(bonusLead[2] || 1); parts.shift() }
+    else {
+      const penaltyLead = /^(p|惩罚|惩罚骰)(\d+)?$/i.exec(parts[0] || "")
+      if (penaltyLead) { modifier = -Number(penaltyLead[2] || 1); parts.shift() }
+    }
+    // 目标值取最后一个纯数字 token（sealdice 值在末尾；取第一个会被漏解析的
+    // 轮数/数量劫持，例如「3 今天开团 60」曾被判成对 3 检定并丢弃真值）
+    let valueIndex = -1
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+      if (/^-?\d+$/.test(parts[i])) { valueIndex = i; break }
+    }
     if (valueIndex < 0) {
       const compact = parts.join(" ")
       const compactMatch = compact.match(/^(.+?)[\s:=：]*(-?\d+)$/)
       if (compactMatch) {
-        return { skill: normalizeSkillName(compactMatch[1]), target: Number(compactMatch[2]), modifier, difficulty }
+        return { skill: normalizeSkillName(compactMatch[1]), target: Number(compactMatch[2]), modifier, difficulty, rounds }
       }
-      return { skill: compact || "检定", target: NaN, modifier, difficulty }
+      return { skill: compact || "检定", target: NaN, modifier, difficulty, rounds }
     }
     const target = Number(parts[valueIndex])
     const skill = parts.slice(0, valueIndex).join(" ") || "检定"
-    return { skill, target, modifier, difficulty }
+    return { skill, target, modifier, difficulty, rounds }
   }
 
   handleCheck(e, raw = "", options = {}) {
@@ -1481,18 +1691,29 @@ export class DiceManager {
     if (!Number.isFinite(target)) return `找不到「${parsed.skill}」的技能值。请写成：.ra ${parsed.skill} 60，或先用 .st 录入。`
     const modifier = options.modifier ?? parsed.modifier
     const difficulty = Number(options.difficulty ?? parsed.difficulty) || 0
-    const roll = this.rollD100(modifier)
+    const maxRounds = safeNumber(config.maxRounds, 20, 1, 1000)
+    const rounds = Math.max(1, Math.min(maxRounds, Number(options.rounds ?? parsed.rounds) || 1))
     const rule = this.getGroupRule(e, config)
-    const level = this.renderCheckLevel(roll.value, target, rule, difficulty)
-    return renderTemplate(pickCheckTemplate(config.templates, level, config.checkLevels), {
-      name: this.getUserName(targetEvent),
-      skill: difficulty > 1 ? `${this.difficultyLabel(difficulty)}${parsed.skill}` : parsed.skill,
-      target,
-      roll: roll.value,
-      diceText: roll.diceText,
-      level,
-      rule
-    })
+    const skill = difficulty > 1 ? `${this.difficultyLabel(difficulty)}${parsed.skill}` : parsed.skill
+    const renderOnce = () => {
+      const roll = this.rollD100(modifier)
+      const level = this.renderCheckLevel(roll.value, target, rule, difficulty)
+      // 多轮时用基础单行模板，避免逐轮吐槽文案刷屏
+      const template = rounds > 1
+        ? (config.templates.check || DEFAULT_TEMPLATES.check)
+        : pickCheckTemplate(config.templates, level, config.checkLevels)
+      return renderTemplate(template, {
+        name: this.getUserName(targetEvent),
+        skill,
+        target,
+        roll: roll.value,
+        diceText: roll.diceText,
+        level,
+        rule
+      })
+    }
+    if (rounds > 1) return Array.from({ length: rounds }, renderOnce).join("\n")
+    return renderOnce()
   }
 
   difficultyLabel(difficulty = 0) {
@@ -1661,6 +1882,49 @@ export class DiceManager {
 
   async handleEn(e, raw = "") {
     const config = this.getConfig()
+    const text = String(raw || "").trim()
+    // 批量成长：.en 技能1 技能2 …（全部按人物卡数值结算，sealdice 语义）
+    const tokens = text.split(/[\s,，]+/).filter(Boolean)
+    const skillTokens = tokens.filter(token => !/^\d+$/.test(token))
+    const numberTokens = tokens.filter(token => /^\d+$/.test(token))
+    if (skillTokens.length >= 2) {
+      if (numberTokens.length) return "批量成长按人物卡数值结算，不带数值；请写 .en 技能1 技能2，或逐个 .en 技能 数值。"
+      const state = this.readState(config)
+      const card = this.getActiveCard(e, state)
+      if (this.isCardLocked(card)) return this.lockedCardReply(card)
+      const lines = []
+      let changed = false
+      for (const token of skillTokens.slice(0, 20)) {
+        const key = normalizeSkillName(token)
+        const attr = ATTR_ALIASES[token] || ATTR_ALIASES[key]
+        const storedValue = attr ? card.attrs?.[attr] : card.skills?.[key]
+        const target = Number(storedValue)
+        if (!Number.isFinite(target)) {
+          lines.push(`${token}：找不到技能值，请先 .st ${token} 60`)
+          continue
+        }
+        const roll = this.rollD100(0).value
+        const success = roll > target
+        const gain = success ? this.rollExpression("1d10", config).total : 0
+        let result = "成长失败"
+        if (success) {
+          const after = target + gain
+          if (attr) card.attrs[attr] = after
+          else card.skills[key] = after
+          changed = true
+          result = `成长成功，增加 ${gain}（${target}→${after}，已写入人物卡）`
+        }
+        lines.push(renderTemplate(config.templates.en, {
+          name: this.getUserName(e),
+          skill: token,
+          target,
+          roll,
+          result
+        }))
+      }
+      if (changed) await this.writeState(state, config)
+      return lines.join("\n")
+    }
     const parsed = this.parseCheckArgs(raw)
     const state = this.readState(config)
     const card = this.getActiveCard(e, state)
@@ -1790,8 +2054,26 @@ export class DiceManager {
     const user = this.ensureUser(state, e)
     const card = user.cards[user.activeCard]
     const text = String(raw || "").trim()
-    if (!text) return this.renderCard(e, card, config)
-    if (/^(show|查看|查询)$/i.test(text)) return this.renderCard(e, card, config)
+    const groupId = String(e?.group_id || "private")
+    const group = (state.groups[groupId] ||= {})
+    if (!text) return this.renderCard(e, card, config, { groupFmt: group.stFmt })
+    if (/^(show|查看|查询)$/i.test(text)) return this.renderCard(e, card, config, { groupFmt: group.stFmt })
+    const fmtMatch = text.match(/^fmt\s*([\s\S]*)$/i)
+    if (fmtMatch) {
+      const arg = fmtMatch[1].trim()
+      if (!arg) return `当前群人物卡模板：${group.stFmt || "（未设置）"}\n设置：.st fmt HP:{hp}/{hpmax} SAN:{san}\n模板里 {属性名} 会替换为对应数值；.st fmt clr 恢复默认（群管理可改）。`
+      if (/^(clr|clear|清除|重置)$/i.test(arg)) {
+        if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改本群人物卡模板。"
+        delete group.stFmt
+        await this.writeState(state, config)
+        return "人物卡模板已恢复默认展示。"
+      }
+      if (!this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改本群人物卡模板。"
+      if (arg.length > 300) return "模板太长（上限 300 字符）。"
+      group.stFmt = arg
+      await this.writeState(state, config)
+      return `人物卡模板已保存：${arg}\n.st show 将按此格式展示。`
+    }
     if (this.isCardLocked(card)) return this.lockedCardReply(card)
     const clearMatch = text.match(/^(clr|clear|清空)(?:\s+(.+))?$/i)
     if (clearMatch) {
@@ -1914,6 +2196,18 @@ export class DiceManager {
   }
 
   renderCard(e, card, config = this.getConfig(), options = {}) {
+    // 群级 .st fmt 模板：{属性名} 替换为对应数值（属性/技能均可引用）
+    if (options.groupFmt && !options.showAll) {
+      const lookup = {}
+      for (const [key, value] of Object.entries({ ...(card.attrs || {}), ...(card.skills || {}) })) {
+        lookup[String(key).toLowerCase()] = value
+      }
+      const expanded = String(options.groupFmt).replace(/\{([^{}\s]{1,40})\}/g, (_, key) => {
+        const value = lookup[String(key).toLowerCase()]
+        return value === undefined ? "-" : String(value)
+      })
+      return renderTemplate(config.templates.card, { name: this.getUserName(e), card: expanded })
+    }
     const hidden = new Set(options.showAll ? [] : (card.hiddenAttrs || []))
     const attrs = Object.entries(card.attrs || {})
       .filter(([k]) => options.showAll || !hidden.has(k))

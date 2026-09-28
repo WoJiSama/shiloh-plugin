@@ -482,6 +482,52 @@ test("empty outcome templates fall back to the default check template", () => {
   }
 })
 
+test("multi-round checks render one line per round with the base template and cap at maxRounds", () => {
+  const runtime = createRuntime()
+  try {
+    const pluginDir = path.join(runtime.cwd, "plugins", "shiloh-plugin")
+    fs.mkdirSync(path.join(pluginDir, "config"), { recursive: true })
+    fs.writeFileSync(path.join(pluginDir, "config", "message.yaml"), [
+      "pluginSettings:",
+      "  diceSystem:",
+      "    enabled: true",
+      "    maxRounds: 5",
+      "    templates:",
+      '      check: "{name} {skill} {roll}/{target} {level}"',
+      '      check_fail: "FAIL {roll}/{target} {skill}"'
+    ].join("\n"))
+    let seq = 0
+    runtime.manager.rollD100 = () => { seq += 1; return { value: 10 * seq, diceText: "1D100" } }
+    const three = runtime.manager.handleCheck(event(), "今天开团 60", { rounds: 3 })
+    const lines = three.split("\n")
+    assert.equal(lines.length, 3)
+    assert.match(lines[0], /调查员 今天开团 10\/60/)
+    assert.match(lines[2], /调查员 今天开团 30\/60/)
+    // 多轮必须用基础模板，不逐轮套 check_fail 吐槽
+    assert.ok(lines.every(line => !line.includes("FAIL")))
+    // 轮数超过 maxRounds 被封顶
+    const capped = runtime.manager.handleCheck(event(), "侦查 60", { rounds: 99 })
+    assert.equal(capped.split("\n").length, 5)
+    // 参数区 3# 前缀同样进入多轮，且不污染技能名
+    const fromArgs = runtime.manager.handleCheck(event(), "3# 今天开团 60")
+    assert.equal(fromArgs.split("\n").length, 3)
+    assert.ok(fromArgs.includes("今天开团"))
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("check parsing resists stray leading numbers hijacking the target", () => {
+  const runtime = createRuntime()
+  try {
+    const parsed = runtime.manager.parseCheckArgs("3 今天开团 60")
+    assert.equal(parsed.target, 60)
+    assert.equal(parsed.skill, "3 今天开团")
+  } finally {
+    runtime.cleanup()
+  }
+})
+
 test("custom level names still drive SAN success and fumble logic", async () => {
   const runtime = createRuntime()
   try {

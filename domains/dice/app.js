@@ -474,6 +474,27 @@ export class DicePlugin extends plugin {
     return true
   }
 
+  // 旁观模式：.obon / .oboff / .ob list
+  async observer(e) {
+    const match = matchDiceCommand(String(e.msg || ""), "(obon|oboff|ob)\\s*([\\s\\S]*)")
+    const head = String(match?.[1] || "ob").toLowerCase()
+    const action = head === "obon" ? "on" : head === "oboff" ? "off" : String(match?.[2] || "").trim().toLowerCase()
+    await this.reply(e, await diceManager.handleObserve(e, action))
+    return true
+  }
+
+  // .name [zh|en|jp] [数量] 随机姓名（fnc 不能叫 name：plugin 基类的 this.name 是插件名字符串）
+  async randomName(e) {
+    await this.reply(e, diceManager.handleName(e, this.strip(e, "name")))
+    return true
+  }
+
+  // .log list 本群团录列表
+  async logList(e) {
+    await this.reply(e, diceManager.handleLogList(e))
+    return true
+  }
+
   async rsr(e) {
     await this.reply(e, diceManager.handleRsr(e, this.strip(e, "rsr")))
     return true
@@ -520,14 +541,19 @@ export class DicePlugin extends plugin {
 
   async seaCocCheck(e) {
     const text = String(e.msg || "")
-    const match = matchDiceCommand(text, "(rab|rap|rahb|rahp|rah|ra)(\\d+)?#?(b|p)?\\s*([\\s\\S]*)")
+    const match = matchDiceCommand(text, "(rab|rap|rahb|rahp|rah|ra)(\\d+)?#?(\\d+)?(b|p)?\\s*([\\s\\S]*)")
     const head = String(match?.[1] || "ra").toLowerCase()
     const num = Number(match?.[2] || 0)
-    const suffix = String(match?.[3] || "").toLowerCase()
-    const modifier = head.includes("b") || suffix === "b" ? (num || 1) : head.includes("p") || suffix === "p" ? -(num || 1) : 0
+    const rounds = Number(match?.[3] || 0) || undefined
+    const suffix = String(match?.[4] || "").toLowerCase()
+    const hasBonus = head.includes("b") || suffix === "b"
+    const hasPenalty = head.includes("p") || suffix === "p"
+    // 头部没有 b/p 时传 undefined，交给 parseCheckArgs 识别参数区前缀（.ra b 侦查 60），
+    // 否则 modifier:0 会把解析出的奖惩骰覆盖掉
+    const modifier = hasBonus ? (num || 1) : hasPenalty ? -(num || 1) : undefined
     const hidden = head.includes("h")
-    const raw = match?.[4] || ""
-    await this.reply(e, hidden ? await diceManager.handleHiddenCheck(e, raw, { modifier }) : diceManager.handleCheck(e, raw, { modifier }))
+    const raw = match?.[5] || ""
+    await this.reply(e, hidden ? await diceManager.handleHiddenCheck(e, raw, { modifier, rounds }) : diceManager.handleCheck(e, raw, { modifier, rounds }))
     return true
   }
 
