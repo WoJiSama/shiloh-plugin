@@ -412,17 +412,17 @@ function renderEditor() {
       area.rows = 4
       area.style.cssText = "width:100%;box-sizing:border-box"
       area.placeholder = placeholder
-      area.value = (state.emojiAdmission && state.emojiAdmission[key] || []).join("\n")
+      area.value = (state.emojiAdmission && state.emojiAdmission[key] || []).join("\\n")
       area.oninput = () => {
         state.emojiAdmission ||= {}
-        state.emojiAdmission[key] = area.value.split("\n").map(s => s.trim()).filter(Boolean)
+        state.emojiAdmission[key] = area.value.split("\\n").map(s => s.trim()).filter(Boolean)
       }
       wrap.appendChild(label)
       wrap.appendChild(area)
       return wrap
     }
-    admitGrid.appendChild(makeAdmitArea("补充放行（一行一条，命中可入库）", "allow", "例：猫狗搞怪表情只要够夸张就放行\n例：允许经典影视梗图"))
-    admitGrid.appendChild(makeAdmitArea("补充拒绝（一行一条，命中直接拒）", "reject", "例：不要任何带明星脸的\n例：不要政治相关图"))
+    admitGrid.appendChild(makeAdmitArea("补充放行（一行一条，命中可入库）", "allow", "例：猫狗搞怪表情只要够夸张就放行\\n例：允许经典影视梗图"))
+    admitGrid.appendChild(makeAdmitArea("补充拒绝（一行一条，命中直接拒）", "reject", "例：不要任何带明星脸的\\n例：不要政治相关图"))
     box.appendChild(admitGrid)
     const admitBar = document.createElement("div")
     admitBar.style.cssText = "display:flex;gap:8px;margin:8px 0 18px"
@@ -1443,7 +1443,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
             kind: "rule",
             packId: staged.pending?.id || "",
             packName: staged.pack?.name || "",
-            report: staged.report || staged.errors?.join("\n") || "",
+            report: staged.report || staged.errors?.join("\\n") || "",
             staged: Boolean(staged.pending)
           })
         } catch (error) {
