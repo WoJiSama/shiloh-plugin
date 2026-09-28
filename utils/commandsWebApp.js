@@ -214,7 +214,7 @@ function buildPageHtml() {
 <div id="status"></div>
 <div id="drop-overlay">📎 松开导入：牌堆(.json/.yaml) · 规则包(.yaml/.js/.cjs)</div>
 <script>
-const state = { token: localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceJrrp: [], diceBuiltin: [], diceLevelMeta: [], diceDecks: [], emojiItems: [], emojiStats: null, emojiSelection: {}, emojiAdmission: null }
+const state = { token: window.__BL_AUTO_TOKEN__ || localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceJrrp: [], diceBuiltin: [], diceLevelMeta: [], diceDecks: [], emojiItems: [], emojiStats: null, emojiSelection: {}, emojiAdmission: null }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
@@ -1004,7 +1004,7 @@ if (urlGuobaToken) {
   history.replaceState(null, "", location.pathname)
 }
 if (!state.guobaToken) state.guobaToken = localStorage.getItem("bl-guoba-token") || ""
-if (!state.token && window.__BL_AUTO_TOKEN__) {
+if (window.__BL_AUTO_TOKEN__) {
   state.token = window.__BL_AUTO_TOKEN__
   localStorage.setItem("bl-commands-token", state.token)
 }
