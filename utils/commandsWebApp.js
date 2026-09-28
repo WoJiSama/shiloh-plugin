@@ -1004,6 +1004,10 @@ if (urlGuobaToken) {
   history.replaceState(null, "", location.pathname)
 }
 if (!state.guobaToken) state.guobaToken = localStorage.getItem("bl-guoba-token") || ""
+if (!state.token && window.__BL_AUTO_TOKEN__) {
+  state.token = window.__BL_AUTO_TOKEN__
+  localStorage.setItem("bl-commands-token", state.token)
+}
 if (state.token) load(); else if (state.guobaToken) tryGuobaEntry(); else showLock()
 
 async function tryGuobaEntry() {
@@ -1018,6 +1022,16 @@ async function tryGuobaEntry() {
 </script>
 </body>
 </html>`
+}
+
+/** 构建页面 HTML(带嵌入式令牌——打开即可进入,无需手动输入) */
+function buildPageHtmlWithToken(token = "") {
+  const html = buildPageHtml()
+  if (!token) return html
+  return html.replace(
+    "</head>",
+    `<script>window.__BL_AUTO_TOKEN__=${JSON.stringify(String(token))};</script>\n</head>`
+  )
 }
 
 /** 在 Yunzai 的 express 上挂载命令管理页（幂等） */
@@ -1040,7 +1054,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
       res.set("Cache-Control", "no-cache, no-store, must-revalidate")
-      res.type("html").send(buildPageHtml())
+      res.type("html").send(buildPageHtmlWithToken(token))
       return
     }
     if (req.path.startsWith("/api/")) {
