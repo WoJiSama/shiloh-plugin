@@ -1,3 +1,26 @@
+# 2026-09-28 海豹骰差距 P0+P1 七项补齐
+- 用户确认按优先级补齐与 sealdice 的差距。P0：旁观模式 .obon/.oboff/.ob list（网关层静默抑制+自身命令豁免）、.init next/下一回合 回合轮转（按名字记游标，插删条目自动对齐，轮空进位轮数+1）、.log export [序号|团名] [html] 美化网页导出（自包含 HTML、内容全转义、pre-wrap）。
+- P1：.st fmt 群级卡模板（{属性名} 替换数值，群管理可设/clr）、.en 技能1 技能2 批量成长（按卡结算+缺失逐项提示，带数值明确拒绝）、.log list 团录历史列表（当前+序号历史+条数）、.name [zh|en|jp] [数量] 随机姓名（内置三语名字库，默认 5 个、上限 20）。
+- 实现要点：fnc 不能叫 name（与 plugin 基类 this.name 冲突会在构造期崩溃，改名 randomName）；exportLog 格式词用 token 级解析（strip 会去掉空格）；命令注册进 config_default/commands.yaml 并重新生成文档（117 条）。
+- 发现并处理配置分层问题：服务器 config/commands.yaml（命令管理页 9/21 重存的旧默认，无人工定制）优先于 config_default，已用 writeRegistryConfig 同一序列化器从新默认重生成，用户配置备份 commands-user-yaml-before-seal-p0p1-20260928.yaml。
+- 新增 tests/diceSealExtras.test.js 9 用例（旁观抑制/豁免、轮转回环、HTML 转义、导出格式词、log list、fmt 权限、批量成长、姓名库）；commandRegistry 覆盖测试同步新用法。本地全量 1139/0。
+- 已部署：备份 shiloh-plugin-seal-p0p1-20260928-152805.tar.gz；同步 4 个 dice 源文件+配置+文档+测试；AppleDouble 清 0；远端语法与 61/61 通过；图片任务 0 时安全重启，服务 active、39 插件、OneBotv11 已连接、加载错误 0。
+- 线上群模拟终验 122/122（新增 28 个 P0/P1 步骤）：旁观掷骰静默、init next 轮转与第 2 轮回环、HTML 文件真实上传（美化团-*.html）、fmt 模板展示、批量成长逐项输出、三语姓名均正常。
+
+# 2026-09-28 联网搜索 403 根因定位与失败原因透传
+- 用户报告"刚联网查了，但搜索服务返回了 403"。线上还原 14:37 群 240837518 真实请求：searchInformationTool 调 souimagery grok-4.6 返回 403，上游真实原因为 token 配额不足（余额 ＄0.001656 < 单次预扣 ＄0.001966），不是代码逻辑错误。
+- 已排除服务器现存替代搜索后端：本机 one-api 网关（gpt-5.5/5.6-luna/sol/terra，主聊天在用）模型自述无联网能力；krill api.krill-ai.net/.com 均直连 ETIMEDOUT；DeepSeek 官方 key 无搜索模型。恢复搜索需为 souimagery 充值或提供新搜索 key；注意 imageEdit/imageGeneration 的 souimagery 渠道共用该 key，图片链路同样受影响（krill 当前不可达）。
+- 已修复代码层缺陷：SearchInformationTool 响应体非 JSON 时不再让解析异常顶替真实状态码；4xx/5xx 时透传上游 error.message（如配额不足原文），最终回复可如实说明"余额不足"而非裸 403。
+- 本地与线上 searchProgress 回归均 5/5（新增配额 403 透传、非 JSON 503 两用例）；备份 /opt/trss-yunzai-backups/shiloh-plugin-search-error-reason-20260928-144902.tar.gz；重启前确认图片任务 0（Redis 无队列 key、数据目录无队列文件、日志无图片任务活动），安全重启后 active、39 插件、OneBotv11 已连接；线上真实配置探针已输出带配额原因的失败文案。本次重启顺带清理了 14:36 非优雅退出残留的 1 条运行中持久任务记录。
+
+# 2026-09-28 COC 命令全量群模拟测试与 .ra 切分修复
+- 用户要求登录服务器模拟测试全部 COC 命令。已用生产代码+线上配置副本在 /opt/coc-sim 搭隔离环境（数据不落生产 state.json），按 Yunzai 同款规则匹配模拟群消息，首轮 84/84 通过；`.draw`/`.log`/暗骰私聊/文件导出等发送通道全部真实走到。
+- 发现 .ra 检定子系统 5 处切分缺陷：`.rab#3 技能 60` 的 `#N` 不被解析且残留数字把目标值劫持成 3（用户线上真实案例）；`.ra b/p 技能 值` 空格前缀被 modifier:0 覆盖（parseCheckArgs 本可解析）；`.ra b2/p3` 数量混进技能名；`.ra` 家族无多轮能力；目标值取第一个数字 token 而非末位。
+- 已修复：parseCheckArgs 支持 b/p 带数量、N#/#N/紧贴式多轮前缀、目标值改取末位数字；handleCheck 支持 rounds 多轮（每行用基础模板防吐槽刷屏，cap maxRounds）；seaCocCheck 头部正则支持 `rab#3` 且头部无 b/p 时不再覆盖参数区 modifier；路由正则同步。
+- 本地新增回归（sealdice 兼容/策略/核心三处），定向 48/48、全量 1128 通过 0 失败；命令文档已重新生成。
+- 已部署：备份 shiloh-plugin-ra-multiround-20260928-143543.tar.gz，同步后清理全部 `._*`（含 2 个 9/20 遗留），远端 node --check 与 48/48 通过，图片任务 0 时安全重启；服务 active、39 插件、OneBotv11 已连接、加载错误 0。
+- 线上群模拟终验 94/94（含 10 个新修复回归用例）：`.rab#3 今天开团 60` 现输出 3 轮奖励骰检定对 60，`.ra b/p/b2/3#` 全部正确。
+
 # 2026-08-07 对外失败原因统一展示
 
 # 2026-09-01 群广告扫描艾特通知

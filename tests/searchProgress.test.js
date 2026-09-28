@@ -67,6 +67,34 @@ test("suppresses a generated progress reply when the search finishes first", asy
   assert.deepEqual(replies, [])
 })
 
+test("surfaced upstream error message on quota-exhausted 403", async () => {
+  const tool = new SearchInformationTool({
+    configLoader: () => CONFIG,
+    fetchImpl: async () => ({
+      ok: false,
+      status: 403,
+      async json() {
+        return { error: { message: "token quota is not enough, token remain quota: ＄0.001656, need quota: ＄0.001966" } }
+      }
+    })
+  })
+  const result = await tool.func({ query: "claude 最新模型" }, { msg: "查一下 claude 最新模型" })
+  assert.match(result, /搜索失败：搜索服务返回 403：token quota is not enough/)
+})
+
+test("non-JSON error body still reports the status code", async () => {
+  const tool = new SearchInformationTool({
+    configLoader: () => CONFIG,
+    fetchImpl: async () => ({
+      ok: false,
+      status: 502,
+      async json() { throw new SyntaxError("Unexpected token < in JSON") }
+    })
+  })
+  const result = await tool.func({ query: "测试" }, { msg: "查一下" })
+  assert.match(result, /搜索失败：搜索服务返回 502$/)
+})
+
 test("does not send another progress reply after an earlier tool stage used the turn budget", async () => {
   const replies = []
   const tool = new SearchInformationTool({

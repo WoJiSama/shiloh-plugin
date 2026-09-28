@@ -220,8 +220,12 @@ export class SearchInformationTool extends AbstractTool {
       })
       clearTimeout(requestTimeout)
 
-      const analysis = await response.json()
-      if (!response.ok) throw new Error(`搜索服务返回 ${response.status}`)
+      // 非 JSON 响应体(如网关 HTML)不应顶替真实状态码;4xx/5xx 时透传上游 error.message(如配额不足)供最终回复如实说明
+      const analysis = await response.json().catch(() => null)
+      if (!response.ok) {
+        const upstream = typeof analysis?.error?.message === 'string' ? `：${analysis.error.message.slice(0, 200)}` : ''
+        throw new Error(`搜索服务返回 ${response.status}${upstream}`)
+      }
       const content = analysis?.choices?.[0]?.message?.content
       if (!content) throw new Error('搜索服务没有返回可用结果')
       return content + '\n\n提示：如果用户想基于搜索结果制作文件，可以使用 aiMindMapTool 工具继续操作。'
