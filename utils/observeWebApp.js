@@ -164,6 +164,15 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
         const sortedMs = [...msValues].sort((a, b) => a - b)
         const pct = (list, p) => list.length ? list[Math.min(list.length - 1, Math.max(0, Math.ceil((p / 100) * list.length) - 1))] : 0
 
+        // 群名映射:读消息处理时缓存的 group_names.json
+        const groupNameMap = {}
+        try {
+          const cachePath = path.join(String(pluginRoot || ""), "data", "group_names.json")
+          if (fs.existsSync(cachePath)) {
+            Object.assign(groupNameMap, JSON.parse(fs.readFileSync(cachePath, "utf8")))
+          }
+        } catch {}
+
         res.json({
           summary: {
             turns: records.length,
@@ -184,7 +193,7 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
             avgMs: d.msList.length ? Math.round(d.msList.reduce((a, b) => a + b, 0) / d.msList.length) : 0
           })),
           groups: [...groupMap.values()].sort((a, b) => b.turns - a.turns).slice(0, 10).map(g => ({
-            groupId: g.groupId, turns: g.turns, emoji: g.emoji, outbound: g.outbound, users: g.users.size
+            groupId: g.groupId, groupName: groupNameMap[g.groupId] || "", turns: g.turns, emoji: g.emoji, outbound: g.outbound, users: g.users.size
           })),
           intents: [...intentCounts.entries()].sort((a, b) => b[1] - a[1]),
           triggers: [...triggerCounts.entries()].sort((a, b) => b[1] - a[1]),
@@ -254,7 +263,7 @@ function buildPageHtml(observeToken = "") {
   <span class="spacer"></span>
   <button id="reload">刷新</button>
 </header>
-<div id="app" style="display:none"></div>
+<div id="app"></div>
 <div id="status"></div>
 <script>
 window.__OBSERVE_TOKEN__ = ${JSON.stringify(String(observeToken || ""))}
@@ -282,15 +291,15 @@ function render(d) {
   const s = d.summary || {}
   const total = Math.max(1, s.turns || 0)
   const cards = [
-    ["回合（近7天）", s.turns], ["出站消息", s.outboundTotal],
-    ["表情发送", (s.emojiSends || 0) + "（" + (s.emojiShare || 0) + "%）"], ["工具调用", (s.toolRuns || 0) + " / 失败 " + (s.toolFails || 0)],
-    ["活跃群 / 用户", (s.groups || 0) + " / " + (s.users || 0)], ["快路跳过", (s.fastPathSkips || 0) + "（" + Math.round((s.fastPathSkips || 0) / total * 100) + "%）"],
-    ["平均耗时", (s.avgMs || 0) + "ms"], ["p95 耗时", (s.p95Ms || 0) + "ms"]
+    ["对话轮次(7天)", s.turns], ["发出消息", s.outboundTotal],
+    ["表情发送", (s.emojiSends || 0) + "(" + (s.emojiShare || 0) + "%)"], ["工具调用/失败", (s.toolRuns || 0) + " / " + (s.toolFails || 0)],
+    ["活跃群/用户", (s.groups || 0) + " / " + (s.users || 0)], ["闲聊快路(跳过模型)", (s.fastPathSkips || 0) + "(" + Math.round((s.fastPathSkips || 0) / total * 100) + "%)"],
+    ["平均响应", ((s.avgMs || 0) / 1000).toFixed(1) + "s"], ["95%响应", ((s.p95Ms || 0) / 1000).toFixed(1) + "s"]
   ].map(c => '<div class="card"><div class="num">' + c[1] + '</div><div class="label">' + c[0] + "</div></div>").join("")
 
   const dailyRows = (d.daily || []).map(day => "<tr><td>" + day.date.slice(5) + "</td><td>" + bar(day.turns, Math.max(1, ...d.daily.map(x => x.turns))) + "</td><td>" + day.outbound + "</td><td>" + day.emoji + "</td><td>" + (day.failures || 0) + "</td><td>" + (day.avgMs || 0) + "ms</td></tr>").join("") || emptyRow(6)
 
-  const groupRows = (d.groups || []).map(g => "<tr><td>" + g.groupId.slice(-6) + "</td><td>" + bar(g.turns, Math.max(1, ...d.groups.map(x => x.turns))) + "</td><td>" + g.users + "</td><td>" + g.emoji + "</td><td>" + g.outbound + "</td></tr>").join("") || emptyRow(5)
+  const groupRows = (d.groups || []).map(g => "<tr><td title=\"" + g.groupId + "\">" + (g.groupName || "…"+g.groupId.slice(-4)) + "<div style='font-size:11px;color:#8a93a5'>" + g.groupId + "</div></td><td>" + bar(g.turns, Math.max(1, ...d.groups.map(x => x.turns))) + "</td><td>" + g.users + "</td><td>" + g.emoji + "</td><td>" + g.outbound + "</td></tr>").join("") || emptyRow(5)
 
   const intentRows = (d.intents || []).map(kv => distRow(kv[0], kv[1], s.turns)).join("") || emptyRow(3)
   const triggerRows = (d.triggers || []).map(kv => distRow(kv[0], kv[1], s.turns)).join("") || emptyRow(3)
@@ -305,24 +314,29 @@ function render(d) {
 
   const hours = (d.hourly || []).map(h => "<tr><td>" + h[0].slice(11) + ":00</td><td>" + bar(h[1].turns, Math.max.apply(null, d.hourly.map(x => x[1].turns).concat(1))) + "</td><td class='emoji'>" + bar(h[1].emoji, Math.max.apply(null, d.hourly.map(x => x[1].emoji).concat(1))) + "</td><td class='fail'>" + bar(h[1].failures, Math.max.apply(null, d.hourly.map(x => x[1].failures).concat(1))) + "</td></tr>").join("") || emptyRow(4)
 
-  const recent = (d.recentTurns || []).map(t => "<tr><td>" + t.at + "</td><td>" + t.group + "</td><td>" + t.intent + "</td><td>" + t.trigger + "</td><td>" + escapeHtml(t.tools) + "</td><td>" + t.outbound + "</td><td>" + t.totalMs + "ms</td></tr>").join("") || emptyRow(7)
+  const groupNameLookup = {}
+  for (const g of d.groups || []) groupNameLookup[g.groupId] = g.groupName || ""
+  const recent = (d.recentTurns || []).map(t => {
+    const gName = groupNameLookup[t.group] || t.group
+    return "<tr><td>" + t.at + "</td><td title=\"" + t.group + "\">" + (gName.length > 8 ? gName.slice(0,8)+"…" : gName) + "</td><td>" + t.intent + "</td><td>" + t.trigger + "</td><td>" + escapeHtml(t.tools) + "</td><td>" + t.outbound + "</td><td>" + t.totalMs + "ms</td></tr>"
+  }).join("") || emptyRow(7)
 
   $("app").innerHTML =
     '<div class="cards">' + cards + "</div>" +
     '<div class="grid2">' +
-    '<section><h2>按天汇总</h2><table><tr><th>日期</th><th>回合</th><th>出站</th><th>表情</th><th>失败</th><th>平均耗时</th></tr>' + dailyRows + "</table></section>" +
-    '<section><h2>分群排行 Top10</h2><table><tr><th>群（尾号）</th><th>回合</th><th>用户数</th><th>表情</th><th>出站</th></tr>' + groupRows + "</table></section>" +
-    '<section><h2>意图分布</h2><table><tr><th>意图</th><th>分布</th><th>占比</th></tr>' + intentRows + "</table></section>" +
-    '<section><h2>触发来源 / Gate 决策</h2><table><tr><th>触发</th><th>分布</th><th>占比</th></tr>' + triggerRows + "</table>" +
+    '<section><h2>按天汇总</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">每天的对话量、消息数和平均响应时间</p><table><tr><th>日期</th><th>回合</th><th>出站</th><th>表情</th><th>失败</th><th>平均耗时</th></tr>' + dailyRows + "</table></section>" +
+    '<section><h2>群排行 Top10</h2><table><tr><th>群名 / 群号</th><th>对话轮次</th><th>活跃人数</th><th>表情</th><th>发出消息</th></tr>' + groupRows + "</table></section>" +
+    '<section><h2>意图分布</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">机器人判定每条消息的目的(聊天/画图/搜索等)</p><table><tr><th>意图</th><th>分布</th><th>占比</th></tr>' + intentRows + "</table></section>" +
+    '<section><h2>触发来源 / Gate 决策</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">消息如何触发回复(被@/点名/主动插话)及 Gate 是否放行</p><table><tr><th>触发</th><th>分布</th><th>占比</th></tr>' + triggerRows + "</table>" +
     '<table style="margin-top:10px"><tr><th>Gate 决策</th><th>分布</th><th>占比</th></tr>' + gateRows + "</table></section>" +
     "</div>" +
-    '<section><h2>工具调用明细</h2><table><tr><th>工具</th><th>次数</th><th>成功率</th><th>失败</th><th>平均耗时</th></tr>' + toolRows + "</table></section>" +
+    '<section><h2>工具调用明细</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">各工具的使用频率、成功率和耗时(画图/搜索/表情等)</p><table><tr><th>工具</th><th>次数</th><th>成功率</th><th>失败</th><th>平均耗时</th></tr>' + toolRows + "</table></section>" +
     '<div class="grid2">' +
-    '<section><h2>模型调用阶段</h2><table><tr><th>阶段</th><th>次数</th><th>平均</th><th>p95</th><th>累计</th></tr>' + stageRows + "</table></section>" +
-    '<section><h2>错误 Top（阶段 · 信息）</h2><table><tr><th>错误</th><th>次数</th></tr>' + errRows + "</table></section>" +
+    '<section><h2>模型调用阶段</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">LLM各阶段(意图判定/Gate/主回复/总结)的耗时</p><table><tr><th>阶段</th><th>次数</th><th>平均</th><th>p95</th><th>累计</th></tr>' + stageRows + "</table></section>" +
+    '<section><h2>错误 Top</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">最近7天出现最多的错误(阶段及原因)</p><table><tr><th>错误</th><th>次数</th></tr>' + errRows + "</table></section>" +
     "</div>" +
-    '<section><h2>按小时分布（回合 / 表情 / 失败）</h2><table><tr><th>小时</th><th>回合</th><th>表情</th><th>失败</th></tr>' + hours + "</table></section>" +
-    '<section><h2>最近回合</h2><table><tr><th>时间</th><th>群</th><th>意图</th><th>触发</th><th>工具</th><th>出站</th><th>耗时</th></tr>' + recent + "</table></section>" +
+    '<section><h2>按小时分布</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">每小时的对话量、表情发送和失败次数</p><table><tr><th>小时</th><th>回合</th><th>表情</th><th>失败</th></tr>' + hours + "</table></section>" +
+    '<section><h2>最近回合</h2><p style="font-size:12px;color:#8a93a5;margin:-6px 0 8px">最新20条对话的处理概要</p><table><tr><th>时间</th><th>群</th><th>意图</th><th>触发</th><th>工具</th><th>出站</th><th>耗时</th></tr>' + recent + "</table></section>" +
     '<div style="color:#8a93a5;font-size:12px">生成于 ' + d.generatedAt + " · 数据源 data/turn_trace/（保留 7 天）</div>"
 }
 function emptyRow(n) { return "<tr><td colspan='" + n + "' class='empty'>暂无数据</td></tr>" }

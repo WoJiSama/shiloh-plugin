@@ -3627,6 +3627,20 @@ ${recentHistory || '(无)'}
       try {
         const args = msg?.replace(/^#tool\s*/, "").trim() || ""
         const atQq = collectMentionTargetIds(e, Bot.uin)
+        // 群名缓存(观测页读取):消息事件自带群名,顺手落盘
+        try {
+          const gName = String(e?.group?.group_name || e?.group_name || e?.sender?.group_name || "").trim()
+          if (gName && groupId) {
+            globalThis.__bl_group_names ||= {}
+            if (globalThis.__bl_group_names[String(groupId)] !== gName) {
+              globalThis.__bl_group_names[String(groupId)] = gName
+              const fs = await import("node:fs")
+              const pathMod = await import("node:path")
+              const cachePath = pathMod.join(process.cwd(), "data", "group_names.json")
+              fs.writeFileSync(cachePath, JSON.stringify(globalThis.__bl_group_names, null, 2))
+            }
+          }
+        } catch {}
         let repliedMessage = null
         if (e.getReply) {
           try {
