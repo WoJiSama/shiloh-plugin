@@ -74,8 +74,37 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
 
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
-      res.set("Cache-Control", "no-cache, no-store, must-revalidate")
-      res.type("html").send(buildPageHtml(observeToken))
+      res.set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
+      // 服务端直接嵌入初始数据,页面加载即可见(不依赖浏览器 JS fetch)
+      let initialData = "{}"
+      try {
+        const records = readRecentTraceRecords(7, pluginRoot).filter(r => r && r.turnId)
+        const groupNameMap = {}
+        try {
+          const cachePath = path.join(String(pluginRoot || ""), "data", "group_names.json")
+          if (fs.existsSync(cachePath)) Object.assign(groupNameMap, JSON.parse(fs.readFileSync(cachePath, "utf8")))
+        } catch {}
+        const groupMap = new Map()
+        for (const r of records) {
+          const gid = String(r.groupId || "")
+          if (!gid) continue
+          const g = groupMap.get(gid) || { groupId: gid, turns: 0, users: new Set() }
+          g.turns++
+          if (r.userId) g.users.add(String(r.userId))
+          groupMap.set(gid, g)
+        }
+        initialData = JSON.stringify({
+          summary: { turns: records.length, groups: groupMap.size },
+          groups: [...groupMap.values()].sort((a, b) => b.turns - a.turns).slice(0, 10).map(g => ({
+            groupId: g.groupId, groupName: groupNameMap[g.groupId] || "", turns: g.turns, users: g.users.size
+          }))
+        })
+      } catch {}
+      const html = buildPageHtml(observeToken).replace(
+        '<div id="app"></div>',
+        '<div id="app"><noscript>需要启用 JavaScript</noscript><script>window.__OBSERVE_SSR__=' + initialData + '</script></div>'
+      )
+      res.type("html").send(html)
       return
     }
     if (req.path === "/api/stats") {
@@ -348,6 +377,11 @@ function escapeHtml(s) { return String(s || "").replace(/&/g, "&amp;").replace(/
 $("reload").onclick = () => load()
 const urlToken = new URLSearchParams(location.search).get("token")
 if (urlToken) { state.token = urlToken; history.replaceState(null, "", location.pathname) }
+// 先渲染服务端嵌入的初始数据(SSR),让页面立刻有内容
+if (window.__OBSERVE_SSR__) {
+  try { render(window.__OBSERVE_SSR__) } catch (e) { console.error("SSR render:", e) }
+}
+// 再异步加载完整数据
 load()
 </script>
 </body>
