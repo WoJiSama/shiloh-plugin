@@ -123,6 +123,10 @@ function messageHasType(record, type) {
   return Array.isArray(record.message) && record.message.some(seg => seg?.type === type)
 }
 
+function isRecallNotice(record = {}) {
+  return record.archive_kind === "notice" && /(^|\.)recall$/.test(String(record.notice_type || "").trim())
+}
+
 function archiveRecordIdentity(record = {}) {
   if (record.event_id) return `event:${String(record.event_id)}`
   if (record.message_id === undefined || record.message_id === null || record.message_id === "") return ""
@@ -361,6 +365,10 @@ export class MessageArchiveManager {
       const dir = path.join(this.getBaseDir(), "group", String(record.group_id || "unknown"))
       await fs.promises.mkdir(dir, { recursive: true })
       await this.appendRecordOnce(path.join(dir, `${formatDate(new Date(record.timestamp))}.ndjson`), record)
+      if (isRecallNotice(record) && record.message_id !== null && record.message_id !== undefined && String(record.message_id) !== "") {
+        const marked = await this.markMessageRecalled(record)
+        if (marked) this.logger?.info?.(`[MessageArchive] 消息 ${record.message_id} 已标记撤回（群 ${record.group_id}）`)
+      }
       this.cleanupExpired().catch(error => this.logger?.warn?.(`[MessageArchive] 清理过期归档失败: ${error.message}`))
       return record
     } catch (error) {
@@ -368,6 +376,51 @@ export class MessageArchiveManager {
       if (options.throwOnError) throw error
       return null
     }
+  }
+
+  async markMessageRecalled(noticeRecord = {}) {
+    const messageId = String(noticeRecord.message_id ?? "")
+    if (!messageId) return false
+    const dir = path.join(this.getBaseDir(), "group", String(noticeRecord.group_id || "unknown"))
+    const files = (await fs.promises.readdir(dir).catch(() => []))
+      .filter(name => name.endsWith(".ndjson"))
+      .sort()
+      .reverse()
+    for (const name of files.slice(0, 8)) {
+      if (await this.rewriteFileMarkingRecall(path.join(dir, name), messageId, noticeRecord)) return true
+    }
+    return false
+  }
+
+  rewriteFileMarkingRecall(file, messageId, noticeRecord) {
+    return archiveWriteQueue.run(file, async () => {
+      const text = await fs.promises.readFile(file, "utf8").catch(() => null)
+      if (!text) return false
+      let marked = false
+      const out = text.split("\n").map(line => {
+        if (marked || !line.trim()) return line
+        try {
+          const record = JSON.parse(line)
+          if (record.archive_kind === "notice" || String(record.message_id ?? "") !== messageId) return line
+          if (record.recalled) {
+            marked = true
+            return line
+          }
+          record.recalled = true
+          record.recalled_at = Number(noticeRecord.timestamp) || Date.now()
+          record.recalled_by = Number(noticeRecord.operator_id) || null
+          marked = true
+          return JSON.stringify(record)
+        } catch {
+          return line
+        }
+      })
+      if (!marked) return false
+      const tmp = `${file}.recall-tmp`
+      await fs.promises.writeFile(tmp, out.join("\n"), "utf8")
+      await fs.promises.rename(tmp, file)
+      return true
+    })
   }
 
   buildRecord(e, cfg = this.getConfig()) {
@@ -495,6 +548,7 @@ export class MessageArchiveManager {
         if (!line.trim()) continue
         try {
           const record = JSON.parse(line)
+          if (isRecallNotice(record)) continue
           if (this.inTimeRange(record, options)) records.push(record)
         } catch {}
       }
@@ -575,8 +629,10 @@ export class MessageArchiveManager {
       : record.sender?.card || record.sender?.nickname || "未知"
     let text = renderReadableMessage(record).replace(/\r/g, "")
     if (text.length > maxTextLength) text = safeTruncateUnicode(text, maxTextLength, "...")
+    if (record.recalled) text = `[已撤回] ${text}`
     if (compact) return text || "[非文本消息]"
-    return `[${record.time}] ${name}(${record.user_id})${record.message_id ? ` [${record.message_id}]` : ""}\n${text || "[非文本消息]"}`
+    const suffix = record.recalled ? `（撤回于 ${record.recalled_at ? formatClock(record.recalled_at) : "未知时间"}）` : ""
+    return `[${record.time}]${suffix} ${name}(${record.user_id})${record.message_id ? ` [${record.message_id}]` : ""}\n${text || "[非文本消息]"}`
   }
 }
 
