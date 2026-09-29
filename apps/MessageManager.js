@@ -1,5 +1,6 @@
 import { MessageManager } from '../utils/MessageManager.js'
 import { messageArchiveManager } from '../utils/MessageArchiveManager.js'
+import { getBase64Image } from '../utils/fileUtils.js'
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
@@ -399,15 +400,17 @@ export class MessageRecordPlugin extends plugin {
                 continue;
             }
             const message = [this.archiveManager.formatRecord(record, { compact: true })];
-            // 图片段以真实图片加入转发(不只是 [图片] 占位文本)
-            const imageUrls = (Array.isArray(record.message) ? record.message : [])
-                .filter(seg => seg?.type === "image")
-                .map(seg => String(seg?.url || seg?.file || "").trim())
-                .filter(Boolean);
-            for (const imageUrl of imageUrls.slice(0, 3)) {
+            // 图片段以真实图片加入转发:getBase64Image 处理 QQ 图床 rkey
+            const imageSegments = (Array.isArray(record.message) ? record.message : [])
+                .filter(seg => seg?.type === "image").slice(0, 3);
+            for (let imgIdx = 0; imgIdx < imageSegments.length; imgIdx++) {
+                const url = String(imageSegments[imgIdx]?.url || "").trim();
+                if (!url) continue;
                 try {
-                    const encoded = await this.encodeImageForForward(imageUrl);
-                    if (encoded) message.push("\n", encoded);
+                    const result = await getBase64Image(url, `archive-img-${imgIdx}.png`);
+                    if (typeof result === "string" && result.startsWith("data:")) {
+                        message.push("\n", segment.image(result));
+                    }
                 } catch {}
             }
             const bilibili = this.getBilibiliSegment(record);
@@ -423,20 +426,6 @@ export class MessageRecordPlugin extends plugin {
             });
         }
         return { messages, tempFiles };
-    }
-
-    async encodeImageForForward(url = "") {
-        if (!/^https?:\/\//i.test(String(url || ""))) return null
-        try {
-            const response = await fetch(url, {
-                headers: { "User-Agent": "Mozilla/5.0" },
-                signal: AbortSignal.timeout(15000)
-            })
-            if (!response.ok) return null
-            const buffer = Buffer.from(await response.arrayBuffer())
-            if (buffer.length > 4 * 1024 * 1024) return null
-            return segment.image(buffer)
-        } catch { return null }
     }
 
     async searchArchive(e) {
