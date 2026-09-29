@@ -72,6 +72,21 @@ function makeAiProviderBlock(definition) {
         schemas: makeProviderSchemas(definition)
       },
       bottomHelpMessage: `${definition.usageHint}。可配置多个模型，priority 数字越小越优先；保存时会把第一个优先级同步到旧字段，现有功能继续兼容。文生图已支持失败后自动尝试下一个候选；其他场景当前用于面板切换优先模型`
+    },
+    {
+      component: "GButtons",
+      componentProps: {
+        buttons: [
+          {
+            label: "测试本组模型连通性",
+            action: "testAiProviders",
+            args: [definition.configKey],
+            type: "primary",
+            size: "small"
+          }
+        ]
+      },
+      bottomHelpMessage: "先点下方保存再测试：对这组已保存的每个模型发一次最小请求，按名称回报延迟或上游真实错误（图片类只验证连通与鉴权，不实际出图；Embedding 验证返回维度）"
     }
   ]
 }

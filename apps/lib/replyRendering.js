@@ -41,6 +41,14 @@ export async function sendSegmentedMessage(host, e, output, quoteChance = 0.5, {
         logger.info(`[回复新鲜度] group=${groupId || ""} cancelled anchor=${e?._proactiveReplyAnchorAt || 0} latest=${lastIncomingMsgAt.get(groupId) || 0}`)
         return null
       }
+      // 出站幂等（回合持久化）：本回合已有另一份执行发出过回复时跳过，防止补跑后重复刷屏
+      if (typeof host?.claimTurnReply === "function") {
+        const claim = await host.claimTurnReply(e)
+        if (claim && claim.claimed === false) {
+          logger.info(`[回合持久化] group=${groupId || ""} 回复已被认领，跳过重复发送`)
+          return null
+        }
+      }
       const replyWithReceipt = async (payload, quote, channel = "agent_text") => {
         return await host.sendObservedReply(e, payload, quote, channel)
       }

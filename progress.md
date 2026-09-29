@@ -1,3 +1,75 @@
+# 2026-09-29 海豹源码全面审计与 COC 语义对齐（用户批评"犯错好几次,没把豹骰的东西拿来"）
+- 方法：clone sealdice-core 源码（git@github.com，浅克隆），逐命令提取帮助文本与解析语义（ext_coc7.go/ext_log.go/ext_dnd5e.go/builtin_commands.go + templates/coc7.yaml、dnd5e.yaml），与我方实现逐条对照。
+- 修复九项差距：①内置默认技能值表（coc7.yaml attrs.defaults 约 80 项 + 派生：闪避=敏捷/2、生命值上限=(体质+体型)/10、母语=教育）——未录卡技能按官方默认判档（侦查25/格斗5/斗殴25…），自造词仍走"照掷+提示录入"；②.ra 技能±N 修正后缀（侦查+10=默认/卡值+10），数值 token 支持表达式（侦查 20+10）；③.ra 3#p 语法=多轮每轮奖惩骰（原被误判成 N 个奖惩骰）；④.sc b|p 奖惩骰与单参简易写法（.sc 1d6=成功扣0）；⑤.en +成功值 / +失败值/成功值（失败也可按设定成长）；⑥.rav 技能1 技能2 @A @B 两人各用各的卡对抗；⑦.nn 无参=查看、.nn clr=重置回群名片；⑧.pc rename 改名（锁定卡拦截）；⑨.sn coc/cocL/dnd 内置名片模板（sealdice 真语义：卡摘要写入群名片，"玩家 SAN{理智} HP{生命值}/{上限} DEX{敏捷}"，dnd 为 HP/AC/DC/PP），未知词仍回退设昵称+同步。
+- 纠正上一轮错误：.sn coc 此前被实现成"昵称=coc"，实际豹骰是内置名片模板——本次已按真语义重做。
+- 测试：diceManagerCore 重写未录值用例为"官方默认判档+自造词照掷"，新增 sc 简易/奖惩、en 自定义成长、rav 双人、pc rename、sn 内置模板共 37 用例；commandRegistry desc 断言同步。本地全量 1172/0；群模拟 156 用例（新增海豹对齐组），线上生产代码实测 156/156。
+- 已部署：备份 seal-audit-20260929；排空重启 active、OneBotv11 连接、0 加载错误；用户级 commands.yaml 重生成。
+- 遗留（本次未做，非语义错误）：.ra 表达式级代骰（.ra(1)50）、sealdice 属性别名全表、pc 序号引用、st 的模板 show 顺序细节。
+
+# 2026-09-29 .sn 非模板名不再报错（用户：.sn coc 提示找不到名片模板）
+- 原因：.sn 挤了两套语义——on/off 自动群名片开关 + 海豹扩展规则包名片模板（dh/gm，来自 nameTemplate 注册表）；服务器未装带模板的规则包，注册表为空，任何 .sn <词> 都报"没有找到名片模板"。
+- 已修复：.sn <文字> 优先精确匹配模板名（模板功能不变）；未命中则按 sealdice 直觉回退——设置骰娘昵称并立即调用 set_group_card 同步一次群名片，回复附"持续自动同步用 .sn on"；on/off/无参状态语义不变，状态帮助文案补 .sn <昵称>。命令总表同步。
+- 测试：diceManagerCore 新增非模板名回退断言（昵称落库+set_group_card 参数+on/off 不变）；群模拟加 51b（.sn coc），线上实测 147/147；本地全量 1170/0。已部署重启验证（active、OneBotv11、0 加载错误），用户级 commands.yaml 重生成。
+
+# 2026-09-29 骰娘 log 结果入档 + HTML 染色（对齐豹骰团录语义）
+- 用户问我们的 log 和豹骰是否一样。审计结论：存储为 NDJSON 结构化行，但只记玩家消息（含命令原文），骰娘的掷骰/检定结果完全不入档——团录无法复盘检定，是实质功能差距；HTML 导出也无结果区分。
+- 已实现：DiceManager.recordDiceResult（结果以发起玩家名义入档，type=dice_result，log 未开启时不记录）；app.js reply() 出口统一挂接（所有骰娘命令回复自动入档，含 .ra/.sc/.r/多轮；.rh 仅公开文本，私聊暗骰结果不入档）；buildLogHtml 对 dice_result 染色（🎲前缀+左侧色条：大成功绿/大失败红/成功绿/失败橙/普通骰蓝紫），txt 导出格式不变自然包含结果行。
+- 测试：diceManagerCore 新增"未开不记/开log成对入档/归属发起玩家/HTML染 dice-crit 与 dice-fumble"回归（顺带修了测试 event(role, overrides) 助手误用）；群模拟加 106b/106c（log 期间掷骰检定）与 144 号运行后自检（直接读最新团录 NDJSON 断言 dice_result≥2 且命令原文在档）。本地全量 1169/0，线上实测 146/146。已部署重启验证（active、OneBotv11、0 加载错误）。
+
+# 2026-09-28 退群命令加 .bot off 且必须艾特机器人（用户需求：@Mr.K .bot off 才退群）
+- 需求：退群命令支持 .bot off，且只有"首位艾特机器人 + 命令"才真正退群，防误触。
+- 已实现：handleBotControl 退群分支扩为 bye|dismiss|退出|off；新增 startsWithBotMention（与网关 startsWithMentionOfOtherMember 同构：message 段首位 at 比对 e.bot.uin，raw CQ 兜底）作为硬闸——裸命令/艾特别人（网关已拦）都不退群，回复引导文案；@机器人+主人/群管理才发告别语并调 set_group_leave。.bot on 兼容响应不变，帮助与命令总表描述同步。
+- 测试：diceManagerCore 新增退群守卫 4 分支（裸命令引导/艾特+owner 真调 API/艾特+member 拒绝/艾特别人不退）；群模拟扩到 143 用例（含 withAtBot 事件构造），线上实测 143/143；本地全量 1168/0。已部署重启验证（active、OneBotv11、0 加载错误），用户级 commands.yaml 已重生成。
+
+# 2026-09-28 .ra 未录值照掷 + 同消息多指令拆分（用户：.ra格斗 连发应投骰而非报错）
+- 用户场景：连发/粘连 .ra格斗 期望投骰。两处根因：技能未录卡值时 handleCheck 直接报"找不到技能值"；粘连的 .ra格斗.ra格斗 被解析成一个技能名"格斗.ra格斗"。
+- 已修复 1：未录值检定改为照样掷骰不过判定线，回复附录入指引（.st 格斗 60 / .ra 格斗 60）；.ra 空参同样掷裸 d100，不再出现"检定 检定"重复词。录了卡后判档不受影响（回归覆盖）。
+- 已修复 2：DicePlugin 新增 dispatchSplitCommands——一条消息粘多条 .命令 时拆开逐条执行（上限 5 段）；防误拆约束=除首段外每段必须命中已知内置命令（排除 catch-all），".draw 示例.牌堆"这类参数含点的命令不拆。分段走原型链克隆事件(_splitDispatched 防递归)，首段改写原事件继续正常流程。
+- 边界说明：同用户同原文消息 1 秒内会被 Yunzai 核心 msgThrottle 去重（全局防刷屏，不属插件层），正常间隔连发不受影响。
+- 测试：diceManagerCore 未录值掷骰+录卡后判档回归；群模拟扩到 140 用例（.ra格斗/.ra格斗×3 粘连/.r1d100.r1d20 混合/防误拆），线上实测 140/140。本地全量 1167/0。已部署重启验证（active、OneBotv11、0 加载错误）。
+
+# 2026-09-28 .help 改为命令总表驱动（用户反馈"现在的帮助不准"）
+- 根因：原生命令帮助是 DiceManager.showHelp 手写数组，与实现/命令管理页脱节；且 config_default/commands.yaml 中 .ra 的 desc 含未加引号的" #N"被 YAML 当注释截断（只剩"奖惩骰与"）。
+- 已实现：utils/commandRegistry.js 新增 renderTopicHelp——主题命中模块（别名 coc/coc7/跑团/骰→dice、key、中文名包含）返回整模块权威列表（renderDomainHelp）；否则按 usage 行首命令词前缀跨模块收集；未命中返回 null。app.js help() 顺序：海豹扩展命令 → 命令总表主题帮助 → 内置 showHelp 兜底（ww/dx/rsr/ek 详表保留在内置路径，因总表 usage 行首是 rsr 不拦 ww）。
+- 修复 yaml：.ra desc 加引号防 # 注释截断；新增回归（desc 完整性 + renderTopicHelp 模块/前缀/中文/未命中）。用户级 config/commands.yaml 用 writeRegistryConfig 重生成。
+- 效果：.help coc=骰子模块 37 条权威列表；.help ra 显示总表完整 desc（含"#N 多轮"）；.help log 含权限标注；.help 记忆 命中记忆模块。本地全量 1166/0；群模拟扩到 136 用例，线上实测 136/136；部署重启验证 active、OneBotv11 连接、0 加载错误。
+
+# 2026-09-28 .help 分主题 + .ww 无效再骰线改为拦下引导
+- 用户问 .ww6a4 输出"有问题吗"与 .help ww 弹全量帮助的原因。ww 数字计算本身按 WoD 规则无误（8+计成功、1 抵消、4-again 爆骰 6→15 颗），但对计数意图完全错义；.help ww 全量是因为 showHelp() 签名没有 topic 参数，app.js 传参被忽略。
+- 已改 handleWw：again 阈值 2-7（WoD 只有 8/9/10-again）直接不掷骰，回复"WoD 没有 X-again + 想计数用 .r 6d10>4 + .help ww"，替换原"掷完附提示"方案——错义结果不再占据聊天记录。
+- 已重写 showHelp(topic)：ww/wod/骰池、dx/无限、rsr、ek/ekgen 有独立详表（按真实实现写：难度/再骰线、暴击链C、随机选择、幻梦六维）；其它主题按行首命令词前缀过滤主帮助（【ra 相关命令】）；中文/未知主题回退全量并给主题示例；无参不变。
+- 测试：ww 拦截断言重写 + showHelp 主题 6 断言新增；本地全量 1164/0；群模拟扩到 134 用例（含 .help ww/.help ra/.help 未知/.ww6a4 新行为/.骰娘帮助 回归），线上实测 134/134。已部署重启验证（active、OneBotv11 连接、0 加载错误）。
+
+# 2026-09-28 .ra 贴头轮数（用户需求：.ra3#格斗90 三连检定）
+- 用户反馈 .r3#d100 可用但 .ra3#格斗90 不行。根因：seaCocCheck 头部正则读走 ra 后紧贴的数字后，仅在 rab/rap 头当奖惩骰数量，普通 ra 头直接丢弃，# 也被吞，退化为单次检定。
+- 已修复：#后数字优先（.ra#3技能）；否则非 b/p 头部紧贴数字视为轮数——.ra3#技能90 / .ra3技能90 / .ra 3#技能90 全部三连，与 .r3# 写法对称；rab3/rab3#2 的奖惩骰语义不受影响，.rah3 变暗骰三连。
+- 测试：cocRuleSealdiceCompat 新增头部解析语义与 handleCheck 轮数组合 2 组；本地全量 1163/0；群模拟扩到 130 用例（含 .ra3#格斗90/.ra#3格斗90/.rab3# 保护），线上实测 130/130。已部署重启验证（active、OneBotv11 连接、0 加载错误）。
+
+# 2026-09-28 骰子比较计数（群真实需求：.r3#d100＜60 / .r6d6a4 / .ww6a4 误用）
+- 群聊复盘：用户发 .r3#d100＜60 想要逐骰判 <60（全角＜其实已归一，缺的是比较运算）；.r6d6a4 是老习惯骰池计数语法；.ww6a4 误触 WoD 骰池且 a4 被当再骰阈值，出现"能跑但语义全错"的静默误导。
+- 已实现 A：DiceExpressionParser 尾部比较子句（< <= > >=），对最后一组骰子的保留骰逐骰 ✓/✗ 判定并给"成功 x/y"；kh/kl 组合时判定作用在保留骰上；无骰子时对总数判一次；displayExpr 带完整比较写法。
+- B：aN 兼容糖——表达式中无比较符且尾缀为 a数字 时转换为 >N（如 6d6a4=6d6>4），不碰 kh/kl/min/max。
+- C：.ww 检测 a 阈值 2-4（WoD 只有 8/9/10-again）时在结果后附引导"想数几个骰子大于某数请用 .r 6d10>4"。
+- 测试：diceManagerCore 新增 3 组（比较标记/边界/kh 组合/aN 糖/全角/无骰回退/ww 提示），本地全量 1161/0；群模拟扩到 127 用例（含三条用户原命令），线上生产代码实测 127/127。
+- 已部署：备份 dice-compare-20260928-174207；用户级 config/commands.yaml 同步重生成；排空重启后服务 active、OneBotv11 连接、0 加载错误。
+
+# 2026-09-28 聊天回合持久化 P1（高可用第一步）
+- 用户诉求：重启后进行中的聊天/命令要重发，希望队列化；另问骰子 log 跨重启是否正常。log 已实测（staging 双进程）：状态落盘 state.json+NDJSON 追加，重启后 .log status/end/export 全部正常，无需改。
+- 方案定为 P1 三件套：回合持久化 + 出站幂等 + 优雅排空；不做多实例真 HA。P2（停机窗口入站消息常驻采集）暂缓。
+- 已实现 utils/chatTurnDurability.js：beginTurn/completeTurn（ytbot:chat_turn:{群}:{消息id}，EX 600s，auto_media 事件有独立 outbox 幂等故跳过）；claimReply（ytbot:chat_turn_replied: NX 认领，同进程分段发送放行）；recoverPending（启动按 staleSeconds=150 补跑未回复回合，过期/已回复/损坏清理）；pendingTurnCount（排空用）；Redis 故障一律 fail-open 不阻塞聊天。
+- 接入：apps/test.js handleTool 包持久化外壳（原体改名 handleToolInner）、claimTurnReply 方法、startChatTurnRecovery（延迟 30s 等 OneBot 稳定后补跑）；sendSegmentedMessage 入口认领防重复回复（wrapEvent 用 Object.create 原型继承，幂等键一致）。config_default 增 chatTurnDurability 段；restartTrssSafely.sh 增聊天回合排空（CHAT_TURN_DRAIN_SECONDS=120，超时保留记录重启后补跑）。
+- 测试：tests/chatTurnDurability.test.js 7 用例（落盘/清理/跳过/幂等一次姓/fail-open/恢复四分支/事件重建/键回退哈希）；aiConversationGate 守卫标记同步改名。本地全量 1158/0。
+- 已部署并用生产 Redis 真实闭环验证：种入指向不存在测试群的丢失回合 → 排空脚本检测到并等待 20s 超时 → 重启 → OneBot 连接后 30s 自动补跑（日志"补跑 1、过期丢弃 0、已回复跳过 0、无效 0"）→ Redis 记录被消费；服务 active、0 加载错误。补跑期间唯一 WARN 为 memoryAiConfig glm-5.3-flash 404（已知坏渠道，与本次无关）。
+
+# 2026-09-28 锅巴 AI 模型配置「测试连通性」按钮
+- 用户需求：在锅巴 AI 模型配置处新增模型后，无法确认是否可用，希望旁边有测试按钮。
+- 已确认锅巴 1.4.2 原生支持：前端 GButtons 组件（POST /plugin/do/{plugin}/action，args 支持 #{field} 模板）+ 插件 configInfo.actions 自定义后端（Result.ok(data, message) 的 message 即按钮 toast 文案）。
+- 已实现：utils/aiProviderProbe.js 纯探针模块——chat 类发最小 ping 补全（max_tokens 400 自动换 max_completion_tokens 重试一次）、embedding 验证维度、图片类只探 /models 验证连通与鉴权不实际出图；URL 复用生产 resolveChatCompletionUrl 归一（base/…/v1/完整端点三种写法都兼容）；15s 超时；输出 maskSecrets 防泄漏 key。
+- models/Guoba/configInfo.js 增加 actions.testAiProviders（先 withAiProviderPanelDefaults 同步旧扁平字段再测，与面板展示一致）；aiModels.js 十组 AI 配置块每块下方加「测试本组模型连通性」按钮+说明。
+- 测试：tests/aiProviderProbe.test.js 用例（本地 http fixture：成功/401 透传/max_tokens 重试/维度/图片不生成/超时/缺字段/掩码/汇总/上限/URL 归一）；本地全量 1151/0。
+- 已部署并重启验证：服务 active、39 插件、OneBotv11 已连接、0 加载错误；用真实生产配置直调 action 端到端测通：chatAiConfig/trackAiConfig gpt-6-sol ✅、intentAiConfig deepseek-v4-flash 451ms ✅、embedding BAAI/bge-m3 1024 维 ✅、imageGeneration grok ✅ 且当场发现 krill-image-2 ETIMEDOUT 真实故障（与 403 排查结论一致）。
+- 追问"glm-5.3-flash 0 tokens 是否正常"引出探针误报修复：直连复现该渠道（memoryAiConfig 经本机 one-api 网关）对任意请求都返回 200+空 content+全零 usage，属渠道未真正生成；探针原判 ✅ 掩盖了故障。已改为：空正文+0/缺失 usage → ❌「HTTP 200 但空回复且 0 tokens——渠道没有真正生成」；空正文但 tokens>0 → 仍 ✅（思考型模型小额度正常现象）。复验 memoryAiConfig 现正确报 ❌，chatAiConfig 仍 ✅；服务重启后正常。
+
 # 2026-09-28 海豹骰差距 P0+P1 七项补齐
 - 用户确认按优先级补齐与 sealdice 的差距。P0：旁观模式 .obon/.oboff/.ob list（网关层静默抑制+自身命令豁免）、.init next/下一回合 回合轮转（按名字记游标，插删条目自动对齐，轮空进位轮数+1）、.log export [序号|团名] [html] 美化网页导出（自包含 HTML、内容全转义、pre-wrap）。
 - P1：.st fmt 群级卡模板（{属性名} 替换数值，群管理可设/clr）、.en 技能1 技能2 批量成长（按卡结算+缺失逐项提示，带数值明确拒绝）、.log list 团录历史列表（当前+序号历史+条数）、.name [zh|en|jp] [数量] 随机姓名（内置三语名字库，默认 5 个、上限 20）。

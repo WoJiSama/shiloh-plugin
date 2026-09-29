@@ -648,3 +648,318 @@ test("紧凑中文 .st(无分隔符)逐段解析:敏捷0力量-1生命6 全部�
     runtime.cleanup()
   }
 })
+
+test("comparison suffix counts per-die successes with marks", () => {
+  const runtime = createRuntime()
+  try {
+    const roll = (expr, values) => {
+      const it = values[Symbol.iterator]()
+      return runtime.manager.rollExpression(expr, runtime.manager.getConfig(), () => it.next().value)
+    }
+    const under = roll("3d100<60", [0.22, 0.71, 0.45])
+    assert.equal(under.total, "成功 2/3")
+    assert.equal(under.expr, "3D100<60")
+    assert.equal(under.detail, "3D100[23✓+72✗+46✓]")
+
+    const over = roll("6d6>4", [0.16, 0.83, 0.66, 0.99, 0.0, 0.5])
+    assert.equal(over.total, "成功 2/6")
+    assert.equal(over.detail, "6D6[1✗+5✓+4✗+6✓+1✗+4✗]")
+
+    // <= 边界：60 算成功，61 算失败
+    assert.equal(roll("1d100<=60", [0.599]).total, "成功 1/1")
+    assert.equal(roll("1d100<=60", [0.6]).total, "成功 0/1")
+
+    // kh 修饰：判定作用在保留的骰子上
+    const kept = roll("4d6kh3>=4", [0.66, 0.83, 0.16, 0.5])
+    assert.equal(kept.total, "成功 3/3")
+    assert.match(kept.detail, /=>4✓\+4✓\+5✓/)
+
+    // 无骰子时对总数判定一次
+    assert.equal(roll("10<60", []).total, "成功 1/1")
+    // 普通表达式不受影响
+    assert.equal(roll("1d100", [0.42]).total, 43)
+    assert.equal(roll("1d100", [0.42]).detail, "1D100[43]")
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("aN suffix sugar counts dice above N and full-width operators normalize", () => {
+  const runtime = createRuntime()
+  try {
+    const roll = (expr, values) => {
+      const it = values[Symbol.iterator]()
+      return runtime.manager.rollExpression(expr, runtime.manager.getConfig(), () => it.next().value)
+    }
+    const sugar = roll("6d6a4", [0.16, 0.83, 0.66, 0.99, 0.0, 0.5])
+    assert.equal(sugar.total, "成功 2/6")
+    assert.equal(sugar.expr, "6D6>4")
+    assert.equal(sugar.detail, "6D6[1✗+5✓+4✗+6✓+1✗+4✗]")
+
+    // 全角＜（手机输入法）经归一化后同样可用
+    const fullwidth = roll("3d100＜60", [0.22, 0.71, 0.45])
+    assert.equal(fullwidth.total, "成功 2/3")
+    assert.equal(fullwidth.expr, "3D100<60")
+
+    // 比较符后无数字仍是格式错误；糖不吞 kh 等既有修饰符
+    assert.throws(() => runtime.manager.rollExpression("1d100<", runtime.manager.getConfig()), /格式不正确/)
+    const plain = roll("2d6kh1", [0.9, 0.1])
+    assert.equal(plain.detail, "2D6KH1[6+1=>6]")
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("handleWw rejects sub-8 again thresholds with counting guidance instead of rolling", () => {
+  const runtime = createRuntime()
+  try {
+    const e = { group_id: "1", user_id: "9", sender: { card: "探针" } }
+    const mislead = runtime.manager.handleWw(e, "6a4")
+    assert.ok(!mislead.includes("WoD 骰池"), "无效再骰线不应掷骰")
+    assert.match(mislead, /WoD 没有 4-again/)
+    assert.match(mislead, /\.r 6d10>4/)
+    assert.match(mislead, /\.help ww/)
+    const normal = runtime.manager.handleWw(e, "10a10")
+    assert.match(normal, /WoD 骰池/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("showHelp supports topic filtering with extended system docs", () => {
+  const runtime = createRuntime()
+  try {
+    const ww = runtime.manager.showHelp("ww")
+    assert.match(ww, /WoD 黑暗世界骰池/)
+    assert.ok(!ww.includes(".r[表达式]"), "主题帮助不应混入全量内容")
+    const dx = runtime.manager.showHelp("dx")
+    assert.match(dx, /DX 暴击链/)
+    const alias = runtime.manager.showHelp("WOD")
+    assert.match(alias, /WoD 黑暗世界骰池/)
+    const ra = runtime.manager.showHelp("ra")
+    assert.match(ra, /【ra 相关命令】/)
+    assert.match(ra, /COC 检定/)
+    assert.ok(!ra.includes(".log new"), "ra 主题不应包含 log 行")
+    const unknown = runtime.manager.showHelp("不存在的主题xyz")
+    assert.match(unknown, /没有找到「不存在的主题xyz」/)
+    assert.match(unknown, /COC 骰娘/, "未知主题回退全量帮助")
+    const full = runtime.manager.showHelp("")
+    assert.match(full, /COC 骰娘/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("official default skills judge without recording; unknown skills roll with a hint", async () => {
+  const runtime = createRuntime()
+  try {
+    runtime.manager.rollD100 = () => ({ value: 42, diceText: "1D100" })
+    // sealdice coc7 内置默认值：侦查 25、格斗 5——未录卡也按默认判档
+    assert.match(runtime.manager.handleCheck(event(), "侦查"), /42\/25 失败/)
+    assert.match(runtime.manager.handleCheck(event(), "格斗"), /42\/5 失败/)
+    // 卡值优先于默认值
+    const e = event()
+    await runtime.manager.handleSt(e, "格斗=90")
+    runtime.manager.rollD100 = () => ({ value: 42, diceText: "1D100" })
+    assert.match(runtime.manager.handleCheck(e, "格斗"), /42\/90 困难成功/)
+    // 完全未知的自造技能：照掷不判档，并提示录入
+    const rolled = runtime.manager.handleCheck(event(), "自创魂印")
+    assert.match(rolled, /进行 自创魂印 检定：1D100=42（未录卡值，不判档位；录入：\.st 自创魂印 60/)
+    const bare = runtime.manager.handleCheck(event(), "")
+    assert.match(bare, /进行 检定：1D100=42/)
+    assert.ok(!bare.includes("进行 检定 检定"), "空参不应出现重复的检定词")
+    // 派生默认：闪避=敏捷/2（录了 DEX 才生效）；修正后缀 侦查+10=25+10
+    await runtime.manager.handleSt(e, "DEX 70")
+    runtime.manager.rollD100 = () => ({ value: 42, diceText: "1D100" })
+    assert.match(runtime.manager.handleCheck(e, "闪避"), /42\/35 失败/)
+    assert.match(runtime.manager.handleCheck(event(), "侦查+10"), /42\/35 失败/)
+    assert.match(runtime.manager.handleCheck(event(), "侦查 20+10"), /42\/30 失败/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("bot quit requires a leading @bot mention plus admin permission", async () => {
+  const runtime = createRuntime()
+  try {
+    const api = []
+    const base = {
+      group_id: "4321",
+      user_id: "55",
+      sender: { card: "群主", role: "owner" },
+      bot: { uin: "10001", sendApi: async (action, params) => { api.push({ action, params }); return { retcode: 0 } } },
+      reply: async text => text
+    }
+    const atBot = [{ type: "at", data: { qq: "10001" } }, { type: "text", data: { text: ".bot off" } }]
+    const atOther = [{ type: "at", data: { qq: "99999" } }, { type: "text", data: { text: ".bot off" } }]
+
+    // 裸命令：不退群，给引导
+    const bare = await runtime.manager.handleBotControl({ ...base, msg: ".bot off" }, "off")
+    assert.match(bare, /退群命令需要先艾特我/)
+    assert.equal(api.length, 0)
+
+    // @机器人 + 管理员：告别并调用退群 API
+    const quit = await runtime.manager.handleBotControl({ ...base, msg: ".bot off", message: atBot }, "off")
+    assert.equal(quit, "")
+    assert.deepEqual(api, [{ action: "set_group_leave", params: { group_id: 4321 } }])
+
+    // @机器人但普通成员：权限拒绝且不退
+    api.length = 0
+    const denied = await runtime.manager.handleBotControl({ ...base, msg: ".bot off", message: atBot, sender: { card: "路人", role: "member" } }, "off")
+    assert.match(denied, /只有主人或群主\/管理员/)
+    assert.equal(api.length, 0)
+
+    // 艾特别人：不构成退群指令
+    api.length = 0
+    const other = await runtime.manager.handleBotControl({ ...base, msg: ".bot off", message: atOther }, "off")
+    assert.match(other, /退群命令需要先艾特我/)
+    assert.equal(api.length, 0)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("dice results are recorded into the active log and styled in html export", async () => {
+  const runtime = createRuntime()
+  try {
+    const e = event("owner")
+    // 未开 log：不记录
+    await runtime.manager.recordDiceResult(e, "调查员 进行 侦查 检定：1D100=10/60 大成功")
+    // 开 log：命令消息 + 结果成对入档
+    await runtime.manager.startLog(e, "结果团")
+    await runtime.manager.recordLogMessage({ msg: ".ra 侦查 60", group_id: "10001", user_id: "20002", sender: { card: "调查员" } })
+    await runtime.manager.recordDiceResult(e, "调查员 进行 侦查 检定：1D100=10/60 大成功")
+    await runtime.manager.recordDiceResult(e, "调查员 掷骰：1D100=100")
+    await runtime.manager.stopLog(e)
+    const state = runtime.manager.readState()
+    const file = state.groups["10001"].logs?.[0]?.file || state.groups["10001"].log?.file
+    const lines = runtime.manager.readLogLines(file)
+    assert.equal(lines.length, 3)
+    assert.equal(lines[0].content, ".ra 侦查 60")
+    assert.equal(lines[1].type, "dice_result")
+    assert.equal(lines[1].name, "调查员")
+    assert.match(lines[1].content, /大成功/)
+    assert.equal(lines[2].type, "dice_result")
+    // HTML 染色
+    const html = runtime.manager.buildLogHtml({ title: "t", startedAt: "x" }, lines)
+    assert.ok(html.includes("dice-crit"), "大成功应绿色高亮")
+    assert.ok(html.includes("🎲 调查员"), "结果行带骰子标记")
+    const fumble = runtime.manager.buildLogHtml({ title: "t" }, [{ at: "2026-09-28T00:00:00Z", name: "甲", userId: "1", type: "dice_result", content: "SAN Check 大失败" }])
+    assert.ok(fumble.includes("dice-fumble"), "大失败应红色高亮")
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("sn with a non-template name sets the dice nickname and syncs the group card", async () => {
+  const runtime = createRuntime()
+  try {
+    const api = []
+    const e = event("member", {
+      group_id: "10001",
+      bot: { sendApi: async (action, params) => { api.push({ action, params }); return { retcode: 0 } } }
+    })
+    const reply = await runtime.manager.handleSn(e, "coc")
+    assert.match(reply, /骰娘昵称已设置为：coc，群名片已同步/)
+    assert.deepEqual(api, [{ action: "set_group_card", params: { group_id: 10001, user_id: 20002, card: "coc" } }])
+    const state = runtime.manager.readState()
+    assert.equal(state.users["20002"].nickname, "coc")
+    // on/off 语义不变
+    const status = await runtime.manager.handleSn(e, "")
+    assert.match(status, /自动群名片：关闭/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("sealdice sc/en/rav parity: single arg, bp dice, custom growth, two-skill opposed", async () => {
+  const runtime = createRuntime()
+  try {
+    const api = []
+    const e = event("owner", {
+      group_id: "10001",
+      bot: { sendApi: async (action, params) => { api.push({ action, params }); return { retcode: 0 } } }
+    })
+    await runtime.manager.handleSt(e, "san 60")
+    // .sc 1d6 单参：成功扣0失败扣1d6；.sc b 0/2 带奖励骰
+    runtime.manager.rollD100 = () => ({ value: 90, diceText: "1D100" })
+    runtime.manager.rollExpression = expr => ({ total: expr.includes("d") ? 4 : Number(expr) || 0 })
+    assert.match(await runtime.manager.handleSan(e, "1d6"), /SAN Check：1D100=90\/60 失败，理智损失 4/)
+    runtime.manager.rollD100 = () => ({ value: 10, diceText: "1D100" })
+    assert.match(await runtime.manager.handleSan(e, "1d6"), /理智损失 0/)
+    // .en 技能 +失败/成功：失败也按设定成长
+    await runtime.manager.handleSt(e, "射击=70")
+    runtime.manager.rollD100 = () => ({ value: 60, diceText: "1D100" })
+    assert.match(await runtime.manager.handleEn(e, "射击 +1/2"), /成长失败，按 \+失败\/成功 设定增加 2（70→72，已写入人物卡）/)
+    runtime.manager.rollD100 = () => ({ value: 80, diceText: "1D100" })
+    assert.match(await runtime.manager.handleEn(e, "射击 +1/2"), /成长成功，增加 1（72→73，已写入人物卡）/)
+    runtime.manager.rollD100 = () => ({ value: 90, diceText: "1D100" })
+    assert.match(await runtime.manager.handleEn(e, "射击 +3"), /成长成功，增加 3（73→76，已写入人物卡）/)
+    // .pc rename
+    await runtime.manager.handleSt(e, "侦查=60")
+    const pc = await runtime.manager.handlePc(e, "new 备用")
+    assert.match(await runtime.manager.handlePc(e, "rename 备用 主线卡"), /人物卡已改名：备用 → 主线卡/)
+    assert.match(await runtime.manager.handlePc(e, "list"), /主线卡/)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("builtin sn templates coc/cocL/dnd build card summary", async () => {
+  const runtime = createRuntime()
+  try {
+    const api = []
+    const e = event("member", {
+      group_id: "10001",
+      bot: { sendApi: async (action, params) => { api.push({ action, params }); return { retcode: 0 } } }
+    })
+    await runtime.manager.handleSt(e, "san 60")
+    await runtime.manager.handleSt(e, "hp 12")
+    await runtime.manager.handleSt(e, "hpmax 15")
+    await runtime.manager.handleSt(e, "dex 65")
+    const applied = await runtime.manager.applyBuiltinCardTemplate(e, "coc")
+    assert.equal(applied, "调查员 SAN60 HP12/15 DEX65")
+    assert.deepEqual(api.at(-1), { action: "set_group_card", params: { group_id: 10001, user_id: 20002, card: "调查员 SAN60 HP12/15 DEX65" } })
+    const lower = await runtime.manager.applyBuiltinCardTemplate(e, "cocL")
+    assert.equal(lower, "调查员 san60 hp12/15 dex65")
+    const dnd = await runtime.manager.applyBuiltinCardTemplate(e, "dnd")
+    assert.equal(dnd, "调查员 HP12/15 AC? DC? PP?")
+    assert.equal(await runtime.manager.applyBuiltinCardTemplate(e, "unknown"), null)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("组队 system: add/del/ra batch check/draw/call; stat from log; who/ping", async () => {
+  const runtime = createRuntime()
+  try {
+    const e = event("owner", {
+      group_id: "10001",
+      message: [{ type: "text", data: { text: ".team" } }, { type: "at", data: { qq: "111" } }, { type: "at", data: { qq: "222" } }],
+      bot: { uin: "10001" }
+    })
+    assert.match(await runtime.manager.handleTeam(e, "小队 add"), /已添加 2 名玩家至团队 小队/)
+    runtime.manager.rollD100 = () => ({ value: 10, diceText: "1D100" })
+    const batch = await runtime.manager.handleTeam(e, "小队 ra 侦查")
+    assert.match(batch, /团队 小队 检定 侦查/)
+    assert.match(batch, /1D100=10\/25 困难成功/)
+    assert.equal((batch.match(/1D100/g) || []).length, 2, "全队每人一次检定")
+    assert.match(await runtime.manager.handleTeam(e, "小队 call"), /呼叫 小队：\[CQ:at,qq=111\] \[CQ:at,qq=222\]/)
+    assert.match(await runtime.manager.handleTeam(e, "小队 draw 1"), /随机抽取到：\[CQ:at,qq=(111|222)\]/)
+    assert.match(await runtime.manager.handleTeam(e, "小队 clear"), /清空了团队 小队/)
+    // stat：先造一份带 dice_result 的团录
+    await runtime.manager.startLog(e, "统计团")
+    await runtime.manager.recordDiceResult(e, "调查员 进行 侦查 检定：1D100=10/60 大成功")
+    await runtime.manager.recordDiceResult(e, "调查员 进行 斗殴 检定：1D100=50/60 成功")
+    await runtime.manager.recordDiceResult(e, "调查员 SAN Check：1D100=95/60 大失败")
+    await runtime.manager.stopLog(e)
+    const stat = runtime.manager.handleStat(e, "")
+    assert.match(stat, /团录「统计团」检定统计/)
+    assert.match(stat, /调查员：检定 3 次，成功 2，大成功 1，大失败 1/)
+    // who / ping
+    assert.match(runtime.manager.handleWho(e, "甲 乙 丙"), /随机分配结果/)
+    assert.match(runtime.manager.handlePing(e), /pong！希洛在线/)
+  } finally {
+    runtime.cleanup()
+  }
+})

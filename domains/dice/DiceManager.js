@@ -95,6 +95,42 @@ const NAME_BANKS = {
   }
 }
 
+// 首位艾特是否指向机器人本体（@希洛 .bot off 的安全闸）；
+// 与网关的 startsWithMentionOfOtherMember 同构：跳过 reply 段，遇正文即判负
+function startsWithBotMention(e = {}) {
+  const botId = String(e?.bot?.uin || globalThis.Bot?.uin || "")
+  if (!/^\d+$/.test(botId)) return false
+  const isBot = value => String(value ?? "").trim() === botId
+  if (Array.isArray(e?.message)) {
+    for (const segment of e.message) {
+      if (segment?.type === "at") return isBot(getMentionTargetId(segment))
+      if (segment?.type === "text" && String(segment.text ?? segment.data?.text ?? "").trim()) return false
+      if (segment?.type && segment.type !== "reply") return false
+    }
+  }
+  const raw = String(e?.raw_message || "")
+  const leadingMention = raw.match(/^\s*\[CQ:at,[^\]]*(?:qq|user_id|id|uin)=(\d+)(?:,|\])/i)
+  return Boolean(leadingMention && leadingMention[1] === botId)
+}
+
+// sealdice coc7 模板的内置默认技能值（coc7.yaml attrs.defaults 摘录）：
+// 未录卡的常规技能按官方默认值判档，而非拒绝或裸掷
+const COC_DEFAULT_SKILLS = {
+  信用评级: 0, 取悦: 15, 话术: 5, 恐吓: 15, 说服: 10, 心理学: 10, 外语: 1,
+  估价: 5, 乔装: 5, 潜行: 20, 追踪: 10, 侦查: 25, 聆听: 20, 读唇: 1, 图书馆使用: 20,
+  生存: 10, 沙漠: 10, 海洋: 10, 极地: 10, 攀爬: 20, 跳跃: 20, 骑术: 5, 游泳: 20, 潜水: 1,
+  艺术与手艺: 5, 表演: 5, 美术: 5, 伪造: 5, 摄影: 5, 打字: 5, 速记: 5, 技术制图: 5,
+  耕作: 5, 木匠: 5, 焊接: 5, 管道工: 5, 写作: 5, 音乐: 5, 舞蹈: 5, 厨艺: 5, 书法: 5,
+  理发: 5, 制陶: 5, 裁缝: 5, 雕塑: 5, 妙手: 10, 锁匠: 1,
+  格斗: 5, 斗殴: 25, 斧: 15, 链锯: 10, 连枷: 10, 绞索: 15, 矛: 20, 剑: 20, 鞭: 5,
+  射击: 10, "射击:弓": 15, "射击:手枪": 20, "射击:重武器": 10, "射击:火焰喷射器": 10,
+  "射击:机枪": 10, "射击:步霰": 25, "射击:冲锋枪": 15, 投掷: 20, 爆破: 1, 炮术: 1,
+  急救: 30, 医学: 1, 精神分析: 1, 催眠: 1,
+  会计: 5, 法律: 5, 历史: 5, 考古学: 1, 博物学: 10, 人类学: 1, 神秘学: 5, 电子学: 1,
+  科学: 1, 天文学: 1, 生物学: 1, 克苏鲁神话: 0, 学识: 1, 园艺: 5, 器乐: 5, 声乐: 5,
+  日本刀: 20
+}
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
 }
@@ -230,12 +266,27 @@ function normalizeDiceExpression(expr = "") {
 
 class DiceExpressionParser {
   constructor(expr, config, random = secureDiceRandom) {
-    this.expr = normalizeDiceExpression(expr)
+    let working = normalizeDiceExpression(expr)
+    this.rawExpr = working
+    // 兼容糖：骰池尾缀 aN（如 6d6a4）= 逐骰 >N 计数；仅在本来没有比较运算时转换
+    if (!/[<>]/.test(working)) working = working.replace(/([\d)])a(\d+)$/, "$1>$2")
+    // 尾部比较子句：d100<60 / 6d6>=4（全角＜＞已归一化），对最后一组骰子逐骰判定
+    this.comparison = null
+    const cmp = working.match(/(<=|>=|<|>)(\d+)$/)
+    if (cmp) {
+      this.comparison = { op: cmp[1], threshold: Number(cmp[2]) }
+      working = working.slice(0, cmp.index)
+    }
+    this.expr = working || "1d100"
+    // 展示用：含 aN 糖转换与比较子句的完整写法
+    this.displayExpr = this.comparison ? `${this.expr}${this.comparison.op}${this.comparison.threshold}` : this.expr
     this.config = config
     this.random = typeof random === "function" ? random : secureDiceRandom
     this.pos = 0
     this.diceCount = 0
     this.detailParts = []
+    this.lastDice = null
+    this.lastDiceDetailIndex = -1
   }
 
   peek() {
@@ -264,11 +315,32 @@ class DiceExpressionParser {
       throw new Error(`骰点表达式在「${this.expr.slice(this.pos)}」附近格式不正确`)
     }
     if (!Number.isFinite(value)) throw new Error("骰点结果无效")
-    return {
-      expr: this.expr.toUpperCase(),
+    const base = {
+      expr: this.displayExpr.toUpperCase(),
       detail: this.detailParts.length ? this.detailParts.join("+") : String(Math.trunc(value)),
       total: Math.trunc(value)
     }
+    if (!this.comparison) return base
+    // 比较计数：对最后一组骰子的保留结果逐骰 ✓/✗；没有骰子时对总算术结果判定一次
+    const compareOk = v => {
+      if (this.comparison.op === "<") return v < this.comparison.threshold
+      if (this.comparison.op === "<=") return v <= this.comparison.threshold
+      if (this.comparison.op === ">") return v > this.comparison.threshold
+      return v >= this.comparison.threshold
+    }
+    const dice = this.lastDice?.kept?.length ? this.lastDice.kept : [Math.trunc(value)]
+    const success = dice.filter(compareOk).length
+    if (this.lastDice && this.lastDiceDetailIndex >= 0) {
+      const markedKept = this.lastDice.kept.map(v => `${v}${compareOk(v) ? "✓" : "✗"}`).join("+")
+      const inner = this.lastDice.rolls.join("+")
+      const shown = this.lastDice.keptText
+        ? `${inner}=>${markedKept}`
+        : markedKept
+      this.detailParts[this.lastDiceDetailIndex] = `${this.lastDice.count}D${this.lastDice.sides}${this.lastDice.suffixText}[${shown}]`
+      base.detail = this.detailParts.join("+")
+    }
+    base.total = `成功 ${success}/${dice.length}`
+    return base
   }
 
   parseExpression() {
@@ -345,6 +417,8 @@ class DiceExpressionParser {
     }
     const total = kept.reduce((sum, value) => sum + value, 0)
     const keptText = suffix ? `=>${kept.join("+")}` : ""
+    this.lastDiceDetailIndex = this.detailParts.length
+    this.lastDice = { count, sides, suffixText, rolls: [...rolls], kept: [...kept], keptText }
     this.detailParts.push(`${count}D${sides}${suffixText}[${rolls.join("+")}${keptText}]`)
     return total
   }
@@ -537,6 +611,34 @@ export class DiceManager {
     await fs.promises.appendFile(log.file, JSON.stringify(record) + "\n", "utf8")
   }
 
+  /**
+   * 骰娘命令结果入档（sealdice 语义：结果以发起玩家名义挂在命令后）。
+   * 由命令回复出口统一调用，团录复盘时可见完整检定/掷骰结果。
+   */
+  async recordDiceResult(e, output = "") {
+    const content = String(output || "").trim()
+    if (!content || !e?.group_id) return
+    const config = this.getConfig()
+    if (!config.enabled) return
+    const groupId = String(e.group_id)
+    const state = this.readState(config)
+    const log = state.groups?.[groupId]?.log
+    if (!log?.active || !log.file) return
+    const sender = e.sender || {}
+    const record = {
+      at: new Date().toISOString(),
+      time: Date.now(),
+      groupId,
+      userId: String(e.user_id || sender.user_id || ""),
+      name: sender.card || sender.nickname || this.getUserName(e),
+      messageId: "",
+      type: "dice_result",
+      content
+    }
+    ensureDir(path.dirname(log.file))
+    await fs.promises.appendFile(log.file, JSON.stringify(record) + "\n", "utf8")
+  }
+
   async recordStructuredRuleEvent(e, event = {}, state = null, config = this.getConfig()) {
     if (!config.enabled || !e?.group_id) return false
     const groupId = String(e.group_id)
@@ -630,8 +732,12 @@ export class DiceManager {
   async handleBotControl(e, raw = "") {
     const text = String(raw || "").trim().toLowerCase()
 
-    // .bot bye / .bot dismiss:真正退群(仅主人或群主/管理员)
-    if (/^(bye|dismiss|退出)$/.test(text)) {
+    // .bot bye / .bot dismiss / .bot off:真正退群(仅主人或群主/管理员)
+    // 安全约束:必须首位艾特机器人才执行(@希洛 .bot off),防止群里裸发命令误触
+    if (/^(bye|dismiss|退出|off)$/.test(text)) {
+      if (!startsWithBotMention(e)) {
+        return "退群命令需要先艾特我，例如：@我 .bot off（仅主人或群主/管理员），防止误触。"
+      }
       const isMaster = Boolean(e?.isMaster)
       const senderRole = String(e?.sender?.role || "").toLowerCase()
       const isAdmin = senderRole === "admin" || senderRole === "owner"
@@ -660,10 +766,10 @@ export class DiceManager {
       }
     }
 
-    if (/^(on|off|开启|关闭)/.test(text) || !text) {
-      return "希洛不是独立骰娘实例，`.bot on/off` 已做兼容响应。\n`.bot bye` 可以让希洛退出当前群（仅主人或群主/管理员）。"
+    if (/^(on|开启)/.test(text) || !text) {
+      return "希洛不是独立骰娘实例，`.bot on` 已做兼容响应。\n退群：艾特我后发 `.bot off` 或 `.bot bye`（仅主人或群主/管理员）。"
     }
-    return "bot 命令：.bot on / .bot off / .bot bye（退群，需主人或管理员）"
+    return "bot 命令：.bot on（兼容响应）/ @我 .bot off 或 .bot bye（退群，需主人或管理员）"
   }
 
   async replyText(e, text) {
@@ -760,7 +866,57 @@ export class DiceManager {
       }
       return `自动群名片已关闭${suffix}`
     }
-    return `自动群名片：${current?.enabled ? "开启" : "关闭"}\n命令：.sn on / .sn off`
+    // .sn <名字>（非模板名）：按 sealdice 直觉——设置骰娘昵称并立即同步一次群名片
+    if (text) {
+      const name = text.slice(0, 60)
+      const user = this.ensureUser(state, e)
+      user.nickname = name
+      await this.writeState(state, config)
+      let suffix = ""
+      try {
+        await this.setGroupCardName(e, name)
+        suffix = "，群名片已同步"
+      } catch (error) {
+        suffix = `；群名片同步失败：${sanitizeDiceCommandError(error)}（昵称已生效）`
+      }
+      return `骰娘昵称已设置为：${name}${suffix}\n（持续自动同步用 .sn on；规则包名片模板名仍优先按模板应用）`
+    }
+    return `自动群名片：${current?.enabled ? "开启" : "关闭"}\n命令：.sn on / .sn off / .sn <昵称>（改名并同步名片）`
+  }
+
+  /**
+   * sealdice 内置名片模板（coc7.yaml/dnd5e.yaml 的 sn 段）：
+   * .sn coc = 「玩家 SAN{理智} HP{生命值}/{生命值上限} DEX{敏捷}」写入群名片
+   * 未命中内置模板返回 null，由调用方继续尝试规则包模板/昵称回退。
+   */
+  async applyBuiltinCardTemplate(e, templateName = "") {
+    const key = String(templateName || "").trim().toLowerCase()
+    if (!["coc", "cocl", "dnd"].includes(key)) return null
+    const state = this.readState()
+    const card = this.getActiveCard(e, state)
+    const lookup = (...names) => {
+      for (const name of names) {
+        for (const bag of [card.attrs || {}, card.skills || {}]) {
+          for (const [k, v] of Object.entries(bag)) {
+            if (k.toLowerCase() === String(name).toLowerCase() && Number.isFinite(Number(v))) return Number(v)
+          }
+        }
+      }
+      return null
+    }
+    const show = value => (value === null ? "?" : value)
+    const player = this.getUserName(e)
+    let text = null
+    if (key === "coc") {
+      text = `${player} SAN${show(lookup("SAN", "理智"))} HP${show(lookup("HP", "生命值"))}/${show(lookup("HPMAX", "hpmax", "生命值上限"))} DEX${show(lookup("DEX", "敏捷"))}`
+    } else if (key === "cocl") {
+      text = `${player} san${show(lookup("SAN", "理智"))} hp${show(lookup("HP", "生命值"))}/${show(lookup("HPMAX", "hpmax", "生命值上限"))} dex${show(lookup("DEX", "敏捷"))}`
+    } else if (key === "dnd") {
+      text = `${player} HP${show(lookup("hp", "生命值"))}/${show(lookup("hpmax", "生命值上限"))} AC${show(lookup("ac"))} DC${show(lookup("dc"))} PP${show(lookup("pp"))}`
+    }
+    if (text === null) return null
+    await this.setGroupCardName(e, text)
+    return text
   }
 
   async setGroupCardName(e, name, userId = e?.user_id || e?.sender?.user_id) {
@@ -1101,6 +1257,10 @@ export class DiceManager {
     const count = Math.min(100, Math.max(1, Number(text.match(/\d+/)?.[0]) || 1))
     const target = Number(text.match(/(?:>=|难度|tn)\s*(\d+)/i)?.[1] || 8)
     const again = Number(text.match(/(?:again|爆骰|a)\s*(\d+)/i)?.[1] || 0)
+    // WoD 的再骰线只有 8/9/10；小阈值几乎都是误把计数语法（如 .ww 6a4）当 WoD 用，直接拦下引导
+    if (again >= 2 && again <= 7) {
+      return `WoD 没有 ${again}-again（再骰线只有 8/9/10）。\n如果你是想数「几颗骰子大于某数」，用比较计数：.r ${count}d10>${again}\nWoD 完整用法：.help ww`
+    }
     const queue = Array.from({ length: count }, () => true)
     const rolls = []
     while (queue.length) {
@@ -1255,11 +1415,22 @@ export class DiceManager {
   buildLogHtml(log, lines) {
     const esc = value => String(value ?? "")
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    // 掷骰结果染色：大成功绿、大失败红、其余成败按档位轻着色
+    const diceClass = content => {
+      const text = String(content || "")
+      if (text.includes("大成功")) return "dice-crit"
+      if (text.includes("大失败")) return "dice-fumble"
+      if (/极难成功|困难成功|成功/.test(text)) return "dice-pass"
+      if (/失败/.test(text)) return "dice-fail"
+      return "dice-roll"
+    }
     const rows = lines.map(item => {
       const time = item.at ? item.at.replace("T", " ").slice(0, 19) : ""
+      const isDice = item.type === "dice_result"
+      const extraClass = isDice ? ` dice ${diceClass(item.content)}` : ""
       return [
-        `<div class="msg">`,
-        `  <div class="meta"><span class="name">${esc(item.name || item.userId)}</span><span class="time">${esc(time)}</span></div>`,
+        `<div class="msg${extraClass}">`,
+        `  <div class="meta"><span class="name">${isDice ? "🎲 " : ""}${esc(item.name || item.userId)}</span><span class="time">${esc(time)}</span></div>`,
         `  <div class="content">${esc(item.content)}</div>`,
         `</div>`
       ].join("\n")
@@ -1281,6 +1452,14 @@ export class DiceManager {
   .name { color: #8ab4f8; font-weight: 600; }
   .time { color: #6b6f84; }
   .content { white-space: pre-wrap; word-break: break-word; }
+  .dice { border-left: 3px solid #6b7280; }
+  .dice-crit { border-left-color: #34d399; background: #17251f; }
+  .dice-crit .content { color: #6ee7b7; }
+  .dice-fumble { border-left-color: #f87171; background: #2a1c1e; }
+  .dice-fumble .content { color: #fca5a5; }
+  .dice-pass { border-left-color: #4ade80; }
+  .dice-fail { border-left-color: #fb923c; }
+  .dice-roll { border-left-color: #818cf8; }
   footer { margin-top: 22px; color: #565a6e; font-size: 12px; text-align: center; }
 </style>
 </head>
@@ -1420,7 +1599,26 @@ ${rows}
     const state = this.readState()
     const card = this.getActiveCard(e, state)
     const key = normalizeSkillName(skill)
-    return Number(card.skills?.[key] ?? card.attrs?.[ATTR_ALIASES[key] || key])
+    const fromCard = Number(card.skills?.[key] ?? card.attrs?.[ATTR_ALIASES[key] || key])
+    if (Number.isFinite(fromCard)) return fromCard
+    // sealdice coc7 语义：常规技能未录卡时按官方默认值判档
+    if (Object.prototype.hasOwnProperty.call(COC_DEFAULT_SKILLS, key)) {
+      const preset = COC_DEFAULT_SKILLS[key]
+      if (Number.isFinite(Number(preset))) return Number(preset)
+    }
+    const attr = name => Number(card.attrs?.[ATTR_ALIASES[name] || name])
+    // sealdice defaultsComputed：依赖属性的派生默认（属性缺失时不硬造）
+    const computed = {
+      闪避: () => Number.isFinite(attr("DEX")) ? Math.floor(attr("DEX") / 2) : NaN,
+      生命值上限: () => Number.isFinite(attr("CON")) && Number.isFinite(attr("SIZ")) ? Math.floor((attr("CON") + attr("SIZ")) / 10) : NaN,
+      母语: () => attr("EDU"),
+      理智上限: () => Number.isFinite(card.skills?.克苏鲁神话) || Number(card.skills?.克苏鲁神话) === 0 ? 99 - Number(card.skills.克苏鲁神话) : 99
+    }
+    if (Object.prototype.hasOwnProperty.call(computed, key)) {
+      const derived = computed[key]()
+      if (Number.isFinite(derived)) return derived
+    }
+    return fromCard
   }
 
   getGroupRule(e, config = this.getConfig()) {
@@ -1661,23 +1859,45 @@ ${rows}
       const penaltyLead = /^(p|惩罚|惩罚骰)(\d+)?$/i.exec(parts[0] || "")
       if (penaltyLead) { modifier = -Number(penaltyLead[2] || 1); parts.shift() }
     }
-    // 目标值取最后一个纯数字 token（sealdice 值在末尾；取第一个会被漏解析的
-    // 轮数/数量劫持，例如「3 今天开团 60」曾被判成对 3 检定并丢弃真值）
+    // sealdice 技能修正后缀：侦查+10 / 斗殴-5（作用于卡值/默认值/显式值）
+    let offset = 0
+    const offsetToken = parts.length ? parts[parts.length - 1].match(/^([.+\-])(\d+)$/) : null
+    if (offsetToken && parts.length >= 2) {
+      offset = Number(offsetToken[1] + offsetToken[2])
+      parts.pop()
+    }
+    const splitSkillOffset = name => {
+      const m = String(name || "").match(/^(.+?)([+\-]\d+)$/)
+      return m ? { skill: m[1], offset: Number(m[2]) } : { skill: name, offset: 0 }
+    }
+    // 目标值取最后一个数字/表达式 token（sealdice 值在末尾且支持表达式，如 50+10）
     let valueIndex = -1
     for (let i = parts.length - 1; i >= 0; i -= 1) {
-      if (/^-?\d+$/.test(parts[i])) { valueIndex = i; break }
+      if (/^[\d.+\-*/%()dDkhl]+$/.test(parts[i]) && /\d/.test(parts[i])) { valueIndex = i; break }
     }
     if (valueIndex < 0) {
       const compact = parts.join(" ")
+      // 紧贴修正优先：侦查+10（避免被末尾数字截断成「侦查+ 对10检定」）
+      const compactOffset = compact.match(/^(.+?)([+\-]\d+)$/)
+      if (compactOffset && compactOffset[1].trim() && !/^[+\-]/.test(compactOffset[1].trim())) {
+        const base = normalizeSkillName(compactOffset[1])
+        return { skill: base || "检定", target: NaN, modifier, difficulty, rounds, offset: offset + Number(compactOffset[2]) }
+      }
       const compactMatch = compact.match(/^(.+?)[\s:=：]*(-?\d+)$/)
       if (compactMatch) {
-        return { skill: normalizeSkillName(compactMatch[1]), target: Number(compactMatch[2]), modifier, difficulty, rounds }
+        const split = splitSkillOffset(normalizeSkillName(compactMatch[1]))
+        return { skill: split.skill, target: Number(compactMatch[2]), modifier, difficulty, rounds, offset: offset + split.offset }
       }
-      return { skill: compact || "检定", target: NaN, modifier, difficulty, rounds }
+      const split = splitSkillOffset(compact || "检定")
+      return { skill: split.skill || "检定", target: NaN, modifier, difficulty, rounds, offset: offset + split.offset }
     }
-    const target = Number(parts[valueIndex])
-    const skill = parts.slice(0, valueIndex).join(" ") || "检定"
-    return { skill, target, modifier, difficulty, rounds }
+    let target = Number(parts[valueIndex])
+    if (!/^\d+$/.test(parts[valueIndex])) {
+      try { target = this.rollExpression(parts[valueIndex], this.getConfig()).total } catch { target = NaN }
+    }
+    const skillRaw = parts.slice(0, valueIndex).join(" ") || "检定"
+    const split = splitSkillOffset(skillRaw)
+    return { skill: split.skill || "检定", target, modifier, difficulty, rounds, offset: offset + split.offset }
   }
 
   handleCheck(e, raw = "", options = {}) {
@@ -1687,9 +1907,18 @@ ${rows}
     const cleanRaw = targetUserId ? stripCqMentions(raw) : raw
     const targetEvent = targetUserId ? this.getEventForUser(e, targetUserId) : e
     const parsed = this.parseCheckArgs(cleanRaw)
-    const target = this.getTargetValue(parsed.skill, parsed.target, targetEvent)
-    if (!Number.isFinite(target)) return `找不到「${parsed.skill}」的技能值。请写成：.ra ${parsed.skill} 60，或先用 .st 录入。`
+    // sealdice 语义：.ra 侦查+10 = 基础值（卡/默认/显式）+ 修正
+    const target = Number.isFinite(Number(parsed.target))
+      ? Number(parsed.target) + (parsed.offset || 0)
+      : (Number.isFinite(this.getTargetValue(parsed.skill, NaN, targetEvent)) ? this.getTargetValue(parsed.skill, NaN, targetEvent) + (parsed.offset || 0) : NaN)
     const modifier = options.modifier ?? parsed.modifier
+    if (!Number.isFinite(target)) {
+      // 未录卡值：照样掷骰（不过判定线），并提示怎么录入——群里发 .ra格斗 应该有骰可看
+      const bare = !String(cleanRaw || "").trim()
+      const roll = this.rollD100(modifier)
+      const label = bare ? "" : ` ${parsed.skill}`
+      return `${this.getUserName(targetEvent)} 进行${label} 检定：${roll.diceText}=${roll.value}（未录卡值，不判档位；录入：.st${label} 60，或带值检定 .ra${label} 60）`
+    }
     const difficulty = Number(options.difficulty ?? parsed.difficulty) || 0
     const maxRounds = safeNumber(config.maxRounds, 20, 1, 1000)
     const rounds = Math.max(1, Math.min(maxRounds, Number(options.rounds ?? parsed.rounds) || 1))
@@ -1763,6 +1992,156 @@ ${rows}
     }
   }
 
+  /** 团录检定统计（sealdice .stat log）：从团录 NDJSON 统计各角色检定/成败 */
+  handleStat(e, raw = "") {
+    const config = this.getConfig()
+    if (!e?.group_id) return "统计只能在群聊中使用。"
+    const text = String(raw || "").trim()
+    const group = this.readState(config).groups?.[String(e.group_id)] || {}
+    const current = group.log?.file ? group.log : null
+    const history = [...(group.logs || [])].filter(item => item?.file).reverse()
+    let log = null
+    let title = ""
+    if (!text || /^(current|当前|log|最近)$/i.test(text)) {
+      log = current || history[0] || null
+      title = log?.title || ""
+    } else if (/^\d+$/.test(text)) {
+      log = history[Number(text) - 1] || null
+      title = log?.title || ""
+    } else {
+      log = [current, ...history].filter(Boolean).find(item => String(item.title || "") === text) || null
+      title = text
+    }
+    if (!log?.file) return "没有找到可统计的团录（.log list 查看序号），或该团录还没有检定记录。"
+    const lines = this.readLogLines(log.file).filter(item => item.type === "dice_result" && item.name)
+    const byName = new Map()
+    for (const line of lines) {
+      const entry = byName.get(line.name) || { total: 0, crit: 0, fumble: 0, pass: 0 }
+      entry.total += 1
+      if (String(line.content).includes("大成功")) entry.crit += 1
+      if (String(line.content).includes("大失败")) entry.fumble += 1
+      if (/(极难成功|困难成功|成功)/.test(String(line.content)) && !String(line.content).includes("失败")) entry.pass += 1
+      byName.set(line.name, entry)
+    }
+    if (!byName.size) return `团录「${title || log.title || "未命名"}」里还没有检定记录（.ra/.sc 等结果会被记入）。`
+    const rows = [...byName.entries()]
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([name, v], i) => `${i + 1}. ${name}：检定 ${v.total} 次，成功 ${v.pass}，大成功 ${v.crit}，大失败 ${v.fumble}`)
+    return `团录「${title || log.title || "未命名"}」检定统计：\n${rows.join("\n")}`
+  }
+
+  /** .who a b c：随机打乱/分配（sealdice ext_story） */
+  handleWho(e, raw = "") {
+    const items = String(raw || "").split(/[\s,，、]+/).filter(Boolean)
+    if (items.length < 2) return "格式：.who 选项1 选项2 选项3 …（随机打乱顺序，常用作身份/顺序分配）"
+    const pool = [...items]
+    const shuffled = []
+    while (pool.length) shuffled.push(pool.splice(Math.floor(secureDiceRandom() * pool.length), 1)[0])
+    return `随机分配结果：\n${items.map((item, i) => `${item} → ${shuffled[i]}`).join("\n")}`
+  }
+
+  /** .ping：存活检测（sealdice ext_fun） */
+  handlePing(e) {
+    const uptime = process.uptime()
+    const mm = Math.floor(uptime / 60)
+    return `pong！希洛在线，已运行 ${mm >= 60 ? `${Math.floor(mm / 60)}时${mm % 60}分` : `${mm}分钟`}。`
+  }
+
+  // ── 组队系统（sealdice ext_core_team：.team 名 add/del/clear/call/draw/ra/rc）──
+  getTeamMap(e, state = null, config = null) {
+    config = config || this.getConfig()
+    const groupId = String(e?.group_id || "private")
+    const full = state || this.readState(config)
+    full.groups[groupId] ||= {}
+    full.groups[groupId].teams ||= {}
+    return { teams: full.groups[groupId].teams, groupId, state: full, config }
+  }
+
+  async handleTeam(e, raw = "") {
+    const config = this.getConfig()
+    if (!e?.group_id) return "组队只能在群聊中使用。"
+    const text = String(raw || "").trim()
+    const { teams, state } = this.getTeamMap(e, null, config)
+    if (!text || /^(list|列表|帮助|help)$/i.test(text)) {
+      const names = Object.keys(teams)
+      if (!names.length) return "当前群还没有团队。用法：.team 队名 add @成员 ｜ .team 队名 ra 技能 ｜ .team 队名 draw 2"
+      return names.map(name => `【${name}】${teams[name].length} 人：${teams[name].map(id => this.getUserName({ group_id: e.group_id, user_id: id, sender: {} })).join("、")}`).join("\n")
+    }
+    const match = text.match(/^(\S+)\s+([\s\S]+)$/)
+    if (!match) return "用法：.team 队名 add @成员 ｜ del @成员 ｜ clear ｜ call ｜ draw [N] ｜ st ｜ ra/rc 技能"
+    const teamName = match[1].slice(0, 30)
+    const action = match[2].trim()
+    const members = () => teams[teamName] || []
+    const ensureTeam = () => { teams[teamName] ||= []; return teams[teamName] }
+
+    if (/^add/i.test(action)) {
+      const ids = this.getMentionedUserIds(e)
+      const botId = String(e?.bot?.uin || globalThis.Bot?.uin || "")
+      const valid = ids.filter(id => id !== botId)
+      if (!valid.length) return "必须 @ 至少一名成员（不能是骰子自己或@全体）。"
+      const team = ensureTeam()
+      for (const id of valid) if (!team.includes(id)) team.push(id)
+      await this.writeState(state, config)
+      return `已添加 ${valid.length} 名玩家至团队 ${teamName}（现 ${team.length} 人）。`
+    }
+    if (/^(del|rm|delete|remove)/i.test(action)) {
+      if (!teams[teamName]) return `没有叫 ${teamName} 的团队，或它已被清除。`
+      const ids = this.getMentionedUserIds(e)
+      const before = teams[teamName].length
+      teams[teamName] = teams[teamName].filter(id => !ids.includes(id))
+      await this.writeState(state, config)
+      return `已从团队 ${teamName} 删除 ${before - teams[teamName].length} 名玩家（现 ${teams[teamName].length} 人）。`
+    }
+    if (/^clear/i.test(action)) {
+      if (!teams[teamName]) return `没有叫 ${teamName} 的团队，或它已被清除。`
+      delete teams[teamName]
+      await this.writeState(state, config)
+      return `清空了团队 ${teamName}。`
+    }
+    if (/^call/i.test(action)) {
+      const team = members()
+      if (!team.length) return `团队 ${teamName} 没有成员。`
+      return `呼叫 ${teamName}：` + team.map(id => `[CQ:at,qq=${id}]`).join(" ")
+    }
+    if (/^draw/i.test(action)) {
+      const team = members()
+      if (!team.length) return `团队 ${teamName} 没有成员。`
+      const count = Math.min(team.length, Math.max(1, Number(action.match(/\d+/)?.[0]) || 1))
+      const pool = [...team]
+      const picked = []
+      while (picked.length < count) picked.push(pool.splice(Math.floor(secureDiceRandom() * pool.length), 1)[0])
+      return (count === 1
+        ? `从团队 ${teamName} 中随机抽取到：` + picked.map(id => `[CQ:at,qq=${id}]`).join(" ")
+        : `从团队 ${teamName} 中随机抽取 ${count} 名成员：` + picked.map(id => `[CQ:at,qq=${id}]`).join(" "))
+    }
+    if (/^(st|show|查看)$/i.test(action)) {
+      const team = members()
+      if (!team.length) return `团队 ${teamName} 没有成员。`
+      return `队伍 ${teamName} 的属性：\n` + team.map(id => {
+        const userEvent = this.getEventForUser(e, id)
+        return `${this.getUserName(userEvent)}：${this.renderCard(userEvent, this.getActiveCard(userEvent, state), config).split("\n").slice(2).join("；")}`
+      }).join("\n")
+    }
+    if (/^(ra|rc|检定)\b/i.test(action) || /^ra/i.test(action) || /^rc/i.test(action)) {
+      const team = members()
+      if (!team.length) return `团队 ${teamName} 没有成员。`
+      const expr = action.replace(/^(ra|rc|检定)\s*/i, "")
+      const lines = []
+      for (const id of team) {
+        const userEvent = this.getEventForUser(e, id)
+        try {
+          lines.push(this.rollCheckObject(userEvent, expr || "斗殴"))
+        } catch { }
+      }
+      if (!lines.length) return "团队检定没有产生任何结果，请检查技能名。"
+      return `团队 ${teamName} 检定 ${expr}：\n` + lines.map(l => `${l.name}：${l.diceText}=${l.roll}/${l.target} ${l.level}`).join("\n")
+    }
+    // 无动作：视为创建/查看
+    ensureTeam()
+    await this.writeState(state, config)
+    return `团队 ${teamName} 已就绪（现 ${teams[teamName].length} 人）。add @成员 添加；ra 技能 全队检定。`
+  }
+
   handleOpposed(e, raw = "") {
     const config = this.getConfig()
     if (!config.enabled) return "骰娘模块现在没开。"
@@ -1772,18 +2151,42 @@ ${rows}
     let rightRaw = ""
     let rightEvent = e
     const mentioned = this.getMentionedUserIds(e)
+    let leftEvent = e
     if (parts.length >= 2) {
       leftRaw = parts[0]
       rightRaw = parts.slice(1).join(" vs ")
+      // .rav 技能1 技能2 @A @B：两人各用各的技能对抗（sealdice）
+      if (mentioned.length >= 2) {
+        const tokens = stripCqMentions(parts[0]).split(/[\s,，]+/).filter(Boolean)
+        if (tokens.length >= 2) {
+          leftRaw = tokens[0]
+          rightRaw = tokens[1]
+          leftEvent = this.getEventForUser(e, mentioned[0])
+          rightEvent = this.getEventForUser(e, mentioned[1])
+        }
+      }
+    } else if (mentioned.length >= 2) {
+      const tokens = stripCqMentions(text).split(/[\s,，]+/).filter(Boolean)
+      if (tokens.length >= 2) {
+        leftRaw = tokens[0]
+        rightRaw = tokens[1]
+        leftEvent = this.getEventForUser(e, mentioned[0])
+        rightEvent = this.getEventForUser(e, mentioned[1])
+      } else {
+        leftRaw = stripCqMentions(text)
+        rightRaw = leftRaw
+        leftEvent = this.getEventForUser(e, mentioned[0])
+        rightEvent = this.getEventForUser(e, mentioned[1])
+      }
     } else if (mentioned.length) {
       leftRaw = stripCqMentions(text)
       rightRaw = leftRaw
       rightEvent = this.getEventForUser(e, mentioned[0])
     } else {
-      return "格式：.rav 斗殴 60 vs 斗殴 50，或 .rav 斗殴 @对方"
+      return "格式：.rav 斗殴 60 vs 斗殴 50 ｜ .rav 斗殴 @对方 ｜ .rav 侦查 斗殴 @A @B（两人各用各的卡）"
     }
     try {
-      const left = this.rollCheckObject(e, leftRaw)
+      const left = this.rollCheckObject(leftEvent, leftRaw)
       const right = this.rollCheckObject(rightEvent, rightRaw)
       // sealdice 语义：双方成功等级相同视为平局（其属性比较分支已被官方注释停用）
       let winner = "平手"
@@ -1825,20 +2228,31 @@ ${rows}
     text = text.replace(/--half\b\s*/gi, () => { halfLoss = true; return "" })
     text = text.replace(/--cap\s*=\s*(\d+)\s*/gi, (_, n) => { lossCap = Number(n); return "" })
     text = text.trim()
-    const m = text.match(/^(\S+)\/(\S+)(?:\s+(\d+))?/)
-    if (!m) return "格式：.sc 成功损失/失败损失 [当前SAN]，例如 .sc 1/1d6 60，可加 --half --cap=5"
-    const target = this.getTargetValue("SAN", m[3], e)
+    // sealdice：.sc [b|p] 前缀 = SAN 检定带奖惩骰
+    let bpModifier = 0
+    text = text.replace(/^([bp])(\d*)\s+/i, (_, kind, n) => {
+      bpModifier = (kind.toLowerCase() === "b" ? 1 : -1) * (Number(n) || 1)
+      return ""
+    }).trim()
+    // sealdice：.sc <失败时掉san> 单参简易写法 = 成功扣 0（仅接受表达式形态）
+    const single = /^[\d.+\-*/%()dDkhl]+$/.test(text) && /\d/.test(text) && !text.includes("/") ? [text, text] : null
+    const m = text.match(/^(\S+)\s*\/\s*(\S+)(?:\s+(\d+))?/)
+    if (!m && !single) return "格式：.sc 成功损失/失败损失 [当前SAN]，例如 .sc 1/1d6 60、.sc 1d6（简易）、.sc b 1/1d6（奖惩骰）"
+    const successExpr = m ? m[1] : "0"
+    const failExpr = m ? m[2] : single[1]
+    const sanHint = m ? m[3] : undefined
+    const target = this.getTargetValue("SAN", sanHint, e)
     if (!Number.isFinite(target)) return "找不到当前 SAN。请写成：.sc 1/1d6 60，或先用 .st SAN=60"
-    if (!m[3]) {
+    if (!sanHint) {
       const currentState = this.readState(config)
       const currentCard = this.getActiveCard(e, currentState)
       if (this.isCardLocked(currentCard)) return this.lockedCardReply(currentCard)
     }
-    const roll = this.rollD100(0)
+    const roll = this.rollD100(bpModifier)
     const rule = this.getGroupRule(e, config)
     const details = this.judgeCocDetails(roll.value, target, rule)
     const level = details.level
-    const lossExpr = details.displayRank > 0 ? m[1] : m[2]
+    const lossExpr = details.displayRank > 0 ? successExpr : failExpr
     // sealdice：大失败时损失骰取最大值（BigFailDiceOn）
     const isBigFail = details.displayRank === -2
     const lossRandom = isBigFail ? () => 0.999999 : undefined
@@ -1847,7 +2261,7 @@ ${rows}
     if (lossCap > 0 && loss > lossCap) loss = lossCap
     let sanAfter = Math.max(0, target - loss)
     let insanity = loss >= 5 ? `；单次损失 >=5，建议进行 INT 检定判定临时疯狂` : ""
-    if (!m[3]) {
+    if (!sanHint) {
       const state = this.readState(config)
       const card = this.getActiveCard(e, state)
       if (Number.isFinite(Number(card.attrs?.SAN))) {
@@ -1885,8 +2299,14 @@ ${rows}
     const text = String(raw || "").trim()
     // 批量成长：.en 技能1 技能2 …（全部按人物卡数值结算，sealdice 语义）
     const tokens = text.split(/[\s,，]+/).filter(Boolean)
-    const skillTokens = tokens.filter(token => !/^\d+$/.test(token))
-    const numberTokens = tokens.filter(token => /^\d+$/.test(token))
+    // sealdice：.en 技能[值] +成功成长值 / +失败成长值/成功成长值
+    const gainToken = text.match(/\+([^\s+/]+)(?:\/([^\s+/]+))?\s*$/)
+    const tokensBase = gainToken ? text.slice(0, text.lastIndexOf(gainToken[0])).split(/[\s,，]+/).filter(Boolean) : tokens
+    const skillTokens = tokensBase.filter(token => !/^\d+$/.test(token) && !/^\+/.test(token))
+    const numberTokens = tokensBase.filter(token => /^\d+$/.test(token))
+    if (gainToken && skillTokens.length >= 2) {
+      return "带自定义成长值（+N）的批量成长暂不支持，请逐个 .en，或用 .en 技能1 技能2 走默认 +1d10。"
+    }
     if (skillTokens.length >= 2) {
       if (numberTokens.length) return "批量成长按人物卡数值结算，不带数值；请写 .en 技能1 技能2，或逐个 .en 技能 数值。"
       const state = this.readState(config)
@@ -1925,7 +2345,8 @@ ${rows}
       if (changed) await this.writeState(state, config)
       return lines.join("\n")
     }
-    const parsed = this.parseCheckArgs(raw)
+    // 有自定义成长值(+N/+F/S)时先剥离，避免 +1/2 被当数值 token 解析
+    const parsed = this.parseCheckArgs(gainToken ? tokensBase.join(" ") : raw)
     const state = this.readState(config)
     const card = this.getActiveCard(e, state)
     const key = normalizeSkillName(parsed.skill)
@@ -1937,8 +2358,11 @@ ${rows}
     if (usesCardValue && this.isCardLocked(card)) return this.lockedCardReply(card)
     const roll = this.rollD100(0).value
     const success = roll > target
-    const gain = success ? this.rollExpression("1d10", config).total : 0
-    let result = "成长失败"
+    // sealdice 语义：成功加 <成功成长值>（默认 1d10），失败加 <失败成长值>（默认 0）
+    const successGain = gainToken ? this.rollExpression(gainToken[1], config).total : this.rollExpression("1d10", config).total
+    const failGain = gainToken && gainToken[2] ? this.rollExpression(gainToken[2], config).total : 0
+    const gain = success ? successGain : failGain
+    let result = gain > 0 ? `成长失败，但按设定增加 ${gain}` : "成长失败"
     if (success && usesCardValue) {
       const after = Number(storedValue) + gain
       if (attr) card.attrs[attr] = after
@@ -1947,6 +2371,12 @@ ${rows}
       result = `成长成功，增加 ${gain}（${target}→${after}，已写入人物卡）`
     } else if (success) {
       result = `成长成功，增加 ${gain}（使用临时技能值，未修改人物卡）`
+    } else if (!success && failGain > 0 && usesCardValue) {
+      const after = Number(storedValue) + failGain
+      if (attr) card.attrs[attr] = after
+      else card.skills[key] = after
+      await this.writeState(state, config)
+      result = `成长失败，按 +失败/成功 设定增加 ${failGain}（${target}→${after}，已写入人物卡）`
     }
     return renderTemplate(config.templates.en, {
       name: this.getUserName(e),
@@ -2235,6 +2665,22 @@ ${rows}
       const cards = Object.entries(user.cards).map(([cardName, card]) => `${cardName}${this.isCardLocked(card) ? "🔒" : ""}`)
       return `人物卡：${cards.join("，")}\n当前：${user.activeCard}`
     }
+    if (/^(rename|改名)$/i.test(cmd)) {
+      const renameArgs = name.split(/\s+/).filter(Boolean)
+      if (!renameArgs.length) return "格式：.pc rename 新名字 ｜ .pc rename 旧名字 新名字"
+      let targetName = null
+      let newName = renameArgs[renameArgs.length - 1]
+      if (renameArgs.length >= 2) targetName = renameArgs[0]
+      const current = targetName || user.activeCard
+      if (!user.cards[current]) return `没有找到人物卡：${current}`
+      if (user.cards[current].locked) return `人物卡「${current}」已锁定；请先用 .pc unlock 解锁。`
+      if (user.cards[newName]) return `已存在同名人物卡：${newName}`
+      user.cards[newName] = { ...user.cards[current], name: newName }
+      delete user.cards[current]
+      if (user.activeCard === current) user.activeCard = newName
+      await this.writeState(state, config)
+      return `人物卡已改名：${current} → ${newName}`
+    }
     if (/^(new|新增|创建|save|保存)$/i.test(cmd)) {
       if (!name) return "格式：.pc new 角色名"
       user.cards[name] = user.cards[name] || { name, attrs: {}, skills: {} }
@@ -2280,7 +2726,27 @@ ${rows}
   async handleNn(e, raw = "") {
     const config = this.getConfig()
     const name = String(raw || "").trim()
-    if (!name) return "格式：.nn 昵称"
+    // sealdice：.nn 无参=查看当前角色名；.nn clr=重置回群名片
+    if (!name) {
+      const user = this.readState(config).users?.[String(e?.user_id || "")]
+      const current = user?.nickname || e?.sender?.card || e?.sender?.nickname || "(未设置)"
+      return `当前骰娘昵称：${current}\n.nn <名字> 修改；.nn clr 重置回群名片`
+    }
+    if (/^(clr|清除|重置)$/i.test(name)) {
+      const state = this.readState(config)
+      const user = this.ensureUser(state, e)
+      const restore = e?.sender?.card || e?.sender?.nickname || user.nickname || ""
+      delete user.nickname
+      await this.writeState(state, config)
+      let suffix = ""
+      try {
+        if (restore) {
+          await this.setGroupCardName(e, restore)
+          suffix = `，群名片已恢复为：${restore}`
+        }
+      } catch { }
+      return `骰娘昵称已清除${suffix}`
+    }
     const state = this.readState(config)
     const user = this.ensureUser(state, e)
     user.nickname = name.slice(0, 30)
@@ -2329,12 +2795,13 @@ ${rows}
     })
   }
 
-  showHelp() {
-    return [
+  showHelp(topic = "") {
+    const lines = [
       "COC 骰娘（发 .骰规则 查看规则包管理命令）：",
       ".r[表达式] - 普通掷骰，如 .r1d100 / .r 2d6+3 / .r 3#1d100 / .r2d10#3",
       "复杂表达式：支持多层括号、四则运算、取余和多个骰组，如 .r ((2d6+3)*2)%5、.r (1d8+1d4)*2",
       "进阶骰法：也支持取高/取低/丢高/丢低，如 .r 4d6kh3、.r 10d6dl2",
+      "比较计数：末尾加 <60/>=4 等对每个骰子判定，如 .r 3d100<60（✓/✗+成功数）、.r 6d6a4（=6d6>4）",
       ".bp[数量] / .pp[数量] - 奖励骰 / 惩罚骰掷骰",
       ".ra 技能 60 - COC 检定；.rb/.rp 或 .ra+1/.ra-1 为奖励/惩罚骰",
       ".rav A 60 vs B 50 - 对抗检定；也支持 .rav 斗殴 @对方",
@@ -2358,7 +2825,49 @@ ${rows}
       ".draw 牌组 - 抽牌；.draw keys/list/search/desc/reload - 牌堆管理",
       ".骰规则帮助 - 固定点命令的 YAML 规则包、角色权限与团务系统",
       ".log new [标题] / .log on / .log off / .log status / .log export [历史序号] / .log end - 跑团记录与完整文件导出"
-    ].join("\n")
+    ]
+    const key = String(topic || "").trim().toLowerCase()
+    if (!key) return lines.join("\n")
+
+    // 扩展系统有独立详表
+    const extended = {
+      ww: [
+        "WoD 黑暗世界骰池（.ww）：",
+        "用法：.ww [骰数] [难度N | >=N | tnN] [aN | againN | 爆骰N]",
+        "掷 N 颗 D10：每颗 ≥难度（默认 8）记 1 个成功；每颗 1 抵消 1 个成功；",
+        "一个成功都没有且有 1 → 大失败。aN 是再骰线（正规 WoD 只有 8/9/10-again）：≥N 的骰子补掷。",
+        "示例：.ww 8 ｜ .ww 8 难度9 ｜ .ww 10 a10",
+        "只想数「几颗骰子大于某数」？那不是 WoD，用比较计数：.r 8d10>4"
+      ].join("\n"),
+      dx: [
+        "DX 暴击链（.dx，无限规则风格）：",
+        "用法：.dx [骰数] [暴击线C，默认10]",
+        `掷 N 颗 D10：≥暴击线的骰子凑成下一轮继续掷并各记 10 点；无暴击的那轮取最高骰面；总合为达成值。`,
+        "示例：.dx 5 ｜ .dx 5 8"
+      ].join("\n"),
+      rsr: [
+        "随机选择（.rsr）：",
+        "用法：.rsr 选项A 选项B 选项C（空格或逗号分隔）",
+        "从给出的选项里随机选一个，适合「去哪/谁上」这类裁决。"
+      ].join("\n"),
+      ek: [
+        "永恒幻梦（.ek / .ekgen）：",
+        ".ek [表达式] - 用标准掷骰表达式掷一次（默认 1d100）",
+        ".ekgen - 生成六维属性：体魄/灵巧/感知/意志/学识/魅力（2d6+3）"
+      ].join("\n")
+    }
+    const aliasMap = { wod: "ww", "骰池": "ww", 无限: "dx", 随机: "rsr", 选择: "rsr", 幻梦: "ek", ekgen: "ek" }
+    const extendedKey = extended[key] ? key : aliasMap[key]
+    if (extendedKey) return extended[extendedKey]
+
+    // 通用主题：按行首命令词前缀过滤主帮助（仅拉丁命令词）
+    const clean = key.replace(/[^a-z]/gi, "")
+    const matched = clean ? lines.filter(line => {
+      const head = line.match(/^\.([a-z]+)/i)
+      return head && head[1].startsWith(clean)
+    }) : []
+    if (matched.length) return `【${topic} 相关命令】\n${matched.join("\n")}\n（完整帮助：.骰娘帮助）`
+    return `没有找到「${topic}」相关的主题，常用主题：.help ra / .help sc / .help log / .help st / .help ww / .help dx\n${lines.join("\n")}`
   }
 }
 

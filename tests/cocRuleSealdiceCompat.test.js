@@ -176,3 +176,35 @@ test("大失败满骰：loss 表达式按最大面数计", async () => {
   const maxRoll = m.rollExpression("1d6+2", config, () => 0.999999)
   assert.equal(maxRoll.total, 8)
 })
+
+test("seaCocCheck 头部紧贴轮数：.ra3#技能90 与 .r3#d100 写法对齐", async () => {
+  const m = await getManager()
+  // 模拟 seaCocCheck 的头部解析语义（app.js 同一正则）
+  const parse = text => {
+    const head = text.match(/(?:rab|rap|rahb|rahp|rah|ra)(\d+)?#?(\d+)?(b|p)?\s*([\s\S]*)$/)
+    const num = Number(head?.[1] || 0)
+    const afterHash = Number(head?.[2] || 0) || undefined
+    const suffix = String(head?.[3] || "")
+    const hasB = /rab|rahb/.test(text) || suffix === "b"
+    const hasP = /rap|rahp/.test(text) || suffix === "p"
+    return {
+      modifier: hasB ? (num || 1) : hasP ? -(num || 1) : undefined,
+      rounds: afterHash ?? (num > 0 && !hasB && !hasP ? num : undefined)
+    }
+  }
+  assert.deepEqual(parse(".ra3#格斗90"), { modifier: undefined, rounds: 3 })
+  assert.deepEqual(parse(".ra3格斗90"), { modifier: undefined, rounds: 3 })
+  assert.deepEqual(parse(".ra#3格斗90"), { modifier: undefined, rounds: 3 })
+  assert.deepEqual(parse(".ra格斗90"), { modifier: undefined, rounds: undefined })
+  assert.deepEqual(parse(".rab3#格斗90"), { modifier: 3, rounds: undefined })
+  assert.deepEqual(parse(".rab3#2格斗90"), { modifier: 3, rounds: 2 })
+})
+
+test("handleCheck 轮数与显式值组合：.ra3# 格斗 90 三连", async () => {
+  const m = await getManager()
+  m.rollD100 = () => ({ value: 50, diceText: "1D100" })
+  const text = m.handleCheck({ group_id: "1", user_id: "9", sender: { card: "探针" } }, "格斗 90", { rounds: 3 })
+  const lines = text.split("\n")
+  assert.equal(lines.length, 3)
+  assert.ok(lines.every(line => /1D100=50\/90 成功/.test(line)))
+})

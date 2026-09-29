@@ -25,7 +25,7 @@ test("AI conversation entries re-check the master switch", () => {
     "if (!isAiConversationEnabled(this.config)) return\n        if (!this.checkGroupPermission(e))",
     "插件总开关已关闭，取消续话",
     "error: 'plugin_disabled'",
-    "async handleTool(e) {\n    if (!isAiConversationEnabled(this.config)) return false"
+    "async handleToolInner(e) {\n    if (!isAiConversationEnabled(this.config)) return false"
   ]) {
     assert.ok(src.includes(marker.replaceAll("\\n", "\n")), `missing guard: ${marker.split("\n")[0]}`)
   }

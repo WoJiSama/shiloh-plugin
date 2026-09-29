@@ -5,6 +5,11 @@ import { sendSmartReply } from "../../utils/SmartReply.js"
 import { DICE_COMMAND_RULES, matchDiceCommand, resolveDiceDocPath, stripDiceCommand } from "./diceCommandPolicy.js"
 import { canManageGroupDice, executeDiceCommand, getCustomDiceCommandGate } from "./diceCommandGateway.js"
 import { buildVisibleFailureDetail } from "../../utils/visibleFailure.js"
+import { getCommandRegistry, renderTopicHelp } from "../../utils/commandRegistry.js"
+import { fileURLToPath } from "node:url"
+import path from "node:path"
+
+const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
 
 const diceRulePackManager = new DiceRulePackManager({ diceManager })
 
@@ -31,19 +36,59 @@ export class DicePlugin extends plugin {
     for (const commandName of new Set(DICE_COMMAND_RULES.map(rule => rule.fnc))) {
       const handler = this[commandName]?.bind(this)
       if (!handler) continue
-      this[commandName] = async e => await executeDiceCommand({
-        manager: diceManager,
-        e,
-        commandName,
-        work: () => handler(e),
-        reply: output => this.reply(e, output),
-        logger: globalThis.logger
-      })
+      this[commandName] = async e => {
+        // sealdice 同消息多指令：.ra格斗.ra格斗 拆成两条各执行一次
+        await this.dispatchSplitCommands(e)
+        return await executeDiceCommand({
+          manager: diceManager,
+          e,
+          commandName,
+          work: () => handler(e),
+          reply: output => this.reply(e, output),
+          logger: globalThis.logger
+        })
+      }
     }
     // 重启后预热 JS 规则包的自定义函数（loadPack 同步取用）
     diceRulePackManager.warmupJsPacks().catch(error => {
       globalThis.logger?.warn?.(`[骰规则] JS 规则包预热失败: ${error.message}`)
     })
+  }
+
+  /** 一条消息里粘了多条 .命令 时拆开执行；要求除首段外每段都是已知命令，防止误拆参数里的点 */
+  async dispatchSplitCommands(e) {
+    if (e?._splitDispatched) return false
+    const msg = String(e?.msg || "")
+    if (!/^[.。][\s\S]*[.。]/.test(msg)) return false
+    const parts = msg.split(/(?=[.。])/).filter(part => part.length > 1)
+    if (parts.length < 2 || parts.length > 5) return false
+    // 只认已知内置命令：排除兜底规则，避免把参数里的点（如牌堆名 示例.牌组）误拆
+    const knownRules = this.rule.filter(rule => rule.fnc !== "customDiceRule")
+    const isKnownCommand = text => knownRules.some(rule => {
+      try { return new RegExp(rule.reg).test(text) } catch { return false }
+    })
+    if (!parts.slice(1).every(isKnownCommand)) return false
+    for (const part of parts.slice(1)) {
+      const segment = Object.create(e)
+      segment.msg = part
+      segment.raw_message = part
+      segment.message = [{ type: "text", data: { text: part } }]
+      segment._splitDispatched = true
+      try {
+        for (const rule of this.rule) {
+          if (!new RegExp(rule.reg).test(segment.msg)) continue
+          if (await this[rule.fnc](segment) === true) break
+        }
+      } catch (error) {
+        globalThis.logger?.warn?.(`[骰娘] 分段命令「${part}」执行失败: ${error?.message || error}`)
+      }
+    }
+    // 原事件改写为第一段，让本次调用继续正常执行第一段
+    e.msg = parts[0]
+    e.raw_message = parts[0]
+    e.message = [{ type: "text", data: { text: parts[0] } }]
+    globalThis.logger?.info?.(`[骰娘] 同消息多指令：已拆为 ${parts.length} 条分别执行`)
+    return true
   }
 
   strip(e, head) {
@@ -106,7 +151,14 @@ export class DicePlugin extends plugin {
           avatarUrl: `https://q1.qlogo.cn/g?b=qq&nk=${userId}&s=100`
         }
       : {}
-    return await sendSmartReply(e, output, { ...senderOptions, ...options, forceText })
+    const sent = await sendSmartReply(e, output, { ...senderOptions, ...options, forceText })
+    // 跑团 log 记录中：命令结果以发起玩家名义入档（sealdice 语义，复盘可见完整检定）
+    if (typeof output === "string" && output.trim()) {
+      diceManager.recordDiceResult(e, output).catch(error => {
+        globalThis.logger?.warn?.(`[骰娘] log 结果入档失败: ${error?.message || error}`)
+      })
+    }
+    return sent
   }
 
   async runStateCommand(e, work) {
@@ -128,6 +180,16 @@ export class DicePlugin extends plugin {
 
 —— 来自规则包:${sealCommand.loaded.pack?.name || sealCommand.loaded.pack?.id}`, { kind: "diceLong" })
         return true
+      }
+      // 命令总表(commands.yaml)驱动的主题帮助:模块命中或命令词前缀命中,内容与命令管理页同源
+      try {
+        const topicHelp = renderTopicHelp(getCommandRegistry(pluginRoot), helpArg)
+        if (topicHelp) {
+          await this.reply(e, topicHelp, { kind: "diceLong" })
+          return true
+        }
+      } catch (error) {
+        globalThis.logger?.warn?.(`[骰娘] 命令总表主题帮助读取失败,回退内置帮助: ${error?.message || error}`)
       }
     }
     const base = diceManager.showHelp(helpArg)
@@ -407,15 +469,25 @@ export class DicePlugin extends plugin {
   async sn(e) {
     const raw = this.strip(e, "sn")
     const text = String(raw || "").trim()
-    // .sn <模板名>(如 .sn dh/.sn gm):从包的 nameTemplate 按名应用
     if (text && !/^(on|off|开启|关闭)$/i.test(text)) {
+      // sealdice 内置名片模板：.sn coc / .sn cocL / .sn dnd —— 按卡摘要写群名片
+      try {
+        const applied = await diceManager.applyBuiltinCardTemplate(e, text)
+        if (applied !== null) {
+          await this.reply(e, `名片已按内置模板 ${text} 设置为：${applied}`)
+          return true
+        }
+      } catch (error) {
+        await this.reply(e, `名片设置失败：${buildVisibleFailureDetail(error)}`)
+        return true
+      }
+      // 规则包名片模板(如 .sn dh/.sn gm):从包的 nameTemplate 按名应用
       const refreshed = diceRulePackManager.refreshSealCard(e, text)
       if (refreshed) {
         await this.reply(e, `已按名片模板 ${text} 应用。`)
         return true
       }
-      await this.reply(e, `没有找到名为「${text}」的名片模板。可用模板名请看规则包帮助(如 dh/gm),或先掷一次对应命令建立模板。`)
-      return true
+      // 都不是：交给 handleSn 按「设置骰娘昵称并立即同步群名片」处理（sealdice 直觉）
     }
     await this.reply(e, await this.runStateCommand(e, () => diceManager.handleSn(e, raw)))
     return true
@@ -534,6 +606,26 @@ export class DicePlugin extends plugin {
     return true
   }
 
+  async team(e) {
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleTeam(e, this.strip(e, "组队"))))
+    return true
+  }
+
+  async stat(e) {
+    await this.reply(e, diceManager.handleStat(e, this.strip(e, "stat")), { kind: "ranking" })
+    return true
+  }
+
+  async who(e) {
+    await this.reply(e, diceManager.handleWho(e, this.strip(e, "who")))
+    return true
+  }
+
+  async ping(e) {
+    await this.reply(e, diceManager.handlePing(e))
+    return true
+  }
+
   async opposed(e) {
     await this.reply(e, diceManager.handleOpposed(e, this.strip(e, "rav")))
     return true
@@ -541,18 +633,28 @@ export class DicePlugin extends plugin {
 
   async seaCocCheck(e) {
     const text = String(e.msg || "")
-    const match = matchDiceCommand(text, "(rab|rap|rahb|rahp|rah|ra)(\\d+)?#?(\\d+)?(b|p)?\\s*([\\s\\S]*)")
+    const match = matchDiceCommand(text, "(rab|rap|rahb|rahp|rah|ra)(\\d+)?(#)?(\\d+)?(b|p)?\\s*([\\s\\S]*)")
     const head = String(match?.[1] || "ra").toLowerCase()
     const num = Number(match?.[2] || 0)
-    const rounds = Number(match?.[3] || 0) || undefined
-    const suffix = String(match?.[4] || "").toLowerCase()
+    const hash = Boolean(match?.[3])
+    const afterHash = Number(match?.[4] || 0) || undefined
+    const suffix = String(match?.[5] || "").toLowerCase()
     const hasBonus = head.includes("b") || suffix === "b"
     const hasPenalty = head.includes("p") || suffix === "p"
-    // 头部没有 b/p 时传 undefined，交给 parseCheckArgs 识别参数区前缀（.ra b 侦查 60），
-    // 否则 modifier:0 会把解析出的奖惩骰覆盖掉
-    const modifier = hasBonus ? (num || 1) : hasPenalty ? -(num || 1) : undefined
+    let modifier
+    let rounds
+    if (hash) {
+      // sealdice：.ra 3#技能 / .ra 3#p 技能 —— #前数字是轮数，b/p 是每轮奖惩骰
+      rounds = (afterHash && afterHash > 0) ? afterHash : (num > 0 ? num : 1)
+      modifier = hasBonus ? 1 : hasPenalty ? -1 : 0
+    } else {
+      // 头部没有 b/p 时传 undefined，交给 parseCheckArgs 识别参数区前缀（.ra b 侦查 60）
+      modifier = head.includes("b") ? (num || 1) : head.includes("p") ? -(num || 1) : undefined
+      // 非 b/p 头部紧贴的数字视为轮数（.ra3技能90，与 .r3#d100 对齐）
+      rounds = afterHash ?? (num > 0 && !head.includes("b") && !head.includes("p") ? num : undefined)
+    }
     const hidden = head.includes("h")
-    const raw = match?.[5] || ""
+    const raw = match?.[6] || ""
     await this.reply(e, hidden ? await diceManager.handleHiddenCheck(e, raw, { modifier, rounds }) : diceManager.handleCheck(e, raw, { modifier, rounds }))
     return true
   }

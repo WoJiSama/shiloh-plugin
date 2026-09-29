@@ -208,3 +208,61 @@ export function writeRegistryConfig(data = {}, pluginRoot = process.cwd()) {
   fs.writeFileSync(target, `# 由命令管理页维护（${new Date().toISOString().slice(0, 19).replace("T", " ")}）\n${YAML.stringify(value)}`, "utf8")
   return target
 }
+
+// 主题别名 → 模块 key（.help coc 落到骰子模块）
+const TOPIC_MODULE_ALIASES = {
+  coc: "dice",
+  coc7: "dice",
+  跑团: "dice",
+  骰: "dice",
+  dice: "dice",
+  游戏: "games"
+}
+
+/**
+ * 按主题渲染命令帮助（.help <主题>）：
+ * 1) 主题命中某个模块（key/别名/名称包含）→ 整模块权威列表；
+ * 2) 否则按 usage 行首命令词前缀跨模块收集；
+ * 没有命中返回 null，由调用方走兜底。数据源是命令总表，天然与实现同步。
+ */
+export function renderTopicHelp(registry = {}, topic = "") {
+  const raw = String(topic || "").trim()
+  const key = raw.toLowerCase()
+  if (!key) return null
+  const domains = Array.isArray(registry?.domains) ? registry.domains : []
+
+  const aliasKey = TOPIC_MODULE_ALIASES[key]
+  let domain = aliasKey ? domains.find(item => item?.key === aliasKey) : null
+  if (!domain) {
+    domain = domains.find(item =>
+      item?.key === key ||
+      String(item?.name || "").includes(raw) ||
+      String(item?.name || "").toLowerCase().includes(key) ||
+      String(item?.desc || "").includes(raw)
+    )
+  }
+  if (domain) {
+    const block = renderDomainHelp(domain)
+    return block ? `${block}\n（按主题查：.help ra / .help log / .help coc ｜ 全部命令：.命令）` : null
+  }
+
+  const clean = key.replace(/[^a-z]/gi, "")
+  if (!clean) return null
+  const hits = []
+  for (const item of domains) {
+    for (const command of item?.commands || []) {
+      const head = String(command?.usage || "").match(/^\.([a-z]+)/i)
+      if (head && head[1].toLowerCase().startsWith(clean)) hits.push({ domain: item, command })
+    }
+  }
+  if (!hits.length) return null
+  const lines = hits.map(({ domain: item, command }) =>
+    `${command.usage} —— ${command.desc}［${PERM_LABEL[command.perm]}］`
+  )
+  const modules = [...new Set(hits.map(({ domain: item }) => item?.name).filter(Boolean))]
+  return [
+    `【${raw} 相关命令】（${modules.join("、")}）`,
+    ...lines,
+    "（按主题查：.help ra / .help log / .help coc ｜ 全部命令：.命令）"
+  ].join("\n")
+}

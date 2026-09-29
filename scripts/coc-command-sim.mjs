@@ -87,6 +87,7 @@ function makeEvent(as, msg) {
     group: { sendFile: async (url, name) => { fileUploads.push({ via: "group.sendFile", name }) } },
     friend: { sendFile: async (url, name) => { fileUploads.push({ via: "friend.sendFile", name }) } },
     bot: {
+      uin: String(SELF_ID),
       pickFriend: uid => ({ sendMsg: async m => { privates.push({ uid, text: describe(m) }) } }),
       sendApi: async (action, params = {}) => {
         fileUploads.push({ via: action, name: params?.name })
@@ -186,6 +187,8 @@ const STEPS = [
   { id: "49", group: "昵称", cmd: ".nn", as: "member", expect: /格式|昵称|名字/ },
   { id: "50", group: "昵称", cmd: ".sn on", as: "admin", expect: /名片|sn|开启|已/i },
   { id: "51", group: "昵称", cmd: ".sn off", as: "admin", expect: /名片|sn|关闭|已/i },
+  { id: "51b", group: "昵称", cmd: ".sn coc", as: "member", validate: r => (/名片已按内置模板 coc 设置为：.+SAN/.test(r.allText) && r.files.some(f => String(f).includes("set_group_card")) ? null : "应命中内置 coc 名片模板"), note: "用户原命令:现命中内置模板" },
+  { id: "51c", group: "昵称", cmd: ".sn 我的江湖名", as: "member", validate: r => (/骰娘昵称已设置为：我的江湖名，群名片已同步/.test(r.allText) ? null : "未知词应回退为设昵称+同步名片"), note: "非模板非保留词:昵称回退" },
   // 牌堆
   { id: "52", group: "牌堆", cmd: ".draw", as: "member", expect: /牌堆|draw|格式/i },
   { id: "53", group: "牌堆", cmd: ".draw list", as: "member", expect: /牌堆|示例|没有/i },
@@ -210,7 +213,7 @@ const STEPS = [
   { id: "69", group: "先攻", cmd: ".init clear", as: "member", expect: /先攻|清|已/ },
   // 兼容开关
   { id: "70", group: "开关", cmd: ".bot on", as: "admin", expect: /开启|on|已/i },
-  { id: "71", group: "开关", cmd: ".bot off", as: "admin", expect: /关闭|off|已/i },
+  { id: "71", group: "开关", cmd: ".bot off", as: "admin", expect: /退群命令需要先艾特我/, note: "裸命令不退群" },
   { id: "72", group: "开关", cmd: ".reply on", as: "member", expect: /开启|on|已|reply/i },
   // 杂项
   { id: "73", group: "杂项", cmd: ".send 这是一条测试留言", as: "member", expect: /已收到|转达|格式/ },
@@ -267,6 +270,8 @@ const STEPS = [
   { id: "104", group: "先攻轮转", cmd: ".init next", as: "member", expect: /第1轮：轮到/, validate: r => (/▶ 2\./.test(r.allText) ? null : "第2次 next 应标记第2位行动者"), note: "推进到第2位" },
   { id: "105", group: "先攻轮转", cmd: ".init 下一回合", as: "member", expect: /第2轮：轮到/, note: "轮完一圈进第2轮" },
   { id: "106", group: "HTML团录", cmd: ".log on 美化团", as: "admin", expect: /跑团 log 已开启/ },
+  { id: "106b", group: "HTML团录", cmd: ".r 1d20", as: "member", expect: /D20\[\d+\]/, note: "log期间掷骰(结果入档)" },
+  { id: "106c", group: "HTML团录", cmd: ".ra 侦查 60", as: "member", expect: new RegExp(`(${L})`), note: "log期间检定(结果入档)" },
   { id: "107", group: "HTML团录", cmd: ".log end 美化团", as: "admin", expect: /已结束/, expectFile: true },
   { id: "108", group: "HTML团录", cmd: ".log export html", as: "admin", expect: null, validate: r => (r.files.some(f => /\.html$/.test(String(f))) ? null : "应导出 .html 文件"), note: "HTML 美化导出" },
   { id: "109", group: "HTML团录", cmd: ".log list", as: "member", expect: /美化团[\s\S]*测试团/, note: "团录列表(含历史)" },
@@ -287,8 +292,69 @@ const STEPS = [
   { id: "119", group: "批量成长", cmd: ".en 射击 闪避 60", as: "admin", expect: /批量成长按人物卡数值结算/, note: "批量带数值应提示" },
   { id: "120", group: "随机姓名", cmd: ".name", as: "member", expect: /随机姓名（中文）：/ },
   { id: "121", group: "随机姓名", cmd: ".name en 3", as: "member", expect: /随机姓名（英文）：/ },
-  { id: "122", group: "随机姓名", cmd: ".name jp 2", as: "member", expect: /随机姓名（日文）：/ }
+  { id: "122", group: "随机姓名", cmd: ".name jp 2", as: "member", expect: /随机姓名（日文）：/ },
+  // 2026-09-28 比较计数(群真实需求:.r3#d100＜60 / .r6d6a4)
+  { id: "123", group: "比较计数", cmd: ".r3#d100＜60", as: "member", validate: r => {
+      const lines = r.allText.split("\n").filter(l => l.includes("D100<60"))
+      if (lines.length !== 3) return `3 轮应各带 D100<60, 实际 ${lines.length} 行`
+      if (!lines.every(l => /[✓✗]/.test(l) && /成功 [01]\/1/.test(l))) return "每轮应有✓/✗与成功数"
+      return null
+    }, note: "用户原命令(全角＜):3 轮逐骰判定" },
+  { id: "124", group: "比较计数", cmd: ".r 6d6>4", as: "member", expect: /6D6>4=6D6\[[\d✓✗+]+\]=成功 \d\/6/, note: "逐骰>4 计数" },
+  { id: "125", group: "比较计数", cmd: ".r6d6a4", as: "member", expect: /6D6>4=6D6\[[\d✓✗+]+\]=成功 \d\/6/, note: "用户原命令:aN 糖=骰池>N" },
+  { id: "126", group: "比较计数", cmd: ".r 4d6kh3>=4", as: "member", validate: r => (/D6KH3\[\d+\+\d+\+\d+\+\d+=>[\d✓✗+]+\]/.test(r.allText) && /成功 \d\/3/.test(r.allText)) ? null : "kh 保留骰应带判定标记", note: "kh 与比较组合" },
+  { id: "127", group: "比较计数", cmd: ".ww6a4", as: "member", validate: r => (!/WoD 骰池/.test(r.allText) && /WoD 没有 4-again/.test(r.allText) && /\.r 6d10>4/.test(r.allText) && /\.help ww/.test(r.allText)) ? null : "无效再骰线应拦下引导而不是掷骰", note: "用户原命令:直接拦下+引导" },
+  { id: "131", group: "帮助主题", cmd: ".help ww", as: "member", validate: r => (/WoD 黑暗世界骰池/.test(r.allText) && !/\.r\[表达式\]/.test(r.allText) && !/\.log new/.test(r.allText)) ? null : "应只显示 ww 主题帮助", note: "用户原命令:分主题帮助" },
+  { id: "132", group: "帮助主题", cmd: ".help ra", as: "member", validate: r => (/【ra 相关命令】/.test(r.allText) && /#N 多轮/.test(r.allText) && !/\.log new/.test(r.allText)) ? null : "ra 主题应显示命令总表完整描述(含#N多轮)", note: "命令总表驱动,desc不被#截断" },
+  { id: "135", group: "帮助主题", cmd: ".help coc", as: "member", validate: r => (/骰子（\d+ 条）/.test(r.allText) && /COC 检定/.test(r.allText) && /SAN Check/.test(r.allText) && /跑团日志/.test(r.allText)) ? null : "coc 应落到骰子模块全量权威列表", note: "coc=骰子模块(命令总表)" },
+  { id: "136", group: "帮助主题", cmd: ".help 记忆", as: "member", expect: /记忆与表达（\d+ 条）[\s\S]*#记忆状态/, note: "中文主题命中模块" },
+  // 2026-09-28 未录值检定+同消息多指令(用户:.ra格斗 连发应投骰)
+  { id: "137", group: "连发检定", cmd: ".ra格斗", as: "member", expect: /进行 格斗 检定：1D100=\d+\/5 (成功|失败|大成功|大失败|困难成功|极难成功)/, note: "官方默认值:格斗=5 直接判档" },
+  { id: "138", group: "连发检定", cmd: ".ra格斗.ra格斗.ra格斗", as: "member", validate: r => {
+      const n = r.allText.split("\n").filter(l => /格斗 检定/.test(l)).length
+      return n === 3 ? null : `粘连三条应各投一次, 实际 ${n} 次`
+    }, note: "用户原命令:粘连多指令拆分=投三次" },
+  { id: "139", group: "连发检定", cmd: ".r1d100.r1d20", as: "member", validate: r => (/D100\[\d+\]/.test(r.allText) && /D20\[\d+\]/.test(r.allText)) ? null : "混合粘连应两掷", note: "混合命令拆分" },
+  { id: "140", group: "连发检定", cmd: ".draw 示例.牌堆不存在", as: "member", expect: /牌组「示例\.牌堆不存在」不存在/, note: "防误拆:参数含点不拆分" },
+  // 2026-09-28 退群命令守卫(用户需求:@机器人 .bot off 才退群)
+  { id: "141", group: "退群守卫", cmd: ".bot off", as: "admin", expect: /退群命令需要先艾特我/, note: "无艾特不退" },
+  { id: "142", group: "退群守卫", cmd: ".bot off", as: "admin", withAtBot: true, validate: r => (r.allText.includes("希洛先走了") && r.files.some(f => String(f).includes("set_group_leave")) ? null : "应有告别语并真实调用退群API"), note: "@机器人 .bot off=退群" },
+  { id: "143", group: "退群守卫", cmd: ".bot off", as: "member", withAtBot: true, expect: /只有主人或群主\/管理员可以让希洛退群/, note: "艾特了但无权限" },
+  { id: "133", group: "帮助主题", cmd: ".help 完全不存在的主题xyz", as: "member", expect: /没有找到「完全不存在的主题xyz」[\s\S]*COC 骰娘/, note: "未知主题回退全量" },
+  { id: "134", group: "帮助主题", cmd: ".骰娘帮助", as: "member", expect: /COC 骰娘[\s\S]*\.log new/, note: "全量帮助不受影响" },
+  // 2026-09-28 贴头轮数(用户需求:.ra3#格斗90)
+  { id: "128", group: "检定轮数", cmd: ".ra3#格斗90", as: "member", validate: r => {
+      const lines = r.allText.split("\n").filter(l => /格斗 检定/.test(l))
+      return lines.length === 3 && lines.every(l => /\/90 /.test(l)) ? null : `应 3 连检定对 90, 实际 ${lines.length} 行`
+    }, note: "用户原命令:贴头轮数与 .r3# 对齐" },
+  { id: "129", group: "检定轮数", cmd: ".ra#3格斗90", as: "member", validate: r => (r.allText.split("\n").filter(l => /格斗 检定/.test(l)).length === 3 ? null : "应 3 连检定"), note: "#后轮数保持" },
+  { id: "130", group: "检定轮数", cmd: ".rab3#格斗90", as: "member", validate: r => {
+      const lines = r.allText.split("\n").filter(l => /格斗 检定/.test(l))
+      return lines.length === 3 && lines.every(l => /奖励骰\[十位:\d+\/\d+,个位:\d+\]/.test(l) && /\/90 /.test(l)) ? null : `sealdice 语义:rab3#=3轮每轮1奖励骰,实际${lines.length}行`
+    }, note: "rab3#=3轮每轮奖励骰(sealdice 3#语义)" }
 ]
+
+// 2026-09-29 海豹语义全面对齐(源码审计)附加用例
+STEPS.push(
+  { id: "145", group: "海豹对齐", cmd: ".sc 1d6", as: "admin", expect: /SAN Check[\s\S]*理智损失/, note: "单参简易:成功扣0失败扣1d6(admin卡有SAN)" },
+  { id: "146", group: "海豹对齐", cmd: ".sc b 0/1", as: "admin", expect: /SAN Check[\s\S]*奖励骰/, note: "sc 奖惩骰" },
+  { id: "147", group: "海豹对齐", cmd: ".ra 侦查+10", as: "member", validate: r => (/侦查 检定：1D100=\d+\/35 /.test(r.allText) ? null : "活动卡无侦查应默认25+10=35"), note: "技能修正后缀:默认25+10=35" },
+  { id: "148", group: "海豹对齐", cmd: ".ra3#p格斗90", as: "member", validate: r => {
+      const lines = r.allText.split("\n").filter(l => /格斗 检定/.test(l))
+      return lines.length === 3 && lines.every(l => /惩罚骰/.test(l) && /\/90 /.test(l)) ? null : `应3轮每轮惩罚骰,实际${lines.length}`
+    }, note: "3#p=3轮每轮惩罚骰" },
+  { id: "149", group: "海豹对齐", cmd: ".sn coc", as: "admin", expect: /名片已按内置模板 coc 设置为：/, note: "内置coc名片模板" },
+  { id: "150", group: "海豹对齐", cmd: ".nn", as: "member", expect: /当前骰娘昵称：/, note: "nn无参查看" },
+  { id: "151", group: "海豹对齐", cmd: ".pc new 临时卡", as: "admin", expect: /已保存并切换人物卡：临时卡/, note: "为 rename 准备" },
+  { id: "152", group: "海豹对齐", cmd: ".pc rename 临时卡 主线卡", as: "admin", expect: /人物卡已改名：临时卡 → 主线卡/, note: "pc rename" },
+  { id: "153", group: "全量审计", cmd: ".组队 猎犬小队 add @调查员 @群主", as: "admin", atIds: [28800000001, 28800000002], expect: /已添加 2 名玩家至团队 猎犬小队/, note: "组队 add" },
+  { id: "154", group: "全量审计", cmd: ".组队 猎犬小队 ra 侦查", as: "admin", validate: r => (r.allText.split("\n").filter(l => /1D100=/.test(l)).length === 2 ? null : "全队应每人一次检定"), note: "组队全队检定" },
+  { id: "155", group: "全量审计", cmd: ".组队 猎犬小队 call", as: "admin", expect: /呼叫 猎犬小队：\[CQ:at,qq=28800000001\] \[CQ:at,qq=28800000002\]/, note: "组队呼叫" },
+  { id: "156", group: "全量审计", cmd: ".组队 猎犬小队 clear", as: "admin", expect: /清空了团队 猎犬小队/, note: "组队清空" },
+  { id: "157", group: "全量审计", cmd: ".stat", as: "admin", validate: r => (/检定统计/.test(r.allText) || /还没有检定记录/.test(r.allText) ? null : "应输出统计或无记录提示"), note: "团录统计" },
+  { id: "158", group: "全量审计", cmd: ".who 甲 乙 丙", as: "member", validate: r => (/随机分配结果：/.test(r.allText) && new Set(r.allText.match(/→ (甲|乙|丙)/g)).size === 3 ? null : "应随机置换分配"), note: "who 随机分配" },
+  { id: "159", group: "全量审计", cmd: ".ping", as: "member", expect: /pong！希洛在线/, note: "存活检测" }
+)
 
 // ---- 执行 ----
 const results = []
@@ -298,6 +364,13 @@ for (const step of STEPS) {
   const privatesBefore = privates.length
   const filesBefore = fileUploads.length
   const { e, replies } = makeEvent(step.as, step.cmd)
+  if (step.withAtBot) {
+    e.message = [{ type: "at", data: { qq: String(SELF_ID) } }, { type: "text", data: { text: step.cmd } }]
+  }
+  if (step.atIds) {
+    const head = step.cmd.split(/@\S+/)[0]
+    e.message = [{ type: "text", data: { text: head } }, ...step.atIds.map(id => ({ type: "at", data: { qq: String(id) } }))]
+  }
   const startedAt = Date.now()
   let outcome
   try {
@@ -335,6 +408,32 @@ for (const step of STEPS) {
     problems,
     note: step.note || ""
   })
+}
+
+// ---- 自检:团录文件应包含骰娘结果行(dice_result) ----
+{
+  const logDir = "/opt/coc-sim/plugins/shiloh-plugin/data/dice/logs/999000111"
+  try {
+    const fs2 = (await import("node:fs")).default
+    const path2 = (await import("node:path")).default
+    const files = fs2.readdirSync(logDir).filter(f => f.endsWith(".jsonl"))
+    const newest = files.map(f => ({ f, m: fs2.statSync(path2.join(logDir, f)).mtimeMs })).sort((a, b) => b.m - a.m)[0]
+    const lines = newest ? fs2.readFileSync(path2.join(logDir, newest.f), "utf8").trim().split("\n").map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean) : []
+    const diceCount = lines.filter(l => l.type === "dice_result").length
+    const hasCommand = lines.some(l => !l.type && /^\.r 1d20$/.test(String(l.content || "")))
+    const ok = diceCount >= 2 && hasCommand
+    results.push({
+      id: "144", group: "结果入档", cmd: "(自动检查团录NDJSON)", as: "-",
+      fnc: `dice_result=${diceCount}/${lines.length}`,
+      ms: 0,
+      replies: `最新团录 ${newest?.f || "无"}：${lines.length} 行，其中骰娘结果 ${diceCount} 条${hasCommand ? "，命令原文在档" : "，缺命令原文"}`,
+      privateTo: [], files: [], pass: ok,
+      problems: ok ? [] : ["团录未包含骰娘结果行(dice_result)"],
+      note: "sealdice 语义:命令+结果成对入档"
+    })
+  } catch (error) {
+    results.push({ id: "144", group: "结果入档", cmd: "(自动检查团录NDJSON)", as: "-", fnc: "读取失败", ms: 0, replies: "", privateTo: [], files: [], pass: false, problems: [String(error?.message || error)], note: "自检异常" })
+  }
 }
 
 // ---- 输出 ----

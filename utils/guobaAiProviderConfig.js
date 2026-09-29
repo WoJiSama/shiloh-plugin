@@ -9,6 +9,7 @@ export const AI_PROVIDER_DEFINITIONS = [
     priorityField: "trackAiPriority",
     urlPlaceholder: "https://api.openai.com/v1/chat/completions",
     modelPlaceholder: "gpt-4o-mini",
+    autoResolveHelp: "开启时自动补全 /chat/completions 等路径;关闭则直接使用上方 URL 原文",
     usageHint: "用于会话追踪时判断用户是否在和 bot 继续对话，推荐快速小模型"
   },
   {

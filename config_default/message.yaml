@@ -3,6 +3,14 @@ pluginSettings:
   groupHistory: true
   useTools: true
   concurrentLimit: 3
+  chatTurnDurability:
+    enabled: true
+    # 重启/崩溃后补跑未完成聊天回合的最大时效（秒），超过则静默丢弃
+    staleSeconds: 150
+    # 启动后延迟多少毫秒执行回合补跑（等 OneBot 连接稳定）
+    recoverDelayMs: 30000
+    # 回合记录与回复幂等标记的 Redis TTL（秒）
+    ttlSeconds: 600
   triggerPrefixes:
     - 哈基米
   excludeMessageTypes:

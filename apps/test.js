@@ -112,6 +112,7 @@ import { updateGroupTopic, updateGroupSocial, getGroupTopicPrompt, getGroupSocia
 import { recordEpisode, recallEpisodes, recallUserEpisodes, buildEpisodicPrompt, buildUserCallbackPrompt, hasTemporalDeixis } from "../utils/episodicMemory.js"
 import { createTurnTrace, resolveTurnTraceArchiveDir } from "../utils/turnTrace.js"
 import { createOutboundArbiter } from "../utils/messagePipeline/outboundArbiter.js"
+import { createChatTurnDurability, rebuildChatTurnEvent } from "../utils/chatTurnDurability.js"
 import { resolveLongTaskFeedbackPolicy } from "../utils/longTaskFeedbackPolicy.js"
 import { resolvePromptLayerProfile } from "../utils/promptLayers.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../utils/personaSource.js"
@@ -273,6 +274,7 @@ const FORWARD_CONTEXT_MAX_LINES = 120
 const FORWARD_CONTEXT_MAX_TEXT = 9000
 let activeChatLruTimer = null // 全局 24h LRU 扫描定时器，进程内单例
 let durableToolRecoveryStarted = false
+let chatTurnRecoveryStarted = false
 
 
 let sharedConfigStore = null
@@ -621,7 +623,52 @@ export class ExamplePlugin extends plugin {
     }
 
     pluginBridge.instance = this
+    this.chatTurnDurability = createChatTurnDurability({
+      logger,
+      getConfig: () => this.config?.chatTurnDurability || {}
+    })
     this.startDurableToolRecovery()
+    this.startChatTurnRecovery()
+  }
+
+  // 回合持久化外壳：进行中的 AI 回合落 Redis，崩溃/重启后启动恢复可补跑。
+  // 媒体自动交付事件(auto_media)有独立 outbox 幂等，beginTurn 内部会跳过。
+  async handleTool(e) {
+    const durability = this.chatTurnDurability
+    if (!durability) return await this.handleToolInner(e)
+    const turnEvent = e
+    await durability.beginTurn(turnEvent)
+    try {
+      return await this.handleToolInner(e)
+    } finally {
+      await durability.completeTurn(turnEvent)
+    }
+  }
+
+  /** 出站幂等入口：sendSegmentedMessage 每次发送前认领，防补跑重复回复 */
+  async claimTurnReply(e) {
+    return await this.chatTurnDurability?.claimReply(e) || { claimed: true }
+  }
+
+  /** 启动恢复：等 OneBot 连接稳定后补跑未完成的聊天回合 */
+  startChatTurnRecovery() {
+    if (chatTurnRecoveryStarted) return
+    chatTurnRecoveryStarted = true
+    const delayMs = this.chatTurnDurability.options().recoverDelayMs
+    const timer = setTimeout(() => {
+      this.chatTurnDurability.recoverPending({
+        redispatch: async envelope => {
+          const e = rebuildChatTurnEvent(envelope)
+          if (!e) {
+            logger.warn(`[回合持久化] 无法重建事件（Bot 未连接或缺群对象），丢弃 group=${envelope.group_id}`)
+            return
+          }
+          logger.info(`[回合持久化] 补跑未完成回合 group=${envelope.group_id} user=${envelope.user_id} msg="${String(envelope.msg || "").slice(0, 30)}"`)
+          await this.handleToolInner(e)
+        }
+      }).catch(error => logger.error("[回合持久化] 恢复调度失败:", error))
+    }, delayMs)
+    timer.unref?.()
   }
 
   startDurableToolRecovery() {
@@ -3565,7 +3612,7 @@ ${recentHistory || '(无)'}
     return false
   }
 
-  async handleTool(e) {
+  async handleToolInner(e) {
     if (!isAiConversationEnabled(this.config)) return false
     if (!this.config.enabled || !e.group_id) {
       if (!e.group_id) await this.sendObservedReply(e, "该命令只能在群聊中使用。")
@@ -4635,7 +4682,12 @@ ${recentHistory || '(无)'}
 
   shouldUseSemanticToolIntent(...args) { return shouldUseSemanticToolIntent(this, ...args) }
   normalizeToolDecision(...args) { return normalizeToolDecision(this, ...args) }
-  resolveChatCompletionUrl(...args) { return normalizeChatCompletionUrl(...args) }
+  resolveChatCompletionUrl(url = "", apiConfig = null) {
+    // 按渠道 autoResolve: false → 直接使用配置的 URL 原文
+    const cfg = apiConfig || {}
+    if (cfg.autoResolve === false) return String(url || "").trim()
+    return normalizeChatCompletionUrl(url)
+  }
   extractJsonObject(...args) { return extractJsonObject(this, ...args) }
   async classifySemanticToolIntent(...args) { return await classifySemanticToolIntent(this, ...args) }
   buildToolCallFromDecision(...args) { return buildToolCallFromDecision(this, ...args) }

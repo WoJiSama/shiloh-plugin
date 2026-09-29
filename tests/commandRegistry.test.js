@@ -61,3 +61,48 @@ test("骰娘命令总表覆盖 log 家族与常用命令", async () => {
     assert.ok(usages.has(required), `命令总表缺少：${required}`)
   }
 })
+
+test("renderTopicHelp: 模块别名/命令前缀/中文主题/未知主题", async () => {
+  const { renderTopicHelp } = await import("../utils/commandRegistry.js")
+  const fixture = {
+    domains: [
+      {
+        key: "memory", name: "记忆与表达", icon: "🧠", desc: "长期记忆", order: 1,
+        commands: [
+          { usage: "#记忆状态", desc: "查看记忆系统运行状态", perm: "all", src: "x" }
+        ]
+      },
+      {
+        key: "dice", name: "骰子", icon: "🎲", desc: "COC7/DND 骰娘", order: 3,
+        commands: [
+          { usage: ".ra <技能> <值>", desc: "COC 检定（含 #N 多轮）", perm: "all", src: "x" },
+          { usage: ".log on <团名>", desc: "开启跑团日志", perm: "admin", src: "x" },
+          { usage: ".sc <成功/失败>", desc: "SAN Check", perm: "all", src: "x" }
+        ]
+      }
+    ]
+  }
+  const coc = renderTopicHelp(fixture, "coc")
+  assert.match(coc, /骰子（3 条）/)
+  assert.match(coc, /COC 检定（含 #N 多轮）/)
+  assert.match(coc, /SAN Check/)
+  const ra = renderTopicHelp(fixture, "ra")
+  assert.match(ra, /【ra 相关命令】/)
+  assert.match(ra, /\.ra <技能> <值> —— /)
+  assert.ok(!ra.includes(".log"), "ra 主题不应包含 log 命令")
+  const log = renderTopicHelp(fixture, "log")
+  assert.match(log, /\.log on <团名> —— 开启跑团日志［群管理］/)
+  const zh = renderTopicHelp(fixture, "记忆")
+  assert.match(zh, /记忆与表达（1 条）/)
+  assert.equal(renderTopicHelp(fixture, "不存在xyz"), null)
+  assert.equal(renderTopicHelp(fixture, ""), null)
+})
+
+test("命令总表 desc 不被 YAML # 注释截断（.ra 描述完整）", async () => {
+  const { getCommandRegistry } = await import("../utils/commandRegistry.js")
+  const registry = getCommandRegistry(pluginRoot)
+  const ra = registry.domains.flatMap(d => d.commands).find(c => c.usage.startsWith(".ra "))
+  assert.ok(ra, "应存在 .ra 命令")
+  assert.match(ra.desc, /#N 多轮/)
+  assert.match(ra.desc, /判档）$/)
+})

@@ -108,15 +108,23 @@ domains:
     desc: COC7/DND 骰娘（sealdice 语义兼容）+ 规则包 + 海豹扩展 + 牌堆；回复文案可在命令管理页「骰子模板」里改
     commands:
       - usage: ".r <表达式>"
-        desc: 掷骰，如 .r1d100 / .r 2d6+3 / .r 3#1d100 / .r 4d6kh3（取高丢低都支持）
+        desc: 掷骰，如 .r1d100 / .r 3#1d100 / .r 4d6kh3；末尾可带比较计数 .r 3d100<60（逐骰✓/✗+成功数）或 .r 6d6a4
         perm: all
         src: "domains/dice/app.js roll"
       - usage: ".ra <技能> <值> [困难|极难|大成功]"
-        desc: COC 检定（支持难度前缀、.ra b/p 奖惩骰与 #N 多轮，如 .rab#3 技能 60 连掷三次）
+        desc: "COC 检定（难度前缀、b/p 奖惩骰、#N 多轮、技能+N 修正、未录卡按官方默认值判档）"
         perm: all
         src: "domains/dice/app.js check"
       - usage: ".rav A 60 vs B 50"
-        desc: 对抗检定；也可 .rav 斗殴 @对方
+        desc: 对抗检定；也可 .rav 斗殴 @对方；.rav 技能1 技能2 @A @B 两人对抗
+      - usage: ".组队 <队名> <add|del|clear|call|draw|ra|st>"
+        desc: 组队系统：add/del @成员、call 呼叫全队、draw N 随机抽人、ra 技能 全队批量检定
+      - usage: ".stat [团名|序号]"
+        desc: 团录检定统计（各角色检定次数/成功/大成功/大失败）
+      - usage: ".who <项1> <项2> ..."
+        desc: 随机打乱分配（身份/顺序）
+      - usage: ".ping"
+        desc: 存活检测
         perm: all
         src: "domains/dice/app.js opposed"
       - usage: ".rh <技能> <值>"
@@ -124,11 +132,11 @@ domains:
         perm: all
         src: "domains/dice/app.js hiddenCheck"
       - usage: ".sc <成功/失败> [SAN] [--half --cap=N]"
-        desc: SAN Check（大失败时损失骰取最大）
+        desc: SAN Check（.sc 成功/失败；单参简易写法；.sc b|p 奖惩骰；大失败损失骰取最大）
         perm: all
         src: "domains/dice/app.js sanCheck"
       - usage: ".en <技能...> [值]"
-        desc: 成长检定（失败可成长 +1d10，自动写卡；.en 技能1 技能2 批量成长）
+        desc: 成长检定（默认+1d10；.en 技能 +成功值 或 +失败值/成功值 自定义；批量成长）
         perm: all
         src: "domains/dice/app.js enCheck"
       - usage: ".st <录入|show|showall|hide|del|clr|fmt>"
@@ -136,7 +144,7 @@ domains:
         perm: all
         src: "domains/dice/app.js st"
       - usage: ".pc <list|new|use|del|tag|lock>"
-        desc: 多人物卡管理
+        desc: 多人物卡管理（list/new/use/del/tag/lock/rename 改名）
         perm: all
         src: "domains/dice/app.js pc"
       - usage: ".coc7 [数量] / .dnd [数量]"
@@ -155,8 +163,8 @@ domains:
         desc: 临时疯狂/总结疯狂表
         perm: all
         src: "domains/dice/app.js ti|li"
-      - usage: ".nn <昵称> / .sn on|off"
-        desc: 骰娘显示名 / 自动群名片
+      - usage: ".nn <昵称> / .sn on|off / .sn <昵称>"
+        desc: 骰娘显示名(.nn 无参查看/.nn clr 重置)；.sn coc/cocL/dnd 内置名片模板；.sn on/off 自动同步
         perm: all
         src: "domains/dice/app.js nn|sn"
       - usage: ".obon / .oboff / .ob list"
@@ -243,8 +251,8 @@ domains:
         desc: 给主人留言 / 查询词条
         perm: all
         src: "domains/dice/app.js sendToMaster|findEntry"
-      - usage: ".bot on|off|bye / .reply on|off"
-        desc: 骰娘兼容开关（.bot 只做受控响应，不退群）
+      - usage: ".bot on / @机器人 .bot off|bye / .reply on|off"
+        desc: 骰娘兼容开关；退群须首位艾特机器人再发 .bot off 或 .bot bye（仅主人/群管理）
         perm: all
         src: "domains/dice/app.js botControl|replyControl"
       - usage: ".dice"
