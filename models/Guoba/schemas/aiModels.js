@@ -17,6 +17,12 @@ function makeProviderSchemas(definition) {
       componentProps: { placeholder: definition.urlPlaceholder }
     },
     {
+      field: "autoResolve",
+      label: "URL 自动补全",
+      component: "Switch",
+      bottomHelpMessage: "开启: URL 只填到版本号(如 …/v1 或 …/v4)即可,自动补 /chat/completions。关闭: 直接使用 URL 原文,需填完整端点。"
+    },
+    {
       field: "model",
       label: "模型名",
       component: "Input",

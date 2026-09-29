@@ -171,11 +171,5 @@ export default [
     component: "InputNumber",
     bottomHelpMessage: "事件时间落在过去 N 天内时可自然回扣(如'考得咋样')",
     componentProps: { min: 0, max: 90, placeholder: "7" }
-  },
-    {
-      field: "memoryAiConfig.autoResolve",
-      label: "URL 自动补全",
-      bottomHelpMessage: "开启: URL 只需填到版本号(如 …/v1 或 …/v4),系统自动补 /chat/completions。关闭: 直接使用 URL 原文,需填完整端点。",
-      component: "Switch"
-    }
+  }
 ]
