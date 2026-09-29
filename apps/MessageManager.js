@@ -399,6 +399,17 @@ export class MessageRecordPlugin extends plugin {
                 continue;
             }
             const message = [this.archiveManager.formatRecord(record, { compact: true })];
+            // 图片段以真实图片加入转发(不只是 [图片] 占位文本)
+            const imageUrls = (Array.isArray(record.message) ? record.message : [])
+                .filter(seg => seg?.type === "image")
+                .map(seg => String(seg?.url || seg?.file || "").trim())
+                .filter(Boolean);
+            for (const imageUrl of imageUrls.slice(0, 3)) {
+                try {
+                    const encoded = await this.encodeImageForForward(imageUrl);
+                    if (encoded) message.push("\n", encoded);
+                } catch {}
+            }
             const bilibili = this.getBilibiliSegment(record);
             if (bilibili) {
                 const relay = await buildBilibiliArchiveRelaySegments(bilibili, { logger });
@@ -412,6 +423,20 @@ export class MessageRecordPlugin extends plugin {
             });
         }
         return { messages, tempFiles };
+    }
+
+    async encodeImageForForward(url = "") {
+        if (!/^https?:\/\//i.test(String(url || ""))) return null
+        try {
+            const response = await fetch(url, {
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(15000)
+            })
+            if (!response.ok) return null
+            const buffer = Buffer.from(await response.arrayBuffer())
+            if (buffer.length > 4 * 1024 * 1024) return null
+            return segment.image(buffer)
+        } catch { return null }
     }
 
     async searchArchive(e) {
