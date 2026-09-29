@@ -575,7 +575,7 @@ export class MessageArchiveManager {
       : record.sender?.card || record.sender?.nickname || "未知"
     let text = renderReadableMessage(record).replace(/\r/g, "")
     if (text.length > maxTextLength) text = safeTruncateUnicode(text, maxTextLength, "...")
-    if (compact) return `${formatClock(record.timestamp)} ${name}：${text || "[非文本消息]"}`
+    if (compact) return text || "[非文本消息]"
     return `[${record.time}] ${name}(${record.user_id})${record.message_id ? ` [${record.message_id}]` : ""}\n${text || "[非文本消息]"}`
   }
 }
