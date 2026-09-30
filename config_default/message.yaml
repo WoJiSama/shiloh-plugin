@@ -683,8 +683,10 @@ pluginSettings:
     embeddingApiModel: text-embedding-3-small
     embeddingApiKey: sk-xxxxx
   # 群聊长期记忆(RAG):归档滑窗分块 → 向量+BM25 混合召回 → RRF 融合注入主模型上下文
+  # 保留期独立于归档(归档 7 天);索引是压缩精华,延长记忆跨度成本远低于延长归档
   semanticMemory:
     enabled: false
+    retentionDays: 30
     includeGroups: []
     excludeGroups: []
     windowSize: 8

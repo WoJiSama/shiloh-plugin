@@ -271,5 +271,42 @@ test("配置归一化:范围钳制与群过滤", async t => {
   assert.equal(config.stride, 4, "stride=0 视为未配置,回落默认 4")
   assert.equal(config.topK, 99)
   assert.equal(config.minScore, 0.95)
+  assert.equal(config.retentionDays, 30, "保留期默认 30 天,独立于归档")
   assert.deepEqual(config.includeGroups, ["123", "456"])
+})
+
+test("保留期独立于归档 + 每日清扫强制压实", async t => {
+  const loaded = await loadModules()
+  if (!loaded) return t.skip("module not found")
+  const { SemanticMemoryStore } = loaded.store
+  const gateway = new FakeGateway()
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "semantic-sweep-"))
+  try {
+    const dir = path.join(cwd, "semantic_memory")
+    const store = new SemanticMemoryStore({ baseDir: dir, dimension: 6, retentionDays: 30 })
+    const now = Date.now()
+    const day = 24 * 3600 * 1000
+    // 8 天前的分块:旧 7 天保留会丢,独立 30 天保留应留下
+    await store.appendChunks("609235590", [
+      { ...chunkDraft("g:old8d", "甲: 八天前聊的星露谷", { end_ts: now - 8 * day, start_ts: now - 8 * day - 60000 }), vector: gateway.vectorFor("星露谷") },
+      { ...chunkDraft("g:old40d", "乙: 四十天前的旧话", { end_ts: now - 40 * day, start_ts: now - 40 * day - 60000 }), vector: gateway.vectorFor("旧话") },
+      { ...chunkDraft("g:fresh", "丙: 今天的新话题", { end_ts: now, start_ts: now - 60000 }), vector: gateway.vectorFor("新话题") }
+    ])
+    const state = store.loadGroup("609235590")
+    assert.ok(state.chunks.has("g:old8d"), "8 天前分块在 30 天保留下存活")
+    assert.ok(!state.chunks.has("g:old40d"), "40 天前分块被清理")
+    assert.ok(state.chunks.has("g:fresh"))
+
+    // 清扫:过期行(40天)仍留在磁盘文件里,sweepAll 强制压实
+    const file = path.join(dir, "group", "609235590.ndjson")
+    const beforeLines = fs.readFileSync(file, "utf8").trim().split("\n").length
+    const summary = await store.sweepAll()
+    assert.equal(beforeLines, 3)
+    assert.equal(summary.compactedGroups, 1)
+    assert.ok(summary.droppedChunks >= 1)
+    const afterLines = fs.readFileSync(file, "utf8").trim().split("\n").length
+    assert.equal(afterLines, 2)
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true })
+  }
 })

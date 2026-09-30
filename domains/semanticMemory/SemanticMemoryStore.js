@@ -171,6 +171,7 @@ export class SemanticMemoryStore {
     }
     state.loaded = true
     state.droppedOnLoad = dropped
+    state.records = keptRecords
 
     // 载入时顺带压实:过期/重复行占比高则重写文件
     if (file && fs.existsSync(file) && dropped > 0 && dropped >= keptRecords.length * 0.2) {
@@ -194,8 +195,35 @@ export class SemanticMemoryStore {
       matrix: null,
       bm25: new BM25Index(),
       loaded: false,
-      droppedOnLoad: 0
+      droppedOnLoad: 0,
+      records: []
     }
+  }
+
+  // 每日清扫:逐群装载(丢弃过期)并强制压实任何含过期/无效行的文件。
+  // 覆盖"群已沉寂不再触发装载"的场景,保证磁盘稳态。
+  async sweepAll() {
+    const groupIds = []
+    try {
+      for (const entry of fs.readdirSync(this.groupDir(), { withFileTypes: true })) {
+        if (entry.isFile() && entry.name.endsWith(".ndjson")) groupIds.push(entry.name.replace(/\.ndjson$/, ""))
+      }
+    } catch {
+      return { groups: 0, compactedGroups: 0, droppedChunks: 0 }
+    }
+    let compactedGroups = 0
+    let droppedChunks = 0
+    for (const groupId of groupIds) {
+      const state = this.loadGroup(groupId)
+      if (!state.file || !fs.existsSync(state.file)) continue
+      droppedChunks += state.droppedOnLoad || 0
+      if ((state.droppedOnLoad || 0) > 0) {
+        await this.compactFile(state.file, state.records || []).catch(error =>
+          this.logger?.warn?.(`[SemanticMemory] 清扫压实 ${groupId} 失败: ${error.message}`))
+        compactedGroups++
+      }
+    }
+    return { groups: groupIds.length, compactedGroups, droppedChunks }
   }
 
   async compactFile(file, records) {

@@ -8,6 +8,9 @@ import { SemanticMemoryRetriever } from "./SemanticMemoryRetriever.js"
 
 export const DEFAULT_SEMANTIC_MEMORY_CONFIG = {
   enabled: false,
+  // 语义记忆保留期独立于归档:索引是压缩后的精华(分块远少于原消息),
+  // 延长记忆跨度比延长归档便宜得多,默认 30 天
+  retentionDays: 30,
   includeGroups: [],
   excludeGroups: [],
   windowSize: 8,
@@ -22,6 +25,27 @@ export const DEFAULT_SEMANTIC_MEMORY_CONFIG = {
 
 let runtime = null
 let archiveHookInstalled = false
+let sweepTimer = null
+let sweepInterval = null
+
+const SWEEP_INITIAL_DELAY_MS = 60000
+const SWEEP_INTERVAL_MS = 24 * 3600 * 1000
+
+function scheduleSweep(store, logger) {
+  if (sweepTimer) clearTimeout(sweepTimer)
+  if (sweepInterval) clearInterval(sweepInterval)
+  const runSweep = () => {
+    store.sweepAll().then(summary => {
+      if (summary.compactedGroups > 0 || summary.droppedChunks > 0) {
+        logger?.info?.(`[SemanticMemory] 每日清扫:${summary.compactedGroups} 群压实,清理过期分块 ${summary.droppedChunks} 个`)
+      }
+    }).catch(error => logger?.warn?.(`[SemanticMemory] 清扫失败: ${error.message}`))
+  }
+  sweepTimer = setTimeout(runSweep, SWEEP_INITIAL_DELAY_MS)
+  sweepTimer.unref?.()
+  sweepInterval = setInterval(runSweep, SWEEP_INTERVAL_MS)
+  sweepInterval.unref?.()
+}
 
 export function normalizeSemanticMemoryConfig(raw = {}, embeddingAiConfig = {}) {
   const config = {
@@ -34,6 +58,7 @@ export function normalizeSemanticMemoryConfig(raw = {}, embeddingAiConfig = {}) 
   config.stride = Math.max(1, Number(config.stride) || 4)
   config.topK = Math.max(1, Number(config.topK) || 5)
   config.minScore = Math.min(0.95, Math.max(0.05, Number(config.minScore) || 0.35))
+  config.retentionDays = Math.max(1, Number(config.retentionDays) || 30)
   config.embeddingDimensions = Number(config.embeddingDimensions) || 1024
   return config
 }
@@ -55,6 +80,8 @@ export function installSemanticMemoryRuntime({ pluginSettings = {}, archiveManag
   )
   if (!usable) {
     if (runtime) detachArchiveHook()
+    if (sweepTimer) clearTimeout(sweepTimer)
+    if (sweepInterval) clearInterval(sweepInterval)
     runtime = null
     return null
   }
@@ -63,7 +90,7 @@ export function installSemanticMemoryRuntime({ pluginSettings = {}, archiveManag
   const store = new SemanticMemoryStore({
     baseDir,
     dimension: config.embeddingDimensions,
-    retentionDays: Number(pluginSettings.messageArchive?.retentionDays) || 7,
+    retentionDays: config.retentionDays,
     logger
   })
   const gateway = new EmbeddingGateway({
@@ -86,7 +113,8 @@ export function installSemanticMemoryRuntime({ pluginSettings = {}, archiveManag
     }
   }
   installArchiveHook(archiveManager, logger)
-  logger?.info?.(`[SemanticMemory] 语义记忆就绪 model=${gateway.model} dim=${store.dimension} base=${baseDir}`)
+  scheduleSweep(store, logger)
+  logger?.info?.(`[SemanticMemory] 语义记忆就绪 model=${gateway.model} dim=${store.dimension} retention=${config.retentionDays}d base=${baseDir}`)
   return runtime
 }
 
@@ -113,4 +141,8 @@ function detachArchiveHook() {
 export function __resetSemanticMemoryRuntimeForTest() {
   runtime = null
   archiveHookInstalled = false
+  if (sweepTimer) clearTimeout(sweepTimer)
+  if (sweepInterval) clearInterval(sweepInterval)
+  sweepTimer = null
+  sweepInterval = null
 }
