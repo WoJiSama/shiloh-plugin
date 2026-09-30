@@ -59,10 +59,14 @@ if (!report) {
   process.exit(1)
 }
 const pct = value => `${Math.round(value * 100)}%`
+const rerankLine = report.recallAt5Rerank !== undefined
+  ? `recall@5 混合+重排:${pct(report.recallAt5Rerank)}(重排生效 ${report.rerankApplied}/${report.samples}) | recall@10 重排:${pct(report.recallAt10Rerank)}`
+  : '重排:未启用'
 console.log([
   `评估样本:${report.samples}(出题失败 ${report.questionFailures})`,
   `recall@5:纯向量 ${pct(report.recallAt5Vector)} | 混合 ${pct(report.recallAt5Hybrid)}`,
   `recall@10:混合 ${pct(report.recallAt10Hybrid)}`,
+  rerankLine,
   `延迟:P50 ${report.latencyP50Ms}ms / P95 ${report.latencyP95Ms}ms`
 ].join("\n"))
 const reportPath = path.join(runtime.baseDir, "eval-report.json")

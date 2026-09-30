@@ -697,6 +697,12 @@ pluginSettings:
     retrieveTimeoutMs: 900
     indexOnWrite: true
     embeddingDimensions: 1024
+    # 重排(SiliconFlow 免费 bge-reranker-v2-m3):评估/调试默认启用,聊天热路径默认关闭
+    rerankEnabled: true
+    rerankInChat: false
+    rerankModel: BAAI/bge-reranker-v2-m3
+    rerankTopN: 20
+    rerankTimeoutMs: 1500
   emojiSystem:
     enabled: false
     # 表情包以 QQ"表情"小图发送（sub_type=1）；置 false 恢复普通大图

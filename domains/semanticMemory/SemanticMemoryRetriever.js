@@ -29,19 +29,21 @@ function messageIdOverlap(a = [], b = []) {
 }
 
 export class SemanticMemoryRetriever {
-  constructor({ store, gateway, config = {}, logger = globalThis.logger } = {}) {
+  constructor({ store, gateway, reranker = null, config = {}, logger = globalThis.logger } = {}) {
     this.store = store
     this.gateway = gateway
+    this.reranker = reranker
     this.config = config
     this.logger = logger
-    this.stats = { queries: 0, hits: 0, timeouts: 0, failures: 0 }
+    this.stats = { queries: 0, hits: 0, timeouts: 0, failures: 0, rerankQueries: 0, rerankApplied: 0 }
   }
 
-  async search(groupId, query, { topK, minScore, timeoutMs, candidatePool } = {}) {
+  async search(groupId, query, { topK, minScore, timeoutMs, candidatePool, rerank = false } = {}) {
     const startedAt = Date.now()
     const budget = Math.max(200, Number(timeoutMs || this.config.retrieveTimeoutMs) || 900)
     const k = Math.max(1, Number(topK || this.config.topK) || 5)
     const threshold = Number(minScore ?? this.config.minScore ?? 0.35)
+    const pool = candidatePool || CANDIDATE_POOL
     const text = String(query || "").trim()
     if (!text) return { items: [], elapsedMs: 0, reason: "empty query" }
     try {
@@ -54,18 +56,37 @@ export class SemanticMemoryRetriever {
         return { items: [], elapsedMs: Date.now() - startedAt, reason: "timeout" }
       }
       const vectorStart = Date.now()
-      const vectorHits = queryVector ? this.store.searchVector(groupId, queryVector, candidatePool || CANDIDATE_POOL) : []
+      const vectorHits = queryVector ? this.store.searchVector(groupId, queryVector, pool) : []
       const vectorMs = Date.now() - vectorStart
       const bm25Start = Date.now()
-      const bm25Hits = this.store.searchBM25(groupId, text, candidatePool || CANDIDATE_POOL)
+      const bm25Hits = this.store.searchBM25(groupId, text, pool)
       const bm25Ms = Date.now() - bm25Start
 
       const fused = rrfFuse(vectorHits, bm25Hits)
       // 阈值门控:向量分数是唯一可比的绝对量;纯 BM25 命中需排前 3 才保留(关键词强信号)
       const gated = fused.filter(entry => entry.vector >= threshold || (entry.bm25Rank >= 1 && entry.bm25Rank <= 3))
+
+      // 可选重排:对门控后的候选池取前 rerankTopN 交给交叉编码器,失败/超时回落 RRF 顺序
+      let candidates = gated
+      let rerankScores = null
+      let rerankMs = 0
+      if (rerank && this.reranker && gated.length > 1) {
+        this.stats.rerankQueries++
+        const rerankTopN = Math.max(k, Number(this.config.rerankTopN) || 20)
+        candidates = gated.slice(0, rerankTopN)
+        rerankMs = Date.now()
+        rerankScores = await this.reranker.rerank(text, candidates.map(entry => entry.chunk))
+        rerankMs = Date.now() - rerankMs
+        if (rerankScores) {
+          this.stats.rerankApplied++
+          candidates = [...candidates].sort((a, b) =>
+            (rerankScores.get(String(b.chunk.id)) ?? -1) - (rerankScores.get(String(a.chunk.id)) ?? -1))
+        }
+      }
+
       // 相邻窗口去重:与已保留分块消息重叠 >50% 的丢弃
       const kept = []
-      for (const entry of gated) {
+      for (const entry of candidates) {
         const overlaps = kept.some(item => messageIdOverlap(item.chunk.message_ids, entry.chunk.message_ids) > 0.5)
         if (!overlaps) kept.push(entry)
         if (kept.length >= k) break
@@ -78,11 +99,14 @@ export class SemanticMemoryRetriever {
           rrfScore: entry.rrf,
           vectorScore: entry.vector,
           vectorRank: entry.vectorRank,
-          bm25Rank: entry.bm25Rank
+          bm25Rank: entry.bm25Rank,
+          rerankScore: rerankScores ? (rerankScores.get(String(entry.chunk.id)) ?? null) : null
         })),
         elapsedMs: Date.now() - startedAt,
         vectorMs,
         bm25Ms,
+        rerankMs,
+        reranked: Boolean(rerankScores),
         candidates: fused.length
       }
     } catch (error) {

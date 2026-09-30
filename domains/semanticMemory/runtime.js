@@ -3,6 +3,7 @@
 import path from "node:path"
 import { SemanticMemoryStore } from "./SemanticMemoryStore.js"
 import { EmbeddingGateway } from "./EmbeddingGateway.js"
+import { RerankGateway, rerankUrlFromEmbeddingUrl } from "./RerankGateway.js"
 import { SemanticMemoryIndexer } from "./SemanticMemoryIndexer.js"
 import { SemanticMemoryRetriever } from "./SemanticMemoryRetriever.js"
 
@@ -20,7 +21,13 @@ export const DEFAULT_SEMANTIC_MEMORY_CONFIG = {
   contextMaxChars: 900,
   retrieveTimeoutMs: 900,
   indexOnWrite: true,
-  embeddingDimensions: 1024
+  embeddingDimensions: 1024,
+  // 重排:SiliconFlow 免费 bge-reranker-v2-m3;默认评估/调试启用,聊天热路径默认关闭(保延迟)
+  rerankEnabled: true,
+  rerankInChat: false,
+  rerankModel: "BAAI/bge-reranker-v2-m3",
+  rerankTopN: 20,
+  rerankTimeoutMs: 1500
 }
 
 let runtime = null
@@ -60,6 +67,11 @@ export function normalizeSemanticMemoryConfig(raw = {}, embeddingAiConfig = {}) 
   config.minScore = Math.min(0.95, Math.max(0.05, Number(config.minScore) || 0.35))
   config.retentionDays = Math.max(1, Number(config.retentionDays) || 30)
   config.embeddingDimensions = Number(config.embeddingDimensions) || 1024
+  config.rerankEnabled = config.rerankEnabled !== false
+  config.rerankInChat = config.rerankInChat === true
+  config.rerankModel = String(config.rerankModel || "BAAI/bge-reranker-v2-m3")
+  config.rerankTopN = Math.max(5, Number(config.rerankTopN) || 20)
+  config.rerankTimeoutMs = Math.max(300, Number(config.rerankTimeoutMs) || 1500)
   return config
 }
 
@@ -99,9 +111,18 @@ export function installSemanticMemoryRuntime({ pluginSettings = {}, archiveManag
     model: embedding.embeddingApiModel,
     logger
   })
+  const reranker = config.rerankEnabled
+    ? new RerankGateway({
+      apiUrl: rerankUrlFromEmbeddingUrl(embedding.embeddingApiUrl),
+      apiKey: embedding.embeddingApiKey,
+      model: config.rerankModel,
+      timeoutMs: config.rerankTimeoutMs,
+      logger
+    })
+    : null
   const indexer = new SemanticMemoryIndexer({ store, gateway, archiveManager, config, logger })
-  const retriever = new SemanticMemoryRetriever({ store, gateway, config, logger })
-  runtime = { config, store, gateway, indexer, retriever, baseDir }
+  const retriever = new SemanticMemoryRetriever({ store, gateway, reranker, config, logger })
+  runtime = { config, store, gateway, reranker, indexer, retriever, baseDir }
   // 评估出题模型:复用 memoryAiConfig(glm flash 一类便宜小模型)
   const memory = pluginSettings.memoryAiConfig || {}
   if (memory.memoryAiUrl && memory.memoryAiApikey) {

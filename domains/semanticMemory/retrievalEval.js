@@ -25,6 +25,7 @@ export async function runRetrievalEval(runtime, { sampleCount = 20, sampleMinCha
   const report = {
     samples: cases.length,
     recallAt5Vector: 0, recallAt5Hybrid: 0, recallAt10Hybrid: 0,
+    recallAt5Rerank: 0, recallAt10Rerank: 0, rerankApplied: 0,
     latencyP50Ms: 0, latencyP95Ms: 0,
     questionFailures: picked.length - cases.length
   }
@@ -32,10 +33,13 @@ export async function runRetrievalEval(runtime, { sampleCount = 20, sampleMinCha
 
   const hit = (result, target, k) => result.items.slice(0, k).some(item =>
     item.chunk.id === target.id || messageIdJaccard(item.chunk.message_ids, target.message_ids) >= 0.5)
+  const useRerank = Boolean(runtime.reranker && runtime.config.rerankEnabled)
 
   let vectorHits5 = 0
   let hybridHits5 = 0
   let hybridHits10 = 0
+  let rerankHits5 = 0
+  let rerankHits10 = 0
   const latencies = []
   for (const testCase of cases) {
     const startedAt = Date.now()
@@ -44,6 +48,17 @@ export async function runRetrievalEval(runtime, { sampleCount = 20, sampleMinCha
       minScore: 0,
       timeoutMs: 5000
     })
+    if (useRerank) {
+      const rerankResult = await retriever.search(testCase.groupId, testCase.question, {
+        topK: 10,
+        minScore: 0,
+        timeoutMs: 5000,
+        rerank: true
+      })
+      if (rerankResult.reranked) report.rerankApplied++
+      if (hit(rerankResult, testCase.chunk, 5)) rerankHits5++
+      if (hit(rerankResult, testCase.chunk, 10)) rerankHits10++
+    }
     latencies.push(Date.now() - startedAt)
     // 纯向量消融:同一批候选内只按向量排名
     const vectorOnly = { items: [...result.items].sort((a, b) => (a.vectorRank || 999) - (b.vectorRank || 999)) }
@@ -55,8 +70,19 @@ export async function runRetrievalEval(runtime, { sampleCount = 20, sampleMinCha
   report.recallAt5Vector = vectorHits5 / cases.length
   report.recallAt5Hybrid = hybridHits5 / cases.length
   report.recallAt10Hybrid = hybridHits10 / cases.length
+  if (useRerank) {
+    report.recallAt5Rerank = rerankHits5 / cases.length
+    report.recallAt10Rerank = rerankHits10 / cases.length
+  }
   report.latencyP50Ms = latencies[Math.floor(latencies.length * 0.5)] || 0
   report.latencyP95Ms = latencies[Math.floor(latencies.length * 0.95)] || 0
+  // 历史落盘,供后台页绘制趋势
+  try {
+    const fs = await import("node:fs")
+    fs.mkdirSync(runtime.baseDir, { recursive: true })
+    fs.appendFileSync(`${runtime.baseDir}/eval-history.ndjson`,
+      JSON.stringify({ generatedAt: new Date().toISOString(), ...report }) + "\n", "utf8")
+  } catch {}
   return report
 }
 

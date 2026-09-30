@@ -85,15 +85,18 @@ export class SemanticMemoryPlugin extends plugin {
       return true
     }
     const groupId = e.group_id ? String(e.group_id) : ''
-    const result = await runtime.retriever.search(groupId, query, { timeoutMs: 5000 })
+    const result = await runtime.retriever.search(groupId, query, {
+      timeoutMs: 5000,
+      rerank: Boolean(runtime.config.rerankEnabled)
+    })
     if (!result.items.length) {
       await e.reply(`没有检索到相关记忆(${result.elapsedMs}ms ${result.reason || ''})`.trim())
       return true
     }
     const lines = [
-      `检索耗时 ${result.elapsedMs}ms(向量 ${result.vectorMs ?? '-'}ms / BM25 ${result.bm25Ms ?? '-'}ms) 候选 ${result.candidates}`,
+      `检索耗时 ${result.elapsedMs}ms(向量 ${result.vectorMs ?? '-'}ms / BM25 ${result.bm25Ms ?? '-'}ms / 重排 ${result.rerankMs ?? 0}ms${result.reranked ? '' : '未启用'}) 候选 ${result.candidates}`,
       ...result.items.map((item, index) =>
-        `#${index + 1} 余弦${item.vectorScore.toFixed(3)} 向量#${item.vectorRank || '-'} BM25#${item.bm25Rank || '-'}\n${runtime.retriever.renderContext({ items: [item] })}`)
+        `#${index + 1} 余弦${item.vectorScore.toFixed(3)} 向量#${item.vectorRank || '-'} BM25#${item.bm25Rank || '-'}${item.rerankScore !== null && item.rerankScore !== undefined ? ` 重排${item.rerankScore.toFixed(3)}` : ''}\n${runtime.retriever.renderContext({ items: [item] })}`)
     ]
     await e.reply(lines.join('\n\n'))
     return true
@@ -125,8 +128,12 @@ export class SemanticMemoryPlugin extends plugin {
       await e.reply('评估失败:没有可用的索引分块,先执行 .语义记忆 重建')
       return true
     }
+    const rerankLine = report.recallAt5Rerank !== undefined
+      ? `recall@5 混合+重排 ${pct(report.recallAt5Rerank)} | recall@10 重排 ${pct(report.recallAt10Rerank)} | 重排生效 ${report.rerankApplied}/${report.samples}`
+      : '重排未启用'
     const lines = [
       `评估样本:${report.samples} | recall@5 向量 ${pct(report.recallAt5Vector)} / 混合 ${pct(report.recallAt5Hybrid)} | recall@10 混合 ${pct(report.recallAt10Hybrid)}`,
+      rerankLine,
       `检索延迟 P50 ${report.latencyP50Ms}ms / P95 ${report.latencyP95Ms}ms | 问题生成失败 ${report.questionFailures}`
     ]
     await e.reply(lines.join('\n'))

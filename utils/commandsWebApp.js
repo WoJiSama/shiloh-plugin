@@ -1053,6 +1053,13 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
     logger?.warn?.(`[运行观测页] 挂载失败: ${observeError?.message || observeError}`)
   }
 
+  try {
+    const { registerSemanticMemoryWebApp } = await import("./semanticMemoryWebApp.js")
+    registerSemanticMemoryWebApp(expressApp, pluginRoot, readOrCreateTokens(pluginRoot), logger)
+  } catch (semanticError) {
+    logger?.warn?.(`[语义记忆页] 挂载失败: ${semanticError?.message || semanticError}`)
+  }
+
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
       res.set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")

@@ -118,6 +118,7 @@ import { createChatTurnDurability, rebuildChatTurnEvent } from "../utils/chatTur
 import { resolveLongTaskFeedbackPolicy } from "../utils/longTaskFeedbackPolicy.js"
 import { resolvePromptLayerProfile } from "../utils/promptLayers.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../utils/personaSource.js"
+import { createPersonaLibrary } from "../utils/personaLibrary.js"
 import { buildMainSystemPrompt } from "../utils/systemPromptTemplate.js"
 import { composeTurnPromptLayers } from "../utils/turnPromptComposer.js"
 import { applyOutputPersonaGuards } from "../utils/outputGuardPipeline.js"
@@ -579,11 +580,25 @@ export class ExamplePlugin extends plugin {
         { reg: "^#mcp\\s+列表", fnc: "listMCPTools" },
         { reg: "^#mcp\\s+状态", fnc: "mcpStatus" },
         { reg: "^#mcp\\s+测试\\s+\\S+", fnc: "testMCPTool" },
+        { reg: "^#人设列表$", fnc: "handlePersonaList" },
+        { reg: "^#当前人设$", fnc: "handlePersonaCurrent" },
+        { reg: "^#人设详情\\s+\\S+$", fnc: "handlePersonaDetail" },
+        { reg: "^#切换人设\\s+\\S+(\\s+\\d+)?$", fnc: "handlePersonaSwitch" },
+        { reg: "^#人设重置(\\s+\\d+)?$", fnc: "handlePersonaReset" },
+        { reg: "^#保存人设\\s+\\S+$", fnc: "handlePersonaSave" },
+        { reg: "^#删除人设\\s+\\S+$", fnc: "handlePersonaDelete" },
+        { reg: "^#人设重载$", fnc: "handlePersonaReload" },
+        { reg: "^#人设绑定列表$", fnc: "handlePersonaBindings" },
         { reg: "[\\s\\S]*", fnc: "handleRandomReply", log: false }
       ]
     })
 
     this.initConfig()
+    // 多人设库:多套人设 + 按群绑定,config/persona-library.yaml,手动编辑热生效
+    this.personaLibrary = createPersonaLibrary({
+      libraryPath: path.join(_path, "plugins/shiloh-plugin/config/persona-library.yaml"),
+      getBasePersona: () => this.config?.persona || {}
+    })
     // 观测日志:关键 info(工具调用/路由决策/模型耗时)tee 到 logs/shiloh-obs/
     installObservabilityLog({
       enabled: this.config?.observabilityLog?.enabled !== false,
@@ -2146,7 +2161,7 @@ export class ExamplePlugin extends plugin {
 
     const gatePersonaTone = buildPersonaTonePrompt({
       userText: currentText,
-      persona: this.config.persona
+      persona: this.getPersonaFor(e)
     })
     const systemPrompt = `你是 QQ 群聊节奏判断助手。机器人名字叫"${botName}"。
 当前北京时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
@@ -2850,6 +2865,25 @@ ${specialSignalsBlock}
     const { settings } = store.load()
     this.config = settings
     store.startWatch()
+  }
+
+  // 当前会话生效人设:群按 persona-library 的群绑定,私聊按 privateBinding,否则 message.yaml 默认
+  getPersonaFor(e) {
+    try {
+      return this.personaLibrary?.resolve({
+        messageType: e?.message_type,
+        groupId: e?.group_id
+      })?.persona || this.config?.persona || {}
+    } catch {
+      return this.config?.persona || {}
+    }
+  }
+
+  // 按会话人设生成的配置视图:未绑定群直接复用全局配置对象(零开销),绑定群浅拷贝替换 persona
+  getChatConfig(e) {
+    const persona = this.getPersonaFor(e)
+    if (!persona || persona === this.config?.persona) return this.config
+    return { ...this.config, persona }
   }
 
   mergeConfig(defaults, user) {
@@ -4017,7 +4051,7 @@ ${recentHistory || '(无)'}
           : this.getBasicGroupContext(e)
         const cardRequestText = [args, msg, userContent].filter(Boolean).join("\n")
         const promptLayers = await composeTurnPromptLayers({
-          config: this.config,
+          config: this.getChatConfig(e),
           profile: session.promptLayerProfile,
           turn: {
             groupId,
@@ -4060,7 +4094,9 @@ ${recentHistory || '(无)'}
           e.message_type === "group" &&
           semanticMemoryRuntime.indexer.groupAllowed(groupId) &&
           semanticMemoryQueryText
-          ? semanticMemoryRuntime.retriever.search(groupId, semanticMemoryQueryText).catch(() => null)
+          ? semanticMemoryRuntime.retriever.search(groupId, semanticMemoryQueryText, {
+              rerank: Boolean(semanticMemoryRuntime.config.rerankInChat)
+            }).catch(() => null)
           : null
         const episodicPrompt = this.config?.episodicMemory?.enabled !== false && hasTemporalDeixis(currentIntentText)
           ? buildEpisodicPrompt(recallEpisodes({
@@ -4098,13 +4134,15 @@ ${recentHistory || '(无)'}
           environmental_factors: { local_time: "北京时间: " + new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }) }
         }
 
+        // 本回合生效人设:群绑定切换后,主提示词/风格覆盖/名字全部随之变化
+        const chatPersona = this.getPersonaFor(e)
         const systemContent = buildMainSystemPrompt({
-          baseIdentity: renderPersonaTemplate(this.config.systemContent, this.config.persona),
-          personaOverride: buildPersonaStyleOverride(this.config.persona),
+          baseIdentity: renderPersonaTemplate(this.config.systemContent, chatPersona),
+          personaOverride: buildPersonaStyleOverride(chatPersona),
           runtimeData,
           enhancedPrompts,
           mcpPrompts,
-          personaName: resolvePersonaName(this.config.persona)
+          personaName: resolvePersonaName(chatPersona)
         })
         // 获取历史记录
         if (this.config.groupHistory) {
@@ -4243,7 +4281,7 @@ ${recentHistory || '(无)'}
           modelIntent: modelIntentDecision?.intent,
           images, videos, groupId, userId,
           botName: Bot?.nickname || "",
-          config: this.config,
+          config: this.getChatConfig(e),
           memberMap,
           hasExcelContext, excelToolIntent, excelToolParams, hasPixivSearchSession,
           groupWorkflowPrompt: workflowPrompt,
@@ -4765,7 +4803,7 @@ ${recentHistory || '(无)'}
       output = applyOutputPersonaGuards(output, {
         userText: session?.userContent || e?.msg || "",
         toolName,
-        botNames: [Bot?.nickname, this.config?.persona?.name],
+        botNames: [Bot?.nickname, this.getPersonaFor(e)?.name],
         personaGuard: this.config.personaGuard,
         polish: true
       })
@@ -5231,6 +5269,218 @@ ${recentHistory || '(无)'}
     } catch (error) {
       logger.error(`[MCP] 测试工具 ${alias} 失败:`, error)
       await this.sendObservedReply(e, `MCP工具测试失败：${error.message}`)
+    }
+    return true
+  }
+
+  // ===== 多人设库:多套人设按群切换 =====
+  // 权限:查看类所有人;切换/重置要群主/群管理或主人;增删/重载仅主人。
+  isChatManager(e) {
+    return Boolean(e?.isMaster || ["owner", "admin"].includes(e?.sender?.role))
+  }
+
+  // "#切换人设 名字 123456" 里可带目标群号(仅主人,跨群切换);群内使用默认切本群
+  resolvePersonaTargetGroup(e, explicit) {
+    const target = String(explicit || "").trim()
+    if (target) {
+      if (!e?.isMaster) return { error: "带群号切换仅主人可用,群里直接发 #切换人设 <名字> 即可" }
+      if (!/^\d{5,12}$/.test(target)) return { error: "群号格式不对" }
+      return { groupId: target }
+    }
+    if (e?.message_type !== "group" || !e?.group_id) return { error: "这条命令要在群里用,或者主人用 #切换人设 <名字> <群号>" }
+    return { groupId: String(e.group_id) }
+  }
+
+  formatPersonaDetail(detail) {
+    const p = detail.persona || {}
+    const lines = [`【人设:${p.name || "未命名"}】(id:${detail.id}${detail.source === "default" ? ",默认" : ""})`]
+    const fieldLabels = [["identity", "身份"], ["tone", "语气"]]
+    for (const [field, label] of fieldLabels) {
+      const value = String(p[field] || "").trim()
+      if (value) lines.push(`■ ${label}: ${value}`)
+    }
+    const listLabels = [["speechStyle", "说话风格"], ["preferences", "偏好"], ["boundaries", "边界"]]
+    for (const [field, label] of listLabels) {
+      const items = Array.isArray(p[field]) ? p[field].filter(Boolean) : []
+      if (items.length) lines.push(`■ ${label}: ${items.join("、")}`)
+    }
+    const notes = String(p.notes || "").trim()
+    if (notes) lines.push(`■ 备注: ${notes}`)
+    return lines.join("\n")
+  }
+
+  async handlePersonaList(e) {
+    try {
+      const entries = this.personaLibrary.list()
+      const resolved = this.personaLibrary.resolve({ messageType: e?.message_type, groupId: e?.group_id })
+      const lines = ["【人设库】"]
+      for (const item of entries) {
+        const mark = item.id === resolved.id ? " ←当前" : ""
+        lines.push(`- ${item.name}${item.source === "default" ? "(默认)" : ""} [${item.id}]${mark}`)
+      }
+      lines.push("", "#切换人设 <名字> 切换本群人设(管理)", "#人设详情 <名字> 查看内容", "#人设重置 回到默认")
+      await this.sendObservedReply(e, lines.join("\n"))
+    } catch (error) {
+      await this.sendObservedReply(e, `人设列表读取失败：${error.message}`)
+    }
+    return true
+  }
+
+  async handlePersonaCurrent(e) {
+    try {
+      const detail = this.personaLibrary.resolve({ messageType: e?.message_type, groupId: e?.group_id })
+      await this.sendObservedReply(e, this.formatPersonaDetail(detail))
+    } catch (error) {
+      await this.sendObservedReply(e, `读取当前人设失败：${error.message}`)
+    }
+    return true
+  }
+
+  async handlePersonaDetail(e) {
+    const name = String(e.msg || "").replace(/^#人设详情\s+/, "").trim()
+    const detail = this.personaLibrary.detail(name)
+    if (!detail) {
+      await this.sendObservedReply(e, `没有找到人设「${name}」,发 #人设列表 看看有哪些`)
+      return true
+    }
+    await this.sendObservedReply(e, this.formatPersonaDetail(detail))
+    return true
+  }
+
+  async handlePersonaSwitch(e) {
+    const rest = String(e.msg || "").replace(/^#切换人设\s+/, "").trim()
+    const spaceIndex = rest.indexOf(" ")
+    const name = (spaceIndex === -1 ? rest : rest.slice(0, spaceIndex)).trim()
+    const explicitGroup = spaceIndex === -1 ? "" : rest.slice(spaceIndex + 1).trim()
+    if (!this.isChatManager(e)) {
+      await this.sendObservedReply(e, "切换人设要群主或群管理来操作哦")
+      return true
+    }
+    const target = this.resolvePersonaTargetGroup(e, explicitGroup)
+    if (target.error) {
+      await this.sendObservedReply(e, target.error)
+      return true
+    }
+    try {
+      if (!name || name === "默认" || name === "default") {
+        await this.personaLibrary.setGroupBinding(target.groupId, "default")
+        await this.sendObservedReply(e, `群 ${target.groupId} 已切回默认人设`)
+        return true
+      }
+      const entry = this.personaLibrary.detail(name)
+      if (!entry) {
+        await this.sendObservedReply(e, `没有找到人设「${name}」,发 #人设列表 看看有哪些`)
+        return true
+      }
+      const bound = this.personaLibrary.setGroupBinding(target.groupId, entry.id)
+      logger.mark(`[人设库] group=${target.groupId} 切换人设 -> ${entry.id}(${entry.persona?.name}) by=${e?.user_id}`)
+      await this.sendObservedReply(e, `本群已切换为人设「${entry.persona?.name}」(id:${bound}),下一条回复开始生效`)
+    } catch (error) {
+      await this.sendObservedReply(e, `切换失败：${error.message}`)
+    }
+    return true
+  }
+
+  async handlePersonaReset(e) {
+    const explicitGroup = String(e.msg || "").replace(/^#人设重置\s*/, "").trim()
+    if (!this.isChatManager(e)) {
+      await this.sendObservedReply(e, "重置人设要群主或群管理来操作哦")
+      return true
+    }
+    const target = this.resolvePersonaTargetGroup(e, explicitGroup)
+    if (target.error) {
+      await this.sendObservedReply(e, target.error)
+      return true
+    }
+    try {
+      this.personaLibrary.setGroupBinding(target.groupId, "default")
+      await this.sendObservedReply(e, `群 ${target.groupId} 已解绑,回到默认人设「${resolvePersonaName(this.config.persona)}」`)
+    } catch (error) {
+      await this.sendObservedReply(e, `重置失败：${error.message}`)
+    }
+    return true
+  }
+
+  // 把当前会话生效的人设快照存成人设库新条目(主人);重名覆盖
+  async handlePersonaSave(e) {
+    if (!e?.isMaster) {
+      await this.sendObservedReply(e, "只有主人才能保存人设")
+      return true
+    }
+    const name = String(e.msg || "").replace(/^#保存人设\s+/, "").trim()
+    if (!name) {
+      await this.sendObservedReply(e, "用法：#保存人设 <名字>,把当前会话生效的人设存成一套")
+      return true
+    }
+    try {
+      const resolved = this.personaLibrary.resolve({ messageType: e?.message_type, groupId: e?.group_id })
+      const saved = this.personaLibrary.upsert({ ...resolved.persona, name })
+      logger.mark(`[人设库] 保存人设 ${saved.id}(${saved.name}) by=${e?.user_id}`)
+      await this.sendObservedReply(e, `已保存人设「${saved.name}」(id:${saved.id}),可以用 #切换人设 ${saved.name} 给群换上`)
+    } catch (error) {
+      await this.sendObservedReply(e, `保存失败：${error.message}`)
+    }
+    return true
+  }
+
+  async handlePersonaDelete(e) {
+    if (!e?.isMaster) {
+      await this.sendObservedReply(e, "只有主人才能删除人设")
+      return true
+    }
+    const name = String(e.msg || "").replace(/^#删除人设\s+/, "").trim()
+    if (!name || name === "default" || name === "默认") {
+      await this.sendObservedReply(e, "默认人设不能删,它来自 message.yaml")
+      return true
+    }
+    try {
+      const removed = this.personaLibrary.remove(name)
+      if (!removed) {
+        await this.sendObservedReply(e, `没有找到人设「${name}」`)
+        return true
+      }
+      logger.mark(`[人设库] 删除人设 ${removed.id}(${removed.name}) by=${e?.user_id}`)
+      await this.sendObservedReply(e, `已删除人设「${removed.name}」,绑定它的群自动回到默认人设`)
+    } catch (error) {
+      await this.sendObservedReply(e, `删除失败：${error.message}`)
+    }
+    return true
+  }
+
+  async handlePersonaReload(e) {
+    if (!e?.isMaster) {
+      await this.sendObservedReply(e, "只有主人才能重载人设库")
+      return true
+    }
+    try {
+      const state = this.personaLibrary.reload()
+      await this.sendObservedReply(e, `人设库已重载：${state.personas.length} 套自定义人设,${Object.keys(state.groupBindings).length} 个群绑定`)
+    } catch (error) {
+      await this.sendObservedReply(e, `重载失败：${error.message}`)
+    }
+    return true
+  }
+
+  async handlePersonaBindings(e) {
+    if (!e?.isMaster) {
+      await this.sendObservedReply(e, "只有主人才能查看全部绑定")
+      return true
+    }
+    try {
+      const bindings = this.personaLibrary.bindings()
+      const entries = Object.entries(bindings).filter(([, id]) => id)
+      if (!entries.length) {
+        await this.sendObservedReply(e, "还没有任何群绑定自定义人设,全部用默认人设")
+        return true
+      }
+      const lines = ["【人设绑定】"]
+      for (const [groupId, personaId] of entries) {
+        const detail = this.personaLibrary.detail(personaId)
+        lines.push(`- ${groupId === "__private__" ? "私聊" : `群 ${groupId}`} → ${detail?.persona?.name || personaId}`)
+      }
+      await this.sendObservedReply(e, lines.join("\n"))
+    } catch (error) {
+      await this.sendObservedReply(e, `读取绑定失败：${error.message}`)
     }
     return true
   }

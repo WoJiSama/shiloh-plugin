@@ -310,3 +310,75 @@ test("保留期独立于归档 + 每日清扫强制压实", async t => {
     fs.rmSync(cwd, { recursive: true, force: true })
   }
 })
+
+test("重排:RRF 靠后的候选可被重排提到首位,失败时回落 RRF 顺序", async t => {
+  const loaded = await loadModules()
+  if (!loaded) return t.skip("module not found")
+  const { SemanticMemoryStore } = loaded.store
+  const { SemanticMemoryRetriever } = loaded.retriever
+  const { RerankGateway, rerankUrlFromEmbeddingUrl } = await import("../domains/semanticMemory/RerankGateway.js")
+
+  // URL 推导
+  assert.equal(rerankUrlFromEmbeddingUrl("https://api.siliconflow.cn/v1/embeddings"), "https://api.siliconflow.cn/v1/rerank")
+  assert.equal(rerankUrlFromEmbeddingUrl("https://x/v1/embeddings/"), "https://x/v1/rerank")
+
+  const gateway = new FakeGateway()
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "semantic-rerank-"))
+  try {
+    const store = new SemanticMemoryStore({ baseDir: path.join(cwd, "sm"), dimension: 6, retentionDays: 3650 })
+    // 三个块都含"星露谷"(向量同分),RRF 顺序取决于稳定排序;重排指定 b 为最相关
+    await store.appendChunks("609235590", [
+      { ...chunkDraft("g:a", "甲: 星露谷任务一", { message_ids: ["a1", "a2", "a3", "a4"] }), vector: gateway.vectorFor("星露谷") },
+      { ...chunkDraft("g:b", "乙: 星露谷新版本更新内容", { message_ids: ["b1", "b2", "b3", "b4"] }), vector: gateway.vectorFor("星露谷") },
+      { ...chunkDraft("g:c", "丙: 星露谷随便聊聊", { message_ids: ["c1", "c2", "c3", "c4"] }), vector: gateway.vectorFor("星露谷") }
+    ])
+    const scores = new Map([["g:b", 0.9], ["g:a", 0.5], ["g:c", 0.1]])
+    const fakeReranker = { rerank: async (query, chunks) => new Map(chunks.map(c => [String(c.id), scores.get(String(c.id)) || 0])) }
+    const retriever = new SemanticMemoryRetriever({
+      store, gateway, reranker: fakeReranker,
+      config: { topK: 3, minScore: 0.3, retrieveTimeoutMs: 2000, rerankTopN: 20 }
+    })
+    const result = await retriever.search("609235590", "星露谷新版本", { rerank: true })
+    assert.equal(result.reranked, true)
+    assert.equal(result.items[0].chunk.id, "g:b", "重排把最相关块提到首位")
+    assert.equal(result.items[0].rerankScore, 0.9)
+    assert.ok(result.rerankMs >= 0)
+
+    // 不开重排:回落 RRF 顺序,g 顺序保持原样
+    const plain = await retriever.search("609235590", "星露谷新版本")
+    assert.equal(plain.reranked, false)
+    assert.equal(plain.items.every(item => item.rerankScore === null), true)
+
+    // 重排网关失败(返回 null):不崩溃,顺序回落
+    const brokenReranker = { rerank: async () => null }
+    const fallback = new SemanticMemoryRetriever({
+      store, gateway, reranker: brokenReranker,
+      config: { topK: 3, minScore: 0.3, retrieveTimeoutMs: 2000, rerankTopN: 20 }
+    })
+    const fbResult = await fallback.search("609235590", "星露谷新版本", { rerank: true })
+    assert.equal(fbResult.reranked, false)
+    assert.equal(fbResult.items.length, 3)
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true })
+  }
+})
+
+test("RerankGateway:请求体形状与未配置时的短路", async t => {
+  const { RerankGateway } = await import("../domains/semanticMemory/RerankGateway.js")
+  let captured = null
+  const fetchFn = async (url, options) => {
+    captured = { url, body: JSON.parse(options.body) }
+    return { ok: true, json: async () => ({ results: [{ index: 1, relevance_score: 0.42 }, { index: 0, relevance_score: 0.1 }] }) }
+  }
+  const gateway = new RerankGateway({ apiUrl: "https://x/v1/rerank", apiKey: "sk-test", fetchFn })
+  const chunks = [{ id: "a", text: "文档A" }, { id: "b", text: "文档B" }]
+  const scores = await gateway.rerank("问题", chunks)
+  assert.equal(captured.body.model, "BAAI/bge-reranker-v2-m3")
+  assert.equal(captured.body.top_n, 2)
+  assert.deepEqual([...scores.entries()], [["b", 0.42], ["a", 0.1]])
+
+  const unconfigured = new RerankGateway({ apiUrl: "", apiKey: "", fetchFn })
+  assert.equal(await unconfigured.rerank("q", chunks), null)
+  const placeholderKey = new RerankGateway({ apiUrl: "https://x", apiKey: "sk-xxx", fetchFn })
+  assert.equal(placeholderKey.configured(), false)
+})
