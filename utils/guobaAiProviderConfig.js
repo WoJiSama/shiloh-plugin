@@ -165,10 +165,10 @@ function readProviderValue(provider = {}, definition, genericField, legacyField)
 }
 
 export function normalizeProviderForPanel(provider = {}, definition) {
-  const apiUrl = readProviderValue(provider, definition, "apiUrl", definition.urlField);
-  const model = readProviderValue(provider, definition, "model", definition.modelField);
-  const apiKey = readProviderValue(provider, definition, "apiKey", definition.keyField);
-  if (!hasText(apiUrl) && !hasText(model) && !hasText(apiKey)) return null;
+  const apiUrl = readProviderValue(provider, definition, "apiUrl", definition.urlField)
+  const model = readProviderValue(provider, definition, "model", definition.modelField)
+  const apiKey = readProviderValue(provider, definition, "apiKey", definition.keyField)
+  if (!hasText(apiUrl) && !hasText(model) && !hasText(apiKey)) return null
 
   const item = {
     name: provider.name || provider.label || provider[definition.modelField] || provider.model || "primary",
@@ -176,14 +176,23 @@ export function normalizeProviderForPanel(provider = {}, definition) {
     model,
     apiKey,
     priority: normalizePriority(provider.priority ?? provider[definition.priorityField])
-  };
-
-  for (const extra of definition.extraFields || []) {
-    const value = provider[extra.panelField] ?? provider[extra.legacyField] ?? "";
-    if (hasText(value)) item[extra.panelField] = value;
   }
 
-  return item;
+  // 显式设置的 URL 自动补全开关必须原样保留,否则每次保存都会被重置
+  if (provider.autoResolve !== undefined) {
+    const flag = provider.autoResolve
+    item.autoResolve = flag === true || flag === "true" || flag === 1
+      ? true
+      : (flag === false || flag === "false" || flag === 0 ? false : undefined)
+    if (item.autoResolve === undefined) delete item.autoResolve
+  }
+
+  for (const extra of definition.extraFields || []) {
+    const value = provider[extra.panelField] ?? provider[extra.legacyField] ?? ""
+    if (hasText(value)) item[extra.panelField] = value
+  }
+
+  return item
 }
 
 export function buildLegacyProvider(cfg = {}, definition) {
@@ -237,19 +246,23 @@ export function withAiProviderPanelDefaults(settings = {}) {
 }
 
 export function normalizeAiProviderUpdates(updates = {}) {
-  let next = { ...updates };
+  let next = { ...updates }
 
   for (const definition of AI_PROVIDER_DEFINITIONS) {
-    const flatProvidersKey = `${definition.configKey}.providers`;
-    const providers = next[flatProvidersKey];
-    if (!Array.isArray(providers) || !providers.length) continue;
+    const flatProvidersKey = `${definition.configKey}.providers`
+    const providers = next[flatProvidersKey]
+    if (providers === undefined) continue
+    // 列表为空(undefined/null/[]/整行无效)时绝不能把空值写回——
+    // 那会把已保存的多渠道配置整个抹掉。丢弃该键,保留磁盘原状。
+    const normalizedProviders = Array.isArray(providers)
+      ? providers.map(item => normalizeProviderForPanel(item, definition)).filter(Boolean)
+      : []
+    if (!normalizedProviders.length) {
+      delete next[flatProvidersKey]
+      continue
+    }
 
-    const normalizedProviders = providers
-      .map(item => normalizeProviderForPanel(item, definition))
-      .filter(Boolean);
-    if (!normalizedProviders.length) continue;
-
-    const primary = sortAiProviders(normalizedProviders)[0] || {};
+    const primary = sortAiProviders(normalizedProviders)[0] || {}
     next = {
       ...next,
       [flatProvidersKey]: normalizedProviders,
@@ -258,12 +271,12 @@ export function normalizeAiProviderUpdates(updates = {}) {
       [`${definition.configKey}.${definition.modelField}`]: primary.model,
       [`${definition.configKey}.${definition.keyField}`]: primary.apiKey,
       [`${definition.configKey}.${definition.priorityField}`]: primary.priority
-    };
+    }
 
     for (const extra of definition.extraFields || []) {
-      next[`${definition.configKey}.${extra.legacyField}`] = primary[extra.panelField];
+      next[`${definition.configKey}.${extra.legacyField}`] = primary[extra.panelField]
     }
   }
 
-  return next;
+  return next
 }

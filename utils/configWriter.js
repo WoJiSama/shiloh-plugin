@@ -30,7 +30,8 @@ function loadDocument() {
 export function applyFlatUpdates(updates) {
   const doc = loadDocument()
   for (const [flatKey, value] of Object.entries(updates || {})) {
-    if (!flatKey) continue
+    // undefined/null 不写:避免表单未加载出的字段把已有配置整个抹掉
+    if (!flatKey || value === undefined || value === null) continue
     const segments = ["pluginSettings", ...String(flatKey).split(".")]
     doc.setIn(segments, value)
   }
