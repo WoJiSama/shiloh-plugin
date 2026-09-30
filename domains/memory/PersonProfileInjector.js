@@ -78,7 +78,10 @@ export class PersonProfileInjector {
     const lines = []
     let hasData = false
 
-    const personaPrompt = this.buildPersonaPrompt(config?.persona)
+    // 人设按会话解析:群绑定了独立人设时,画像卡里的"她"也跟着换人
+    const instance = pluginBridge.instance
+    const activePersona = (typeof instance?.getPersonaFor === "function" ? instance.getPersonaFor(e) : null) || config?.persona
+    const personaPrompt = this.buildPersonaPrompt(activePersona)
     if (personaPrompt) lines.push(personaPrompt)
 
     const groupPrompt = this.buildGroupProfilePrompt(config?.groupProfiles, groupId)

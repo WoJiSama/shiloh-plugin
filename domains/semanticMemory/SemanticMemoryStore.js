@@ -85,11 +85,43 @@ function decodeVector(base64, dimension) {
 
 const GROUP_STATE_LRU_LIMIT = 32
 
+const DEFAULT_EVOLUTION = {
+  enabled: true,
+  halfLifeDays: 7,
+  reinforceBoost: 0.35,
+  maxStrength: 1,
+  freezeThreshold: 0.06,
+  flushBatch: 32
+}
+
+export function normalizeEvolutionConfig(raw = {}) {
+  const config = { ...DEFAULT_EVOLUTION, ...(raw && typeof raw === "object" ? raw : {}) }
+  config.enabled = config.enabled !== false
+  config.halfLifeDays = Math.max(0.5, Number(config.halfLifeDays) || 7)
+  config.reinforceBoost = Math.min(1, Math.max(0.05, Number(config.reinforceBoost) || 0.35))
+  config.maxStrength = Math.min(1, Math.max(0.5, Number(config.maxStrength) || 1))
+  config.freezeThreshold = Math.min(0.5, Math.max(0, Number(config.freezeThreshold) ?? 0.06))
+  config.flushBatch = Math.max(4, Number(config.flushBatch) || 32)
+  return config
+}
+
+// 记忆强度演化(借鉴 A-Memorix 半衰期模型):强度随时间衰减,被召回注入即强化并重置衰减时钟。
+// 基准时间取 lastRecallAt(最近一次被想起)与 end_ts(内容发生时间)的较大者——
+// 新写入的记忆从写入时刻起算,被想起过的从最近想起时刻起算。
+export function effectiveStrength(record = {}, now = Date.now(), halfLifeDays = 7) {
+  const base = Number(record?.strength)
+  const strength = Number.isFinite(base) && base > 0 ? Math.min(1, base) : 1
+  const anchor = Math.max(Number(record?.lastRecallAt) || 0, Number(record?.end_ts) || 0)
+  const elapsedDays = Math.max(0, (Number(now) - anchor) / (24 * 3600 * 1000))
+  return strength * Math.pow(0.5, elapsedDays / Math.max(0.5, halfLifeDays))
+}
+
 export class SemanticMemoryStore {
-  constructor({ baseDir, dimension = 1024, retentionDays = 7, logger = globalThis.logger } = {}) {
+  constructor({ baseDir, dimension = 1024, retentionDays = 7, evolution = {}, logger = globalThis.logger } = {}) {
     this.baseDir = baseDir
     this.dimension = Number(dimension) || 1024
     this.retentionDays = Math.max(1, Number(retentionDays) || 7)
+    this.evolution = normalizeEvolutionConfig(evolution)
     this.logger = logger
     this.groups = new Map() // groupId -> { file, chunks: Map(id->meta), matrix: Float32Array|null, norms, bm25 }
   }
@@ -180,9 +212,7 @@ export class SemanticMemoryStore {
     }
 
     this.groups.set(id, state)
-    while (this.groups.size > GROUP_STATE_LRU_LIMIT) {
-      this.groups.delete(this.groups.keys().next().value)
-    }
+    this.evictLRU()
     return state
   }
 
@@ -196,12 +226,117 @@ export class SemanticMemoryStore {
       bm25: new BM25Index(),
       loaded: false,
       droppedOnLoad: 0,
-      records: []
+      records: [],
+      dirty: new Set() // 已强化未落盘的分块 id
     }
   }
 
-  // 每日清扫:逐群装载(丢弃过期)并强制压实任何含过期/无效行的文件。
-  // 覆盖"群已沉寂不再触发装载"的场景,保证磁盘稳态。
+  // LRU 淘汰前先把强化落盘,防止"被想起过"的状态随缓存消失
+  evictLRU() {
+    while (this.groups.size > GROUP_STATE_LRU_LIMIT) {
+      const oldestKey = this.groups.keys().next().value
+      const oldest = this.groups.get(oldestKey)
+      if (oldest?.dirty?.size) {
+        this.flushDirty(oldest).catch(error =>
+          this.logger?.warn?.(`[SemanticMemory] 淘汰落盘 ${oldestKey} 失败: ${error.message}`))
+      }
+      this.groups.delete(oldestKey)
+    }
+  }
+
+  // 召回强化:被注入上下文的分块提升强度并重置衰减时钟。
+  // 内存即时生效;达到 flushBatch 批量追加落盘(同 id 后写覆盖)。
+  reinforceChunks(groupId, ids = [], { boost, now = Date.now() } = {}) {
+    if (!this.evolution.enabled || !ids.length) return 0
+    const state = this.touchGroup(groupId)
+    const gain = Math.min(1, Math.max(0.05, Number(boost ?? this.evolution.reinforceBoost)))
+    let updated = 0
+    for (const id of ids) {
+      const meta = state.chunks.get(String(id))
+      const record = state.records.find(item => item.id === String(id))
+      if (!meta || !record) continue
+      const next = Math.min(this.evolution.maxStrength, (Number(meta.strength) || 1) + gain)
+      meta.strength = next
+      meta.recallCount = (Number(meta.recallCount) || 0) + 1
+      meta.lastRecallAt = now
+      record.strength = next
+      record.recallCount = meta.recallCount
+      record.lastRecallAt = now
+      state.dirty.add(String(id))
+      updated++
+    }
+    if (state.dirty.size >= this.evolution.flushBatch) {
+      this.flushDirty(state).catch(error =>
+        this.logger?.warn?.(`[SemanticMemory] 强化落盘 ${groupId} 失败: ${error.message}`))
+    }
+    return updated
+  }
+
+  // 把强化过的分块以整行记录追加回去(追加式存储,同 id 后写覆盖)
+  async flushDirty(state) {
+    if (!state?.dirty?.size || !state.file) return 0
+    const dirtyIds = [...state.dirty]
+    const lines = []
+    for (const id of dirtyIds) {
+      const record = state.records.find(item => item.id === id)
+      if (record) lines.push(JSON.stringify(record))
+    }
+    if (lines.length) {
+      await fs.promises.appendFile(state.file, lines.join("\n") + "\n", "utf8")
+    }
+    state.dirty.clear()
+    return lines.length
+  }
+
+  // 按群号落盘未写的强化(网页"想起"按钮等手动场景用)
+  async flushGroupDirty(groupId) {
+    const state = this.loadGroup(String(groupId || ""))
+    return this.flushDirty(state)
+  }
+
+  // 记忆自纠错的降权:与强化对称,但不重置衰减锚点——被纠错的记忆基准下调,
+  // 继续沿原时钟衰减,重复纠错会跌破冻结线由清扫淡忘;单次误伤只降权不丢数据。
+  penalizeChunks(groupId, ids = [], { penalty = 0.5 } = {}) {
+    const key = String(groupId || "")
+    if (!key || !ids.length) return 0
+    const state = this.touchGroup(key)
+    const cut = Math.min(0.95, Math.max(0.05, Number(penalty) || 0.5))
+    let updated = 0
+    for (const id of ids) {
+      const meta = state.chunks.get(String(id))
+      const record = state.records.find(item => item.id === String(id))
+      if (!meta || !record) continue
+      const next = Math.max(0.02, (Number(meta.strength) || 1) - cut)
+      meta.strength = next
+      record.strength = next
+      state.dirty.add(String(id))
+      updated++
+    }
+    if (state.dirty.size >= this.evolution.flushBatch) {
+      this.flushDirty(state).catch(error =>
+        this.logger?.warn?.(`[SemanticMemory] 纠错落盘 ${key} 失败: ${error.message}`))
+    }
+    return updated
+  }
+
+  // 单条遗忘:重写该群文件(剔除目标 id)后重载内存态
+  async forgetChunk(groupId, id) {
+    const key = String(groupId || "")
+    const targetId = String(id || "")
+    const state = this.loadGroup(key)
+    if (!state.chunks.has(targetId)) return false
+    const kept = (state.records || []).filter(record => record.id !== targetId)
+    if (state.file) {
+      await fs.promises.mkdir(this.groupDir(), { recursive: true })
+      await this.compactFile(state.file, kept)
+    }
+    this.groups.delete(key)
+    this.loadGroup(key)
+    return true
+  }
+
+  // 每日清扫:逐群装载(丢弃过期)并强制压实任何含过期/无效行的文件;
+  // 记忆演化启用时,强度衰减到冻结阈值以下的分块一并遗忘(半衰期模型代替硬保留期)。
   async sweepAll() {
     const groupIds = []
     try {
@@ -209,21 +344,36 @@ export class SemanticMemoryStore {
         if (entry.isFile() && entry.name.endsWith(".ndjson")) groupIds.push(entry.name.replace(/\.ndjson$/, ""))
       }
     } catch {
-      return { groups: 0, compactedGroups: 0, droppedChunks: 0 }
+      return { groups: 0, compactedGroups: 0, droppedChunks: 0, frozenChunks: 0 }
     }
+    const now = Date.now()
+    const evolutionOn = this.evolution.enabled && this.evolution.freezeThreshold > 0
     let compactedGroups = 0
     let droppedChunks = 0
+    let frozenChunks = 0
     for (const groupId of groupIds) {
       const state = this.loadGroup(groupId)
       if (!state.file || !fs.existsSync(state.file)) continue
       droppedChunks += state.droppedOnLoad || 0
-      if ((state.droppedOnLoad || 0) > 0) {
-        await this.compactFile(state.file, state.records || []).catch(error =>
+      let records = state.records || []
+      if (evolutionOn) {
+        const survivors = records.filter(record =>
+          effectiveStrength(record, now, this.evolution.halfLifeDays) >= this.evolution.freezeThreshold)
+        frozenChunks += records.length - survivors.length
+        records = survivors
+      }
+      // 强化未落盘的行不能被旧记录覆盖:先落盘再按合并结果压实
+      await this.flushDirty(state).catch(error =>
+        this.logger?.warn?.(`[SemanticMemory] 清扫落盘 ${groupId} 失败: ${error.message}`))
+      if (records.length !== (state.records || []).length || (state.droppedOnLoad || 0) > 0) {
+        await this.compactFile(state.file, records).catch(error =>
           this.logger?.warn?.(`[SemanticMemory] 清扫压实 ${groupId} 失败: ${error.message}`))
         compactedGroups++
+        this.groups.delete(String(groupId))
+        this.loadGroup(String(groupId))
       }
     }
-    return { groups: groupIds.length, compactedGroups, droppedChunks }
+    return { groups: groupIds.length, compactedGroups, droppedChunks, frozenChunks }
   }
 
   async compactFile(file, records) {
@@ -256,7 +406,12 @@ export class SemanticMemoryStore {
     })
     await fs.promises.appendFile(file, lines.join("\n") + "\n", "utf8")
 
-    // 内存增量:重载该群(文件已在页缓存,毫秒级)
+    // 内存增量:重载该群(文件已在页缓存,毫秒级);重载前先保住未落盘的强化
+    const prior = this.groups.get(String(groupId))
+    if (prior?.dirty?.size) {
+      await this.flushDirty(prior).catch(error =>
+        this.logger?.warn?.(`[SemanticMemory] 写入前落盘 ${groupId} 失败: ${error.message}`))
+    }
     this.groups.delete(String(groupId))
     this.loadGroup(groupId)
     return usable.length

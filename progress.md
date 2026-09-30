@@ -1,3 +1,93 @@
+# 2026-09-30 第三批修正:节奏装饰器撤除 + 记忆纠错改为自纠错（用户对三功能的裁决:"1可以做,2的节奏不需要做,3的记忆不应该他自己作吗"）
+- 拟人节奏装饰器全量撤除:replyRendering 两处延迟恢复原公式,删模块/配置/测试——用户不要"节奏破绽"这类活人拟态。
+- 记忆自纠错(utils/memorySelfCorrection.js):纠错发生在对话里而非主人手动查删。链路:语义记忆注入时 noteInjectedChunks 记录该群本轮引用的分块 id(TTL 10min)→ 群消息命中纠错话术(你记错了/记岔/不是这样的/根本没有...)且与 bot 相关(引用 bot 消息,或发送者正是 bot 上轮回复的人)→ store.penalizeChunks 降权这些分块。降权非删除:基准强度 -0.5 且不重置衰减锚点(与强化不对称——被纠错的记忆继续按原时钟衰减),重复纠错跌破冻结线由每日清扫淡忘,单次误伤只降权不丢数据。她的口头回应不需改:纠错消息本身在上下文里,模型自然会说"啊那我记岔了"。三个入口(strict/smart/handleTool)统一挂 handleMemorySelfCorrection 钩子;config semanticMemory.selfCorrection{enabled,penalty,ttlMinutes}。
+- 测试:memorySelfCorrection 5 用例(话术命中与误伤/三条件缺一不可/TTL/降权数学含锚点不重置与钳下限/缓存过滤);节奏相关 4 用例删除。全量 1321/0。部署:备份 selfcorrection-predeploy;服务器同步删除 humanRhythmDecorator;重启 0 加载错误、服务器单测 9/9。
+
+# 2026-09-30 第三批落地:注意力漂移/拟人节奏装饰器/记忆纠错闭环（用户"做"）
+- 注意力漂移(借鉴 MaiBot attention_drift,做薄为纯话题统计零模型调用):groupContextState 关键词加 firstAt,detectAttentionHook(新词+≥2次爆发+窗口判定,now 可注入);timingGate 采集段注入 formatAttentionHint 三档措辞(subtle 轻提/normal 更容易被吸引/strong 明显被吸引),strong 档在 handleRandomReplySmart 阈值处降一档门槛(带日志);config smartTrigger.attentionDrift{enabled,level,windowMinutes}。
+- 拟人节奏装饰器(自研路线,不抄错别字):utils/humanRhythmDecorator.js planSendBeats——在既有 typingSpeed 曲线上叠加偶发节拍变体:慢半拍(回复前 1.2-3.5s+段间×1.8-2.6,像在琢磨)、快连发(段间 80-320ms,像急着补一句);replyRendering 两处延迟点统一走 beats.gaps;config humanRhythm{slowBeatProbability 0.15,quickBeatProbability 0.10};只改节奏不改内容。
+- 记忆纠错闭环:.语义记忆 查询 结果带序号+提示"忘记 第N条"(10 分钟缓存 per 群);resolveForgetTarget 支持序号/原始 id/越界/过期四路径;忘记 handler 接入。
+- 测试:tests/batch3Features.test.js 8 用例(节拍三态/延迟量级/钩子检测含拨表/三档措辞/纠错四路径+集成链路);过程中踩两次:ESM import 提升导致全局垫桩失效(家规:测试体内垫桩+动态 import)、handleCommand 运行时单例门槛不可注入(直测方法绕过,测缓存闭环本体)。全量 1320/0。
+- 部署:备份 batch3-features-predeploy;重启 0 加载错误、中期记忆就绪、服务器单测 8/8、新配置键自动合入。
+
+# 2026-09-30 第二批重构:test.js 主链路拆分 + 群运行时状态统一（用户"继续做",行为不变原则）
+- core/runtime/groupRuntime.js:smart 状态存储(trackingChatStates)与 100 群 LRU 原样迁入,提供 getSmartRuntimeState/delete/list/has;getGroupRuntime(groupId) 统一门面组合 smart+话题+社交(peek 只读快照,groupContextState 加 peek 导出)——跨子系统功能(注意力漂移等)以后只面对这一个入口。TTL 扫描器留在 test.js(它编排多张 Map),改走门面 API。
+- apps/lib/adminCommands.js(321行,18 方法):mcp 查询/调试 + 违禁词 + 人设库全部命令处理器迁出,host 注入;reloadMCP/initMCP 留在原地(牵模块级 mcpInitPromise)。
+- apps/lib/smartDynamics.js(122行,9 方法):对话相位(FOCUS/FADING/COLD)/talkValue(含按群覆盖)/空闲补偿/回复延迟/群速率纯辅助。
+- apps/lib/timingGate.js(204行):Timing Gate LLM 决策整体迁出,注意力漂移的扩展点。类内全部保留单行委托(house pattern)。
+- 事故与工具:抽取脚本首版切片 bug(split 尾空行多留大括号)导致 adminCommands 损坏,靠服务器一小时前的部署副本恢复原始方法体重建——**部署即异地备份**的价值实证;danglingReferences 测试当场抓住 timingGate 6 个漏 import;两份源码级合同测试(sessionContinuity/triggerUnification)钉住"gate 位置"的断言更新到新家,合同意图(共享信号模块/人设注入)不变。部署时踩服务器旧版 chatCompletionUrl 具名导出不存在的坑,改回 house style 的 as 别名导入。
+- 结果:apps/test.js 5622→5092 行(-530),新增 4 个职责清晰的模块;全量 1312/0(行为不变);服务器重启后 0 加载错误、QQ 已连、合同测试 7/7。备份 batch2-refactor-predeploy-20260930。
+
+# 2026-09-30 MaiBot 借鉴第一批落地:中期记忆/调皮心情时刻/表情认识感/按群频率（用户确认批次计划后"按你说的,做吧"）
+- 中期记忆(滚动主线摘要,domains/midtermMemory/MidtermSummaryManager.js):归档钩子→群缓冲攒批(15条,防抖20s)→便宜模型(memoryAiConfig,默认 glm-5.3-flash)把旧摘要+新消息压成≤500字主线→JSON 落盘→提示词层注入。三层记忆结构成型:原文(60min窗口)→主线叙事(3天)→长期事实(RAG 30天+强度演化)。LLM 失败行回缓冲重试不丢消息;12h 清扫过期摘要;midtermMemory 层同时进 chat/task 两个层集(闲聊不断片是重点)。新增第 20 层,更新 promptLayers 特征快照与 composer mock。
+- 调皮心情时刻(utils/personaMoods.js,用户定义:"不是换人格,是偶尔活泼或腹黑一下"):persona.moods[]=[{name,hint,probability}],主链路每回合掷骰(独立概率,命中一个即止,概率封顶1),群级冷却10分钟防连发;命中经 turn.moodHint 进 composer,拼在 personaTone 层——"只影响这一次回复的语气"。message.yaml 默认人设/人设库条目/网页人设面板(一行一条 名称|提示|概率)三处都可配。
+- 表情包认识感(借鉴"认识"视角,做薄):emojiFamiliarity 派生认识度(0=新捡,5次封顶);选择权重加 familiarityBias(默认0.25)小幅偏置熟悉图(0=回到纯多样性);selectEmoji 结果带 firstUse,发送工具首次使用新表情时在返回给模型的文案里带"刚捡到"认领提示,不刻意解释。
+- 按群 talkValue:smartTrigger.groupTalkValues={群号:0.15},优先级高于时段规则——某些群话痨某些群安静。
+- 测试:新增 midtermMemory(9)/personaMoods(6)/emojiFamiliarity(3,统计验证真实抽样而非公式复刻)共 18 用例;过程中三次踩归一化下限钳制(minMessages/flushBatch/概率封顶)——测试参数要贴着钳制边界写。全量 1312/0。
+- 部署:备份 batch1-mai-absorb-predeploy-20260930;重启后 [中期记忆] 就绪(glm-5.3-flash)、语义记忆/页面正常、0 错误;服务器单测 18/18;用户 message.yaml 自动合入新配置键;网页人设面板 moods 字段已渲染。
+
+# 2026-09-30 借鉴 MaiBot/A-Memorix:记忆强度演化 + 单条遗忘（用户："把Mai里面你觉得对我们更有用的优势给借鉴一下"）
+- 选型结论:MaiBot 值得抄的是 A-Memorix 的记忆演化模型(半衰期衰减/召回强化/冻结遗忘),而不是整体换框架——浏览/搜索网页已有,缺的正是演化与遗忘;关系图/情景分层暂缓(现有 episodic+semantic 已覆盖主干)。
+- 实现:1) SemanticMemoryStore 增 effectiveStrength(半衰期,锚点取 lastRecallAt/end_ts 较大者——被想起即重置衰减时钟)、reinforceChunks(内存强化+flushBatch 批量追加落盘)、forgetChunk(重写文件剔除+重载)、LRU 淘汰/写入前先落盘防强化丢失、sweepAll 增冻结遗忘(强度<freezeThreshold 清扫时删除,retentionDays 仍作硬上限);2) Retriever 排序混入强度因子(0.5+0.5*strength 乘 RRF,不翻转相似度主序)、低于冻结阈值不注入、被注入的自动强化;3) 配置 semanticMemory.memoryEvolution(半衰期默认 7 天/强化 0.35/冻结 0.06,freezeThreshold=0 可关闭);4) 语义记忆网页增强度列+想起(强化)/忘记按钮,QQ 增 .语义记忆 忘记/想起 <分块id>;5) 旧数据无 strength 字段按 1.0 兼容,关闭开关即回到原排序。
+- 调试插曲:测试给 flushBatch=2 被归一化下限钳到 4 导致落盘不触发——实现无误,是测试参数越界,顺带验证了钳制逻辑本身。
+- 测试:新增 tests/semanticMemoryEvolution.test.js 8 用例(半衰期数学/强化持久化/遗忘/清扫冻结/排序融合/关闭兼容/rrfFuse 回归);全量 1294/0。页面改动沿用"模板求值后语法检查"验证法。
+- 部署:备份 memory-evolution-predeploy-20260930;重启后语义记忆就绪、页面挂载;线上端到端:chunks 返回 effStrength(0.996)、reinforce 后 recallCount 0→1 且强度回到 1.000、forget 幽灵 id 正确返回未找到。
+
+# 2026-09-30 网页管理入口:命令管理页新增人设库/违禁词面板（用户："锅巴页面还是哪里我也要可以添加"）
+- 违禁词锅巴 UI 确认已注册生效（permission.js 在 schemas 列表,重启后出现）。
+- 命令管理页（2536/bl-chat/commands,自带令牌鉴权）新增两个管理面板,照表情包/骰子面板的"独立保存按钮"模式:
+  - 🎭 人设库面板:默认人设只读卡 + 库内人设卡片编辑（名字/身份/语气/说话风格/偏好/边界/备注,列表字段一行一条）+ 以默认为模板新增 + 删除 + 按群绑定行编辑 + 私聊人设选择,保存走 POST /api/persona-data。
+  - 🚫 违禁词面板:开关/出站拦截/提示语/词表（一行一条,支持 /正则/i）,保存走 POST /api/forbidden-data（applyFlatUpdates 写 message.yaml 热更新）。
+- personaLibrary 新增 exportState()（深拷贝快照）与 replaceAll()（网页整库写:保 id/非法 id 与 default 冒充换随机新 id、重名报错不落盘、指向已删人设的绑定自动清理）。
+- 事故与修复:第一版页面模板里的前端代码用了单反斜杠 \n,模板求值后变成真实换行把页面脚本的字符串字面量折断——整个管理页（含原有命令管理）白屏无数据。浏览器实测抓到,改为家规双反斜杠 \\n;并建立"模板求值后再对 <script> 做 new Function 语法检查"的验证方法（此前只查源码不查求值结果,查不出这类错）。教训:改这个文件必须跑求值后检查+浏览器实测。
+- 验证:本地全量 1286/0；服务器 curl 验证 API（GET/POST/坏令牌 401/注释不丢）；浏览器实测:导航 13 模块、两面板渲染、人设"新增→改名→保存→回读→删除→保存清理"全链路,测试数据已清。部署备份 backups/web-persona-predeploy-20260930。
+
+# 2026-09-30 违禁词黑名单:命中即中断当前对话（用户："如果说了一些违禁词就立马中断当前对话"）
+- 新增 utils/forbiddenWordGuard.js：词表编译（普通词大小写不敏感子串 + `/正则/` 形式、非法正则降级普通词）、按群会话中断状态（单调递增时间戳）、出站文本提取（字符串/CQ 段数组/对象）。
+- 中断语义（锚点制）：回合入口（strict/smart/handleTool 三处）给事件打 `_forbiddenAnchorAt` 锚点且只打一次（内部 handleTool 复锚不复活已中断回合）；出站咽喉 sendSegmentedMessage/sendObservedReply 发现"中断晚于锚点"即丢弃——进行中的模型调用/工具回合会跑完但结果不再发出，群视角=立刻掐断；未打锚点的事件（指令回复）永不被误杀；中断后新消息开新回合不受旧中断影响。
+- 入口门禁：strict/smart/handleTool 三个入口最先检测（在学习/话题记录之前，违禁内容不进任何下游），命中→标记中断+清理 smart 排队续话（deferredTimer/waitTimers/rerunEvent/force 标志）+ 可选 replyText 提示（支持 {personaName}，默认静默）。
+- 出站兜底 blockOutput：bot 自己要说的话含违禁词→拦截该条并同样中断本回合（防复读式绕过）。
+- 管理：#违禁词列表/#加违禁词/#删违禁词（仅主人，configWriter 写 message.yaml 热更新）；Guoba 权限页新增违禁词配置区；commands.yaml 增 forbidden 域。
+- 测试：tests/forbiddenWordGuard.test.js 7 用例（词表/正则降级/锚点时间语义/出站咽喉三场景拦截链）；过程中修掉实现 bug——中断时间戳同毫秒分辨率不足导致锚点比较漏判，改单调递增。全量 1285 用例 0 失败（55 skip 为既有环境跳过）。
+- 已部署服务器并重启验证。
+
+# 2026-09-30 多人设库 + 按群切换（用户："人设可以保存多份,并且可以按群切换"）
+- 新增 utils/personaLibrary.js：多套人设存 config/persona-library.yaml（personas 列表 + groupBindings 群绑定 + privateBinding 私聊绑定），mtime 缓存热读取（手改 yaml 下轮对话生效）、yaml 坏文件沿用上次好状态不炸聊天；默认人设 id=default 永远来自 message.yaml 随主配置热更；库内条目缺省字段回退默认人设（深合并语义）；重名 upsert 保留原 id 不断绑定；删除人设自动解绑其群。
+- 接入聊天链路（按会话解析人设）：apps/test.js 主提示词三要素（baseIdentity/personaOverride/personaName）、gate 节奏判断 buildPersonaTonePrompt、composeTurnPromptLayers 与 resolveToolRoute 改传 getChatConfig(e) 视图（未绑定群零开销复用全局配置对象）；replyRendering/semanticToolIntent/PersonProfileInjector/Banana/Voice/TextImage 工具守卫 botNames 均改为 getPersonaFor(e)。Google 两工具的 config 本就由路由层传入，自动生效。
+- 指令（apps/test.js，命令总表已同步 persona 域 9 条）：#人设列表/#当前人设/#人设详情 任意人；#切换人设 <名字> [群号]/#人设重置 [群号] 群主/群管或主人（带群号跨群切仅主人）；#保存人设（快照当前会话生效人设）/#删除人设/#人设重载/#人设绑定列表 仅主人。
+- 测试：新增 tests/personaLibrary.test.js 12 用例（含共享空状态污染、坏 yaml 回退、热更新、重名覆盖保 id、集成契约——绑定切换后主提示词三要素跟随）；过程中修掉自身引入的 bug：模块级 EMPTY_STATE 常量被多实例 upsert 交叉污染，改 emptyState() 工厂。全量 0 失败（55 skip 为既有环境跳过）。
+- 已部署：服务器 /opt/trss-yunzai/plugins/shiloh-plugin（服务器与本地逐字节一致已核验），备份 persona-library-predeploy-20260930；服务器 config/commands.yaml 由命令管理页维护，已按机器格式追加 persona 域；重启后 active、OneBotv11 已连、0 加载错误。persona-library.yaml 首次保存/绑定时自动生成。
+
+# 2026-09-29 梨骰算符 + 命运骰（用户确认补齐表达式引擎前两项）
+- 语义取自 dicescript 源码：roll.peg `_dicePearMod`——优势/劣势仅 dN 形式（XdY优势 不合法），SetTimes=2+KeepHigh/Low=1，支持繁体優勢/劣勢；roll_func.go RollFate——固定 4 颗，每颗 roll3-2∈{-1,0,1}，符号 -/0/+。
+- 已实现：normalizeDiceExpression 归一 `(?<![\dd.])d(\d+)(优势|優勢|劣势|劣勢)` → 2dNkh1/kl1（负向断言防 3d20优势 误拆）；parsePrimary 增加 f 分支 parseFateDice（默认 4 颗、支持 Xf 数量前缀比豹骰略宽容、maxDiceCount 守卫、防御钳制注入 random=1.0 越界）。
+- 测试：diceManagerCore 新增确定性断言（优势取高/劣势取低/繁体/算术组合/3d20kh1 不误伤/f 符号与总和/Xf）；本地全量 1184/0；群模拟 175 用例线上实测 175/175。已部署重启验证（active、OneBotv11、0 加载错误）。
+
+# 2026-09-29 代骰家族补全 + (N)M 表达式（用户："代骰都做不到吗"）
+- 澄清：此前遗留清单里"表达式级代骰"是误标——@代骰家族我们只有 ra/rav 做了，r/sc/en/st 都缺；(.ra(1)50) 实为括号轮数形式，不是代骰。都不复杂，本轮全部补齐。
+- 已实现：resolveDelegate 统一入口（首位 @某人 不含骰子→对方事件），接入四命令——.r @某人=代掷（显示对方名）、.sc @某人=扣对方卡 SAN、.en @某人=成长对方卡（读卡/取值/写回统一对方事件）、.st @某人=录/查对方卡（KP 录 NPC）；.sc 显示名也归属代骰对象。parseCheckArgs 支持 (N)M 形式（.ra(1)50=1 轮对 50，.rab3(1)50 组合可用）。
+- 过程中修复自身引入的两处：renderCard 方法被段替换越界污染（stEvent 未定义）、en 读写事件不一致（读对方卡写自己卡——红队探针当场抓获）。
+- 测试：合同新增代骰家族（st 代录/代查、r 代掷、sc 代扣断言"剩余 50"、en 代成长断言"不得写发起者卡"）与 (N)M 用例；本地全量 1183/0；群模拟 171 用例线上实测 171/171（代骰组用 master 作目标，member 卡锁是环境序问题）。已部署重启验证（active、OneBotv11、0 加载错误）。
+
+# 2026-09-29 红队终验（用户质疑"真的没问题了吗"）
+- 方法：不再自评，做对抗性红队扫描——把豹骰帮助文本全部文档化写法（35 项）+ 近期改动交互边角在隔离环境逐条重测，失败逐个甄别（区分环境脚本问题 vs 真差异）。
+- 结果：35+5 项中甄别出 1 个真差异并修复——.en 未录但有官方默认的技能（神秘学=5、克苏鲁神话=0）应按默认值成长（sealdice 变量读取含 defaults），原只查卡报"找不到"。修复后 en 与 ra 同源取值。其余"失败"均为红队脚本自身未设卡环境/断言笔误（sc 未录 SAN 报错与豹骰一致；.en 未录自造词提示与豹骰"属性未录入"一致）。
+- 新增合同用例：神秘学/克苏鲁神话按默认成长。本地全量 1181/0；线上 166/166；部署后生产日志 30 分钟窗口 0 骰娘执行失败、0 回合持久化失败。
+- 诚实剩余清单（已知未对齐，非缺陷级）：ra 表达式级代骰(.ra(1)50)、rav 对抗同档属性细则官方已停用分支、stat 统计口径与豹骰 detail 模式不同、.组队成员显示 QQ 号非昵称、dnd 侧 cast/ss 语法未逐行对源、story/alias/gugu/jsr/drl/botlist 明确不做（前述理由）。
+
+# 2026-09-29 合同测试体系（用户指出"sn coc 问题说明单测写得不对,缺失很多东西"）
+- 根因确认：旧单测断言的是"我写的实现"而非豹骰权威行为，错了也能全绿（.sn coc 错误实现照样通过自己的测试）。
+- 已建立 sealdice 合同测试：tests/sealdiceContract.test.js——期望值全部取自 sealdice 源码数据（文件头注明来源），含 797 项别名表逐条比对、113 项官方默认值逐项比对、sn 三模板精确串、ra/sc/en 帮助文本语法逐形式断言。配套 fixtures（seal_alias/defaults.json）由 coc7.yaml 导出，实现侧生成 domains/dice/sealSkillAliases.js 与 sealCocDefaults.js（手抄默认表当场被抓漏 28 项，改为 yaml 直出）。
+- 合同测试当场抓到的真问题：①默认值手抄漏项（电气维修等 28 项）→改为源数据生成；②别名写入侧全局归一会把永恒幻梦的「知识」改写成「教育」→改为**读取侧候选键**设计（写入原样、读取按 原名→规范名→同组别名 顺序命中），跨体系不污染。
+- 别名能力上线：繁体/同义词互通（.st 偵查 60 与 .ra 侦察/侦查 命中同值），默认值与别名叠加生效。
+- 测试：本地全量 1180/0（新增合同 7 用例）；群模拟 166 用例线上实测 166/166（含繁体默认判档/读写别名互通）。已部署重启验证（active、OneBotv11、0 加载错误）。
+
+# 2026-09-29 全豹骰逻辑审计（用户："不仅仅是coc,整个豹骰的逻辑都要仔细分析"）
+- 全模块命令枚举：builtin_commands(roll/dismiss/master/ban/bot/botlist/ext/find/help/nn/pc/reply/set/userid/randalgo)、coc7(已对齐)、dnd5e(rc/cast/ri/ss/死亡豁免/长休/dnd/init——我方均有等价)、deck(=.draw 系列等价)、log(sn/ob/log/stat)、fun(drl/jsr/welcome/alias/check/dx/ek/ekgen/gugu/jrrp/ping/rsr/send/text/ww)、story(story/modu/name/namednd/who)、core_team(team)。
+- 新实现四项：①.组队 <队名> add/del/clear/call/draw N/ra 技能 全队批量检定/st（sealdice ext_core_team 语义；命令名用"组队"因 .team 已被自家 V2 团务规则包系统占用，冲突检测正确拦截了核心路由）；②.stat [团名|序号] 团录检定统计（读 NDJSON 的 dice_result 行，按角色统计检定/成功/大成功/大失败，依赖昨日结果入档）；③.who 随机置换分配；④.ping 存活检测。
+- 明确不做/暂缓（附理由）：story/modu(剧本系统,与规则包V2定位重叠)、alias(我方命令已短)、gugu(纯娱乐)、jsr/drl 群抽奖池、botlist 多骰娘握手(P2 结论不变)、randalgo/master/ban(有等价管理面)、welcome(groupNotice 已有)。
+- 测试：diceManagerCore 新增组队/stat/who/ping 用例 38 项通过；本地全量 1173/0；群模拟 163 用例线上实测 163/163。已部署：备份 full-audit-20260929，排空重启 active、OneBotv11、0 加载错误；命令总表 121 条。
+
 # 2026-09-29 海豹源码全面审计与 COC 语义对齐（用户批评"犯错好几次,没把豹骰的东西拿来"）
 - 方法：clone sealdice-core 源码（git@github.com，浅克隆），逐命令提取帮助文本与解析语义（ext_coc7.go/ext_log.go/ext_dnd5e.go/builtin_commands.go + templates/coc7.yaml、dnd5e.yaml），与我方实现逐条对照。
 - 修复九项差距：①内置默认技能值表（coc7.yaml attrs.defaults 约 80 项 + 派生：闪避=敏捷/2、生命值上限=(体质+体型)/10、母语=教育）——未录卡技能按官方默认判档（侦查25/格斗5/斗殴25…），自造词仍走"照掷+提示录入"；②.ra 技能±N 修正后缀（侦查+10=默认/卡值+10），数值 token 支持表达式（侦查 20+10）；③.ra 3#p 语法=多轮每轮奖惩骰（原被误判成 N 个奖惩骰）；④.sc b|p 奖惩骰与单参简易写法（.sc 1d6=成功扣0）；⑤.en +成功值 / +失败值/成功值（失败也可按设定成长）；⑥.rav 技能1 技能2 @A @B 两人各用各的卡对抗；⑦.nn 无参=查看、.nn clr=重置回群名片；⑧.pc rename 改名（锁定卡拦截）；⑨.sn coc/cocL/dnd 内置名片模板（sealdice 真语义：卡摘要写入群名片，"玩家 SAN{理智} HP{生命值}/{上限} DEX{敏捷}"，dnd 为 HP/AC/DC/PP），未知词仍回退设昵称+同步。

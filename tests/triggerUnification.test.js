@@ -17,8 +17,10 @@ test("turn trace carries trigger provenance", () => {
 
 test("timing gate shares the persona and trigger decisions flow into the turn", () => {
   const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
-  assert.ok(src.includes("gatePersonaTone"), "Gate prompt 需要注入人设语气")
-  assert.ok(src.includes("触发决策与主链路共享同一份人设"), "Gate 与主链路共享人设的说明")
+  // gate 已拆到 apps/lib/timingGate.js(P 重构),人设注入断言看新家
+  const gateSrc = fs.readFileSync(path.join(root, "apps/lib/timingGate.js"), "utf8")
+  assert.ok(gateSrc.includes("gatePersonaTone"), "Gate prompt 需要注入人设语气")
+  assert.ok(gateSrc.includes("触发决策与主链路共享同一份人设"), "Gate 与主链路共享人设的说明")
   for (const marker of [
     'e._triggerContext = { mode: "smart_gate", gateDecision: "continue"',
     'e._triggerContext = { mode: "auto_media" }',

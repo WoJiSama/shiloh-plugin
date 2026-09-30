@@ -135,7 +135,7 @@ export class SendLocalEmojiTool extends AbstractTool {
       return `error: 近期 ${rl.windowMinutes} 分钟内已发送 ${rl.count} 张表情包（上限 ${rl.max}），本轮请直接用文字回复，不要再调用本工具`
     }
 
-    const { item, strategy, score, criteria: matchedCriteria } = await emojiPackManager.selectEmoji(criteria, { groupId })
+    const { item, strategy, score, criteria: matchedCriteria, firstUse } = await emojiPackManager.selectEmoji(criteria, { groupId })
     if (!item) {
       // 无匹配/库空不是失败：返回文字引导（非 error: 前缀），让后续轮次用纯文字自然回应，
       // 不走失败道歉路径——限流/发送失败才是 error，由失败策略静默处理
@@ -196,7 +196,9 @@ export class SendLocalEmojiTool extends AbstractTool {
       const textParts = rhythm.sequence.filter(part => part.type === "text").map(part => part.text)
       const followInfo = textParts.length ? ` + ${textParts.length}段文字"${textParts.join(" / ").slice(0, 28)}${textParts.join(" / ").length > 28 ? "..." : ""}"` : ""
       const scoreInfo = Number.isFinite(score) ? `, 相关度: ${score.toFixed(2)}` : ""
-      return `已发送表情包 [${tagInfo}]${followInfo} (策略: ${strategy}${scoreInfo}, 回复模式: ${replyMode}, ${describeEmojiSelectionCriteria(matchedCriteria || criteria)})`
+      // 认领时刻:首次使用刚收藏的新表情时告知模型,后续文字可带点"刚捡到"的自然口气(不强制)
+      const claimInfo = firstUse ? ";这是刚收藏还没用过的新表情,如需补文字可以带一点点'刚捡到'的口气,但别刻意解释" : ""
+      return `已发送表情包 [${tagInfo}]${followInfo} (策略: ${strategy}${scoreInfo}, 回复模式: ${replyMode}, ${describeEmojiSelectionCriteria(matchedCriteria || criteria)})${claimInfo}`
     } catch (err) {
       // 本轮已有任一可见内容发出时计入限流，避免失败重试继续刷屏。
       if (emojiSent) {

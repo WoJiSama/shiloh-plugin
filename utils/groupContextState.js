@@ -27,15 +27,35 @@ export function updateGroupTopic({ groupId = "", text = "" } = {}) {
   const now = Date.now()
   state.recentCount += 1
   for (const word of extractChatKeywords(content, 4)) {
-    const entry = state.keywords.get(word) || { count: 0, at: 0 }
+    const entry = state.keywords.get(word) || { count: 0, at: 0, firstAt: now }
     entry.count += 1
     entry.at = now
+    if (!entry.firstAt) entry.firstAt = now
     state.keywords.set(word, entry)
   }
   for (const [word, entry] of state.keywords) {
     if (now - entry.at > TOPIC_WINDOW_MS) state.keywords.delete(word)
   }
   topicByGroup.set(key, state)
+}
+
+/**
+ * 注意力钩子(借鉴 MaiBot attention_drift,做薄):检测"刚冒出来且正在爆发"的新话题。
+ * 判定:firstAt 在 windowMs 内(新词)且提及次数达到 minCount(爆发)。
+ * 返回 { word, count, firstAt } 或 null——给 TimingGate 注入"容易被新话题吸引"的提示。
+ */
+export function detectAttentionHook({ groupId = "", windowMs = 5 * 60 * 1000, minCount = 2, now = Date.now() } = {}) {
+  const state = topicByGroup.get(String(groupId || ""))
+  if (!state) return null
+  let best = null
+  for (const [word, entry] of state.keywords) {
+    const firstAt = Number(entry.firstAt) || Number(entry.at) || 0
+    if (now - firstAt > windowMs) continue
+    const count = Number(entry.count) || 0
+    if (count < minCount) continue
+    if (!best || count > best.count) best = { word, count, firstAt }
+  }
+  return best
 }
 
 export function getGroupTopicPrompt(groupId = "") {
@@ -104,4 +124,25 @@ export function getGroupSocialPrompt(groupId = "") {
 export function resetGroupContextStateForTests() {
   topicByGroup.clear()
   socialByGroup.clear()
+}
+
+// 只读快照:给群运行时门面(groupRuntime)组合用,不改变任何维护逻辑
+export function peekGroupTopicState(groupId = "") {
+  const state = topicByGroup.get(String(groupId || ""))
+  if (!state) return null
+  const words = [...state.keywords.entries()]
+    .sort((a, b) => b[1].count - a[1].count || b[1].at - a[1].at)
+    .slice(0, TOPIC_MAX_KEYWORDS)
+    .map(([word, entry]) => ({ word, count: entry.count, at: entry.at }))
+  return { recentCount: state.recentCount, keywords: words }
+}
+
+export function peekGroupSocialState(groupId = "") {
+  const state = socialByGroup.get(String(groupId || ""))
+  if (!state) return null
+  const now = Date.now()
+  return {
+    speakers: state.speakers.filter(s => now - s.at <= SOCIAL_WINDOW_MS).map(s => ({ ...s })),
+    edges: [...state.edges.values()].filter(e => now - e.at <= SOCIAL_WINDOW_MS).map(e => ({ ...e }))
+  }
 }

@@ -16,6 +16,9 @@ function buildDeps(overrides = {}) {
     emotionManager: {
       getEmotionPromptForGroup: async () => "【情绪】E"
     },
+    midtermSummaryManager: {
+      getSummaryPrompt: async () => "【本群近期主线】S"
+    },
     memoryManager: {
       getContextualMemoryPrompt: async (groupId, userId, text) => {
         calls.memory.push({ groupId, userId, text })
@@ -59,6 +62,7 @@ const CONFIG = {
   memorySystem: { enabled: true },
   expressionLearning: { enabled: true },
   personProfileInjection: { enabled: true },
+  midtermMemory: { enabled: true },
   globalStyleLearning: { semanticPromptWaitMs: 350 }
 }
 

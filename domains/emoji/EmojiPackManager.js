@@ -33,6 +33,7 @@ const DEFAULT_EMOJI_CONFIG = {
   avoidRecentEnabled: true,
   avoidRecentCount: 20,
   avoidRecentTtlMinutes: 30,
+  familiarityBias: 0.25,
   followUpDelayMinMs: 300,
   followUpDelayMaxMs: 1200,
   rateLimitEnabled: true,
@@ -57,6 +58,14 @@ let instance = null
 
 function logInfo(msg) { globalThis.logger?.info?.(`[EmojiPackManager] ${msg}`) }
 function logWarn(msg) { globalThis.logger?.warn?.(`[EmojiPackManager] ${msg}`) }
+
+// 表情认识度(派生,不落盘):0=刚捡的新表情,1=常用熟图。
+// 依据现有 usedCount 字段:用过即脱离"新",5 次封顶视为完全熟悉。
+export function emojiFamiliarity(item = {}) {
+  const usedCount = Number(item?.usedCount) || 0
+  if (usedCount <= 0) return 0
+  return Math.min(1, 0.3 + 0.7 * Math.min(usedCount, 5) / 5)
+}
 function logError(msg) { globalThis.logger?.error?.(`[EmojiPackManager] ${msg}`) }
 
 function readPluginConfig() {
@@ -864,11 +873,16 @@ ${list}
       return 1
     }
 
+    // 认识感偏置(借鉴 MaiBot 表情包"认识"视角):熟悉度 0(新捡)~1(常用),
+    // 在 score 主导与多样性(usageFactor)之外,给熟悉的表情小幅加成;0=关闭回到纯多样性
+    const familiarityBias = Math.min(1, Math.max(0, Number(this.config?.familiarityBias ?? 0.25)))
     const weights = pool.map(({ item, score }) => {
       const usedCount = item.usedCount || 0
       const usageFactor = Math.min(1.5, (1 / (usedCount + 1)) * (usedCount === 0 ? 2 : 1))
+      const familiarity = emojiFamiliarity(item)
+      const familiarityFactor = 1 - familiarityBias + familiarityBias * familiarity
       const baseScore = Math.max(0.01, Number(score) || 0.01)
-      return Math.pow(baseScore, 3) * usageFactor * cooldownPenalty(item.lastUsedAt)
+      return Math.pow(baseScore, 3) * usageFactor * cooldownPenalty(item.lastUsedAt) * familiarityFactor
     })
     const total = weights.reduce((a, b) => a + b, 0)
     if (total <= 0) return pool[0]
@@ -919,6 +933,14 @@ ${list}
     return deletedFiles
   }
 
+  // 选择结果附带认识感信息:firstUse=刚捡的首次使用(认领时刻),familiar=认识度
+  withFamiliarity(result) {
+    if (!result?.item) return result
+    result.familiarity = emojiFamiliarity(result.item)
+    result.firstUse = (Number(result.item.usedCount) || 0) === 0
+    return result
+  }
+
   async selectEmoji(input, options = {}) {
     this.refreshConfig()
     const allItems = await this.loadItems()
@@ -959,7 +981,7 @@ ${list}
       if (localRanked.length) {
         const preserveStrongMatch = criteria.tags.length > 0 || criteria.useCases.length > 0
         const picked = this.weightedSampleByUsage(localRanked, { preserveStrongMatch })
-        return { item: picked.item, strategy: "tag_scene", score: picked.score, criteria }
+        return this.withFamiliarity({ item: picked.item, strategy: "tag_scene", score: picked.score, criteria })
       }
     }
 
@@ -977,7 +999,7 @@ ${list}
             .slice(0, topK)
           if (ranked.length) {
             const picked = this.weightedSampleByUsage(ranked)
-            return { item: picked.item, strategy: "embedding", score: picked.score, criteria }
+            return this.withFamiliarity({ item: picked.item, strategy: "embedding", score: picked.score, criteria })
           }
         }
       } catch (err) {

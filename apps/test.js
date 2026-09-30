@@ -110,7 +110,7 @@ import { isAiConversationEnabled } from "../utils/aiConversationGate.js"
 import { shouldSkipIntentModel } from "../utils/intentFastPath.js"
 import { computeAddresseeSignal, buildAddresseePrompt } from "../utils/addresseeSignals.js"
 import { recordTurnContinuity, loadTurnContinuity, buildTurnContinuityPrompt } from "../utils/turnContinuity.js"
-import { updateGroupTopic, updateGroupSocial, getGroupTopicPrompt, getGroupSocialPrompt } from "../utils/groupContextState.js"
+import { updateGroupTopic, updateGroupSocial, getGroupTopicPrompt, getGroupSocialPrompt, detectAttentionHook} from "../utils/groupContextState.js"
 import { recordEpisode, recallEpisodes, recallUserEpisodes, buildEpisodicPrompt, buildUserCallbackPrompt, hasTemporalDeixis } from "../utils/episodicMemory.js"
 import { createTurnTrace, resolveTurnTraceArchiveDir } from "../utils/turnTrace.js"
 import { createOutboundArbiter } from "../utils/messagePipeline/outboundArbiter.js"
@@ -119,6 +119,44 @@ import { resolveLongTaskFeedbackPolicy } from "../utils/longTaskFeedbackPolicy.j
 import { resolvePromptLayerProfile } from "../utils/promptLayers.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../utils/personaSource.js"
 import { createPersonaLibrary } from "../utils/personaLibrary.js"
+import { findForbiddenWord, anchorEventConversation, markConversationInterrupted } from "../utils/forbiddenWordGuard.js"
+import { applyFlatUpdates } from "../utils/configWriter.js"
+import { installMidtermMemoryRuntime, getMidtermMemoryManager } from "../domains/midtermMemory/MidtermSummaryManager.js"
+import { rollPersonaMood } from "../utils/personaMoods.js"
+import { noteInjectedChunks, detectAndPenalize } from "../utils/memorySelfCorrection.js"
+import { getSmartRuntimeState, deleteSmartRuntimeState, smartRuntimeGroupIds, smartRuntimeSize, hasSmartRuntimeState } from "../core/runtime/groupRuntime.js"
+import {
+  mcpStatus,
+  testMCPTool,
+  isChatManager,
+  forbiddenWordList,
+  handleForbiddenList,
+  handleForbiddenAdd,
+  handleForbiddenRemove,
+  resolvePersonaTargetGroup,
+  formatPersonaDetail,
+  handlePersonaList,
+  handlePersonaCurrent,
+  handlePersonaDetail,
+  handlePersonaSwitch,
+  handlePersonaReset,
+  handlePersonaSave,
+  handlePersonaDelete,
+  handlePersonaReload,
+  handlePersonaBindings
+} from "./lib/adminCommands.js"
+import {
+  resolveConversationPhase,
+  applyRateLimitGuard,
+  resolveTalkValue,
+  idleCompensationMet,
+  computeAvgReplyLatency,
+  recordReplyLatency,
+  computeGroupMsgRate5min,
+  getDirectTriggerMergeMs,
+  getDirectTriggerMergeMaxMessages
+} from "./lib/smartDynamics.js"
+import { runTimingGate as runTimingGateFn } from "./lib/timingGate.js"
 import { buildMainSystemPrompt } from "../utils/systemPromptTemplate.js"
 import { composeTurnPromptLayers } from "../utils/turnPromptComposer.js"
 import { applyOutputPersonaGuards } from "../utils/outputGuardPipeline.js"
@@ -244,7 +282,6 @@ const trackingThrottle = new Map() // 节流: key: `${groupId}_${userId}`, value
 const pendingJudgments = [] // 批量判断队列
 let batchTimer = null // 批量处理定时器
 // smart 模式：每群独立的频率状态，进程内 Map，重启清零
-const trackingChatStates = new Map() // groupId -> { pendingCount, lastMsgAt, replyLatencies: [{at, ms}], forceContinue, forceGateCheck, lastGateNoActionAt, inFlight, waitTimers: Map<userKey, timeoutId> }
 // 群连续被新消息打断的累计计数（达到上限后下一轮强制走完不再让步）
 const consecutiveInterrupts = new Map() // groupId -> count
 // smart 锁持有令牌：看门狗强制释放后旧轮次的 finally 不得误释放新轮次的锁
@@ -438,6 +475,7 @@ function initializeSharedState(config) {
       logger.error('[LocalToolRegistry] 热更新工具失败:', error)
     })
     installSemanticMemoryRuntime({ pluginSettings: config, archiveManager: messageArchiveManager })
+    installMidtermMemoryRuntime({ pluginSettings: config, archiveManager: messageArchiveManager })
     setSharedRuntime({ memoryManager: sharedState.memoryManager, getConfig: () => config })
     return applyToolRegistrySnapshot(sharedState)
   }
@@ -472,6 +510,7 @@ function initializeSharedState(config) {
   }
   setSharedRuntime({ memoryManager: sharedState.memoryManager, getConfig: () => config })
   installSemanticMemoryRuntime({ pluginSettings: config, archiveManager: messageArchiveManager })
+  installMidtermMemoryRuntime({ pluginSettings: config, archiveManager: messageArchiveManager })
 
   applyToolRegistrySnapshot(sharedState)
   refreshLocalTools(sharedState, { force: true }).catch(error => {
@@ -589,6 +628,9 @@ export class ExamplePlugin extends plugin {
         { reg: "^#删除人设\\s+\\S+$", fnc: "handlePersonaDelete" },
         { reg: "^#人设重载$", fnc: "handlePersonaReload" },
         { reg: "^#人设绑定列表$", fnc: "handlePersonaBindings" },
+        { reg: "^#违禁词列表$", fnc: "handleForbiddenList" },
+        { reg: "^#加违禁词\\s+\\S+$", fnc: "handleForbiddenAdd" },
+        { reg: "^#删违禁词\\s+\\S+$", fnc: "handleForbiddenRemove" },
         { reg: "[\\s\\S]*", fnc: "handleRandomReply", log: false }
       ]
     })
@@ -653,6 +695,10 @@ export class ExamplePlugin extends plugin {
   // 回合持久化外壳：进行中的 AI 回合落 Redis，崩溃/重启后启动恢复可补跑。
   // 媒体自动交付事件(auto_media)有独立 outbox 幂等，beginTurn 内部会跳过。
   async handleTool(e) {
+    // 违禁词:工具/指令路径同样受黑名单约束;命中即中断当前对话,不开新回合
+    if (this.handleForbiddenWordHit(e)) return false
+    this.handleMemorySelfCorrection(e)
+    anchorEventConversation(e)
     const durability = this.chatTurnDurability
     if (!durability) return await this.handleToolInner(e)
     const turnEvent = e
@@ -716,7 +762,7 @@ export class ExamplePlugin extends plugin {
   }
 
   /**
-   * 启动 trackingChatStates 的 TTL 扫描器（进程内单例）：每 1 小时扫一次，
+   * 启动 smart 群状态的 TTL 扫描器（进程内单例）：每 1 小时扫一次，
    * 把 lastMsgAt 超过 activeChatTtlHours 的群从内存状态淘汰，连同 waitTimers 一并清掉。
    */
   startActiveChatLruScanner() {
@@ -727,11 +773,10 @@ export class ExamplePlugin extends plugin {
         const ttlHours = Number(this.config?.smartTrigger?.activeChatTtlHours) || 24
         const cutoff = Date.now() - ttlHours * 3600 * 1000
         let removed = 0
-        for (const [gid, st] of trackingChatStates) {
+        for (const gid of smartRuntimeGroupIds()) {
+          const st = getSmartState(gid)
           if ((st.lastMsgAt || 0) < cutoff) {
-            if (st.waitTimers) for (const t of st.waitTimers.values()) clearTimeout(t)
-            if (st.deferredTimer) clearTimeout(st.deferredTimer)
-            trackingChatStates.delete(gid)
+            deleteSmartRuntimeState(gid)
             lastIncomingMsgAt.delete(gid)
             consecutiveInterrupts.delete(gid)
             mutedStatusCache.delete(gid)
@@ -740,7 +785,7 @@ export class ExamplePlugin extends plugin {
         }
         // 兜底：清掉孤儿条目（不应该出现，但防御性编程）
         for (const [gid, ts] of lastIncomingMsgAt) {
-          if (!trackingChatStates.has(gid) && ts < cutoff) {
+          if (!hasSmartRuntimeState(gid) && ts < cutoff) {
             lastIncomingMsgAt.delete(gid)
             consecutiveInterrupts.delete(gid)
           }
@@ -750,7 +795,7 @@ export class ExamplePlugin extends plugin {
         for (const [gid, item] of mutedStatusCache) {
           if (item.at < mutedCutoff) mutedStatusCache.delete(gid)
         }
-        if (removed > 0) logger.info(`[ActiveChatLRU] 淘汰 ${removed} 个 ${ttlHours}h 未活跃群，当前活跃 ${trackingChatStates.size}`)
+        if (removed > 0) logger.info(`[ActiveChatLRU] 淘汰 ${removed} 个 ${ttlHours}h 未活跃群，当前活跃 ${smartRuntimeSize()}`)
         // 顺带清扫回合会话:异常回合未 clearSession 的条目按 TTL/容量淘汰,防随机 UUID 键无限累积
         const sweptSessions = this.sessionStore?.sweep() || 0
         if (sweptSessions > 0) logger.info(`[回合会话] 清扫 ${sweptSessions} 个过期/超量会话，当前 ${this.sessionStore.stats().sessions}`)
@@ -1129,33 +1174,7 @@ export class ExamplePlugin extends plugin {
    * 长时间无消息时一次性衰减到位（focus 经过 fading 直到 cold），避免误判为"刚进入 fading"。
    */
   resolveConversationPhase(state) {
-    const now = Date.now()
-    const smartCfg = this.config.smartTrigger || {}
-    const fadingDurationMs = Number(smartCfg.fadingDurationMs) || 90000
-
-    // 自动衰减：一次入口可能跨越多个 phase，循环到稳定状态
-    while (state.phaseUntil && now > state.phaseUntil) {
-      if (state.conversationPhase === 'focus') {
-        state.conversationPhase = 'fading'
-        // 从 focus 结束的那一刻起算 fading 持续时间
-        const fadingStart = state.phaseUntil
-        state.phaseUntil = fadingStart + fadingDurationMs
-        state.consecutiveNoAction = 0
-        if (now > state.phaseUntil) continue   // fading 也已过期，继续衰减到 cold
-        break
-      }
-      if (state.conversationPhase === 'fading') {
-        state.conversationPhase = 'cold'
-        state.phaseUntil = 0
-        state.focusReplyCount = 0
-        state.consecutiveNoAction = 0
-        break
-      }
-      // 已经是 cold，phaseUntil 不应该为 0 以外的值；保险起见清掉
-      state.phaseUntil = 0
-      break
-    }
-    return state.conversationPhase || 'cold'
+    return resolveConversationPhase(this, state)
   }
 
   /**
@@ -1282,10 +1301,7 @@ export class ExamplePlugin extends plugin {
    * 仅做粗略统计：state.recentIncomingTimestamps 滑动窗口。
    */
   computeGroupMsgRate5min(state) {
-    if (!Array.isArray(state?.recentIncomingTimestamps)) return 0
-    const cutoff = Date.now() - 300000
-    state.recentIncomingTimestamps = state.recentIncomingTimestamps.filter(t => t > cutoff)
-    return state.recentIncomingTimestamps.length
+    return computeGroupMsgRate5min(this, state)
   }
 
   /**
@@ -1293,18 +1309,7 @@ export class ExamplePlugin extends plugin {
    * 返回 true=可以继续回复，false=已超上限不该回复（force 路径请勿调用本函数）
    */
   applyRateLimitGuard(state, groupId) {
-    const smartCfg = this.config.smartTrigger || {}
-    const cutoff = Date.now() - 600000
-    state.recentReplyTimestamps = (state.recentReplyTimestamps || []).filter(t => t > cutoff)
-    const maxPer10Min = Number(smartCfg.maxRepliesPer10Min) || 8
-    if (state.recentReplyTimestamps.length >= maxPer10Min) {
-      logger.info(`[RateLimit] group=${groupId} 10min 已回复 ${state.recentReplyTimestamps.length}/${maxPer10Min} 次，强制 no_action`)
-      state.conversationPhase = 'fading'
-      state.phaseUntil = Date.now() + (Number(smartCfg.rateLimitCooldownMs) || 300000)
-      return false
-    }
-    state.recentReplyTimestamps.push(Date.now())
-    return true
+    return applyRateLimitGuard(this, state, groupId)
   }
 
   /**
@@ -1501,69 +1506,16 @@ export class ExamplePlugin extends plugin {
   }
 
   getSmartState(groupId) {
-    let state = trackingChatStates.get(groupId)
-    if (!state) {
-      // 上限保护：超过 100 个群时按 lastMsgAt 淘汰最旧的群（防长期累积内存膨胀）
-      if (trackingChatStates.size >= 100) {
-        let oldestId = null
-        let oldestAt = Infinity
-        for (const [gid, st] of trackingChatStates) {
-          if (st.lastMsgAt < oldestAt) { oldestAt = st.lastMsgAt; oldestId = gid }
-        }
-        if (oldestId != null) {
-          const old = trackingChatStates.get(oldestId)
-          if (old?.waitTimers) for (const t of old.waitTimers.values()) clearTimeout(t)
-          if (old?.deferredTimer) clearTimeout(old.deferredTimer)
-          trackingChatStates.delete(oldestId)
-        }
-      }
-      state = {
-        pendingCount: 0,
-        lastMsgAt: Date.now(),
-        replyLatencies: [],
-        forceContinue: false,
-        forceGateCheck: false,
-        lastGateNoActionAt: 0,
-        inFlight: false,
-        inFlightToken: 0,
-        inFlightSince: 0,
-        inFlightWatchdog: null,
-        needsRerun: false,
-        rerunEvent: null,
-        queuedWhileInFlight: 0,
-        queuedForceGateCheck: false,
-        waitTimers: new Map(),
-        // 拟人化重构新增字段
-        conversationPhase: 'cold',        // 'cold' | 'focus' | 'fading'
-        phaseUntil: 0,                    // 当前 phase 自动衰减时间戳
-        focusReplyCount: 0,               // 本轮 FOCUS 期 bot 主动回复次数
-        consecutiveNoAction: 0,           // FOCUS 期 Gate 连续 no_action 次数
-        lastBotReplyAt: 0,                // bot 在该群最近一次发言时间
-        lastBotReplyToUserId: null,       // bot 最近一次回复对应的用户，用于判断后续是否同一人接话
-        lastBotReplyKeywords: [],         // bot 上次发言提取的关键词（给 continuation R2 用）
-        recentReplyTimestamps: [],        // bot 在该群的最近回复时间戳列表（速率限制用）
-        recentIncomingTimestamps: [],     // 该群最近群消息时间戳（活跃度统计用）
-        recentMessages: [],               // 最近群消息 deque {userId, text, at}，复读检测用
-        lastRepeatJoinAt: 0,              // bot 最近一次参与复读的时间（防短期反复跟读）
-        deferredTimer: null               // 冷群唤醒定时器
-      }
-      trackingChatStates.set(groupId, state)
-    }
-    return state
+    // 群运行时状态统一门面:smart 状态存储已迁 core/runtime/groupRuntime.js(行为不变)
+    return getSmartRuntimeState(groupId)
   }
 
   getDirectTriggerMergeMs() {
-    const smartCfg = this.config.smartTrigger || {}
-    const configured = Number(smartCfg.directTriggerMergeMs)
-    if (Number.isFinite(configured)) return Math.max(0, Math.min(5000, configured))
-    const fallback = Number(smartCfg.replyDebounceMs)
-    return Math.max(0, Math.min(5000, Number.isFinite(fallback) ? fallback : 1500))
+    return getDirectTriggerMergeMs(this)
   }
 
   getDirectTriggerMergeMaxMessages() {
-    const configured = Number(this.config.smartTrigger?.directTriggerMergeMaxMessages)
-    if (Number.isFinite(configured)) return Math.max(2, Math.min(20, Math.floor(configured)))
-    return 8
+    return getDirectTriggerMergeMaxMessages(this)
   }
 
   getMergeMsForEvent(e = {}) {
@@ -1762,6 +1714,10 @@ export class ExamplePlugin extends plugin {
       logger.info(`[用户黑名单] smart group=${groupId} user=${e.user_id} msg="${summarizeForLog(e.msg || "")}"`)
       return false
     }
+    // 违禁词:在学习/话题记录之前拦截,命中内容完全不进入任何下游
+    if (this.handleForbiddenWordHit(e)) return false
+    this.handleMemorySelfCorrection(e)
+    anchorEventConversation(e)
     const state = this.getSmartState(groupId)
     // 记录该群最新消息时间戳给 applyReplyDebounce 用（仅 smart 模式需要，避免 strict 模式持续累积内存）
     const shouldRecordIncoming = !e?._smartWaitRerun && !e?._smartQueuedRerun && !e?._proactiveReply
@@ -1914,9 +1870,18 @@ export class ExamplePlugin extends plugin {
       // 阈值判定（fading 期半阈值，仅作用于"非 force"路径）
       const talkValue = this.resolveTalkValue(groupId)
       const rawThreshold = Math.max(1, Math.ceil(1 / Math.max(0.01, talkValue)))
-      const threshold = phase === 'fading'
+      let threshold = phase === 'fading'
         ? Math.max(1, Math.floor(rawThreshold / 2))
         : rawThreshold
+      // 注意力漂移(strong 档):群里刚冒出爆发新话题时降一档门槛,更容易被吸引插话
+      const driftCfg = this.config?.smartTrigger?.attentionDrift || {}
+      if (driftCfg.enabled !== false && String(driftCfg.level) === "strong" && threshold > 1) {
+        const hook = detectAttentionHook({ groupId, windowMs: (Number(driftCfg.windowMinutes) || 5) * 60 * 1000 })
+        if (hook) {
+          threshold = Math.max(1, threshold - 1)
+          logger.info(`[注意力漂移] group=${groupId} 新话题「${hook.word}」爆发(${hook.count}次),阈值降为 ${threshold}`)
+        }
+      }
       const reachThreshold = state.pendingCount >= threshold
       const idleHit = this.idleCompensationMet(state, threshold, prevLastMsgAt)
       if (!state.forceContinue && !state.forceGateCheck && !reachThreshold && !idleHit) {
@@ -2083,196 +2048,7 @@ export class ExamplePlugin extends plugin {
    * @param ctx 额外上下文：{ phase, prefilter, threshold }
    */
   async runTimingGate(e, state, ctx = {}) {
-    const smartCfg = this.config.smartTrigger || {}
-    const ctxSize = Math.max(5, Math.min(100, Number(smartCfg.gateContextSize) || 20))
-    const botName = Bot.nickname || '机器人'
-
-    let history = ''
-    try {
-      history = await this.messageManager.formatMessageHistory('group', e.group_id, ctxSize)
-    } catch { history = '(无)' }
-
-    // Gate 子代理复用 trackAiConfig（同样是"轻量 LLM 决策回不回话"用途，不再单独配置一份模型）
-    const trackCfg = this.config.trackAiConfig
-    const useCfg = {
-      url: normalizeChatCompletionUrl(trackCfg?.trackAiUrl),
-      model: trackCfg?.trackAiModel || 'gpt-4o-mini',
-      apikey: trackCfg?.trackAiApikey
-    }
-    if (!useCfg.url || !useCfg.apikey || String(useCfg.apikey).startsWith('sk-xxxxx')) {
-      return { decision: 'no_action', reason: 'no_api_config' }
-    }
-
-    // ─── 多维信号采集 ─────────────────────────────────────
-    const phase = ctx.phase || state.conversationPhase || 'cold'
-    const prefilterKind = ctx.prefilter?.kind || 'regular'
-    const prefilterReason = ctx.prefilter?.reason || ''
-    const recentReplyCount = (state.recentReplyTimestamps || []).filter(t => t > Date.now() - 600000).length
-    const groupMsgRate5min = this.computeGroupMsgRate5min(state)
-    const sinceLastBotReplySec = state.lastBotReplyAt
-      ? Math.max(0, Math.floor((Date.now() - state.lastBotReplyAt) / 1000))
-      : -1
-    const sinceLastMsgSec = state.lastMsgAt
-      ? Math.max(0, Math.floor((Date.now() - state.lastMsgAt) / 1000))
-      : 0
-    const now = new Date()
-    const hh = now.getHours()
-    const hhmm = `${String(hh).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    const isLateNight = hh >= 23 || hh < 6
-    // 是否 @ 别人 / 引用 bot
-      let addressedToOther = false
-      let currentMsgQuotesBot = false
-      let atBot = false
-      try {
-        const botId = e?.bot?.uin || Bot.uin
-        currentMsgQuotesBot = messageQuotesUser(e, botId)
-        if (Array.isArray(e?.message)) {
-          for (const seg of e.message) {
-            if (seg?.type === 'at' && String(getMentionTargetId(seg)) === String(botId)) atBot = true
-            if (seg?.type === 'at' && String(getMentionTargetId(seg)) !== String(botId)) addressedToOther = true
-            if (seg?.type === 'reply') {
-              // 部分协议端会附带被回复消息的 sender 信息
-              const repliedUid = getReplySender(seg)
-              if (repliedUid && String(repliedUid) === String(botId)) currentMsgQuotesBot = true
-            }
-          }
-        }
-      if (!atBot) atBot = messageMentionsUser(e, botId)
-    } catch {}
-    const currentText = String(e?.msg || '')
-    const mentionsBotName = hasBotTextAnchor(currentText, botName, this.config.triggerPrefixes)
-    const sameUserAsLastReply = state.lastBotReplyToUserId && String(e?.user_id || '') === String(state.lastBotReplyToUserId)
-    // 触发决策与主链路共享同一份人设与对象信号：Gate 判断"要不要回"，主链路判断"回给谁"，口径必须一致
-    const addresseeSignal = computeAddresseeSignal({
-      e,
-      botId: e?.bot?.uin || Bot.uin,
-      mentionsBotName,
-      quotesBot: currentMsgQuotesBot,
-      sameUserAsLastReply,
-      prefilterKind
-    })
-    const { groupAddressed, targetKind, pronounWithoutBotAnchor } = addresseeSignal
-    const triggerReason = e?._deferredReason
-      ? 'deferred'
-      : (prefilterKind === 'continuation_strong' ? `continuation_strong(${prefilterReason})` : 'regular')
-
-    const promptHintBusyGroupRate = Number(smartCfg.promptHintBusyGroupRate) || 30
-    const promptHintRateLimitWarn = Number(smartCfg.promptHintRateLimitWarn) || 5
-
-    const gatePersonaTone = buildPersonaTonePrompt({
-      userText: currentText,
-      persona: this.getPersonaFor(e)
-    })
-    const systemPrompt = `你是 QQ 群聊节奏判断助手。机器人名字叫"${botName}"。
-当前北京时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
-你需要判断 ${botName} 是否应该现在插话、保持沉默、或稍后再说。
-
-**总原则：默认旁听，只有高置信度确认当前消息在对 ${botName} 说、引用 ${botName}、延续 ${botName} 刚说的话，或强相关到不接会显得突兀时，才 continue。**
-克制优先。普通群友之间互相聊天时，即使内容有趣、出现"你"、正在玩梗，也默认 no_action。不要为了显得活跃而找理由插话。
-
-判断指引：
-- continue：目标对象=bot；被 @/点名；当前消息明确叫了 ${botName}；引用了 ${botName} 的消息；同一个用户正在追问 ${botName} 刚说过的内容；有人直接问 ${botName} 的身份/状态/意见；明确请求 ${botName} 做事。
-- no_action：目标对象=other；没有叫 ${botName}；只是群友之间聊天；"你"明显可能指别人；只是普通玩梗/复读/吐槽；${botName} 只是看得懂但不是被问到；同一话题 ${botName} 刚回过应该让别人说。
-- wait：用户句子像是没说完，或者 ${botName} 刚被叫到但对方可能还在补充。
-
-时段倾向：任何时段都默认克制；深夜（23:00-06:00）更倾向 no_action。
-
-【信号判断指引】
-- 看到"⚠ @ 了别人"信号：除非该消息内容显然是普遍话题（如"大家觉得..."），否则倾向 no_action
-- 看到"目标对象=group"：这是全群问题或公共话题，可以谨慎判断是否插话；只有 ${botName} 能自然帮上或补充时才 continue
-- 看到"目标对象=unknown"：默认 no_action，除非近期上下文强烈表明在说 ${botName}
-- 看到"目标对象=other"：必须 no_action
-- 看到"焦点=focus"不等于一定接话；只有当前消息明确回应 ${botName} 或引用/点名 ${botName}，才倾向 continue
-- 看到"最近 10 分钟已回复 ≥${promptHintRateLimitWarn} 次"：除非被点名，倾向 no_action（避免刷屏）
-- 看到"群最近 5 分钟消息数 ≥ ${promptHintBusyGroupRate}"：群友正在热聊，默认 no_action，除非明确叫 ${botName}
-- 看到"触发原因=deferred"：这是定时自检，群里没新消息或 ${botName} 刚开了话头还没人接；只在非常合适时主动补一句，否则 no_action
-- 看到"触发原因=continuation_strong"且消息明显在向 ${botName} 提问/反馈：可以 continue；如果只是相关词命中但没有对 ${botName} 说，仍然 no_action
-- 没有明确"应该插"的理由时，必须 no_action
-
-${gatePersonaTone ? `\n${gatePersonaTone}\n` : ""}
-只返回严格的 JSON，格式：{"decision":"continue|no_action|wait","wait_seconds":3,"reason":"简短理由"}
-wait 时 wait_seconds 取 3-15 之间。不要任何其他文字、不要 markdown、不要代码块包装。`
-
-    const specialSignals = []
-    if (addressedToOther) specialSignals.push('⚠ 当前消息 @ 了别人，谨慎插话')
-    if (currentMsgQuotesBot) specialSignals.push(`✓ 当前消息引用了 ${botName} 的某条消息`)
-    const specialSignalsBlock = specialSignals.length ? `\n【特殊信号】\n${specialSignals.join('\n')}\n` : ''
-
-    const userPrompt = `【近期群聊记录】
-${history}
-
-【当前消息】
-${e.sender?.card || e.sender?.nickname || '用户'}: ${e.msg || ''}
-
-【时间与活跃度】
-- 距上一条群消息：${sinceLastMsgSec}s
-- 距 ${botName} 上一次发言：${sinceLastBotReplySec >= 0 ? sinceLastBotReplySec + 's' : '长时间未发言'}
-- ${botName} 最近 10 分钟在本群已回复：${recentReplyCount} 次
-- 群最近 5 分钟消息数：${groupMsgRate5min}
-- 当前时段：${hhmm}（${isLateNight ? '深夜' : '日间'}）
-
-${getGroupTopicPrompt(e?.group_id) ? "\n【群话题】" + getGroupTopicPrompt(e?.group_id).replace("【群话题】", "") : ""}
-${getGroupSocialPrompt(e?.group_id)}
-【对话状态】
-- 当前焦点：${phase}（focus=刚参与话题中；fading=余热；cold=未参与）
-- 触发原因：${triggerReason}
-- 明确 @ ${botName}：${atBot ? '是' : '否'}
-- 文本点名 ${botName}：${mentionsBotName ? '是' : '否'}
-- 引用了 ${botName} 的消息：${currentMsgQuotesBot ? '是' : '否'}
-- 是否同一用户接续 ${botName} 上次回复：${sameUserAsLastReply ? '是' : '否'}
-- 当前消息目标对象：${targetKind}
-- 文本含"你"但没有任何 ${botName} 指向锚点：${pronounWithoutBotAnchor ? '是，默认认为在对别人说' : '否'}
-${specialSignalsBlock}
-请输出 JSON 决策。`
-
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000)
-    try {
-      const response = await fetch(useCfg.url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${useCfg.apikey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: useCfg.model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3
-        }),
-        signal: controller.signal
-      })
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '')
-        logger.warn(`[TimingGate] 请求失败 group=${e?.group_id || ''} status=${response.status} body=${errorText.slice(0, 240)}`)
-        return { decision: 'no_action', reason: `http_${response.status}` }
-      }
-      const data = await response.json()
-      const raw = data?.choices?.[0]?.message?.content?.trim() || ''
-      const jsonMatch = raw.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        logger.warn(`[TimingGate] 返回非JSON group=${e?.group_id || ''} raw=${raw.slice(0, 240)}`)
-        return { decision: 'no_action', reason: 'no_json' }
-      }
-      const parsed = JSON.parse(jsonMatch[0])
-      const dec = String(parsed.decision || '').toLowerCase()
-      if (!['continue', 'no_action', 'wait'].includes(dec)) {
-        logger.warn(`[TimingGate] 非法decision group=${e?.group_id || ''} decision=${parsed.decision}`)
-        return { decision: 'no_action', reason: 'invalid_decision' }
-      }
-      return {
-        decision: dec,
-        wait_seconds: Number(parsed.wait_seconds) || 5,
-        reason: String(parsed.reason || '').slice(0, 80)
-      }
-    } catch (err) {
-      logger.warn(`[TimingGate] 异常 group=${e?.group_id || ''}: ${err.message}`)
-      return { decision: 'no_action', reason: `exception:${err.message}` }
-    } finally {
-      clearTimeout(timeoutId)
-    }
+    return await runTimingGateFn(this, e, state, ctx)
   }
 
   /**
@@ -2306,25 +2082,7 @@ ${specialSignalsBlock}
    * 解析 talkValue：优先用时段化规则，否则用全局 talkValue
    */
   resolveTalkValue(groupId) {
-    const s = this.config.smartTrigger || {}
-    const fallback = Number(s.talkValue) || 1.0
-    if (!s.enableTalkValueRules || !Array.isArray(s.talkValueRules) || s.talkValueRules.length === 0) {
-      return fallback
-    }
-    const now = new Date()
-    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-    for (const rule of s.talkValueRules) {
-      const range = String(rule?.range || '').trim()
-      const [start, end] = range.split('-').map(x => x?.trim())
-      if (!start || !end) continue
-      const inRange = (start <= end && hhmm >= start && hhmm <= end) ||
-                      (start > end && (hhmm >= start || hhmm <= end))
-      if (inRange) {
-        const v = Number(rule.value)
-        if (Number.isFinite(v) && v > 0) return v
-      }
-    }
-    return fallback
+    return resolveTalkValue(this, groupId)
   }
 
   /**
@@ -2334,34 +2092,21 @@ ${specialSignalsBlock}
    * @param prevLastMsgAt - 上一条消息的时间戳（本次入口前的值，必须由调用方传入，否则 idle=0 永远不命中）
    */
   idleCompensationMet(state, threshold, prevLastMsgAt) {
-    const s = this.config.smartTrigger || {}
-    if (!s.idleCompensationEnabled) return false
-    const avgMs = this.computeAvgReplyLatency(state) || Number(s.avgLatencyDefaultMs) || 60000
-    if (avgMs <= 0) return false
-    const idleMs = Math.max(0, Date.now() - (prevLastMsgAt || Date.now()))
-    return state.pendingCount + idleMs / avgMs >= threshold
+    return idleCompensationMet(this, state, threshold, prevLastMsgAt)
   }
 
   /**
    * 计算最近 10 分钟平均回复延迟（毫秒）
    */
   computeAvgReplyLatency(state) {
-    if (!state?.replyLatencies?.length) return 0
-    const cutoff = Date.now() - 600000
-    state.replyLatencies = state.replyLatencies.filter(item => item.at >= cutoff)
-    if (!state.replyLatencies.length) return 0
-    const sum = state.replyLatencies.reduce((acc, item) => acc + item.ms, 0)
-    return sum / state.replyLatencies.length
+    return computeAvgReplyLatency(this, state)
   }
 
   /**
    * 记录一次"用户消息→bot 回复"的延迟，给空窗补偿用。两种模式都调用。
    */
   recordReplyLatency(groupId, latencyMs) {
-    if (!groupId || !Number.isFinite(latencyMs) || latencyMs <= 0) return
-    const state = this.getSmartState(groupId)
-    state.replyLatencies.push({ at: Date.now(), ms: latencyMs })
-    if (state.replyLatencies.length > 50) state.replyLatencies = state.replyLatencies.slice(-50)
+    return recordReplyLatency(this, groupId, latencyMs)
   }
 
   /**
@@ -2947,6 +2692,68 @@ ${specialSignalsBlock}
     return users.some(id => String(id).trim() === String(userId))
   }
 
+  // 违禁词命中处理:标记会话中断(掐掉该群所有早于此的进行中回合) + 取消排队续话。
+  // 返回 true 表示本条消息已被黑名单吞掉,调用方直接 return。
+  handleForbiddenWordHit(e) {
+    const cfg = this.config?.forbiddenWords
+    if (cfg?.enabled === false) return false
+    const text = String(e?.msg || e?.raw_message || "")
+    const word = findForbiddenWord(text, cfg)
+    if (!word) return false
+    const groupId = e?.group_id
+    markConversationInterrupted(groupId)
+    if (groupId) this.cancelPendingConversation(groupId)
+    logger.mark(`[违禁词] group=${groupId} user=${e?.user_id} word=${word} 已中断当前对话 msg="${summarizeForLog(text)}"`)
+    const replyText = String(cfg?.replyText || "").trim()
+    if (replyText) {
+      this.sendObservedReply(e, renderPersonaTemplate(replyText, this.getPersonaFor(e)), false, "forbidden_notice")
+        .catch(error => logger.warn(`[违禁词] 提示语发送失败: ${error?.message || error}`))
+    }
+    return true
+  }
+
+  // 记忆自纠错:群友指出"你记错了"时,自动降权她上一轮引用的记忆(降权非删除,重复纠错自然淡忘)
+  handleMemorySelfCorrection(e) {
+    try {
+      const groupId = e?.group_id
+      if (!groupId) return false
+      const runtime = getSemanticMemoryRuntime()
+      if (!runtime || runtime.config?.selfCorrection?.enabled === false) return false
+      const state = this.getSmartState(groupId)
+      detectAndPenalize({
+        text: e?.msg || e?.raw_message || "",
+        groupId,
+        quotesBot: (() => { try { return messageQuotesUser(e, e?.bot?.uin || Bot.uin) } catch { return false } })(),
+        senderUserId: e?.user_id,
+        lastBotReplyToUserId: state?.lastBotReplyToUserId,
+        runtime,
+        penalty: Number(runtime.config?.selfCorrection?.penalty) || 0.5,
+        ttlMs: (Number(runtime.config?.selfCorrection?.ttlMinutes) || 10) * 60 * 1000
+      })
+    } catch {}
+    return false
+  }
+
+  // 中断后的排队清理:延迟触发/续话定时器/待重跑事件全部作废,新消息可开新对话
+  cancelPendingConversation(groupId) {
+    try {
+      const state = this.getSmartState(groupId)
+      if (state.deferredTimer) {
+        clearTimeout(state.deferredTimer)
+        state.deferredTimer = null
+      }
+      for (const timer of state.waitTimers?.values() || []) clearTimeout(timer)
+      state.waitTimers?.clear?.()
+      state.rerunEvent = null
+      state.forceContinue = false
+      state.forceGateCheck = false
+      state.queuedForceGateCheck = false
+      state.needsRerun = false
+    } catch (error) {
+      logger.warn(`[违禁词] 清理排队续话失败 group=${groupId}: ${error?.message || error}`)
+    }
+  }
+
   async getGroupUserMessages(groupId, userId) {
     const redisKey = `${this.messageHistoriesRedisKey}:${groupId}:${userId}`
     const filePath = path.join(this.messageHistoriesDir, `${groupId}_${userId}.json`)
@@ -3502,6 +3309,11 @@ ${recentHistory || '(无)'}
       return false
     }
 
+    // 违禁词黑名单:命中即中断本群当前对话(含进行中回合),本条不进入任何下游
+    if (this.handleForbiddenWordHit(e)) return false
+    this.handleMemorySelfCorrection(e)
+    anchorEventConversation(e)
+
     if (diceManager.isLogActive(e.group_id, this.config.diceSystem)) {
       logger.info(`[骰娘log] group=${e.group_id} log开启中，跳过AI对话`)
       return false
@@ -4050,6 +3862,9 @@ ${recentHistory || '(无)'}
           ? await this.getCurrentGroupContext(e)
           : this.getBasicGroupContext(e)
         const cardRequestText = [args, msg, userContent].filter(Boolean).join("\n")
+        // 调皮情绪时刻:同人格内偶发情绪着色,命中只影响本回合(掷骰+群级冷却)
+        const moodHit = rollPersonaMood(this.getPersonaFor(e), groupId)
+        if (moodHit) logger.info(`[心情时刻] group=${groupId} 命中「${moodHit.name}」(本回合生效)`)
         const promptLayers = await composeTurnPromptLayers({
           config: this.getChatConfig(e),
           profile: session.promptLayerProfile,
@@ -4057,6 +3872,7 @@ ${recentHistory || '(无)'}
             groupId,
             userId,
             event: e,
+            moodHint: moodHit,
             messageText: e.msg || args,
             memoryText: e.msg || "",
             rawMessageText: e.msg || "",
@@ -4078,7 +3894,8 @@ ${recentHistory || '(无)'}
             knowledgeSearcher: this.knowledgeSearcher,
             personaFeedbackManager,
             globalStyleLearnerManager,
-            personProfileInjector
+            personProfileInjector,
+            midtermSummaryManager: getMidtermMemoryManager()
           }
         })
         // 语义工具规划器复用群工作流层文本
@@ -4227,6 +4044,8 @@ ${recentHistory || '(无)'}
               })
               const maxScore = Math.max(...memoryResult.items.map(item => item.vectorScore)).toFixed(3)
               logger.info(`[语义记忆] group=${groupId} 注入 ${memoryResult.items.length} 段 max余弦=${maxScore} 耗时=${memoryResult.elapsedMs}ms(向量${memoryResult.vectorMs ?? "-"}ms/BM25${memoryResult.bm25Ms ?? "-"}ms)`)
+              // 记忆自纠错:记录本轮"引用了哪些记忆说话",群友说"你记错了"时降权这些分块
+              noteInjectedChunks(groupId, memoryResult.items)
             }
           } else {
             logger.info(`[语义记忆] group=${groupId} 无命中(${memoryResult?.reason || "低于阈值"}) ${memoryResult?.elapsedMs ?? 0}ms`)
@@ -5235,253 +5054,76 @@ ${recentHistory || '(无)'}
   }
 
   async mcpStatus(e) {
-    await this.replyLongForward(e, "MCP状态", mcpManager.getStatusSummary())
-    return true
+    return await mcpStatus(this, e)
   }
 
   async testMCPTool(e) {
-    if (!e.isMaster) {
-      await this.sendObservedReply(e, "只有主人才能执行此操作")
-      return true
-    }
-
-    const input = String(e.msg || "").replace(/^#mcp\s+测试\s+/, "").trim()
-    const spaceIndex = input.indexOf(" ")
-    const alias = spaceIndex === -1 ? input : input.slice(0, spaceIndex)
-    const rawParams = spaceIndex === -1 ? "{}" : input.slice(spaceIndex + 1).trim()
-
-    if (!alias) {
-      await this.sendObservedReply(e, "请输入要测试的 MCP 工具名，例如：#mcp 测试 mcp_server_search {\"query\":\"你好\"}")
-      return true
-    }
-
-    let params = {}
-    try {
-      params = rawParams ? JSON.parse(rawParams) : {}
-    } catch (error) {
-      await this.sendObservedReply(e, `JSON 参数解析失败：${error.message}`)
-      return true
-    }
-
-    try {
-      const result = await mcpManager.executeToolByAlias(alias, params)
-      await this.replyLongForward(e, `MCP测试 ${alias}`, result)
-    } catch (error) {
-      logger.error(`[MCP] 测试工具 ${alias} 失败:`, error)
-      await this.sendObservedReply(e, `MCP工具测试失败：${error.message}`)
-    }
-    return true
+    return await testMCPTool(this, e)
   }
 
-  // ===== 多人设库:多套人设按群切换 =====
-  // 权限:查看类所有人;切换/重置要群主/群管理或主人;增删/重载仅主人。
   isChatManager(e) {
-    return Boolean(e?.isMaster || ["owner", "admin"].includes(e?.sender?.role))
+    return isChatManager(this, e)
+  }
+
+  forbiddenWordList() {
+    return forbiddenWordList(this)
+  }
+
+  async handleForbiddenList(e) {
+    return await handleForbiddenList(this, e)
+  }
+
+  async handleForbiddenAdd(e) {
+    return await handleForbiddenAdd(this, e)
+  }
+
+  async handleForbiddenRemove(e) {
+    return await handleForbiddenRemove(this, e)
   }
 
   // "#切换人设 名字 123456" 里可带目标群号(仅主人,跨群切换);群内使用默认切本群
   resolvePersonaTargetGroup(e, explicit) {
-    const target = String(explicit || "").trim()
-    if (target) {
-      if (!e?.isMaster) return { error: "带群号切换仅主人可用,群里直接发 #切换人设 <名字> 即可" }
-      if (!/^\d{5,12}$/.test(target)) return { error: "群号格式不对" }
-      return { groupId: target }
-    }
-    if (e?.message_type !== "group" || !e?.group_id) return { error: "这条命令要在群里用,或者主人用 #切换人设 <名字> <群号>" }
-    return { groupId: String(e.group_id) }
+    return resolvePersonaTargetGroup(this, e, explicit)
   }
 
   formatPersonaDetail(detail) {
-    const p = detail.persona || {}
-    const lines = [`【人设:${p.name || "未命名"}】(id:${detail.id}${detail.source === "default" ? ",默认" : ""})`]
-    const fieldLabels = [["identity", "身份"], ["tone", "语气"]]
-    for (const [field, label] of fieldLabels) {
-      const value = String(p[field] || "").trim()
-      if (value) lines.push(`■ ${label}: ${value}`)
-    }
-    const listLabels = [["speechStyle", "说话风格"], ["preferences", "偏好"], ["boundaries", "边界"]]
-    for (const [field, label] of listLabels) {
-      const items = Array.isArray(p[field]) ? p[field].filter(Boolean) : []
-      if (items.length) lines.push(`■ ${label}: ${items.join("、")}`)
-    }
-    const notes = String(p.notes || "").trim()
-    if (notes) lines.push(`■ 备注: ${notes}`)
-    return lines.join("\n")
+    return formatPersonaDetail(this, detail)
   }
 
   async handlePersonaList(e) {
-    try {
-      const entries = this.personaLibrary.list()
-      const resolved = this.personaLibrary.resolve({ messageType: e?.message_type, groupId: e?.group_id })
-      const lines = ["【人设库】"]
-      for (const item of entries) {
-        const mark = item.id === resolved.id ? " ←当前" : ""
-        lines.push(`- ${item.name}${item.source === "default" ? "(默认)" : ""} [${item.id}]${mark}`)
-      }
-      lines.push("", "#切换人设 <名字> 切换本群人设(管理)", "#人设详情 <名字> 查看内容", "#人设重置 回到默认")
-      await this.sendObservedReply(e, lines.join("\n"))
-    } catch (error) {
-      await this.sendObservedReply(e, `人设列表读取失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaList(this, e)
   }
 
   async handlePersonaCurrent(e) {
-    try {
-      const detail = this.personaLibrary.resolve({ messageType: e?.message_type, groupId: e?.group_id })
-      await this.sendObservedReply(e, this.formatPersonaDetail(detail))
-    } catch (error) {
-      await this.sendObservedReply(e, `读取当前人设失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaCurrent(this, e)
   }
 
   async handlePersonaDetail(e) {
-    const name = String(e.msg || "").replace(/^#人设详情\s+/, "").trim()
-    const detail = this.personaLibrary.detail(name)
-    if (!detail) {
-      await this.sendObservedReply(e, `没有找到人设「${name}」,发 #人设列表 看看有哪些`)
-      return true
-    }
-    await this.sendObservedReply(e, this.formatPersonaDetail(detail))
-    return true
+    return await handlePersonaDetail(this, e)
   }
 
   async handlePersonaSwitch(e) {
-    const rest = String(e.msg || "").replace(/^#切换人设\s+/, "").trim()
-    const spaceIndex = rest.indexOf(" ")
-    const name = (spaceIndex === -1 ? rest : rest.slice(0, spaceIndex)).trim()
-    const explicitGroup = spaceIndex === -1 ? "" : rest.slice(spaceIndex + 1).trim()
-    if (!this.isChatManager(e)) {
-      await this.sendObservedReply(e, "切换人设要群主或群管理来操作哦")
-      return true
-    }
-    const target = this.resolvePersonaTargetGroup(e, explicitGroup)
-    if (target.error) {
-      await this.sendObservedReply(e, target.error)
-      return true
-    }
-    try {
-      if (!name || name === "默认" || name === "default") {
-        await this.personaLibrary.setGroupBinding(target.groupId, "default")
-        await this.sendObservedReply(e, `群 ${target.groupId} 已切回默认人设`)
-        return true
-      }
-      const entry = this.personaLibrary.detail(name)
-      if (!entry) {
-        await this.sendObservedReply(e, `没有找到人设「${name}」,发 #人设列表 看看有哪些`)
-        return true
-      }
-      const bound = this.personaLibrary.setGroupBinding(target.groupId, entry.id)
-      logger.mark(`[人设库] group=${target.groupId} 切换人设 -> ${entry.id}(${entry.persona?.name}) by=${e?.user_id}`)
-      await this.sendObservedReply(e, `本群已切换为人设「${entry.persona?.name}」(id:${bound}),下一条回复开始生效`)
-    } catch (error) {
-      await this.sendObservedReply(e, `切换失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaSwitch(this, e)
   }
 
   async handlePersonaReset(e) {
-    const explicitGroup = String(e.msg || "").replace(/^#人设重置\s*/, "").trim()
-    if (!this.isChatManager(e)) {
-      await this.sendObservedReply(e, "重置人设要群主或群管理来操作哦")
-      return true
-    }
-    const target = this.resolvePersonaTargetGroup(e, explicitGroup)
-    if (target.error) {
-      await this.sendObservedReply(e, target.error)
-      return true
-    }
-    try {
-      this.personaLibrary.setGroupBinding(target.groupId, "default")
-      await this.sendObservedReply(e, `群 ${target.groupId} 已解绑,回到默认人设「${resolvePersonaName(this.config.persona)}」`)
-    } catch (error) {
-      await this.sendObservedReply(e, `重置失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaReset(this, e)
   }
 
   // 把当前会话生效的人设快照存成人设库新条目(主人);重名覆盖
   async handlePersonaSave(e) {
-    if (!e?.isMaster) {
-      await this.sendObservedReply(e, "只有主人才能保存人设")
-      return true
-    }
-    const name = String(e.msg || "").replace(/^#保存人设\s+/, "").trim()
-    if (!name) {
-      await this.sendObservedReply(e, "用法：#保存人设 <名字>,把当前会话生效的人设存成一套")
-      return true
-    }
-    try {
-      const resolved = this.personaLibrary.resolve({ messageType: e?.message_type, groupId: e?.group_id })
-      const saved = this.personaLibrary.upsert({ ...resolved.persona, name })
-      logger.mark(`[人设库] 保存人设 ${saved.id}(${saved.name}) by=${e?.user_id}`)
-      await this.sendObservedReply(e, `已保存人设「${saved.name}」(id:${saved.id}),可以用 #切换人设 ${saved.name} 给群换上`)
-    } catch (error) {
-      await this.sendObservedReply(e, `保存失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaSave(this, e)
   }
 
   async handlePersonaDelete(e) {
-    if (!e?.isMaster) {
-      await this.sendObservedReply(e, "只有主人才能删除人设")
-      return true
-    }
-    const name = String(e.msg || "").replace(/^#删除人设\s+/, "").trim()
-    if (!name || name === "default" || name === "默认") {
-      await this.sendObservedReply(e, "默认人设不能删,它来自 message.yaml")
-      return true
-    }
-    try {
-      const removed = this.personaLibrary.remove(name)
-      if (!removed) {
-        await this.sendObservedReply(e, `没有找到人设「${name}」`)
-        return true
-      }
-      logger.mark(`[人设库] 删除人设 ${removed.id}(${removed.name}) by=${e?.user_id}`)
-      await this.sendObservedReply(e, `已删除人设「${removed.name}」,绑定它的群自动回到默认人设`)
-    } catch (error) {
-      await this.sendObservedReply(e, `删除失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaDelete(this, e)
   }
 
   async handlePersonaReload(e) {
-    if (!e?.isMaster) {
-      await this.sendObservedReply(e, "只有主人才能重载人设库")
-      return true
-    }
-    try {
-      const state = this.personaLibrary.reload()
-      await this.sendObservedReply(e, `人设库已重载：${state.personas.length} 套自定义人设,${Object.keys(state.groupBindings).length} 个群绑定`)
-    } catch (error) {
-      await this.sendObservedReply(e, `重载失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaReload(this, e)
   }
 
   async handlePersonaBindings(e) {
-    if (!e?.isMaster) {
-      await this.sendObservedReply(e, "只有主人才能查看全部绑定")
-      return true
-    }
-    try {
-      const bindings = this.personaLibrary.bindings()
-      const entries = Object.entries(bindings).filter(([, id]) => id)
-      if (!entries.length) {
-        await this.sendObservedReply(e, "还没有任何群绑定自定义人设,全部用默认人设")
-        return true
-      }
-      const lines = ["【人设绑定】"]
-      for (const [groupId, personaId] of entries) {
-        const detail = this.personaLibrary.detail(personaId)
-        lines.push(`- ${groupId === "__private__" ? "私聊" : `群 ${groupId}`} → ${detail?.persona?.name || personaId}`)
-      }
-      await this.sendObservedReply(e, lines.join("\n"))
-    } catch (error) {
-      await this.sendObservedReply(e, `读取绑定失败：${error.message}`)
-    }
-    return true
+    return await handlePersonaBindings(this, e)
   }
 }

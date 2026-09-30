@@ -11,6 +11,7 @@
 // 保证测试可以直接用假依赖驱动。
 import { applyPromptLayerProfile } from "./promptLayers.js"
 import { buildPersonaTonePrompt } from "./personaTonePolicy.js"
+import { formatMoodPrompt } from "./personaMoods.js"
 import { isNarrativeWritingRequest } from "./narrativeReply.js"
 import { buildSolutionExplanationStylePrompt } from "./solutionExplanationStyle.js"
 import { resolveCardPresentation } from "./turnPresentation.js"
@@ -79,7 +80,8 @@ export async function composeTurnPromptLayers({
     knowledgeSearcher,
     personaFeedbackManager,
     globalStyleLearnerManager,
-    personProfileInjector
+    personProfileInjector,
+    midtermSummaryManager
   } = deps
   const { groupId, userId, event } = turn
   const messageText = String(turn.messageText || "")
@@ -114,7 +116,8 @@ export async function composeTurnPromptLayers({
     expressionPrompt,
     knowledgePrompt,
     personProfilePrompt,
-    globalStylePrompt
+    globalStylePrompt,
+    midtermMemoryPrompt
   ] = await Promise.all([
     config.emotionSystem?.enabled && emotionManager
       ? cachedOr(groupId ? `emotion:${groupId}` : "", LAYER_CACHE_TTL_MS.emotion,
@@ -172,7 +175,18 @@ export async function composeTurnPromptLayers({
     globalStyleLearnerManager
       ? cachedOr("globalStyle", LAYER_CACHE_TTL_MS.globalStyle,
           () => globalStyleLearnerManager.buildPrompt(config.globalStyleLearning))
-      : ''
+      : '',
+    // 中期记忆:本群滚动主线摘要(纯本地读盘,微秒级;摘要变化频率低,走 60s 层缓存)
+    (async () => {
+      if (!config.midtermMemory?.enabled || !midtermSummaryManager || !groupId) return ''
+      try {
+        return await cachedOr(groupId ? `midtermMemory:${groupId}` : "", 60_000,
+          () => Promise.resolve(midtermSummaryManager.getSummaryPrompt(groupId)))
+      } catch (err) {
+        globalThis.logger?.warn?.(`[中期记忆] prompt 读取失败 group=${groupId}: ${err?.message}`)
+        return ''
+      }
+    })()
   ])
   const semanticStylePrompt = await withOptionalPromptTimeout(
     semanticStylePromise,
@@ -180,10 +194,16 @@ export async function composeTurnPromptLayers({
   )
 
   // ── 纯文本层 ──
-  const personaTonePrompt = buildPersonaTonePrompt({
-    userText: toneText,
-    persona: config.persona
-  })
+  // 人设语气层顺带携带"本回合心情"(调皮情绪时刻):test.js 每回合掷骰后经 turn.moodHint 传入,
+  // 命中时只给这一回合加一点情绪着色,不换人格。
+  const moodHintPrompt = formatMoodPrompt(turn.moodHint || null)
+  const personaTonePrompt = [
+    buildPersonaTonePrompt({
+      userText: toneText,
+      persona: config.persona
+    }),
+    moodHintPrompt
+  ].filter(Boolean).join("\n")
   const narrativeWritingPrompt = isNarrativeWritingRequest(cardText)
     ? [
         "【叙事输出格式】",
@@ -212,6 +232,7 @@ export async function composeTurnPromptLayers({
     mergedTrigger: precomputed.mergedTrigger || "",
     emotion: emotionPrompt,
     memory: memoryPrompt,
+    midtermMemory: midtermMemoryPrompt,
     expression: expressionPrompt,
     personaTone: personaTonePrompt,
     narrativeWriting: narrativeWritingPrompt,

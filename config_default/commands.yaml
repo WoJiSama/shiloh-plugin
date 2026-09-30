@@ -102,6 +102,66 @@ domains:
         perm: master
         src: "apps/test.js testMCPTool"
 
+  - key: persona
+    name: 人设库
+    icon: "🎭"
+    desc: 多套人设保存与按群切换
+    commands:
+      - usage: "#人设列表"
+        desc: 列出全部人设（标出本群当前用的）
+        perm: all
+        src: "apps/test.js handlePersonaList"
+      - usage: "#当前人设"
+        desc: 查看本群当前生效的人设
+        perm: all
+        src: "apps/test.js handlePersonaCurrent"
+      - usage: "#人设详情 <名字>"
+        desc: 查看指定人设内容
+        perm: all
+        src: "apps/test.js handlePersonaDetail"
+      - usage: "#切换人设 <名字> [群号]"
+        desc: 本群切换人设；带群号仅主人跨群切换
+        perm: admin
+        src: "apps/test.js handlePersonaSwitch"
+      - usage: "#人设重置 [群号]"
+        desc: 解绑本群，回到默认人设
+        perm: admin
+        src: "apps/test.js handlePersonaReset"
+      - usage: "#保存人设 <名字>"
+        desc: 把当前会话生效的人设存成人设库新条目
+        perm: master
+        src: "apps/test.js handlePersonaSave"
+      - usage: "#删除人设 <名字>"
+        desc: 删除指定人设（默认人设不可删）
+        perm: master
+        src: "apps/test.js handlePersonaDelete"
+      - usage: "#人设重载"
+        desc: 手动改 persona-library.yaml 后重载
+        perm: master
+        src: "apps/test.js handlePersonaReload"
+      - usage: "#人设绑定列表"
+        desc: 查看所有群的人设绑定
+        perm: master
+        src: "apps/test.js handlePersonaBindings"
+
+  - key: forbidden
+    name: 违禁词黑名单
+    icon: "🚫"
+    desc: 违禁词命中即中断当前对话
+    commands:
+      - usage: "#违禁词列表"
+        desc: 查看违禁词黑名单
+        perm: master
+        src: "apps/test.js handleForbiddenList"
+      - usage: "#加违禁词 <词>"
+        desc: 添加违禁词（支持 /正则/i），热更新生效
+        perm: master
+        src: "apps/test.js handleForbiddenAdd"
+      - usage: "#删违禁词 <词>"
+        desc: 删除违禁词
+        perm: master
+        src: "apps/test.js handleForbiddenRemove"
+
   - key: dice
     name: 骰子
     icon: "🎲"

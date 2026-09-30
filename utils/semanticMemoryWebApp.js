@@ -1,9 +1,11 @@
 import fs from "fs"
 import path from "path"
 import { getSemanticMemoryRuntime } from "../domains/semanticMemory/runtime.js"
+import { effectiveStrength } from "../domains/semanticMemory/SemanticMemoryStore.js"
 
 // 语义记忆后台页:索引总览(量化数据)、检索游乐场、分块浏览器、评估历史。
-// 挂在 /bl-chat/semantic-memory,与命令/观测页共用同一份令牌(只读页,主/观测令牌皆可)。
+// 挂在 /bl-chat/semantic-memory,与命令/观测页共用同一份令牌。
+// 记忆演化落地后支持:强度展示、单条"想起(强化)/忘记"。
 
 const MOUNT_PATH = "/bl-chat/semantic-memory"
 let registered = false
@@ -111,7 +113,7 @@ function buildPageHtml() {
 </head>
 <body>
 <h1>语义记忆(RAG)</h1>
-<div class="sub">分块 → 向量+BM25 混合召回 → RRF 融合 → 重排 · 只读页</div>
+<div class="sub">分块 → 向量+BM25 混合召回 → RRF 融合 → 强度演化(半衰期/召回强化) → 重排</div>
 <div id="app">加载中…</div>
 <script>
 (function () {
@@ -124,6 +126,12 @@ function buildPageHtml() {
     }).then(function (data) {
       if (data && data.error && data.error.indexOf("令牌") >= 0) throw new Error("访问令牌无效:请从命令管理页进入,或在 URL 加 ?token=主令牌");
       return data;
+    });
+  }
+  function apiPost(name, body) {
+    var url = "/bl-chat/semantic-memory/api/" + name + "?token=" + encodeURIComponent(TOKEN);
+    return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }).then(function (r) {
+      return r.json().catch(function () { return { error: "响应解析失败 HTTP " + r.status }; });
     });
   }
   function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
@@ -183,7 +191,7 @@ function buildPageHtml() {
       if (r.error) { out.innerHTML = '<div class="item off">' + esc(r.error) + '</div>'; return; }
       var html = '<div class="sub">耗时 ' + r.elapsedMs + 'ms(向量 ' + (r.vectorMs || 0) + ' / BM25 ' + (r.bm25Ms || 0) + ' / 重排 ' + (r.rerankMs || 0) + ') · 候选 ' + r.candidates + ' · 命中 ' + r.items.length + (r.reranked ? " · 已重排" : "") + '</div>';
       r.items.forEach(function (it, i) {
-        html += '<div class="item"><div class="scores">#' + (i + 1) + ' 余弦 ' + (it.vectorScore || 0).toFixed(3) + ' · 向量#' + (it.vectorRank || "-") + ' · BM25#' + (it.bm25Rank || "-") + (it.rerankScore != null ? ' · 重排 ' + it.rerankScore.toFixed(3) : '') + ' · ' + esc(it.timeRange) + '</div><div class="text">' + esc(it.text) + '</div></div>';
+        html += '<div class="item"><div class="scores">#' + (i + 1) + ' 余弦 ' + (it.vectorScore || 0).toFixed(3) + ' · 向量#' + (it.vectorRank || "-") + ' · BM25#' + (it.bm25Rank || "-") + (it.rerankScore != null ? ' · 重排 ' + it.rerankScore.toFixed(3) : '') + (it.effectiveStrength != null ? ' · 强度 ' + it.effectiveStrength.toFixed(2) : '') + (it.recallCount ? ' · 被想起 ' + it.recallCount + ' 次' : '') + ' · ' + esc(it.timeRange) + '</div><div class="text">' + esc(it.text) + '</div></div>';
       });
       out.innerHTML = html || '<div class="dim">无命中</div>';
     });
@@ -194,9 +202,26 @@ function buildPageHtml() {
     api("chunks", { group: group, offset: cbOffset, limit: 20 }).then(function (r) {
       if (r.error) { out.innerHTML = '<div class="item off">' + esc(r.error) + '</div>'; return; }
       var html = r.chunks.map(function (c) {
-        return '<div class="item"><div class="scores">' + esc(c.id) + ' · ' + esc(c.timeRange) + ' · ' + esc(c.speakers) + ' · ' + c.messages + ' 条消息</div><div class="text">' + esc(c.preview) + '</div></div>';
+        return '<div class="item"><div class="scores">' + esc(c.id) + ' · ' + esc(c.timeRange) + ' · ' + esc(c.speakers) + ' · ' + c.messages + ' 条消息 · 强度 ' + (c.effStrength != null ? c.effStrength.toFixed(2) : "-") + (c.recallCount ? ' · 被想起 ' + c.recallCount + ' 次' : '') + '</div><div class="text">' + esc(c.preview) + '</div><div class="row" style="margin-top:6px;margin-bottom:0"><button class="mem-reinforce" data-id="' + esc(c.id) + '">想起(强化)</button><button class="mem-forget" data-id="' + esc(c.id) + '">忘记</button></div></div>';
       }).join("");
       out.innerHTML = html || '<div class="dim">该群暂无索引</div>';
+      out.querySelectorAll(".mem-forget").forEach(function (btn) {
+        btn.onclick = function () {
+          if (!confirm("忘记这条记忆?该分块立即从索引中移除。")) return;
+          apiPost("forget", { group: group, id: btn.getAttribute("data-id") }).then(function (r) {
+            alert(r.message || (r.ok ? "已忘记" : "操作失败"));
+            loadChunks();
+          });
+        };
+      });
+      out.querySelectorAll(".mem-reinforce").forEach(function (btn) {
+        btn.onclick = function () {
+          apiPost("reinforce", { group: group, id: btn.getAttribute("data-id") }).then(function (r) {
+            alert(r.message || (r.ok ? "已强化" : "操作失败"));
+            loadChunks();
+          });
+        };
+      });
     });
   }
   function loadEvalHistory() {
@@ -283,9 +308,36 @@ export function registerSemanticMemoryWebApp(expressApp, pluginRoot, tokens = {}
               messages: (item.chunk.message_ids || []).length,
               text: item.chunk.text,
               vectorScore: item.vectorScore, vectorRank: item.vectorRank,
-              bm25Rank: item.bm25Rank, rerankScore: item.rerankScore
+              bm25Rank: item.bm25Rank, rerankScore: item.rerankScore,
+              effectiveStrength: item.effectiveStrength ?? null,
+              recallCount: item.recallCount ?? 0
             }))
           })
+          return
+        }
+        if (req.path === "/api/forget" && req.method === "POST") {
+          const group = String(req.body?.group || "").trim()
+          const id = String(req.body?.id || "").trim()
+          if (!group || !id) {
+            res.status(400).json({ error: "缺少 group 或 id" })
+            return
+          }
+          const ok = await runtime.store.forgetChunk(group, id)
+          logger?.info?.(`[语义记忆页] 忘记分块 group=${group} id=${id} ok=${ok}`)
+          res.json({ ok, message: ok ? "已忘记该条记忆(立即生效)" : "没有找到该分块" })
+          return
+        }
+        if (req.path === "/api/reinforce" && req.method === "POST") {
+          const group = String(req.body?.group || "").trim()
+          const id = String(req.body?.id || "").trim()
+          if (!group || !id) {
+            res.status(400).json({ error: "缺少 group 或 id" })
+            return
+          }
+          const updated = runtime.store.reinforceChunks(group, [id])
+          await runtime.store.flushGroupDirty(group)
+          logger?.info?.(`[语义记忆页] 手动强化分块 group=${group} id=${id} ok=${updated > 0}`)
+          res.json({ ok: updated > 0, message: updated > 0 ? "已强化,这条记忆不会再淡忘一阵子" : "没有找到该分块" })
           return
         }
         if (req.path === "/api/chunks") {
@@ -310,7 +362,9 @@ export function registerSemanticMemoryWebApp(expressApp, pluginRoot, tokens = {}
               timeRange: `${fmt(chunk.start_ts)} ~ ${fmt(chunk.end_ts)}`,
               speakers: (chunk.speakers || []).join("、"),
               messages: (chunk.message_ids || []).length,
-              preview: String(chunk.text || "").slice(0, 400)
+              preview: String(chunk.text || "").slice(0, 400),
+              effStrength: effectiveStrength(chunk, Date.now(), runtime.store.evolution?.halfLifeDays || 7),
+              recallCount: Number(chunk.recallCount) || 0
             }))
           res.json({ chunks, total: state.chunks.size })
           return

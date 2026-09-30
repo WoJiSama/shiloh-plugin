@@ -909,7 +909,7 @@ export class BananaTool extends AbstractTool {
       }
       const guardedMessage = personaFeedbackManager.guardReply(message, pluginBridge.instance?.config?.personaGuard, {
         userText: e?.msg || "",
-        botNames: [e?.bot?.nickname, pluginBridge.instance?.config?.persona?.name]
+        botNames: [e?.bot?.nickname, pluginBridge.instance?.getPersonaFor?.(e)?.name ?? pluginBridge.instance?.config?.persona?.name]
       });
       if (!guardedMessage) {
         reservation.release();

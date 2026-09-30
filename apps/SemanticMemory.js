@@ -4,6 +4,30 @@ import { getSemanticMemoryRuntime } from '../domains/semanticMemory/runtime.js'
 import { runRetrievalEval } from '../domains/semanticMemory/retrievalEval.js'
 import { buildVisibleFailureDetail } from '../utils/visibleFailure.js'
 
+// 记忆纠错闭环:.语义记忆 查询 的结果按序号缓存,随后可 .语义记忆 忘记 第N条 一键删除
+const lastQueryByGroup = new Map() // groupId -> { ids: [], at }
+const LAST_QUERY_TTL_MS = 10 * 60 * 1000
+
+function rememberQueryResults(groupId, items) {
+  if (!groupId || !Array.isArray(items) || !items.length) return
+  lastQueryByGroup.set(String(groupId), { ids: items.map(item => item.chunk?.id || ""), at: Date.now() })
+}
+
+export function resolveForgetTarget(arg = "", groupId = "", now = Date.now()) {
+  const text = String(arg || "").trim()
+  const record = lastQueryByGroup.get(String(groupId || ""))
+  const match = text.match(/^第?(\d+)条?$/)
+  if (match) {
+    if (!record || now - record.at > LAST_QUERY_TTL_MS) return { error: "最近 10 分钟没有查询结果,先 .语义记忆 查询 <问题> 再按序号遗忘" }
+    const index = Number(match[1]) - 1
+    const id = record.ids[index]
+    if (!id) return { error: `序号超出范围(最近查询共 ${record.ids.length} 条)` }
+    return { id }
+  }
+  if (!text) return { error: "缺少参数" }
+  return { id: text }
+}
+
 function requireRuntime(e) {
   const runtime = getSemanticMemoryRuntime()
   if (!runtime) {
@@ -44,12 +68,16 @@ export class SemanticMemoryPlugin extends plugin {
     try {
       if (/^(状态|status)$/i.test(action)) return await this.showStatus(e, runtime)
       if (/^(查询|search)$/i.test(action)) return await this.debugSearch(e, runtime, text)
+      if (/^(忘记|forget)$/i.test(action)) return await this.forgetChunk(e, runtime, text)
+      if (/^(想起|强化|reinforce)$/i.test(action)) return await this.reinforceChunk(e, runtime, text)
       if (/^(重建|回填|rebuild)$/i.test(action)) return await this.rebuild(e, runtime, text)
       if (/^(评估|eval)$/i.test(action)) return await this.evaluate(e, runtime, text)
       await e.reply([
         '用法:',
         '  .语义记忆                状态',
         '  .语义记忆 查询 <问题>    调试检索(看分数)',
+        '  .语义记忆 忘记 第N条|<id>  删除一条记忆(查询后按序号)',
+        '  .语义记忆 想起 <分块id>  强化一条记忆(本群)',
         '  .语义记忆 重建 [群=xxx]  全量回填索引',
         '  .语义记忆 评估 [N=20]    在线评估 recall@k'
       ].join('\n'))
@@ -59,6 +87,30 @@ export class SemanticMemoryPlugin extends plugin {
       await e.reply(`语义记忆命令失败：${buildVisibleFailureDetail(error)}`)
       return true
     }
+  }
+
+  // 单条记忆管理:忘记(删除)/想起(强化),作用于当前群,分块 id 从 .语义记忆 查询 或网页分块浏览器获取
+  async forgetChunk(e, runtime, text) {
+    const target = resolveForgetTarget(text.split(/\s+/)[2], e.group_id)
+    if (target.error || !target.id) {
+      await e.reply(target.error || '用法:.语义记忆 忘记 第N条(按查询序号) 或 <分块id>')
+      return true
+    }
+    const ok = await runtime.store.forgetChunk(e.group_id, target.id)
+    await e.reply(ok ? `已忘记记忆 ${target.id}` : `没有找到分块 ${target.id}(注意要在对应群里执行)`)
+    return true
+  }
+
+  async reinforceChunk(e, runtime, text) {
+    const id = text.split(/\s+/)[2]
+    if (!id) {
+      await e.reply('用法:.语义记忆 想起 <分块id>(强化后该记忆短期内不会淡忘)')
+      return true
+    }
+    const updated = runtime.store.reinforceChunks(e.group_id, [id])
+    await runtime.store.flushGroupDirty(e.group_id)
+    await e.reply(updated ? `已强化记忆 ${id}` : `没有找到分块 ${id}(注意要在对应群里执行)`)
+    return true
   }
 
   async showStatus(e, runtime) {
@@ -93,11 +145,13 @@ export class SemanticMemoryPlugin extends plugin {
       await e.reply(`没有检索到相关记忆(${result.elapsedMs}ms ${result.reason || ''})`.trim())
       return true
     }
+    rememberQueryResults(groupId, result.items)
     const lines = [
       `检索耗时 ${result.elapsedMs}ms(向量 ${result.vectorMs ?? '-'}ms / BM25 ${result.bm25Ms ?? '-'}ms / 重排 ${result.rerankMs ?? 0}ms${result.reranked ? '' : '未启用'}) 候选 ${result.candidates}`,
       ...result.items.map((item, index) =>
         `#${index + 1} 余弦${item.vectorScore.toFixed(3)} 向量#${item.vectorRank || '-'} BM25#${item.bm25Rank || '-'}${item.rerankScore !== null && item.rerankScore !== undefined ? ` 重排${item.rerankScore.toFixed(3)}` : ''}\n${runtime.retriever.renderContext({ items: [item] })}`)
     ]
+    lines.push('记错了哪条?发 .语义记忆 忘记 第N条 删除(10 分钟内有效)')
     await e.reply(lines.join('\n\n'))
     return true
   }

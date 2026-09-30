@@ -64,7 +64,10 @@ test("turn continuity records and rebuilds the last-turn summary", async () => {
 
 test("gate and main path share the addressee signal module", () => {
   const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
-  assert.ok(src.includes("const addresseeSignal = computeAddresseeSignal({"), "Gate 使用共享信号")
+  // gate 已拆到 apps/lib/timingGate.js(P 重构),两处必须 import 同一 addresseeSignals 模块
+  const gateSrc = fs.readFileSync(path.join(root, "apps/lib/timingGate.js"), "utf8")
+  assert.ok(gateSrc.includes("const addresseeSignal = computeAddresseeSignal({"), "Gate 使用共享信号")
+  assert.ok(gateSrc.includes('from "../../utils/addresseeSignals.js"'), "Gate 从共享模块 import")
   assert.ok(src.includes("session.addresseeSignal = computeAddresseeSignal({"), "主链路使用共享信号")
   assert.ok(src.includes("buildAddresseePrompt(session.addresseeSignal)"), "对象指认进入主 prompt")
 })

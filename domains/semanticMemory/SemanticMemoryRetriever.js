@@ -1,5 +1,9 @@
 // 语义记忆检索:向量(归一化余弦)+ BM25 混合召回 → RRF 融合(k=60)
 // → 相邻窗口重叠去重 → 余弦阈值门控。可选 LLM 重排(评估/调试用,不进热路径)。
+// 记忆演化(借鉴 A-Memorix):排序混入强度因子(近期/被反复想起的记忆上浮,
+// 长期无人提起的衰减下沉),低于冻结阈值的直接不注入;被注入的分块即强化并重置衰减时钟。
+import { effectiveStrength } from "./SemanticMemoryStore.js"
+
 const RRF_K = 60
 const CANDIDATE_POOL = 30
 
@@ -66,14 +70,33 @@ export class SemanticMemoryRetriever {
       // 阈值门控:向量分数是唯一可比的绝对量;纯 BM25 命中需排前 3 才保留(关键词强信号)
       const gated = fused.filter(entry => entry.vector >= threshold || (entry.bm25Rank >= 1 && entry.bm25Rank <= 3))
 
+      // 记忆演化:强度因子混入排序(0.5~1.0,不翻转相似度主序,只做近期/强化加权),
+      // 低于冻结阈值的视为"已淡忘",不再注入
+      const evolution = this.config.memoryEvolution || {}
+      const evolutionOn = evolution.enabled !== false && Number(evolution.freezeThreshold) > 0
+      let ranked = gated
+      if (evolutionOn) {
+        const now = Date.now()
+        const halfLifeDays = Number(evolution.halfLifeDays) || 7
+        const freezeThreshold = Number(evolution.freezeThreshold) || 0.06
+        ranked = []
+        for (const entry of gated) {
+          entry.effectiveStrength = effectiveStrength(entry.chunk, now, halfLifeDays)
+          if (entry.effectiveStrength < freezeThreshold) continue
+          entry.memoryFactor = 0.5 + 0.5 * entry.effectiveStrength
+          ranked.push(entry)
+        }
+        ranked.sort((a, b) => (b.rrf * b.memoryFactor) - (a.rrf * a.memoryFactor))
+      }
+
       // 可选重排:对门控后的候选池取前 rerankTopN 交给交叉编码器,失败/超时回落 RRF 顺序
-      let candidates = gated
+      let candidates = ranked
       let rerankScores = null
       let rerankMs = 0
-      if (rerank && this.reranker && gated.length > 1) {
+      if (rerank && this.reranker && ranked.length > 1) {
         this.stats.rerankQueries++
         const rerankTopN = Math.max(k, Number(this.config.rerankTopN) || 20)
-        candidates = gated.slice(0, rerankTopN)
+        candidates = ranked.slice(0, rerankTopN)
         rerankMs = Date.now()
         rerankScores = await this.reranker.rerank(text, candidates.map(entry => entry.chunk))
         rerankMs = Date.now() - rerankMs
@@ -93,6 +116,12 @@ export class SemanticMemoryRetriever {
       }
       this.stats.queries++
       if (kept.length) this.stats.hits++
+      // 召回即强化:被注入的分块重置衰减时钟(内存生效,批量落盘在 store 侧)
+      if (evolutionOn && kept.length) {
+        try {
+          this.store.reinforceChunks(groupId, kept.map(entry => entry.chunk.id))
+        } catch {}
+      }
       return {
         items: kept.map(entry => ({
           chunk: entry.chunk,
@@ -100,6 +129,9 @@ export class SemanticMemoryRetriever {
           vectorScore: entry.vector,
           vectorRank: entry.vectorRank,
           bm25Rank: entry.bm25Rank,
+          effectiveStrength: entry.effectiveStrength ?? null,
+          memoryFactor: entry.memoryFactor ?? null,
+          recallCount: Number(entry.chunk.recallCount) || 0,
           rerankScore: rerankScores ? (rerankScores.get(String(entry.chunk.id)) ?? null) : null
         })),
         elapsedMs: Date.now() - startedAt,

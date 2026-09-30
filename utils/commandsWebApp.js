@@ -7,6 +7,8 @@ import {
   writeRegistryConfig,
   writeCommandsMarkdown
 } from "./commandRegistry.js"
+import { pluginBridge } from "./pluginBridge.js"
+import { readUserSettings, applyFlatUpdates } from "./configWriter.js"
 import { ensureGuobaJumpLink, watchGuobaJumpLink } from "./guobaJumpLink.js"
 import { checkGuobaLoginToken } from "./guobaLoginTrust.js"
 import { buildDiceReplyPayload } from "../domains/dice/diceReplyCatalog.js"
@@ -214,7 +216,7 @@ function buildPageHtml() {
 <div id="status"></div>
 <div id="drop-overlay">📎 松开导入：牌堆(.json/.yaml) · 规则包(.yaml/.js/.cjs)</div>
 <script>
-const state = { token: window.__BL_AUTO_TOKEN__ || localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceJrrp: [], diceBuiltin: [], diceLevelMeta: [], diceDecks: [], emojiItems: [], emojiStats: null, emojiSelection: {}, emojiAdmission: null }
+const state = { token: window.__BL_AUTO_TOKEN__ || localStorage.getItem("bl-commands-token") || "", domains: [], activeKey: null, dirty: false, diceTemplates: {}, dicePacks: [], diceCheckLevels: {}, diceInsanity: {}, diceJrrp: [], diceBuiltin: [], diceLevelMeta: [], diceDecks: [], emojiItems: [], emojiStats: null, emojiSelection: {}, emojiAdmission: null, persona: null, forbidden: null }
 
 const $ = id => document.getElementById(id)
 function toast(msg, isErr = false) {
@@ -227,6 +229,9 @@ function toast(msg, isErr = false) {
 }
 function guobaHeaders() {
   return state.guobaToken ? { "x-guoba-token": state.guobaToken } : {}
+}
+function escapeHtml(text) {
+  return String(text ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]))
 }
 async function api(path, body) {
   const res = await fetch(path + (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(state.token), body
@@ -546,6 +551,255 @@ function renderEditor() {
       grid.appendChild(cell)
     }
     box.appendChild(grid)
+  }
+
+  // 人设库面板:多套人设编辑 + 按群绑定,独立保存按钮(不动命令表)
+  if (d.key === "persona") {
+    const lib = state.persona
+    const title = document.createElement("div")
+    title.className = "section-title"
+    title.textContent = "🎭 人设库（多套人设 + 按群绑定，保存后立即热生效）"
+    box.appendChild(title)
+    if (!lib) {
+      const empty = document.createElement("div")
+      empty.className = "empty"
+      empty.innerHTML = '人设库数据还没加载出来,<button class="ghost" id="persona-reload">重新加载</button>'
+      empty.querySelector("#persona-reload").onclick = async () => { await loadPersonaLibrary(); renderEditor() }
+      box.appendChild(empty)
+    } else {
+      const baseCard = document.createElement("div")
+      baseCard.className = "card open"
+      baseCard.innerHTML = '<div class="card-head"><span class="title">📌 默认人设:' + escapeHtml(lib.basePersona?.name || "未命名") + '</span><span class="desc">来自 message.yaml / 锅巴「人设与画像」页;未绑定群的会话和库内人设的缺省字段都用它</span></div>' +
+        '<div class="card-body"><div class="hint">身份:' + escapeHtml(lib.basePersona?.identity || "(未填)") + '</div><div class="hint">语气:' + escapeHtml(lib.basePersona?.tone || "(未填)") + '</div></div>'
+      box.appendChild(baseCard)
+
+      const listTitle = document.createElement("div")
+      listTitle.className = "sub-title"
+      listTitle.textContent = "库内人设(" + (lib.personas || []).length + " 套)"
+      box.appendChild(listTitle)
+      const personaHost = document.createElement("div")
+      box.appendChild(personaHost)
+      const renderPersonaCards = () => {
+        personaHost.innerHTML = ""
+        lib.personas.forEach((p, i) => {
+          const card = document.createElement("div")
+          card.className = "card open"
+          const head = document.createElement("div")
+          head.className = "card-head"
+          const nameInput = document.createElement("input")
+          nameInput.style.cssText = "max-width:160px;font-weight:600"
+          nameInput.value = p.name || ""
+          nameInput.oninput = () => { p.name = nameInput.value }
+          const idTag = document.createElement("span")
+          idTag.className = "desc"
+          idTag.textContent = "id:" + (p.id || "")
+          const delBtn = document.createElement("button")
+          delBtn.className = "danger"
+          delBtn.textContent = "删除"
+          delBtn.onclick = () => {
+            if (!confirm("删除人设「" + (p.name || p.id) + "」?绑定它的群会自动回到默认人设。")) return
+            lib.personas.splice(i, 1)
+            renderPersonaCards()
+          }
+          head.appendChild(nameInput); head.appendChild(idTag); head.appendChild(delBtn)
+          card.appendChild(head)
+          const body = document.createElement("div")
+          body.className = "card-body"
+          const makeRow = (labelText, field, isArea) => {
+            const row = document.createElement("div")
+            row.className = "grid-row"
+            const label = document.createElement("div")
+            label.className = "label"
+            label.textContent = labelText
+            const el = document.createElement(isArea ? "textarea" : "input")
+            if (!isArea) el.type = "text"
+            el.value = p[field] || ""
+            el.oninput = () => { p[field] = el.value }
+            row.appendChild(label); row.appendChild(el)
+            return row
+          }
+          body.appendChild(makeRow("身份定位", "identity", true))
+          body.appendChild(makeRow("语气", "tone", true))
+          for (const [field, fieldLabel] of PERSONA_LIST_FIELDS) body.appendChild(makeRow(fieldLabel, field + "Text", true))
+          body.appendChild(makeRow("调皮心情时刻(名称|提示|概率)", "moodsText", true))
+          body.appendChild(makeRow("备注", "notes", true))
+          card.appendChild(body)
+          personaHost.appendChild(card)
+        })
+      }
+      renderPersonaCards()
+
+      const addPersona = document.createElement("button")
+      addPersona.className = "ghost"
+      addPersona.textContent = "+ 以默认人设为模板新增"
+      addPersona.onclick = () => {
+        lib.personas.push({
+          id: "", name: "新人设",
+          identity: lib.basePersona?.identity || "", tone: lib.basePersona?.tone || "",
+          speechStyleText: "", preferencesText: "", boundariesText: "", notes: ""
+        })
+        renderPersonaCards()
+        personaHost.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+      box.appendChild(addPersona)
+
+      const bindTitle = document.createElement("div")
+      bindTitle.className = "section-title"
+      bindTitle.textContent = "🔗 按群绑定(群号 → 人设;不在表里的群用默认人设)"
+      box.appendChild(bindTitle)
+      const bindHost = document.createElement("div")
+      box.appendChild(bindHost)
+      const personaOptions = () => [{ id: "default", name: "(默认人设)" }, ...(lib.personas || []).map(p => ({ id: p.id, name: p.name }))]
+      const renderBindRows = () => {
+        bindHost.innerHTML = ""
+        lib.bindingRows.forEach((row, i) => {
+          const line = document.createElement("div")
+          line.style.cssText = "display:flex;gap:8px;margin-bottom:6px;align-items:center"
+          const groupInput = document.createElement("input")
+          groupInput.placeholder = "群号"
+          groupInput.style.cssText = "max-width:180px"
+          groupInput.value = row.groupId || ""
+          groupInput.oninput = () => { row.groupId = groupInput.value.trim() }
+          const select = document.createElement("select")
+          for (const opt of personaOptions()) {
+            const o = document.createElement("option")
+            o.value = opt.id; o.textContent = opt.name
+            select.appendChild(o)
+          }
+          select.value = personaOptions().some(o => o.id === row.personaId) ? row.personaId : "default"
+          row.personaId = select.value
+          select.onchange = () => { row.personaId = select.value }
+          const del = document.createElement("button")
+          del.className = "danger"
+          del.textContent = "删"
+          del.onclick = () => { lib.bindingRows.splice(i, 1); renderBindRows() }
+          line.appendChild(groupInput); line.appendChild(select); line.appendChild(del)
+          bindHost.appendChild(line)
+        })
+      }
+      renderBindRows()
+      const addBind = document.createElement("button")
+      addBind.className = "ghost"
+      addBind.textContent = "+ 添加群绑定"
+      addBind.onclick = () => { lib.bindingRows.push({ groupId: "", personaId: "default" }); renderBindRows() }
+      box.appendChild(addBind)
+
+      const privateRow = document.createElement("div")
+      privateRow.style.cssText = "display:flex;gap:8px;margin:10px 0 0;align-items:center"
+      const privateLabel = document.createElement("span")
+      privateLabel.style.cssText = "font-size:13px;color:#6b7280"
+      privateLabel.textContent = "私聊人设:"
+      const privateSelect = document.createElement("select")
+      for (const opt of personaOptions()) {
+        const o = document.createElement("option")
+        o.value = opt.id; o.textContent = opt.name
+        privateSelect.appendChild(o)
+      }
+      privateSelect.value = personaOptions().some(o => o.id === lib.privateBinding) ? lib.privateBinding : "default"
+      lib.privateBinding = privateSelect.value === "default" ? "" : privateSelect.value
+      privateSelect.onchange = () => { lib.privateBinding = privateSelect.value === "default" ? "" : privateSelect.value }
+      privateRow.appendChild(privateLabel); privateRow.appendChild(privateSelect)
+      box.appendChild(privateRow)
+
+      const saveBar = document.createElement("div")
+      saveBar.className = "save-bar"
+      const saveHint = document.createElement("span")
+      saveHint.className = "hint"
+      saveHint.textContent = "保存写入 config/persona-library.yaml,立即热生效;QQ 里也可用 #人设列表/#切换人设"
+      const saveBtn = document.createElement("button")
+      saveBtn.textContent = "💾 保存人设库"
+      saveBtn.onclick = async () => {
+        saveBtn.disabled = true
+        try {
+          const r = await api("api/persona-data", buildPersonaPayload())
+          toast("人设库已保存并热生效:" + r.personas + " 套人设、" + r.bindings + " 个群绑定")
+          await loadPersonaLibrary()
+          renderEditor()
+        } catch (e) { toast(e.message, true) }
+        saveBtn.disabled = false
+      }
+      saveBar.appendChild(saveHint); saveBar.appendChild(saveBtn)
+      box.appendChild(saveBar)
+    }
+  }
+
+  // 违禁词面板:词表 + 开关 + 提示语,独立保存
+  if (d.key === "forbidden") {
+    const fw = state.forbidden
+    const title = document.createElement("div")
+    title.className = "section-title"
+    title.textContent = "🚫 违禁词黑名单（命中即中断该群当前对话，保存后立即热生效）"
+    box.appendChild(title)
+    if (!fw) {
+      const empty = document.createElement("div")
+      empty.className = "empty"
+      empty.innerHTML = '违禁词数据还没加载出来,<button class="ghost" id="fw-reload">重新加载</button>'
+      empty.querySelector("#fw-reload").onclick = async () => { await loadForbiddenWords(); renderEditor() }
+      box.appendChild(empty)
+    } else {
+      const card = document.createElement("div")
+      card.className = "card open"
+      const body = document.createElement("div")
+      body.className = "card-body"
+      const row1 = document.createElement("div")
+      row1.style.cssText = "display:flex;gap:16px;margin-bottom:8px;align-items:center;flex-wrap:wrap"
+      const mkCheck = (labelText, field) => {
+        const label = document.createElement("label")
+        label.style.cssText = "display:flex;gap:6px;align-items:center;font-size:13px;color:#6b7280;cursor:pointer"
+        const cb = document.createElement("input")
+        cb.type = "checkbox"
+        cb.checked = fw[field] !== false
+        cb.onchange = () => { fw[field] = cb.checked }
+        label.appendChild(cb); label.appendChild(document.createTextNode(labelText))
+        return label
+      }
+      row1.appendChild(mkCheck("启用违禁词", "enabled"))
+      row1.appendChild(mkCheck("bot 出站同样拦截", "blockOutput"))
+      const replyLabel = document.createElement("label")
+      replyLabel.style.cssText = "display:flex;gap:6px;align-items:center;font-size:13px;color:#6b7280"
+      replyLabel.textContent = "命中提示语:"
+      const replyInput = document.createElement("input")
+      replyInput.placeholder = "留空=完全静默,可用 {personaName}"
+      replyInput.style.cssText = "flex:1;min-width:200px"
+      replyInput.value = fw.replyText || ""
+      replyInput.oninput = () => { fw.replyText = replyInput.value }
+      replyLabel.appendChild(replyInput)
+      row1.appendChild(replyLabel)
+      body.appendChild(row1)
+      const wordsLabel = document.createElement("div")
+      wordsLabel.className = "label"
+      wordsLabel.style.cssText = "font-size:13px;color:#6b7280;margin-bottom:4px"
+      wordsLabel.textContent = "违禁词(一行一条;支持 /正则/i 写法)"
+      const wordsArea = document.createElement("textarea")
+      wordsArea.rows = 8
+      wordsArea.style.cssText = "width:100%"
+      wordsArea.value = fw.wordsText || ""
+      wordsArea.oninput = () => { fw.wordsText = wordsArea.value }
+      body.appendChild(wordsLabel); body.appendChild(wordsArea)
+      card.appendChild(body)
+      box.appendChild(card)
+
+      const saveBar = document.createElement("div")
+      saveBar.className = "save-bar"
+      const saveHint = document.createElement("span")
+      saveHint.className = "hint"
+      saveHint.textContent = "保存写入 message.yaml 热更新生效;QQ 里也可用 #加违禁词/#删违禁词"
+      const saveBtn = document.createElement("button")
+      saveBtn.textContent = "💾 保存违禁词"
+      saveBtn.onclick = async () => {
+        saveBtn.disabled = true
+        try {
+          const words = String(fw.wordsText || "").split("\\n").map(s => s.trim()).filter(Boolean)
+          const r = await api("api/forbidden-data", { enabled: fw.enabled !== false, words, replyText: fw.replyText || "", blockOutput: fw.blockOutput !== false })
+          toast("违禁词已保存并热生效:" + r.words + " 条")
+          await loadForbiddenWords()
+          renderEditor()
+        } catch (e) { toast(e.message, true) }
+        saveBtn.disabled = false
+      }
+      saveBar.appendChild(saveHint); saveBar.appendChild(saveBtn)
+      box.appendChild(saveBar)
+    }
   }
 
   if (d.key === "dice") {
@@ -925,12 +1179,61 @@ async function loadEmojiGallery() {
   return true
 }
 
+// —— 人设库:多套人设 + 按群绑定 ——
+const PERSONA_LIST_FIELDS = [
+  ["speechStyle", "说话风格（一行一条）"],
+  ["preferences", "偏好（一行一条）"],
+  ["boundaries", "边界（一行一条）"]
+]
+
+async function loadPersonaLibrary() {
+  try {
+    const data = await api("api/persona-data")
+    for (const p of (data.personas || [])) {
+      for (const [field] of PERSONA_LIST_FIELDS) p[field + "Text"] = (p[field] || []).join("\\n")
+      p.moodsText = (p.moods || []).map(m => [m.name, m.hint, m.probability].join("|")).join("\\n")
+    }
+    data.bindingRows = Object.entries(data.groupBindings || {}).map(([groupId, personaId]) => ({ groupId, personaId }))
+    state.persona = data
+  } catch (e) { state.persona = null; return false }
+  return true
+}
+
+function buildPersonaPayload() {
+  const lib = state.persona
+  const personas = (lib.personas || []).map(p => {
+    const entry = { id: p.id, name: p.name, identity: p.identity, tone: p.tone, notes: p.notes }
+    for (const [field] of PERSONA_LIST_FIELDS) {
+      entry[field] = String(p[field + "Text"] || "").split("\\n").map(s => s.trim()).filter(Boolean)
+    }
+    entry.moods = String(p.moodsText || "").split("\\n").map(line => line.split("|").map(s => s.trim())).filter(parts => parts.length >= 2 && parts[0] && parts[1]).map(parts => ({ name: parts[0], hint: parts[1], probability: Number(parts[2]) > 0 ? Number(parts[2]) : 0.1 }))
+    return entry
+  })
+  const groupBindings = {}
+  for (const row of (lib.bindingRows || [])) {
+    const groupId = String(row.groupId || "").trim()
+    if (groupId && row.personaId && row.personaId !== "default") groupBindings[groupId] = row.personaId
+  }
+  return { personas, groupBindings, privateBinding: lib.privateBinding || "" }
+}
+
+async function loadForbiddenWords() {
+  try {
+    const data = await api("api/forbidden-data")
+    data.wordsText = (data.words || []).join("\\n")
+    state.forbidden = data
+  } catch (e) { state.forbidden = null; return false }
+  return true
+}
+
 async function load() {
   $("lock").style.display = "none"
   $("app").style.display = "block"
   try {
     await loadDiceExtras()
     loadEmojiGallery().catch(() => {})
+    loadPersonaLibrary().catch(() => {})
+    loadForbiddenWords().catch(() => {})
     const data = await api("api/data")
     state.domains = data.domains
     state.dirty = false
@@ -1092,6 +1395,71 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
           res.json({ ok: true, commandCount: registry.commandCount, docPath: path.relative(pluginRoot, docPath) })
         } catch (error) {
           res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      // 人设库:多套人设 + 按群绑定,读写 persona-library.yaml(主插件实例持有热读缓存)
+      if (req.path === "/api/persona-data" && req.method === "POST") {
+        try {
+          const lib = pluginBridge.instance?.personaLibrary
+          if (!lib) throw new Error("聊天插件尚未就绪,稍后重试")
+          const state = lib.replaceAll({
+            personas: req.body?.personas,
+            groupBindings: req.body?.groupBindings,
+            privateBinding: req.body?.privateBinding
+          })
+          logger?.info?.(`[命令管理页] 已保存人设库:${state.personas.length} 套人设、${Object.keys(state.groupBindings).length} 个群绑定`)
+          res.json({ ok: true, personas: state.personas.length, bindings: Object.keys(state.groupBindings).length })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/persona-data") {
+        try {
+          const lib = pluginBridge.instance?.personaLibrary
+          if (!lib) throw new Error("聊天插件尚未就绪,稍后重试")
+          const base = pluginBridge.instance?.config?.persona || {}
+          res.json({
+            ...lib.exportState(),
+            basePersona: { name: base.name || "", identity: base.identity || "", tone: base.tone || "" }
+          })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      // 违禁词黑名单:读实时合并配置,写 message.yaml 走热更新
+      if (req.path === "/api/forbidden-data" && req.method === "POST") {
+        try {
+          const body = req.body || {}
+          const words = Array.isArray(body.words)
+            ? body.words.map(w => String(w || "").trim()).filter(Boolean)
+            : []
+          applyFlatUpdates({
+            "forbiddenWords.enabled": body.enabled !== false,
+            "forbiddenWords.words": words,
+            "forbiddenWords.replyText": String(body.replyText || ""),
+            "forbiddenWords.blockOutput": body.blockOutput !== false
+          })
+          logger?.info?.(`[命令管理页] 已保存违禁词 ${words.length} 条(热更新生效)`)
+          res.json({ ok: true, words: words.length })
+        } catch (error) {
+          res.status(400).json({ error: error?.message || String(error) })
+        }
+        return
+      }
+      if (req.path === "/api/forbidden-data") {
+        try {
+          const cfg = pluginBridge.instance?.config?.forbiddenWords || readUserSettings()?.forbiddenWords || {}
+          res.json({
+            enabled: cfg.enabled !== false,
+            words: Array.isArray(cfg.words) ? cfg.words.map(w => String(w)) : [],
+            replyText: String(cfg.replyText || ""),
+            blockOutput: cfg.blockOutput !== false
+          })
+        } catch (error) {
+          res.status(500).json({ error: error?.message || String(error) })
         }
         return
       }

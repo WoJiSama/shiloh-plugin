@@ -1449,7 +1449,7 @@ export class TextImageTool extends AbstractTool {
   async func(opts, e) {
     const text = personaFeedbackManager.guardReply(String(opts.text || "").trim(), pluginBridge.instance?.config?.personaGuard, {
       userText: e?.msg || "",
-      botNames: [e?.bot?.nickname, pluginBridge.instance?.config?.persona?.name]
+      botNames: [e?.bot?.nickname, pluginBridge.instance?.getPersonaFor?.(e)?.name ?? pluginBridge.instance?.config?.persona?.name]
     })
     if (!text) return "error: text 不能为空"
 

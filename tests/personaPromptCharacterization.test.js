@@ -122,7 +122,7 @@ test("PersonaFeedbackManager.buildFeedbackPrompt 支持人设名注入", () => {
 test("分层画像:闲聊保底层与任务全量层的选取与顺序(特征快照)", () => {
   const chat = resolvePromptLayerProfile({ responseKind: "chat", modelIntent: "", requiredToolNames: [] })
   assert.equal(chat.profile, "chat")
-  assert.deepEqual(chat.layers, ["identityBindings", "emotion", "memory", "personaTone", "personaFeedback"])
+  assert.deepEqual(chat.layers, ["identityBindings", "emotion", "memory", "midtermMemory", "personaTone", "personaFeedback"])
 
   const task = resolvePromptLayerProfile({ responseKind: "chat", modelIntent: "image_generate" })
   assert.equal(task.profile, "task")

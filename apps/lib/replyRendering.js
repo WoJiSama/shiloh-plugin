@@ -10,9 +10,34 @@ import { extractChatKeywords } from "../../core/intent/messageIntent.js"
 import { planTextReplyMessages } from "../../utils/replyRhythm.js"
 import { TotalTokens } from "../../functions/tools/CalculateToken.js"
 import { ThinkingProcessor } from "../../utils/providers/ThinkingProcessor.js"
+import { findForbiddenWord, isConversationInterrupted, markConversationInterrupted, extractReplyText } from "../../utils/forbiddenWordGuard.js"
+
+// 出站违禁词黑名单统一咽喉检查:
+// 1) 该群会话已被违禁词中断且中断晚于本回合锚点 → 丢弃(中断当前对话);
+// 2) bot 自己要说的话含违禁词(blockOutput) → 拦截本条并同样中断本回合。
+// 返回 true 表示已拦截,调用方应放弃本次发送。
+function shouldBlockByForbiddenWords(host, e, text, where) {
+    const cfg = host?.config?.forbiddenWords
+    if (cfg?.enabled === false) return false
+    const groupId = e?.group_id
+    if (isConversationInterrupted(e)) {
+      logger.info(`[违禁词中断] group=${groupId || ""} ${where} 本回合已被中断，丢弃发送`)
+      return true
+    }
+    if (cfg && cfg.blockOutput !== false) {
+      const word = findForbiddenWord(extractReplyText(text), cfg)
+      if (word) {
+        markConversationInterrupted(groupId)
+        logger.mark(`[违禁词拦截] group=${groupId || ""} ${where} 出站内容命中「${word}」，已拦截并中断本回合`)
+        return true
+      }
+    }
+    return false
+  }
 
 export async function sendObservedReply(host, e, payload, quote = false, channel = "command") {
     try {
+      if (shouldBlockByForbiddenWords(host, e, payload, `channel=${channel}`)) return null
       const result = await e.reply(payload, quote)
       logDeliveryOutcome(logger, {
         status: "sent",
@@ -41,6 +66,7 @@ export async function sendSegmentedMessage(host, e, output, quoteChance = 0.5, {
         logger.info(`[回复新鲜度] group=${groupId || ""} cancelled anchor=${e?._proactiveReplyAnchorAt || 0} latest=${lastIncomingMsgAt.get(groupId) || 0}`)
         return null
       }
+      if (shouldBlockByForbiddenWords(host, e, output, "分段回复")) return null
       // 出站幂等（回合持久化）：本回合已有另一份执行发出过回复时跳过，防止补跑后重复刷屏
       if (typeof host?.claimTurnReply === "function") {
         const claim = await host.claimTurnReply(e)
@@ -55,7 +81,7 @@ export async function sendSegmentedMessage(host, e, output, quoteChance = 0.5, {
       if (typeof output === "string" && !alreadyGuarded) {
         output = applyOutputPersonaGuards(output, {
           userText: e?.msg || "",
-          botNames: [Bot?.nickname, host.config?.persona?.name],
+          botNames: [Bot?.nickname, (typeof host.getPersonaFor === "function" ? host.getPersonaFor(e) : host.config?.persona)?.name],
           personaGuard: host.config.personaGuard
         })
       }

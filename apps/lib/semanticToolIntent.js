@@ -260,7 +260,7 @@ export async function classifySemanticToolIntent(host, context = {}) {
                 "search: 用户询问实时信息或明确要搜索/查询/最新信息。",
                 "chat: 普通闲聊、问能不能做某事但没有给出具体任务、玩梗、情绪回应。",
                 "如果用户需求明确对应【候选工具】中的某个工具，优先输出该工具名；这适用于三角洲、提醒、点歌、禁言、改名片、戳一戳、点赞、礼物、聊天记录、表情、导图等已有工具。",
-                `选择具体工具时，intent 写 tool，toolName 写工具名，params 按该工具参数名生成 JSON；不确定必要参数时不要乱填，选 chat 让${resolvePersonaName(host.config?.persona)}追问。`,
+                `选择具体工具时，intent 写 tool，toolName 写工具名，params 按该工具参数名生成 JSON；不确定必要参数时不要乱填，选 chat 让${resolvePersonaName(typeof host.getPersonaFor === "function" ? host.getPersonaFor(context.e) : host.config?.persona)}追问。`,
                 "如果【候选工具详细规则】出现，必须优先按详细规则抽参；详细规则比通用描述更可信。",
                 "语义判断框架：先判断载体和真实目标。图片/截图/引用/转发常是载体，用户真正要处理的可能是里面的内容、说法、政策、事件或人物。",
                 "带图片/截图并说“查一下这个是真的假的/是不是真的/看看最新信息”时，真实目标默认是核实图片里承载的内容或说法；应先选 image_analysis 提取内容，后续再搜索。不要直接选纯 search，也不要理解成图片AI检测。",

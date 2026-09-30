@@ -22,6 +22,16 @@ export const DEFAULT_SEMANTIC_MEMORY_CONFIG = {
   retrieveTimeoutMs: 900,
   indexOnWrite: true,
   embeddingDimensions: 1024,
+  // 记忆强度演化(借鉴 A-Memorix 半衰期模型):强度随时间衰减、被召回即强化、
+  // 低于冻结阈值的在每日清扫时遗忘;排序按强度加权,近期/常被想起的记忆上浮
+  memoryEvolution: {
+    enabled: true,
+    halfLifeDays: 7,
+    reinforceBoost: 0.35,
+    maxStrength: 1,
+    freezeThreshold: 0.06,
+    flushBatch: 32
+  },
   // 重排:SiliconFlow 免费 bge-reranker-v2-m3;默认评估/调试启用,聊天热路径默认关闭(保延迟)
   rerankEnabled: true,
   rerankInChat: false,
@@ -43,8 +53,8 @@ function scheduleSweep(store, logger) {
   if (sweepInterval) clearInterval(sweepInterval)
   const runSweep = () => {
     store.sweepAll().then(summary => {
-      if (summary.compactedGroups > 0 || summary.droppedChunks > 0) {
-        logger?.info?.(`[SemanticMemory] 每日清扫:${summary.compactedGroups} 群压实,清理过期分块 ${summary.droppedChunks} 个`)
+      if (summary.compactedGroups > 0 || summary.droppedChunks > 0 || summary.frozenChunks > 0) {
+        logger?.info?.(`[SemanticMemory] 每日清扫:${summary.compactedGroups} 群压实,过期 ${summary.droppedChunks} 个,淡忘(强度冻结) ${summary.frozenChunks} 个`)
       }
     }).catch(error => logger?.warn?.(`[SemanticMemory] 清扫失败: ${error.message}`))
   }
@@ -58,6 +68,7 @@ export function normalizeSemanticMemoryConfig(raw = {}, embeddingAiConfig = {}) 
   const config = {
     ...DEFAULT_SEMANTIC_MEMORY_CONFIG,
     ...raw,
+    memoryEvolution: { ...DEFAULT_SEMANTIC_MEMORY_CONFIG.memoryEvolution, ...(raw?.memoryEvolution || {}) },
     includeGroups: Array.isArray(raw.includeGroups) ? raw.includeGroups.map(String) : [],
     excludeGroups: Array.isArray(raw.excludeGroups) ? raw.excludeGroups.map(String) : []
   }
@@ -103,6 +114,7 @@ export function installSemanticMemoryRuntime({ pluginSettings = {}, archiveManag
     baseDir,
     dimension: config.embeddingDimensions,
     retentionDays: config.retentionDays,
+    evolution: config.memoryEvolution,
     logger
   })
   const gateway = new EmbeddingGateway({
