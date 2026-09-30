@@ -123,7 +123,7 @@ test("handleTool wires trace and arbiter into the turn", () => {
   for (const marker of [
     "const turnTrace = createTurnTrace({",
     "e = outboundArbiter.wrapEvent(e)",
-    'outboundArbiter.enqueue("commitment", () => this.sendSegmentedMessage(e, acknowledgement, 0))',
+    'outboundArbiter.enqueue("commitment", () => host.sendSegmentedMessage(e, acknowledgement, 0))',
     "session?.outboundArbiter?.resolveToolOutcomes()",
     "context?.session?.outboundArbiter?.markFailure()",
     "outboundArbiter.settle(session.turnPlan?.outcomes || [])",

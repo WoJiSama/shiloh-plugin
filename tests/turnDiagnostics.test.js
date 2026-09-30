@@ -89,7 +89,8 @@ test("守卫统计快照随回合留存:后续增长不影响历史回合的数�
 
 test("命令接线:主链路 finally 记录诊断,命令规则已注册", async () => {
   const fs = await import("node:fs")
-  const src = fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")
+  const src = ["../apps/test.js", "../apps/lib/chatTurn.js", "../apps/lib/smartConversation.js"]
+      .map(rel => fs.readFileSync(new URL(rel, import.meta.url), "utf8")).join("\n")
   assert.ok(src.includes("recordTurnDiagnostics({"), "主链路 finally 中记录回合诊断")
   assert.ok(src.includes('reg: "^#希洛调试", fnc: "handleDebugDiagnostics"'), "命令规则已注册")
   assert.ok(src.includes("async handleDebugDiagnostics(e)"), "命令处理方法存在")

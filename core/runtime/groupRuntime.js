@@ -8,6 +8,15 @@ const SMART_GROUP_LIMIT = 100
 
 const smartStatesByGroup = new Map()
 
+// 运行时提供者注册:emotionManager/sessionStore 等实例由插件装配处注入,
+// 门面只做组合不持有创建逻辑(避免 core → domains 的反向依赖)
+let runtimeProviders = { emotion: null, sessions: null }
+
+export function registerGroupRuntimeProviders(next = {}) {
+  runtimeProviders = { ...runtimeProviders, ...next }
+  return runtimeProviders
+}
+
 // smart 会话状态:same shape as before(见字段注释),超过 100 个群按 lastMsgAt 淘汰最旧
 export function getSmartRuntimeState(groupId) {
   const key = String(groupId || "")
@@ -93,7 +102,9 @@ export function getGroupRuntime(groupId) {
     groupId: key,
     smart: getSmartRuntimeState(key),
     get topic() { return peekGroupTopicState(key) },
-    get social() { return peekGroupSocialState(key) }
+    get social() { return peekGroupSocialState(key) },
+    get emotion() { return runtimeProviders.emotion },
+    get sessions() { return runtimeProviders.sessions }
   }
 }
 

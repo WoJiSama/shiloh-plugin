@@ -120,10 +120,10 @@ test("最终卡片:简报在前、原文材料为证据层、总长受 maxChars 
 
 test("主链路接线:简报优先 + 失败回退规则卡 + 配置开关", () => {
   const src = [
-    fs.readFileSync(path.join(root, "apps/test.js"), "utf8"),
+    ...[path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")].map(file => fs.readFileSync(file, "utf8")),
     fs.readFileSync(path.join(root, "apps/lib/promptContext.js"), "utf8")
   ].join("\n")
-  assert.ok(src.includes("this.resolveUnderstandingPrompt({"), "注入点改为异步简报解析(现为瀑布stage包裹)")
+  assert.ok(src.includes("this.resolveUnderstandingPrompt({") || src.includes("host.resolveUnderstandingPrompt({"), "注入点改为异步简报解析(现为瀑布stage包裹)")
   assert.ok(src.includes("requestUnderstandingBrief({"), "模型简报调用已接线")
   assert.ok(src.includes("回退规则卡 reason="), "回退有观测日志")
   assert.ok(src.includes("briefEnabled: cfg.briefEnabled !== false"), "配置开关默认开启")

@@ -16,7 +16,8 @@ test("turn trace carries trigger provenance", () => {
 })
 
 test("timing gate shares the persona and trigger decisions flow into the turn", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = [path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")]
+      .map(file => fs.readFileSync(file, "utf8")).join("\n")
   // gate 已拆到 apps/lib/timingGate.js(P 重构),人设注入断言看新家
   const gateSrc = fs.readFileSync(path.join(root, "apps/lib/timingGate.js"), "utf8")
   assert.ok(gateSrc.includes("gatePersonaTone"), "Gate prompt 需要注入人设语气")

@@ -1,3 +1,8 @@
+# 2026-09-30 配置界面收口:今日新功能全部补齐锅巴（用户："这个moods也应该在页面上可以控制,我们要避免所有的配置文件的写法"）
+- 原则确立:一切配置皆有界面,不逼手写 yaml。盘点今日新增配置,补齐锅巴:persona.moods(GSubForm 心情名/提示/概率)、semanticMemory.memoryEvolution 与 selfCorrection、midtermMemory、smartTrigger.attentionDrift 与 groupTalkValues、emojiSystem.familiarityBias;服务器端验证 7 个字段全部出现在 schemas。
+- groupTalkValues 形态问题:锅巴 GSubForm 只写数组[{group,value}],原设计是对象{群号:值}——resolveTalkValue 改为双形态兼容(数组优先、对象向后兼容手写),默认配置改数组;补双形态单测。
+- git 收口:今日工作分三 commit——3f23b5f 豹骰 WIP、e44ee2d MaiBot 吸收三批(43文件+3940/-589)、29f2e45 锅巴界面;工作区干净,未 push。
+
 # 2026-09-30 第三批修正:节奏装饰器撤除 + 记忆纠错改为自纠错（用户对三功能的裁决:"1可以做,2的节奏不需要做,3的记忆不应该他自己作吗"）
 - 拟人节奏装饰器全量撤除:replyRendering 两处延迟恢复原公式,删模块/配置/测试——用户不要"节奏破绽"这类活人拟态。
 - 记忆自纠错(utils/memorySelfCorrection.js):纠错发生在对话里而非主人手动查删。链路:语义记忆注入时 noteInjectedChunks 记录该群本轮引用的分块 id(TTL 10min)→ 群消息命中纠错话术(你记错了/记岔/不是这样的/根本没有...)且与 bot 相关(引用 bot 消息,或发送者正是 bot 上轮回复的人)→ store.penalizeChunks 降权这些分块。降权非删除:基准强度 -0.5 且不重置衰减锚点(与强化不对称——被纠错的记忆继续按原时钟衰减),重复纠错跌破冻结线由每日清扫淡忘,单次误伤只降权不丢数据。她的口头回应不需改:纠错消息本身在上下文里,模型自然会说"啊那我记岔了"。三个入口(strict/smart/handleTool)统一挂 handleMemorySelfCorrection 钩子;config semanticMemory.selfCorrection{enabled,penalty,ttlMinutes}。

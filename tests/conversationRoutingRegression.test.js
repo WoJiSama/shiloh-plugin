@@ -39,7 +39,7 @@ test("high-confidence emoji reactions bypass model tool selection", () => {
 test("ordinary casual emoji replies retain the optional tool for model selection", () => {
   assert.match(source, /const initialToolNames = turnPlan\.capabilities\.required\.length/)
   assert.match(source, /: turnPlan\.capabilities\.optional/)
-  assert.match(source, /this\.getToolsByName\(initialToolNames\)/)
+  assert.match(source, /(?:this|host)\.getToolsByName\(initialToolNames\)/)
 })
 
 test("knowledge replies use TurnPlan instead of optional emoji capability routing", () => {
@@ -50,7 +50,7 @@ test("knowledge replies use TurnPlan instead of optional emoji capability routin
   const genericEmojiExposure = source.indexOf("轻松闲聊仅启用 sendLocalEmojiTool")
   const executionRoute = source.indexOf("const turnPlan = createTurnPlan")
   // buildRequestData 已迁至 utils/modelGateway.js(buildChatRequestData),主链路改为直接调用
-  const modelRequest = source.indexOf("const requestData = buildChatRequestData(this.config,")
+  const modelRequest = source.indexOf("const requestData = buildChatRequestData(host.config,")
   assert.ok(genericEmojiExposure > 0 && executionRoute > genericEmojiExposure && modelRequest > executionRoute)
 })
 
@@ -67,7 +67,7 @@ test("card replies acknowledge before generation and keep the card body free of 
   assert.match(composerSrc, /卡面正文边界/)
   assert.match(source, /已剥离模型开场/)
   const acknowledgement = source.indexOf("const acknowledgement = cardAcknowledgement")
-  const request = source.indexOf("const requestData = buildChatRequestData(this.config,", acknowledgement)
+  const request = source.indexOf("const requestData = buildChatRequestData(host.config,", acknowledgement)
   assert.ok(acknowledgement > 0 && request > acknowledgement)
 })
 

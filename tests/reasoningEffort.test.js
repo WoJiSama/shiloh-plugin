@@ -92,9 +92,9 @@ test("其他档位不受升档影响", () => {
 })
 
 test("主链路已把配置传入 deriveTurnPlanRequest", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = fs.readFileSync(path.join(root, "apps/lib/chatTurn.js"), "utf8")
   assert.ok(
-    src.includes("deriveTurnPlanRequest(turnPlan, this.config)"),
+    src.includes("deriveTurnPlanRequest(turnPlan, host.config)"),
     "主链路需传 config,否则 complexReasoningEffort 配置不生效"
   )
 })

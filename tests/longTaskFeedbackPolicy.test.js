@@ -65,7 +65,8 @@ test("local opening sends once per event and never blocks the task", async () =>
 })
 
 test("smart lock release path consumes the policy table", () => {
-  const testJs = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const testJs = [path.join(root, "apps/test.js"), path.join(root, "apps/lib/smartConversation.js"), path.join(root, "apps/lib/chatTurn.js")]
+    .map(file => fs.readFileSync(file, "utf8")).join("\n")
   assert.ok(
     testJs.includes("const longTaskPolicy = resolveLongTaskFeedbackPolicy(String(e?.msg || \"\"))"),
     "release call site must resolve policy (and log task kind)"

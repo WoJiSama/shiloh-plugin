@@ -63,7 +63,8 @@ test("turn continuity records and rebuilds the last-turn summary", async () => {
 })
 
 test("gate and main path share the addressee signal module", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = [path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")]
+      .map(file => fs.readFileSync(file, "utf8")).join("\n")
   // gate 已拆到 apps/lib/timingGate.js(P 重构),两处必须 import 同一 addresseeSignals 模块
   const gateSrc = fs.readFileSync(path.join(root, "apps/lib/timingGate.js"), "utf8")
   assert.ok(gateSrc.includes("const addresseeSignal = computeAddresseeSignal({"), "Gate 使用共享信号")
@@ -73,7 +74,8 @@ test("gate and main path share the addressee signal module", () => {
 })
 
 test("turn continuity is injected next turn and recorded at turn end", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = [path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")]
+      .map(file => fs.readFileSync(file, "utf8")).join("\n")
   assert.ok(src.includes("loadTurnContinuity({ redis: globalThis.redis, groupId, userId })"), "下一轮注入上一轮摘要")
   assert.ok(src.includes("await recordTurnContinuity({"), "轮末记录延续摘要")
   assert.ok(src.includes("session.lastFinalReply = String(output || \"\").slice(0, 240)"), "最终回复节选入摘要")

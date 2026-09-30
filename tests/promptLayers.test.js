@@ -59,7 +59,7 @@ test("apply keeps declared order and reports omitted layers", () => {
 })
 
 test("handleTool resolves the layer profile before assembling prompts", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = fs.readFileSync(path.join(root, "apps/lib/chatTurn.js"), "utf8") // 主链路已迁 lib(P 重构)
   // 层拼装已迁入 utils/turnPromptComposer.js;主链路改为调用 composeTurnPromptLayers
   const composerSrc = fs.readFileSync(path.join(root, "utils/turnPromptComposer.js"), "utf8")
   const intentPos = src.indexOf("modelIntentDecision = await intentPromise")
