@@ -386,7 +386,50 @@ export class MessageRecordPlugin extends plugin {
             : null;
     }
 
-    async buildArchiveForwardMessages(records = [], group = null) {
+    // QQ→显示名:优先群成员名片,回落到本次查询记录里的发送者名,再回落 QQ 号。
+    async buildArchiveNameResolver(group, records = []) {
+        const names = new Map();
+        for (const record of records) {
+            const uid = String(record.sender?.user_id || record.user_id || "");
+            const name = record.sender?.card || record.sender?.nickname;
+            if (uid && name && !names.has(uid)) names.set(uid, name);
+        }
+        try {
+            const memberMap = await group?.getMemberMap?.();
+            for (const [qq, info] of memberMap || []) {
+                const name = info?.card || info?.nickname;
+                if (name) names.set(String(qq), name);
+            }
+        } catch (error) {
+            logger.warn(`[MessageArchive] 拉取群成员名片失败,名字解析回落归档数据: ${error.message}`);
+        }
+        return qq => names.get(String(qq || "")) || String(qq || "");
+    }
+
+    // 渲染上下文:@名字解析、回复引用预览、真实媒体已携带时文本不再重复占位
+    async buildArchiveRenderContext(records = [], groupId = "", group = null) {
+        const resolveName = await this.buildArchiveNameResolver(group, records);
+        const replyIds = [...new Set(records.flatMap(record =>
+            (Array.isArray(record.message) ? record.message : [])
+                .filter(seg => seg?.type === "reply" && seg.id !== undefined && seg.id !== null && seg.id !== "")
+                .map(seg => String(seg.id))
+        ))];
+        let previews = new Map();
+        if (replyIds.length) {
+            try {
+                previews = await this.archiveManager.findMessagePreviews(groupId, replyIds);
+            } catch (error) {
+                logger.warn(`[MessageArchive] 回复预览反查失败: ${error.message}`);
+            }
+        }
+        return {
+            resolveName,
+            replyPreview: id => previews.get(String(id)) || null,
+            skipTypes: ["image", "bilibili"]
+        };
+    }
+
+    async buildArchiveForwardMessages(records = [], group = null, context = null) {
         const messages = [];
         const tempFiles = [];
         for (const record of records) {
@@ -399,8 +442,9 @@ export class MessageRecordPlugin extends plugin {
                 }, ...forwardNodes);
                 continue;
             }
-            const message = [this.archiveManager.formatRecord(record, { compact: true })];
-            // 图片段以真实图片加入转发:getBase64Image 处理 QQ 图床 rkey
+            // 真实图片/卡片由转发节点直接携带,文本里不再重复占位
+            const text = this.archiveManager.formatRecord(record, { compact: true, context });
+            const message = text ? [text] : [];
             const imageSegments = (Array.isArray(record.message) ? record.message : [])
                 .filter(seg => seg?.type === "image").slice(0, 3);
             for (let imgIdx = 0; imgIdx < imageSegments.length; imgIdx++) {
@@ -409,7 +453,7 @@ export class MessageRecordPlugin extends plugin {
                 try {
                     const result = await getBase64Image(url, `archive-img-${imgIdx}.png`);
                     if (typeof result === "string" && result.startsWith("data:")) {
-                        message.push("\n", segment.image(result));
+                        message.push(segment.image(result));
                     }
                 } catch {}
             }
@@ -419,9 +463,12 @@ export class MessageRecordPlugin extends plugin {
                 message.push(...relay.segments);
                 tempFiles.push(...relay.tempFiles);
             }
+            if (!message.length) message.push(this.archiveManager.formatRecord(record, { compact: true }));
             messages.push({
                 user_id: record.user_id || record.sender?.user_id || Bot.uin,
-                nickname: record.sender?.card || record.sender?.nickname || String(record.user_id || "未知"),
+                nickname: record.archive_kind === "notice"
+                    ? context?.resolveName(record.user_id) || String(record.user_id || "未知")
+                    : record.sender?.card || record.sender?.nickname || String(record.user_id || "未知"),
                 message
             });
         }
@@ -457,7 +504,8 @@ export class MessageRecordPlugin extends plugin {
                 `共 ${records.length} 条`
             ].filter(Boolean).join(" | ");
             logger.info(`[MessageArchive] ${title}`);
-            const { messages: forwardMsgs, tempFiles } = await this.buildArchiveForwardMessages(records, e.group);
+            const context = await this.buildArchiveRenderContext(records, opts.groupId, e.group);
+            const { messages: forwardMsgs, tempFiles } = await this.buildArchiveForwardMessages(records, e.group, context);
             try {
                 const summary = e.group?.makeForwardMsg
                     ? await e.group.makeForwardMsg(forwardMsgs)

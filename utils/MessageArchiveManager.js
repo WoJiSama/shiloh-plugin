@@ -1,12 +1,13 @@
 import fs from "fs"
 import path from "path"
 import YAML from "yaml"
-import { getMentionTargetId, replaceCqMentions } from "./mentionTargets.js"
+import { getMentionTargetId } from "./mentionTargets.js"
 import { safeTruncateUnicode } from "./unicodeText.js"
 import { enrichBilibiliMessageSegments, formatBilibiliHistoryLinks, formatBilibiliHistoryText } from "./bilibiliMessage.js"
 import { enrichDouyinMessageSegments, formatDouyinHistoryLinks, formatDouyinHistoryText } from "./douyinMessage.js"
 import { enrichYoutubeMessageSegments, formatYoutubeHistoryLinks, formatYoutubeHistoryText } from "./youtubeMessage.js"
 import { enrichPixivMessageSegments, formatPixivHistoryLinks, formatPixivHistoryText } from "./pixivMessage.js"
+import { qqFaceText } from "./qqFaceTable.js"
 import { KeyedSerialQueue } from "./messagePipeline/keyedSerialQueue.js"
 
 const archiveWriteQueue = new KeyedSerialQueue()
@@ -127,6 +128,13 @@ function isRecallNotice(record = {}) {
   return record.archive_kind === "notice" && /(^|\.)recall$/.test(String(record.notice_type || "").trim())
 }
 
+// 消息表情回应在 QQ 里只是消息上的角标,不是一条独立消息,查询聊天记录时不展示。
+function isQueryHiddenNotice(record = {}) {
+  if (record.archive_kind !== "notice") return false
+  if (isRecallNotice(record)) return true
+  return /(^|\.)msg_emoji_like$/.test(String(record.notice_type || "").trim())
+}
+
 function archiveRecordIdentity(record = {}) {
   if (record.event_id) return `event:${String(record.event_id)}`
   if (record.message_id === undefined || record.message_id === null || record.message_id === "") return ""
@@ -178,18 +186,24 @@ function decodeEntities(text = "") {
     .replace(/&gt;/g, ">")
 }
 
-function renderSegment(seg = {}) {
+function renderSegment(seg = {}, ctx = null) {
   const type = seg?.type || "unknown"
+  const skipped = Array.isArray(ctx?.skipTypes) && ctx.skipTypes.includes(type)
+  if (skipped) return ""
   if (type === "text") return decodeEntities(seg.text || "")
-  if (type === "at") return `@${getMentionTargetId(seg) || ""}`
-  if (type === "reply") return `[回复:${seg.id || ""}]`
-  if (type === "face") return `[表情:${seg.id || ""}]`
+  if (type === "at") return `@${ctx?.resolveName ? ctx.resolveName(getMentionTargetId(seg)) : (getMentionTargetId(seg) || "")}`
+  if (type === "reply") {
+    const preview = ctx?.replyPreview ? ctx.replyPreview(String(seg.id || "")) : null
+    if (preview) return preview.text ? `[回复 ${preview.name}：${preview.text}]` : `[回复 ${preview.name}]`
+    return ctx ? "" : `[回复:${seg.id || ""}]`
+  }
+  if (type === "face") return qqFaceText(seg.id)
   if (type === "image") {
     const summary = decodeEntities(seg.summary || "").replace(/^\[|\]$/g, "")
     return summary ? `[图片:${summary}]` : "[图片]"
   }
   if (type === "file") return `[文件:${seg.file || seg.name || ""}]`
-  if (type === "video") return seg.url ? `[视频:${seg.url}]` : "[视频]"
+  if (type === "video") return "[视频]"
   if (type === "bilibili") {
     const links = formatBilibiliHistoryLinks(seg)
     return links ? `${formatBilibiliHistoryText(seg)} [${links}]` : formatBilibiliHistoryText(seg)
@@ -207,26 +221,39 @@ function renderSegment(seg = {}) {
     return links ? `${formatPixivHistoryText(seg)} [${links}]` : formatPixivHistoryText(seg)
   }
   if (type === "record") return "[语音]"
+  if (type === "forward") return "[聊天记录]"
   if (type === "forward_context") return `[合并转发记录]\n${decodeEntities(seg.text || "")}`.trim()
-  if (type === "json" || type === "xml" || type === "markdown") return `[${type}消息]`
+  if (type === "json" || type === "xml" || type === "markdown") return "[卡片消息]"
   if (type === "notice") return decodeEntities(seg.text || "[群通知]")
   return `[${type}消息]`
 }
 
-function renderReadableMessage(record = {}) {
+function renderReadableMessage(record = {}, ctx = null) {
   if (Array.isArray(record.message) && record.message.length) {
-    const text = record.message.map(renderSegment).join("").trim()
+    const text = record.message.map(seg => renderSegment(seg, ctx)).join("").trim()
     if (text) return text
   }
-  const decoded = decodeEntities(record.raw_message || "")
-    .replace(/\[CQ:reply,id=([^\],]+)[^\]]*\]/g, "[回复:$1]")
-  return replaceCqMentions(decoded)
-    .replace(/\[CQ:image(?:,[^\]]*summary=([^,\]]+))?[^\]]*\]/g, (_, summary) => summary ? `[图片:${decodeEntities(summary)}]` : "[图片]")
-    .replace(/\[CQ:face,id=([^\],]+)[^\]]*\]/g, "[表情:$1]")
+  // CQ 码替换必须在未解码的原文上做:值里的 [ ] 是 &#91;/&#93; 实体,
+  // 先解码会让中括号截断 CQ 码匹配,漏出 ,file=... 之类的尾巴。
+  const skipImage = Array.isArray(ctx?.skipTypes) && ctx.skipTypes.includes("image")
+  return decodeEntities(String(record.raw_message || "")
+    .replace(/\[CQ:reply,id=([^\],]+)[^\]]*\]/g, (_, id) => {
+      const preview = ctx?.replyPreview ? ctx.replyPreview(String(id)) : null
+      if (preview) return preview.text ? `[回复 ${preview.name}：${preview.text}]` : `[回复 ${preview.name}]`
+      return ctx ? "" : `[回复:${id}]`
+    })
+    .replace(/\[CQ:at,[^\]]*(?:qq|user_id|id|uin)=(\d+)[^\]]*\]/g, (_, userId) =>
+      `@${ctx?.resolveName ? ctx.resolveName(userId) : userId}`)
+    .replace(/\[CQ:image(?:,[^\]]*summary=([^,\]]*))?[^\]]*\]/g, (_, summary) => {
+      if (skipImage) return ""
+      const label = decodeEntities(summary).replace(/^\[|\]$/g, "")
+      return label ? `[图片:${label}]` : "[图片]"
+    })
+    .replace(/\[CQ:face,id=([^\],]+)[^\]]*\]/g, (_, id) => qqFaceText(id))
     .replace(/\[CQ:record[^\]]*\]/g, "[语音]")
     .replace(/\[CQ:video[^\]]*\]/g, "[视频]")
-    .replace(/\[CQ:json[^\]]*\]/g, "[json消息]")
-    .replace(/\[CQ:xml[^\]]*\]/g, "[xml消息]")
+    .replace(/\[CQ:json[^\]]*\]/g, "[卡片消息]")
+    .replace(/\[CQ:xml[^\]]*\]/g, "[卡片消息]"))
     .trim()
 }
 
@@ -471,6 +498,7 @@ export class MessageArchiveManager {
       group_name: e.group_name || e.group?.name || "",
       user_id: Number(userId || operatorId || 0),
       operator_id: operatorId ? Number(operatorId) : null,
+      target_id: e.target_id ? Number(e.target_id) : null,
       sender: {
         user_id: Number(userId || operatorId || 0),
         nickname: "",
@@ -548,7 +576,7 @@ export class MessageArchiveManager {
         if (!line.trim()) continue
         try {
           const record = JSON.parse(line)
-          if (isRecallNotice(record)) continue
+          if (isQueryHiddenNotice(record)) continue
           if (this.inTimeRange(record, options)) records.push(record)
         } catch {}
       }
@@ -623,16 +651,91 @@ export class MessageArchiveManager {
     ].filter(Boolean).join("\n")
   }
 
-  formatRecord(record, { maxTextLength = 800, compact = false } = {}) {
+  formatRecord(record, { maxTextLength = 800, compact = false, context = null } = {}) {
     const name = record.archive_kind === "notice"
       ? "群通知"
       : record.sender?.card || record.sender?.nickname || "未知"
-    let text = renderReadableMessage(record).replace(/\r/g, "")
+    let text
+    if (record.archive_kind === "notice" && context) {
+      text = this.formatNoticeDisplay(record, context).replace(/\r/g, "")
+    } else {
+      text = renderReadableMessage(record, context).replace(/\r/g, "")
+    }
     if (text.length > maxTextLength) text = safeTruncateUnicode(text, maxTextLength, "...")
     if (record.recalled) text = `[已撤回] ${text}`
-    if (compact) return text || "[非文本消息]"
+    if (compact) return context ? text : (text || "[非文本消息]")
     const suffix = record.recalled ? `（撤回于 ${record.recalled_at ? formatClock(record.recalled_at) : "未知时间"}）` : ""
     return `[${record.time}]${suffix} ${name}(${record.user_id})${record.message_id ? ` [${record.message_id}]` : ""}\n${text || "[非文本消息]"}`
+  }
+
+  // 查询展示时按通知字段重新生成可读文案(归档里的 raw_message 是落档时的原始快照,不含名字)。
+  formatNoticeDisplay(record = {}, ctx = null) {
+    const resolve = id => {
+      const key = String(id || "")
+      if (!key) return ""
+      return ctx?.resolveName ? ctx.resolveName(key) : key
+    }
+    const noticeType = String(record.notice_type || "")
+    const user = resolve(record.user_id)
+    const operator = resolve(record.operator_id)
+    const target = resolve(record.target_id)
+    if (/\.poke$/.test(noticeType)) {
+      return record.target_id ? `${operator || user} 戳了戳 ${target}` : `${user || operator} 发起了戳一戳`
+    }
+    if (/\.increase$/.test(noticeType)) {
+      return record.operator_id && record.operator_id !== record.user_id
+        ? `${operator} 邀请 ${user} 加入了群聊`
+        : `${user} 加入了群聊`
+    }
+    if (/\.decrease$/.test(noticeType)) {
+      return record.operator_id && record.operator_id !== record.user_id
+        ? `${user} 被管理员 ${operator} 移出了群聊`
+        : `${user} 退出了群聊`
+    }
+    if (/\.recall$/.test(noticeType)) return `${operator || user} 撤回了一条消息`
+    if (/\.ban$/.test(noticeType)) return record.operator_id ? `管理员 ${operator} 禁言了 ${user}` : `${user} 被禁言`
+    if (/\.lift_ban$/.test(noticeType)) return `管理员 ${operator} 解除了 ${user} 的禁言`
+    if (/\.upload$/.test(noticeType)) return `${user} 上传了文件`
+    if (/\.essence$/.test(noticeType)) return `${operator || user} 设置了精华消息`
+    if (/\.card$/.test(noticeType)) return `${user} 修改了群名片`
+    if (/\.admin$/.test(noticeType)) return `${user} 的管理员身份发生了变更`
+    if (/\.honor$/.test(noticeType)) return `${user} 获得了群荣誉`
+    if (/\.title$/.test(noticeType)) return `${user} 获得了群头衔`
+    if (/\.input$/.test(noticeType)) return `${user} 正在输入`
+    return `群通知：${noticeType || "unknown"}`
+  }
+
+  async findMessagePreviews(groupId, messageIds = []) {
+    const wanted = new Set(messageIds.map(id => String(id || "").trim()).filter(Boolean))
+    if (!wanted.size) return new Map()
+    const dir = path.join(this.getBaseDir(), "group", String(groupId || ""))
+    const files = (await fs.promises.readdir(dir).catch(() => []))
+      .filter(name => name.endsWith(".ndjson"))
+      .sort()
+      .reverse()
+    const found = new Map()
+    for (const name of files.slice(0, 8)) {
+      const text = await fs.promises.readFile(path.join(dir, name), "utf8").catch(() => "")
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue
+        let record
+        try {
+          record = JSON.parse(line)
+        } catch {
+          continue
+        }
+        if (record.archive_kind === "notice") continue
+        const mid = String(record.message_id ?? "")
+        if (!wanted.has(mid)) continue
+        const preview = renderReadableMessage(record).replace(/\r/g, "")
+        found.set(mid, {
+          name: record.sender?.card || record.sender?.nickname || String(record.user_id || ""),
+          text: safeTruncateUnicode(preview, 60, "…")
+        })
+        if (found.size === wanted.size) return found
+      }
+    }
+    return found
   }
 }
 
