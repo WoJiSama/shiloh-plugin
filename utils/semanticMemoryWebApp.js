@@ -119,12 +119,18 @@ function buildPageHtml() {
   function api(name, params) {
     var url = "/bl-chat/semantic-memory/api/" + name + "?token=" + encodeURIComponent(TOKEN);
     if (params) url += "&" + new URLSearchParams(params).toString();
-    return fetch(url).then(function (r) { return r.json(); });
+    return fetch(url).then(function (r) {
+      return r.json().catch(function () { return { error: "响应解析失败 HTTP " + r.status }; });
+    }).then(function (data) {
+      if (data && data.error && data.error.indexOf("令牌") >= 0) throw new Error("访问令牌无效:请从命令管理页进入,或在 URL 加 ?token=主令牌");
+      return data;
+    });
   }
   function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
   function refresh() {
     api("stats").then(function (s) {
       var el = document.getElementById("app");
+      if (s && s.error) { el.innerHTML = errorBox(s.error); return; }
       if (!s.enabled) { el.innerHTML = '<div class="item off">语义记忆未启用(semanticMemory.enabled=false 或 embedding 未配置)</div>'; return; }
       var ev = s.evalLatest || {};
       el.innerHTML =
@@ -157,7 +163,12 @@ function buildPageHtml() {
       document.getElementById("cb-load").onclick = function () { cbOffset = 0; loadChunks(); };
       document.getElementById("cb-more").onclick = function () { cbOffset += 20; loadChunks(); };
       loadEvalHistory();
+    }).catch(function (error) {
+      document.getElementById("app").innerHTML = errorBox(error && error.message ? error.message : "加载失败");
     });
+  }
+  function errorBox(message) {
+    return '<div class="item off">' + esc(message) + '</div><div class="row" style="margin-top:10px"><button onclick="refresh()">重试</button></div>';
   }
   function card(num, label, good) { return '<div class="card"><div class="num' + (good ? ' good' : '') + '">' + esc(num) + '</div><div class="label">' + esc(label) + '</div></div>'; }
   function pct(v) { return (typeof v === "number" && isFinite(v)) ? Math.round(v * 100) + "%" : "-"; }
