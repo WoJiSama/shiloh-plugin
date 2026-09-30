@@ -682,6 +682,19 @@ pluginSettings:
     embeddingApiUrl: https://api.openai.com/v1/embeddings
     embeddingApiModel: text-embedding-3-small
     embeddingApiKey: sk-xxxxx
+  # 群聊长期记忆(RAG):归档滑窗分块 → 向量+BM25 混合召回 → RRF 融合注入主模型上下文
+  semanticMemory:
+    enabled: false
+    includeGroups: []
+    excludeGroups: []
+    windowSize: 8
+    stride: 4
+    topK: 5
+    minScore: 0.35
+    contextMaxChars: 900
+    retrieveTimeoutMs: 900
+    indexOnWrite: true
+    embeddingDimensions: 1024
   emojiSystem:
     enabled: false
     # 表情包以 QQ"表情"小图发送（sub_type=1）；置 false 恢复普通大图

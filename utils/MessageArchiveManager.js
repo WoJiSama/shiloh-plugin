@@ -705,8 +705,39 @@ export class MessageArchiveManager {
     return `群通知：${noticeType || "unknown"}`
   }
 
-  async findMessagePreviews(groupId, messageIds = []) {
-    const wanted = new Set(messageIds.map(id => String(id || "").trim()).filter(Boolean))
+  // ---- 语义记忆索引的读取辅助 ----
+
+  async listArchiveGroupIds() {
+    const dir = path.join(this.getBaseDir(), "group")
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true }).catch(() => [])
+    return entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+  }
+
+  async readAllGroupMessages(groupId) {
+    const dir = path.join(this.getBaseDir(), "group", String(groupId || ""))
+    const files = await this.pickFiles(dir, {})
+    const records = []
+    for (const file of files) {
+      const text = await fs.promises.readFile(file, "utf8").catch(() => "")
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue
+        try {
+          const record = JSON.parse(line)
+          if (record.archive_kind === "notice") continue
+          records.push(record)
+        } catch {}
+      }
+    }
+    records.sort((a, b) => a.timestamp - b.timestamp)
+    return records
+  }
+
+  async readRecentGroupMessages(groupId, limit = 40) {
+    const all = await this.readAllGroupMessages(groupId)
+    return all.slice(-Math.max(1, Number(limit) || 40))
+  }
+
+  async findMessagePreviews(groupId, messageIds = []) {    const wanted = new Set(messageIds.map(id => String(id || "").trim()).filter(Boolean))
     if (!wanted.size) return new Map()
     const dir = path.join(this.getBaseDir(), "group", String(groupId || ""))
     const files = (await fs.promises.readdir(dir).catch(() => []))

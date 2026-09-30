@@ -49,6 +49,8 @@ import { TakeImages } from "../utils/fileUtils.js"
 import { loadData, saveData } from "../utils/redisClient.js"
 import { YTapi } from "../utils/apiClient.js"
 import { MessageManager } from "../utils/MessageManager.js"
+import { messageArchiveManager } from "../utils/MessageArchiveManager.js"
+import { getSemanticMemoryRuntime, installSemanticMemoryRuntime } from "../domains/semanticMemory/runtime.js"
 import { ThinkingProcessor } from "../utils/providers/ThinkingProcessor.js"
 import { TotalTokens } from "../functions/tools/CalculateToken.js"
 import { mcpManager } from "../utils/MCPClient.js"
@@ -434,6 +436,7 @@ function initializeSharedState(config) {
     refreshLocalTools(sharedState, { force: true }).catch(error => {
       logger.error('[LocalToolRegistry] 热更新工具失败:', error)
     })
+    installSemanticMemoryRuntime({ pluginSettings: config, archiveManager: messageArchiveManager })
     setSharedRuntime({ memoryManager: sharedState.memoryManager, getConfig: () => config })
     return applyToolRegistrySnapshot(sharedState)
   }
@@ -467,6 +470,7 @@ function initializeSharedState(config) {
     sessionMap: new Map()
   }
   setSharedRuntime({ memoryManager: sharedState.memoryManager, getConfig: () => config })
+  installSemanticMemoryRuntime({ pluginSettings: config, archiveManager: messageArchiveManager })
 
   applyToolRegistrySnapshot(sharedState)
   refreshLocalTools(sharedState, { force: true }).catch(error => {
@@ -4049,6 +4053,15 @@ ${recentHistory || '(无)'}
         const groupTopicPrompt = getGroupTopicPrompt(groupId)
         const groupSocialPrompt = getGroupSocialPrompt(groupId)
         // 时间指代（上次/昨天/那天…）触发情节回放，接住跨天指代
+        // 语义记忆:此处尽早发起检索,与历史拉取/理解增强并行,历史选择后再收割
+        const semanticMemoryRuntime = getSemanticMemoryRuntime()
+        const semanticMemoryQueryText = [currentIntentText, args, msg].filter(Boolean).join(" ").trim()
+        const semanticMemoryPromise = semanticMemoryRuntime &&
+          e.message_type === "group" &&
+          semanticMemoryRuntime.indexer.groupAllowed(groupId) &&
+          semanticMemoryQueryText
+          ? semanticMemoryRuntime.retriever.search(groupId, semanticMemoryQueryText).catch(() => null)
+          : null
         const episodicPrompt = this.config?.episodicMemory?.enabled !== false && hasTemporalDeixis(currentIntentText)
           ? buildEpisodicPrompt(recallEpisodes({
               groupId,
@@ -4159,6 +4172,26 @@ ${recentHistory || '(无)'}
             if (groupUserMessages.length < originalHistoryCount) {
               logger.info(`[上下文选择] group=${groupId} mode=${historyBudget.mode} selected=${groupUserMessages.length}/${originalHistoryCount} recent=${groupUserMessages.filter(item => item.contextSection === "recent").length} relevant=${groupUserMessages.filter(item => item.contextSection === "relevant").length}`)
             }
+          }
+        }
+
+        // 语义记忆收割:检索已在情节回忆阶段并行发起,超时/未命中都不阻塞回复
+        if (semanticMemoryPromise) {
+          const memoryResult = await semanticMemoryPromise
+          if (memoryResult?.items?.length) {
+            const memoryContext = semanticMemoryRuntime.retriever.renderContext(memoryResult)
+            if (memoryContext) {
+              groupUserMessages = groupUserMessages || []
+              groupUserMessages.unshift({
+                role: "user",
+                userId: "memory",
+                content: `【系统提示:群聊长期记忆】以下是早前群聊中与当前话题相关的片段(时间早于近期上下文,供回忆参考,不要主动提及"检索"二字):\n${memoryContext}`
+              })
+              const maxScore = Math.max(...memoryResult.items.map(item => item.vectorScore)).toFixed(3)
+              logger.info(`[语义记忆] group=${groupId} 注入 ${memoryResult.items.length} 段 max余弦=${maxScore} 耗时=${memoryResult.elapsedMs}ms(向量${memoryResult.vectorMs ?? "-"}ms/BM25${memoryResult.bm25Ms ?? "-"}ms)`)
+            }
+          } else {
+            logger.info(`[语义记忆] group=${groupId} 无命中(${memoryResult?.reason || "低于阈值"}) ${memoryResult?.elapsedMs ?? 0}ms`)
           }
         }
 
