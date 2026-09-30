@@ -2,6 +2,8 @@ import fs from "fs"
 import path from "path"
 import { createRequire } from "module"
 import { withFileLock } from "../../utils/fileLock.js"
+import { resolveSealSkillName, sealSkillLookupKeys } from "./sealSkillAliases.js"
+import { SEAL_COC_DEFAULT_SKILLS } from "./sealCocDefaults.js"
 import { collectMentionTargetIds, getMentionTargetId, stripCqMentions } from "../../utils/mentionTargets.js"
 import { KeyedSerialQueue } from "../../utils/messagePipeline/keyedSerialQueue.js"
 import { canManageGroupDice, sanitizeDiceCommandError } from "./diceCommandGateway.js"
@@ -113,24 +115,7 @@ function startsWithBotMention(e = {}) {
   return Boolean(leadingMention && leadingMention[1] === botId)
 }
 
-// sealdice coc7 模板的内置默认技能值（coc7.yaml attrs.defaults 摘录）：
-// 未录卡的常规技能按官方默认值判档，而非拒绝或裸掷
-const COC_DEFAULT_SKILLS = {
-  信用评级: 0, 取悦: 15, 话术: 5, 恐吓: 15, 说服: 10, 心理学: 10, 外语: 1,
-  估价: 5, 乔装: 5, 潜行: 20, 追踪: 10, 侦查: 25, 聆听: 20, 读唇: 1, 图书馆使用: 20,
-  生存: 10, 沙漠: 10, 海洋: 10, 极地: 10, 攀爬: 20, 跳跃: 20, 骑术: 5, 游泳: 20, 潜水: 1,
-  艺术与手艺: 5, 表演: 5, 美术: 5, 伪造: 5, 摄影: 5, 打字: 5, 速记: 5, 技术制图: 5,
-  耕作: 5, 木匠: 5, 焊接: 5, 管道工: 5, 写作: 5, 音乐: 5, 舞蹈: 5, 厨艺: 5, 书法: 5,
-  理发: 5, 制陶: 5, 裁缝: 5, 雕塑: 5, 妙手: 10, 锁匠: 1,
-  格斗: 5, 斗殴: 25, 斧: 15, 链锯: 10, 连枷: 10, 绞索: 15, 矛: 20, 剑: 20, 鞭: 5,
-  射击: 10, "射击:弓": 15, "射击:手枪": 20, "射击:重武器": 10, "射击:火焰喷射器": 10,
-  "射击:机枪": 10, "射击:步霰": 25, "射击:冲锋枪": 15, 投掷: 20, 爆破: 1, 炮术: 1,
-  急救: 30, 医学: 1, 精神分析: 1, 催眠: 1,
-  会计: 5, 法律: 5, 历史: 5, 考古学: 1, 博物学: 10, 人类学: 1, 神秘学: 5, 电子学: 1,
-  科学: 1, 天文学: 1, 生物学: 1, 克苏鲁神话: 0, 学识: 1, 园艺: 5, 器乐: 5, 声乐: 5,
-  日本刀: 20
-}
-
+const COC_DEFAULT_SKILLS = SEAL_COC_DEFAULT_SKILLS
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true })
 }
@@ -260,6 +245,9 @@ function normalizeDiceExpression(expr = "") {
     .replace(/[（]/g, "(")
     .replace(/[）]/g, ")")
     .replace(/\bmod\b/gi, "%")
+    // 梨骰算符（sealdice dicescript roll.peg _dicePearMod）：d20优势=2d20kh1、d20劣势=2d20kl1，支持繁体
+    .replace(/(?<![\dd.])d(\d+)(优势|優勢)/gi, (_, sides) => `2d${sides}kh1`)
+    .replace(/(?<![\dd.])d(\d+)(劣势|劣勢)/gi, (_, sides) => `2d${sides}kl1`)
     .replace(/\s+/g, "")
     .toLowerCase()
 }
@@ -384,6 +372,11 @@ class DiceExpressionParser {
     }
     const number = this.readNumber()
     if (this.consume("d")) return this.parseDice(number || 1)
+    // 命运骰（sealdice dicescript RollFate）：每颗 -1/0/+1，默认 4 颗，符号序列展示
+    if (this.peek() === "f") {
+      this.pos += 1
+      return this.parseFateDice(number === null ? 4 : number)
+    }
     if (number !== null) return number
     if (this.peek() === "d") {
       this.pos += 1
@@ -420,6 +413,19 @@ class DiceExpressionParser {
     this.lastDiceDetailIndex = this.detailParts.length
     this.lastDice = { count, sides, suffixText, rolls: [...rolls], kept: [...kept], keptText }
     this.detailParts.push(`${count}D${sides}${suffixText}[${rolls.join("+")}${keptText}]`)
+    return total
+  }
+
+  parseFateDice(count) {
+    if (!Number.isInteger(count) || count < 1 || count > this.config.maxDiceCount) {
+      throw new Error(`命运骰数量必须是 1-${this.config.maxDiceCount}`)
+    }
+    this.diceCount += count
+    if (this.diceCount > this.config.maxDiceCount) throw new Error(`单次最多掷 ${this.config.maxDiceCount} 颗骰子`)
+    const rolls = Array.from({ length: count }, () => Math.min(2, Math.floor(this.random() * 3)) - 1)
+    const symbols = rolls.map(value => (value === -1 ? "-" : value === 0 ? "0" : "+")).join("")
+    const total = rolls.reduce((sum, value) => sum + value, 0)
+    this.detailParts.push(`${count}F[${symbols}]`)
     return total
   }
 
@@ -1572,6 +1578,13 @@ ${rows}
     return `人物卡「${card?.name || "当前人物卡"}」已锁定；请先用 .pc unlock 解锁后再修改。`
   }
 
+  /** sealdice 代骰：命令里首位 @某人（不含骰子）→ 以对方身份掷骰/取卡 */
+  resolveDelegate(e) {
+    const ids = this.getMentionedUserIds(e)
+    if (!ids.length) return { event: e, delegated: false }
+    return { event: this.getEventForUser(e, ids[0]), delegated: true, userId: ids[0] }
+  }
+
   getEventForUser(e, userId) {
     return {
       ...e,
@@ -1599,12 +1612,18 @@ ${rows}
     const state = this.readState()
     const card = this.getActiveCard(e, state)
     const key = normalizeSkillName(skill)
-    const fromCard = Number(card.skills?.[key] ?? card.attrs?.[ATTR_ALIASES[key] || key])
+    // sealdice 别名（读取侧候选键）：繁体/同义词（偵查/侦察/侦查）命中同一卡值；
+    // 写入不归一，保证其他规则体系（如永恒幻梦的「知识」）的原样卡不被改写
+    const lookupKeys = sealSkillLookupKeys(key)
+    const fromCard = Number(lookupKeys.reduce((found, k) =>
+      found ?? card.skills?.[k] ?? card.attrs?.[ATTR_ALIASES[k] || k], undefined))
     if (Number.isFinite(fromCard)) return fromCard
     // sealdice coc7 语义：常规技能未录卡时按官方默认值判档
-    if (Object.prototype.hasOwnProperty.call(COC_DEFAULT_SKILLS, key)) {
-      const preset = COC_DEFAULT_SKILLS[key]
-      if (Number.isFinite(Number(preset))) return Number(preset)
+    for (const lookupKey of lookupKeys) {
+      if (Object.prototype.hasOwnProperty.call(COC_DEFAULT_SKILLS, lookupKey)) {
+        const preset = COC_DEFAULT_SKILLS[lookupKey]
+        if (Number.isFinite(Number(preset))) return Number(preset)
+      }
     }
     const attr = name => Number(card.attrs?.[ATTR_ALIASES[name] || name])
     // sealdice defaultsComputed：依赖属性的派生默认（属性缺失时不硬造）
@@ -1787,9 +1806,10 @@ ${rows}
   handleRoll(e, raw = "") {
     const config = this.getConfig()
     if (!config.enabled) return "骰娘模块现在没开。"
-    const { rounds, expr } = this.splitRounds(raw || "1d100")
+    const { rounds, expr } = this.splitRounds(stripCqMentions(raw || "1d100"))
     if (rounds > config.maxRounds) return `最多一次掷 ${config.maxRounds} 轮。`
-    const name = this.getUserName(e)
+    const rollEvent = this.resolveDelegate(e).event
+    const name = this.getUserName(rollEvent)
     const results = []
     for (let i = 0; i < rounds; i += 1) {
       const result = this.rollExpression(expr || "1d100", config)
@@ -1820,6 +1840,9 @@ ${rows}
   parseCheckArgs(raw = "") {
     let text = String(raw || "").trim()
     let difficulty = 0
+    // sealdice 表达式形式：(N)M = N 轮对 M 检定（.ra(1)50 / .rab3(1)50）
+    const paren = text.match(/^\((\d+)\)\s*(\d+)$/)
+    if (paren) return { skill: "检定", target: Number(paren[2]), modifier: 0, difficulty: 0, rounds: Number(paren[1]) }
     // 难度前缀：可能独立成词（.ra 困难 侦查 60）或紧贴技能（.ra 困难侦查60）
     const spaceSplit = text.split(/\s+/)
     const first = this.extractDifficultyPrefix(spaceSplit[0] || "")
@@ -1923,7 +1946,7 @@ ${rows}
     const maxRounds = safeNumber(config.maxRounds, 20, 1, 1000)
     const rounds = Math.max(1, Math.min(maxRounds, Number(options.rounds ?? parsed.rounds) || 1))
     const rule = this.getGroupRule(e, config)
-    const skill = difficulty > 1 ? `${this.difficultyLabel(difficulty)}${parsed.skill}` : parsed.skill
+    const skill = difficulty > 1 ? `${this.difficultyLabel(difficulty)}${resolveSealSkillName(parsed.skill)}` : resolveSealSkillName(parsed.skill)
     const renderOnce = () => {
       const roll = this.rollD100(modifier)
       const level = this.renderCheckLevel(roll.value, target, rule, difficulty)
@@ -2238,14 +2261,17 @@ ${rows}
     const single = /^[\d.+\-*/%()dDkhl]+$/.test(text) && /\d/.test(text) && !text.includes("/") ? [text, text] : null
     const m = text.match(/^(\S+)\s*\/\s*(\S+)(?:\s+(\d+))?/)
     if (!m && !single) return "格式：.sc 成功损失/失败损失 [当前SAN]，例如 .sc 1/1d6 60、.sc 1d6（简易）、.sc b 1/1d6（奖惩骰）"
+    // sealdice 代骰：.sc 1/1d6 @某人 → 用对方的卡扣 SAN
+    const scDelegate = this.resolveDelegate(e)
+    const scEvent = scDelegate.event
     const successExpr = m ? m[1] : "0"
     const failExpr = m ? m[2] : single[1]
     const sanHint = m ? m[3] : undefined
-    const target = this.getTargetValue("SAN", sanHint, e)
+    const target = this.getTargetValue("SAN", sanHint, scEvent)
     if (!Number.isFinite(target)) return "找不到当前 SAN。请写成：.sc 1/1d6 60，或先用 .st SAN=60"
     if (!sanHint) {
       const currentState = this.readState(config)
-      const currentCard = this.getActiveCard(e, currentState)
+      const currentCard = this.getActiveCard(scEvent, currentState)
       if (this.isCardLocked(currentCard)) return this.lockedCardReply(currentCard)
     }
     const roll = this.rollD100(bpModifier)
@@ -2263,7 +2289,7 @@ ${rows}
     let insanity = loss >= 5 ? `；单次损失 >=5，建议进行 INT 检定判定临时疯狂` : ""
     if (!sanHint) {
       const state = this.readState(config)
-      const card = this.getActiveCard(e, state)
+      const card = this.getActiveCard(scEvent, state)
       if (Number.isFinite(Number(card.attrs?.SAN))) {
         card.attrs.SAN = sanAfter
         card.sanLossLog ||= {}
@@ -2283,7 +2309,7 @@ ${rows}
     }
     if (sanAfter <= 0) insanity += "；SAN 归零"
     return renderTemplate(config.templates.san, {
-      name: this.getUserName(e),
+      name: this.getUserName(scEvent),
       target,
       roll: roll.value,
       diceText: roll.diceText,
@@ -2315,9 +2341,9 @@ ${rows}
       const lines = []
       let changed = false
       for (const token of skillTokens.slice(0, 20)) {
-        const key = normalizeSkillName(token)
-        const attr = ATTR_ALIASES[token] || ATTR_ALIASES[key]
-        const storedValue = attr ? card.attrs?.[attr] : card.skills?.[key]
+        const rawKey = normalizeSkillName(token)
+        const attr = ATTR_ALIASES[token] || ATTR_ALIASES[rawKey]
+        const storedValue = attr ? card.attrs?.[attr] : sealSkillLookupKeys(rawKey).reduce((found, k) => found ?? card.skills?.[k], undefined)
         const target = Number(storedValue)
         if (!Number.isFinite(target)) {
           lines.push(`${token}：找不到技能值，请先 .st ${token} 60`)
@@ -2330,7 +2356,7 @@ ${rows}
         if (success) {
           const after = target + gain
           if (attr) card.attrs[attr] = after
-          else card.skills[key] = after
+          else card.skills[rawKey] = after
           changed = true
           result = `成长成功，增加 ${gain}（${target}→${after}，已写入人物卡）`
         }
@@ -2347,11 +2373,18 @@ ${rows}
     }
     // 有自定义成长值(+N/+F/S)时先剥离，避免 +1/2 被当数值 token 解析
     const parsed = this.parseCheckArgs(gainToken ? tokensBase.join(" ") : raw)
+    // sealdice 代骰：.en 技能 @某人 → 成长对方的卡（读写都用对方事件）
+    const enDelegate = this.resolveDelegate(e)
+    const enEvent = enDelegate.event
     const state = this.readState(config)
-    const card = this.getActiveCard(e, state)
-    const key = normalizeSkillName(parsed.skill)
-    const attr = ATTR_ALIASES[parsed.skill] || ATTR_ALIASES[key]
-    const storedValue = attr ? card.attrs?.[attr] : card.skills?.[key]
+    const card = this.getActiveCard(enEvent, state)
+    const rawKey = normalizeSkillName(parsed.skill)
+    const attr = ATTR_ALIASES[parsed.skill] || ATTR_ALIASES[rawKey]
+    // sealdice 语义：成长按"当前值"=卡值优先，未录但有官方默认(如 神秘学=5)时按默认值
+    const storedValue = attr
+      ? card.attrs?.[attr]
+      : sealSkillLookupKeys(rawKey).reduce((found, k) => found ?? card.skills?.[k], undefined) ?? this.getTargetValue(parsed.skill, NaN, enEvent)
+    const key = rawKey
     const usesCardValue = !Number.isFinite(Number(parsed.target))
     const target = usesCardValue ? Number(storedValue) : Number(parsed.target)
     if (!Number.isFinite(target)) return `找不到「${parsed.skill}」的技能值。请写成：.en ${parsed.skill} 60`
@@ -2379,7 +2412,7 @@ ${rows}
       result = `成长失败，按 +失败/成功 设定增加 ${failGain}（${target}→${after}，已写入人物卡）`
     }
     return renderTemplate(config.templates.en, {
-      name: this.getUserName(e),
+      name: this.getUserName(enEvent),
       skill: parsed.skill,
       target,
       roll,
@@ -2481,13 +2514,15 @@ ${rows}
   async handleSt(e, raw = "") {
     const config = this.getConfig()
     const state = this.readState(config)
-    const user = this.ensureUser(state, e)
+    // sealdice 代骰：.st 侦查 60 @某人 → 录到对方的卡（KP 录 NPC/玩家）
+    const stEvent = this.resolveDelegate(e).event
+    const user = this.ensureUser(state, stEvent)
     const card = user.cards[user.activeCard]
     const text = String(raw || "").trim()
     const groupId = String(e?.group_id || "private")
     const group = (state.groups[groupId] ||= {})
-    if (!text) return this.renderCard(e, card, config, { groupFmt: group.stFmt })
-    if (/^(show|查看|查询)$/i.test(text)) return this.renderCard(e, card, config, { groupFmt: group.stFmt })
+    if (!text) return this.renderCard(stEvent, card, config, { groupFmt: group.stFmt })
+    if (/^(show|查看|查询)$/i.test(text)) return this.renderCard(stEvent, card, config, { groupFmt: group.stFmt })
     const fmtMatch = text.match(/^fmt\s*([\s\S]*)$/i)
     if (fmtMatch) {
       const arg = fmtMatch[1].trim()
@@ -2520,7 +2555,7 @@ ${rows}
       await this.writeState(state, config)
       return `已清空：${key}`
     }
-    if (/^(showall|显示全部)$/i.test(text)) return this.renderCard(e, card, config, { showAll: true })
+    if (/^(showall|显示全部)$/i.test(text)) return this.renderCard(stEvent, card, config, { showAll: true })
     const hideMatch = text.match(/^(hide|隐藏)\s+(.+)$/i)
     if (hideMatch) {
       const key = normalizeSkillName(hideMatch[2])
@@ -2588,7 +2623,7 @@ ${rows}
     }
     if (updates.length) {
       await this.writeState(state, config)
-      return renderTemplate(config.templates.cardSaved, { name: this.getUserName(e), updates: formatUpdates(updates) })
+      return renderTemplate(config.templates.cardSaved, { name: this.getUserName(stEvent), updates: formatUpdates(updates) })
     }
     const pairs = text.match(/[^,\s，]+(?:\s*[:=：]\s*|\s+)[+\-]?\d+|[^,\s，]+[+\-]\d+/g) || []
     const compactPairs = []
@@ -2622,7 +2657,7 @@ ${rows}
     }
     if (!updates.length) return "没有识别到属性或技能。格式：.st STR=50 侦查=60 或 .st 侦查 60"
     await this.writeState(state, config)
-    return renderTemplate(config.templates.cardSaved, { name: this.getUserName(e), updates: formatUpdates(updates) })
+    return renderTemplate(config.templates.cardSaved, { name: this.getUserName(stEvent), updates: formatUpdates(updates) })
   }
 
   renderCard(e, card, config = this.getConfig(), options = {}) {

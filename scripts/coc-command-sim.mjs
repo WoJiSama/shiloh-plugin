@@ -353,7 +353,19 @@ STEPS.push(
   { id: "156", group: "全量审计", cmd: ".组队 猎犬小队 clear", as: "admin", expect: /清空了团队 猎犬小队/, note: "组队清空" },
   { id: "157", group: "全量审计", cmd: ".stat", as: "admin", validate: r => (/检定统计/.test(r.allText) || /还没有检定记录/.test(r.allText) ? null : "应输出统计或无记录提示"), note: "团录统计" },
   { id: "158", group: "全量审计", cmd: ".who 甲 乙 丙", as: "member", validate: r => (/随机分配结果：/.test(r.allText) && new Set(r.allText.match(/→ (甲|乙|丙)/g)).size === 3 ? null : "应随机置换分配"), note: "who 随机分配" },
-  { id: "159", group: "全量审计", cmd: ".ping", as: "member", expect: /pong！希洛在线/, note: "存活检测" }
+  { id: "159", group: "全量审计", cmd: ".ping", as: "member", expect: /pong！希洛在线/, note: "存活检测" },
+  { id: "160", group: "别名合同", cmd: ".ra 偵查", as: "member", validate: r => (/偵查 检定：1D100=\d+\/25 /.test(r.allText) || /侦查 检定：1D100=\d+\/25 /.test(r.allText) ? null : "繁体偵查应按官方默认25判档"), note: "繁体别名+官方默认" },
+  { id: "161", group: "别名合同", cmd: ".st 聆聽 45", as: "admin", expect: /人物卡已更新/, note: "繁体录入(admin卡未锁)" },
+  { id: "162", group: "别名合同", cmd: ".ra 聆听", as: "admin", validate: r => (/聆听 检定：1D100=\d+\/45 /.test(r.allText) ? null : "简体检定应命中繁体录入的45"), note: "读写别名互通(候选键)" },
+  { id: "163", group: "代骰", cmd: ".st san 50 侦查 65", as: "admin", atIds: [28800000003], expect: /人物卡已更新/, note: "代录成员卡" },
+  { id: "164", group: "代骰", cmd: ".st show", as: "admin", atIds: [28800000003], expect: /侦查:65/, note: "代查成员卡" },
+  { id: "165", group: "代骰", cmd: ".r 1d20", as: "admin", atIds: [28800000003], validate: r => (/掷骰：1D20=/.test(r.allText) ? null : "代掷应显示结果"), note: "代掷" },
+  { id: "166", group: "代骰", cmd: ".sc 0/2", as: "admin", atIds: [28800000003], expect: /SAN Check[\s\S]*理智损失/, note: "代扣成员SAN" },
+  { id: "167", group: "代骰", cmd: ".ra(1)50", as: "member", expect: /检定：1D100=\d+\/50 /, note: "表达式形式(N)M" },
+  { id: "168", group: "梨骰命运", cmd: ".r d20优势", as: "member", expect: /2D20KH1\[\d+\+\d+=>\d+\]/, note: "d20优势=2d20kh(豹骰梨骰算符)" },
+  { id: "169", group: "梨骰命运", cmd: ".r d20劣势", as: "member", expect: /2D20KL1\[\d+\+\d+=>\d+\]/, note: "d20劣势=2d20kl" },
+  { id: "170", group: "梨骰命运", cmd: ".r f", as: "member", validate: r => (/4F\[[+\-0]{4}\]=[-\d]/.test(r.allText) ? null : "命运骰应显示4符号与总和"), note: "命运骰f" },
+  { id: "171", group: "梨骰命运", cmd: ".r 3f", as: "member", validate: r => (/3F\[[+\-0]{3}\]/.test(r.allText) ? null : "3f 应掷3颗"), note: "命运骰数量前缀" }
 )
 
 // ---- 执行 ----

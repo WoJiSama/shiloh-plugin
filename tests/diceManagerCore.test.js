@@ -963,3 +963,38 @@ test("组队 system: add/del/ra batch check/draw/call; stat from log; who/ping",
     runtime.cleanup()
   }
 })
+
+test("梨骰算符与命运骰（源 dicescript roll.peg _dicePearMod / roll_func.go RollFate）", () => {
+  const runtime = createRuntime()
+  try {
+    const roll = (expr, values) => {
+      const it = values[Symbol.iterator]()
+      return runtime.manager.rollExpression(expr, runtime.manager.getConfig(), () => it.next().value)
+    }
+    // d20优势 = 2d20kh1：取两骰中高者
+    const adv = roll("d20优势", [0.9, 0.2])
+    assert.equal(adv.total, 19)
+    assert.equal(adv.detail, "2D20KH1[19+5=>19]")
+    // d20劣势 = 2d20kl1：取低者（繁体亦支持）
+    const dis = roll("d20劣势", [0.9, 0.2])
+    assert.equal(dis.total, 5)
+    const advTw = roll("d20優勢", [0.5, 0.8])
+    assert.equal(advTw.total, 17)
+    // 优势+算术组合
+    assert.equal(roll("d20优势+3", [0.9, 0.2]).total, 22)
+    // XdYkh 不被优势替换误伤
+    assert.equal(roll("3d20kh1", [0.9, 0.2, 0.5]).detail, "3D20KH1[19+5+11=>19]")
+    // f：每颗 roll3-2 ∈ {-1,0,1}，符号 -/0/+，默认 4 颗
+    const fate = roll("f", [0.0, 0.4, 0.7, 1.0])
+    assert.equal(fate.detail, "4F[-0++]")
+    assert.equal(fate.total, 1)
+    // 3f 支持数量前缀
+    const fate3 = roll("3f", [0.7, 0.0, 0.4])
+    assert.equal(fate3.detail, "3F[+-0]")
+    assert.equal(fate3.total, 0)
+    // f 参与算术
+    assert.equal(roll("f+1", [0, 0, 0, 0]).total, -3)
+  } finally {
+    runtime.cleanup()
+  }
+})
