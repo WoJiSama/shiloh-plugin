@@ -19,6 +19,12 @@ pluginSettings:
     - "973682389"
   enableGroupWhitelist: true
   whitelistRejectMsg: 本群未开启此功能哦~
+  # 私聊功能：默认关闭。开启后白名单用户可私聊机器人（走同一主回合/人设/心情/违禁词），
+  # 白名单留空 = 仅主人可聊；私聊不带群工具（纯人设聊天）；私聊消息不入归档/记忆索引
+  privateChat:
+    enabled: false
+    allowedUsers: []             # 可私聊的 QQ 号（锅巴"私聊功能"区编辑）
+    cooldownSeconds: 3           # 同一用户两轮私聊的最小间隔（防刷）
   userBlacklist:
     enabled: false
     users: []

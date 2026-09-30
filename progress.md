@@ -1,3 +1,12 @@
+# 2026-09-30 架构第二阶段收尾:主聊天回合/smart 编排迁出 + 门面补全（用户"继续抽"）
+- apps/lib/chatTurn.js(956行):handleToolInner 主回合整体迁出——提示词组装/历史选择/模型调用/回答分发的完整链路,host 注入行为不变;80+ import 清单不做手工,由 test.js 导入表自动映射生成,danglingReferences 测试兜底抓漏。
+- apps/lib/smartConversation.js(313行):handleRandomReplySmart 编排主体(入口锁/上下文记录/Gate/续话排队),smartLockTokenCounter 随迁。
+- groupRuntime 门面补全:registerGroupRuntimeProviders 由构造器注册 emotionManager/sessionStore,getGroupRuntime 一站取 smart+topic+social+emotion+sessions。
+- 私聊覆盖核实为伪任务:bot 纯群聊设计(handleToolInner 显式拒私聊),此前"私聊没覆盖"是我的误判,如实修正。
+- 本地辅助 delay/getOrCreateGroupLimiter/filterToolsForMessageIntent 留 test.js 导出供 chatTurn 引(函数声明提升使循环 import 安全),避免连搬 filterTools 的深层依赖树。
+- 12 份源码级合同测试更新(aiConversationGate/conversationRouting/emojiCooldown/intentFastPath/longTaskFeedbackPolicy/outboundArbiter/promptLayers/reasoningEffort/sessionContinuity/triggerUnification/turnDiagnostics/understandingBrief):断言位置改新家或 this↔host 兼容,合同意图不变。
+- 结果:test.js 5622→3943(今日两阶段累计 -1679,只剩入口/委托/未拆小方法);全量 1322/0;部署重启 0 加载错误、QQ 已连、服务器合同测试 15/15。commit 9a37b83。
+
 # 2026-09-30 配置界面收口:今日新功能全部补齐锅巴（用户："这个moods也应该在页面上可以控制,我们要避免所有的配置文件的写法"）
 - 原则确立:一切配置皆有界面,不逼手写 yaml。盘点今日新增配置,补齐锅巴:persona.moods(GSubForm 心情名/提示/概率)、semanticMemory.memoryEvolution 与 selfCorrection、midtermMemory、smartTrigger.attentionDrift 与 groupTalkValues、emojiSystem.familiarityBias;服务器端验证 7 个字段全部出现在 schemas。
 - groupTalkValues 形态问题:锅巴 GSubForm 只写数组[{group,value}],原设计是对象{群号:值}——resolveTalkValue 改为双形态兼容(数组优先、对象向后兼容手写),默认配置改数组;补双形态单测。

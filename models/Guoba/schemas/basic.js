@@ -9,6 +9,27 @@ export default [
     component: "Switch",
     bottomHelpMessage: "关闭后本插件不再进行 AI 对话，包括 @/前缀、smart 续话、复读跟读和主动搭话。骰子、视频搬运、群管不受影响"
   },
+  { component: "Divider", label: "私聊功能" },
+  {
+    field: "privateChat.enabled",
+    label: "启用私聊",
+    component: "Switch",
+    bottomHelpMessage: "开启后白名单用户可私聊机器人（同一人设/心情/违禁词）；私聊不入归档与记忆索引"
+  },
+  {
+    field: "privateChat.allowedUsers",
+    label: "私聊白名单",
+    component: "GTags",
+    bottomHelpMessage: "可私聊的 QQ 号；留空 = 仅主人可聊",
+    componentProps: { allowAdd: true, allowDel: true }
+  },
+  {
+    field: "privateChat.cooldownSeconds",
+    label: "私聊冷却(秒)",
+    component: "InputNumber",
+    bottomHelpMessage: "同一用户两轮私聊的最小间隔，防刷屏",
+    componentProps: { min: 0, max: 60, step: 1, placeholder: "3" }
+  },
   {
     field: "groupHistory",
     label: "群聊历史记录",

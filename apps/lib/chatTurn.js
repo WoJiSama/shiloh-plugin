@@ -14,6 +14,7 @@ import { recordActionOutcomes } from "../../utils/actionOutcomes.js"
 import { buildAddresseePrompt, computeAddresseeSignal } from "../../utils/addresseeSignals.js"
 import { resolveHistorySelectionBudget, selectRelevantGroupHistory } from "../../utils/agentIntelligence.js"
 import { isAiConversationEnabled } from "../../utils/aiConversationGate.js"
+import { evaluatePrivateChatGate } from "./privateChat.js"
 import { buildDrawFailureNoteMessage, recordDrawTextFallback, takeDrawFailureNote } from "../../utils/drawFailureNote.js"
 import { prepareImageEditAssets, resolveAvatarEditBase } from "../../utils/editReferencePipeline.js"
 import { classifyEmojiToolExposure } from "../../utils/emojiToolPolicy.js"
@@ -59,9 +60,19 @@ const logger = globalThis.logger
 
 export async function handleToolInner(host, e) {
     if (!isAiConversationEnabled(host.config)) return false
-    if (!host.config.enabled || !e.group_id) {
-      if (!e.group_id) await host.sendObservedReply(e, "该命令只能在群聊中使用。")
+    // 私聊:经私聊门禁(开关/白名单=留空仅主人/节流)后与群聊共用主回合
+    const isPrivateChat = e.message_type === "private" && !e.group_id
+    if (!host.config.enabled) return false
+    if (!e.group_id && !isPrivateChat) {
+      await host.sendObservedReply(e, "该命令只能在群聊中使用。")
       return false
+    }
+    if (isPrivateChat) {
+      const gate = evaluatePrivateChatGate({ config: host.config, e, isMaster: e?.isMaster })
+      if (!gate.allowed) {
+        if (gate.reason === "disabled") await host.sendObservedReply(e, "私聊功能未开启。")
+        return false
+      }
     }
 
     if (host.isUserBlacklisted(e)) {
@@ -84,7 +95,7 @@ export async function handleToolInner(host, e) {
     const { group_id: groupId, user_id: userId, msg } = e
     const sessionId = randomUUID()
     e.sessionId = sessionId
-    const session = host.getOrCreateSession(sessionId, host.tools)
+    const session = host.getOrCreateSession(sessionId, isPrivateChat ? [] : host.tools)
     session.taskContext = taskContext
     // 一个回合一条 trace + 一个出站仲裁：回合内所有出站消息过同一个有序队列
     const turnTrace = createTurnTrace({ groupId, userId, sessionId, logger, archive: { enabled: host.config?.turnTrace?.archiveEnabled !== false, dir: String(host.config?.turnTrace?.archiveDir || "") || resolveTurnTraceArchiveDir(), retentionDays: Number(host.config?.turnTrace?.retentionDays) || 7 } })
@@ -458,7 +469,7 @@ export async function handleToolInner(host, e) {
           : host.getBasicGroupContext(e)
         const cardRequestText = [args, msg, userContent].filter(Boolean).join("\n")
         // 调皮情绪时刻:同人格内偶发情绪着色,命中只影响本回合(掷骰+群级冷却)
-        const moodHit = rollPersonaMood(host.getPersonaFor(e), groupId)
+        const moodHit = rollPersonaMood(host.getPersonaFor(e), isPrivateChat ? `private:${userId}` : groupId)
         if (moodHit) logger.info(`[心情时刻] group=${groupId} 命中「${moodHit.name}」(本回合生效)`)
         const promptLayers = await composeTurnPromptLayers({
           config: host.getChatConfig(e),
@@ -561,7 +572,7 @@ export async function handleToolInner(host, e) {
           const chatHistory = await host.messageManager.getMessages(e.message_type, e.message_type === "group" ? e.group_id : e.user_id)
 
           if (chatHistory?.length) {
-            const historyMemberMap = memberMap || await e.bot.pickGroup(groupId).getMemberMap()
+            const historyMemberMap = isPrivateChat ? null : (memberMap || await e.bot.pickGroup(groupId).getMemberMap())
 
             // 使用 message_id 过滤当前消息
             const currentMessageId = e.message_id

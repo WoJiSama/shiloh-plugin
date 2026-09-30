@@ -56,8 +56,15 @@ export function findForbiddenWord(text, cfg = {}) {
 
 // —— 会话中断状态 ——
 
-export function markConversationInterrupted(groupId) {
-  const key = String(groupId ?? "")
+// 会话作用域键:群聊用群号,私聊用用户号——同一套中断/锚点语义两个场景通用
+export function chatScopeKey(e = {}) {
+  const group = String(e?.group_id || "")
+  if (group) return group
+  return e?.message_type === "private" ? `private:${String(e?.user_id || "")}` : ""
+}
+
+export function markConversationInterrupted(scopeKey) {
+  const key = String(scopeKey ?? "")
   if (!key) return 0
   // 单调递增:同毫秒内连续两次中断也要严格变大,锚点比较(at > anchor)才不会漏判
   const ts = Math.max(Date.now(), (interruptedAtByGroup.get(key) || 0) + 1)
@@ -65,21 +72,21 @@ export function markConversationInterrupted(groupId) {
   return ts
 }
 
-export function getConversationInterruptedAt(groupId) {
-  return interruptedAtByGroup.get(String(groupId ?? "")) || 0
+export function getConversationInterruptedAt(scopeKey) {
+  return interruptedAtByGroup.get(String(scopeKey ?? "")) || 0
 }
 
 // 回合入口打锚点:只打一次,内部 handleTool 复用外层锚点,不因二次进入而复活已中断回合
 export function anchorEventConversation(e) {
   if (!e || e._forbiddenAnchorAt !== undefined) return e
-  e._forbiddenAnchorAt = getConversationInterruptedAt(e.group_id)
+  e._forbiddenAnchorAt = getConversationInterruptedAt(chatScopeKey(e))
   return e
 }
 
 // 中断是否晚于该回合锚点:晚于 → 本回合作废;未打锚点的事件(指令回复等)不受影响
 export function isConversationInterrupted(e = {}) {
   if (e?._forbiddenAnchorAt === undefined) return false
-  const at = getConversationInterruptedAt(e?.group_id)
+  const at = getConversationInterruptedAt(chatScopeKey(e))
   return at > 0 && at > e._forbiddenAnchorAt
 }
 

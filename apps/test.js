@@ -119,7 +119,7 @@ import { resolveLongTaskFeedbackPolicy } from "../utils/longTaskFeedbackPolicy.j
 import { resolvePromptLayerProfile } from "../utils/promptLayers.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../utils/personaSource.js"
 import { createPersonaLibrary } from "../utils/personaLibrary.js"
-import { findForbiddenWord, anchorEventConversation, markConversationInterrupted } from "../utils/forbiddenWordGuard.js"
+import { findForbiddenWord, anchorEventConversation, markConversationInterrupted, chatScopeKey } from "../utils/forbiddenWordGuard.js"
 import { applyFlatUpdates } from "../utils/configWriter.js"
 import { installMidtermMemoryRuntime, getMidtermMemoryManager } from "../domains/midtermMemory/MidtermSummaryManager.js"
 import { rollPersonaMood } from "../utils/personaMoods.js"
@@ -159,6 +159,7 @@ import {
 import { runTimingGate as runTimingGateFn } from "./lib/timingGate.js"
 import { handleRandomReplySmart as handleRandomReplySmartFn } from "./lib/smartConversation.js"
 import { handleToolInner as handleToolInnerFn } from "./lib/chatTurn.js"
+import { evaluatePrivateChatGate } from "./lib/privateChat.js"
 import { buildMainSystemPrompt } from "../utils/systemPromptTemplate.js"
 import { composeTurnPromptLayers } from "../utils/turnPromptComposer.js"
 import { applyOutputPersonaGuards } from "../utils/outputGuardPipeline.js"
@@ -2391,6 +2392,24 @@ export class ExamplePlugin extends plugin {
     return this.config.allowedGroups.some(id => String(id) === String(e.group_id))
   }
 
+  // 私聊回合入口:门禁(开关/白名单/节流) → 违禁词 → 锚点 → 主回合
+  async handlePrivateChat(e) {
+    if (this.isCommand(e)) return false // #指令仍走指令规则(人设列表等本就支持私聊)
+    const gate = evaluatePrivateChatGate({ config: this.config, e, isMaster: e?.isMaster })
+    if (!gate.allowed) {
+      if (gate.reason === "disabled" || gate.reason === "master_only" || gate.reason === "not_allowed") {
+        logger.info(`[私聊] user=${e.user_id} 忽略(${gate.reason})`)
+      }
+      return false
+    }
+    if (this.isUserBlacklisted(e)) return false
+    if (this.handleForbiddenWordHit(e)) return false
+    anchorEventConversation(e)
+    e._triggerContext = { mode: "private_chat" }
+    logger.info(`[私聊] user=${e.user_id} 进入私聊回合 msg="${summarizeForLog(e.msg || "")}"`)
+    return await this.handleTool(e)
+  }
+
   isUserBlacklisted(e) {
     const blacklist = this.config?.userBlacklist
     if (!blacklist?.enabled) return false
@@ -2408,10 +2427,10 @@ export class ExamplePlugin extends plugin {
     const text = String(e?.msg || e?.raw_message || "")
     const word = findForbiddenWord(text, cfg)
     if (!word) return false
-    const groupId = e?.group_id
-    markConversationInterrupted(groupId)
-    if (groupId) this.cancelPendingConversation(groupId)
-    logger.mark(`[违禁词] group=${groupId} user=${e?.user_id} word=${word} 已中断当前对话 msg="${summarizeForLog(text)}"`)
+    const scopeKey = chatScopeKey(e)
+    markConversationInterrupted(scopeKey)
+    if (e?.group_id) this.cancelPendingConversation(e.group_id)
+    logger.mark(`[违禁词] scope=${scopeKey} user=${e?.user_id} word=${word} 已中断当前对话 msg="${summarizeForLog(text)}"`)
     const replyText = String(cfg?.replyText || "").trim()
     if (replyText) {
       this.sendObservedReply(e, renderPersonaTemplate(replyText, this.getPersonaFor(e)), false, "forbidden_notice")
@@ -3008,6 +3027,8 @@ ${recentHistory || '(无)'}
   }
 
   async handleRandomReply(e) {
+    // 私聊分流:默认关闭,开启后白名单(留空=仅主人)用户可私聊,走同一主回合
+    if (e.message_type === "private") return await this.handlePrivateChat(e)
     if (!this.config.enabled || !this.checkGroupPermission(e) || this.isCommand(e) || !e.group_id) {
       return false
     }
