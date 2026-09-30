@@ -172,4 +172,172 @@ export default [
     bottomHelpMessage: "事件时间落在过去 N 天内时可自然回扣(如'考得咋样')",
     componentProps: { min: 0, max: 90, placeholder: "7" }
   }
+,
+  { component: "Divider", label: "语义记忆强度演化" },
+  {
+    field: "semanticMemory.memoryEvolution.enabled",
+    label: "启用强度演化",
+    component: "Switch",
+    bottomHelpMessage: "记忆随时间衰减、被召回即强化;关闭后回到纯相似度排序"
+  },
+  {
+    field: "semanticMemory.memoryEvolution.halfLifeDays",
+    label: "半衰期(天)",
+    component: "InputNumber",
+    bottomHelpMessage: "N 天没人想起强度减半",
+    componentProps: { min: 1, max: 90, step: 1, placeholder: "7" }
+  },
+  {
+    field: "semanticMemory.memoryEvolution.reinforceBoost",
+    label: "召回强化幅度",
+    component: "InputNumber",
+    bottomHelpMessage: "每次被召回注入提升的强度",
+    componentProps: { min: 0.05, max: 1, step: 0.05, placeholder: "0.35" }
+  },
+  {
+    field: "semanticMemory.memoryEvolution.freezeThreshold",
+    label: "淡忘阈值",
+    component: "InputNumber",
+    bottomHelpMessage: "强度低于此值每日清扫时删除;0=只用保留期不按强度遗忘",
+    componentProps: { min: 0, max: 0.5, step: 0.01, placeholder: "0.06" }
+  },
+  { component: "Divider", label: "记忆自纠错" },
+  {
+    field: "semanticMemory.selfCorrection.enabled",
+    label: "启用自纠错",
+    component: "Switch",
+    bottomHelpMessage: "群友说\"你记错了\"且指向机器人时,自动降权上一轮引用的记忆(降权非删除,重复纠错自然淡忘)"
+  },
+  {
+    field: "semanticMemory.selfCorrection.penalty",
+    label: "每次降权幅度",
+    component: "InputNumber",
+    bottomHelpMessage: "1=一次纠错直接打到冻结线",
+    componentProps: { min: 0.05, max: 1, step: 0.05, placeholder: "0.5" }
+  },
+  {
+    field: "semanticMemory.selfCorrection.ttlMinutes",
+    label: "纠错有效窗口(分)",
+    component: "InputNumber",
+    bottomHelpMessage: "机器人引用记忆后多久内的纠错才算数",
+    componentProps: { min: 1, max: 60, step: 1, placeholder: "10" }
+  },
+  { component: "Divider", label: "中期记忆(主线摘要)" },
+  {
+    field: "midtermMemory.enabled",
+    label: "启用中期记忆",
+    component: "Switch",
+    bottomHelpMessage: "每群滚动维护\"最近在聊什么主线\"摘要,补 60 分钟窗口与长期记忆之间的空档;依赖记忆模型配置"
+  },
+  {
+    field: "midtermMemory.minMessages",
+    label: "触发消息数",
+    component: "InputNumber",
+    bottomHelpMessage: "攒够多少条新消息更新一次摘要",
+    componentProps: { min: 4, max: 100, step: 1, placeholder: "15" }
+  },
+  {
+    field: "midtermMemory.maxSummaryChars",
+    label: "摘要长度上限",
+    component: "InputNumber",
+    componentProps: { min: 120, max: 2000, step: 20, placeholder: "500" }
+  },
+  {
+    field: "midtermMemory.retentionDays",
+    label: "主线保留天数",
+    component: "InputNumber",
+    bottomHelpMessage: "过期的主线自然淡忘",
+    componentProps: { min: 1, max: 14, step: 1, placeholder: "3" }
+  },
+  {
+    field: "midtermMemory.model",
+    label: "摘要模型",
+    component: "Input",
+    bottomHelpMessage: "留空用记忆模型(memoryAiModel)",
+    componentProps: { placeholder: "如 glm-5.3-flash" }
+  }
+,
+  { component: "Divider", label: "语义记忆强度演化" },
+  {
+    field: "semanticMemory.memoryEvolution.enabled",
+    label: "启用强度演化",
+    component: "Switch",
+    bottomHelpMessage: "记忆随时间衰减、被召回即强化;关闭后回到纯相似度排序"
+  },
+  {
+    field: "semanticMemory.memoryEvolution.halfLifeDays",
+    label: "半衰期(天)",
+    component: "InputNumber",
+    bottomHelpMessage: "N 天没人想起强度减半",
+    componentProps: { min: 1, max: 90, step: 1, placeholder: "7" }
+  },
+  {
+    field: "semanticMemory.memoryEvolution.reinforceBoost",
+    label: "召回强化幅度",
+    component: "InputNumber",
+    bottomHelpMessage: "每次被召回注入提升的强度",
+    componentProps: { min: 0.05, max: 1, step: 0.05, placeholder: "0.35" }
+  },
+  {
+    field: "semanticMemory.memoryEvolution.freezeThreshold",
+    label: "淡忘阈值",
+    component: "InputNumber",
+    bottomHelpMessage: "强度低于此值每日清扫时删除;0=只用保留期不按强度遗忘",
+    componentProps: { min: 0, max: 0.5, step: 0.01, placeholder: "0.06" }
+  },
+  { component: "Divider", label: "记忆自纠错" },
+  {
+    field: "semanticMemory.selfCorrection.enabled",
+    label: "启用自纠错",
+    component: "Switch",
+    bottomHelpMessage: "群友说\"你记错了\"且指向机器人时,自动降权上一轮引用的记忆(降权非删除,重复纠错自然淡忘)"
+  },
+  {
+    field: "semanticMemory.selfCorrection.penalty",
+    label: "每次降权幅度",
+    component: "InputNumber",
+    bottomHelpMessage: "1=一次纠错直接打到冻结线",
+    componentProps: { min: 0.05, max: 1, step: 0.05, placeholder: "0.5" }
+  },
+  {
+    field: "semanticMemory.selfCorrection.ttlMinutes",
+    label: "纠错有效窗口(分)",
+    component: "InputNumber",
+    bottomHelpMessage: "机器人引用记忆后多久内的纠错才算数",
+    componentProps: { min: 1, max: 60, step: 1, placeholder: "10" }
+  },
+  { component: "Divider", label: "中期记忆(主线摘要)" },
+  {
+    field: "midtermMemory.enabled",
+    label: "启用中期记忆",
+    component: "Switch",
+    bottomHelpMessage: "每群滚动维护\"最近在聊什么主线\"摘要,补 60 分钟窗口与长期记忆之间的空档;依赖记忆模型配置"
+  },
+  {
+    field: "midtermMemory.minMessages",
+    label: "触发消息数",
+    component: "InputNumber",
+    bottomHelpMessage: "攒够多少条新消息更新一次摘要",
+    componentProps: { min: 4, max: 100, step: 1, placeholder: "15" }
+  },
+  {
+    field: "midtermMemory.maxSummaryChars",
+    label: "摘要长度上限",
+    component: "InputNumber",
+    componentProps: { min: 120, max: 2000, step: 20, placeholder: "500" }
+  },
+  {
+    field: "midtermMemory.retentionDays",
+    label: "主线保留天数",
+    component: "InputNumber",
+    bottomHelpMessage: "过期的主线自然淡忘",
+    componentProps: { min: 1, max: 14, step: 1, placeholder: "3" }
+  },
+  {
+    field: "midtermMemory.model",
+    label: "摘要模型",
+    component: "Input",
+    bottomHelpMessage: "留空用记忆模型(memoryAiModel)",
+    componentProps: { placeholder: "如 glm-5.3-flash" }
+  }
 ]

@@ -51,8 +51,13 @@ export function resolveTalkValue(host, groupId) {
     const s = host.config.smartTrigger || {}
     const fallback = Number(s.talkValue) || 1.0
     // 按群覆盖:某些群话痨/某些群安静,优先级最高(借鉴 MaiBot 按 item_id 的频率规则)
+    // 兼容两种形态:锅巴 GSubForm 写的数组 [{group,value}],手写 yaml 的对象 {群号:值}
     const groupOverrides = s.groupTalkValues
-    if (groupOverrides && typeof groupOverrides === "object") {
+    if (Array.isArray(groupOverrides)) {
+      const entry = groupOverrides.find(item => item && String(item.group) === String(groupId || ""))
+      const v = Number(entry?.value)
+      if (Number.isFinite(v) && v > 0) return Math.min(1, v)
+    } else if (groupOverrides && typeof groupOverrides === "object") {
       const v = Number(groupOverrides[String(groupId || "")])
       if (Number.isFinite(v) && v > 0) return Math.min(1, v)
     }

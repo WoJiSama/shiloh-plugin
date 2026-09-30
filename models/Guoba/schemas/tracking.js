@@ -60,6 +60,46 @@ export default [
     componentProps: { min: 0.01, max: 1, step: 0.05, placeholder: "0.15" }
   },
   {
+    field: "smartTrigger.attentionDrift.enabled",
+    label: "注意力漂移",
+    component: "Switch",
+    bottomHelpMessage: "群里刚冒出爆发新话题时,时机判断更容易被吸引;纯话题统计,不额外调模型"
+  },
+  {
+    field: "smartTrigger.attentionDrift.level",
+    label: "漂移强度",
+    component: "Select",
+    componentProps: {
+      options: [
+        { label: "subtle(轻提一句)", value: "subtle" },
+        { label: "normal(更容易被吸引)", value: "normal" },
+        { label: "strong(明显被吸引+降触发门槛)", value: "strong" }
+      ]
+    },
+    bottomHelpMessage: "strong 档会在新话题爆发期把触发门槛降一档"
+  },
+  {
+    field: "smartTrigger.attentionDrift.windowMinutes",
+    label: "新话题判定窗口(分)",
+    component: "InputNumber",
+    bottomHelpMessage: "首现于窗口内且提及≥2次算爆发",
+    componentProps: { min: 1, max: 30, step: 1, placeholder: "5" }
+  },
+  {
+    field: "smartTrigger.groupTalkValues",
+    label: "按群话痨覆盖",
+    component: "GSubForm",
+    componentProps: {
+      multiple: true,
+      modalProps: { title: "按群话痨覆盖" },
+      schemas: [
+        { field: "group", label: "群号", component: "Input", required: true },
+        { field: "value", label: "话痨值(0.01~1)", component: "InputNumber", componentProps: { min: 0.01, max: 1, step: 0.01, placeholder: "0.15" } }
+      ]
+    },
+    bottomHelpMessage: "某些群话痨某些群安静;优先级高于时段规则"
+  },
+  {
     field: "smartTrigger.idleCompensationEnabled",
     label: "冷群空窗补偿",
     component: "Switch",

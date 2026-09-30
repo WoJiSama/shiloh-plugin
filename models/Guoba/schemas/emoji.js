@@ -138,6 +138,13 @@ export default [
     bottomHelpMessage: "开启后避免短时间内重复发同一张图（按 hash 排除）。按群独立记忆，关闭时纯按召回算法选图（可能出现连发同款）"
   },
   {
+    field: "emojiSystem.familiarityBias",
+    label: "认识感偏置",
+    component: "InputNumber",
+    bottomHelpMessage: "熟悉的表情小幅优先发送;0=关闭回到纯多样性;新表情首次发出时模型会收到\"刚捡到\"提示",
+    componentProps: { min: 0, max: 1, step: 0.05, placeholder: "0.25" }
+  },
+  {
     field: "emojiSystem.avoidRecentCount",
     label: "记忆最近 N 次发送",
     component: "InputNumber",

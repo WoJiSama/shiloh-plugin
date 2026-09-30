@@ -89,3 +89,23 @@ test("纠错闭环集成:查询带序号与提示 → 忘记 第N条 → 越界�
   await plugin.forgetChunk(e, runtime, ".语义记忆 忘记 第5条")
   assert.ok(replies[2].includes("超出范围"), `越界提示:${replies[2]}`)
 })
+
+
+test("resolveTalkValue:按群覆盖兼容数组(锅巴表单)与对象(手写 yaml)两种形态", async () => {
+  globalThis.plugin ||= class {}
+  globalThis.logger ||= { info() {}, warn() {}, error() {}, mark() {} }
+  const { default: init } = await import("../apps/lib/smartDynamics.js").catch(() => ({}))
+  const mod = await import("../apps/lib/smartDynamics.js")
+  assert.equal(typeof mod.resolveTalkValue, "function", "smartDynamics 应导出 resolveTalkValue")
+  const host = config => ({ config })
+  // 数组形态
+  const arrayHost = host({ smartTrigger: { talkValue: 0.07, groupTalkValues: [{ group: "111", value: 0.5 }] } })
+  assert.ok(Math.abs(mod.resolveTalkValue(arrayHost, "111") - 0.5) < 1e-9, "数组形态按群覆盖生效")
+  assert.equal(mod.resolveTalkValue(arrayHost, "222"), 0.07, "未覆盖群回落默认")
+  // 对象形态(向后兼容)
+  const mapHost = host({ smartTrigger: { talkValue: 0.07, groupTalkValues: { "111": 0.3 } } })
+  assert.ok(Math.abs(mod.resolveTalkValue(mapHost, "111") - 0.3) < 1e-9, "对象形态向后兼容")
+  // 钳上限
+  const clampHost = host({ smartTrigger: { groupTalkValues: [{ group: "111", value: 5 }] } })
+  assert.equal(mod.resolveTalkValue(clampHost, "111"), 1)
+})

@@ -240,7 +240,7 @@ pluginSettings:
     waitToolEnabled: true                # 是否暴露 wait 工具给 LLM
     inevitableAtReply: true              # 命中 @bot 或 triggerPrefixes 时强制回复（跳过 Gate/cooldown/threshold/debounce）；两种命中走同一路径
     mentionedNameReply: false            # 非 @ 且不在 triggerPrefixes 里，但消息含机器人昵称（Bot.nickname）时也强制触发
-    groupTalkValues: {}                  # 按群话痨覆盖（优先级最高）：{ "群号": 0.15 }，某些群话痨某些群安静
+    groupTalkValues: []                  # 按群话痨覆盖（优先级最高，锅巴"按群话痨覆盖"表单编辑）: [{group: "123", value: 0.15}]
     # 注意力漂移（借鉴 MaiBot attention_drift，纯话题统计零模型调用）：
     # 群里刚冒出且正在爆发的新话题 → Gate 注入"容易被吸引"提示；strong 档额外降一档触发门槛
     attentionDrift:

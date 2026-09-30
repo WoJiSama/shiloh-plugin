@@ -45,6 +45,21 @@ export default [
     label: "其他备注",
     component: "InputTextArea"
   },
+  {
+    field: "persona.moods",
+    label: "调皮心情时刻",
+    component: "GSubForm",
+    componentProps: {
+      multiple: true,
+      modalProps: { title: "调皮心情时刻" },
+      schemas: [
+        { field: "name", label: "心情名", component: "Input", required: true, componentProps: { placeholder: "如 活泼 / 腹黑" } },
+        { field: "hint", label: "心情提示", component: "InputTextArea", required: true, componentProps: { placeholder: "给模型的一句话描述,如 语速快一点、爱接梗、多用感叹号" } },
+        { field: "probability", label: "触发概率", component: "InputNumber", componentProps: { min: 0.01, max: 1, step: 0.01, placeholder: "0.12" } }
+      ]
+    },
+    bottomHelpMessage: "每条回复按概率随机着色一次心情,只影响当次回复不换人格;同群 10 分钟冷却。建议 0.05~0.2"
+  },
 
   { component: "Divider", label: "回复微雕" },
   {
