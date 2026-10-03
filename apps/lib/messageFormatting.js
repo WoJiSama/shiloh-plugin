@@ -1,7 +1,7 @@
 // 消息格式化:用户内容组装(CQ/引用/媒体)与聊天历史格式化。
 // 从 apps/test.js 原样迁出(行为不变),this 依赖以 host 注入。
 import { buildStructuredHistoryMessage } from "../../utils/agentIntelligence.js"
-import { compactDrawPromptText } from "./lib/textPolicy.js"
+import { compactDrawPromptText } from "./textPolicy.js"
 import { formatMemberDisplayName } from "../../utils/messageContext.js"
 import { getMentionTargetId } from "../../utils/mentionTargets.js"
 import { ROLE_MAP as roleMap } from "../../utils/messageContext.js"
