@@ -1,4 +1,5 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
@@ -10,14 +11,6 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
-function readPluginSources() {
-  const libDir = new URL("../apps/lib/", import.meta.url)
-  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
-  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
-    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
-  }
-  return parts.join("\n")
-}
 
 test("emoji-only 回复后进入冷却，explicit 请求不受限", () => {
   resetEmojiCooldownForTests()
@@ -53,7 +46,7 @@ test("test.js 已接线：终态表情后记录冷却、暴露过滤传冷却参
 })
 
 test("filterToolsForMessageIntent 解构参数后不得残留 options 引用", () => {
-  const pluginSource = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const pluginSource = readPluginSources()
   const start = pluginSource.indexOf("function filterToolsForMessageIntent")
   const end = pluginSource.indexOf("\n}", start)
   const body = pluginSource.slice(start, end)

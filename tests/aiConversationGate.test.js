@@ -26,7 +26,7 @@ test("AI conversation entries re-check the master switch", () => {
   for (const marker of [
     "async handleRandomReplySmart(e) {", // 类内委托仍在
     "export async function handleRandomReplySmart(host, e) {\n    if (!isAiConversationEnabled(host.config)) return false",
-    "async joinRepeat(e, state, text) {\n    if (!isAiConversationEnabled(this.config)) return false",
+    "export async function joinRepeat(host, e, state, text) {\n    if (!isAiConversationEnabled(host.config)) return false",
     "if (!isAiConversationEnabled(this.config)) return\n        if (!this.checkGroupPermission(e))",
     "插件总开关已关闭，取消续话",
     "error: 'plugin_disabled'",

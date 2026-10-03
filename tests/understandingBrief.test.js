@@ -1,6 +1,7 @@
 // 理解简报测试:输入构造、成功判读、四类失败回退(超时/接口缺失/HTTP 错误/输出不合法)、
 // 最终卡片组装(简报在前材料在后、长度受控)、主链路接线。
 import { test } from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
@@ -121,7 +122,7 @@ test("最终卡片:简报在前、原文材料为证据层、总长受 maxChars 
 test("主链路接线:简报优先 + 失败回退规则卡 + 配置开关", () => {
   const src = [
     ...[path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")].map(file => fs.readFileSync(file, "utf8")),
-    fs.readFileSync(path.join(root, "apps/lib/promptContext.js"), "utf8")
+    readSource("apps/lib/promptContext.js")
   ].join("\n")
   assert.ok(src.includes("this.resolveUnderstandingPrompt({") || src.includes("host.resolveUnderstandingPrompt({"), "注入点改为异步简报解析(现为瀑布stage包裹)")
   assert.ok(src.includes("requestUnderstandingBrief({"), "模型简报调用已接线")

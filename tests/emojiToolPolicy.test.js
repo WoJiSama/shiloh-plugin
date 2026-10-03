@@ -1,4 +1,5 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
@@ -24,14 +25,6 @@ const LEGACY_CASUAL_PHRASES = [
   "安慰一下我", "哄哄我", "啊？"
 ]
 
-function readPluginSources() {
-  const libDir = new URL("../apps/lib/", import.meta.url)
-  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
-  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
-    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
-  }
-  return parts.join("\n")
-}
 
 test("legacy casual reaction phrases still classify as casual_reaction", () => {
   for (const phrase of LEGACY_CASUAL_PHRASES) {
@@ -109,7 +102,7 @@ test("reaction rules are the single source: casual set derives from the rule arr
 })
 
 test("emoji failures fall silent instead of triggering an apology model call", () => {
-  const pluginSource = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const pluginSource = readPluginSources()
   assert.ok(
     pluginSource.includes("if (toolName === LOCAL_EMOJI_TOOL_NAME) {"),
     "表情工具失败必须静默跳过"

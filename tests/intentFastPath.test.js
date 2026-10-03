@@ -1,4 +1,5 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
@@ -37,7 +38,7 @@ test("skipped turns sample shadow verification at a bounded rate", () => {
 })
 
 test("handleTool wires the fast path with shadow sampling", () => {
-  const src = fs.readFileSync(path.join(root, "apps/lib/chatTurn.js"), "utf8") // 主链路已迁 lib(P 重构)
+  const src = readSource("apps/lib/chatTurn.js") // 主链路已迁 lib(P 重构)
   // 闲聊快路的层裁剪已迁入 utils/turnPromptComposer.js(提示词组装重构)
   const composerSrc = fs.readFileSync(path.join(root, "utils/turnPromptComposer.js"), "utf8")
   assert.ok(src.includes("const skipIntentModel = shouldSkipIntentModel({"), "快路判定接入")

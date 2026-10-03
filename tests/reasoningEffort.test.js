@@ -2,8 +2,8 @@
 // chat 回合也可升档、reasoning 档请求真正携带 reasoning_effort、
 // 配置可改档可关闭、其他档位不受影响。
 import { test } from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
-import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { createTurnPlan, deriveTurnPlanRequest, needsDeliberateReasoning } from "../utils/turnPlan.js"
@@ -92,7 +92,7 @@ test("其他档位不受升档影响", () => {
 })
 
 test("主链路已把配置传入 deriveTurnPlanRequest", () => {
-  const src = fs.readFileSync(path.join(root, "apps/lib/chatTurn.js"), "utf8")
+  const src = readSource("apps/lib/chatTurn.js")
   assert.ok(
     src.includes("deriveTurnPlanRequest(turnPlan, host.config)"),
     "主链路需传 config,否则 complexReasoningEffort 配置不生效"

@@ -1,19 +1,12 @@
 import { test } from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 
 const source = readPluginSources()
 const routeSource = fs.readFileSync(new URL("../utils/routeDecision.js", import.meta.url), "utf8")
-const semanticSource = fs.readFileSync(new URL("../apps/lib/semanticToolIntent.js", import.meta.url), "utf8")
+const semanticSource = readSource("apps/lib/semanticToolIntent.js")
 
-function readPluginSources() {
-  const libDir = new URL("../apps/lib/", import.meta.url)
-  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
-  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
-    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
-  }
-  return parts.join("\n")
-}
 
 
 test("explicit image generation is forced before semantic planning", () => {

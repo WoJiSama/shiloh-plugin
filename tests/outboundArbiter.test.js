@@ -1,4 +1,5 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
@@ -13,14 +14,6 @@ function recorder() {
   return { sent, reply: async text => { sent.push(text) } }
 }
 
-function readPluginSources() {
-  const libDir = new URL("../apps/lib/", import.meta.url)
-  const parts = [fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")]
-  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
-    parts.push(fs.readFileSync(new URL(file, libDir), "utf8"))
-  }
-  return parts.join("\n")
-}
 
 test("outbound sends are serialized in enqueue order", async () => {
   const state = { gate: Promise.resolve() }

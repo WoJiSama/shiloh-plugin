@@ -1,7 +1,7 @@
 // 私聊功能单测:门禁(开关/白名单语义/节流)、违禁词作用域键(私聊按用户)、主回合防护合同
 import { test, beforeEach } from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
-import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import {
@@ -67,13 +67,13 @@ test("违禁词作用域键:群=群号,私聊=用户号,锚点/中断在私聊�
 })
 
 test("主回合防护合同:私聊门禁双验/无工具/心情键/成员图防护/合并旁路(源码合同)", () => {
-  const chatTurn = fs.readFileSync(path.join(root, "apps/lib/chatTurn.js"), "utf8")
-  const testJs = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const chatTurn = readSource("apps/lib/chatTurn.js")
+  const testJs = readPluginSources()
 
   assert.ok(chatTurn.includes("evaluatePrivateChatGate({ config: host.config, e"), "主回合二次门禁(保护 #tool 直入)")
   assert.ok(chatTurn.includes("isPrivateChat ? [] : host.tools"), "私聊回合不带群工具")
   assert.ok(chatTurn.includes("isPrivateChat ? `private:${userId}` : groupId"), "心情冷却私聊按用户")
   assert.ok(chatTurn.includes("isPrivateChat ? null : (memberMap || await e.bot.pickGroup(groupId).getMemberMap())"), "私聊跳过群成员表")
-  assert.ok(testJs.includes("if (e.message_type === \"private\") return await this.handlePrivateChat(e)"), "私聊入口分流")
+  assert.ok(testJs.includes("if (e.message_type === \"private\") return await host.handlePrivateChat(e)"), "私聊入口分流")
   assert.ok(testJs.includes("markConversationInterrupted(scopeKey)"), "违禁词中断用作用域键")
 })

@@ -1,18 +1,11 @@
 import test from "node:test"
+import { readPluginSources } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { decideToolContinuation, formatDirectToolResult } from "../utils/toolContinuationPolicy.js"
 
-function readPluginSources() {
-  const libDir = path.join(root, "apps/lib")
-  const parts = [fs.readFileSync(path.join(root, "apps/test.js"), "utf8")]
-  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
-    parts.push(fs.readFileSync(path.join(libDir, file), "utf8"))
-  }
-  return parts.join("\n")
-}
 
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")

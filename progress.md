@@ -1,3 +1,11 @@
+# 2026-09-30 私聊功能落地（用户引用"私聊为伪任务"的说明后指示"做"——把能力真正做出来）
+- 背景:此前核实 bot 纯群聊设计;用户决定补上私聊。设计原则:默认关、白名单制(留空=仅主人,防陌生人)、与群聊共用主回合。
+- apps/lib/privateChat.js:纯函数门禁(开关/白名单/每用户节流),入口与 chatTurn 双重校验(防 #tool 直入绕过);锅巴"基础设置"页新增私聊区。
+- handlePrivateChat 入口:私聊消息分流(#指令仍走指令规则,人设列表等本就支持私聊),违禁词/黑名单/锚点全套适用;chatTurn 私聊分支:不带群工具(纯人设聊天)、心情冷却按用户键、跳过群成员表。
+- forbiddenWordGuard 增 chatScopeKey(群=群号/私聊=用户号):中断-锚点语义两场景通用;违禁词中断在私聊同样生效。
+- 隐私隔离免费:归档 includePrivate 默认 false → 私聊不入归档,中期记忆/语义索引/自纠错天然不碰私聊。
+- 调试插曲:门禁测试两次翻车——模块级节流表在子场景间串号(改用不同用户号隔离)、now 参数传了函数导致 NaN 比较恒假(改传数字);全量 1326/0。部署 0 错误,服务器 4/4。commit 4e7889b。
+
 # 2026-09-30 架构第二阶段收尾:主聊天回合/smart 编排迁出 + 门面补全（用户"继续抽"）
 - apps/lib/chatTurn.js(956行):handleToolInner 主回合整体迁出——提示词组装/历史选择/模型调用/回答分发的完整链路,host 注入行为不变;80+ import 清单不做手工,由 test.js 导入表自动映射生成,danglingReferences 测试兜底抓漏。
 - apps/lib/smartConversation.js(313行):handleRandomReplySmart 编排主体(入口锁/上下文记录/Gate/续话排队),smartLockTokenCounter 随迁。

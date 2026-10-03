@@ -1,6 +1,6 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
-import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { createTurnTrace } from "../utils/turnTrace.js"
@@ -16,10 +16,9 @@ test("turn trace carries trigger provenance", () => {
 })
 
 test("timing gate shares the persona and trigger decisions flow into the turn", () => {
-  const src = [path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")]
-      .map(file => fs.readFileSync(file, "utf8")).join("\n")
+  const src = readPluginSources()
   // gate 已拆到 apps/lib/timingGate.js(P 重构),人设注入断言看新家
-  const gateSrc = fs.readFileSync(path.join(root, "apps/lib/timingGate.js"), "utf8")
+  const gateSrc = readSource("apps/lib/timingGate.js")
   assert.ok(gateSrc.includes("gatePersonaTone"), "Gate prompt 需要注入人设语气")
   assert.ok(gateSrc.includes("触发决策与主链路共享同一份人设"), "Gate 与主链路共享人设的说明")
   for (const marker of [

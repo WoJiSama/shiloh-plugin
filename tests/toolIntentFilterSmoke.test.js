@@ -1,6 +1,6 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
-import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -27,7 +27,7 @@ function extractFunction(source, name) {
 }
 
 test("filterToolsForMessageIntent 可执行且不残留未定义引用", () => {
-  const src = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const src = readPluginSources()
   const fn = extractFunction(src, "filterToolsForMessageIntent").replace(
     "function filterToolsForMessageIntent", "function __f")
   const stub = `

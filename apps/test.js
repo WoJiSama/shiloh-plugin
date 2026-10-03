@@ -158,8 +158,41 @@ import {
 } from "./lib/smartDynamics.js"
 import { runTimingGate as runTimingGateFn } from "./lib/timingGate.js"
 import { handleRandomReplySmart as handleRandomReplySmartFn } from "./lib/smartConversation.js"
+import {
+  setTrackingWithTimer,
+  joinRepeat,
+  detectGroupRepeat,
+  isUserTalkingToBot,
+  addToBatchJudgment,
+  processBatchJudgments,
+  batchIsUserTalkingToBot,
+  fallbackToSingleJudgment,
+  handleRandomReply
+} from "./lib/strictConversation.js"
+import {
+  getTaskStatusCacheKey,
+  getTaskStatusRedisKey,
+  getActiveToolTaskCacheKey,
+  getActiveToolTaskRedisKey,
+  getTaskStatusTtlSeconds,
+  saveTaskStatus,
+  getTaskStatus,
+  clearTaskStatus,
+  updateUserToolTaskStatus,
+  getUserToolTaskStatus,
+  clearUserToolTaskStatus,
+  getRuntimeToolTaskStatus,
+  getCurrentUserToolTaskStatus,
+  buildDrawTaskStatusReply,
+  buildReplySegment,
+  buildTaskStatusReplyMessage,
+  handleActiveDrawStatusQuestion,
+  formatTaskStatusForPrompt
+} from "./lib/taskStatus.js"
+import { formatTime, buildMessageContent, formatMessages } from "./lib/messageFormatting.js"
 import { handleToolInner as handleToolInnerFn } from "./lib/chatTurn.js"
 import { evaluatePrivateChatGate } from "./lib/privateChat.js"
+import { delay, getOrCreateGroupLimiter, filterToolsForMessageIntent, toolConfigHasName, parseToolConfigEntry } from "./lib/conversationUtils.js"
 import { buildMainSystemPrompt } from "../utils/systemPromptTemplate.js"
 import { composeTurnPromptLayers } from "../utils/turnPromptComposer.js"
 import { applyOutputPersonaGuards } from "../utils/outputGuardPipeline.js"
@@ -265,47 +298,19 @@ import schedule from 'node-schedule'
 const _path = process.cwd()
 
 // 自动抢红包配置
-const RED_BAG_CONFIG = {
-  enabled: true, // 是否启用自动抢红包
-  minProbability: 0.3, // 最小触发概率
-  maxProbability: 0.8, // 最大触发概率
-  cooldownTime: 60000 // 冷却时间（毫秒），同一个群60秒内不重复触发
-}
 
-const redBagCooldowns = new Map() // 红包冷却记录: key: groupId, value: lastGrabTime
 
 // 清空群记忆二次确认（P0-1）：进程内 pending，key: `${groupId}_${userId}`, value: 过期时间戳。
 
-const taskStatusCache = new Map()
-const activeUserToolTaskCache = new Map()
 const directTriggerMergeTimers = new Map()
 const toolRequestMergeTimers = new Map()
-const activeConversations = new Map() // 会话追踪: key: `${groupId}_${userId}`, value: { lastActiveTime, chatHistory: [], timer: null }
-const trackingThrottle = new Map() // 节流: key: `${groupId}_${userId}`, value: lastCallTime
-const pendingJudgments = [] // 批量判断队列
-let batchTimer = null // 批量处理定时器
 // smart 模式：每群独立的频率状态，进程内 Map，重启清零
 // 群连续被新消息打断的累计计数（达到上限后下一轮强制走完不再让步）
 const consecutiveInterrupts = new Map() // groupId -> count
 // smart 锁持有令牌：看门狗强制释放后旧轮次的 finally 不得误释放新轮次的锁
 // redis 抖动/断连时命令可能既不成功也不失败（挂起）。任务状态只是去重辅助，
 // 超时降级为"无状态"，绝不能卡住会话收尾（进而卡死 smart 锁）。
-const TASK_STATUS_REDIS_TIMEOUT_MS = 2000
 
-async function settleTaskStatusRedis(promise, fallback, label) {
-  let timer = null
-  const timeout = new Promise(resolve => {
-    timer = setTimeout(() => resolve(fallback), TASK_STATUS_REDIS_TIMEOUT_MS)
-  })
-  try {
-    return await Promise.race([promise, timeout])
-  } catch (error) {
-    logger.warn(`[任务状态] ${label}失败：${error.message}`)
-    return fallback
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
 // 禁言状态短期缓存：避免每条群消息都查一次 ws RPC pickMember.getInfo()
 const mutedStatusCache = new Map() // groupId -> { isMuted, at }
 const MUTED_CACHE_TTL_MS = 30000
@@ -324,34 +329,9 @@ let pluginInitialized = false
 let sharedState = null
 let mcpInitPromise = null
 
-export function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
 
-export function getOrCreateGroupLimiter(limitersMap, groupId, concurrency) {
-  const entry = limitersMap.get(groupId)
-  if (entry && entry.concurrency === concurrency) {
-    return entry.limiter
-  }
-  const limiter = pLimit(concurrency)
-  limitersMap.set(groupId, { limiter, concurrency })
-  return limiter
-}
 
-function parseToolConfigEntry(entry) {
-  const raw = String(entry || "").trim()
-  const match = raw.match(/^([A-Za-z_][A-Za-z0-9_-]*)(?:\(([^)]*)\))?$/)
-  if (!match) return { name: raw, dedupe: false, marker: "" }
-  return {
-    name: match[1],
-    dedupe: match[2] !== undefined,
-    marker: match[2] || ""
-  }
-}
 
-function toolConfigHasName(toolNames, name) {
-  return Array.isArray(toolNames) && toolNames.some(item => parseToolConfigEntry(item).name === name)
-}
 
 function buildInternalStatusSafeReply(toolName = "", session = {}) {
   const text = [session?.rawArgs, session?.userContent].filter(Boolean).join("\n")
@@ -364,46 +344,8 @@ function buildInternalStatusSafeReply(toolName = "", session = {}) {
   return buildGenericChatFailureReply(text, { failureKind: "upstream" })
 }
 
-function hasMediaNeedingTool(message = []) {
-  return Array.isArray(message) && message.some(seg =>
-    ["image", "video", "record", "voice", "file", "wallet"].includes(seg?.type)
-  )
-}
 
-function shouldExposeToolsForMessage(e = {}, text = "") {
-  const content = normalizeIntentText(text || e?.msg || "")
-  if (hasMediaNeedingTool(e?.message)) return true
-  if (e?._groupContextAssets?.media?.length) return true
-  if (shouldExposeEmojiToolForMessage(content)) return true
-  return isRealtimeInfoRequest(content) || isExplicitSearchRequest(content) || isExplicitToolIntent(content)
-}
 
-export function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearch = false, emojiCooldownMs = 120000 } = {}) {
-  if (!Array.isArray(tools) || !tools.length) return []
-  const content = normalizeIntentText(text || e?.msg || "")
-  if (allowSearch) return tools.filter(tool => tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content))
-  if (!shouldExposeToolsForMessage(e, content)) return []
-
-  // The all-admin tool is deliberately unavailable unless the user used
-  // collection wording. A singular role request must go through exact member
-  // targeting instead of allowing the model to broaden the audience.
-  tools = tools.filter(tool =>
-    tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content)
-  )
-
-  const emojiOnlyTools = filterToolsForEmojiExposure(tools, content, {
-    groupId: String(e?.group_id || ""),
-    cooldownMs: emojiCooldownMs
-  })
-  if (emojiOnlyTools) return emojiOnlyTools
-
-  if (allowSearch || isRealtimeInfoRequest(content) || isExplicitSearchRequest(content)) return tools
-
-  return tools.filter(tool => {
-    const name = tool?.function?.name
-    return name && !SEARCH_TOOL_NAMES.has(name)
-  })
-}
 
 
 function applyToolRegistrySnapshot(state, snapshot = localToolRegistry.getSnapshot()) {
@@ -1145,32 +1087,7 @@ export class ExamplePlugin extends plugin {
    * @param {object} newData - 要更新的数据 { chatHistory, lastActiveTime }
    */
   setTrackingWithTimer(conversationKey, newData = {}) {
-    const timeout = (this.config.conversationTrackingTimeout || 2) * 60000
-    const activeConv = activeConversations.get(conversationKey)
-
-    // 清除旧定时器
-    if (activeConv?.timer) {
-      clearTimeout(activeConv.timer)
-    }
-
-    // 创建新定时器
-    const timer = setTimeout(() => {
-      const conv = activeConversations.get(conversationKey)
-      // 确保清除的是同一个定时器（防止竞态）
-      if (conv?.timer === timer) {
-        activeConversations.delete(conversationKey)
-        trackingThrottle.delete(conversationKey)
-        logger.info(`[会话追踪] ${conversationKey} 超时，已清除`)
-      }
-    }, timeout)
-
-    // 原子操作：创建定时器后立即存储
-    activeConversations.set(conversationKey, {
-      lastActiveTime: Date.now(),
-      chatHistory: activeConv?.chatHistory || [],
-      ...newData,
-      timer
-    })
+    return setTrackingWithTimer(this, conversationKey, newData)
   }
 
   /**
@@ -1371,36 +1288,7 @@ export class ExamplePlugin extends plugin {
    * rate limit 已满时返回 false 不复读。
    */
   async joinRepeat(e, state, text) {
-    if (!isAiConversationEnabled(this.config)) return false
-    const smartCfg = this.config.smartTrigger || {}
-    const groupId = e.group_id
-    // 复用速率检查（避免和正常回复一起把 bot 刷成复读机）
-    const cutoff = Date.now() - 600000
-    state.recentReplyTimestamps = (state.recentReplyTimestamps || []).filter(t => t > cutoff)
-    const maxPer10Min = Number(smartCfg.maxRepliesPer10Min) || 8
-    if (state.recentReplyTimestamps.length >= maxPer10Min) {
-      logger.info(`[Repeat] group=${groupId} rate limit 已满 (${state.recentReplyTimestamps.length}/${maxPer10Min}) 放弃复读`)
-      return false
-    }
-    logger.info(`[Repeat] group=${groupId} 参与复读 text="${text.slice(0, 30)}"`)
-    // 先发再写 state：避免 e.reply 抛错时 cooldown / rate limit / lastBotReplyAt 等被脏写
-    try {
-      await this.sendObservedReply(e, text, false, "repeat")
-    } catch (err) {
-      logger.error('[Repeat] 发送失败:', err)
-      return false
-    }
-    // 发送成功才提交状态变更
-    state.recentReplyTimestamps.push(Date.now())
-    state.lastRepeatJoinAt = Date.now()
-    state.lastBotReplyAt = Date.now()
-    state.lastBotReplyKeywords = extractChatKeywords(text, Number(smartCfg.continuationKeywordMaxCount) || 5)
-    state.pendingCount = 0
-    // 清瞬态标志：复读路径跳过了 continue/wait/no_action 分支，需要显式清掉以免污染下一条消息
-    state.forceContinue = false
-    state.forceGateCheck = false
-    state.lastGateNoActionAt = 0
-    return true
+    return await joinRepeat(this, e, state, text)
   }
 
   /**
@@ -1409,56 +1297,7 @@ export class ExamplePlugin extends plugin {
    * 命中时不走 Gate / handleTool，直接 e.reply 原文，规避 LLM 改写。
    */
   detectGroupRepeat(e, state) {
-    const smartCfg = this.config.smartTrigger || {}
-    if (smartCfg.repeatJoinEnabled === false) return null
-
-    const text = String(e?.msg || '').trim()
-    if (!text) return null
-    const maxLen = Number(smartCfg.repeatMaxTextLength) || 30
-    if (text.length > maxLen) return null
-
-    const botId = e?.bot?.uin || (typeof Bot !== 'undefined' && Bot.uin)
-    const currentUserId = String(e?.user_id || '')
-    const window = Math.max(2, Number(smartCfg.repeatDetectionWindow) || 5)
-    const recent = (state.recentMessages || []).slice(-window)
-    // 统计窗口内（不含当前消息）发过相同文本的不同用户数
-    const distinctUsers = new Set()
-    for (const m of recent) {
-      if (m.text === text && String(m.userId) !== currentUserId) {
-        distinctUsers.add(String(m.userId))
-      }
-    }
-    // 当前用户也算一个独立"复读源"
-    if (currentUserId) distinctUsers.add(currentUserId)
-    // 排除 bot 自己（理论上不该在 recentMessages 里）
-    if (botId) distinctUsers.delete(String(botId))
-
-    const minCount = Math.max(2, Number(smartCfg.repeatMinCount) || 3)
-    if (distinctUsers.size < minCount) return null
-
-    // 已确认是复读潮（≥minCount 个不同用户在重复），下面任何失败都打日志方便排查
-    const groupId = e?.group_id
-    const textPreview = text.length > 20 ? text.slice(0, 20) + '...' : text
-
-    // 冷却：避免同一波内反复跟
-    const cooldownMs = Number(smartCfg.repeatJoinCooldownMs) || 180000
-    const sinceLast = Date.now() - (state.lastRepeatJoinAt || 0)
-    if (sinceLast < cooldownMs) {
-      const remainSec = Math.ceil((cooldownMs - sinceLast) / 1000)
-      logger.info(`[Repeat] group=${groupId} 检测到复读 text="${textPreview}" users=${distinctUsers.size} 但冷却中(剩余${remainSec}s)`)
-      return null
-    }
-
-    // 通过概率筛选
-    const prob = Number(smartCfg.repeatJoinProbability)
-    const finalProb = Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : 0.6
-    if (Math.random() > finalProb) {
-      logger.info(`[Repeat] group=${groupId} 检测到复读 text="${textPreview}" users=${distinctUsers.size} 但概率未命中(prob=${finalProb})`)
-      return null
-    }
-
-    logger.info(`[Repeat] group=${groupId} 检测到复读 text="${textPreview}" users=${distinctUsers.size} 准备参与`)
-    return text
+    return detectGroupRepeat(this, e, state)
   }
 
   // ==================== smart 模式：Timing Gate 触发 ====================
@@ -1963,213 +1802,75 @@ export class ExamplePlugin extends plugin {
   }
 
   getTaskStatusCacheKey(groupId, messageId) {
-    return `${groupId}:${messageId}`
+    return getTaskStatusCacheKey(this, groupId, messageId)
   }
 
   getTaskStatusRedisKey(groupId, messageId) {
-    return `${this.TASK_STATUS_PREFIX}${groupId}:${messageId}`
+    return getTaskStatusRedisKey(this, groupId, messageId)
   }
 
   getActiveToolTaskCacheKey(groupId, userId, toolName) {
-    return `${groupId}:${userId}:${toolName}`
+    return getActiveToolTaskCacheKey(this, groupId, userId, toolName)
   }
 
   getActiveToolTaskRedisKey(groupId, userId, toolName) {
-    return `${this.ACTIVE_TOOL_TASK_PREFIX}${groupId}:${userId}:${toolName}`
+    return getActiveToolTaskRedisKey(this, groupId, userId, toolName)
   }
 
   getTaskStatusTtlSeconds() {
-    return Math.max(60, Math.floor((this.config.groupChatMemoryDays || 1) * 24 * 60 * 60))
+    return getTaskStatusTtlSeconds(this)
   }
 
-  async saveTaskStatus({ groupId, userId, messageId, status, toolName = "", error = "" }) {
-    if (!groupId || !messageId || !status) return
-
-    const record = {
-      groupId: String(groupId),
-      userId: userId ? String(userId) : "",
-      messageId: String(messageId),
-      status,
-      toolName,
-      error: error ? String(error).slice(0, 120) : "",
-      updatedAt: Date.now()
-    }
-    const cacheKey = this.getTaskStatusCacheKey(groupId, messageId)
-    taskStatusCache.set(cacheKey, record)
-
-    await settleTaskStatusRedis(
-      redis.set(this.getTaskStatusRedisKey(groupId, messageId), JSON.stringify(record), {
-        EX: this.getTaskStatusTtlSeconds()
-      }),
-      undefined,
-      "写入"
-    )
+  async saveTaskStatus(payload) {
+    return await saveTaskStatus(this, payload)
   }
 
   async getTaskStatus(groupId, messageId) {
-    if (!groupId || !messageId) return null
-
-    const cacheKey = this.getTaskStatusCacheKey(groupId, messageId)
-    if (taskStatusCache.has(cacheKey)) return taskStatusCache.get(cacheKey)
-
-    const raw = await settleTaskStatusRedis(
-      redis.get(this.getTaskStatusRedisKey(groupId, messageId)),
-      null,
-      "读取"
-    )
-    if (!raw) return null
-    try {
-      const record = JSON.parse(raw)
-      taskStatusCache.set(cacheKey, record)
-      return record
-    } catch (error) {
-      logger.warn(`[任务状态] 解析失败：${error.message}`)
-      return null
-    }
+    return await getTaskStatus(this, groupId, messageId)
   }
 
   async clearTaskStatus(groupId, messageId) {
-    if (!groupId || !messageId) return
-    taskStatusCache.delete(this.getTaskStatusCacheKey(groupId, messageId))
-    await settleTaskStatusRedis(
-      redis.del(this.getTaskStatusRedisKey(groupId, messageId)),
-      undefined,
-      "清理"
-    )
+    return await clearTaskStatus(this, groupId, messageId)
   }
 
-  async updateUserToolTaskStatus({ groupId, userId, messageId = "", toolName, status, requesterName = "", detail = "", scopeKey = "" }) {
-    if (!groupId || !userId || !toolName || !status) return
-
-    const key = this.getActiveToolTaskCacheKey(groupId, userId, toolName)
-    const previous = activeUserToolTaskCache.get(key) || {}
-    const record = {
-      ...previous,
-      groupId: String(groupId),
-      userId: String(userId),
-      messageId: messageId ? String(messageId) : String(previous.messageId || ""),
-      toolName,
-      status,
-      requesterName: requesterName || previous.requesterName || "",
-      detail: detail ? String(detail).slice(0, 160) : "",
-      scopeKey: scopeKey || previous.scopeKey || "",
-      startedAt: previous.startedAt || Date.now(),
-      updatedAt: Date.now()
-    }
-    activeUserToolTaskCache.set(key, record)
-
-    try {
-      await redis.set(this.getActiveToolTaskRedisKey(groupId, userId, toolName), JSON.stringify(record), {
-        EX: this.getTaskStatusTtlSeconds()
-      })
-    } catch (error) {
-      logger.warn(`[活跃任务] 写入失败：${error.message}`)
-    }
+  async updateUserToolTaskStatus(payload) {
+    return await updateUserToolTaskStatus(this, payload)
   }
 
   async getUserToolTaskStatus(groupId, userId, toolName) {
-    if (!groupId || !userId || !toolName) return null
-
-    const key = this.getActiveToolTaskCacheKey(groupId, userId, toolName)
-    if (activeUserToolTaskCache.has(key)) return activeUserToolTaskCache.get(key)
-
-    try {
-      const raw = await redis.get(this.getActiveToolTaskRedisKey(groupId, userId, toolName))
-      if (!raw) return null
-      const record = JSON.parse(raw)
-      activeUserToolTaskCache.set(key, record)
-      return record
-    } catch (error) {
-      logger.warn(`[活跃任务] 读取失败：${error.message}`)
-      return null
-    }
+    return await getUserToolTaskStatus(this, groupId, userId, toolName)
   }
 
-  async clearUserToolTaskStatus({ groupId, userId, toolName }) {
-    if (!groupId || !userId || !toolName) return
-    const key = this.getActiveToolTaskCacheKey(groupId, userId, toolName)
-    activeUserToolTaskCache.delete(key)
-
-    try {
-      await redis.del(this.getActiveToolTaskRedisKey(groupId, userId, toolName))
-    } catch (error) {
-      logger.warn(`[活跃任务] 清理失败：${error.message}`)
-    }
+  async clearUserToolTaskStatus(payload) {
+    return await clearUserToolTaskStatus(this, payload)
   }
 
   getRuntimeToolTaskStatus(groupId, userId, toolName) {
-    const runtime = activeDedupeToolRuns.get(this.getToolRunKey(groupId, userId, toolName))
-    if (!runtime) return null
-    return {
-      ...runtime,
-      groupId: String(groupId),
-      userId: String(userId),
-      toolName,
-      status: "running",
-      updatedAt: Date.now()
-    }
+    return getRuntimeToolTaskStatus(this, groupId, userId, toolName)
   }
 
   async getCurrentUserToolTaskStatus(groupId, userId, toolName) {
-    const runtime = this.getRuntimeToolTaskStatus(groupId, userId, toolName)
-    if (runtime) return runtime
-    const stored = await this.getUserToolTaskStatus(groupId, userId, toolName)
-    if (!stored || !["queued", "running"].includes(stored.status)) return null
-    return stored
+    return await getCurrentUserToolTaskStatus(this, groupId, userId, toolName)
   }
 
   buildDrawTaskStatusReply(status) {
-    const queued = status?.status === "queued"
-    const isEdit = status?.toolName === "googleImageEditTool"
-    if (isEdit) {
-      return "那张图还在改，结果还没回来。出来了我就直接发。"
-    }
-    return queued
-      ? "这张已经在队列里，前面还有任务。轮到它就会继续画，成图会直接发。"
-      : "这张还在生成，结果还没回来。成图会直接发。"
+    return buildDrawTaskStatusReply(this, status)
   }
 
   buildReplySegment(messageId) {
-    if (!messageId) return null
-    if (globalThis.segment?.reply) return globalThis.segment.reply(messageId)
-    if (typeof segment !== "undefined" && segment?.reply) return segment.reply(messageId)
-    return { type: "reply", id: String(messageId), data: { id: String(messageId) } }
+    return buildReplySegment(this, messageId)
   }
 
   buildTaskStatusReplyMessage(status, text) {
-    const replySegment = this.buildReplySegment(status?.messageId)
-    return replySegment ? [replySegment, text] : text
+    return buildTaskStatusReplyMessage(this, status, text)
   }
 
   async handleActiveDrawStatusQuestion(e, text = "") {
-    if (!isDrawTaskStatusInquiry(text)) return false
-    const statuses = await Promise.all([
-      this.getCurrentUserToolTaskStatus(e.group_id, e.user_id, "bananaTool"),
-      this.getCurrentUserToolTaskStatus(e.group_id, e.user_id, "googleImageEditTool")
-    ])
-    const status = statuses.find(Boolean)
-    if (!status) return false
-
-    logger.info(`[活跃任务] 命中图片任务进度追问 group=${e.group_id} user=${e.user_id} tool=${status.toolName} status=${status.status}`)
-    await this.sendObservedReply(e, this.buildTaskStatusReplyMessage(status, this.buildDrawTaskStatusReply(status)))
-    return true
+    return await handleActiveDrawStatusQuestion(this, e, text)
   }
 
   formatTaskStatusForPrompt(status) {
-    if (!status?.status) return ""
-    if (status.status === "processing") {
-      return "[历史处理标记: 这条历史消息已进入处理流程，禁止把它当作当前新任务重复处理]"
-    }
-    if (status.status === "tool_running") {
-      return "[历史处理标记: 这条历史消息仍在后台处理，禁止重复处理；不要在回复中提到后台状态]"
-    }
-    if (status.status === "tool_success") {
-      return "[历史处理标记: 这条历史消息已经处理完，禁止重复处理]"
-    }
-    if (status.status === "tool_failed") {
-      return "[历史处理标记: 这条历史消息此前没有产生可用输出。除非当前用户明确要求重试，否则只把它当普通历史；不要提到后台、工具、模型、接口、报错或失败等内部状态]"
-    }
-    return ""
+    return formatTaskStatusForPrompt(this, status)
   }
 
   getToolRunKey(groupId, userId, toolName) {
@@ -2526,9 +2227,7 @@ export class ExamplePlugin extends plugin {
   }
 
   formatTime() {
-    const now = new Date()
-    const pad = n => String(n).padStart(2, "0")
-    return `[${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}]`
+    return formatTime(this)
   }
 
   async collectForwardPromptLines(group, forwardId, state = {}) {
@@ -2601,167 +2300,7 @@ export class ExamplePlugin extends plugin {
   }
 
   async buildMessageContent(sender, msg, images, atQq = [], group, e = null) {
-    const senderRole = roleMap[sender.role] || "member"
-    const messageId = e?.message_id ? `[消息ID:${e.message_id}]` : ''
-    let senderMember = sender
-    if (group && sender?.user_id) {
-      try {
-        const memberMap = await group.getMemberMap()
-        senderMember = memberMap.get(Number(sender.user_id)) || sender
-      } catch {}
-    }
-    const senderInfo = `${formatMemberDisplayName(senderMember, sender.card || sender.nickname)}(qq号: ${sender.user_id})[群身份: ${senderRole}]${messageId}`
-
-    let atContent = ""
-    if (atQq.length > 0 && group) {
-      const memberMap = await group.getMemberMap()
-      const atUsers = atQq.map(qq => {
-        const info = memberMap.get(Number(qq))
-        if (!info) return `@未知用户(${qq})`
-        return `@${formatMemberDisplayName(info)}`
-      })
-      atContent = `${atUsers.join(" ")} `
-    }
-
-    let quoteContent = ""
-    if (e?.getReply) {
-      try {
-        const reply = e?._groupContextAssets?.reply || await e.getReply()
-        if (reply) {
-          const quotedSender = reply.sender
-          let quotedMsg = ""
-          let forwardPromptText = ""
-          if (reply.message && Array.isArray(reply.message)) {
-            quotedMsg = reply.message
-              .filter(m => m.type === "text")
-              .map(m => m.text)
-              .join("")
-              .trim()
-          } else if (typeof reply.raw_message === "string") {
-            quotedMsg = reply.raw_message
-          }
-
-          // 提取被引用消息中的转发记录内容，递归展开嵌套合并转发。
-          let forwardContent = ""
-          forwardPromptText = e?._groupContextAssets?.quotedForwardText ||
-            await this.resolveForwardPromptFromSegments(reply.message || [], e?.group || group)
-          if (forwardPromptText) {
-            forwardContent = `[转发记录内容:\n${forwardPromptText}\n]`
-          }
-
-          const quotedImages = reply.message?.filter(m => m.type === "image") || []
-          const hasQuotedImage = quotedImages.length > 0
-
-          // 视频 / 语音 / 文件 segment（之前没处理，导致引用视频时 LLM 看到的描述只是"一条消息"，
-          // 看不到视频链接也就没法调 videoAnalysisTool 分析）
-          const quotedVideos = reply.message?.filter(m => m.type === "video") || []
-          const videoUrls = quotedVideos
-            .map(v => v?.url || v?.file_url || v?.data?.url || v?.data?.file_url || v?.file || v?.data?.file)
-            .filter(Boolean)
-          const hasQuotedVideo = quotedVideos.length > 0
-
-          const quotedRecords = reply.message?.filter(m => m.type === "record") || []
-          const recordUrls = quotedRecords
-            .map(r => r?.url || r?.file_url || r?.data?.url || r?.data?.file_url || r?.file || r?.data?.file)
-            .filter(Boolean)
-          const hasQuotedRecord = quotedRecords.length > 0
-
-          const quotedFiles = reply.message?.filter(m => m.type === "file") || []
-          const fileNames = quotedFiles
-            .map(f => f?.name || f?.data?.name || f?.file || f?.data?.file)
-            .filter(Boolean)
-          const hasQuotedFile = quotedFiles.length > 0
-
-          if (quotedSender) {
-            let quotedNickname = quotedSender.nickname || quotedSender.card || "未知用户"
-
-            if (group) {
-              try {
-                const memberMap = await group.getMemberMap()
-                const quotedMemberInfo = memberMap.get(Number(quotedSender.user_id))
-                if (quotedMemberInfo) {
-                  quotedNickname = formatMemberDisplayName(quotedMemberInfo, quotedNickname)
-                }
-              } catch (err) {
-              }
-            }
-
-            const quotedMessageId = reply.message_id ? `(消息ID:${reply.message_id})` : ''
-
-            const parts = []
-            if (quotedMsg) parts.push(`"${quotedMsg}"`)
-            if (forwardContent) parts.push(forwardContent)
-            if (hasQuotedImage) parts.push(`${quotedImages.length}张图片`)
-            if (hasQuotedVideo) {
-              const urlText = videoUrls.length ? `(链接: ${videoUrls.join(", ")})` : ""
-              parts.push(`一段视频${urlText}`)
-            }
-            if (hasQuotedRecord) {
-              const urlText = recordUrls.length ? `(链接: ${recordUrls.join(", ")})` : ""
-              parts.push(`一段语音${urlText}`)
-            }
-            if (hasQuotedFile) {
-              const fileText = fileNames.length ? `(文件名: ${fileNames.join(", ")})` : ""
-              parts.push(`一个文件${fileText}`)
-            }
-            const quotedDescription = parts.length > 0 ? parts.join("，以及") : "一条消息"
-
-            quoteContent = `[回复 ${quotedNickname}${quotedMessageId}的消息: ${quotedDescription}] `
-            if (e) {
-              const promptParts = []
-              if (quotedMsg) promptParts.push(quotedMsg)
-              if (forwardPromptText) promptParts.push(forwardPromptText)
-              e._quotedPromptContext = {
-                senderName: quotedNickname,
-                messageId: reply.message_id ? String(reply.message_id) : "",
-                text: compactDrawPromptText(promptParts.join("\n"), 2600),
-                mediaSummary: [
-                  hasQuotedImage ? `${quotedImages.length}张图片` : "",
-                  hasQuotedVideo ? "一段视频" : "",
-                  hasQuotedRecord ? "一段语音" : "",
-                  hasQuotedFile ? `文件${fileNames.length ? `: ${fileNames.join(", ")}` : ""}` : ""
-                ].filter(Boolean).join("，")
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("获取引用消息失败:", error)
-      }
-    }
-
-    const content = []
-    if (msg) {
-      let fullMsg = msg
-      if (e?.message && group && atQq.length > 0) {
-        try {
-          const memberMap = await group.getMemberMap()
-          fullMsg = e.message.map(m => {
-            if (m.type === 'text') return m.text
-            const mentionedUserId = m.type === 'at' ? getMentionTargetId(m) : null
-            if (mentionedUserId && String(mentionedUserId) !== String(Bot.uin)) {
-              const info = memberMap.get(Number(mentionedUserId))
-              return `@${info ? formatMemberDisplayName(info) : mentionedUserId}`
-            }
-            return ''
-          }).join('').replace(/^#tool\s*/, '').trim()
-        } catch {}
-      }
-      content.push(`在群里说: ${fullMsg}`)
-    }
-    const currentForwardPromptText = e?._groupContextAssets?.currentForwardText ||
-      await this.resolveForwardPromptFromSegments(e?.message || [], group)
-    if (currentForwardPromptText) {
-      content.push(`转发了合并聊天记录:\n${currentForwardPromptText}`)
-    }
-    if (images?.length) {
-      content.push(`发送了${images.length === 1 ? "一张" : images.length + " 张"}图片${images.map(img => `\n![图片](${img})`).join("")}`)
-    }
-    if (e?._groupContextImagePrompt) {
-      content.push(e._groupContextImagePrompt)
-    }
-
-    return `${this.formatTime()} ${senderInfo}: ${quoteContent}${atContent}${content.join("，")}`
+    return await buildMessageContent(this, sender, msg, images, atQq, group, e)
   }
 
   checkTriggers(e) {
@@ -2812,383 +2351,39 @@ export class ExamplePlugin extends plugin {
    * @param {Array} chatHistory - 对话历史数组 [{role: 'bot'|'user', content: '...'}]
    */
   async isUserTalkingToBot(userMessage, chatHistory = []) {
-    try {
-      const botName = Bot.nickname || '机器人'
-
-      // 构建对话历史文本
-      const historyText = chatHistory.length > 0
-        ? chatHistory.map(h => `[${h.role === 'bot' ? '机器人' : '用户'}] ${h.content}`).join('\n')
-        : '(无历史记录)'
-
-      const response = await fetch(this.resolveChatCompletionUrl(this.config.trackAiConfig.trackAiUrl), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.trackAiConfig.trackAiApikey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: this.config.trackAiConfig.trackAiModel,
-          messages: [
-            {
-              role: "system",
-              content: `你是QQ群聊对话判断助手。机器人名字叫"${botName}"，QQ号${Bot.uin}。
-
-根据对话历史，判断用户新消息是否在继续跟机器人对话。
-
-【判断为 true】
-- 内容是对机器人上一条回复的回应或追问
-- 话题自然延续（机器人说"中午好"→用户问"吃什么"）
-- 针对机器人之前说的内容提问
-
-【判断为 false】
-- @了其他群成员
-- 明确叫其他人名字
-- 话题与之前对话完全无关
-- 明显是群里的日常闲聊/水群
-
-你只回复 true 或 false，不要输出其他内容。
-`
-            },
-            {
-              role: "user",
-              content: `【近期对话记录】\n${historyText}\n\n【用户新消息】\n${userMessage}\n\n这条新消息是在跟机器人说话吗？`
-            }
-          ]
-        })
-      })
-
-      if (!response.ok) return false // 请求失败时默认不触发
-
-      const data = await response.json()
-      const answer = data?.choices?.[0]?.message?.content?.toLowerCase()?.trim()
-      // logger.error(answer, historyText, userMessage, 8888)
-      return answer === 'true' || answer?.includes('true')
-    } catch (error) {
-      logger.error('[会话追踪] AI判断失败:', error)
-      return false // 出错时默认不触发
-    }
+    return await isUserTalkingToBot(this, userMessage, chatHistory)
   }
 
   /**
    * 加入批量判断队列
    */
   addToBatchJudgment(conversationKey, userMessage, chatHistory, e) {
-    return new Promise(resolve => {
-      pendingJudgments.push({ conversationKey, userMessage, chatHistory, e, resolve })
-
-      if (!batchTimer) {
-        const batchDelay = (this.config.batchJudgmentDelay || 3) * 1000
-        batchTimer = setTimeout(() => this.processBatchJudgments(), batchDelay)
-      }
-    })
+    return addToBatchJudgment(this, conversationKey, userMessage, chatHistory, e)
   }
 
   /**
    * 处理批量判断队列
    */
   async processBatchJudgments() {
-    batchTimer = null
-    if (pendingJudgments.length === 0) return
-
-    const batch = pendingJudgments.splice(0)
-
-    if (batch.length === 1) {
-      const result = await this.isUserTalkingToBot(batch[0].userMessage, batch[0].chatHistory)
-      batch[0].resolve(result)
-      return
-    }
-
-    try {
-      const results = await this.batchIsUserTalkingToBot(batch)
-      batch.forEach((item, i) => item.resolve(results[i] || false))
-    } catch (error) {
-      logger.error('[批量判断] 失败:', error)
-      batch.forEach(item => item.resolve(false))
-    }
+    return await processBatchJudgments(this)
   }
 
   /**
    * 批量判断多条消息是否在跟机器人对话
    */
   async batchIsUserTalkingToBot(batch) {
-    try {
-      const botName = Bot.nickname || '机器人'
-
-      // 为每条消息生成唯一标识
-      const batchWithIds = batch.map((item, i) => ({
-        ...item,
-        id: `MSG_${i + 1}_${item.e?.user_id || 'unknown'}`
-      }))
-
-      const messagesText = batchWithIds.map(item => {
-        const recentHistory = (item.chatHistory || []).slice(-3).map(h => `[${h.role === 'bot' ? '机器人' : '用户'}] ${h.content}`).join('\n')
-        const userName = item.e?.sender?.card || item.e?.sender?.nickname || '未知用户'
-        return `【${item.id}】用户: ${userName}(QQ:${item.e?.user_id})
-对话历史:
-${recentHistory || '(无)'}
-新消息: ${item.userMessage}
----`
-      }).join('\n\n')
-
-      const response = await fetch(this.resolveChatCompletionUrl(this.config.trackAiConfig.trackAiUrl), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.config.trackAiConfig.trackAiApikey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: this.config.trackAiConfig.trackAiModel,
-          messages: [
-            {
-              role: "system",
-              content: `你是QQ群聊对话判断助手。机器人名字叫"${botName}"。
-
-每条消息来自不同用户，有独立的对话历史，请分别独立判断。
-
-【判断为 true】
-- 内容是对机器人上一条回复的回应或追问
-- 话题自然延续
-- 针对机器人之前说的内容提问
-
-【判断为 false】
-- @了其他群成员
-- 明确叫其他人名字
-- 话题与之前对话完全无关
-- 明显是群里的日常闲聊/水群
-- 无对话历史且消息内容与机器人无关
-
-返回JSON对象，key为消息ID，value为判断结果。
-示例: {"MSG_1_12345": true, "MSG_2_67890": false}
-只返回JSON对象，不要其他内容。`
-            },
-            {
-              role: "user",
-              content: `分别判断以下${batchWithIds.length}条来自不同用户的消息:\n\n${messagesText}\n\n返回JSON对象:`
-            }
-          ]
-        })
-      })
-
-      if (!response.ok) {
-        logger.error('[批量判断] API请求失败')
-        return this.fallbackToSingleJudgment(batch)
-      }
-
-      const data = await response.json()
-      let content = data?.choices?.[0]?.message?.content?.trim() || '{}'
-
-      // 提取JSON对象
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        content = jsonMatch[0]
-      }
-
-      const resultsMap = JSON.parse(content)
-      logger.info(`[批量判断] ${batch.length}条消息，结果: ${JSON.stringify(resultsMap)}`)
-
-      // 按ID映射回结果数组
-      const results = batchWithIds.map(item => {
-        const result = resultsMap[item.id]
-        if (result === undefined) {
-          logger.warn(`[批量判断] 缺少ID ${item.id} 的结果，回退单独判断`)
-          return null // 标记需要单独判断
-        }
-        return result === true || result === 'true'
-      })
-
-      // 检查是否有需要单独判断的
-      const needsFallback = results.some(r => r === null)
-      if (needsFallback) {
-        return this.fallbackToSingleJudgment(batch, results)
-      }
-
-      return results
-    } catch (error) {
-      logger.error('[批量判断] 解析失败:', error)
-      return this.fallbackToSingleJudgment(batch)
-    }
+    return await batchIsUserTalkingToBot(this, batch)
   }
 
   /**
    * 回退到单独判断
    */
   async fallbackToSingleJudgment(batch, partialResults = null) {
-    logger.info(`[批量判断] 回退到单独判断，共${batch.length}条`)
-    const results = []
-    for (let i = 0; i < batch.length; i++) {
-      if (partialResults && partialResults[i] !== null) {
-        results.push(partialResults[i])
-      } else {
-        const result = await this.isUserTalkingToBot(batch[i].userMessage, batch[i].chatHistory)
-        results.push(result)
-      }
-    }
-    return results
+    return await fallbackToSingleJudgment(this, batch, partialResults)
   }
 
   async handleRandomReply(e) {
-    // 私聊分流:默认关闭,开启后白名单(留空=仅主人)用户可私聊,走同一主回合
-    if (e.message_type === "private") return await this.handlePrivateChat(e)
-    if (!this.config.enabled || !this.checkGroupPermission(e) || this.isCommand(e) || !e.group_id) {
-      return false
-    }
-
-    if (this.isUserBlacklisted(e)) {
-      logger.info(`[用户黑名单] group=${e.group_id} user=${e.user_id} msg="${summarizeForLog(e.msg || "")}"`)
-      return false
-    }
-
-    // 违禁词黑名单:命中即中断本群当前对话(含进行中回合),本条不进入任何下游
-    if (this.handleForbiddenWordHit(e)) return false
-    this.handleMemorySelfCorrection(e)
-    anchorEventConversation(e)
-
-    if (diceManager.isLogActive(e.group_id, this.config.diceSystem)) {
-      logger.info(`[骰娘log] group=${e.group_id} log开启中，跳过AI对话`)
-      return false
-    }
-
-    const messageTypes = e.message?.map(m => m.type) || []
-    if (this.config.excludeMessageTypes.some(t => messageTypes.includes(t))) return false
-
-    if (this.config.globalStyleLearning?.enabled !== false) {
-      try {
-        globalStyleLearnerManager.observeMessage(e, this.config.globalStyleLearning, this.config.embeddingAiConfig)
-        globalStyleLearnerManager.maybeAutoSummarize(
-          this.config.globalStyleLearning,
-          this.config.memoryAiConfig
-        ).catch(error => {
-          logger.warn(`[全局表达学习] 自动总结调度失败: ${error.message}`)
-        })
-      } catch (error) {
-        logger.warn(`[全局表达学习] 记录失败: ${error.message}`)
-      }
-    }
-
-    // 必须和全局风格观察一样放在本处理函数的第一个 await 之前。
-    // 否则高并发群消息会因异步检查返回顺序不同而重排，把 A-B-A 误学成 A 的连续两句。
-    if (this.config.expressionLearning?.enabled &&
-      String(e.user_id || '') !== String(e.bot?.uin || Bot.uin || '') &&
-      (e.msg || e.raw_message || Array.isArray(e.message))) {
-      this.expressionLearner.updateGroupExpressions(e.group_id, e.msg || e.raw_message || '', {
-        userId: e.user_id,
-        messageId: e.message_id,
-        at: Number(e.time) > 0 ? Number(e.time) * 1000 : Date.now(),
-        message: e.message
-      }).catch(() => {})
-    }
-
-    // 禁言检测：bot 在该群被禁言（个人/全员）时不触发任何回复，避免发送失败 + 表情/red 包等也无意义
-    if (await this.isMutedInGroup(e)) return false
-
-    // 磁链与视频卡片一样是独立媒体交付事件：不必点名，也不能交给闲聊 TimingGate 决定。
-    if (this.isAutomaticTorrentDownloadEvent(e)) {
-      logger.info(`[自动磁链下载] group=${e.group_id} user=${e.user_id} 已识别有效 BTIH 磁链`)
-      e._triggerContext = { mode: "auto_media" }
-      return await this.handleTool(e)
-    }
-
-    // 检测红包消息并随机触发抢红包（两种模式都生效）
-    const walletSeg = e.message?.find(m => m.type == 'wallet')
-    if (walletSeg && RED_BAG_CONFIG.enabled && toolConfigHasName(this.config.oneapi_tools, 'grabRedBagTool')) {
-      const wallet = walletSeg.data || walletSeg
-      const redBagType = getRedBagType(wallet)
-      const botId = e.bot?.uin || Bot.uin
-
-      // 专属红包：判断是否给机器人
-      if (redBagType.type === 'exclusive') {
-        if (!isExclusiveForUser(wallet, botId)) {
-          logger.info(`[自动抢红包] 专属红包不是给机器人的，跳过`)
-          return false
-        }
-        // 专属红包给机器人，直接触发
-        logger.info(`[自动抢红包] 检测到给机器人的专属红包，直接触发抢红包`)
-        e.forceGrabRedBag = true
-        e._triggerContext = { mode: "red_bag" }
-        return await this.handleTool(e)
-      }
-
-      const now = Date.now()
-      const lastGrabTime = redBagCooldowns.get(e.group_id) || 0
-
-      // 检查冷却时间
-      if (now - lastGrabTime >= RED_BAG_CONFIG.cooldownTime) {
-        // 随机概率
-        const probability = RED_BAG_CONFIG.minProbability +
-          Math.random() * (RED_BAG_CONFIG.maxProbability - RED_BAG_CONFIG.minProbability)
-
-        if (Math.random() < probability) {
-          redBagCooldowns.set(e.group_id, now)
-          logger.info(`[自动抢红包] 检测到${redBagType.name}，触发概率 ${(probability * 100).toFixed(1)}%，执行抢红包`)
-          e.forceGrabRedBag = true // 标记强制抢红包
-          e._triggerContext = { mode: "red_bag" }
-          return await this.handleTool(e)
-        } else {
-          logger.info(`[自动抢红包] 检测到${redBagType.name}，未命中概率 ${(probability * 100).toFixed(1)}%，跳过`)
-        }
-      }
-    }
-
-    // smart 模式分发
-    const triggerMode = String(this.config.chatTriggerMode || 'strict').toLowerCase()
-    if (triggerMode === 'smart') {
-      return await this.handleRandomReplySmart(e)
-    }
-
-    const hasTrigger = await this.checkTriggers(e)
-
-    // 会话追踪逻辑
-    const conversationKey = `${e.group_id}_${e.user_id}`
-    const activeConv = activeConversations.get(conversationKey)
-
-    // 如果明确触发（@或前缀），直接触发并更新追踪
-    if (hasTrigger) {
-      e._triggerContext = { mode: "strict_trigger" }
-      if (this.config.conversationTrackingEnabled) {
-        this.setTrackingWithTimer(conversationKey)
-      }
-      const scheduled = this.scheduleMergedDirectTrigger(e, async mergedEvent => {
-        await this.handleTool(mergedEvent)
-      }, 'strict_trigger')
-      if (scheduled === false) return false
-      return await this.handleTool(e)
-    }
-
-    // 在追踪期内，判断是否在继续对话
-    if (this.config.conversationTrackingEnabled && activeConv) {
-      // 节流检查
-      const throttleKey = conversationKey
-      const lastCallTime = trackingThrottle.get(throttleKey) || 0
-      const throttleInterval = (this.config.conversationTrackingThrottle || 3) * 1000
-
-      if (Date.now() - lastCallTime < throttleInterval) {
-        // 节流期内，直接返回不触发
-        return false
-      }
-
-      // 更新节流时间
-      trackingThrottle.set(throttleKey, Date.now())
-
-      // 构建完整格式的用户消息
-      const senderRole = roleMap[e.sender?.role] || "member"
-      const senderName = e.sender?.card || e.sender?.nickname || "未知用户"
-      const userMessageFormatted = `${this.formatTime()} ${senderName}(qq号: ${e.user_id})[群身份: ${senderRole}]: 在群里说: ${e.msg || ''}`
-
-      // 使用批量判断队列
-      const isTalking = await this.addToBatchJudgment(conversationKey, userMessageFormatted, activeConv.chatHistory || [], e)
-
-      if (isTalking) {
-        // 重置定时器
-        this.setTrackingWithTimer(conversationKey)
-        e._triggerContext = { mode: "conversation_tracking" }
-        return await this.handleTool(e)
-      }
-      // 判断不是在跟机器人对话，直接返回不触发
-      return false
-    }
-
-    // 未在追踪期内，不触发
-    return false
+    return await handleRandomReply(this, e)
   }
 
   async handleToolInner(e) {
@@ -3196,20 +2391,7 @@ ${recentHistory || '(无)'}
   }
 
   formatMessages(messages, e, currentUserContent = null) {
-    if (!messages?.length) return messages
-
-    const systemMsgs = messages.filter(m => m.role === "system")
-    const lastUser = messages[messages.length - 1]?.role === "user" ? [messages[messages.length - 1]] : []
-    const middle = messages
-      .slice(systemMsgs.length, messages.length - lastUser.length)
-      .filter(message => !String(message?.content || "").startsWith("【系统提示】"))
-    const historyContext = buildStructuredHistoryMessage(middle)
-
-    return [
-      ...systemMsgs,
-      historyContext,
-      ...lastUser
-    ].filter(Boolean)
+    return formatMessages(this, messages, e, currentUserContent)
   }
 
   /**

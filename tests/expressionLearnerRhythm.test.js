@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { readPluginSources } from "./helpers/pluginSources.js"
 import assert from 'node:assert/strict'
 import { ExpressionLearner, normalizeExpressionData } from '../domains/memory/ExpressionLearner.js'
 import { buildExpressionObservation, isLikelyEmojiPackSegment } from '../utils/expressionSequence.js'
@@ -136,10 +137,10 @@ test('injects learned rhythm while preserving default single-message boundary', 
 })
 
 test('production observes expression order before the first asynchronous group check', () => {
-  const source = fs.readFileSync(new URL('../apps/test.js', import.meta.url), 'utf8')
-  const handlerStart = source.indexOf('async handleRandomReply(e)')
-  const expressionCall = source.indexOf('this.expressionLearner.updateGroupExpressions', handlerStart)
-  const firstAwait = source.indexOf('await this.isMutedInGroup(e)', handlerStart)
+  const source = readPluginSources()
+  const handlerStart = source.indexOf('async function handleRandomReply(host, e)')
+  const expressionCall = source.indexOf('host.expressionLearner.updateGroupExpressions', handlerStart)
+  const firstAwait = source.indexOf('await host.isMutedInGroup(e)', handlerStart)
   assert.ok(handlerStart >= 0 && expressionCall > handlerStart)
   assert.ok(expressionCall < firstAwait, 'expression observation must preserve arrival order before the first await')
 })

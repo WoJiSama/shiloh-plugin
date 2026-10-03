@@ -1,4 +1,5 @@
 import test from "node:test"
+import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import path from "node:path"
@@ -88,6 +89,6 @@ test("expression learner exposes group emoji layout stats", () => {
   const src = fs.readFileSync(path.join(root, "domains/memory/ExpressionLearner.js"), "utf8")
   assert.ok(src.includes("async getGroupEmojiLayoutStats(groupId)"), "学习器提供群级表情布局统计")
   assert.ok(src.includes("emojiOnlyShare"), "统计含裸表情占比")
-  const testSrc = fs.readFileSync(path.join(root, "apps/test.js"), "utf8")
+  const testSrc = readPluginSources()
   assert.ok(testSrc.includes("getGroupEmojiLayoutStats?.(groupId)"), "主链路消费该统计")
 })
