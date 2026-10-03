@@ -3,6 +3,7 @@
 // 输入(e, state, ctx)与返回 {decision, reason, ...} 契约不变。
 // 注意力漂移等"何时说话"的新信号以后在信号采集段扩展。
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
+import { sideLLMCall } from "../../utils/sideLLM.js"
 import { hasBotTextAnchor, getReplySender, messageQuotesUser } from "../../utils/messageContext.js"
 import { getMentionTargetId, messageMentionsUser } from "../../utils/mentionTargets.js"
 import { computeAddresseeSignal } from "../../utils/addresseeSignals.js"
@@ -176,32 +177,23 @@ ${getGroupSocialPrompt(e?.group_id)}
 ${specialSignalsBlock}
 请输出 JSON 决策。`
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15000)
+    const result = await sideLLMCall({
+      url: useCfg.url,
+      apikey: useCfg.apikey,
+      model: useCfg.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.3,
+      timeoutMs: 15000
+    })
+    if (!result.ok) {
+      logger.warn(`[TimingGate] 请求失败 group=${e?.group_id || ''} ${result.error}`)
+      return { decision: 'no_action', reason: 'request_failed' }
+    }
+    const raw = result.content
     try {
-      const response = await fetch(useCfg.url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${useCfg.apikey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: useCfg.model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3
-        }),
-        signal: controller.signal
-      })
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '')
-        logger.warn(`[TimingGate] 请求失败 group=${e?.group_id || ''} status=${response.status} body=${errorText.slice(0, 240)}`)
-        return { decision: 'no_action', reason: `http_${response.status}` }
-      }
-      const data = await response.json()
-      const raw = data?.choices?.[0]?.message?.content?.trim() || ''
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
         logger.warn(`[TimingGate] 返回非JSON group=${e?.group_id || ''} raw=${raw.slice(0, 240)}`)
@@ -221,7 +213,5 @@ ${specialSignalsBlock}
     } catch (err) {
       logger.warn(`[TimingGate] 异常 group=${e?.group_id || ''}: ${err.message}`)
       return { decision: 'no_action', reason: `exception:${err.message}` }
-    } finally {
-      clearTimeout(timeoutId)
     }
 }

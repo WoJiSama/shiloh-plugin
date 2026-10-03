@@ -2,6 +2,7 @@
 // 借鉴 MaiBot/A-Memorix 的会话摘要思路,做薄:单一摘要、便宜模型、追加式更新。
 // 链路:归档写入钩子 → 内存缓冲攒批(防抖) → 合并旧摘要生成新摘要 → 落盘 JSON → 提示词层注入。
 import fs from "node:fs"
+import { sideLLMCall } from "../../utils/sideLLM.js"
 import path from "node:path"
 
 const CHAT_TIMEOUT_MS = 30000
@@ -167,33 +168,23 @@ export class MidtermSummaryManager {
       `请输出合并后的主线摘要,不超过 ${this.config.maxSummaryChars} 字。`
     ].join("\n")
     this.stats.llmCalls++
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS)
-    try {
-      const res = await fetch(ai.memoryAiUrl, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${ai.memoryAiApikey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: this.config.model || ai.memoryAiModel || "gpt-4o-mini",
-          messages: [
-            { role: "system", content: SUMMARY_SYSTEM_PROMPT },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.2,
-          max_tokens: Math.ceil(this.config.maxSummaryChars * 2)
-        }),
-        signal: controller.signal
-      })
-      if (!res.ok) throw new Error(`摘要模型请求失败: ${res.status}`)
-      const data = await res.json()
-      const content = String(data?.choices?.[0]?.message?.content || "").trim()
-      if (!content) throw new Error("摘要模型返回空")
-      return content.length > this.config.maxSummaryChars
-        ? content.slice(0, this.config.maxSummaryChars)
-        : content
-    } finally {
-      clearTimeout(timeout)
-    }
+    const result = await sideLLMCall({
+      url: ai.memoryAiUrl,
+      apikey: ai.memoryAiApikey,
+      model: this.config.model || ai.memoryAiModel || "gpt-4o-mini",
+      messages: [
+        { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.2,
+      maxTokens: Math.ceil(this.config.maxSummaryChars * 2),
+      timeoutMs: CHAT_TIMEOUT_MS
+    })
+    if (!result.ok) throw new Error(result.error)
+    const content = result.content
+    return content.length > this.config.maxSummaryChars
+      ? content.slice(0, this.config.maxSummaryChars)
+      : content
   }
 
   // ── 存取 ──

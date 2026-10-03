@@ -1,5 +1,6 @@
 // utils/memory/extractor.js
 import { ROUTES, clamp, compactText } from './constants.js'
+import { sideLLMCall } from "../../../utils/sideLLM.js"
 import { makeFact } from './entityModel.js'
 import { memStats } from './stats.js'
 
@@ -120,17 +121,19 @@ export class MemoryExtractor {
     const startedAt = Date.now()
     const boundedTimeoutMs = Math.max(500, Math.min(CHAT_TIMEOUT_MS, Number(timeoutMs) || CHAT_TIMEOUT_MS))
     try {
-      const res = await fetch(c.memoryAiUrl, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${c.memoryAiApikey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: c.memoryAiModel || 'gpt-4o-mini', messages, temperature: 0.2, max_tokens: maxTokens }),
-        signal: AbortSignal.timeout(boundedTimeoutMs)
+      const result = await sideLLMCall({
+        url: c.memoryAiUrl,
+        apikey: c.memoryAiApikey,
+        model: c.memoryAiModel || 'gpt-4o-mini',
+        messages,
+        temperature: 0.2,
+        maxTokens: maxTokens,
+        timeoutMs: boundedTimeoutMs
       })
-      if (!res.ok) throw new Error(`记忆 AI 请求失败：${res.status}`)
-      const data = await res.json()
+      if (!result.ok) throw new Error(result.error)
       memStats.inc('llm.extract.call')
       memStats.observe('llm.extract.ms', Date.now() - startedAt)
-      return data?.choices?.[0]?.message?.content?.trim() || '[]'
+      return result.content || '[]'
     } catch (e) {
       memStats.inc('llm.extract.fail')
       globalThis.logger?.warn?.(`[memory] extract LLM 调用失败：${e?.message || e}`)

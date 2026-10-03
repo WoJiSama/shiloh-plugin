@@ -124,7 +124,7 @@ import { applyFlatUpdates } from "../utils/configWriter.js"
 import { installMidtermMemoryRuntime, getMidtermMemoryManager } from "../domains/midtermMemory/MidtermSummaryManager.js"
 import { rollPersonaMood } from "../utils/personaMoods.js"
 import { noteInjectedChunks, detectAndPenalize } from "../utils/memorySelfCorrection.js"
-import { getSmartRuntimeState, deleteSmartRuntimeState, smartRuntimeGroupIds, smartRuntimeSize, hasSmartRuntimeState, registerGroupRuntimeProviders } from "../core/runtime/groupRuntime.js"
+import { getSmartRuntimeState, smartRuntimeGroupIds, smartRuntimeSize, hasSmartRuntimeState, registerGroupRuntimeProviders, registerRuntimeSweep, runRuntimeSweeps } from "../core/runtime/groupRuntime.js"
 import {
   mcpStatus,
   testMCPTool,
@@ -711,38 +711,59 @@ export class ExamplePlugin extends plugin {
    * 启动 smart 群状态的 TTL 扫描器（进程内单例）：每 1 小时扫一次，
    * 把 lastMsgAt 超过 activeChatTtlHours 的群从内存状态淘汰，连同 waitTimers 一并清掉。
    */
+  // 清扫调度器:每群各状态经 groupRuntime 注册自己的清扫回调,这里只做调度与日志
+  registerAuxRuntimeSweeps() {
+    // lastIncoming/连续打断孤儿清理(挂在 smart 清扫之后的兜底)
+    registerRuntimeSweep("auxCaches", ({ ttlHours } = {}) => {
+      const cutoff = Date.now() - Math.max(1, Number(ttlHours) || 24) * 3600 * 1000
+      let removed = 0
+      for (const [gid, ts] of lastIncomingMsgAt) {
+        if (!hasSmartRuntimeState(gid) && ts < cutoff) {
+          lastIncomingMsgAt.delete(gid)
+          consecutiveInterrupts.delete(gid)
+          removed += 1
+        }
+      }
+      return removed
+    })
+    // 禁言缓存独立 TTL(30 秒就过期,但冷群条目也别永留)
+    registerRuntimeSweep("mutedCache", () => {
+      const mutedCutoff = Date.now() - MUTED_CACHE_TTL_MS * 10
+      let removed = 0
+      for (const [gid, item] of mutedStatusCache) {
+        if (item.at < mutedCutoff) { mutedStatusCache.delete(gid); removed += 1 }
+      }
+      return removed
+    })
+    // smart 清扫时连带清 lastIncoming/打断/禁言(同群同命运)
+    registerRuntimeSweep("lastIncomingWithSmart", ({ ttlHours } = {}) => {
+      const cutoff = Date.now() - Math.max(1, Number(ttlHours) || 24) * 3600 * 1000
+      let removed = 0
+      for (const gid of smartRuntimeGroupIds()) {
+        const st = getSmartState(gid)
+        if ((st.lastMsgAt || 0) < cutoff) {
+          lastIncomingMsgAt.delete(gid)
+          consecutiveInterrupts.delete(gid)
+          mutedStatusCache.delete(gid)
+          removed += 1
+        }
+      }
+      return removed
+    })
+  }
+
   startActiveChatLruScanner() {
     if (activeChatLruTimer) return
+    this.registerAuxRuntimeSweeps()
     const intervalMs = 60 * 60 * 1000
     activeChatLruTimer = setInterval(() => {
       try {
         const ttlHours = Number(this.config?.smartTrigger?.activeChatTtlHours) || 24
-        const cutoff = Date.now() - ttlHours * 3600 * 1000
-        let removed = 0
-        for (const gid of smartRuntimeGroupIds()) {
-          const st = getSmartState(gid)
-          if ((st.lastMsgAt || 0) < cutoff) {
-            deleteSmartRuntimeState(gid)
-            lastIncomingMsgAt.delete(gid)
-            consecutiveInterrupts.delete(gid)
-            mutedStatusCache.delete(gid)
-            removed += 1
-          }
+        const { removed, results } = runRuntimeSweeps({ ttlHours, logger })
+        if (removed > 0) {
+          logger.info(`[ActiveChatLRU] 清扫 ${removed} 条(明细 ${JSON.stringify(results)}),当前活跃 ${smartRuntimeSize()}`)
         }
-        // 兜底：清掉孤儿条目（不应该出现，但防御性编程）
-        for (const [gid, ts] of lastIncomingMsgAt) {
-          if (!hasSmartRuntimeState(gid) && ts < cutoff) {
-            lastIncomingMsgAt.delete(gid)
-            consecutiveInterrupts.delete(gid)
-          }
-        }
-        // 禁言缓存独立 TTL（30 秒就过期了，但万一某个群冷下来缓存条目永远留着也不好）
-        const mutedCutoff = Date.now() - MUTED_CACHE_TTL_MS * 10
-        for (const [gid, item] of mutedStatusCache) {
-          if (item.at < mutedCutoff) mutedStatusCache.delete(gid)
-        }
-        if (removed > 0) logger.info(`[ActiveChatLRU] 淘汰 ${removed} 个 ${ttlHours}h 未活跃群，当前活跃 ${smartRuntimeSize()}`)
-        // 顺带清扫回合会话:异常回合未 clearSession 的条目按 TTL/容量淘汰,防随机 UUID 键无限累积
+        // 回合会话:异常回合未 clearSession 的条目按 TTL/容量淘汰
         const sweptSessions = this.sessionStore?.sweep() || 0
         if (sweptSessions > 0) logger.info(`[回合会话] 清扫 ${sweptSessions} 个过期/超量会话，当前 ${this.sessionStore.stats().sessions}`)
       } catch (err) {

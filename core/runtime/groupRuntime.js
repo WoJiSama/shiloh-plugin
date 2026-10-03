@@ -115,3 +115,51 @@ export function resetGroupRuntimeForTests() {
   }
   smartStatesByGroup.clear()
 }
+
+// ── 清扫生命周期:各状态自己注册清扫回调,调度器不再逐张 Map 硬编码 ──
+// 注册 fn 签名:({ ttlHours }) => removedCount
+const runtimeSweeps = new Map()
+
+export function registerRuntimeSweep(name, fn) {
+  if (typeof fn !== "function") return false
+  runtimeSweeps.set(String(name || ""), fn)
+  return true
+}
+
+export function unregisterRuntimeSweep(name) {
+  return runtimeSweeps.delete(String(name || ""))
+}
+
+export function listRuntimeSweeps() {
+  return [...runtimeSweeps.keys()]
+}
+
+export function runRuntimeSweeps({ ttlHours = 24, logger = globalThis.logger } = {}) {
+  const results = {}
+  let removed = 0
+  for (const [name, fn] of runtimeSweeps) {
+    try {
+      const count = Number(fn({ ttlHours })) || 0
+      results[name] = count
+      removed += count
+    } catch (error) {
+      results[name] = -1
+      logger?.warn?.(`[群运行时] 清扫 ${name} 失败: ${error?.message || error}`)
+    }
+  }
+  return { removed, results }
+}
+
+// 内建:smart 状态 TTL 清扫(超时群清定时器并删除)
+registerRuntimeSweep("smartStates", ({ ttlHours } = {}) => {
+  const cutoff = Date.now() - Math.max(1, Number(ttlHours) || 24) * 3600 * 1000
+  let removed = 0
+  for (const gid of [...smartStatesByGroup.keys()]) {
+    const state = smartStatesByGroup.get(gid)
+    if ((state?.lastMsgAt || 0) < cutoff) {
+      deleteSmartRuntimeState(gid)
+      removed += 1
+    }
+  }
+  return removed
+})

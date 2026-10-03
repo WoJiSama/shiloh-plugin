@@ -1,5 +1,6 @@
 // utils/memory/reflector.js
 import { authorityRank, clamp, compactText } from './constants.js'
+import { sideLLMCall } from "../../../utils/sideLLM.js"
 import { makeFact } from './entityModel.js'
 import { memStats } from './stats.js'
 
@@ -91,17 +92,19 @@ export class Reflector {
     const c = this.config.memoryAiConfig || {}
     const startedAt = Date.now()
     try {
-      const res = await fetch(c.memoryAiUrl, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${c.memoryAiApikey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: c.memoryAiModel || 'gpt-4o-mini', messages, temperature: 0.2, max_tokens: maxTokens }),
-        signal: AbortSignal.timeout(CHAT_TIMEOUT_MS)
+      const result = await sideLLMCall({
+        url: c.memoryAiUrl,
+        apikey: c.memoryAiApikey,
+        model: c.memoryAiModel || 'gpt-4o-mini',
+        messages,
+        temperature: 0.2,
+        maxTokens: maxTokens,
+        timeoutMs: CHAT_TIMEOUT_MS
       })
-      if (!res.ok) throw new Error(`记忆 AI 请求失败：${res.status}`)
-      const data = await res.json()
+      if (!result.ok) throw new Error(result.error)
       memStats.inc('llm.reflect.call')
       memStats.observe('llm.reflect.ms', Date.now() - startedAt)
-      return data?.choices?.[0]?.message?.content?.trim() || '[]'
+      return result.content || '[]'
     } catch (e) {
       memStats.inc('llm.reflect.fail')
       globalThis.logger?.warn?.(`[memory] reflect LLM 调用失败：${e?.message || e}`)
