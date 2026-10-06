@@ -1,3 +1,12 @@
+# 2026-10-03 P0+P1 架构收口（用户"p0p1都做"）
+- P0.1 tests/helpers/pluginSources.js:合同测试统一聚合读取(test.js+apps/lib/*),17 份测试迁移——此后方法搬家合同测试零改动;过程中 4 份测试本有同名本地函数,删除本地定义换 import。
+- P0.2 apps/lib/conversationUtils.js:消除 chatTurn→test.js 循环依赖——delay/limiter/工具暴露过滤簇(含 shouldExposeToolsForMessage/hasMediaNeedingTool/parseToolConfigEntry/toolConfigHasName 依赖链整体随迁)+红包配置。
+- P1.3 第三轮拆分(test.js 3943→约3150):strictConversation.js(handleRandomReply 主体+会话追踪+批量判断+复读参与,状态随迁)、taskStatus.js(18 方法+任务状态缓存/Redis 超时件)、messageFormatting.js(消息组装+历史格式化)。委托生成器踩对象解构参数坑(split(',') 炸开解构)——对象参数方法改整参透传 payload。
+- P1.4 utils/sideLLM.js:旁路小模型统一传输(超时 AbortSignal.any/鉴权/错误形状,不抛错返回 ok/content/error),TimingGate/中期记忆/记忆抽取/反思四处迁移;gate 15s 超时语义保留(request_failed→no_action)。emoji 侧两处因返回完整 JSON 供自定义解析,契约不同暂不迁。
+- P1.5 groupRuntime 清扫生命周期:registerRuntimeSweep/runRuntimeSweeps,smart 内建+插件注册 auxCaches/mutedCache/lastIncomingWithSmart,调度器只剩调度与日志,以后加状态不改 scanner。
+- 事故:部署实测抓出 messageFormatting 的 textPolicy 导入路径写错(./lib/→./),本地 dangling 测试测不出"路径错但语法对"的 import——**导入路径类错误只有真实部署能兜底**。修复后 0 加载错误、QQ 已连、服务器 26/26。
+- commits: 22a7b94(P0+P1.3)/d9e0a11(P1.4+P1.5)/ded7cf3(路径修复)。全量 1326/0。
+
 # 2026-09-30 私聊功能落地（用户引用"私聊为伪任务"的说明后指示"做"——把能力真正做出来）
 - 背景:此前核实 bot 纯群聊设计;用户决定补上私聊。设计原则:默认关、白名单制(留空=仅主人,防陌生人)、与群聊共用主回合。
 - apps/lib/privateChat.js:纯函数门禁(开关/白名单/每用户节流),入口与 chatTurn 双重校验(防 #tool 直入绕过);锅巴"基础设置"页新增私聊区。
