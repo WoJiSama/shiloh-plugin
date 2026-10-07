@@ -2,7 +2,7 @@
 // 从 apps/test.js 原样迁出(行为不变),this 依赖以 host 注入;
 // smartLockTokenCounter 随迁(全项目唯一使用点在此)。
 import { lastIncomingMsgAt } from "./splitState.js"
-import { getReplySender } from "../../utils/messageContext.js"
+import { getReplySender, summarizeForLog } from "../../utils/messageContext.js"
 import { collectMentionTargetIds } from "../../utils/mentionTargets.js"
 import { isAiConversationEnabled } from "../../utils/aiConversationGate.js"
 import { updateGroupTopic, updateGroupSocial, detectAttentionHook } from "../../utils/groupContextState.js"

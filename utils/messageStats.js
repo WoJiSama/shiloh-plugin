@@ -7,8 +7,20 @@
 //     send:{botId} / send:{botId}:ch:{channel} / send:{botId}:g:{groupId}
 //     fail:{botId} / fail:{botId}:{code}
 //   shiloh:stats:h:YYYYMMDDHH hash, TTL 8 天,仅 recv/send 总量(日内趋势)
+//
+// Redis 兼容性:TRSS-Yunzai 的 globalThis.redis 是受限包装层(仅保证 get/set/del/eval/scan),
+// 没有 hincrby/hgetall,因此所有写走 eval+Lua(与 redisJobStore 同款调用约定),
+// 读取在有 hgetall 时直用,否则回落 eval。
 
 const HOUR_TTL_SECONDS = 8 * 86400
+
+const BUMP_LUA = [
+  'redis.call("HINCRBY", KEYS[1], ARGV[1], 1)',
+  'if redis.call("HLEN", KEYS[1]) == 1 then redis.call("EXPIRE", KEYS[1], ARGV[2]) end',
+  'return 1'
+].join(" ")
+
+const HGETALL_LUA = 'local r = redis.call("HGETALL", KEYS[1]) local out = {} for i = 1, #r, 2 do out[#out + 1] = r[i] .. "=" .. r[i + 1] end return out'
 
 function pad2(value) {
   return String(value).padStart(2, "0")
@@ -34,28 +46,23 @@ export class MessageStatsEmitter {
   constructor({ redis = globalThis.redis, logger = globalThis.logger, enabled = true, retentionDays = 90 } = {}) {
     this.redis = redis || null
     this.logger = logger
-    this.enabled = enabled !== false && Boolean(this.redis)
+    this.enabled = enabled !== false && typeof this.redis?.eval === "function"
     this.retentionDays = Math.max(7, Math.floor(Number(retentionDays) || 90))
-    this._expireScheduled = new Set()
   }
 
-  // 批量 HINCRBY;同进程内每个桶只安排一次 EXPIRE
+  _evalBump(key, field, ttlSeconds) {
+    return this.redis.eval(BUMP_LUA, { keys: [key], arguments: [field, String(ttlSeconds)] })
+  }
+
+  // 整个方法体包在 try 里:构建与执行阶段的任何异常都不外泄
   async _bump(fields, { hourly = false } = {}) {
     if (!this.enabled || !fields.length) return
-    const day = statsDayKey()
-    const hour = statsHourKey()
-    const ops = []
-    const dayExpire = !this._expireScheduled.has(day)
-    if (dayExpire) this._expireScheduled.add(day)
-    const hourExpire = hourly && !this._expireScheduled.has(hour)
-    if (hourExpire) this._expireScheduled.add(hour)
-    for (const field of fields) {
-      ops.push(this.redis.hincrby(day, field, 1))
-      if (hourly) ops.push(this.redis.hincrby(hour, field, 1))
-    }
-    if (dayExpire) ops.push(this.redis.expire(day, this.retentionDays * 86400))
-    if (hourExpire) ops.push(this.redis.expire(hour, HOUR_TTL_SECONDS))
     try {
+      const ops = []
+      for (const field of fields) {
+        ops.push(this._evalBump(statsDayKey(), field, this.retentionDays * 86400))
+        if (hourly) ops.push(this._evalBump(statsHourKey(), field, HOUR_TTL_SECONDS))
+      }
       await Promise.all(ops)
     } catch (error) {
       this.logger?.warn?.(`[MessageStats] 写入失败(忽略): ${error?.message || error}`)
@@ -110,14 +117,27 @@ export function createStatsEmitterFromSettings({ redis = globalThis.redis, logge
   })
 }
 
+/** 读取天桶原始 hash;受限 redis 上回落 eval(HGETALL) */
+async function readHash(redis, key) {
+  if (typeof redis.hgetall === "function") return await redis.hgetall(key)
+  if (typeof redis.eval !== "function") return {}
+  const flat = await redis.eval(HGETALL_LUA, { keys: [key], arguments: [] })
+  const hash = {}
+  for (const entry of Array.isArray(flat) ? flat : []) {
+    const index = String(entry).indexOf("=")
+    if (index > 0) hash[String(entry).slice(0, index)] = String(entry).slice(index + 1)
+  }
+  return hash
+}
+
 /**
  * 汇总某天的统计(控制台/哨兵读取用)。
  * 返回 { day, bots: { [botId]: { recv, send, fail, failCodes, groups, channels } } }
  */
 export async function readDailyStats(redis, { day = "" } = {}) {
-  if (!redis?.hgetall) return { day: String(day || ""), bots: {} }
+  if (!redis) return { day: String(day || ""), bots: {} }
   const dayKey = day ? `shiloh:stats:d:${String(day).replace(/[^0-9]/g, "")}` : statsDayKey()
-  const raw = await redis.hgetall(dayKey)
+  const raw = await readHash(redis, dayKey)
   const result = { day: dayKey.split(":").pop(), bots: {} }
   const ensureBot = botId => (result.bots[botId] ||= { recv: 0, send: 0, fail: 0, failCodes: {}, groups: {}, channels: {} })
   for (const [field, count] of Object.entries(raw || {})) {

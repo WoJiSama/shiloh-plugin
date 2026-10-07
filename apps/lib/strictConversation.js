@@ -5,7 +5,7 @@ import { diceManager } from "../../domains/dice/DiceManager.js"
 import { globalStyleLearnerManager } from "../../domains/memory/GlobalStyleLearnerManager.js"
 import { isAiConversationEnabled } from "../../utils/aiConversationGate.js"
 import { anchorEventConversation } from "../../utils/forbiddenWordGuard.js"
-import { ROLE_MAP as roleMap } from "../../utils/messageContext.js"
+import { ROLE_MAP as roleMap, summarizeForLog } from "../../utils/messageContext.js"
 import { getRedBagType, isExclusiveForUser } from "../../utils/redBagUtils.js"
 import { toolConfigHasName } from "./conversationUtils.js"
 
