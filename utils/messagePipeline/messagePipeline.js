@@ -73,13 +73,15 @@ export class MessagePipeline {
     enrichDouyin = enrichDouyinMessageSegments,
     enrichYoutube = enrichYoutubeMessageSegments,
     enrichPixiv = enrichPixivMessageSegments,
-    resolveForwardContext = null
+    resolveForwardContext = null,
+    stats = null
   } = {}) {
     this.store = store
     this.recentManager = recentManager
     this.archiveManager = archiveManager
     this.mediaOutbox = mediaOutbox
     this.emojiCollector = emojiCollector
+    this.stats = stats
     this.logger = logger
     this.queue = queue
     this.semaphore = new AsyncSemaphore(concurrency)
@@ -127,6 +129,13 @@ export class MessagePipeline {
     this.capture(envelope).catch(error => {
       this.logger?.warn?.(`[MessagePipeline] 捕获持久化失败 event=${envelope.eventId}: ${cleanError(error)}`)
     })
+    if (this.stats) {
+      try {
+        this.stats.recordReceive(envelope)
+      } catch {
+        // 统计 fail-open,绝不影响事件捕获
+      }
+    }
     return envelope.eventId
   }
 

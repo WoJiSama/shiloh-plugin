@@ -11,6 +11,11 @@ pluginSettings:
     recoverDelayMs: 30000
     # 回合记录与回复幂等标记的 Redis TTL（秒）
     ttlSeconds: 600
+  # 统计埋点:收/发/失败计数入 Redis(shiloh:stats:*),控制台统计页与封号哨兵的数据源
+  stats:
+    enabled: true
+    # 天桶保留天数（小时桶固定 8 天）
+    retentionDays: 90
   triggerPrefixes:
     - 哈基米
   excludeMessageTypes:

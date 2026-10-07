@@ -6,6 +6,7 @@ import { MediaOutbox } from "./mediaOutbox.js"
 import { MediaArtifactStore } from "./mediaArtifactStore.js"
 import { MessagePipeline } from "./messagePipeline.js"
 import { getMissingRedisJobCapabilities, RedisJobStore } from "./redisJobStore.js"
+import { createStatsEmitterFromSettings } from "../messageStats.js"
 import { BilibiliAuthManager } from "../BilibiliAuthManager.js"
 import { collectForwardContext, extractForwardIdsFromSegments } from "../groupContextResolver.js"
 
@@ -124,7 +125,8 @@ export function createMessagePipelineRuntime({
     eventTtlSeconds: config.eventTtlMinutes * 60,
     deliveryTtlSeconds: config.deliveryTtlHours * 60 * 60
   })
-  const deliveryGateway = gateway || new DeliveryGateway({ botRoot: () => globalThis.Bot || bot, logger })
+  const stats = createStatsEmitterFromSettings({ redis, logger, settings: pluginSettings })
+  const deliveryGateway = gateway || new DeliveryGateway({ botRoot: () => globalThis.Bot || bot, logger, stats })
   const artifactStore = new MediaArtifactStore({
     ttlMs: config.mediaArtifactTtlSeconds * 1000,
     maxEntries: config.mediaArtifactMaxEntries,
@@ -168,9 +170,10 @@ export function createMessagePipelineRuntime({
     retryBaseMs: config.retryBaseSeconds * 1000,
     leaseMs: config.eventLeaseSeconds * 1000,
     concurrency: config.eventConcurrency,
-    resolveForwardContext: envelope => resolvePipelineForwardContext(envelope, bot)
+    resolveForwardContext: envelope => resolvePipelineForwardContext(envelope, bot),
+    stats
   })
-  return { config, pipeline, mediaOutbox, store: jobStore, gateway: deliveryGateway, artifactStore }
+  return { config, pipeline, mediaOutbox, store: jobStore, gateway: deliveryGateway, artifactStore, stats }
 }
 
 export function installMessagePipeline({
@@ -188,7 +191,7 @@ export function installMessagePipeline({
 
   const config = normalizeMessagePipelineConfig(pluginSettings.messagePipeline)
   if (!config.enabled) {
-    const runtime = { config, pipeline: null, mediaOutbox: null, store: null, gateway: null }
+    const runtime = { config, pipeline: null, mediaOutbox: null, store: null, gateway: null, stats: null }
     logger?.warn?.("[MessagePipeline] 已在配置中关闭，消息归档和媒体自动搬运不会运行")
     globalThis[RUNTIME_KEY] = runtime
     return runtime

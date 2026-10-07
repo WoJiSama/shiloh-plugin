@@ -194,9 +194,10 @@ async function withForwardMediaTimeout(root, task) {
 }
 
 export class DeliveryGateway {
-  constructor({ botRoot = () => globalThis.Bot, logger = globalThis.logger } = {}) {
+  constructor({ botRoot = () => globalThis.Bot, logger = globalThis.logger, stats = null } = {}) {
     this.botRoot = botRoot
     this.logger = logger
+    this.stats = stats
   }
 
   resolveBot(botId) {
@@ -211,6 +212,7 @@ export class DeliveryGateway {
     const bot = this.resolveBot(botId)
     if (typeof bot?.sendApi !== "function") {
       logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: `missing_bot:${botId || "unknown"}` })
+      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: `missing_bot:${botId || "unknown"}` })
       throw new DeliveryError(`Bot ${botId || "unknown"} 当前没有可用的 OneBot sendApi`)
     }
     let result
@@ -221,6 +223,7 @@ export class DeliveryGateway {
       }))
     } catch (error) {
       logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error })
+      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: "send_api_error" })
       throw new DeliveryError(error.message || "OneBot 调用异常", {
         retryable: false,
         uncertain: true
@@ -228,6 +231,7 @@ export class DeliveryGateway {
     }
     if (!result || typeof result !== "object" || result.retcode === undefined || result.retcode === null) {
       logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: "missing_receipt" })
+      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: "missing_receipt" })
       throw new DeliveryError("OneBot 未返回可验证的发送回执", {
         retryable: false,
         uncertain: true
@@ -236,6 +240,7 @@ export class DeliveryGateway {
     const retcode = Number(result.retcode)
     if (!Number.isFinite(retcode)) {
       logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: `invalid_retcode:${result.retcode}` })
+      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: "invalid_retcode" })
       throw new DeliveryError(`OneBot 返回了非法 retcode: ${String(result.retcode).slice(0, 50)}`, {
         retryable: false,
         uncertain: true
@@ -243,6 +248,7 @@ export class DeliveryGateway {
     }
     if (retcode !== 0) {
       logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: result?.wording || result?.msg || `retcode=${retcode}` })
+      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: `retcode:${retcode}` })
       throw new DeliveryError(result?.wording || result?.msg || `OneBot retcode=${retcode}`, { retcode })
     }
     const receipt = compactReceipt(result)
@@ -253,6 +259,7 @@ export class DeliveryGateway {
       messageId: receipt.messageId,
       parts: Array.isArray(nodes) ? nodes.length : 1
     })
+    this.stats?.recordSend({ botId, groupId, channel: "media_forward" })
     return receipt
   }
 }

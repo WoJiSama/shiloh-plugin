@@ -12,6 +12,12 @@ import { TotalTokens } from "../../functions/tools/CalculateToken.js"
 import { ThinkingProcessor } from "../../utils/providers/ThinkingProcessor.js"
 import { findForbiddenWord, isConversationInterrupted, markConversationInterrupted, extractReplyText } from "../../utils/forbiddenWordGuard.js"
 
+// 统计埋点经全局 runtime 符号读取(与 utils/messagePipeline/runtime.js 的 RUNTIME_KEY 约定一致)。
+// 不静态 import runtime.js:那会拖入 Yunzai 专属依赖链,破坏本模块在测试环境的独立加载。
+function installedPipelineStats() {
+    return globalThis[Symbol.for("shiloh-plugin.message-pipeline.runtime")]?.stats || null
+}
+
 // 出站违禁词黑名单统一咽喉检查:
 // 1) 该群会话已被违禁词中断且中断晚于本回合锚点 → 丢弃(中断当前对话);
 // 2) bot 自己要说的话含违禁词(blockOutput) → 拦截本条并同样中断本回合。
@@ -36,6 +42,12 @@ function shouldBlockByForbiddenWords(host, e, text, where) {
   }
 
 export async function sendObservedReply(host, e, payload, quote = false, channel = "command") {
+    const stats = installedPipelineStats()
+    const statsContext = {
+      botId: e?.self_id || e?.bot?.uin || globalThis.Bot?.uin,
+      groupId: e?.group_id ? String(e.group_id) : "",
+      channel
+    }
     try {
       if (shouldBlockByForbiddenWords(host, e, payload, `channel=${channel}`)) return null
       const result = await e.reply(payload, quote)
@@ -46,6 +58,7 @@ export async function sendObservedReply(host, e, payload, quote = false, channel
         userId: e?.user_id,
         messageId: extractDeliveryMessageId(result)
       })
+      stats?.recordSend(statsContext)
       return result
     } catch (error) {
       logDeliveryOutcome(logger, {
@@ -55,6 +68,7 @@ export async function sendObservedReply(host, e, payload, quote = false, channel
         userId: e?.user_id,
         error
       })
+      stats?.recordFailure({ ...statsContext, code: "reply_error" })
       throw error
     }
   }
