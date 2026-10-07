@@ -16,6 +16,18 @@ pluginSettings:
     enabled: true
     # 天桶保留天数（小时桶固定 8 天）
     retentionDays: 90
+  # 发送节流:仅 AI 聊天回复(agent_* 通道)按会话维持最小间隔+随机抖动,消机器人节拍;
+  # 耗时感知——处理耗时已超过间隔(生图/长回合)则零追加;命令/骰子等通道不经过
+  sendPacing:
+    enabled: true
+    # 同一会话两条聊天回复之间的最小间隔(ms)
+    minIntervalMs: 3000
+    # 在应等待时长上叠加的随机量(ms),制造不可预测节拍
+    jitterMs: 5000
+    # 单次等待上限(ms)
+    maxWaitMs: 15000
+    # 按账号覆盖(多号差异化节拍):"QQ号": {minIntervalMs, jitterMs, maxWaitMs}
+    byBot: {}
   triggerPrefixes:
     - 哈基米
   excludeMessageTypes:

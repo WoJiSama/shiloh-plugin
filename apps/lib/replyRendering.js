@@ -18,6 +18,18 @@ function installedPipelineStats() {
     return globalThis[Symbol.for("shiloh-plugin.message-pipeline.runtime")]?.stats || null
 }
 
+// 发送节流器挂在 host 上,配置引用变化时重建(message.yaml 改动重启后生效)
+import { SendPacer } from "../../utils/sendPacing.js"
+function pacerFor(host) {
+    if (!host) return null
+    const configSource = host.config?.sendPacing
+    if (!host._sendPacer || host._sendPacerSource !== configSource) {
+        host._sendPacer = new SendPacer(configSource || {})
+        host._sendPacerSource = configSource
+    }
+    return host._sendPacer
+}
+
 // 出站违禁词黑名单统一咽喉检查:
 // 1) 该群会话已被违禁词中断且中断晚于本回合锚点 → 丢弃(中断当前对话);
 // 2) bot 自己要说的话含违禁词(blockOutput) → 拦截本条并同样中断本回合。
@@ -50,7 +62,16 @@ export async function sendObservedReply(host, e, payload, quote = false, channel
     }
     try {
       if (shouldBlockByForbiddenWords(host, e, payload, `channel=${channel}`)) return null
+      const pacer = pacerFor(host)
+      try {
+        await pacer.before(e, channel)
+      } catch {
+        // 节流 fail-open,绝不阻断发送
+      }
       const result = await e.reply(payload, quote)
+      try {
+        pacer.markSent(e, channel)
+      } catch {}
       logDeliveryOutcome(logger, {
         status: "sent",
         channel,
