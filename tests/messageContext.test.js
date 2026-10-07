@@ -48,24 +48,29 @@ test("成员查询:术语抽取与成员匹配、提示词拼装", () => {
   assert.equal(formatMemberLookupPrompt([]), "")
 })
 
-test("身份防混淆:机器人自身不参与成员匹配,名录可附身份提醒", () => {
-  // 场景来源:bot 的群名片被跑团工具改成"星野",被问"星野是谁"时误答"就是我"
+test("身份消歧:bot自身参与匹配但带 isSelf 标注,双重命中给出消歧指引", () => {
+  // 场景来源:bot 的群名片被跑团工具改成"星野",群里另有真群友也叫星野
   const memberMap = new Map([
     [10001, { user_id: 10001, card: "星野", nickname: "hoshino", role: "member" }],
     [3094088525, { user_id: 3094088525, card: "星野", nickname: "这里是希洛!", role: "member" }]
   ])
-  const withoutSelf = matchGroupMembersByTerms(memberMap, ["星野"], "10001", { selfBotId: "3094088525" })
-  assert.equal(withoutSelf.length, 1)
-  assert.equal(withoutSelf[0].members.length, 1, "机器人自身被排除,只剩真群友")
-  assert.equal(withoutSelf[0].members[0].userId, 10001)
+  const matches = matchGroupMembersByTerms(memberMap, ["星野"], "10001", { selfBotId: "3094088525" })
+  assert.equal(matches.length, 1)
+  assert.equal(matches[0].members.length, 2, "自己仍是候选,不预先抹掉")
+  const selfEntry = matches[0].members.find(m => m.isSelf)
+  const otherEntry = matches[0].members.find(m => !m.isSelf)
+  assert.equal(selfEntry.userId, 3094088525, "自身条目被标注 isSelf")
+  assert.equal(otherEntry.userId, 10001, "群友条目正常在场")
+
+  const prompt = formatMemberLookupPrompt(matches, { selfNames: ["希洛"], identityNote: "你是机器人" })
+  assert.ok(prompt.includes("【这是你自己】"), "自身条目有明确标注")
+  assert.ok(prompt.includes("本名是「希洛」"), "名片与本名不同时点明本名")
+  assert.ok(prompt.includes("消歧:该名字同时命中群友和你自己的名片"), "双重命中输出消歧指引")
+  assert.ok(prompt.includes("(QQ:10001)"), "群友条目保留完整字段")
+  assert.ok(prompt.includes("【身份提醒】你是机器人"), "身份提醒按需追加")
 
   const legacy = matchGroupMembersByTerms(memberMap, ["星野"], "10001")
-  assert.equal(legacy[0].members.length, 2, "未传 selfBotId 时保持旧行为")
-
-  const prompt = formatMemberLookupPrompt(withoutSelf, { identityNote: "你自己是机器人,名字希洛" })
-  assert.ok(prompt.includes("【身份提醒】你自己是机器人,名字希洛"))
-  assert.ok(!prompt.includes("3094088525"), "提示词里不再出现机器人自身条目")
-  assert.equal(formatMemberLookupPrompt(withoutSelf, {}), formatMemberLookupPrompt(withoutSelf), "无提醒时不追加段")
+  assert.equal(legacy[0].members.every(m => !m.isSelf), true, "未传 selfBotId 时保持旧行为(全部无标注)")
 })
 
 test("触发锚点剥离与成员显示名", () => {

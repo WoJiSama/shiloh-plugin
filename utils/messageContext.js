@@ -146,9 +146,7 @@ export function buildQqAvatarUrl(userId) {
 export function matchGroupMembersByTerms(memberMap, terms = [], currentUserId = null, { selfBotId = "" } = {}) {
   if (!memberMap || !terms.length) return []
   const selfId = String(selfBotId || "")
-  // 机器人自己的群名片可能被跑团等工具改成角色名,匹配到会造成"XX就是我"式身份混淆
   const members = Array.from(memberMap.values())
-    .filter(member => !(selfId && String(member.user_id) === selfId))
   const matches = []
   for (const term of terms) {
     const needle = String(term || "").toLowerCase()
@@ -180,7 +178,9 @@ export function matchGroupMembersByTerms(memberMap, terms = [], currentUserId = 
           title: member.title,
           names,
           avatarUrl: buildQqAvatarUrl(member.user_id),
-          isCurrentSpeaker: currentUserId && String(member.user_id) === String(currentUserId)
+          isCurrentSpeaker: currentUserId && String(member.user_id) === String(currentUserId),
+          // 自己也是合法候选(别名/角色名),交给渲染层做消歧,而不是在这里抹掉
+          isSelf: Boolean(selfId && String(member.user_id) === selfId)
         }))
       })
     }
@@ -188,7 +188,7 @@ export function matchGroupMembersByTerms(memberMap, terms = [], currentUserId = 
   return matches
 }
 
-export function formatMemberLookupPrompt(matches = [], { identityNote = "" } = {}) {
+export function formatMemberLookupPrompt(matches = [], { identityNote = "", selfNames = [] } = {}) {
   if (!matches.length) return ""
   const lines = [
     "【群成员名称匹配】",
@@ -198,12 +198,21 @@ export function formatMemberLookupPrompt(matches = [], { identityNote = "" } = {
   ]
   for (const item of matches) {
     lines.push(`- 查询: ${item.term}`)
-    for (const member of item.members) {
+    const selfEntries = item.members.filter(member => member.isSelf)
+    const otherEntries = item.members.filter(member => !member.isSelf)
+    for (const member of otherEntries) {
       const role = ROLE_MAP[member.role] || member.role || "member"
       const current = member.isCurrentSpeaker ? "，当前发言者本人" : ""
       const title = member.title ? `，头衔:${member.title}` : ""
       const avatar = member.avatarUrl ? `，头像:${member.avatarUrl}` : ""
       lines.push(`  · ${member.names.join(" / ")} (QQ:${member.userId})[群身份:${role}${title}${current}${avatar}]`)
+    }
+    for (const member of selfEntries) {
+      const names = member.names.join(" / ")
+      lines.push(`  · ${names} (QQ:${member.userId})【这是你自己】这个名字命中了你的群名片/昵称——名片可能是跑团等工具设置的角色名,不代表你的身份变了${selfNames.length && !selfNames.includes(names) ? `;你的本名是「${selfNames[0]}」` : ""}`)
+    }
+    if (selfEntries.length && otherEntries.length) {
+      lines.push("  · 消歧:该名字同时命中群友和你自己的名片时,用户问的多半是群友;拿不准就自然地反问一句,不要笃信任何一边")
     }
   }
   if (identityNote) lines.push(`【身份提醒】${identityNote}`)
