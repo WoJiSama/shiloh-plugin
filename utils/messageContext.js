@@ -143,9 +143,12 @@ export function buildQqAvatarUrl(userId) {
   return qq ? `https://q1.qlogo.cn/g?b=qq&nk=${qq}&s=640` : ""
 }
 
-export function matchGroupMembersByTerms(memberMap, terms = [], currentUserId = null) {
+export function matchGroupMembersByTerms(memberMap, terms = [], currentUserId = null, { selfBotId = "" } = {}) {
   if (!memberMap || !terms.length) return []
+  const selfId = String(selfBotId || "")
+  // 机器人自己的群名片可能被跑团等工具改成角色名,匹配到会造成"XX就是我"式身份混淆
   const members = Array.from(memberMap.values())
+    .filter(member => !(selfId && String(member.user_id) === selfId))
   const matches = []
   for (const term of terms) {
     const needle = String(term || "").toLowerCase()
@@ -185,7 +188,7 @@ export function matchGroupMembersByTerms(memberMap, terms = [], currentUserId = 
   return matches
 }
 
-export function formatMemberLookupPrompt(matches = []) {
+export function formatMemberLookupPrompt(matches = [], { identityNote = "" } = {}) {
   if (!matches.length) return ""
   const lines = [
     "【群成员名称匹配】",
@@ -203,6 +206,7 @@ export function formatMemberLookupPrompt(matches = []) {
       lines.push(`  · ${member.names.join(" / ")} (QQ:${member.userId})[群身份:${role}${title}${current}${avatar}]`)
     }
   }
+  if (identityNote) lines.push(`【身份提醒】${identityNote}`)
   return lines.join("\n")
 }
 

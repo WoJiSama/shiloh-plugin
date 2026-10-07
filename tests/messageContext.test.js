@@ -48,6 +48,26 @@ test("成员查询:术语抽取与成员匹配、提示词拼装", () => {
   assert.equal(formatMemberLookupPrompt([]), "")
 })
 
+test("身份防混淆:机器人自身不参与成员匹配,名录可附身份提醒", () => {
+  // 场景来源:bot 的群名片被跑团工具改成"星野",被问"星野是谁"时误答"就是我"
+  const memberMap = new Map([
+    [10001, { user_id: 10001, card: "星野", nickname: "hoshino", role: "member" }],
+    [3094088525, { user_id: 3094088525, card: "星野", nickname: "这里是希洛!", role: "member" }]
+  ])
+  const withoutSelf = matchGroupMembersByTerms(memberMap, ["星野"], "10001", { selfBotId: "3094088525" })
+  assert.equal(withoutSelf.length, 1)
+  assert.equal(withoutSelf[0].members.length, 1, "机器人自身被排除,只剩真群友")
+  assert.equal(withoutSelf[0].members[0].userId, 10001)
+
+  const legacy = matchGroupMembersByTerms(memberMap, ["星野"], "10001")
+  assert.equal(legacy[0].members.length, 2, "未传 selfBotId 时保持旧行为")
+
+  const prompt = formatMemberLookupPrompt(withoutSelf, { identityNote: "你自己是机器人,名字希洛" })
+  assert.ok(prompt.includes("【身份提醒】你自己是机器人,名字希洛"))
+  assert.ok(!prompt.includes("3094088525"), "提示词里不再出现机器人自身条目")
+  assert.equal(formatMemberLookupPrompt(withoutSelf, {}), formatMemberLookupPrompt(withoutSelf), "无提醒时不追加段")
+})
+
 test("触发锚点剥离与成员显示名", () => {
   assert.equal(removeBotAnchors("希洛帮我查一下", "bot", ["botbot"]), " 帮我查一下")
   // 原实现怪癖(保持不动):fallback "未知用户" 默认参与显示名拼接

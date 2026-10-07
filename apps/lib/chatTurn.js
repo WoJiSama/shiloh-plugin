@@ -433,8 +433,13 @@ export async function handleToolInner(host, e) {
         if (savedWorkflowRules.length) recordActionOutcomes(session, "group_workflow", savedWorkflowRules)
         const workflowTeachingPrompt = formatGroupWorkflowTeachingPrompt(savedWorkflowRules)
         const knowledgeTeachingPrompt = formatGroupKnowledgeTeachingPrompt(savedKnowledgeEntries)
+        const selfBotId = String(Bot?.uin || e?.self_id || "")
+        const personaName = (typeof host.getPersonaFor === "function" ? host.getPersonaFor(e)?.name : "") || host.config?.persona?.name || ""
         const memberLookupPrompt = formatMemberLookupPrompt(
-          matchGroupMembersByTerms(memberMap, extractMemberLookupTerms(e.msg || args), userId)
+          matchGroupMembersByTerms(memberMap, extractMemberLookupTerms(e.msg || args), userId, { selfBotId }),
+          {
+            identityNote: `列表里都是其他群友,不是你。你自己是本群机器人(QQ号 ${selfBotId})${personaName ? `,名字只有一个:「${personaName}」` : ""};被问"XX是谁"时,若XX在列表里,XX是别人。你的群名片就算被跑团等工具改成过角色名,也不代表换了身份。`
+          }
         )
         const identityBindingsPrompt = formatIdentityBindingsPrompt(host.config.identityBindings, userId)
 
