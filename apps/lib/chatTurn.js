@@ -54,7 +54,7 @@ import { buildToolCallFromDecision, classifySemanticToolIntent } from "./semanti
 import { formatIdentityBindingsPrompt } from "./teachingFacts.js"
 import { cardAcknowledgement } from "./textPolicy.js"
 import { randomUUID } from "crypto"
-import { delay, getOrCreateGroupLimiter, filterToolsForMessageIntent } from "../test.js"
+import { delay, getOrCreateGroupLimiter, filterToolsForMessageIntent } from "./conversationUtils.js"
 
 const logger = globalThis.logger
 

@@ -10,11 +10,11 @@ import { SEARCH_TOOL_NAMES } from "../../core/intent/messageIntent.js"
 import { shouldExposeEmojiToolForMessage } from "../../utils/emojiToolPolicy.js"
 import { isExplicitToolIntent } from "../../core/intent/messageIntent.js"
 
-function delay(ms) {
+export function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function getOrCreateGroupLimiter(limitersMap, groupId, concurrency) {
+export function getOrCreateGroupLimiter(limitersMap, groupId, concurrency) {
   const entry = limitersMap.get(groupId)
   if (entry && entry.concurrency === concurrency) {
     return entry.limiter
@@ -38,7 +38,7 @@ function shouldExposeToolsForMessage(e = {}, text = "") {
   return isRealtimeInfoRequest(content) || isExplicitSearchRequest(content) || isExplicitToolIntent(content)
 }
 
-function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearch = false, emojiCooldownMs = 120000 } = {}) {
+export function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearch = false, emojiCooldownMs = 120000 } = {}) {
   if (!Array.isArray(tools) || !tools.length) return []
   const content = normalizeIntentText(text || e?.msg || "")
   if (allowSearch) return tools.filter(tool => tool?.function?.name !== "mentionAdminsTool" || isExplicitAdminCollectionMentionRequest(content))
@@ -65,11 +65,11 @@ function filterToolsForMessageIntent(tools = [], e = {}, text = "", { allowSearc
   })
 }
 
-function toolConfigHasName(toolNames, name) {
+export function toolConfigHasName(toolNames, name) {
   return Array.isArray(toolNames) && toolNames.some(item => parseToolConfigEntry(item).name === name)
 }
 
-function parseToolConfigEntry(entry) {
+export function parseToolConfigEntry(entry) {
   const raw = String(entry || "").trim()
   const match = raw.match(/^([A-Za-z_][A-Za-z0-9_-]*)(?:\(([^)]*)\))?$/)
   if (!match) return { name: raw, dedupe: false, marker: "" }
