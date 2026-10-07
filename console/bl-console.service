@@ -1,0 +1,13 @@
+[Unit]
+Description=BL Chat Console (只读看板:账号/统计/哨兵/出口IP)
+After=network.target docker.service redis-server.service
+
+[Service]
+WorkingDirectory=/opt/trss-yunzai/plugins/shiloh-plugin
+ExecStart=/usr/bin/node console/server.js
+Restart=always
+RestartSec=5
+Environment=CONSOLE_PORT=8787
+
+[Install]
+WantedBy=multi-user.target
