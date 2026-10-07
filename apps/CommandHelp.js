@@ -7,6 +7,7 @@ import {
   writeCommandsMarkdown
 } from "../utils/commandRegistry.js"
 import { registerCommandsWebApp } from "../utils/commandsWebApp.js"
+import { guardCommand } from "../utils/commandGate.js"
 
 const _path = process.cwd()
 
@@ -34,12 +35,16 @@ export class CommandHelp extends plugin {
   }
 
   async showMenu(e) {
+    const gate = guardCommand(e, { perm: "all", scope: "both" }, { pluginRoot: this.pluginRoot })
+    if (!gate.proceed) return gate.consume
     const registry = getCommandRegistry(this.pluginRoot)
     await e.reply(renderHelpMenu(registry))
     return true
   }
 
   async showDomain(e) {
+    const gate = guardCommand(e, { perm: "all", scope: "both" }, { pluginRoot: this.pluginRoot })
+    if (!gate.proceed) return gate.consume
     const query = String(e.msg || "").replace(/^[.。#]命令\s*/, "").trim()
     const registry = getCommandRegistry(this.pluginRoot)
     const domain = findCommandDomain(registry, query)
@@ -52,6 +57,8 @@ export class CommandHelp extends plugin {
   }
 
   async exportDoc(e) {
+    const gate = guardCommand(e, { perm: "master", scope: "both" }, { pluginRoot: this.pluginRoot })
+    if (!gate.proceed) return gate.consume
     try {
       const registry = getCommandRegistry(this.pluginRoot, { force: true })
       const target = writeCommandsMarkdown(registry, this.pluginRoot)
