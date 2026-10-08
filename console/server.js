@@ -367,6 +367,22 @@ function containerMemoryFromCgroup(containerId = "", running = false) {
   }
 }
 
+// 后台保温:每 45 秒预热出口IP缓存,用户请求不再等 nsenter curl(最多6秒)
+function prefetchExitIps() {
+  setTimeout(async () => {
+    try {
+      const list = await run("docker", ["ps", "--filter", "name=napcat", "--format", "{{.Names}}"])
+      for (const name of list.stdout.split("\n").map(s => s.trim()).filter(Boolean)) {
+        const info = await run("docker", ["inspect", "-f", "{{.HostConfig.NetworkMode}}", name])
+        const ref = (String(info.stdout || "").trim().match(/^container:(.+)$/) || [])[1]
+        if (ref) await sidecarExitIp(ref)
+      }
+    } catch {}
+    prefetchExitIps()
+  }, 45000)
+}
+prefetchExitIps()
+
 let publicIpCache = null
 async function publicIp() {
   if (publicIpCache) return publicIpCache
@@ -1639,6 +1655,7 @@ function route(){
   document.getElementById('nav-observe').className=page()==='observe'?'on':''
   document.getElementById('nav-semantic').className=page()==='semantic'?'on':''
   document.getElementById('nav-persona').className=page()==='persona'?'on':''
+  if(page()!=='home')lastOverviewHtml=''
   if(page()==='draw'){document.getElementById('at').textContent='';renderDrawPage()}
   else if(page()==='ai'){
     document.getElementById('at').textContent=''
@@ -1656,16 +1673,34 @@ function route(){
 window.addEventListener('hashchange',route)
 
 let loadSeq=0
+let lastOverviewHtml=""
+function addAccountSnapshot(){
+  const box=document.getElementById('addAccountBox')
+  if(!box||box.style.display==='none')return null
+  return {
+    qq:(document.getElementById('aa-qq')||{}).value||'',
+    port:(document.getElementById('aa-port')||{}).value||'',
+    subnet:(document.getElementById('aa-subnet')||{}).value||''
+  }
+}
+function addAccountRestore(keep){
+  if(!keep)return
+  const box=document.getElementById('addAccountBox')
+  if(!box)return
+  box.style.display='block'
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v}
+  set('aa-qq',keep.qq);set('aa-port',keep.port);set('aa-subnet',keep.subnet)
+}
 async function load(){
   const seq=++loadSeq
-  // 骨架先行:采集要 1-3 秒(docker stats),先让页面立刻切过来
-  if(page()==='home'){
+  // 骨架仅首次进入时占位;后续刷新靠指纹比对静默更新,不再整页重绘
+  if(page()==='home'&&!lastOverviewHtml){
     document.getElementById('err').textContent=''
-    document.getElementById('app').innerHTML='<h2>账号</h2><div class="card muted">采集中(docker stats 较慢,约 1-3 秒)…</div><h2>统计</h2><div class="card muted">加载中…</div>'
+    document.getElementById('app').innerHTML='<h2>账号</h2><div class="card muted">采集中…</div><h2>统计</h2><div class="card muted">加载中…</div>'
   }
   try{
     const d=await api('/api/overview')
-    // 过期响应丢弃:总览采集慢(docker stats 数秒),切页后回来的旧数据不得覆盖当前页面
+    // 过期响应丢弃:切页后回来的旧数据不得覆盖当前页面
     if(seq!==loadSeq||page()!=='home')return
     window.__accounts=d.accounts||[]
     document.getElementById('err').textContent=''
@@ -1674,6 +1709,7 @@ async function load(){
       +'<button class="btn small" onclick="batchAction(\\'restart\\',\\'all\\')">全部重启</button>'
       +'<button class="btn small ghost" onclick="batchAction(\\'restart\\',\\'abnormal\\')">重启掉线/待扫码</button>'
       +'<button class="btn small ghost" onclick="showAddAccount()">＋ 添加账号</button>'
+      +'<button class="btn small ghost" onclick="load()" title="立即刷新">↻ 刷新</button>'
       +'<span class="muted" id="batchState"></span></div>'
     +'<div class="card" id="addAccountBox" style="display:none"><b>添加账号</b> <span class="muted">创建停机备号(独立网络+独立出口 sidecar,0 内存)</span>'
       +'<div class="fieldline" style="margin-top:8px">'
@@ -1694,7 +1730,7 @@ async function load(){
         +'</div>'
       const qrUrl='/img/qrcode/'+encodeURIComponent(a.container)+(token?('?token='+encodeURIComponent(token)):'')
       const qr=a.qrAvailable
-        ?'<div style="margin-top:8px"><a href="'+qrUrl+'" target="_blank"><img src="'+qrUrl+'" style="width:150px;border-radius:8px;display:block"></a><div class="muted">扫码重新登录(点图放大;二维码约2分钟一换,刷新页面取最新)</div></div>'
+        ?'<div data-qr-container="'+esc(a.container)+'" style="margin-top:8px"><a href="'+qrUrl+'" target="_blank"><img loading="lazy" src="'+qrUrl+'" style="width:150px;border-radius:8px;display:block"></a><div class="muted">扫码重新登录(点图放大;二维码自动换新)</div></div>'
         :''
       return '<div class="card"><b>'+esc(a.account||a.container)+'</b> <span class="badge '+cls+'">'+label+'</span>'+loginBadge(a)
         +'<table><tr><td>容器</td><td>'+esc(a.container)+'</td><td>内存</td><td>'+esc(a.memory||'-')+'</td></tr>'
@@ -1715,7 +1751,13 @@ async function load(){
     }
     const sen='<div class="card"><h2 style="margin:0 0 8px">哨兵</h2><div class="muted">'+esc(d.sentinel.status||'').replace(/\\n/g,'<br>')+'</div>'
       +(d.sentinel.alerts&&d.sentinel.alerts.length?'<h2 style="margin:12px 0 8px">最近告警</h2>'+d.sentinel.alerts.map(a=>'<div class=muted>'+esc(a)+'</div>').join(''):'')+'</div>'
-    document.getElementById('app').innerHTML='<h2>账号</h2>'+batchBar+'<div class=row>'+acc+'</div><h2>统计</h2>'+statsHtml+sen
+    const html='<h2>账号</h2>'+batchBar+'<div class=row>'+acc+'</div><h2>统计</h2>'+statsHtml+sen
+    // 指纹相同:零 DOM 操作——轮询不再打断点按/吞输入中的表单/闪二维码
+    if(html===lastOverviewHtml)return
+    const keep=addAccountSnapshot()
+    document.getElementById('app').innerHTML=html
+    addAccountRestore(keep)
+    lastOverviewHtml=html
   }catch(e){document.getElementById('err').textContent='加载失败: '+e.message}
 }
 function card(t,v){return '<div class=card style=flex:1;min-width:120px><div class=muted>'+t+'</div><div style="font-size:22px">'+(v||0)+'</div></div>'}
@@ -2420,7 +2462,18 @@ async function aiProbeOne(i){
   renderAiEditor()
 }
 renderAiSkeleton()
-boot();setInterval(()=>{if(me&&page()==='home')load()},30000)
+boot()
+setInterval(()=>{if(me&&!document.hidden&&page()==='home')load()},30000)
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&me&&page()==='home')load()})
+// 待扫码账号的二维码约2分钟一换:只换 img src,不重绘页面
+setInterval(()=>{
+  if(page()!=='home')return
+  for(const a of (window.__accounts||[])){
+    if(!a.qrAvailable)continue
+    const img=document.querySelector('[data-qr-container="'+a.container+'"] img')
+    if(img)img.src='/img/qrcode/'+encodeURIComponent(a.container)+(token?('?token='+encodeURIComponent(token)):'?_r=1')+'&r='+Date.now()
+  }
+},45000)
 </script></body></html>`
 
 // ---------- HTTP ----------
