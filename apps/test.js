@@ -2043,12 +2043,14 @@ export class ExamplePlugin extends plugin {
     store.startWatch()
   }
 
-  // 当前会话生效人设:群按 persona-library 的群绑定,私聊按 privateBinding,否则 message.yaml 默认
+  // 当前会话生效人设:群按 persona-library 的群绑定,私聊按 privateBinding,
+  // 其次按 bot 账号默认(accountBindings),否则 message.yaml 默认
   getPersonaFor(e) {
     try {
       return this.personaLibrary?.resolve({
         messageType: e?.message_type,
-        groupId: e?.group_id
+        groupId: e?.group_id,
+        selfId: e?.self_id || e?.bot?.uin || globalThis.Bot?.uin || ""
       })?.persona || this.config?.persona || {}
     } catch {
       return this.config?.persona || {}

@@ -101,7 +101,7 @@ test("setGroupBinding(default) 等价解绑;绑定不存在的人设报错", () 
   const saved = ctx.lib.upsert({ name: "夜巡" })
   assert.equal(ctx.lib.setGroupBinding("111", saved.id), saved.id)
   assert.equal(ctx.lib.setGroupBinding("111", "default"), "default")
-  assert.deepEqual(ctx.lib.bindings()["111"], undefined)
+  assert.deepEqual(ctx.lib.bindings().groups["111"], undefined)
   assert.throws(() => ctx.lib.setGroupBinding("111", "幽灵"), /没有找到人设/)
 })
 
@@ -114,12 +114,57 @@ test("私聊绑定独立于群绑定", () => {
   assert.equal(ctx.lib.resolve({ messageType: "private" }).id, "default")
 })
 
+test("账号绑定:群/私聊绑定优先,账号默认兜底,删除人设自动解绑", () => {
+  const accountPersona = ctx.lib.upsert({ name: "账号身份", tone: "二号机" })
+  const groupPersona = ctx.lib.upsert({ name: "群专属", tone: "群特化" })
+
+  // 无任何绑定时:带 selfId 的群会话走账号默认
+  ctx.lib.setAccountBinding("10086", accountPersona.id)
+  assert.equal(ctx.lib.resolve({ messageType: "group", groupId: "999", selfId: "10086" }).persona.tone, "二号机")
+  assert.equal(ctx.lib.resolve({ messageType: "private", selfId: "10086" }).persona.tone, "二号机")
+  // 其他账号不受影响
+  assert.equal(ctx.lib.resolve({ messageType: "group", groupId: "999", selfId: "10000" }).id, "default")
+  // 群绑定压过账号默认
+  ctx.lib.setGroupBinding("999", groupPersona.id)
+  assert.equal(ctx.lib.resolve({ messageType: "group", groupId: "999", selfId: "10086" }).persona.tone, "群特化")
+  // 私聊绑定压过账号默认
+  ctx.lib.setPrivateBinding(groupPersona.id)
+  assert.equal(ctx.lib.resolve({ messageType: "private", selfId: "10086" }).persona.tone, "群特化")
+  ctx.lib.setPrivateBinding("default")
+
+  // bindings() 暴露账号维度;setAccountBinding(default) 解绑;QQ 号格式校验
+  assert.equal(ctx.lib.bindings().accounts["10086"], accountPersona.id)
+  assert.equal(ctx.lib.setAccountBinding("10086", "default"), "default")
+  assert.deepEqual(ctx.lib.bindings().accounts["10086"], undefined)
+  assert.throws(() => ctx.lib.setAccountBinding("not-a-qq", accountPersona.id), /QQ 号格式/)
+
+  // 删除人设:账号绑定自动清理
+  ctx.lib.setAccountBinding("10086", accountPersona.id)
+  ctx.lib.remove("账号身份")
+  assert.deepEqual(ctx.lib.bindings().accounts["10086"], undefined)
+  assert.equal(ctx.lib.resolve({ messageType: "group", groupId: "999", selfId: "10086" }).id === "default" || ctx.lib.resolve({ messageType: "group", groupId: "999" }).persona.tone === "群特化", true)
+})
+
+test("replaceAll:未显式传 accountBindings 时保留现状,显式传则整体替换", () => {
+  const a = ctx.lib.upsert({ name: "甲" })
+  ctx.lib.setAccountBinding("10086", a.id)
+  // 旧调用方(命令管理页)只传三个字段:账号绑定不丢
+  ctx.lib.replaceAll({ personas: [{ name: "乙" }], groupBindings: {}, privateBinding: "" })
+  assert.equal(ctx.lib.bindings().accounts["10086"], a.id)
+  // 显式传空对象:清空账号绑定
+  ctx.lib.replaceAll({ personas: [{ name: "乙" }], groupBindings: {}, accountBindings: {}, privateBinding: "" })
+  assert.deepEqual(ctx.lib.bindings().accounts, {})
+  // 指向不存在人设的账号绑定被丢弃
+  ctx.lib.replaceAll({ personas: [{ name: "乙" }], groupBindings: {}, accountBindings: { 10086: "幽灵id" }, privateBinding: "" })
+  assert.deepEqual(ctx.lib.bindings().accounts, {})
+})
+
 test("持久化与热更新:写盘后新实例读到同样状态;改文件后 mtime 缓存失效重读", () => {
   const saved = ctx.lib.upsert({ name: "夜巡" })
   ctx.lib.setGroupBinding("111", saved.id)
 
   const reopened = makeLibrary({ file: ctx.tmp }).lib
-  assert.deepEqual(reopened.bindings(), { "111": saved.id, __private__: "" })
+  assert.deepEqual(reopened.bindings(), { groups: { "111": saved.id }, accounts: {}, private: "" })
   assert.equal(reopened.detail("夜巡").persona.name, "夜巡")
 
   // 手动编辑 yaml(模拟改 tone),新实例立即读到

@@ -1,7 +1,9 @@
-// 多人设库:支持保存多套人设并按群绑定切换。
-// 存储:config/persona-library.yaml { personas: [...], groupBindings: { 群号: 人设id }, privateBinding: "" }
+// 多人设库:支持保存多套人设并按群/账号绑定切换。
+// 存储:config/persona-library.yaml { personas: [...], groupBindings: { 群号: 人设id },
+//   accountBindings: { botQQ: 人设id }, privateBinding: "" }
 // - personas 只存"与默认人设的差异"以外的完整字段,缺省字段回退 message.yaml 的 persona(和 configStore 深合并同思路);
 // - 默认人设(id=default)永远可用且不可删,来源是 message.yaml,随主配置热更新;
+// - 解析优先级:群绑定/私聊绑定 > 账号默认(bot QQ 的身份定位) > 全局默认;
 // - 读取走 mtime 缓存,手动编辑 yaml 下一轮对话即生效,无需重启。
 import fs from "node:fs"
 import path from "node:path"
@@ -19,7 +21,8 @@ export const PERSONA_ENTRY_FIELDS = [
   "moods"
 ]
 
-const PRIVATE_BINDING_KEY = "__private__"
+const PRIVATE_BINDING_KEY = "__private__" // 兼容旧 bindings() 平铺形态的私聊键,现仅作历史标识保留
+void PRIVATE_BINDING_KEY
 
 function normalizeListValue(value) {
   if (Array.isArray(value)) {
@@ -58,7 +61,7 @@ function sameName(a = "", b = "") {
 
 // 空状态必须是每次新建的:模块级共享常量会被多个实例的 upsert 交叉污染
 function emptyState() {
-  return { personas: [], groupBindings: {}, privateBinding: "" }
+  return { personas: [], groupBindings: {}, accountBindings: {}, privateBinding: "" }
 }
 
 export function createPersonaLibrary({
@@ -103,9 +106,18 @@ export function createPersonaLibrary({
             if (groupKey && id) groupBindings[groupKey] = id
           }
         }
+        const accountBindings = {}
+        if (parsed.accountBindings && typeof parsed.accountBindings === "object") {
+          for (const [qq, personaId] of Object.entries(parsed.accountBindings)) {
+            const qqKey = String(qq || "").trim()
+            const id = String(personaId || "").trim()
+            if (qqKey && id) accountBindings[qqKey] = id
+          }
+        }
         state = {
           personas,
           groupBindings,
+          accountBindings,
           privateBinding: String(parsed.privateBinding || "").trim()
         }
       } catch (err) {
@@ -125,6 +137,7 @@ export function createPersonaLibrary({
     const header = [
       "# 多人设库:每套人设一个条目,未写的字段回退 message.yaml 默认人设",
       "# 群绑定:groupBindings 填 { 群号: 人设id };privateBinding 为私聊用人设id(留空=默认人设)",
+      "# 账号绑定:accountBindings 填 { botQQ: 人设id },作为该账号的默认身份(群/私聊绑定优先)",
       "# 手动编辑保存后自动生效;也可用 #人设列表/#人设详情/#切换人设/#保存人设/#删除人设 指令管理",
       ""
     ].join("\n")
@@ -204,6 +217,9 @@ export function createPersonaLibrary({
       for (const [groupId, personaId] of Object.entries(state.groupBindings)) {
         if (personaId === entry.id) delete state.groupBindings[groupId]
       }
+      for (const [qq, personaId] of Object.entries(state.accountBindings || {})) {
+        if (personaId === entry.id) delete state.accountBindings[qq]
+      }
       if (state.privateBinding === entry.id) state.privateBinding = ""
       saveState(state)
       return entry
@@ -215,11 +231,12 @@ export function createPersonaLibrary({
       return JSON.parse(JSON.stringify({
         personas: state.personas,
         groupBindings: state.groupBindings,
+        accountBindings: state.accountBindings || {},
         privateBinding: state.privateBinding
       }))
     },
 
-    replaceAll({ personas = [], groupBindings = {}, privateBinding = "" } = {}) {
+    replaceAll({ personas = [], groupBindings = {}, accountBindings, privateBinding = "" } = {}) {
       if (!Array.isArray(personas)) throw new Error("personas 必须是数组")
       const seenNames = new Set()
       const seenIds = new Set()
@@ -248,13 +265,44 @@ export function createPersonaLibrary({
       const cleanedPrivate = idSet.has(String(privateBinding || "").trim())
         ? String(privateBinding).trim()
         : ""
-      const state = { personas: cleaned, groupBindings: cleanedBindings, privateBinding: cleanedPrivate }
+      // accountBindings 未显式传入时保留现状(旧调用方整库写回不抹账号绑定)
+      const cleanedAccounts = {}
+      if (accountBindings && typeof accountBindings === "object") {
+        for (const [qq, personaId] of Object.entries(accountBindings)) {
+          const qqKey = String(qq || "").trim()
+          const id = String(personaId || "").trim()
+          if (qqKey && id && idSet.has(id)) cleanedAccounts[qqKey] = id
+        }
+      } else {
+        Object.assign(cleanedAccounts, loadState().accountBindings || {})
+      }
+      const state = { personas: cleaned, groupBindings: cleanedBindings, accountBindings: cleanedAccounts, privateBinding: cleanedPrivate }
       saveState(state)
       return state
     },
 
     bindings() {
-      return { ...loadState().groupBindings, [PRIVATE_BINDING_KEY]: loadState().privateBinding }
+      const state = loadState()
+      return {
+        groups: { ...state.groupBindings },
+        accounts: { ...(state.accountBindings || {}) },
+        private: state.privateBinding
+      }
+    },
+
+    setAccountBinding(qq, personaId) {
+      const key = String(qq || "").trim()
+      if (!/^\d{4,12}$/.test(key)) throw new Error("bot QQ 号格式不正确")
+      const state = loadState()
+      if (!personaId || personaId === "default") {
+        delete state.accountBindings[key]
+      } else {
+        const entry = findBound(personaId) || find(personaId)
+        if (!entry) throw new Error(`没有找到人设「${personaId}」`)
+        state.accountBindings[key] = entry.id
+      }
+      saveState(state)
+      return state.accountBindings[key] || "default"
     },
 
     setGroupBinding(groupId, personaId) {
@@ -285,20 +333,22 @@ export function createPersonaLibrary({
       return state.privateBinding || "default"
     },
 
-    // 当前会话生效人设:群按群绑定,私聊按 privateBinding,否则默认
-    resolve({ messageType = "", groupId = "" } = {}) {
+    // 当前会话生效人设:群按群绑定/私聊按 privateBinding,其次账号默认,否则全局默认
+    resolve({ messageType = "", groupId = "", selfId = "" } = {}) {
       const base = getBasePersona() || {}
       const state = loadState()
+      let entry = null
       if (messageType === "group" && groupId) {
-        const entry = findBound(state.groupBindings[String(groupId)] || "")
-        if (entry) {
-          return { id: entry.id, source: "library", persona: mergePersona(base, entry) }
-        }
+        entry = findBound(state.groupBindings[String(groupId)] || "")
       } else if (messageType === "private") {
-        const entry = findBound(state.privateBinding)
-        if (entry) {
-          return { id: entry.id, source: "library", persona: mergePersona(base, entry) }
-        }
+        entry = findBound(state.privateBinding)
+      }
+      if (!entry && selfId) {
+        // 账号默认身份:该 bot QQ 未被群/私聊绑定覆盖时的人设
+        entry = findBound((state.accountBindings || {})[String(selfId).trim()] || "")
+      }
+      if (entry) {
+        return { id: entry.id, source: "library", persona: mergePersona(base, entry) }
       }
       return { id: "default", source: "default", persona: { ...base } }
     },

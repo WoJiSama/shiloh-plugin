@@ -36,6 +36,8 @@ import {
   withAiProviderPanelDefaults
 } from "../utils/guobaAiProviderConfig.js"
 import { classifyConfigKind, probeProvider, probeProviders } from "../utils/aiProviderProbe.js"
+import { createPersonaLibrary } from "../utils/personaLibrary.js"
+import personaSchema from "../models/Guoba/schemas/persona.js"
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const PORT = Number(process.env.CONSOLE_PORT || 8787)
@@ -1088,6 +1090,172 @@ function handleAppPageProxy(req, res, url, session) {
 }
 
 
+// ---------- 通用配置表单引擎(锅巴 schema 同源渲染) ----------
+// schema 是纯声明式数据(字段/组件/帮助文案),控制台按组件词汇表渲染;
+// 写入只提交变更字段,与锅巴共用同一份 schema 即同一份真相源。
+const CONFIG_SCHEMAS = {
+  persona: { title: "默认人设与画像", schema: personaSchema }
+}
+
+function getIn(obj, dottedPath = "") {
+  let cursor = obj
+  for (const key of String(dottedPath).split(".")) {
+    if (cursor == null || typeof cursor !== "object") return undefined
+    cursor = cursor[key]
+  }
+  return cursor
+}
+
+function schemaFieldGroups(schema = []) {
+  const groups = []
+  let current = { label: "通用", fields: [] }
+  for (const item of schema) {
+    if (!item || typeof item !== "object") continue
+    if (item.component === "SOFT_GROUP_BEGIN" || item.component === "Divider") {
+      if (current.fields.length) groups.push(current)
+      current = { label: String(item.label || "通用"), fields: [] }
+      continue
+    }
+    if (item.component === "SOFT_GROUP_END") continue
+    if (!item.field) continue
+    current.fields.push({
+      field: item.field,
+      label: item.label || item.field,
+      component: item.component || "Input",
+      props: item.componentProps || {},
+      subFields: (item.componentProps?.schemas || []).map(sub => ({
+        field: sub.field,
+        label: sub.label || sub.field,
+        component: sub.component || "Input",
+        props: sub.componentProps || {}
+      })),
+      help: item.bottomHelpMessage || ""
+    })
+  }
+  if (current.fields.length) groups.push(current)
+  return groups
+}
+
+// 按组件类型归一值:语义比较与写入都走这里,避免"改回原值仍判脏"
+function normalizeSchemaValue(component = "", value) {
+  if (component === "Switch") return value === true || value === "true"
+  if (component === "InputNumber") {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
+  }
+  if (component === "GTags") {
+    if (Array.isArray(value)) return value.map(v => String(v || "").trim()).filter(Boolean)
+    return String(value || "").split(/[,\n，]/).map(v => v.trim()).filter(Boolean)
+  }
+  if (component === "GSubForm") return Array.isArray(value) ? value : []
+  return value === undefined || value === null ? "" : String(value)
+}
+
+function schemaValuesEqual(component, a, b) {
+  return JSON.stringify(normalizeSchemaValue(component, a)) === JSON.stringify(normalizeSchemaValue(component, b))
+}
+
+function schemaConfigView(key) {
+  const entry = CONFIG_SCHEMAS[key]
+  if (!entry) throw new Error(`未注册的配置页: ${key}`)
+  const settings = loadPluginSettings()
+  const groups = schemaFieldGroups(entry.schema).map(group => ({
+    label: group.label,
+    fields: group.fields.map(field => ({
+      ...field,
+      value: normalizeSchemaValue(field.component, getIn(settings, field.field))
+    }))
+  }))
+  return { key, title: entry.title, groups }
+}
+
+function saveSchemaConfig(key, submitted = {}) {
+  const entry = CONFIG_SCHEMAS[key]
+  if (!entry) throw new Error(`未注册的配置页: ${key}`)
+  const settings = loadPluginSettings()
+  const updates = {}
+  let changed = 0
+  for (const group of schemaFieldGroups(entry.schema)) {
+    for (const field of group.fields) {
+      if (!(field.field in submitted)) continue
+      const next = normalizeSchemaValue(field.component, submitted[field.field])
+      if (schemaValuesEqual(field.component, getIn(settings, field.field), next)) continue
+      updates[field.field] = next
+      changed++
+    }
+  }
+  if (!changed) return { ok: true, changed: 0, backup: null }
+  const backup = backupMessageYaml()
+  applyConsoleFlatUpdates(updates)
+  return { ok: true, changed, backup }
+}
+
+// ---------- 人设库(多套人设 + 群/账号/私聊绑定) ----------
+const PERSONA_LIBRARY_FILE = path.join(PLUGIN_ROOT, "config", "persona-library.yaml")
+
+function personaLibraryOf() {
+  return createPersonaLibrary({
+    libraryPath: PERSONA_LIBRARY_FILE,
+    getBasePersona: () => {
+      try { return loadPluginSettings().persona || {} } catch { return {} }
+    }
+  })
+}
+
+function backupPersonaLibrary() {
+  if (!fs.existsSync(PERSONA_LIBRARY_FILE)) return null
+  const dir = path.dirname(PERSONA_LIBRARY_FILE)
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-")
+  const backup = path.join(dir, `persona-library.yaml.bak-console-${stamp}`)
+  fs.copyFileSync(PERSONA_LIBRARY_FILE, backup)
+  try {
+    const backups = fs.readdirSync(dir).filter(n => n.startsWith("persona-library.yaml.bak-console-")).sort()
+    for (const stale of backups.slice(0, Math.max(0, backups.length - MESSAGE_BACKUP_KEEP))) {
+      fs.unlinkSync(path.join(dir, stale))
+    }
+  } catch {}
+  return path.basename(backup)
+}
+
+// 轻量账号列表:只查 napcat 容器的 ACCOUNT env,不走 stats/出口IP
+async function listBotAccounts() {
+  const list = await run("docker", ["ps", "-a", "--filter", "name=napcat", "--format", "{{.Names}}"])
+  if (list.error) return []
+  const accounts = []
+  for (const name of list.stdout.split("\n").map(s => s.trim()).filter(Boolean)) {
+    const info = await run("docker", ["inspect", "-f", "{{.State.Running}}|{{range .Config.Env}}{{.}} {{end}}", name])
+    if (info.error) continue
+    const [running, env] = info.stdout.trim().split("|")
+    const qq = (env || "").split(" ").find(item => item.startsWith("ACCOUNT="))?.slice(8) || ""
+    accounts.push({ container: name, qq, running: running === "true" })
+  }
+  return accounts
+}
+
+function personaLibraryView() {
+  const lib = personaLibraryOf()
+  const state = lib.exportState()
+  let basePersona = {}
+  try { basePersona = loadPluginSettings().persona || {} } catch {}
+  return {
+    ...state,
+    basePersona: { name: basePersona.name || "", identity: basePersona.identity || "", tone: basePersona.tone || "" },
+    personaFields: ["name", "identity", "tone", "speechStyle", "preferences", "boundaries", "notes", "moods"]
+  }
+}
+
+function savePersonaLibrary(payload = {}) {
+  const lib = personaLibraryOf()
+  const backup = backupPersonaLibrary()
+  const state = lib.replaceAll({
+    personas: payload.personas,
+    groupBindings: payload.groupBindings,
+    accountBindings: payload.accountBindings,
+    privateBinding: payload.privateBinding
+  })
+  return { ok: true, backup, personas: state.personas.length, groups: Object.keys(state.groupBindings).length, accounts: Object.keys(state.accountBindings || {}).length }
+}
+
 const HTML = `<!doctype html>
 <html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1150,6 +1318,7 @@ const HTML = `<!doctype html>
   <a href="#/" id="nav-home">总览</a>
   <a href="#/draw" id="nav-draw">生图工作台</a>
   <a href="#/ai" id="nav-ai">AI 配置</a>
+  <a href="#/persona" id="nav-persona">人设</a>
   <a href="#/commands" id="nav-commands">命令/骰子</a>
   <a href="#/observe" id="nav-observe">运行观测</a>
   <a href="#/semantic" id="nav-semantic">语义记忆</a>
@@ -1173,6 +1342,7 @@ function page(){
   if(h==='#/commands')return 'commands'
   if(h==='#/observe')return 'observe'
   if(h==='#/semantic')return 'semantic'
+  if(h==='#/persona')return 'persona'
   return 'home'
 }
 const APP_PAGES={commands:{label:'命令 / 骰子管理'},observe:{label:'运行观测'},semantic:{label:'语义记忆'}}
@@ -1305,11 +1475,17 @@ function aiDirty(){
   }catch(e){ return false }
 }
 let aiRestore=false
+let personaRestore=false
+let lastPage='home'
 function route(){
   // 离开 AI 配置且本组有未保存修改时拦截(防误触导航手势/侧键丢编辑)
   if(page()!=='ai'&&aiDirty()){
     if(confirm('AI 配置有未保存的修改,确定离开?\\n(留在本页请点"取消")')){ aiData=null }
     else{ aiRestore=true; history.back(); return }
+  }
+  if(lastPage==='persona'&&page()!=='persona'&&(plDirty()||cfgDirty)){
+    if(confirm('人设页有未保存的修改,确定离开?\\n(留在本页请点"取消")')){ plData=null; cfgData=null; cfgDirty=false }
+    else{ personaRestore=true; history.back(); return }
   }
   document.getElementById('nav-home').className=page()==='home'?'on':''
   document.getElementById('nav-draw').className=page()==='draw'?'on':''
@@ -1317,6 +1493,7 @@ function route(){
   document.getElementById('nav-commands').className=page()==='commands'?'on':''
   document.getElementById('nav-observe').className=page()==='observe'?'on':''
   document.getElementById('nav-semantic').className=page()==='semantic'?'on':''
+  document.getElementById('nav-persona').className=page()==='persona'?'on':''
   if(page()==='draw'){document.getElementById('at').textContent='';renderDrawPage()}
   else if(page()==='ai'){
     document.getElementById('at').textContent=''
@@ -1324,7 +1501,12 @@ function route(){
     else renderAiPage()
   }
   else if(page()==='commands'||page()==='observe'||page()==='semantic'){document.getElementById('at').textContent='';renderAppPage(page())}
+  else if(page()==='persona'){
+    document.getElementById('at').textContent=''
+    if(personaRestore){ personaRestore=false } else renderPersonaPage()
+  }
   else load()
+  lastPage=page()
 }
 window.addEventListener('hashchange',route)
 
@@ -1686,6 +1868,198 @@ async function loadHistory(){
   }catch(e){box.innerHTML='<span class="muted">'+esc(e.message)+'</span>'}
 }
 
+// ===== 人设页(多套人设 + 账号/群/私聊绑定 + 默认人设) =====
+let plTab='library'
+let plData=null
+let plModel=null
+let plAccounts=[]
+let cfgData=null
+let cfgModel={}
+let cfgDirty=false
+function plDirty(){ return Boolean(plModel&&plData&&JSON.stringify(plModel)!==JSON.stringify({personas:plData.personas,groupBindings:plData.groupBindings,accountBindings:plData.accountBindings||{},privateBinding:plData.privateBinding})) }
+async function renderPersonaPage(){
+  document.getElementById('app').innerHTML='<div class="card"><span class="muted">加载中…</span></div>'
+  let lib
+  try{ lib=await api('/api/persona/library') }catch(e){ document.getElementById('app').innerHTML='<div class="card" style="color:#ff9d9d">'+esc(e.message)+'</div>'; return }
+  plData=lib
+  plModel=JSON.parse(JSON.stringify({personas:lib.personas,groupBindings:lib.groupBindings,accountBindings:lib.accountBindings||{},privateBinding:lib.privateBinding}))
+  plTab='library'
+  try{ plAccounts=(await api('/api/persona/accounts')).accounts||[] }catch(e){ plAccounts=[] }
+  document.getElementById('app').innerHTML='<div id="personaTabs"></div><div id="personaBody"></div>'
+  renderPersonaTabs()
+  renderPersonaTab()
+}
+function renderPersonaTabs(){
+  let box=document.getElementById('personaTabs')
+  if(!box)return
+  box.innerHTML='<div class="seg">'
+    +'<button class="'+(plTab==='library'?'on':'')+'" onclick="switchPlTab(\\'library\\')">人设库与绑定</button>'
+    +'<button class="'+(plTab==='base'?'on':'')+'" onclick="switchPlTab(\\'base\\')">默认人设与画像</button></div>'
+}
+function switchPlTab(t){
+  if(t!==plTab&&plTab==='library'&&plDirty()){ if(!confirm('人设库有未保存的修改,切换将丢弃,确定?'))return }
+  if(t!==plTab&&plTab==='base'&&cfgDirty()){ if(!confirm('默认人设有未保存的修改,切换将丢弃,确定?'))return }
+  plTab=t
+  renderPersonaTabs()
+  renderPersonaTab()
+}
+function renderPersonaTab(){
+  const box=document.getElementById('personaBody')
+  if(!box)return
+  if(plTab==='library')renderPersonaLibrary(box)
+  else renderBasePersona(box)
+}
+// ---- 人设库 ----
+function personaSelectOptions(selected,withDefault){
+  const opts=withDefault?['<option value="default"'+(selected==='default'?' selected':'')+'>默认人设</option>']:[]
+  for(const p of (plModel.personas||[]))opts.push('<option value="'+esc(p.id)+'"'+(selected===p.id?' selected':'')+'>'+esc(p.name)+'</option>')
+  return opts.join('')
+}
+function renderPersonaLibrary(box){
+  let html='<div class="card"><b>多套人设</b> <span class="badge '+(plDirty()?'warn':'ok')+'">'+(plDirty()?'未保存':'干净')+'</span>'
+    +'<div class="muted" style="margin-top:4px">未写的字段自动回退默认人设;解析优先级:群绑定/私聊绑定 > 账号默认 > 全局默认。保存写入 persona-library.yaml,立即热生效。</div></div>'
+  // 默认人设卡片(只读指引)
+  html+='<div class="pcard" style="opacity:.85"><b>默认人设</b> <span class="badge ok">message.yaml</span>'
+    +'<div class="muted" style="margin-top:4px">'+esc(plData.basePersona.name||'(未命名)')+' · '+esc(String(plData.basePersona.identity||'').slice(0,60))+'</div>'
+    +'<div class="ops"><button class="btn small ghost" onclick="switchPlTab(\\'base\\')">去编辑默认人设</button></div></div>'
+  // 库内人设
+  html+=(plModel.personas||[]).map((p,i)=>personaCard(p,i)).join('')||'<div class="card muted">库里还没有其他人设,点下面新建。</div>'
+  html+='<button class="btn small ghost" onclick="plAddPersona()">+ 新建人设</button>'
+  // 绑定
+  html+='<h2 style="margin:18px 0 8px">账号绑定 <span class="muted">每个 bot QQ 的默认身份</span></h2>'
+  html+='<div class="card">'+(plAccounts.length?plAccounts.map(a=>{
+    const bound=plModel.accountBindings[a.qq]||'default'
+    return '<div class="fieldline"><div style="flex:1;min-width:150px"><label class="fl">'+esc(a.qq||('(未识别) '+a.container))+(a.running?' <span class="badge ok">在线</span>':' <span class="badge bad">停</span>')+'</label><input type="text" value="'+esc(a.container)+'" disabled></div>'
+      +'<div style="flex:2;min-width:200px"><label class="fl">人设</label><select style="width:100%" onchange="plSetAccount(\\''+esc(a.qq)+'\\',this.value)">'+personaSelectOptions(bound,true)+'</select></div></div>'
+  }).join(''):'<div class="muted">没有发现 napcat 账号容器;可手动添加绑定。</div>')
+  html+='<div class="fieldline"><div style="flex:1;min-width:150px"><label class="fl">手动添加 QQ</label><input type="text" id="plAccQq" placeholder="bot QQ 号"></div>'
+    +'<div style="flex:2;min-width:200px"><label class="fl">人设</label><select id="plAccPersona" style="width:100%">'+personaSelectOptions('default',true)+'</select></div>'
+    +'<div style="flex:0 0 auto;align-self:end"><button class="btn small ghost" onclick="plAddAccount()">添加</button></div></div></div>'
+  html+='<h2 style="margin:18px 0 8px">群绑定</h2><div class="card">'
+  const groupRows=Object.entries(plModel.groupBindings||{})
+  html+=groupRows.map(([g,id])=>'<div class="fieldline"><div style="flex:1;min-width:150px"><label class="fl">群号</label><input type="text" value="'+esc(g)+'" onchange="plRenameGroup(\\''+esc(g)+'\\',this.value)"></div>'
+    +'<div style="flex:2;min-width:200px"><label class="fl">人设</label><select style="width:100%" onchange="plSetGroup(\\''+esc(g)+'\\',this.value)">'+personaSelectOptions(id,true)+'</select></div>'
+    +'<div style="flex:0 0 auto;align-self:end"><button class="btn small ghost" style="color:#ff9d9d;border-color:#5a2a2a" onclick="plDelGroup(\\''+esc(g)+'\\')">删除</button></div></div>').join('')||'<div class="muted">还没有群绑定(所有群走账号默认/全局默认)。</div>'
+  html+='<div class="fieldline"><div style="flex:1;min-width:150px"><label class="fl">群号</label><input type="text" id="plGroupNew" placeholder="新群号"></div>'
+    +'<div style="flex:2;min-width:200px"><label class="fl">人设</label><select id="plGroupPersona" style="width:100%">'+personaSelectOptions('default',true)+'</select></div>'
+    +'<div style="flex:0 0 auto;align-self:end"><button class="btn small ghost" onclick="plAddGroup()">添加</button></div></div></div>'
+  html+='<h2 style="margin:18px 0 8px">私聊绑定</h2><div class="card"><div class="fieldline"><div style="max-width:320px"><label class="fl">所有私聊默认人设(账号绑定优先)</label><select style="width:100%" onchange="plModel.privateBinding=this.value;renderPersonaTab()">'+personaSelectOptions(plModel.privateBinding||'default',true)+'</select></div></div></div>'
+  html+='<div style="margin:16px 0"><button class="btn" onclick="plSave()">保存人设库</button> <span class="muted">'+(plDirty()?'有未保存修改':'无改动')+'</span></div>'
+  box.innerHTML=html
+}
+function personaCard(p,i){
+  const moodsLen=(p.moods||[]).length
+  return '<div class="pcard"><b>'+esc(p.name)+'</b> <span class="badge">id '+esc(p.id)+'</span>'
+    +'<div class="muted" style="margin-top:4px">'+esc(String(p.identity||'').slice(0,80)||'(身份未填,回退默认)')+'</div>'
+    +'<div class="muted">'+esc(String(p.tone||'').slice(0,60))+(moodsLen?(' · '+moodsLen+' 个心情'):'')+'</div>'
+    +'<div class="ops"><button class="btn small ghost" onclick="plEditPersona('+i+')">编辑</button>'
+    +'<button class="btn small ghost" style="color:#ff9d9d;border-color:#5a2a2a" onclick="plDelPersona('+i+')">删除</button></div>'
+    +'<div id="plEditor-'+i+'" style="display:none;margin-top:10px"></div></div>'
+}
+function plEditPersona(i){ const box=document.getElementById('plEditor-'+i); if(!box)return; if(box.style.display==='none'){ box.style.display='block'; box.innerHTML=personaEditor(plModel.personas[i],i) } else { box.style.display='none'; box.innerHTML='' } }
+function personaEditor(p,i){
+  const tags=f=>((p[f]||[]).join(','))
+  let html='<div class="fieldline">'
+    +'<div style="flex:1;min-width:140px"><label class="fl">名字</label><input type="text" value="'+esc(p.name||'')+'" oninput="plField('+i+',\\'name\\',this.value)"></div>'
+    +'<div style="flex:3;min-width:220px"><label class="fl">身份定位</label><input type="text" value="'+esc(p.identity||'')+'" oninput="plField('+i+',\\'identity\\',this.value)"></div>'
+    +'<div style="flex:2;min-width:160px"><label class="fl">语气</label><input type="text" value="'+esc(p.tone||'')+'" oninput="plField('+i+',\\'tone\\',this.value)"></div>'
+    +'</div>'
+  for(const [f,label] of [['speechStyle','说话风格(逗号分隔)'],['preferences','偏好(逗号分隔)'],['boundaries','边界(逗号分隔)']]){
+    html+='<div class="fieldline"><div><label class="fl">'+label+'</label><input type="text" value="'+esc(tags(f))+'" oninput="plTags('+i+',\\''+f+'\\',this.value)"></div></div>'
+  }
+  html+='<div class="fieldline"><div><label class="fl">其他备注</label><input type="text" value="'+esc(p.notes||'')+'" oninput="plField('+i+',\\'notes\\',this.value)"></div></div>'
+  html+='<label class="fl">调皮心情时刻(按概率着色,建议 0.05~0.2)</label>'
+  html+=(p.moods||[]).map((m,mi)=>'<div class="fieldline">'
+    +'<div style="flex:1;min-width:100px"><input type="text" value="'+esc(m.name||'')+'" placeholder="心情名" oninput="plMood('+i+','+mi+',\\'name\\',this.value)"></div>'
+    +'<div style="flex:3;min-width:180px"><input type="text" value="'+esc(m.hint||'')+'" placeholder="一句话描述" oninput="plMood('+i+','+mi+',\\'hint\\',this.value)"></div>'
+    +'<div style="flex:0 0 110px"><input type="text" value="'+esc(String(m.probability==null?'':m.probability))+'" placeholder="概率 0.12" oninput="plMoodNum('+i+','+mi+',this.value)"></div>'
+    +'<div style="flex:0 0 auto;align-self:center"><button class="btn small ghost" onclick="plDelMood('+i+','+mi+')">✕</button></div></div>').join('')
+  html+='<button class="btn small ghost" onclick="plAddMood('+i+')">+ 心情</button>'
+  return html
+}
+function plField(i,f,v){ plModel.personas[i][f]=v; plTouch() }
+function plTags(i,f,v){ plModel.personas[i][f]=v.split(/[,，]/).map(s=>s.trim()).filter(Boolean); plTouch() }
+function plMood(i,mi,f,v){ plModel.personas[i].moods[mi][f]=v; plTouch() }
+function plMoodNum(i,mi,v){ const n=Number(v); plModel.personas[i].moods[mi].probability=Number.isFinite(n)&&n>0?n:0.1; plTouch() }
+function plAddMood(i){ plModel.personas[i].moods=plModel.personas[i].moods||[]; plModel.personas[i].moods.push({name:'',hint:'',probability:0.1}); plRerenderKeepEditor(i) }
+function plDelMood(i,mi){ plModel.personas[i].moods.splice(mi,1); plRerenderKeepEditor(i) }
+function plRerenderKeepEditor(i){ renderPersonaTab(); const box=document.getElementById('plEditor-'+i); if(box){ box.style.display='block'; box.innerHTML=personaEditor(plModel.personas[i],i) } }
+function plAddPersona(){ plModel.personas.push({id:'',name:'新人设',identity:'',tone:'',speechStyle:[],preferences:[],boundaries:[],notes:'',moods:[]}); renderPersonaTab(); const last=plModel.personas.length-1; plEditPersona(last) }
+function plDelPersona(i){ if(!confirm('删除人设「'+plModel.personas[i].name+'」?绑定它的群/账号会回退。'))return; plModel.personas.splice(i,1); renderPersonaTab() }
+function plSetAccount(qq,id){ if(id==='default')delete plModel.accountBindings[qq]; else plModel.accountBindings[qq]=id; plTouch() }
+function plAddAccount(){ const qq=document.getElementById('plAccQq').value.trim(); const id=document.getElementById('plAccPersona').value; if(!/^\\d{4,12}$/.test(qq)){toast('QQ 号格式不正确');return} plSetAccount(qq,id); renderPersonaTab() }
+function plSetGroup(g,id){ if(id==='default')delete plModel.groupBindings[g]; else plModel.groupBindings[g]=id; plTouch() }
+function plAddGroup(){ const g=document.getElementById('plGroupNew').value.trim(); const id=document.getElementById('plGroupPersona').value; if(!g){toast('群号不能为空');return} plSetGroup(g,id); renderPersonaTab() }
+function plRenameGroup(oldG,newG){ const id=plModel.groupBindings[oldG]; if(!newG||newG===oldG)return; delete plModel.groupBindings[oldG]; if(id)plModel.groupBindings[newG]=id; plTouch(); renderPersonaTab() }
+function plDelGroup(g){ delete plModel.groupBindings[g]; plTouch(); renderPersonaTab() }
+function plTouch(){ const b=document.querySelector('#personaBody > .card > .badge'); if(b){ b.className='badge warn'; b.textContent='未保存' } }
+async function plSave(){
+  try{
+    const d=await api('/api/persona/library',{method:'PUT',body:JSON.stringify(plModel)})
+    plData=await api('/api/persona/library')
+    plModel=JSON.parse(JSON.stringify({personas:plData.personas,groupBindings:plData.groupBindings,accountBindings:plData.accountBindings||{},privateBinding:plData.privateBinding}))
+    renderPersonaTab()
+    toast('人设库已保存并热生效'+(d.backup?('(备份 '+d.backup+')'):''))
+  }catch(e){toast(e.message,6000)}
+}
+// ---- 默认人设(schema 引擎) ----
+async function renderBasePersona(box){
+  box.innerHTML='<div class="card"><span class="muted">加载中…</span></div>'
+  try{ cfgData=await api('/api/config/persona') }catch(e){ box.innerHTML='<div class="card" style="color:#ff9d9d">'+esc(e.message)+'</div>'; return }
+  cfgModel={}
+  for(const g of cfgData.groups||[])for(const f of g.fields)cfgModel[f.field]=f.value
+  cfgDirty=false
+  renderCfgGroups(box)
+}
+function renderCfgGroups(box){
+  let html='<div class="card"><b>'+esc(cfgData.title)+'</b> <span class="badge '+(cfgDirty?'warn':'ok')+'">'+(cfgDirty?'未保存':'干净')+'</span>'
+    +'<div class="muted" style="margin-top:4px">保存写入 message.yaml(自动备份),bot 热读即生效。schema 与锅巴同源。</div></div>'
+  for(const g of cfgData.groups||[]){
+    html+='<h2 style="margin:16px 0 6px">'+esc(g.label)+'</h2><div class="card">'
+    for(const f of g.fields)html+=cfgFieldHtml(f)
+    html+='</div>'
+  }
+  html+='<div style="margin:16px 0"><button class="btn" onclick="cfgSave()">保存默认人设</button> <span class="muted">'+(cfgDirty?'有未保存修改':'无改动')+'</span></div>'
+  box.innerHTML=html
+}
+function cfgFieldHtml(f){
+  const v=cfgModel[f.field]
+  const on='oninput="cfgSet(\\''+esc(f.field)+'\\',this.value,\\''+f.component+'\\')"'
+  const help=f.help?'<div class="muted" style="margin-top:3px;font-size:11px">'+esc(f.help)+'</div>':''
+  if(f.component==='Switch')return '<div class="fieldline"><div style="display:flex;align-items:center;gap:8px"><input type="checkbox" '+(v===true?'checked':'')+' onchange="cfgSet(\\''+esc(f.field)+'\\',this.checked,\\'Switch\\')"><span style="font-size:13px">'+esc(f.label)+'</span></div>'+help+'</div>'
+  if(f.component==='InputTextArea')return '<div class="fieldline"><div><label class="fl">'+esc(f.label)+'</label><textarea style="min-height:64px" '+on+'>'+esc(v)+'</textarea>'+help+'</div></div>'
+  if(f.component==='InputNumber')return '<div class="fieldline"><div style="max-width:260px"><label class="fl">'+esc(f.label)+'</label><input type="text" inputmode="decimal" value="'+esc(v===null?'':v)+'" '+on+'>'+help+'</div></div>'
+  if(f.component==='GTags')return '<div class="fieldline"><div><label class="fl">'+esc(f.label)+'(逗号分隔)</label><input type="text" value="'+esc(Array.isArray(v)?v.join(','):'')+'" '+on+'>'+help+'</div></div>'
+  if(f.component==='GSubForm'){
+    let html='<label class="fl">'+esc(f.label)+'</label>'
+    html+=(Array.isArray(v)?v:[]).map((row,ri)=>'<div class="fieldline">'
+      +f.subFields.map(sub=>'<div style="flex:'+(sub.component==='InputTextArea'?'3':'1')+';min-width:120px"><label class="fl">'+esc(sub.label)+'</label><input type="text" value="'+esc(row[sub.field]==null?'':row[sub.field])+'" oninput="cfgSubSet(\\''+esc(f.field)+'\\','+ri+',\\''+esc(sub.field)+'\\',this.value)"></div>').join('')
+      +'<div style="flex:0 0 auto;align-self:end"><button class="btn small ghost" onclick="cfgSubDel(\\''+esc(f.field)+'\\','+ri+')">✕</button></div></div>').join('')
+    html+='<button class="btn small ghost" onclick="cfgSubAdd(\\''+esc(f.field)+'\\')">+ 添加</button>'+help
+    return '<div class="fieldline"><div>'+html+'</div></div>'
+  }
+  return '<div class="fieldline"><div><label class="fl">'+esc(f.label)+'</label><input type="text" value="'+esc(v||'')+'" '+on+'>'+help+'</div></div>'
+}
+function cfgSet(field,value,component){
+  let v=value
+  if(component==='InputNumber'){ const n=Number(value); v=(value===''||value===null?'':(Number.isFinite(n)?n:value)) }
+  if(component==='GTags')v=String(value).split(/[,，]/).map(s=>s.trim()).filter(Boolean)
+  cfgModel[field]=v
+  cfgDirty=true
+  const badges=document.querySelectorAll('#personaBody .card .badge'); if(badges.length)badges[0].outerHTML='<span class="badge warn">未保存</span>'
+}
+function cfgSubSet(field,ri,subField,value){ cfgModel[field][ri][subField]=value; cfgDirty=true }
+function cfgSubDel(field,ri){ cfgModel[field].splice(ri,1); cfgDirty=true; renderCfgGroups(document.getElementById('personaBody')) }
+function cfgSubAdd(field){ cfgModel[field]=cfgModel[field]||[]; cfgModel[field].push({}); cfgDirty=true; renderCfgGroups(document.getElementById('personaBody')) }
+async function cfgSave(){
+  try{
+    const d=await api('/api/config/persona',{method:'PUT',body:JSON.stringify({values:cfgModel})})
+    cfgDirty=false
+    renderBasePersona(document.getElementById('personaBody'))
+    toast(d.changed?('已保存 '+d.changed+' 个字段'+(d.backup?('(备份 '+d.backup+')'):'')):'没有变更')
+  }catch(e){toast(e.message,6000)}
+}
+
 // ===== AI 配置 =====
 let aiData=null
 let aiActive=null
@@ -1995,6 +2369,25 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/apps") {
       return sendJson(res, 200, { apps: appPageEntryList() })
+    }
+    if (url.pathname === "/api/config/persona") {
+      if (req.method === "GET") return sendJson(res, 200, schemaConfigView("persona"))
+      if (req.method === "PUT") {
+        const body = await readJsonBody(req, 2 * 1024 * 1024)
+        return sendJson(res, 200, saveSchemaConfig("persona", body.values || {}))
+      }
+      return sendJson(res, 405, { error: "method not allowed" })
+    }
+    if (url.pathname === "/api/persona/library") {
+      if (req.method === "GET") return sendJson(res, 200, personaLibraryView())
+      if (req.method === "PUT") {
+        const body = await readJsonBody(req, 4 * 1024 * 1024)
+        return sendJson(res, 200, savePersonaLibrary(body))
+      }
+      return sendJson(res, 405, { error: "method not allowed" })
+    }
+    if (url.pathname === "/api/persona/accounts") {
+      return sendJson(res, 200, { accounts: await listBotAccounts() })
     }
     if (url.pathname === "/api/accounts/action" && req.method === "POST") {
       const body = await readJsonBody(req, 64 * 1024)

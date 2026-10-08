@@ -303,15 +303,19 @@ export async function handlePersonaBindings(host, e) {
     }
     try {
       const bindings = host.personaLibrary.bindings()
-      const entries = Object.entries(bindings).filter(([, id]) => id)
+      const entries = [
+        ...Object.entries(bindings?.groups || {}).map(([groupId, personaId]) => [`群 ${groupId}`, personaId]),
+        ...Object.entries(bindings?.accounts || {}).map(([qq, personaId]) => [`账号 ${qq}`, personaId]),
+        ...(bindings?.private ? [["私聊", bindings.private]] : [])
+      ].filter(([, id]) => id)
       if (!entries.length) {
-        await host.sendObservedReply(e, "还没有任何群绑定自定义人设,全部用默认人设")
+        await host.sendObservedReply(e, "还没有任何绑定自定义人设,全部用默认人设")
         return true
       }
       const lines = ["【人设绑定】"]
-      for (const [groupId, personaId] of entries) {
+      for (const [label, personaId] of entries) {
         const detail = host.personaLibrary.detail(personaId)
-        lines.push(`- ${groupId === "__private__" ? "私聊" : `群 ${groupId}`} → ${detail?.persona?.name || personaId}`)
+        lines.push(`- ${label} → ${detail?.persona?.name || personaId}`)
       }
       await host.sendObservedReply(e, lines.join("\n"))
     } catch (error) {
