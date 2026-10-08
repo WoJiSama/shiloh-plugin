@@ -1720,8 +1720,14 @@ async function load(){
       +'</div>'
       +'<div class="muted">创建后到账号卡片点「启动」→ 出现二维码扫码登录;WebUI 端口即扫码备用入口。</div></div>'
     const acc=(d.accounts||[]).map(a=>{
-      const cls=a.running?(a.status==='running'?'ok':'warn'):'bad'
-      const label=a.running?(a.status==='running'?'在线':'已停止'):(a.status==='created'?'冷备':'异常')
+      const badge=!a.running
+        ? { cls: 'bad', label: a.status==='created' ? '冷备(未启动)' : '已停止' }
+        : a.loginState==='已登录' ? { cls: 'ok', label: '在线' }
+        : a.loginState==='待扫码' ? { cls: 'warn', label: '待扫码' }
+        : a.loginState==='掉线' ? { cls: 'bad', label: '已掉线' }
+        : { cls: 'warn', label: '状态检测中' }
+      const cls=badge.cls
+      const label=badge.label
       const ops='<div style="margin-top:8px;display:flex;gap:6px">'
         +(a.running
           ?'<button class="btn small" onclick="accountAction(\\''+esc(a.container)+'\\',\\'restart\\')">重启</button>'
@@ -1732,7 +1738,7 @@ async function load(){
       const qr=a.qrAvailable
         ?'<div data-qr-container="'+esc(a.container)+'" style="margin-top:8px"><a href="'+qrUrl+'" target="_blank"><img loading="lazy" src="'+qrUrl+'" style="width:150px;border-radius:8px;display:block"></a><div class="muted">扫码重新登录(点图放大;二维码自动换新)</div></div>'
         :''
-      return '<div class="card"><b>'+esc(a.account||a.container)+'</b> <span class="badge '+cls+'">'+label+'</span>'+loginBadge(a)
+      return '<div class="card"><b>'+esc(a.account||a.container)+'</b> <span class="badge '+cls+'">'+label+'</span>'
         +'<table><tr><td>容器</td><td>'+esc(a.container)+'</td><td>内存</td><td>'+esc(a.memory||'-')+'</td></tr>'
         +'<tr><td>出口IP</td><td>'+esc(a.exitIp||'未知')+'</td><td>登录入口</td><td>'+(a.webui?'<a href='+a.webui+' target=_blank>'+esc(a.webui)+'</a>':'-')+'</td></tr></table>'
         +ops+qr+'</div>'
@@ -1761,13 +1767,6 @@ async function load(){
   }catch(e){document.getElementById('err').textContent='加载失败: '+e.message}
 }
 function card(t,v){return '<div class=card style=flex:1;min-width:120px><div class=muted>'+t+'</div><div style="font-size:22px">'+(v||0)+'</div></div>'}
-function loginBadge(a){
-  const s=a.loginState||'未知'
-  if(s==='已登录')return ' <span class="badge ok">已登录</span>'
-  if(s==='待扫码')return ' <span class="badge warn">掉线·待扫码</span>'
-  if(s==='掉线')return ' <span class="badge bad">掉线</span>'
-  return ' <span class="badge warn">'+esc(s)+'</span>'
-}
 async function accountAction(container,action){
   if(!confirm('确认对容器 '+container+' 执行 '+action+' ?'))return
   try{
