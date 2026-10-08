@@ -1510,7 +1510,7 @@ const APP_PAGES={commands:{label:'命令 / 骰子管理'},observe:{label:'运行
 let appEntriesCache=null
 async function renderAppPage(key){
   const meta=APP_PAGES[key]
-  if(!meta){load();return}
+  if(!meta){renderHomePage();return}
   document.getElementById('app').innerHTML='<div class="card"><span class="muted">加载中…</span></div>'
   let src='/bl-chat/'+({commands:'commands/',observe:'observe/',semantic:'semantic-memory/'}[key]||'')
   try{
@@ -1655,7 +1655,7 @@ function route(){
   document.getElementById('nav-observe').className=page()==='observe'?'on':''
   document.getElementById('nav-semantic').className=page()==='semantic'?'on':''
   document.getElementById('nav-persona').className=page()==='persona'?'on':''
-  if(page()!=='home')lastOverviewHtml=''
+  if(page()!=='home'&&ovModules){ ovModules.accounts.reset(); ovModules.stats.reset(); ovModules.sentinel.reset() }
   if(page()==='draw'){document.getElementById('at').textContent='';renderDrawPage()}
   else if(page()==='ai'){
     document.getElementById('at').textContent=''
@@ -1667,13 +1667,12 @@ function route(){
     document.getElementById('at').textContent=''
     if(personaRestore){ personaRestore=false } else renderPersonaPage()
   }
-  else load()
+  else renderHomePage()
   lastPage=page()
 }
 window.addEventListener('hashchange',route)
 
-let loadSeq=0
-let lastOverviewHtml=""
+// ===== 总览模块化:账号/统计/哨兵独立加载、独立指纹静默刷新,互不影响 =====
 function addAccountSnapshot(){
   const box=document.getElementById('addAccountBox')
   if(!box||box.style.display==='none')return null
@@ -1691,89 +1690,138 @@ function addAccountRestore(keep){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v}
   set('aa-qq',keep.qq);set('aa-port',keep.port);set('aa-subnet',keep.subnet)
 }
-async function load(){
-  const seq=++loadSeq
-  // 骨架仅首次进入时占位;后续刷新靠指纹比对静默更新,不再整页重绘
-  if(page()==='home'&&!lastOverviewHtml){
-    document.getElementById('err').textContent=''
-    document.getElementById('app').innerHTML='<h2>账号</h2><div class="card muted">采集中…</div><h2>统计</h2><div class="card muted">加载中…</div>'
-  }
-  try{
-    const d=await api('/api/overview')
-    // 过期响应丢弃:切页后回来的旧数据不得覆盖当前页面
-    if(seq!==loadSeq||page()!=='home')return
-    window.__accounts=d.accounts||[]
-    document.getElementById('err').textContent=''
-    document.getElementById('at').textContent=new Date(d.at).toLocaleString()
-    const batchBar='<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13px">批量操作</b>'
-      +'<button class="btn small" onclick="batchAction(\\'restart\\',\\'all\\')">全部重启</button>'
-      +'<button class="btn small ghost" onclick="batchAction(\\'restart\\',\\'abnormal\\')">重启掉线/待扫码</button>'
-      +'<button class="btn small ghost" onclick="showAddAccount()">＋ 添加账号</button>'
-      +'<button class="btn small ghost" onclick="load()" title="立即刷新">↻ 刷新</button>'
-      +'<span class="muted" id="batchState"></span></div>'
-    +'<div class="card" id="addAccountBox" style="display:none"><b>添加账号</b> <span class="muted">创建停机备号(独立网络+独立出口 sidecar,0 内存)</span>'
-      +'<div class="fieldline" style="margin-top:8px">'
-      +'<div style="flex:1;min-width:140px"><label class="fl">QQ 号 *</label><input type="text" id="aa-qq" placeholder="新账号 QQ"></div>'
-      +'<div style="flex:1;min-width:120px"><label class="fl">WebUI 端口(留空自动)</label><input type="text" id="aa-port" placeholder="自动分配"></div>'
-      +'<div style="flex:1;min-width:120px"><label class="fl">子网序号(留空自动)</label><input type="text" id="aa-subnet" placeholder="自动分配"></div>'
-      +'<div style="flex:0 0 auto;align-self:end"><button class="btn small" onclick="doAddAccount()">创建</button></div>'
-      +'</div>'
-      +'<div class="muted">创建后到账号卡片点「启动」→ 出现二维码扫码登录;WebUI 端口即扫码备用入口。</div></div>'
-    const acc=(d.accounts||[]).map(a=>{
-      const badge=!a.running
-        ? { cls: 'bad', label: a.status==='created' ? '冷备(未启动)' : '已停止' }
-        : a.loginState==='已登录' ? { cls: 'ok', label: '在线' }
-        : a.loginState==='待扫码' ? { cls: 'warn', label: '待扫码' }
-        : a.loginState==='掉线' ? { cls: 'bad', label: '已掉线' }
-        : { cls: 'warn', label: '状态检测中' }
-      const cls=badge.cls
-      const label=badge.label
-      const ops='<div style="margin-top:8px;display:flex;gap:6px">'
-        +(a.running
-          ?'<button class="btn small" onclick="accountAction(\\''+esc(a.container)+'\\',\\'restart\\')">重启</button>'
-            +'<button class="btn small ghost" onclick="accountAction(\\''+esc(a.container)+'\\',\\'stop\\')">停止</button>'
-          :'<button class="btn small" onclick="accountAction(\\''+esc(a.container)+'\\',\\'start\\')">启动</button>')
-        +'</div>'
-      const qrUrl='/img/qrcode/'+encodeURIComponent(a.container)+(token?('?token='+encodeURIComponent(token)):'')
-      const qr=a.qrAvailable
-        ?'<div data-qr-container="'+esc(a.container)+'" style="margin-top:8px"><a href="'+qrUrl+'" target="_blank"><img loading="lazy" src="'+qrUrl+'" style="width:150px;border-radius:8px;display:block"></a><div class="muted">扫码重新登录(点图放大;二维码自动换新)</div></div>'
-        :''
-      return '<div class="card"><b>'+esc(a.account||a.container)+'</b> <span class="badge '+cls+'">'+label+'</span>'
-        +'<table><tr><td>容器</td><td>'+esc(a.container)+'</td><td>内存</td><td>'+esc(a.memory||'-')+'</td></tr>'
-        +'<tr><td>出口IP</td><td>'+esc(a.exitIp||'未知')+'</td><td>登录入口</td><td>'+(a.webui?'<a href='+a.webui+' target=_blank>'+esc(a.webui)+'</a>':'-')+'</td></tr></table>'
-        +ops+qr+'</div>'
-    }).join('')||'<div class="card muted">没有发现 napcat 容器</div>'
-    let statsHtml='<div class="muted">统计不可用(Redis 未连接?)</div>'
-    if(d.stats){
-      const max=Math.max(...d.stats.week.map(x=>x.recv+x.send),1)
-      statsHtml='<div class="row">'
-        +card('7日收信',d.stats.total.recv)+card('7日发送',d.stats.total.send)+card('7日失败',d.stats.total.fail)+'</div>'
-        +'<div class="card"><table><tr><th>日期</th><th>收</th><th>发</th><th>败</th><th></th></tr>'
-        +d.stats.week.map(x=>'<tr><td>'+x.day+'</td><td>'+x.recv+'</td><td>'+x.send+'</td><td>'+(x.fail||0)+'</td><td style="width:40%"><div class=bar><i style="width:'+Math.round((x.recv+x.send)/max*100)+'%"></i></div></td></tr>').join('')
-        +'</table></div>'
-      const groups=Object.entries(d.stats.todayGroups||{}).sort((a,b)=>(b[1].recv+b[1].send)-(a[1].recv+a[1].send)).slice(0,10)
-      if(groups.length)statsHtml+='<div class="card"><h2 style="margin:0 0 8px">今日按群</h2><table><tr><th>群</th><th>收</th><th>发</th></tr>'
-        +groups.map(([g,v])=>'<tr><td>'+g+'</td><td>'+v.recv+'</td><td>'+v.send+'</td></tr>').join('')+'</table></div>'
+
+function createOverviewModule({ boxId, fetcher, buildHtml, intervalMs, snapshot, restore, onLoaded }) {
+  let lastHtml = ""
+  let seq = 0
+  async function load() {
+    const cur = ++seq
+    let data
+    try { data = await fetcher() } catch (e) {
+      if (cur === seq && !lastHtml) {
+        const box = document.getElementById(boxId)
+        if (box) box.innerHTML = '<div class="card" style="color:#ff9d9d">加载失败: ' + esc(e.message) + '</div>'
+      }
+      return
     }
-    const sen='<div class="card"><h2 style="margin:0 0 8px">哨兵</h2><div class="muted">'+esc(d.sentinel.status||'').replace(/\\n/g,'<br>')+'</div>'
-      +(d.sentinel.alerts&&d.sentinel.alerts.length?'<h2 style="margin:12px 0 8px">最近告警</h2>'+d.sentinel.alerts.map(a=>'<div class=muted>'+esc(a)+'</div>').join(''):'')+'</div>'
-    const html='<h2>账号</h2>'+batchBar+'<div class=row>'+acc+'</div><h2>统计</h2>'+statsHtml+sen
-    // 指纹相同:零 DOM 操作——轮询不再打断点按/吞输入中的表单/闪二维码
-    if(html===lastOverviewHtml)return
-    const keep=addAccountSnapshot()
-    document.getElementById('app').innerHTML=html
-    addAccountRestore(keep)
-    lastOverviewHtml=html
-  }catch(e){document.getElementById('err').textContent='加载失败: '+e.message}
+    if (cur !== seq) return
+    if (onLoaded) onLoaded(data, true)
+    const html = buildHtml(data)
+    if (html === lastHtml) return
+    const keep = snapshot ? snapshot() : null
+    const box = document.getElementById(boxId)
+    if (!box) return
+    box.innerHTML = html
+    if (restore) restore(keep)
+    lastHtml = html
+    if (onLoaded) onLoaded(data, false)
+  }
+  setInterval(() => { if (me && !document.hidden && page() === 'home') load() }, intervalMs)
+  return { load, reset() { lastHtml = "" } }
 }
+
+let ovModules = null
+function ensureOverviewModules() {
+  if (ovModules) return ovModules
+  ovModules = {
+    accounts: createOverviewModule({
+      boxId: 'mod-accounts',
+      intervalMs: 30000,
+      fetcher: () => api('/api/overview/accounts'),
+      buildHtml: buildAccountsModuleHtml,
+      snapshot: addAccountSnapshot,
+      restore: addAccountRestore,
+      onLoaded: (d, unchanged) => {
+        window.__accounts = d.accounts || []
+        document.getElementById('at').textContent = new Date().toLocaleString()
+      }
+    }),
+    stats: createOverviewModule({ boxId: 'mod-stats', intervalMs: 60000, fetcher: () => api('/api/overview/stats'), buildHtml: buildStatsModuleHtml }),
+    sentinel: createOverviewModule({ boxId: 'mod-sentinel', intervalMs: 45000, fetcher: () => api('/api/sentinel'), buildHtml: buildSentinelModuleHtml })
+  }
+  return ovModules
+}
+function renderHomePage() {
+  document.getElementById('app').innerHTML = '<div id="mod-accounts"><div class="card muted">账号采集中…</div></div>'
+    + '<div id="mod-stats"><div class="card muted">统计加载中…</div></div>'
+    + '<div id="mod-sentinel"><div class="card muted">哨兵加载中…</div></div>'
+  const modules = ensureOverviewModules()
+  modules.accounts.load()
+  modules.stats.load()
+  modules.sentinel.load()
+}
+
+function buildAccountsModuleHtml(d) {
+  const batchBar = '<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13px">批量操作</b>'
+    + '<button class="btn small" onclick="batchAction(\\'restart\\',\\'all\\')">全部重启</button>'
+    + '<button class="btn small ghost" onclick="batchAction(\\'restart\\',\\'abnormal\\')">重启掉线/待扫码</button>'
+    + '<button class="btn small ghost" onclick="showAddAccount()">＋ 添加账号</button>'
+    + '<button class="btn small ghost" onclick="ovModules.accounts.load()" title="只刷新账号模块">↻ 刷新</button>'
+    + '<span class="muted" id="batchState"></span></div>'
+    + '<div class="card" id="addAccountBox" style="display:none"><b>添加账号</b> <span class="muted">创建停机备号(独立网络+独立出口 sidecar,0 内存)</span>'
+    + '<div class="fieldline" style="margin-top:8px">'
+    + '<div style="flex:1;min-width:140px"><label class="fl">QQ 号 *</label><input type="text" id="aa-qq" placeholder="新账号 QQ"></div>'
+    + '<div style="flex:1;min-width:120px"><label class="fl">WebUI 端口(留空自动)</label><input type="text" id="aa-port" placeholder="自动分配"></div>'
+    + '<div style="flex:1;min-width:120px"><label class="fl">子网序号(留空自动)</label><input type="text" id="aa-subnet" placeholder="自动分配"></div>'
+    + '<div style="flex:0 0 auto;align-self:end"><button class="btn small" onclick="doAddAccount()">创建</button></div>'
+    + '</div>'
+    + '<div class="muted">创建后到账号卡片点「启动」→ 出现二维码扫码登录;WebUI 端口即扫码备用入口。</div></div>'
+  const acc=(d.accounts||[]).map(a=>{
+    const badge=!a.running
+      ? { cls: 'bad', label: a.status==='created' ? '冷备(未启动)' : '已停止' }
+      : a.loginState==='已登录' ? { cls: 'ok', label: '在线' }
+      : a.loginState==='待扫码' ? { cls: 'warn', label: '待扫码' }
+      : a.loginState==='掉线' ? { cls: 'bad', label: '已掉线' }
+      : { cls: 'warn', label: '状态检测中' }
+    const cls=badge.cls
+    const label=badge.label
+    const ops='<div style="margin-top:8px;display:flex;gap:6px">'
+      +(a.running
+        ?'<button class="btn small" onclick="accountAction(\\''+esc(a.container)+'\\',\\'restart\\')">重启</button>'
+          +'<button class="btn small ghost" onclick="accountAction(\\''+esc(a.container)+'\\',\\'stop\\')">停止</button>'
+        :'<button class="btn small" onclick="accountAction(\\''+esc(a.container)+'\\',\\'start\\')">启动</button>')
+      +'</div>'
+    const qrUrl='/img/qrcode/'+encodeURIComponent(a.container)+(token?('?token='+encodeURIComponent(token)):'')
+    const qr=a.qrAvailable
+      ?'<div data-qr-container="'+esc(a.container)+'" style="margin-top:8px"><a href="'+qrUrl+'" target="_blank"><img loading="lazy" src="'+qrUrl+'" style="width:150px;border-radius:8px;display:block"></a><div class="muted">扫码重新登录(点图放大;二维码自动换新)</div></div>'
+      :''
+    return '<div class="card"><b>'+esc(a.account||a.container)+'</b> <span class="badge '+cls+'">'+label+'</span>'
+      +'<table><tr><td>容器</td><td>'+esc(a.container)+'</td><td>内存</td><td>'+esc(a.memory||'-')+'</td></tr>'
+      +'<tr><td>出口IP</td><td>'+esc(a.exitIp||'未知')+'</td><td>登录入口</td><td>'+(a.webui?'<a href='+a.webui+' target=_blank>'+esc(a.webui)+'</a>':'-')+'</td></tr></table>'
+      +ops+qr+'</div>'
+  }).join('')||'<div class="card muted">没有发现 napcat 容器</div>'
+  return '<h2>账号</h2>'+batchBar+'<div class=row>'+acc+'</div>'
+}
+
+function buildStatsModuleHtml(d) {
+  let statsHtml='<div class="muted">统计不可用(Redis 未连接?)</div>'
+  if(d.stats){
+    const max=Math.max(...d.stats.week.map(x=>x.recv+x.send),1)
+    statsHtml='<div class="row">'
+      +card('7日收信',d.stats.total.recv)+card('7日发送',d.stats.total.send)+card('7日失败',d.stats.total.fail)+'</div>'
+      +'<div class="card"><table><tr><th>日期</th><th>收</th><th>发</th><th>败</th><th></th></tr>'
+      +d.stats.week.map(x=>'<tr><td>'+x.day+'</td><td>'+x.recv+'</td><td>'+x.send+'</td><td>'+(x.fail||0)+'</td><td style="width:40%"><div class=bar><i style="width:'+Math.round((x.recv+x.send)/max*100)+'%"></i></div></td></tr>').join('')
+      +'</table></div>'
+    const groups=Object.entries(d.stats.todayGroups||{}).sort((a,b)=>(b[1].recv+b[1].send)-(a[1].recv+a[1].send)).slice(0,10)
+    if(groups.length)statsHtml+='<div class="card"><h2 style="margin:0 0 8px">今日按群</h2><table><tr><th>群</th><th>收</th><th>发</th></tr>'
+      +groups.map(([g,v])=>'<tr><td>'+g+'</td><td>'+v.recv+'</td><td>'+v.send+'</td></tr>').join('')+'</table></div>'
+  }
+  return '<h2>统计</h2>'+statsHtml
+}
+
+function buildSentinelModuleHtml(d) {
+  return '<div class="card"><h2 style="margin:0 0 8px">哨兵</h2><div class="muted">'+esc(d.status||'').replace(/\\n/g,'<br>')+'</div>'
+    +(d.alerts&&d.alerts.length?'<h2 style="margin:12px 0 8px">最近告警</h2>'+d.alerts.map(a=>'<div class=muted>'+esc(a)+'</div>').join(''):'')+'</div>'
+}
+
 function card(t,v){return '<div class=card style=flex:1;min-width:120px><div class=muted>'+t+'</div><div style="font-size:22px">'+(v||0)+'</div></div>'}
 async function accountAction(container,action){
   if(!confirm('确认对容器 '+container+' 执行 '+action+' ?'))return
   try{
     const d=await api('/api/accounts/action',{method:'POST',body:JSON.stringify({containers:[container],action})})
     toast(d.results.map(r=>r.container+(r.ok?' ✔':' ✘ '+(r.error||''))+(r.note?('('+r.note+')'):'')).join('; '),6000)
-    load()
-    if(action==='start'&&d.ok){ toast('已启动,几秒后卡片会出现扫码二维码(自动刷新中)'); setTimeout(load,4000); setTimeout(load,10000) }
+    if(ovModules)ovModules.accounts.load()
+    if(action==='start'&&d.ok){ toast('已启动,几秒后卡片会出现扫码二维码(自动刷新中)'); const m=ovModules&&ovModules.accounts; if(m){ setTimeout(()=>m.load(),4000); setTimeout(()=>m.load(),10000) } }
   }catch(e){toast(e.message,6000)}
 }
 function showAddAccount(){
@@ -1792,7 +1840,7 @@ async function doAddAccount(){
     })})
     toast('账号 '+d.qq+' 已创建(端口 '+d.port+' · 子网 '+d.subnet+') · 到卡片点「启动」后扫码',8000)
     document.getElementById('addAccountBox').style.display='none'
-    load()
+    if(ovModules)ovModules.accounts.load()
   }catch(e){toast(e.message,8000)}
 }
 async function batchAction(action,scope){
@@ -1806,8 +1854,8 @@ async function batchAction(action,scope){
     const d=await api('/api/accounts/action',{method:'POST',body:JSON.stringify({containers:names,action})})
     if(state)state.textContent=''
     toast(d.results.map(r=>r.container+(r.ok?' ✔':' ✘')).join('; '),6000)
-    load()
-    if(action==='start'&&d.ok){ setTimeout(load,4000); setTimeout(load,10000) }
+    if(ovModules)ovModules.accounts.load()
+    if(action==='start'&&d.ok){ const m=ovModules&&ovModules.accounts; if(m){ setTimeout(()=>m.load(),4000); setTimeout(()=>m.load(),10000) } }
   }catch(e){if(state)state.textContent='';toast(e.message,6000)}
 }
 
@@ -2462,8 +2510,7 @@ async function aiProbeOne(i){
 }
 renderAiSkeleton()
 boot()
-setInterval(()=>{if(me&&!document.hidden&&page()==='home')load()},30000)
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&me&&page()==='home')load()})
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&me&&page()==='home'&&ovModules){ ovModules.accounts.load(); ovModules.stats.load(); ovModules.sentinel.load() }})
 // 待扫码账号的二维码约2分钟一换:只换 img src,不重绘页面
 setInterval(()=>{
   if(page()!=='home')return
@@ -2598,6 +2645,24 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname === "/api/overview") {
       return sendJson(res, 200, await buildOverview())
+    }
+    // 总览模块化:三个细粒度接口,前端各模块独立加载互不影响
+    if (url.pathname === "/api/overview/accounts") {
+      return sendJson(res, 200, { accounts: await collectAccounts() })
+    }
+    if (url.pathname === "/api/overview/stats") {
+      const stats = await (async () => {
+        try {
+          const redis = await new MiniRedis().connect()
+          const stats = await collectStats(redis)
+          redis.socket?.end()
+          return stats
+        } catch { return null }
+      })()
+      return sendJson(res, 200, { stats })
+    }
+    if (url.pathname === "/api/sentinel") {
+      return sendJson(res, 200, collectSentinel())
     }
     if (url.pathname === "/api/apps") {
       return sendJson(res, 200, { apps: appPageEntryList() })
