@@ -4,6 +4,7 @@ import { enrichDouyinMessageSegments, extractDouyinShareFromText } from "../douy
 import { enrichYoutubeMessageSegments, extractYoutubeShareFromText } from "../youtubeMessage.js"
 import { enrichPixivMessageSegments, extractPixivShareFromText } from "../pixivMessage.js"
 import { createEventEnvelope, envelopeToRuntimeEvent, isEnvelopeFromBot } from "./eventEnvelope.js"
+import { isResponsibleBot, isFederationSibling, markBotOnline, onlineBotList } from "../botFederation.js"
 import { AsyncSemaphore, KeyedSerialQueue } from "./keyedSerialQueue.js"
 
 const DEFAULT_MAX_ATTEMPTS = 5
@@ -129,14 +130,56 @@ export class MessagePipeline {
     this.capture(envelope).catch(error => {
       this.logger?.warn?.(`[MessagePipeline] 捕获持久化失败 event=${envelope.eventId}: ${cleanError(error)}`)
     })
+    // 多账号联邦:心跳登记 + 统计只在责任侧计(兄弟消息/旁观者不计,防止双 bot 同群计数翻倍)
+    markBotOnline(envelope.botId)
     if (this.stats) {
-      try {
-        this.stats.recordReceive(envelope)
-      } catch {
-        // 统计 fail-open,绝不影响事件捕获
-      }
+      this.federationAllows(envelope)
+        .then(allows => {
+          if (!allows) return
+          try {
+            this.stats.recordReceive(envelope)
+          } catch {
+            // 统计 fail-open,绝不影响事件捕获
+          }
+        })
+        .catch(() => {
+          try {
+            this.stats.recordReceive(envelope)
+          } catch {}
+        })
     }
     return envelope.eventId
+  }
+
+  // 联邦判定:@ 优先,否则(群号+在线bot列表)稳定哈希选主;私聊与单 bot 恒通过。
+  // 兄弟 bot 的消息(自家其他账号发的)一律不算普通群友事件。
+  async federationAllows(envelope) {
+    try {
+      const me = String(envelope.botId || "")
+      const who = String(envelope.userId || "")
+      if (me && who && who !== me && (await isFederationSibling(me, who))) return false
+      if (!envelope.groupId) return true
+      const bots = await onlineBotList()
+      const atBotQqs = this.extractOwnAtBots(envelope, bots)
+      return await isResponsibleBot({
+        groupId: String(envelope.groupId),
+        selfId: me,
+        atBotQqs,
+        knownBots: bots
+      })
+    } catch {
+      return true
+    }
+  }
+
+  extractOwnAtBots(envelope, bots = []) {
+    const out = new Set()
+    for (const segment of Array.isArray(envelope.message) ? envelope.message : []) {
+      if (segment?.type !== "at") continue
+      const qq = String(segment?.qq ?? segment?.data?.qq ?? "").trim()
+      if (qq && bots.includes(qq)) out.add(qq)
+    }
+    return [...out]
   }
 
   async capture(envelope) {
@@ -225,6 +268,19 @@ export class MessagePipeline {
   async processMessage(job) {
     const envelope = job.envelope
     const errors = []
+
+    // 联邦闸门:兄弟 bot 的消息不作为群友事件;非责任 bot 不做任何数据类消费
+    if (!(await this.federationAllows(envelope))) {
+      let changed = false
+      for (const key of ["media", "emoji", "recent", "archive"]) {
+        if (job.consumers[key] !== "done" && job.consumers[key] !== "skipped") {
+          job.consumers[key] = "skipped"
+          changed = true
+        }
+      }
+      if (changed) await this.store.save("event", job.id, { ...job, updatedAt: Date.now() }).catch(() => {})
+      return
+    }
 
     if (job.consumers.media !== "done" && job.consumers.media !== "skipped") {
       try {

@@ -1,5 +1,6 @@
 // B站高清搬运域（P3 从 apps/MessageManager.js 拆出）
 import fs from "fs"
+import { assertSoleResponsible } from "../../../utils/botFederation.js"
 import YAML from "yaml"
 import { buildBilibiliArchiveRelaySegments, cleanupBilibiliArchiveRelayFiles } from "../../../utils/bilibiliMediaRelay.js"
 import { BilibiliAuthManager } from "../../../utils/BilibiliAuthManager.js"
@@ -72,6 +73,7 @@ export class BilibiliRelayPlugin extends plugin {
   }
 
     async bilibiliAuth(e) {
+        if (!(await assertSoleResponsible(e))) return true
         const action = String(e.msg || '').match(/B站授权(登录|状态|退出)/)?.[1];
         if (action === '状态') {
             const status = this.bilibiliAuthManager.status();
@@ -102,6 +104,7 @@ export class BilibiliRelayPlugin extends plugin {
     }
 
     async manageBilibiliQualityWhitelist(e) {
+        if (!(await assertSoleResponsible(e))) return true
         if (!e.isMaster) return false;
         const groupId = String(e.group_id || '');
         if (!groupId) {
@@ -143,6 +146,7 @@ export class BilibiliRelayPlugin extends plugin {
     }
 
     async relayBilibiliHighQuality(e) {
+        if (!(await assertSoleResponsible(e))) return true
         const request = parseBilibiliQualityRelayRequest(e.msg);
         if (!request) {
             await e.reply('格式：.高清搬运 720P B站链接\n可选：240P、360P、480P、720P、1080P、1080P+、4K，或 qn 数值。');

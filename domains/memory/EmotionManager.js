@@ -39,17 +39,27 @@ export class EmotionManager {
   /**
    * 获取 Redis Key
    */
-  getRedisKey(groupId) {
-    return `${this.REDIS_PREFIX}${groupId}`
+  // 情绪是 bot 的个人状态:多账号同群时按 selfId 分键;<legacy> 为旧版群号键(兼容读)
+  getRedisKey(groupId, selfId = "") {
+    const scope = selfId ? `${String(selfId)}:` : ""
+    return `${this.REDIS_PREFIX}${scope}${groupId}`
   }
 
   /**
    * 获取指定群的情绪状态
    */
-  async getEmotion(groupId) {
+  async getEmotion(groupId, selfId = "") {
     try {
-      const key = this.getRedisKey(groupId)
-      const data = await redis.get(key)
+      const key = this.getRedisKey(groupId, selfId)
+      let data = await redis.get(key)
+      // 旧数据迁移:分键前只有群号键,首次读取回源并落到新键
+      if (!data && selfId) {
+        const legacy = await redis.get(this.getRedisKey(groupId, ""))
+        if (legacy) {
+          await redis.set(key, legacy, { EX: 7 * 24 * 60 * 60 })
+          data = legacy
+        }
+      }
 
       if (data) {
         const state = JSON.parse(data)
@@ -67,9 +77,9 @@ export class EmotionManager {
   /**
    * 保存情绪状态
    */
-  async saveEmotion(groupId, state) {
+  async saveEmotion(groupId, state, selfId = "") {
     try {
-      const key = this.getRedisKey(groupId)
+      const key = this.getRedisKey(groupId, selfId)
       state.lastUpdate = Date.now()
       await redis.set(key, JSON.stringify(state), { EX: 7 * 24 * 60 * 60 }) // 7天过期
     } catch (error) {
@@ -140,9 +150,9 @@ export class EmotionManager {
   /**
    * 更新指定群的情绪
    */
-  async updateEmotion(groupId, event, customDelta = null) {
+  async updateEmotion(groupId, event, customDelta = null, selfId = "") {
     try {
-      const state = await this.getEmotion(groupId)
+      const state = await this.getEmotion(groupId, selfId)
       const delta = customDelta !== null ? customDelta : (this.config.eventWeights[event] || 0)
 
       // 更新 mood
@@ -167,7 +177,7 @@ export class EmotionManager {
         state.recentEvents = state.recentEvents.slice(0, 10)
       }
 
-      await this.saveEmotion(groupId, state)
+      await this.saveEmotion(groupId, state, selfId)
 
       logger.debug(`[情感系统] 群${groupId} 情绪更新: ${event} (${delta > 0 ? '+' : ''}${delta}) → mood=${state.mood.toFixed(2)}, energy=${state.energy.toFixed(2)}`)
 
@@ -181,12 +191,12 @@ export class EmotionManager {
   /**
    * 根据消息内容自动更新情绪
    */
-  async updateEmotionFromMessage(groupId, content, isAtBot = false) {
+  async updateEmotionFromMessage(groupId, content, isAtBot = false, selfId = "") {
     const event = this.analyzeMessage(content, isAtBot)
     if (event) {
-      return await this.updateEmotion(groupId, event)
+      return await this.updateEmotion(groupId, event, null, selfId)
     }
-    return await this.getEmotion(groupId)
+    return await this.getEmotion(groupId, selfId)
   }
 
   /**
@@ -219,8 +229,8 @@ export class EmotionManager {
   /**
    * 获取情绪状态并生成 prompt
    */
-  async getEmotionPromptForGroup(groupId) {
-    const state = await this.getEmotion(groupId)
+  async getEmotionPromptForGroup(groupId, selfId = "") {
+    const state = await this.getEmotion(groupId, selfId)
     return this.getEmotionPrompt(state)
   }
 }

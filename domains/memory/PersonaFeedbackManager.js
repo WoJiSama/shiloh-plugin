@@ -191,18 +191,24 @@ export class PersonaFeedbackManager {
       at: Date.now()
     }
     this.lastReplies.set(key, record)
-    if (groupId !== "private") this.lastReplies.set(`group:${groupId}`, record)
+    // 多账号:群级"最近回复"按 bot 分键,星彩的上一句不能被当成希洛的
+    if (groupId !== "private") this.lastReplies.set(this.getGroupKey(e), record)
   }
 
   getConversationKey(e) {
     return `${String(e?.group_id || "private")}:${String(e?.user_id || "")}`
   }
 
+  // bot 维度的群键:同群多 bot 各记各的
+  getGroupKey(e) {
+    const selfId = String(e?.self_id || e?.bot?.uin || "")
+    return `group:${selfId}:${String(e?.group_id || "private")}`
+  }
+
   getRecentBotReply(e) {
     const direct = this.lastReplies.get(this.getConversationKey(e))
     if (direct) return direct
-    const groupId = String(e?.group_id || "private")
-    return this.lastReplies.get(`group:${groupId}`) || null
+    return this.lastReplies.get(this.getGroupKey(e)) || null
   }
 
   classifyFeedback(text = "") {

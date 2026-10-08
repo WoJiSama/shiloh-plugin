@@ -2771,6 +2771,9 @@ export class ExamplePlugin extends plugin {
 
     try {
       // 工具结果只保留在本轮上下文和日志中，不写入群聊历史，避免后续普通回复泄露内部状态。
+      // 多账号:回复归档用事件自身的 bot 身份与人设名,不再写死主号
+      const replySelfId = e.self_id || e.bot?.uin || Bot.uin
+      const replyPersonaName = resolvePersonaName(this.getPersonaFor(e))
       await this.messageManager.recordMessage({
         message_type: e.message_type,
         group_id: e.group_id,
@@ -2778,8 +2781,8 @@ export class ExamplePlugin extends plugin {
         time: now + 1,
         message: [{ type: "text", text: output }],
         source: "send",
-        self_id: Bot.uin,
-        sender: { user_id: Bot.uin, nickname: Bot.nickname, card: Bot.nickname, role: "member" }
+        self_id: replySelfId,
+        sender: { user_id: replySelfId, nickname: replyPersonaName, card: replyPersonaName, role: "member" }
       })
     } catch (error) {
       logger.error("[MessageRecord] 记录消息失败：", error)
@@ -2835,7 +2838,7 @@ export class ExamplePlugin extends plugin {
     // 1. 更新情感系统
     if (this.config.emotionSystem?.enabled) {
       const isAtBot = messageMentionsUser(e, Bot.uin)
-      emotionState = await this.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot)
+      emotionState = await this.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot, e.self_id || Bot.uin || "")
     }
 
     // 2. 提取并保存长期记忆（后台异步）
