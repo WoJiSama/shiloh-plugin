@@ -6,45 +6,26 @@
 //      被喊名/@ 的 AI 对话不受限(星彩在希洛主责的群里被喊星彩照样回);
 //   3) 自家 bot 互判:来自自家其他账号的消息不算普通群友消息。
 // 单 bot 部署下 onlineBots 恒为 1,所有判定退化为 true,零行为变化。
-const ONLINE_KEY = "shiloh:bots:online"
 const ONLINE_WINDOW_MS = 10 * 60 * 1000
-let onlineCache = { at: 0, list: [] }
-
-function getRedis() {
-  return globalThis.redis
-}
+// 在线发现走进程内 Map:所有适配器共享同一个 Yunzai 进程,模块级状态即全局;
+// 不依赖 globalThis.redis 的具体 API 形态(教训:Yunzai 的 redis 封装没有 zadd,
+// 心跳抛异常炸掉了整个消息监听)。任何情况下绝不向上抛。
+const onlineMap = new Map()
 
 export function markBotOnline(selfId = "") {
-  const qq = String(selfId || "").trim()
-  if (!qq || !/^\d{4,12}$/.test(qq)) return
-  const store = getRedis()
-  if (!store) {
-    if (!onlineCache.localSet) onlineCache.localSet = new Set()
-    onlineCache.localSet.add(qq)
-    onlineCache.at = Date.now()
-    return
-  }
-  store.zadd(ONLINE_KEY, Date.now(), qq).catch(() => {})
+  try {
+    const qq = String(selfId || "").trim()
+    if (!qq || !/^\d{4,12}$/.test(qq)) return
+    onlineMap.set(qq, Date.now())
+  } catch {}
 }
 
 export async function onlineBotList() {
   const now = Date.now()
-  if (now - onlineCache.at < 30000 && onlineCache.list.length) return onlineCache.list
-  const store = getRedis()
-  let list = []
-  if (store) {
-    try {
-      const members = await store.zrangebyscore(ONLINE_KEY, now - ONLINE_WINDOW_MS, "+inf")
-      list = (members || []).map(s => String(s).trim()).filter(qq => /^\d{4,12}$/.test(qq))
-      await store.zremrangebyscore(ONLINE_KEY, "-inf", now - ONLINE_WINDOW_MS * 3).catch(() => {})
-    } catch {}
+  for (const [qq, at] of onlineMap) {
+    if (now - at > ONLINE_WINDOW_MS) onlineMap.delete(qq)
   }
-  if (onlineCache.localSet) {
-    for (const qq of onlineCache.localSet) if (!list.includes(qq)) list.push(qq)
-  }
-  list = [...new Set(list)].sort()
-  onlineCache = { at: now, list, localSet: onlineCache.localSet }
-  return list
+  return [...onlineMap.keys()].sort()
 }
 
 // 稳定字符串哈希(FNV-1a):同输入恒同输出,保证每群选主稳定
