@@ -362,7 +362,7 @@ export async function handleToolInner(host, e) {
         session.addresseeSignal = computeAddresseeSignal({
           e,
           botId: Bot.uin,
-          mentionsBotName: hasBotTextAnchor(String(e?.msg || ""), Bot.nickname || "机器人", host.config.triggerPrefixes),
+          mentionsBotName: hasBotTextAnchor(String(e?.msg || ""), resolvePersonaName(host.getPersonaFor(e)) || Bot.nickname || "机器人", host.config.triggerPrefixes),
           quotesBot: mainQuotesBot,
           sameUserAsLastReply: Boolean(smartStateForSignal?.lastBotReplyToUserId && String(userId) === String(smartStateForSignal.lastBotReplyToUserId)),
           prefilterKind: e?._prefilterKind || "regular"

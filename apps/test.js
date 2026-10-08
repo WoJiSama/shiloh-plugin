@@ -1140,7 +1140,8 @@ export class ExamplePlugin extends plugin {
       const atSelf = messageMentionsUser(e, botId)
       const quotesSelf = messageQuotesUser(e, botId)
       const text = String(e?.msg || '')
-      const hasBotName = hasBotTextAnchor(text, Bot.nickname, this.config.triggerPrefixes)
+      // 喊名判定用当前账号的人设名(多账号下 Bot.nickname 是主号昵称,会串台唤醒)
+      const hasBotName = hasBotTextAnchor(text, resolvePersonaName(this.getPersonaFor(e)), this.config.triggerPrefixes)
       const explicitlyAddressesBot = atSelf || quotesSelf || hasBotName
 
       // @ 别人（且没有明确点名 bot）→ 跳过。

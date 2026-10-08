@@ -2,6 +2,7 @@
 // 从 apps/test.js 原样迁出(行为不变),this 依赖以 host 注入;
 // 输入(e, state, ctx)与返回 {decision, reason, ...} 契约不变。
 // 注意力漂移等"何时说话"的新信号以后在信号采集段扩展。
+import { resolvePersonaName } from "../../utils/personaSource.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../utils/chatCompletionUrl.js"
 import { sideLLMCall } from "../../utils/sideLLM.js"
 import { hasBotTextAnchor, getReplySender, messageQuotesUser } from "../../utils/messageContext.js"
@@ -28,7 +29,8 @@ export function formatAttentionHint(hook, level = "normal") {
 export async function runTimingGate(host, e, state, ctx = {}) {
     const smartCfg = host.config.smartTrigger || {}
     const ctxSize = Math.max(5, Math.min(100, Number(smartCfg.gateContextSize) || 20))
-    const botName = Bot.nickname || '机器人'
+    // 账号人设名优先:门控判定与提示词必须用本账号的名字,不能拿主号昵称串台
+    const botName = resolvePersonaName(host.getPersonaFor(e)) || Bot.nickname || '机器人'
 
     let history = ''
     try {
