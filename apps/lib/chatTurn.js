@@ -829,8 +829,10 @@ export async function handleToolInner(host, e) {
 	        const requestData = buildChatRequestData(host.config, requestMessages, session.tools, toolChoice)
             const initialModelStartedAt = Date.now()
 	        let response = await host.retryRequest(requestData, session.toolContent, 1, undefined, turnPlanRequest.requestOptions)
-	        session?.turnTrace?.addModelCall("main", Date.now() - initialModelStartedAt)
-	        logger.info(`[模型耗时] group=${groupId} stage=initial ${formatTurnPlanLog(session.turnPlan)} toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} history=${session.selectedGroupHistoryCount || 0} mode=${session.historySelectionMode || "full"} elapsed=${Date.now() - initialModelStartedAt}ms`)
+	        const mainElapsedMs = Date.now() - initialModelStartedAt
+	        const mainTokens = Number(response?.usage?.total_tokens) || 0
+	        session?.turnTrace?.addModelCall("main", mainElapsedMs, mainTokens ? { tokens: mainTokens } : undefined)
+	        logger.info(`[模型耗时] group=${groupId} stage=initial ${formatTurnPlanLog(session.turnPlan)} toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} history=${session.selectedGroupHistoryCount || 0} mode=${session.historySelectionMode || "full"} elapsed=${mainElapsedMs}ms${mainTokens ? ` tokens=${mainTokens}` : ""}`)
 
 	        if (!response?.choices?.[0]) {
 		          if (response?.error) {

@@ -111,8 +111,11 @@ export function createTurnTrace({ groupId = "", userId = "", sessionId = "", log
     setRoute(mode, profile, reason) {
       record.route = { mode: String(mode || ""), profile: String(profile || ""), reason: String(reason || "") }
     },
-    addModelCall(stage, ms) {
-      record.modelCalls.push({ stage: String(stage || ""), ms: Number(ms) || 0 })
+    addModelCall(stage, ms, extra) {
+      const call = { stage: String(stage || ""), ms: Number(ms) || 0 }
+      // extra: { tokens } 等;token 数用于区分"上游慢"与"prompt 巨型"两类慢
+      if (extra && Number.isFinite(Number(extra.tokens)) && Number(extra.tokens) > 0) call.tokens = Number(extra.tokens)
+      record.modelCalls.push(call)
     },
     addTool(name, ok, ms) {
       record.tools.push({ name: String(name || ""), ok: ok !== false, ms: Number(ms) || 0 })

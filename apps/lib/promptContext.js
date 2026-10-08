@@ -224,12 +224,18 @@ export async function resolveUnderstandingPrompt(host, context = {}) {
     if (!materials) return ""
     const cfg = materials.cfg
     if (cfg.briefEnabled) {
+      // 简报是 2.5s 预算的轻量理解:优先用意图分类同款 flash 级模型(亚秒),
+      // toolsAi 往往与主对话同源(秒级),每次都撞超时白等——实测该阶段从必超时变为稳定产出
+      const intentCfg = host.config.intentAiConfig || {}
       const toolsCfg = host.config.toolsAiConfig || {}
+      const briefCfg = intentCfg.intentAiUrl && intentCfg.intentAiApikey
+        ? { url: intentCfg.intentAiUrl, key: intentCfg.intentAiApikey, model: intentCfg.intentAiModel }
+        : { url: toolsCfg.toolsAiUrl, key: toolsCfg.toolsAiApikey, model: toolsCfg.toolsAiModel }
       const startedAt = Date.now()
       const result = await requestUnderstandingBrief({
-        apiUrl: normalizeChatCompletionUrl(toolsCfg.toolsAiUrl || ""),
-        apiKey: toolsCfg.toolsAiApikey || "",
-        model: toolsCfg.toolsAiModel || "",
+        apiUrl: normalizeChatCompletionUrl(briefCfg.url || ""),
+        apiKey: briefCfg.key || "",
+        model: briefCfg.model || "",
         materials,
         fetchImpl: (url, options, timeoutMs) => fetchWithTimeout(url, options, timeoutMs),
         timeoutMs: cfg.briefTimeoutMs
