@@ -276,7 +276,7 @@ const LOGIN_MARKERS = [
   { re: /请扫描下面的二维码|二维码已保存到|二维码解码URL/, state: "待扫码" },
   { re: /KickedOffLine|登录已失效|账号已离线|下线通知/, state: "掉线" },
   { re: /\[Login\]\s*Login Error/i, state: "掉线" },
-  { re: /快速登录|反向WebSocket.*已(启动|连接)|WebSocket Client.*连接(成功|建立)|发送 ->|收到 <-/, state: "已登录" }
+  { re: /快速登录|扫码登录成功|登录成功|反向WebSocket.*已(启动|连接)|WebSocket Client.*连接(成功|建立)|发送 ->|接收 <-|收到 <-/, state: "已登录" }
 ]
 function parseLoginState(logText = "") {
   const lines = String(logText || "").split("\n")
@@ -537,6 +537,42 @@ async function nextSubnetAndPort() {
   return { subnet, port }
 }
 
+
+// 开号后预配 onebot11 反向 ws:抄主号的 token 与参数,url 按本账号子网生成,
+// 免去登录后手工编辑 onebot11_<qq>.json 的步骤
+const NAPCAT_BASE = process.env.CONSOLE_NAPCAT_BASE || "/opt"
+
+function findMainOnebotTemplate() {
+  let bases = []
+  try {
+    bases = fs.readdirSync(NAPCAT_BASE).filter(n => n.startsWith("napcat")).map(n => path.join(NAPCAT_BASE, n, "config"))
+  } catch { return null }
+  for (const dir of bases) {
+    try {
+      for (const name of fs.readdirSync(dir).sort()) {
+        if (!/^onebot11_.*\.json$/.test(name)) continue
+        const parsed = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"))
+        const client = parsed?.network?.websocketClients?.[0]
+        if (client?.token) return client
+      }
+    } catch {}
+  }
+  return null
+}
+
+function writeOnebotConfig(qq, subnet) {
+  const dir = path.join(NAPCAT_BASE, `napcat-${qq}`, "config")
+  fs.mkdirSync(dir, { recursive: true })
+  const url = `ws://172.28.${subnet}.1:2536/OneBotv11`
+  const template = findMainOnebotTemplate()
+  const client = template
+    ? { ...template, enable: true, name: `napcat-${qq}`, url }
+    : { enable: true, name: `napcat-${qq}`, url, reportSelfMessage: false, messagePostFormat: "array", token: "", debug: false, heartInterval: 30000, reconnectInterval: 30000, verifyCertificate: true }
+  const config = { network: { httpServers: [], httpSseServers: [], httpClients: [], websocketServers: [], websocketClients: [client] }, musicSignUrl: "" }
+  fs.writeFileSync(path.join(dir, `onebot11_${qq}.json`), JSON.stringify(config, null, 2))
+  return url
+}
+
 async function handleAddAccount(payload = {}) {
   const qq = String(payload.qq || "").trim()
   if (!/^([1-9]\d{4,11})$/.test(qq)) throw new Error("QQ 号格式不正确(5-12位数字)")
@@ -557,13 +593,16 @@ async function handleAddAccount(payload = {}) {
   if (outcome.error) {
     throw new Error(`开通失败: ${String(outcome.error.message || outcome.error).slice(0, 300)}`)
   }
+  let wsUrl = ""
+  try { wsUrl = writeOnebotConfig(qq, subnet) } catch {}
   return {
     ok: true,
     qq,
     port,
     subnet,
+    wsUrl,
     output: String(outcome.stdout || "").trim(),
-    hint: `已创建停机备号(0内存)。下一步:点「启动」两个容器,卡片出现二维码扫码登录;WebUI http://<服务器IP>:${port}`
+    hint: `已创建停机备号(0内存,反向ws已预配${wsUrl ? ":" + wsUrl : ""})。下一步:点「启动」,卡片出二维码扫码登录即可入列。`
   }
 }
 
