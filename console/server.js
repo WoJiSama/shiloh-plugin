@@ -301,18 +301,12 @@ async function collectAccounts() {
   if (list.error) return []
   const names = list.stdout.split("\n").map(s => s.trim()).filter(Boolean)
   if (!names.length) return []
-  const statsRaw = await run("docker", ["stats", "--no-stream", "--format", "{{.Name}}|{{.MemUsage}}"], 20000)
-  const memByContainer = {}
-  for (const line of statsRaw.stdout.split("\n")) {
-    const [name, mem] = line.split("|")
-    if (name) memByContainer[name.trim()] = (mem || "").trim()
-  }
-  const accounts = []
-  for (const name of names) {
+  // 逐容器并行采集;内存走 cgroup 直读(见 containerMemoryFromCgroup),不再调用 docker stats
+  const accounts = await Promise.all(names.map(async name => {
     const info = await run("docker", ["inspect", "-f",
-      "{{.State.Status}}|{{.State.Running}}|{{.HostConfig.NetworkMode}}|{{range $k, $v := .NetworkSettings.Ports}}{{$k}}->{{(index $v 0).HostPort}} {{end}}|{{range .Config.Env}}{{.}} {{end}}", name])
-    if (info.error) continue
-    const [status, running, networkMode, portMaps, env] = info.stdout.trim().split("|")
+      "{{.Id}}|{{.State.Status}}|{{.State.Running}}|{{.HostConfig.NetworkMode}}|{{range $k, $v := .NetworkSettings.Ports}}{{$k}}->{{(index $v 0).HostPort}} {{end}}|{{range .Config.Env}}{{.}} {{end}}", name])
+    if (info.error) return null
+    const [containerId, status, running, networkMode, portMaps, env] = info.stdout.trim().split("|")
     const account = (env || "").split(" ").find(item => item.startsWith("ACCOUNT="))?.slice(8) || ""
     const sidecarRef = networkMode?.startsWith("container:") ? networkMode.slice("container:".length) : ""
     // 端口映射挂在 sidecar(网络的 owner)身上,napcat 只共享命名空间
@@ -330,20 +324,47 @@ async function collectAccounts() {
     const exitIp = sidecarRef ? await sidecarExitIp(sidecarRef) : "host-network(未隔离)"
     const runningBool = running === "true"
     const loginState = await loginStateOf(name, runningBool)
-    accounts.push({
+    return {
       container: name,
+      containerId,
       account,
       status: status || "unknown",
       running: runningBool,
       sidecar: sidecarName || null,
       exitIp,
-      memory: memByContainer[name] || "",
       loginState,
       qrAvailable: runningBool && loginState === "待扫码",
-      webui: webuiPort ? `http://${await publicIp()}:${webuiPort}` : null
-    })
+      webuiPort,
+      webui: null
+    }
+  }))
+  const ip = await publicIp()
+  for (const item of accounts) {
+    if (!item) continue
+    item.memory = containerMemoryFromCgroup(item.containerId, item.running)
+    item.webui = item.webuiPort ? `http://${ip}:${item.webuiPort}` : null
+    delete item.webuiPort
+    delete item.containerId
   }
-  return accounts
+  return accounts.filter(Boolean)
+}
+
+// docker stats --no-stream 要秒级采样;内存直接读 cgroup v2 文件,瞬时完成
+function containerMemoryFromCgroup(containerId = "", running = false) {
+  if (!running || !containerId) return ""
+  const scope = `/sys/fs/cgroup/system.slice/docker-${containerId}.scope`
+  try {
+    const current = Number(fs.readFileSync(`${scope}/memory.current`, "utf8").trim())
+    if (!Number.isFinite(current)) return ""
+    const format = bytes => bytes >= 1024 ** 3
+      ? `${(bytes / 1024 ** 3).toFixed(2)}GiB`
+      : `${(bytes / 1024 ** 2).toFixed(0)}MiB`
+    const maxRaw = fs.readFileSync(`${scope}/memory.max`, "utf8").trim()
+    if (maxRaw !== "max" && Number(maxRaw) > 0) return `${format(current)} / ${format(Number(maxRaw))}`
+    return format(current)
+  } catch {
+    return ""
+  }
 }
 
 let publicIpCache = null
@@ -458,6 +479,62 @@ async function handleAccountAction(payload = {}) {
     return { ok: results.every(item => item.ok), action, results }
   } finally {
     activeAccountOps--
+  }
+}
+
+
+// ---------- 添加账号(封装 /opt/napcat-exit/add-account.sh 开通停机备号) ----------
+// 依据现有编排自动分配:子网取 172.28.N 最小未用序号,端口取 mihomo-* 已占 6099 映射之外的最小值
+async function nextSubnetAndPort() {
+  const usedSubnets = new Set()
+  const nets = await run("docker", ["network", "ls", "--format", "{{.Name}}"])
+  for (const name of nets.stdout.split("\n").map(s => s.trim()).filter(n => n.startsWith("napcat-net-"))) {
+    const detail = await run("docker", ["network", "inspect", name, "--format", "{{range .IPAM.Config}}{{.Subnet}} {{end}}"])
+    const match = detail.stdout.match(/172\.28\.(\d+)\./)
+    if (match) usedSubnets.add(Number(match[1]))
+  }
+  let subnet = 1
+  while (usedSubnets.has(subnet) && subnet <= 250) subnet++
+
+  const usedPorts = new Set()
+  const sidecars = await run("docker", ["ps", "-a", "--filter", "name=mihomo", "--format", "{{.Names}}"])
+  for (const name of sidecars.stdout.split("\n").map(s => s.trim()).filter(Boolean)) {
+    const detail = await run("docker", ["inspect", "-f",
+      "{{range $k, $v := .NetworkSettings.Ports}}{{$k}}->{{(index $v 0).HostPort}} {{end}}", name])
+    for (const m of detail.stdout.matchAll(/6099\/tcp->(\d+)/g)) usedPorts.add(Number(m[1]))
+  }
+  let port = 6100
+  while (usedPorts.has(port) && port < 65500) port++
+  return { subnet, port }
+}
+
+async function handleAddAccount(payload = {}) {
+  const qq = String(payload.qq || "").trim()
+  if (!/^([1-9]\d{4,11})$/.test(qq)) throw new Error("QQ 号格式不正确(5-12位数字)")
+  let port = Number(payload.port)
+  let subnet = Number(payload.subnet)
+  if (port && !(Number.isInteger(port) && port >= 1024 && port <= 65535)) throw new Error("WebUI 端口需在 1024-65535")
+  if (subnet && !(Number.isInteger(subnet) && subnet >= 1 && subnet <= 250)) throw new Error("子网序号需在 1-250")
+  const known = new Set(await listNapcatContainers())
+  if (known.has(`napcat-${qq}`)) throw new Error(`账号 ${qq} 的容器已存在`)
+  if (!port || !subnet) {
+    const auto = await nextSubnetAndPort()
+    port = port || auto.port
+    subnet = subnet || auto.subnet
+  }
+  const script = process.env.CONSOLE_ADD_ACCOUNT_SH || "/opt/napcat-exit/add-account.sh"
+  if (!fs.existsSync(script)) throw new Error(`开通脚本不存在: ${script}`)
+  const outcome = await run("bash", [script, qq, String(port), String(subnet)], 90000)
+  if (outcome.error) {
+    throw new Error(`开通失败: ${String(outcome.error.message || outcome.error).slice(0, 300)}`)
+  }
+  return {
+    ok: true,
+    qq,
+    port,
+    subnet,
+    output: String(outcome.stdout || "").trim(),
+    hint: `已创建停机备号(0内存)。下一步:点「启动」两个容器,卡片出现二维码扫码登录;WebUI http://<服务器IP>:${port}`
   }
 }
 
@@ -1513,6 +1590,11 @@ window.addEventListener('hashchange',route)
 let loadSeq=0
 async function load(){
   const seq=++loadSeq
+  // 骨架先行:采集要 1-3 秒(docker stats),先让页面立刻切过来
+  if(page()==='home'){
+    document.getElementById('err').textContent=''
+    document.getElementById('app').innerHTML='<h2>账号</h2><div class="card muted">采集中(docker stats 较慢,约 1-3 秒)…</div><h2>统计</h2><div class="card muted">加载中…</div>'
+  }
   try{
     const d=await api('/api/overview')
     // 过期响应丢弃:总览采集慢(docker stats 数秒),切页后回来的旧数据不得覆盖当前页面
@@ -1523,7 +1605,16 @@ async function load(){
     const batchBar='<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:13px">批量操作</b>'
       +'<button class="btn small" onclick="batchAction(\\'restart\\',\\'all\\')">全部重启</button>'
       +'<button class="btn small ghost" onclick="batchAction(\\'restart\\',\\'abnormal\\')">重启掉线/待扫码</button>'
+      +'<button class="btn small ghost" onclick="showAddAccount()">＋ 添加账号</button>'
       +'<span class="muted" id="batchState"></span></div>'
+    +'<div class="card" id="addAccountBox" style="display:none"><b>添加账号</b> <span class="muted">创建停机备号(独立网络+独立出口 sidecar,0 内存)</span>'
+      +'<div class="fieldline" style="margin-top:8px">'
+      +'<div style="flex:1;min-width:140px"><label class="fl">QQ 号 *</label><input type="text" id="aa-qq" placeholder="新账号 QQ"></div>'
+      +'<div style="flex:1;min-width:120px"><label class="fl">WebUI 端口(留空自动)</label><input type="text" id="aa-port" placeholder="自动分配"></div>'
+      +'<div style="flex:1;min-width:120px"><label class="fl">子网序号(留空自动)</label><input type="text" id="aa-subnet" placeholder="自动分配"></div>'
+      +'<div style="flex:0 0 auto;align-self:end"><button class="btn small" onclick="doAddAccount()">创建</button></div>'
+      +'</div>'
+      +'<div class="muted">创建后到账号卡片点「启动」→ 出现二维码扫码登录;WebUI 端口即扫码备用入口。</div></div>'
     const acc=(d.accounts||[]).map(a=>{
       const cls=a.running?(a.status==='running'?'ok':'warn'):'bad'
       const label=a.running?(a.status==='running'?'在线':'已停止'):(a.status==='created'?'冷备':'异常')
@@ -1574,6 +1665,25 @@ async function accountAction(container,action){
     toast(d.results.map(r=>r.container+(r.ok?' ✔':' ✘ '+(r.error||''))).join('; '))
     load()
   }catch(e){toast(e.message,6000)}
+}
+function showAddAccount(){
+  const box=document.getElementById('addAccountBox')
+  if(!box)return
+  box.style.display=box.style.display==='none'?'block':'none'
+}
+async function doAddAccount(){
+  const qq=document.getElementById('aa-qq').value.trim()
+  if(!qq){toast('请填 QQ 号');return}
+  try{
+    const d=await api('/api/accounts/add',{method:'POST',body:JSON.stringify({
+      qq,
+      port:document.getElementById('aa-port').value.trim(),
+      subnet:document.getElementById('aa-subnet').value.trim()
+    })})
+    toast('账号 '+d.qq+' 已创建(端口 '+d.port+' · 子网 '+d.subnet+') · 到卡片点「启动」后扫码',8000)
+    document.getElementById('addAccountBox').style.display='none'
+    load()
+  }catch(e){toast(e.message,8000)}
 }
 async function batchAction(action,scope){
   const list=window.__accounts||[]
@@ -2392,6 +2502,10 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/api/accounts/action" && req.method === "POST") {
       const body = await readJsonBody(req, 64 * 1024)
       return sendJson(res, 200, await handleAccountAction(body))
+    }
+    if (url.pathname === "/api/accounts/add" && req.method === "POST") {
+      const body = await readJsonBody(req, 64 * 1024)
+      return sendJson(res, 200, await handleAddAccount(body))
     }
     if (url.pathname === "/api/image/providers") {
       return sendJson(res, 200, imageProviderOverview())
