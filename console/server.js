@@ -469,11 +469,40 @@ async function handleAccountAction(payload = {}) {
   try {
     const results = []
     for (const name of requested) {
+      const note = []
+      // 网络依赖:napcat 共享 mihomo sidecar 的网络命名空间,
+      // 启动前必须先拉起 sidecar,否则 docker start 报 cannot join network of a non running container
+      let sidecarId = ""
+      if (action === "start" || action === "restart") {
+        const netInfo = await run("docker", ["inspect", "-f", "{{.HostConfig.NetworkMode}}", name])
+        sidecarId = (String(netInfo.stdout || "").trim().match(/^container:(.+)$/) || [])[1] || ""
+        if (sidecarId) {
+          const sidecarState = await run("docker", ["inspect", "-f", "{{.State.Running}}", sidecarId])
+          if (String(sidecarState.stdout || "").trim() !== "true") {
+            const boot = await run("docker", ["start", sidecarId], 60000)
+            if (boot.error) {
+              results.push({ container: name, ok: false, error: `出口 sidecar 启动失败: ${String(boot.error.message || boot.error).slice(0, 160)}` })
+              continue
+            }
+            note.push("已先启动出口 sidecar")
+          }
+        }
+      }
       const outcome = await run("docker", [action, name], 60000)
+      // 停止时把 sidecar 一并停掉,回到"停机备号 0 内存"形态
+      if (!outcome.error && action === "stop" && sidecarId === "") {
+        const netInfo = await run("docker", ["inspect", "-f", "{{.HostConfig.NetworkMode}}", name])
+        const stopId = (String(netInfo.stdout || "").trim().match(/^container:(.+)$/) || [])[1] || ""
+        if (stopId) {
+          await run("docker", ["stop", stopId], 60000)
+          note.push("出口 sidecar 已一并停止")
+        }
+      }
       results.push({
         container: name,
         ok: !outcome.error,
-        error: outcome.error ? String(outcome.error.message || outcome.error).slice(0, 200) : ""
+        error: outcome.error ? String(outcome.error.message || outcome.error).slice(0, 200) : "",
+        note: note.join(";")
       })
     }
     return { ok: results.every(item => item.ok), action, results }
@@ -1662,8 +1691,9 @@ async function accountAction(container,action){
   if(!confirm('确认对容器 '+container+' 执行 '+action+' ?'))return
   try{
     const d=await api('/api/accounts/action',{method:'POST',body:JSON.stringify({containers:[container],action})})
-    toast(d.results.map(r=>r.container+(r.ok?' ✔':' ✘ '+(r.error||''))).join('; '))
+    toast(d.results.map(r=>r.container+(r.ok?' ✔':' ✘ '+(r.error||''))+(r.note?('('+r.note+')'):'')).join('; '),6000)
     load()
+    if(action==='start'&&d.ok){ toast('已启动,几秒后卡片会出现扫码二维码(自动刷新中)'); setTimeout(load,4000); setTimeout(load,10000) }
   }catch(e){toast(e.message,6000)}
 }
 function showAddAccount(){
@@ -1697,6 +1727,7 @@ async function batchAction(action,scope){
     if(state)state.textContent=''
     toast(d.results.map(r=>r.container+(r.ok?' ✔':' ✘')).join('; '),6000)
     load()
+    if(action==='start'&&d.ok){ setTimeout(load,4000); setTimeout(load,10000) }
   }catch(e){if(state)state.textContent='';toast(e.message,6000)}
 }
 
