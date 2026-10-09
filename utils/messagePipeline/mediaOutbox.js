@@ -230,6 +230,22 @@ export class MediaOutbox {
     await adapter?.cleanup(relay.tempFiles)
   }
 
+  // 多账号:合并转发要用的媒体文件必须落在"发送 bot 那个 napcat 容器"的挂载目录里,
+  // 否则容器内 ENOENT。约定(add-account.sh):各账号宿主目录 /opt/napcat-<qq>/config,
+  // 主号/旧部署用配置默认;容器内路径 /app/napcat/config/... 所有 napcat 一致。
+  sharedMediaFor(botId = "") {
+    const base = this.sharedMedia
+    if (!base?.hostDir || !base?.containerDir) return base
+    const qq = String(botId || "").trim()
+    if (!/^\d{4,12}$/.test(qq)) return base
+    try {
+      if (fs.existsSync(`/opt/napcat-${qq}/config`)) {
+        return { hostDir: `/opt/napcat-${qq}/config/bl-chat-media`, containerDir: base.containerDir }
+      }
+    } catch {}
+    return base
+  }
+
   platformAdapter(platform) {
     const type = String(platform || "").toLowerCase()
     const adapters = {
@@ -445,13 +461,13 @@ export class MediaOutbox {
       const encodeStartedAt = Date.now()
       for (const video of videoSegments) {
         relay.sharedMediaFiles ||= []
-        videos.push(await inlineForwardVideoSegment(video, { artifactStore: this.artifactStore, sharedMedia: this.sharedMedia, sharedMediaFiles: relay.sharedMediaFiles }))
+        videos.push(await inlineForwardVideoSegment(video, { artifactStore: this.artifactStore, sharedMedia: this.sharedMediaFor(job.botId), sharedMediaFiles: relay.sharedMediaFiles }))
       }
       const inlineSegments = []
       for (const item of nonVideoSegments) {
         if (item?.type === "image") {
           relay.sharedMediaFiles ||= []
-          inlineSegments.push(await inlineForwardLocalFileSegment(item, { artifactStore: this.artifactStore, sharedMedia: this.sharedMedia, sharedMediaFiles: relay.sharedMediaFiles }))
+          inlineSegments.push(await inlineForwardLocalFileSegment(item, { artifactStore: this.artifactStore, sharedMedia: this.sharedMediaFor(job.botId), sharedMediaFiles: relay.sharedMediaFiles }))
         } else {
           inlineSegments.push(item)
         }
@@ -461,7 +477,7 @@ export class MediaOutbox {
       for (const image of Array.isArray(relay.imageNodes) ? relay.imageNodes : []) {
         if (image?.type !== "image") continue
         relay.sharedMediaFiles ||= []
-        galleryImages.push(await inlineForwardLocalFileSegment(image, { artifactStore: this.artifactStore, sharedMedia: this.sharedMedia, sharedMediaFiles: relay.sharedMediaFiles }))
+        galleryImages.push(await inlineForwardLocalFileSegment(image, { artifactStore: this.artifactStore, sharedMedia: this.sharedMediaFor(job.botId), sharedMediaFiles: relay.sharedMediaFiles }))
       }
       timings.encode += Date.now() - encodeStartedAt
       const botRoot = globalThis.Bot
