@@ -2848,7 +2848,9 @@ export class ExamplePlugin extends plugin {
       this.memoryManager.extractAndSaveMemories(groupId, userId, userMessage, botReply, {
         source: "user",
         messageId: e.message_id,
-        senderName: e.sender?.card || e.sender?.nickname
+        senderName: e.sender?.card || e.sender?.nickname,
+        // 共享记忆盖源:这条事实是"当前 bot"在场时听来的,其他 bot 引用时可说"听XX说过"
+        heardFrom: resolvePersonaName(this.getPersonaFor(e))
       })
       // 提取群全局记忆（传入聊天记录）
       if (groupId) {
@@ -2865,7 +2867,9 @@ export class ExamplePlugin extends plugin {
             content: `${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${msg.content}`
           }
         })
-        this.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory)
+        this.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory, {
+          heardFrom: resolvePersonaName(this.getPersonaFor(e))
+        })
       }
     }
 

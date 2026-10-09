@@ -486,6 +486,9 @@ export async function handleToolInner(host, e) {
             groupId,
             userId,
             event: e,
+            // 当前注入对象的 bot 身份:共享记忆"听X说的"标注与分账号情绪缓存键都依赖它
+            viewerSelfId: String(e?.self_id || e?.bot?.uin || globalThis.Bot?.uin || ""),
+            viewerBotName: resolvePersonaName(host.getPersonaFor(e)),
             moodHint: moodHit,
             messageText: e.msg || args,
             memoryText: e.msg || "",

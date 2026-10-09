@@ -51,7 +51,10 @@ export function makeFact(input = {}) {
     superseded: input.superseded === true,
     embedding: normalizeEmbedding(input.embedding),
     eventAt: normalizeEventAt(input.eventAt),
-    origin: normalizeOrigin(input.origin)
+    origin: normalizeOrigin(input.origin),
+    // 多账号共享记忆的来源标注:这条事实是哪个 bot 在场时听来的(人设名);
+    // 注入给其他 bot 时可自然引用为"听XX说过"
+    ...(compactText(input.heardFrom, 24) ? { heardFrom: compactText(input.heardFrom, 24) } : {})
   }
 }
 

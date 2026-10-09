@@ -84,6 +84,8 @@ export async function composeTurnPromptLayers({
     midtermSummaryManager
   } = deps
   const { groupId, userId, event } = turn
+  const viewerSelfId = String(turn.viewerSelfId || "").trim()
+  const viewerBotName = String(turn.viewerBotName || "").trim()
   const messageText = String(turn.messageText || "")
   const memoryText = String(turn.memoryText ?? (turn.messageText || ""))
   const toneText = String(turn.toneText || messageText)
@@ -94,6 +96,8 @@ export async function composeTurnPromptLayers({
   const layerCacheEnabled = isPromptLayerCacheEnabled(config)
   const cachedOr = (key, ttlMs, loader) =>
     (layerCacheEnabled && key ? cachedPromptLayer(key, ttlMs, loader) : loader())
+
+  const e_selfId = selfId => (selfId ? String(selfId) : "")
 
   // ── 异步层读取(原为顺序 await,各层内容与降级语义不变) ──
   // 语义风格层保持原有的"提前启动"时序:先 kickoff,等其他层取完后才进入
@@ -120,15 +124,15 @@ export async function composeTurnPromptLayers({
     midtermMemoryPrompt
   ] = await Promise.all([
     config.emotionSystem?.enabled && emotionManager
-      ? cachedOr(groupId ? `emotion:${groupId}` : "", LAYER_CACHE_TTL_MS.emotion,
-          () => emotionManager.getEmotionPromptForGroup(groupId))
+      ? cachedOr(groupId ? `emotion:${viewerSelfId}:${groupId}` : "", LAYER_CACHE_TTL_MS.emotion,
+          () => emotionManager.getEmotionPromptForGroup(groupId, e_selfId(viewerSelfId)))
         .catch(error => {
           globalThis.logger?.warn?.(`[情绪] prompt 获取失败，降级为空: ${error?.message || error}`)
           return ''
         })
       : '',
     config.memorySystem?.enabled && memoryManager
-      ? withContextualMemoryTimeout(memoryManager.getContextualMemoryPrompt(groupId, userId, memoryText, Date.now()))
+      ? withContextualMemoryTimeout(memoryManager.getContextualMemoryPrompt(groupId, userId, memoryText, Date.now(), { viewerBotName }))
       : '',
     config.memorySystem?.enabled && memoryManager
       ? memoryManager.getGroupWorkflowPrompt(groupId, messageText).catch(error => {

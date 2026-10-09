@@ -337,7 +337,7 @@ export class MemoryManager {
 
   // ---- 语境化注入（mention 感知 / 语义召回 / refs 反查 / 时间回扣）----
   // 一次性读 entities/alias/facts，解析提及，组装六段语境提示。disabled 群返回 ''。
-  async getContextualMemoryPrompt(groupId, speakerQQ, message, now = Date.now()) {
+  async getContextualMemoryPrompt(groupId, speakerQQ, message, now = Date.now(), { viewerBotName = "" } = {}) {
     if (!this.config.enabled) return ''
     const meta = await this.store.getMeta(groupId)
     if (meta.disabled) return ''
@@ -384,7 +384,8 @@ export class MemoryManager {
       aliasDoc,
       pendingFacts,
       query,
-      config: this.config
+      config: this.config,
+      viewerBotName: String(viewerBotName || "").slice(0, 24)
     })
   }
 
@@ -922,7 +923,8 @@ export class MemoryManager {
     }
 
     const key = `${groupId}:${userId}`
-    const buf = this.userBuffers.get(key) || { groupId, userId, messages: [], timer: null }
+    const buf = this.userBuffers.get(key) || { groupId, userId, messages: [], timer: null, heardFrom: "" }
+    if (meta.heardFrom) buf.heardFrom = String(meta.heardFrom).slice(0, 24)
     buf.messages.push(compactText(userMessage, 500))
     this.userBuffers.set(key, buf)
 
@@ -985,6 +987,12 @@ export class MemoryManager {
       this._recordExtractOutcome(buf.groupId, false)
       return { written: 0, error: true }
     }
+    // 盖源:本轮缓冲里的事实带上"在场收听的 bot 人设名"
+    if (buf.heardFrom) {
+      for (const op of ops) {
+        if (op.fact && typeof op.fact === "object") op.fact = { ...op.fact, heardFrom: buf.heardFrom }
+      }
+    }
     const result = await this.applyOps(buf.groupId, ops)
     this._recordExtractOutcome(buf.groupId, true)
     return result
@@ -1004,7 +1012,7 @@ export class MemoryManager {
 
   // 群记忆抽取:最小间隔节流。距上次该群抽取不足 groupExtractMinIntervalMinutes 则跳过,
   // 避免每次回复都整理一遍群记忆。
-  async extractAndSaveGroupMemories(groupId, chatHistory = []) {
+  async extractAndSaveGroupMemories(groupId, chatHistory = [], meta = {}) {
     if (!this.config.enabled || !Array.isArray(chatHistory) || !chatHistory.length) return { queued: false }
 
     const intervalMs = Math.max(0, Number(this.config.groupExtractMinIntervalMinutes) || 0) * 60000
@@ -1032,6 +1040,11 @@ export class MemoryManager {
     }
     // 群抽取只接受 groupFact / alias（teaching），过滤掉需要 speaker 的 self/preference
     const safe = ops.filter(op => op.stream === 'groupFact' || (op.stream === 'alias' && op.authority === 'teaching'))
+    if (meta.heardFrom) {
+      for (const op of safe) {
+        if (op.fact && typeof op.fact === "object") op.fact = { ...op.fact, heardFrom: String(meta.heardFrom).slice(0, 24) }
+      }
+    }
     const result = await this.applyOps(groupId, safe)
     this._recordExtractOutcome(groupId, true)
     return result
