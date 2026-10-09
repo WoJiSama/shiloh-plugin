@@ -2705,7 +2705,7 @@ export class ExamplePlugin extends plugin {
     // 画图请求最终走了纯文字回复且本回合没有出图：给下一轮留失败标记，让模型能接住用户的不满
     if (session?.turnDrawRequested && e.group_id) {
       try {
-        const delivered = await findRecentBotImage(e, { botId: Bot.uin, maxAgeMs: 90000, limit: 12 })
+        const delivered = await findRecentBotImage(e, { botId: e?.bot?.uin || e?.self_id || Bot.uin, maxAgeMs: 90000, limit: 12 })
         if (delivered) {
           clearDrawFailureNote(e.group_id)
         } else {
@@ -2754,7 +2754,8 @@ export class ExamplePlugin extends plugin {
         chatHistory.push({ role: 'user', content: userMsg })
 
         // 添加机器人回复
-        const botMsg = `${this.formatTime()} ${Bot.nickname}(qq号:${Bot.uin})[群身份: member]: 在群里说: ${safeTruncateUnicode(output, 200)}`
+        const turnSelfId = e?.self_id || e?.bot?.uin || Bot.uin
+        const botMsg = `${this.formatTime()} ${resolvePersonaName(this.getPersonaFor(e))}(qq号:${turnSelfId})[群身份: member]: 在群里说: ${safeTruncateUnicode(output, 200)}`
         chatHistory.push({ role: 'bot', content: botMsg })
 
         // 只保留最近10条
@@ -2837,7 +2838,7 @@ export class ExamplePlugin extends plugin {
 
     // 1. 更新情感系统
     if (this.config.emotionSystem?.enabled) {
-      const isAtBot = messageMentionsUser(e, Bot.uin)
+      const isAtBot = messageMentionsUser(e, e?.bot?.uin || e?.self_id || Bot.uin)
       emotionState = await this.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot, e.self_id || Bot.uin || "")
     }
 
@@ -2852,11 +2853,18 @@ export class ExamplePlugin extends plugin {
       // 提取群全局记忆（传入聊天记录）
       if (groupId) {
         const history = await this.messageManager.getMessages('group', groupId)
-        const chatHistory = (history || []).slice(0, 40).map(msg => ({
-          role: msg.sender?.user_id === Bot.uin ? 'assistant' : 'user',
-          source: msg.source || (msg.sender?.user_id === Bot.uin ? "send" : "user"),
-          content: `${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${msg.content}`
-        }))
+        const eventBotId = String(e?.self_id || e?.bot?.uin || Bot.uin)
+        const chatHistory = (history || []).slice(0, 40).map(msg => {
+          // 归档的发送记录带 self_id;旧记录回退按 sender 匹配任一已知身份
+          const recordSelfId = String(msg.self_id || msg.sender?.self_id || "")
+          const isBotMsg = msg.source === "send" || recordSelfId === eventBotId ||
+            String(msg.sender?.user_id || "") === eventBotId
+          return {
+            role: isBotMsg ? 'assistant' : 'user',
+            source: msg.source || (isBotMsg ? "send" : "user"),
+            content: `${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${msg.content}`
+          }
+        })
         this.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory)
       }
     }

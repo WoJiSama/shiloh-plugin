@@ -37,7 +37,9 @@ export function resolveAvatarInspectionTargets({ e = {}, text = "", atQq = [], m
   const targets = []
   const addTarget = (userId, label = "") => {
     const qq = String(userId || "").replace(/\D/g, "")
-    if (!qq || String(qq) === String(Bot.uin)) return
+    // 多账号:排除任一自家 bot 的头像(不只主号)
+    const selfQqs = new Set([String(Bot.uin || ""), String(e?.self_id || ""), String(e?.bot?.uin || "")].filter(Boolean))
+    if (!qq || selfQqs.has(qq)) return
     if (targets.some(item => item.userId === qq)) return
     const member = memberMap?.get?.(Number(qq))
     targets.push({
