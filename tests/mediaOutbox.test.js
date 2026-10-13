@@ -270,7 +270,7 @@ test("uncertain delivery failure is retained without automatic retry", async () 
   const job = await outbox.enqueue({ envelope: envelope(609235590, 15), media: longBilibiliCard() })
   await outbox.process(job.id)
   const failed = await store.get("delivery", job.id)
-  assert.equal(failed.state, "failed")
+  assert.equal(failed.state, "uncertain")
   assert.equal(failed.uncertain, true)
   assert.equal(failed.nextRetryAt, 0)
   assert.equal(sends, 1)
@@ -312,6 +312,7 @@ test("outbox waits for a live lease and recovers only after it expires", async (
     state: "processing",
     attempts: 1,
     ownerRunId: "old-process",
+    createdAt: Date.now(), updatedAt: Date.now(), nextRetryAt: 0, receipt: null, lastError: "",
     leaseUntil: Date.now() + 600000
   }
   await store.create("delivery", job.id, job)
@@ -352,4 +353,56 @@ test('known video resource failures retry once then persist a link fallback', as
   assert.equal(forwards,2);assert.match(fallback,/https:\/\/www.bilibili.com/)
   assert.equal(saved.state,'sent');assert.equal(saved.fallbackStatus,'link_sent')
   await outbox.process(job.id);assert.equal(forwards,2)
+})
+
+test('successful delivery with unavailable receipt persistence is not resent after restart', async () => {
+  const redis = createFakeRedis()
+  const store = new RedisJobStore({ redis })
+  let sends = 0
+  const options = { store, ...mediaDependencies, gateway: { sendGroupForward: async () => { sends++; return { retcode: 0, messageId: 'sent-once' } } } }
+  const outbox = new MediaOutbox(options)
+  outbox.stopped = true
+  const job = await outbox.enqueue({ envelope: envelope(100, 500), media: longBilibiliCard() })
+  const save = store.save.bind(store)
+  store.save = async (kind, id, value) => {
+    if (['sent', 'uncertain'].includes(value.state)) throw new Error('storage unavailable after send')
+    return save(kind, id, value)
+  }
+  assert.equal(await outbox.process(job.id), true)
+  assert.equal((await store.get('delivery', job.id)).state, 'sending')
+  store.save = save
+  const recovered = new MediaOutbox(options)
+  recovered.stopped = true
+  await recovered.process(job.id)
+  assert.equal(sends, 1)
+  assert.equal((await store.get('delivery', job.id)).state, 'uncertain')
+  outbox.stop(); recovered.stop()
+})
+
+test('worker losing lease during sending marker persistence must never send', async () => {
+ const store = new RedisJobStore({ redis: createFakeRedis() })
+ let sends = 0, lost = false
+ const outbox = new MediaOutbox({ store, ...mediaDependencies, gateway: { sendGroupForward: async () => { sends++; return { retcode: 0 } } } })
+ outbox.stopped = true
+ const job = await outbox.enqueue({ envelope: envelope(100, 501), media: longBilibiliCard() })
+ const save = store.save.bind(store), extend = store.extendLock.bind(store)
+ store.save = async (kind, id, value) => { const result = await save(kind,id,value); if (value.state === 'sending') lost = true; return result }
+ store.extendLock = async (...args) => lost ? false : extend(...args)
+ assert.equal(await outbox.process(job.id), false)
+ assert.equal(sends, 0)
+ outbox.stop()
+})
+
+test('malformed persisted delivery jobs cannot reach gateway', async () => {
+ const store = new RedisJobStore({ redis: createFakeRedis() })
+ let sends = 0
+ const outbox = new MediaOutbox({ store, ...mediaDependencies, gateway: { sendGroupForward: async () => { sends++; return { retcode: 0 } } } })
+ outbox.stopped = true
+ const valid = await outbox.enqueue({ envelope: envelope(100, 502), media: longBilibiliCard() })
+ for (const patch of [{ media: null }, { botId: {} }, { groupId: '' }, { state: 'invented' }, { leaseUntil: -1 }, { media: { type: 'bilibili', page_url: {} } }]) {
+  await store.save('delivery', valid.id, { ...valid, ...patch })
+  assert.equal(await outbox.process(valid.id), false)
+ }
+ assert.equal(sends, 0)
+ outbox.stop()
 })

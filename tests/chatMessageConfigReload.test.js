@@ -3,6 +3,7 @@ import fs from "node:fs"
 import vm from "node:vm"
 import { test } from "node:test"
 import moment from "moment"
+import { createMessageManagerClass } from "../dist/backend/modules/messaging/application/recentMessages.js"
 import { resolveMessageCacheTtlSeconds } from "../utils/messageCacheTtl.js"
 import { KeyedSerialQueue } from "../utils/messagePipeline/keyedSerialQueue.js"
 
@@ -32,8 +33,12 @@ function createRuntime() {
     buildMemoryConfig: config => config.memorySystem || {},
     applyToolRegistrySnapshot: state => state
   })
-  const managerSource = fs.readFileSync(new URL("../utils/MessageManager.js", import.meta.url), "utf8")
-  vm.runInContext(managerSource.slice(managerSource.indexOf("export class MessageManager")).replace("export class", "class"), context)
+  context.MessageManager = createMessageManagerClass({
+    redis: context.redis, bot: context.Bot, logger: context.logger, queue: new KeyedSerialQueue(),
+    scheduleJob() {}, getUrl: async () => ({headers:{}}), formatTime: time => moment(time).format('YYYY-MM-DD HH:mm:ss'), parseTime: time => Number(moment(time, 'YYYY-MM-DD HH:mm:ss')),
+    refreshTencentImageUrl: async url => url, enrichBilibiliMessageSegments: async value => value || [], enrichDouyinMessageSegments: async value => value || [],
+    formatBilibiliHistoryText: () => '', formatBilibiliHistoryLinks: () => '', formatDouyinHistoryText: () => '', formatDouyinHistoryLinks: () => ''
+  })
   vm.runInContext(`
     const manager = new MessageManager({ groupMaxMessages: 4, cacheExpireMinutes: 60 });
     let sharedState = {

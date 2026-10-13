@@ -195,3 +195,14 @@ test("automatic music relay stays silent when the source has no audio", async t 
 function pathToFileUrl(filePath) {
   return new URL(`file://${filePath}`).href
 }
+
+test('missing upload receipt is uncertain and cannot trigger duplicate fallback upload', async () => {
+ const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'uncertain-file-'))
+ const file = path.join(dir, 'file.bin')
+ await fs.writeFile(file, 'content')
+ let fallbacks = 0
+ try {
+  await assert.rejects(sendCompleteLocalFile({ group_id: 1, bot: { sendApi: async () => null }, group: { sendFile: async () => { fallbacks++; return { retcode: 0 } } } }, file), error => error.uncertain === true && error.retryable === false)
+  assert.equal(fallbacks, 0)
+ } finally { await fs.rm(dir, { recursive: true, force: true }) }
+})

@@ -24,7 +24,9 @@ export async function sendForwardBatches<Node, Payload>(
     // Await each receipt so records retain their original ordering.
     const payload = await makeForward(batch)
     const receipt = await send(payload)
-    if (normalizeDeliveryReceipt(receipt).state === 'failed') {
+    const normalized = normalizeDeliveryReceipt(receipt)
+    if (normalized.state === 'unknown') throw Object.assign(new Error(`聊天记录第 ${sent + 1}/${batches.length} 份回执不确定；已确认发送 ${sent} 份，未自动重试`), { uncertain: true })
+    if (normalized.state === 'failed') {
       throw new Error(`聊天记录第 ${sent + 1}/${batches.length} 份发送失败；已发送 ${sent} 份`)
     }
     sent++

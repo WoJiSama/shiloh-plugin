@@ -62,3 +62,7 @@ test('multi-target wrappers only export audited emitted implementations', () => 
   assert.equal(verifyCompatibility(item, "export { a } from '../dist/backend/modules/example.js'; export { b } from '../dist/backend/modules/second.js';"), true);
   assert.equal(verifyCompatibility(item, "export { b } from '../dist/backend/modules/unaudited.js';"), false);
 });
+test('explicitly renamed injected capability keys are not ambient globals', () => {
+  assert.deepEqual(checkSource(path, 'const { redis: client } = ports; client.get("key");'), []);
+  assert.ok(checkSource(path, 'const { redis } = ports; redis.get("key");').length);
+});

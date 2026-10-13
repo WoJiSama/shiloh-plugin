@@ -25,7 +25,9 @@ const names: Record<string, string> = {
   retry_wait: '等待重试',
   completed: '已完成',
   sent: '已发送',
-  failed: '失败'
+  failed: '失败',
+  sending: '发送结果待确认',
+  uncertain: '结果不确定（未自动重试）'
 }
 const statuses = [
   { label: '全部状态', value: 'all' },
@@ -98,7 +100,7 @@ onBeforeUnmount(() => {
         /><span v-if="data" class="muted">本次查询 {{ data.returned }} 条 · 最多展示 100 条</span>
       </div>
       <NAlert type="info" :show-icon="false"
-        >任务状态为最后持久化结果，不代表 worker 当前存活；仅包含未过期记录，不是历史累计。<span
+        >任务状态为最后持久化结果，不代表 worker 当前存活；仅包含未过期记录，不是历史累计。结果不确定的任务不会自动重发，请先核对群内实际消息。<span
           v-if="data?.scanTruncated"
           >本次扫描达到上限，结果可能不完整。</span
         ></NAlert
@@ -118,7 +120,7 @@ onBeforeUnmount(() => {
                   }}<NTag
                     size="small"
                     :type="
-                      job.state === 'failed'
+                      job.state === 'failed' || job.state === 'uncertain'
                         ? 'error'
                         : job.state === 'sent' || job.state === 'completed'
                           ? 'success'

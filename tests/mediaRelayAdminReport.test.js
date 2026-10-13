@@ -224,3 +224,10 @@ test("资源失败用明确说明，降级记录保留时间且不增加失败�
   assert.match(view.failuresHtml, /10\/10/)
   assert.match(view.sendAggregatesHtml, /消息发送接口失败 ×1/)
 })
+test('uncertain delivery is visible in report and marked for manual inspection', async () => {
+ const {extractRelayFailures,buildHealthReportView} = await import('../utils/messagePipeline/mediaRelayAdminReport.js')
+ const failures = extractRelayFailures([{state:'uncertain',updatedAt:10000,groupId:'42',lastError:'missing receipt'}], {now:10001})
+ assert.equal(failures.length,1)
+ assert.equal(failures[0].uncertain,true)
+ assert.match(buildHealthReportView({failures}).failuresHtml,/结果不确定/)
+})

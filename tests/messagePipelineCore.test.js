@@ -147,3 +147,34 @@ test("delivery gateway emits the shared delivery receipt log", async () => {
   await gateway.sendGroupForward({ botId: "1", groupId: "2", nodes: [{ message: ["ok"] }] })
   assert.ok(lines.some(line => line.includes("[Delivery] turn= status=sent channel=group_forward group=2") && line.includes("message=123")))
 })
+
+test('lease heartbeat refuses completion after lease owner changes', async () => {
+  const { startLeaseHeartbeat, LeaseLostError } = await import('../utils/messagePipeline/leaseHeartbeat.js')
+  const store = new RedisJobStore({redis:createFakeRedis()})
+  const token = await store.acquireLock('event','lease-fixture',30000)
+  const heartbeat = startLeaseHeartbeat({store,kind:'event',id:'lease-fixture',token,leaseMs:30000})
+  try {
+    await heartbeat.assertOwned()
+    await store.clearLock('event','lease-fixture')
+    const next = await store.acquireLock('event','lease-fixture',30000)
+    await assert.rejects(heartbeat.assertOwned(), LeaseLostError)
+    assert.equal(await store.releaseLock('event','lease-fixture',token),0)
+    assert.equal(await store.extendLock('event','lease-fixture',next,30000),true)
+  } finally { heartbeat.stop() }
+})
+test('job store rejects non-object persisted JSON before exposing records',async()=>{
+ const store=new RedisJobStore({redis:createFakeRedis()})
+ for(const value of ['null','42','[]','broken']){
+  await store.setRaw(store.key('event','bad'),value)
+  assert.equal(await store.get('event','bad'),null)
+ }
+})
+test('event job validator rejects malformed object records and wrong envelope before recovery',async()=>{
+ const {isEventJob}=await import('../dist/backend/modules/messaging/infrastructure/messagePipeline.js')
+ const store=new RedisJobStore({redis:createFakeRedis()})
+ await store.save('event','empty',{})
+ await store.save('event','wrong',{version:1,id:'wrong',state:'pending',attempts:0,createdAt:0,updatedAt:0,nextRetryAt:0,leaseUntil:0,ownerRunId:'',lastError:'',consumers:{recent:'pending',archive:'pending',media:'pending',emoji:'pending'},envelope:{eventId:'wrong',message:'not-array'}})
+ assert.equal(await store.get('event','empty',isEventJob),null)
+ assert.equal(await store.get('event','wrong',isEventJob),null)
+ assert.deepEqual(await store.list('event',isEventJob),[])
+})

@@ -12,7 +12,7 @@ test('forward batching preserves order and acknowledges progress only after each
       await Promise.resolve()
       received.push(...payload.batch)
       events.push('receipt')
-      return { retcode: '0' }
+      return { retcode: '0', message_id: 'fixture' }
     },
     onProgress: (sent, total) => { events.push(`progress:${sent}/${total}`) }
   })
@@ -27,7 +27,7 @@ for (const receipt of [false, { status: 'failed' }, { retcode: 1 }, { retcode: '
     const progress: number[] = []
     await assert.rejects(sendForwardBatches(Array.from({ length: 201 }, (_, i) => i), {
       makeForward: batch => batch,
-      send: () => ++sent === 2 ? receipt : { retcode: 0 },
+      send: () => ++sent === 2 ? receipt : { retcode: 0, message_id: 'fixture' },
       onProgress: count => { progress.push(count) }
     }), /第 2\/3 份发送失败；已发送 1 份/)
     assert.equal(sent, 2)
@@ -52,3 +52,9 @@ for (const failingStep of ['makeForward', 'send'] as const) {
     assert.equal(progress, 0)
   })
 }
+
+test('unknown receipt never counts success or retries remaining nodes', async () => {
+ let calls = 0
+ await assert.rejects(sendForwardBatches(Array(200).fill(1), { makeForward: batch => batch, send: () => { calls++; return {retcode:0} } }), {uncertain:true})
+ assert.equal(calls, 1)
+})

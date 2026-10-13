@@ -26,7 +26,8 @@ export function checkSource(path, text, root = process.cwd()) {
     if (pure && ts.isIdentifier(node) && ['Bot', 'redis', 'global', 'globalThis', 'process', 'pluginBridge'].includes(node.text)) {
       const parent = node.parent;
       const propertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node) || ((ts.isPropertySignature(parent) || ts.isPropertyAssignment(parent)) && parent.name === node);
-      if (!propertyName) add(node, `Platform/global access ${node.text} is forbidden in domain/application/contracts`);
+      const bindingProperty = ts.isBindingElement(parent) && parent.propertyName === node;
+      if (!propertyName && !bindingProperty) add(node, `Platform/global access ${node.text} is forbidden in domain/application/contracts`);
     }
     ts.forEachChild(node, visit);
   };

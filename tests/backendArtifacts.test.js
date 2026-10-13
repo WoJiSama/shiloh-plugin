@@ -56,7 +56,7 @@ test('compiled wrappers load under a host-shaped directory from another cwd; JS 
     import { collectPluginExports } from './utils/pluginExportLoader.js'
     class Base {}; class Plugin extends Base {}
     assert.equal(collectPluginExports({default: Plugin}, Base)[0].PluginClass, Plugin)
-    assert.equal(await sendForwardBatches([1], {makeForward: n => n, send: () => true}), 1)
+    assert.equal(await sendForwardBatches([1], {makeForward: n => n, send: () => ({message_id:1})}), 1)
     for (const format of ['js', 'mjs', 'cjs']) assert.equal((await import('./custom/example.' + format)).default, format)
   `)
   const child = spawnSync(process.execPath, [path.join(plugin, 'smoke.mjs')], { cwd: temp, encoding: 'utf8' })

@@ -136,3 +136,11 @@ test("createStatsEmitterFromSettings 读取 message.yaml stats 段", async () =>
   const disabled = createStatsEmitterFromSettings({ redis: new FakeRedis(), settings: { stats: { enabled: false } } })
   assert.equal(disabled.enabled, false)
 })
+test('statistics scripts retain actual Redis Lua API calls', async () => {
+ const {MessageStatsEmitter} = await import('../utils/messageStats.js')
+ const scripts = []
+ const stats = new MessageStatsEmitter({redis:{eval:async script=>{scripts.push(script);return 1}}})
+ await stats.recordSend({botId:'fixture'})
+ assert.ok(scripts.length)
+ for (const script of scripts) { assert.match(script, /redis\.call\("HINCRBY"/); assert.doesNotMatch(script, /client\.call/) }
+})
