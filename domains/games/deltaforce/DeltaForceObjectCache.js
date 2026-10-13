@@ -124,7 +124,7 @@ export class DeltaForceObjectCache {
   }
 
   getStatusText() {
-    const updated = this.updatedAt ? new Date(this.updatedAt).toLocaleString("zh-CN", { hour12: false }) : "未更新"
+    const updated = this.updatedAt ? new Date(this.updatedAt).toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }) : "未更新"
     const stale = this.isStale() ? "可能已过期" : "正常"
     return `三角洲物品缓存\n数量：${this.size}\n状态：${stale}\n更新时间：${updated}`
   }

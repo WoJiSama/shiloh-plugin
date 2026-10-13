@@ -474,7 +474,7 @@ function formatUnixTime(value) {
   const number = Number(value)
   if (!Number.isFinite(number) || number <= 0) return stringifyValue(value)
   const ms = number > 100000000000 ? number : number * 1000
-  return new Date(ms).toLocaleString("zh-CN", { hour12: false })
+  return new Date(ms).toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" })
 }
 
 function formatDateLabel(timestamp) {
@@ -703,7 +703,7 @@ export function buildPlaceProfitReportData(body, { placeType = "", limit = DEFAU
     kind: "place-profit",
     title: `三角洲特勤处利润（Top ${rows.length}）`,
     subtitle: normalizedPlaceType ? `${placeNameOf(normalizedPlaceType)}｜默认 10 条，最多 20 条` : "全部场所｜默认 10 条，最多 20 条",
-    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
     columns: ["场所", "等级", "推荐制造", "时利", "总利", "材料"],
     rows
   }
@@ -727,7 +727,7 @@ export function buildProfitRankReportData(body, { placeType = "", limit = DEFAUL
     kind: "profit-rank",
     title: `三角洲利润排行（${place} Top ${rows.length}）`,
     subtitle: "按总利润排行｜默认 10 条，最多 20 条",
-    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
     columns: ["排名", "物品", "场所", "等级", "时利", "总利", "材料"],
     rows
   }
@@ -747,7 +747,7 @@ export function buildSolutionListReportData(body, { keyword = "", limit = DEFAUL
     kind: "solution-list",
     title,
     subtitle: "按接口返回顺序｜默认 10 条，最多 20 条",
-    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
     columns: ["排名", "武器与方案", "标签", "价格/成本", "热度", "改枪码与说明"],
     emptyText: searchText ? `没有找到「${searchText}」相关的改枪码` : "暂时没有拿到改枪码数据",
     rows: items.map((item, index) => ({
@@ -779,7 +779,7 @@ export function buildObjectValueReportData(body, { keyword = "", limit = DEFAULT
     kind: "object-value",
     title,
     subtitle: "OCR 最新价格｜默认 10 条，最多 20 条",
-    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
     columns: ["排名", "物品", "成色", "现价", "均价", "价格区间", "涨跌/样本", "更新时间"],
     emptyText: searchText
       ? `没有找到「${searchText}」的物品价值数据，可能价格库暂时未覆盖这个物品`
@@ -916,7 +916,7 @@ export function buildPriceHistoryReportData(body, { keyword = "", days = DEFAULT
       ? `三角洲价格历史：${searchText}（${rows.length}${suffix}）`
       : `三角洲价格历史（${rows.length}）`,
     subtitle: `OCR 历史价格｜默认 ${DEFAULT_HISTORY_DAYS} 天｜按 objectID 分组`,
-    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+    generatedAt: new Date().toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" }),
     columns: ["价格走势"],
     emptyText: searchText ? `没有找到「${searchText}」的价格历史数据` : "没有找到价格历史数据",
     rows: rows.slice(0, normalizeRankLimit(limit, DEFAULT_HISTORY_LIMIT))
