@@ -139,3 +139,12 @@ test('only explicit master feedback is exposed for semantic style learning', asy
     fs.rmSync(cwd, { recursive: true, force: true })
   }
 })
+
+test('direct reply feedback is isolated by bot within the same group and user', () => {
+  const manager = new PersonaFeedbackManager()
+  const common = { group_id: '123', user_id: '456' }
+  manager.rememberBotReply({ ...common, self_id: 'bot-a' }, 'reply from a')
+  manager.rememberBotReply({ ...common, self_id: 'bot-b' }, 'reply from b')
+  assert.equal(manager.getRecentBotReply({ ...common, self_id: 'bot-a' }).text, 'reply from a')
+  assert.equal(manager.getRecentBotReply({ ...common, self_id: 'bot-b' }).text, 'reply from b')
+})

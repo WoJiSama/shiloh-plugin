@@ -6,7 +6,7 @@ export interface MemoryScope { groupId?: RuntimeIdentity; userId?: RuntimeIdenti
 export interface MemoryDeleteResult { deleted: boolean; reason?: string }
 export interface MemoryFact { text: string; tags?: string[]; id?: string }
 export interface MemoryEntry {
-  id: string; createdBy?: RuntimeIdentity; subject?: string; kind?: string
+  id: string; condition?: string; createdBy?: RuntimeIdentity; subject?: string; kind?: string
   targets?: { userId: RuntimeIdentity; displayName?: string }[]
   ownerQQ?: RuntimeIdentity; resource?: { fileName?: string }
 }

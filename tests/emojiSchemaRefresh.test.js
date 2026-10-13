@@ -1,9 +1,7 @@
 import test from "node:test"
-import { readPluginSources, readSource } from "./helpers/pluginSources.js"
+import { readPluginSources } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
-import fs from "node:fs"
-import path from "node:path"
-import { fileURLToPath } from "node:url"
+import { createExpressionLearnerClass } from "../dist/backend/modules/memory/application/expressionLearner.js"
 
 async function loadRuntime(t) {
   if (!globalThis.logger) {
@@ -24,7 +22,6 @@ async function loadRuntime(t) {
   }
 }
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 test("tool schema enum follows the live catalog vocabulary", async t => {
   const runtime = await loadRuntime(t)
@@ -85,10 +82,18 @@ test("catalog change triggers a debounced schema refresh subscription", async t 
   assert.doesNotThrow(() => tool.refreshSchema())
 })
 
-test("expression learner exposes group emoji layout stats", () => {
-  const src = fs.readFileSync(path.join(root, "domains/memory/ExpressionLearner.js"), "utf8")
-  assert.ok(src.includes("async getGroupEmojiLayoutStats(groupId)"), "学习器提供群级表情布局统计")
-  assert.ok(src.includes("emojiOnlyShare"), "统计含裸表情占比")
+test("expression learner exposes group emoji layout stats", async () => {
+  const store = new Map([
+    ["ytbot:expression:group", JSON.stringify({ rhythmPatterns: { emojiOnly: 2, textEmoji: 3, emojiText: 1, textEmojiText: 2 } })]
+  ])
+  const Learner = createExpressionLearnerClass({
+    store: { get: async key => store.get(key) ?? null, set: async (key, value) => store.set(key, value) },
+    logger: { error() {}, info() {} },
+    fetch: async () => { throw new Error("unexpected model request") }
+  })
+  const learner = new Learner({ aiLearningEnabled: false })
+  assert.deepEqual(await learner.getGroupEmojiLayoutStats("group"), { samples: 8, emojiOnlyShare: 0.25, emojiOnly: 2, withText: 6 })
+  assert.equal(await learner.getGroupEmojiLayoutStats("empty"), null)
   const testSrc = readPluginSources()
   assert.ok(testSrc.includes("getGroupEmojiLayoutStats?.(groupId)"), "主链路消费该统计")
 })

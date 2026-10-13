@@ -1,0 +1,1952 @@
+{
+  "baselineCommit": "a93265cd94e2307504dad11d26351cf954cfc071",
+  "metricVersion": 1,
+  "current": {
+    "business:js": {
+      "files": 259,
+      "codeLines": 68858,
+      "bytes": 3151159
+    },
+    "compatibility:js": {
+      "files": 116,
+      "codeLines": 465,
+      "bytes": 44328
+    },
+    "frontend:vue-script": {
+      "files": 25,
+      "codeLines": 3408,
+      "bytes": 292746
+    },
+    "frontend:ts": {
+      "files": 15,
+      "codeLines": 874,
+      "bytes": 30031
+    },
+    "type-declaration:ts": {
+      "files": 1,
+      "codeLines": 1,
+      "bytes": 66
+    },
+    "tests:ts": {
+      "files": 39,
+      "codeLines": 2232,
+      "bytes": 114188
+    },
+    "examples:js": {
+      "files": 2,
+      "codeLines": 2766,
+      "bytes": 99568
+    },
+    "entry:js": {
+      "files": 25,
+      "codeLines": 251,
+      "bytes": 10877
+    },
+    "tooling:js": {
+      "files": 25,
+      "codeLines": 2262,
+      "bytes": 153846
+    },
+    "business:ts": {
+      "files": 148,
+      "codeLines": 21154,
+      "bytes": 1023947
+    },
+    "tests:js": {
+      "files": 238,
+      "codeLines": 27020,
+      "bytes": 1327768
+    }
+  },
+  "compatibilityEntries": [
+    {
+      "path": "apps/SemanticMemory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 531
+    },
+    {
+      "path": "console/lib/pipelineJobs.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 120
+    },
+    {
+      "path": "console/lib/providerCredentials.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 170
+    },
+    {
+      "path": "console/lib/schemaConfig.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 214
+    },
+    {
+      "path": "core/config/configStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 349
+    },
+    {
+      "path": "core/runtime/groupRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 19,
+      "bytes": 1235
+    },
+    {
+      "path": "core/runtime/sharedRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 459
+    },
+    {
+      "path": "domains/memory/EmotionManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 389
+    },
+    {
+      "path": "domains/memory/ExpressionLearner.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 555
+    },
+    {
+      "path": "domains/memory/GlobalStyleLearnerManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 442
+    },
+    {
+      "path": "domains/memory/MemoryManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 550
+    },
+    {
+      "path": "domains/memory/PersonProfileInjector.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 564
+    },
+    {
+      "path": "domains/memory/PersonaFeedbackManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 632
+    },
+    {
+      "path": "domains/memory/commandsApp.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 651
+    },
+    {
+      "path": "domains/memory/engine/aliasRegistry.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 138
+    },
+    {
+      "path": "domains/memory/engine/boundary.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 122
+    },
+    {
+      "path": "domains/memory/engine/conflictResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 110
+    },
+    {
+      "path": "domains/memory/engine/constants.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "domains/memory/engine/embeddings.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 331
+    },
+    {
+      "path": "domains/memory/engine/entityModel.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 168
+    },
+    {
+      "path": "domains/memory/engine/extractor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 396
+    },
+    {
+      "path": "domains/memory/engine/groupKnowledge.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 322
+    },
+    {
+      "path": "domains/memory/engine/groupWorkflow.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 274
+    },
+    {
+      "path": "domains/memory/engine/mentionResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 112
+    },
+    {
+      "path": "domains/memory/engine/redisStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 226
+    },
+    {
+      "path": "domains/memory/engine/reflector.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 282
+    },
+    {
+      "path": "domains/memory/engine/retriever.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 172
+    },
+    {
+      "path": "domains/memory/engine/stats.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "domains/midtermMemory/MidtermSummaryManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 606
+    },
+    {
+      "path": "domains/semanticMemory/EmbeddingGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 253
+    },
+    {
+      "path": "domains/semanticMemory/RerankGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 354
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryIndexer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 265
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryRetriever.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 377
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 417
+    },
+    {
+      "path": "domains/semanticMemory/retrievalEval.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 101
+    },
+    {
+      "path": "domains/semanticMemory/runtime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 446
+    },
+    {
+      "path": "model/config.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 696
+    },
+    {
+      "path": "models/Guoba/configInfo.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 763
+    },
+    {
+      "path": "models/Guoba/schemas/aiCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "models/Guoba/schemas/aiModels.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/Guoba/schemas/basic.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/deltaForce.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/dice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "models/Guoba/schemas/emoji.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/emotion.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/expression.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/groupGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/groupNotice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "models/Guoba/schemas/index.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 646
+    },
+    {
+      "path": "models/Guoba/schemas/knowledge.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "models/Guoba/schemas/magnetSearch.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 100
+    },
+    {
+      "path": "models/Guoba/schemas/memory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "models/Guoba/schemas/messageArchive.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 102
+    },
+    {
+      "path": "models/Guoba/schemas/messagePipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 103
+    },
+    {
+      "path": "models/Guoba/schemas/permission.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/persona.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/reasoning.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "models/Guoba/schemas/riskControl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "models/Guoba/schemas/tools.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/tracking.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/Guoba/schemas/umaRace.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/voice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/configSchemas/aiCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "models/configSchemas/basic.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 91
+    },
+    {
+      "path": "models/configSchemas/conversation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/configSchemas/permission.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/configSchemas/reasoning.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/configSchemas/triggers.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "utils/MessageArchiveManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1428
+    },
+    {
+      "path": "utils/MessageManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 1827
+    },
+    {
+      "path": "utils/aiProviderProbe.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 524
+    },
+    {
+      "path": "utils/apiClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1037
+    },
+    {
+      "path": "utils/chatCompletionUrl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 102
+    },
+    {
+      "path": "utils/chatFailureDiagnosis.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 1112
+    },
+    {
+      "path": "utils/chatRequestRecovery.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 226
+    },
+    {
+      "path": "utils/configWriter.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 742
+    },
+    {
+      "path": "utils/deliveryObservability.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 129
+    },
+    {
+      "path": "utils/episodicMemory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 226
+    },
+    {
+      "path": "utils/expressionSequence.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 209
+    },
+    {
+      "path": "utils/forwardBatches.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 213
+    },
+    {
+      "path": "utils/guobaAiProviderConfig.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 269
+    },
+    {
+      "path": "utils/imageAspectRatio.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 306
+    },
+    {
+      "path": "utils/imageDimensions.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "utils/imageFailurePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 197
+    },
+    {
+      "path": "utils/imageGenerationFallback.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 778
+    },
+    {
+      "path": "utils/imageRequestGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 304
+    },
+    {
+      "path": "utils/imageResult.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 140
+    },
+    {
+      "path": "utils/imageSourcePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 166
+    },
+    {
+      "path": "utils/imageTaskPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 397
+    },
+    {
+      "path": "utils/memorySelfCorrection.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 425
+    },
+    {
+      "path": "utils/messageCacheTtl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 143
+    },
+    {
+      "path": "utils/messagePipeline/deliveryGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 10,
+      "bytes": 862
+    },
+    {
+      "path": "utils/messagePipeline/eventEnvelope.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 391
+    },
+    {
+      "path": "utils/messagePipeline/keyedSerialQueue.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 123
+    },
+    {
+      "path": "utils/messagePipeline/leaseHeartbeat.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 124
+    },
+    {
+      "path": "utils/messagePipeline/mediaArtifactStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 458
+    },
+    {
+      "path": "utils/messagePipeline/mediaOutbox.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 2377
+    },
+    {
+      "path": "utils/messagePipeline/mediaRelayAdminReport.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 24,
+      "bytes": 1648
+    },
+    {
+      "path": "utils/messagePipeline/messagePipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1364
+    },
+    {
+      "path": "utils/messagePipeline/outboundArbiter.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 108
+    },
+    {
+      "path": "utils/messagePipeline/outboundThrottle.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 1131
+    },
+    {
+      "path": "utils/messagePipeline/redisJobStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 403
+    },
+    {
+      "path": "utils/messagePipeline/riskSignalMonitor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 650
+    },
+    {
+      "path": "utils/messagePipeline/runtime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 2491
+    },
+    {
+      "path": "utils/messagePipeline/videoThumbnail.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 135
+    },
+    {
+      "path": "utils/messageStats.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 634
+    },
+    {
+      "path": "utils/modelGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 261
+    },
+    {
+      "path": "utils/multipartFormData.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "utils/pluginExportLoader.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 195
+    },
+    {
+      "path": "utils/providers/ThinkingProcessor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 117
+    },
+    {
+      "path": "utils/semanticMemoryWebApp.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 414
+    },
+    {
+      "path": "utils/sideLLM.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 66
+    },
+    {
+      "path": "utils/thinkingForwardSettings.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 1051
+    },
+    {
+      "path": "utils/turnSession.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 246
+    },
+    {
+      "path": "utils/unicodeText.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 174
+    },
+    {
+      "path": "utils/visibleFailure.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 181
+    }
+  ],
+  "discoveredBusinessJsDebt": {
+    "modules": 2,
+    "codeLines": 82,
+    "paths": [
+      "utils/backendArtifactGuard.js",
+      "utils/pluginUpdateBuild.js"
+    ]
+  },
+  "businessJsCodeLinePercent": 76.4986890636804,
+  "baselineRemaining": {
+    "modules": 257,
+    "codeLines": 69228,
+    "paths": [
+      "apps/CommandHelp.js",
+      "apps/MessageManager.js",
+      "apps/ThinkingForward.js",
+      "apps/lib/adminCommands.js",
+      "apps/lib/avatarReference.js",
+      "apps/lib/chatTurn.js",
+      "apps/lib/conversationUtils.js",
+      "apps/lib/messageFormatting.js",
+      "apps/lib/messageSegments.js",
+      "apps/lib/privateChat.js",
+      "apps/lib/promptContext.js",
+      "apps/lib/replyRendering.js",
+      "apps/lib/semanticToolIntent.js",
+      "apps/lib/smartConversation.js",
+      "apps/lib/smartDynamics.js",
+      "apps/lib/splitState.js",
+      "apps/lib/strictConversation.js",
+      "apps/lib/taskStatus.js",
+      "apps/lib/teachingFacts.js",
+      "apps/lib/textPolicy.js",
+      "apps/lib/timingGate.js",
+      "apps/lib/toolExecution.js",
+      "apps/obsLogQuery.js",
+      "apps/qqinfo1.js",
+      "apps/test.js",
+      "apps/update.js",
+      "console/lib/frontendStatic.js",
+      "console/lib/redisClient.js",
+      "console/server.js",
+      "core/intent/messageIntent.js",
+      "core/intent/modelIntentClassifier.js",
+      "dependence/dependencies.js",
+      "domains/dice/DeckManager.js",
+      "domains/dice/DiceManager.js",
+      "domains/dice/DiceRuleExpression.js",
+      "domains/dice/DiceRulePackManager.js",
+      "domains/dice/DiceRuleSchema.js",
+      "domains/dice/DiceRuleSession.js",
+      "domains/dice/SealExtRuntime.js",
+      "domains/dice/app.js",
+      "domains/dice/diceCommandGateway.js",
+      "domains/dice/diceCommandPolicy.js",
+      "domains/dice/diceReplyCatalog.js",
+      "domains/dice/logRecorder.js",
+      "domains/dice/sealCocDefaults.js",
+      "domains/dice/sealSkillAliases.js",
+      "domains/emoji/EmojiPackManager.js",
+      "domains/emoji/app.js",
+      "domains/emoji/emojiSelection.js",
+      "domains/games/deltaforce/DeltaForceClient.js",
+      "domains/games/deltaforce/DeltaForceObjectCache.js",
+      "domains/games/deltaforce/DeltaForceReportRenderer.js",
+      "domains/games/deltaforce/app.js",
+      "domains/games/deltaforce/model/DeltaForceReport.js",
+      "domains/games/uma/UmaRaceManager.js",
+      "domains/games/uma/UmaRaceReportRenderer.js",
+      "domains/games/uma/app.js",
+      "domains/games/uma/model/UmaRaceReport.js",
+      "domains/group-admin/GroupGuardManager.js",
+      "domains/group-admin/GroupModerationManager.js",
+      "domains/group-admin/GroupNoticeManager.js",
+      "domains/group-admin/adCorpusStore.js",
+      "domains/group-admin/groupGuardQuestion.js",
+      "domains/group-admin/groupModerationRules.js",
+      "domains/group-admin/guardDecrease.js",
+      "domains/group-admin/guardIncrease.js",
+      "domains/group-admin/guardMessage.js",
+      "domains/group-admin/moderationMessage.js",
+      "domains/group-admin/noticeDecrease.js",
+      "domains/group-admin/noticeIncrease.js",
+      "domains/knowledge/KnowledgeExpander.js",
+      "domains/knowledge/KnowledgeSearcher.js",
+      "domains/knowledge/app.js",
+      "domains/media/bilibili/app.js",
+      "domains/media/magnetsearch/MagnetSearchClient.js",
+      "domains/media/magnetsearch/MagnetSearchReportRenderer.js",
+      "domains/media/magnetsearch/app.js",
+      "domains/media/magnetsearch/model/MagnetSearchReport.js",
+      "functions/ask-ban.js",
+      "functions/functions_tools/AbstractTool.js",
+      "functions/functions_tools/AiMindMapTool.js",
+      "functions/functions_tools/BananaTool.js",
+      "functions/functions_tools/BingImageSearchTool.js",
+      "functions/functions_tools/ChangeCardTool.js",
+      "functions/functions_tools/ChatHistoryTool.js",
+      "functions/functions_tools/DeltaForceTool.js",
+      "functions/functions_tools/EmojiSearchTool.js",
+      "functions/functions_tools/ExcelWorkbookTool.js",
+      "functions/functions_tools/ForgetGroupKnowledgeTool.js",
+      "functions/functions_tools/GithubTool.js",
+      "functions/functions_tools/GoogleAnalysisTool.js",
+      "functions/functions_tools/GoogleImageEditTool.js",
+      "functions/functions_tools/GrabRedBagTool.js",
+      "functions/functions_tools/JinyanTool.js",
+      "functions/functions_tools/LikeTool.js",
+      "functions/functions_tools/MemberInfoTool.js",
+      "functions/functions_tools/MentionAdminsTool.js",
+      "functions/functions_tools/MentionMembersTool.js",
+      "functions/functions_tools/ModrinthTool.js",
+      "functions/functions_tools/PixivDownloadTool.js",
+      "functions/functions_tools/PixivSearchTool.js",
+      "functions/functions_tools/PokeTool.js",
+      "functions/functions_tools/QQZoneTool.js",
+      "functions/functions_tools/ReactionTool.js",
+      "functions/functions_tools/RecallTool.js",
+      "functions/functions_tools/ReminderTool.js",
+      "functions/functions_tools/SearchInformationTool.js",
+      "functions/functions_tools/SearchMusicTool.js",
+      "functions/functions_tools/SearchVideoTool.js",
+      "functions/functions_tools/SendGiftTool.js",
+      "functions/functions_tools/SendLocalEmojiTool.js",
+      "functions/functions_tools/TextImageTool.js",
+      "functions/functions_tools/TorrentDownloadTool.js",
+      "functions/functions_tools/VideoAnalysisTool.js",
+      "functions/functions_tools/VoiceTool.js",
+      "functions/functions_tools/WaitTool.js",
+      "functions/functions_tools/puppeteer/WebContentExtractor.js",
+      "functions/functions_tools/puppeteer/WebParser.js",
+      "functions/functions_tools/webParserTool.js",
+      "functions/functions_tools/xiaohongshu/api/feed.js",
+      "functions/functions_tools/xiaohongshu/api/homefeed.js",
+      "functions/functions_tools/xiaohongshu/api/sub_comment.js",
+      "functions/functions_tools/xiaohongshu/config/config.js",
+      "functions/functions_tools/xiaohongshu/sign/X-S-Common.js",
+      "functions/functions_tools/xiaohongshu/sign/X-S.js",
+      "functions/other_tools/file.js",
+      "functions/tools/BilibiliVideoSummary.js",
+      "functions/tools/CalculateToken.js",
+      "functions/tools/SearchClient.js",
+      "functions/tools/UploadFile.js",
+      "functions/tools/bilibilivideoanalysis.js",
+      "functions/tools/messageGenerator.js",
+      "functions/tools/preview.js",
+      "functions/tools/processUploadedFile.js",
+      "functions/tools/sendvideos.js",
+      "functions/tools/textract.js",
+      "model/ModrinthCard.js",
+      "model/base.js",
+      "model/friends.js",
+      "model/qqinfo.js",
+      "models/Guoba/index.js",
+      "models/Guoba/pluginInfo.js",
+      "utils/BilibiliAuthManager.js",
+      "utils/LocalToolRegistry.js",
+      "utils/MCPClient.js",
+      "utils/ModrinthCardRenderer.js",
+      "utils/QQApi.js",
+      "utils/SmartReply.js",
+      "utils/VolcengineVoiceProvider.js",
+      "utils/actionOutcomes.js",
+      "utils/addresseeSignals.js",
+      "utils/agentIntelligence.js",
+      "utils/agentReplyComposer.js",
+      "utils/aiConversationGate.js",
+      "utils/avatarReferencePolicy.js",
+      "utils/bilibiliMediaRelay.js",
+      "utils/bilibiliMessage.js",
+      "utils/botFederation.js",
+      "utils/builtinToolManifests.js",
+      "utils/chatFailureReply.js",
+      "utils/chatTurnDurability.js",
+      "utils/commandGate.js",
+      "utils/commandRegistry.js",
+      "utils/commandsWebApp.js",
+      "utils/common.js",
+      "utils/contextualProgressReply.js",
+      "utils/deltaForceIntent.js",
+      "utils/diceRandom.js",
+      "utils/douyinBrowserResolver.js",
+      "utils/douyinMediaRelay.js",
+      "utils/douyinMessage.js",
+      "utils/drawFailureNote.js",
+      "utils/editReferencePipeline.js",
+      "utils/emojiToolPolicy.js",
+      "utils/excelFileContext.js",
+      "utils/excelRequestPolicy.js",
+      "utils/excelWorkbook.js",
+      "utils/fileLock.js",
+      "utils/fileUtils.js",
+      "utils/forbiddenWordGuard.js",
+      "utils/groupContextResolver.js",
+      "utils/groupContextState.js",
+      "utils/groupKnowledgeForgetPolicy.js",
+      "utils/groupNames.js",
+      "utils/guobaJumpLink.js",
+      "utils/guobaLoginTrust.js",
+      "utils/intentFastPath.js",
+      "utils/internalStatusLeak.js",
+      "utils/longTaskFeedbackPolicy.js",
+      "utils/mediaTypePolicy.js",
+      "utils/mentionFailureReply.js",
+      "utils/mentionRoleRouting.js",
+      "utils/mentionTargets.js",
+      "utils/messageContext.js",
+      "utils/modrinth.js",
+      "utils/musicShareRelay.js",
+      "utils/narrativeReply.js",
+      "utils/obsLog.js",
+      "utils/observeWebApp.js",
+      "utils/outputGuardPipeline.js",
+      "utils/parallelDownload.js",
+      "utils/personaLibrary.js",
+      "utils/personaMoods.js",
+      "utils/personaReplayCore.js",
+      "utils/personaSource.js",
+      "utils/personaTonePolicy.js",
+      "utils/pixivIntent.js",
+      "utils/pixivMediaRelay.js",
+      "utils/pixivMessage.js",
+      "utils/pixivSearch.js",
+      "utils/pluginBridge.js",
+      "utils/proactiveReplyFreshness.js",
+      "utils/progressReplyBudget.js",
+      "utils/promptCompiler.js",
+      "utils/promptLayerCache.js",
+      "utils/promptLayers.js",
+      "utils/proxiedFetch.js",
+      "utils/qqCodeFenceText.js",
+      "utils/qqFaceTable.js",
+      "utils/qqVoiceAudio.js",
+      "utils/qzoneWebApp.js",
+      "utils/recentImageContinuation.js",
+      "utils/redBagUtils.js",
+      "utils/redis-util.js",
+      "utils/redisClient.js",
+      "utils/reliableImageSender.js",
+      "utils/replyExecutionRoute.js",
+      "utils/replyRhythm.js",
+      "utils/replySanitizer.js",
+      "utils/request.js",
+      "utils/routeDecision.js",
+      "utils/semanticToolPolicy.js",
+      "utils/sendPacing.js",
+      "utils/sharedBrowser.js",
+      "utils/singleFlightResolver.js",
+      "utils/smartLockPolicy.js",
+      "utils/solutionExplanationStyle.js",
+      "utils/systemPromptTemplate.js",
+      "utils/textUtils.js",
+      "utils/thinkingForward.js",
+      "utils/toolContinuationPolicy.js",
+      "utils/toolIntentManifests.js",
+      "utils/toolManifestRegistry.js",
+      "utils/toolResultGrounding.js",
+      "utils/toolSkills.js",
+      "utils/torrentDownload.js",
+      "utils/torrentListCard.js",
+      "utils/turnContinuity.js",
+      "utils/turnDiagnostics.js",
+      "utils/turnPlan.js",
+      "utils/turnPresentation.js",
+      "utils/turnPromptComposer.js",
+      "utils/turnTrace.js",
+      "utils/understandingBrief.js",
+      "utils/youtubeAuth.js",
+      "utils/youtubeMediaRelay.js",
+      "utils/youtubeMessage.js"
+    ]
+  },
+  "registeredMigrations": [
+    {
+      "legacy": "domains/memory/commandsApp.js",
+      "implementation": "src/modules/memory/infrastructure/memoryCommands.ts",
+      "kind": "composition",
+      "reviewedSha256": "35d396f3430f839d52f6fa067f4120b53d78556f2e705a0198ab7b513037a365",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/EmotionManager.js",
+      "implementation": "src/modules/memory/application/emotionManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "dd1a8c0c9c86293d3010d11281ed032e0e8406c931d6fca93d90c4aaa8eb5521",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/ExpressionLearner.js",
+      "implementation": "src/modules/memory/application/expressionLearner.ts",
+      "kind": "composition",
+      "reviewedSha256": "9296fc96a477df36502d9d3745c01da682350f0166f851dc8bf6e69a4cf58a6b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/PersonProfileInjector.js",
+      "implementation": "src/modules/memory/application/personProfileInjector.ts",
+      "kind": "composition",
+      "reviewedSha256": "48ca156a1e4f02939d36f2f2d50b6f108c9099b9b9fea600cb0c35291648a3bd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/PersonaFeedbackManager.js",
+      "implementation": "src/modules/memory/infrastructure/personaFeedbackManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "4e9ec5e3fe4f99e390648fef46728ff8ef69b7a2fe63a4c81d1ee684b105aa01",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/MemoryManager.js",
+      "implementation": "src/modules/memory/infrastructure/memoryManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "4580de7a258dff96ad98fc28803d02f9cf493a8d23c33b2c482bd853fe0f6c50",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/expressionSequence.js",
+      "implementation": "src/modules/memory/domain/expressionSequence.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/constants.js",
+      "implementation": "src/modules/memory/infrastructure/engine/constants.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/boundary.js",
+      "implementation": "src/modules/memory/infrastructure/engine/boundary.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/conflictResolver.js",
+      "implementation": "src/modules/memory/infrastructure/engine/conflictResolver.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/entityModel.js",
+      "implementation": "src/modules/memory/infrastructure/engine/entityModel.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/aliasRegistry.js",
+      "implementation": "src/modules/memory/infrastructure/engine/aliasRegistry.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/stats.js",
+      "implementation": "src/modules/memory/infrastructure/engine/stats.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/mentionResolver.js",
+      "implementation": "src/modules/memory/infrastructure/engine/mentionResolver.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/retriever.js",
+      "implementation": "src/modules/memory/infrastructure/engine/retriever.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/groupKnowledge.js",
+      "implementation": "src/modules/memory/infrastructure/engine/groupKnowledge.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/groupWorkflow.js",
+      "implementation": "src/modules/memory/infrastructure/engine/groupWorkflow.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/embeddings.js",
+      "implementation": "src/modules/memory/infrastructure/engine/embeddings.ts",
+      "kind": "composition",
+      "reviewedSha256": "144503cd7b4ca4f661b96e4e1d099e1abc9b46ea1eb396cb988792987aba92da",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/extractor.js",
+      "implementation": "src/modules/memory/infrastructure/engine/extractor.ts",
+      "kind": "composition",
+      "reviewedSha256": "d5cc1a82669cb7162ee4064c000916447e999bb05771d9546b65d2165362ed8a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/reflector.js",
+      "implementation": "src/modules/memory/infrastructure/engine/reflector.ts",
+      "kind": "composition",
+      "reviewedSha256": "fb8cc6a740012ad9ac09279492402b9abc98b81e9ce1fe4456a52b0f125ea596",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/redisStore.js",
+      "implementation": "src/modules/memory/infrastructure/engine/redisStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "d63615c30b727d978c9e43edef605f7fa7559211383822f71115dc1cf05968ce",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/semanticMemoryWebApp.js",
+      "implementation": "src/modules/memory/infrastructure/semanticMemoryWebApp.ts",
+      "kind": "composition",
+      "reviewedSha256": "2f8ff0d7d5339288da526cf9ed059a1a7544197919f1018bc55094d329e97597",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/SemanticMemory.js",
+      "implementation": "src/modules/memory/infrastructure/semanticMemoryCommands.ts",
+      "kind": "composition",
+      "reviewedSha256": "c4552872fb9def917a0a10aea5b64fa3bffb444e9f8d26542a0be182b5f73dec",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/EmbeddingGateway.js",
+      "implementation": "src/modules/memory/infrastructure/EmbeddingGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "676374c1351095779d4d0722135a4bfeaab9bee0cf3da0560f5c4db8216dac2f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/RerankGateway.js",
+      "implementation": "src/modules/memory/infrastructure/RerankGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "2fe0e1e3bad1f97193d9ed4b53d2c24ad04bf6e32b7d8fe3a7d022e343a1017f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/SemanticMemoryStore.js",
+      "implementation": "src/modules/memory/infrastructure/SemanticMemoryStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "da03a3b98c55802dbd9f31d10ec27b05117cb954f5136a230a32025f4b7e5784",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/SemanticMemoryIndexer.js",
+      "implementation": "src/modules/memory/infrastructure/SemanticMemoryIndexer.ts",
+      "kind": "composition",
+      "reviewedSha256": "c004aa3c3ac0a59c5e1e3bc889a2d04580607a738920dca08dab9874d60fa5f8",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/SemanticMemoryRetriever.js",
+      "implementation": "src/modules/memory/infrastructure/SemanticMemoryRetriever.ts",
+      "kind": "composition",
+      "reviewedSha256": "1f671439f0c939f7fdf7a797f70f6da4236cfefc14b8156f6e44efd147e36705",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/runtime.js",
+      "implementation": "src/modules/memory/infrastructure/semanticRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ffd3d6802b0b8d7c6a300a2dc2b3d099b80bd699786aa389664bf39751fbd724",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/retrievalEval.js",
+      "implementation": "src/modules/memory/infrastructure/retrievalEval.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/midtermMemory/MidtermSummaryManager.js",
+      "implementation": "src/modules/memory/infrastructure/MidtermSummaryManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "fa24838fcdd419ac46694934898129ad01f5533bdbad41d0a9553bac6cd75afc",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/episodicMemory.js",
+      "implementation": "src/modules/memory/infrastructure/episodicMemory.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/memorySelfCorrection.js",
+      "implementation": "src/modules/memory/infrastructure/memorySelfCorrection.ts",
+      "kind": "composition",
+      "reviewedSha256": "c7a1f836613de19529551b6bc9e7ff0bffd8fd9eb281ac6d19d261b4381bd18e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/GlobalStyleLearnerManager.js",
+      "implementation": "src/modules/memory/infrastructure/globalStyleLearner.ts",
+      "kind": "composition",
+      "reviewedSha256": "22f8c9f9e186c7110e0c88401ed361a83bc94b03e8a9f607d257895c5c9dd878",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/pluginExportLoader.js",
+      "implementation": "src/modules/platform/domain/pluginExportLoader.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/forwardBatches.js",
+      "implementation": "src/modules/messaging/domain/forwardBatches.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnSession.js",
+      "implementation": "src/modules/runtime/domain/turnSession.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/runtime/groupRuntime.js",
+      "implementation": "src/modules/runtime/application/groupRuntime.ts",
+      "adapter": "src/adapters/legacyRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ea846310dec22fdbb3a91813579002446a005fb6a822b83c917bedd90add2f92",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/runtime/sharedRuntime.js",
+      "implementation": "src/modules/runtime/application/sharedRuntime.ts",
+      "adapter": "src/adapters/sharedRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ffa53a34e2251ada3e5a589063054e27436bff3b4e06cf143bc7de396c174a0d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageSourcePolicy.js",
+      "implementation": "src/modules/image/domain/imageSourcePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageResult.js",
+      "implementation": "src/modules/image/domain/imageResult.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/multipartFormData.js",
+      "implementation": "src/modules/image/infrastructure/multipartFormData.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageTaskPolicy.js",
+      "implementation": "src/modules/image/domain/imageTaskPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageFailurePolicy.js",
+      "implementation": "src/modules/image/domain/imageFailurePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageDimensions.js",
+      "implementation": "src/modules/image/domain/imageDimensions.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/visibleFailure.js",
+      "implementation": "src/modules/models/domain/visibleFailure.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageGenerationFallback.js",
+      "implementation": "src/modules/image/domain/providerConfig.ts",
+      "additionalImplementations": [
+        "src/modules/image/application/legacyImageGeneration.ts"
+      ],
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatCompletionUrl.js",
+      "implementation": "src/modules/models/domain/chatCompletionUrl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/sideLLM.js",
+      "implementation": "src/adapters/sideLLM.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageAspectRatio.js",
+      "implementation": "src/modules/image/domain/imageAspectRatio.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/unicodeText.js",
+      "implementation": "src/modules/models/domain/unicodeText.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/modelGateway.js",
+      "implementation": "src/modules/models/domain/modelGateway.ts",
+      "additionalImplementations": [
+        "src/adapters/modelFetch.ts"
+      ],
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatRequestRecovery.js",
+      "implementation": "src/modules/models/application/chatRequestRecovery.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageRequestGuard.js",
+      "implementation": "src/modules/image/domain/imageRequestGuard.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/providers/ThinkingProcessor.js",
+      "implementation": "src/modules/models/domain/thinkingProcessor.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/apiClient.js",
+      "implementation": "src/modules/models/application/modelExecution.ts",
+      "kind": "composition",
+      "reviewedSha256": "bd6c67a0c7b6653c064278f65de06e564ea8589b34e06bb4b0bacb75edf77faf",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/aiProviderProbe.js",
+      "implementation": "src/modules/models/application/aiProviderProbe.ts",
+      "kind": "composition",
+      "reviewedSha256": "dd99187a0e58d1c758786d10edbbf90a931f97155fcb135d86f54f1feea5e397",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatFailureDiagnosis.js",
+      "implementation": "src/modules/models/application/chatFailureDiagnosis.ts",
+      "kind": "composition",
+      "reviewedSha256": "8b0256e61189492d748e74c1d6d6d9bb9611dc13548b81b1a1fadcf8e3d5123b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/guobaAiProviderConfig.js",
+      "implementation": "src/modules/config/domain/aiProviderConfig.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/conversation.js",
+      "implementation": "src/modules/config/domain/schemas/shared/conversation.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/permission.js",
+      "implementation": "src/modules/config/domain/schemas/shared/permission.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/triggers.js",
+      "implementation": "src/modules/config/domain/schemas/shared/triggers.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/aiCore.js",
+      "implementation": "src/modules/config/domain/schemas/shared/aiCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/basic.js",
+      "implementation": "src/modules/config/domain/schemas/shared/basic.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/reasoning.js",
+      "implementation": "src/modules/config/domain/schemas/shared/reasoning.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/riskControl.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/riskControl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/tools.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/tools.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/magnetSearch.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/magnetSearch.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/emoji.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/emoji.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/messageArchive.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/messageArchive.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/persona.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/persona.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/groupGuard.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/groupGuard.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/dice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/dice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/deltaForce.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/deltaForce.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/permission.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/permission.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/memory.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/memory.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/umaRace.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/umaRace.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/aiCore.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/aiCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/tracking.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/tracking.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/emotion.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/emotion.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/expression.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/expression.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/aiModels.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/aiModels.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/knowledge.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/knowledge.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/basic.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/basic.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/messagePipeline.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/messagePipeline.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/voice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/voice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/reasoning.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/reasoning.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/groupNotice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/groupNotice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/schemaConfig.js",
+      "implementation": "src/adapters/config/schemaConfig.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/providerCredentials.js",
+      "implementation": "src/adapters/config/providerCredentials.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/configWriter.js",
+      "implementation": "src/modules/config/infrastructure/configRepository.ts",
+      "kind": "composition",
+      "reviewedSha256": "104062c5197f73ac8cdf75db39a9894307fd3b7783dd57dfe67d8e29b6ffa970",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/config/configStore.js",
+      "implementation": "src/modules/config/infrastructure/configStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "e3e67595b296087799850131e887b99ffdaba71e6202e667e42e82a72a240cb7",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "model/config.js",
+      "implementation": "src/modules/config/infrastructure/namedConfig.ts",
+      "kind": "composition",
+      "reviewedSha256": "6ae8da4cd1cc092020e711d4137010d6e88a775661fd2375b2cdcb34fe2bf582",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/thinkingForwardSettings.js",
+      "implementation": "src/modules/config/infrastructure/thinkingForwardSettings.ts",
+      "kind": "composition",
+      "reviewedSha256": "95b7f4d0dcba636dd3aedb545d075d451f4be5d9ec0b62537255a81365955751",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/index.js",
+      "implementation": "src/modules/config/application/configPanel.ts",
+      "kind": "composition",
+      "reviewedSha256": "a43fc0749d319eb95662567c49d55286253201637949332aa1fadf91004f4284",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/configInfo.js",
+      "implementation": "src/modules/config/application/configPanel.ts",
+      "kind": "composition",
+      "reviewedSha256": "3dbdc0665f8ca75b2b94a7bf61e9bc78a56cf58f290b0a5dfd95b63bdbe0ef2a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messageCacheTtl.js",
+      "implementation": "src/modules/messaging/domain/messageCacheTtl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/deliveryObservability.js",
+      "implementation": "src/modules/messaging/domain/deliveryObservability.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/leaseHeartbeat.js",
+      "implementation": "src/modules/messaging/infrastructure/leaseHeartbeat.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/keyedSerialQueue.js",
+      "implementation": "src/modules/messaging/infrastructure/keyedSerialQueue.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/outboundArbiter.js",
+      "implementation": "src/modules/messaging/application/outboundArbiter.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/videoThumbnail.js",
+      "implementation": "src/modules/messaging/infrastructure/videoThumbnail.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/MessageManager.js",
+      "implementation": "src/modules/messaging/application/recentMessages.ts",
+      "kind": "composition",
+      "reviewedSha256": "595dbc7d8ae8b4978f205bd868278afadb5d2e1763a49331cbce20203e3106cd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/MessageArchiveManager.js",
+      "implementation": "src/modules/messaging/infrastructure/messageArchive.ts",
+      "kind": "composition",
+      "reviewedSha256": "9845549d27c773910460451818044f8963fae04e348ac1b0d724e8a3bf2d66e6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messageStats.js",
+      "implementation": "src/modules/messaging/application/messageStats.ts",
+      "kind": "composition",
+      "reviewedSha256": "f8c26f4c2984ed59d22c2f69302ea514fdcb4a8b6c49b792a1de192ee1f54bfd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/mediaArtifactStore.js",
+      "implementation": "src/modules/messaging/infrastructure/mediaArtifactStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "bd551b351319fba8f9db0c415efae081b5964effed79f323604ccaecc497f428",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/mediaOutbox.js",
+      "implementation": "src/modules/messaging/infrastructure/mediaOutbox.ts",
+      "kind": "composition",
+      "reviewedSha256": "d7f2c33371c8304e22475be5b4e9ff40ddc73133ee06baa044f145a1218e402f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/runtime.js",
+      "implementation": "src/adapters/pipelineForwardContext.ts",
+      "kind": "composition",
+      "reviewedSha256": "1e7b0a744b15d4d35b591231fbb64c365af5976a8e805d4224348853f24eaa38",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/riskSignalMonitor.js",
+      "implementation": "src/adapters/riskSignalMonitor.ts",
+      "kind": "composition",
+      "reviewedSha256": "5dc9fda0dcabc2e111fb21fc183b1c7c9384611a62578894bf241463c16d090f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/mediaRelayAdminReport.js",
+      "implementation": "src/modules/messaging/infrastructure/mediaRelayAdminReport.ts",
+      "kind": "composition",
+      "reviewedSha256": "205b325a338991e394481b03633d40a0f12a99c0d50598ed3f0c314cf0d92adc",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/outboundThrottle.js",
+      "implementation": "src/modules/messaging/application/outboundThrottle.ts",
+      "kind": "composition",
+      "reviewedSha256": "77afba8eebf49e2cf86a30ceb2753322b649df16480d3c104acc5374b9c3048e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/redisJobStore.js",
+      "implementation": "src/modules/messaging/infrastructure/redisJobStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "2f0644efb97fbac02357db64979da32e42045438986d41865bd237490e7d7c7d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/eventEnvelope.js",
+      "implementation": "src/modules/messaging/infrastructure/eventEnvelope.ts",
+      "kind": "composition",
+      "reviewedSha256": "23056d33bc40a8639cb451dbbc5a6765a2c1c3dc3c57ed13578f6da60b833870",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/messagePipeline.js",
+      "implementation": "src/modules/messaging/infrastructure/messagePipeline.ts",
+      "kind": "composition",
+      "reviewedSha256": "6cb005e73456bfe3dee24d5d1d14e32a724c1f903b035f27af7b068da7a1d164",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/deliveryGateway.js",
+      "implementation": "src/modules/messaging/infrastructure/deliveryGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "fb5d98a1631d1a1dee3728e8b26966ed19ac0cac0d3a71842770e72b7ce42c9b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/pipelineJobs.js",
+      "implementation": "src/modules/messaging/application/pipelineJobs.ts",
+      "present": true,
+      "thinWrapper": true
+    }
+  ],
+  "structure": {
+    "hostMemberCount": 142,
+    "hostReferences": 488,
+    "globalPropertyAccesses": 507,
+    "pluginBridgePropertyReferences": 26,
+    "method": "AST direct named receiver references; alias and computed accesses are not inferred",
+    "sourceBoundaryViolations": 0
+  },
+  "limitations": "Registered re-export wrappers are AST-validated; composition shims require exact reviewed SHA256 and both adapter/application TS sources. Newly discovered JS debt is separate from the immutable baseline; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric."
+}

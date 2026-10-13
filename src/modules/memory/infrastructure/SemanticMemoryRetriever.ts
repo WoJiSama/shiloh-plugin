@@ -1,0 +1,178 @@
+import type { SemanticMemoryStore, MemoryChunk } from './SemanticMemoryStore.js'
+import type { EmbeddingGateway } from './EmbeddingGateway.js'
+import type { RerankGateway } from './RerankGateway.js'
+interface Hit {chunk:MemoryChunk;score:number}
+interface Fused {chunk:MemoryChunk;rrf:number;vector:number;bm25Rank:number;vectorRank:number;effectiveStrength?:number;memoryFactor?:number}
+export interface RetrieveConfig { retrieveTimeoutMs?:number;topK?:number;minScore?:number;rerankTopN?:number;contextMaxChars?:number;memoryEvolution?:{enabled?:boolean;freezeThreshold?:number;halfLifeDays?:number} }
+interface Options {store:SemanticMemoryStore;gateway:EmbeddingGateway;reranker?:RerankGateway|null;config?:RetrieveConfig;logger?:{warn?(message:string):void}}
+// 语义记忆检索:向量(归一化余弦)+ BM25 混合召回 → RRF 融合(k=60)
+// → 相邻窗口重叠去重 → 余弦阈值门控。可选 LLM 重排(评估/调试用,不进热路径)。
+// 记忆演化(借鉴 A-Memorix):排序混入强度因子(近期/被反复想起的记忆上浮,
+// 长期无人提起的衰减下沉),低于冻结阈值的直接不注入;被注入的分块即强化并重置衰减时钟。
+import { effectiveStrength } from "./SemanticMemoryStore.js"
+
+const RRF_K = 60
+const CANDIDATE_POOL = 30
+
+export function rrfFuse(vectorHits:Hit[] = [], bm25Hits:Hit[] = [], { pool = CANDIDATE_POOL } = {}) {
+  const scores = new Map<string,Fused>()
+  const add = (chunk:MemoryChunk, source:string, rank:number, vectorScore = 0) => {
+    const entry = scores.get(chunk.id) || { chunk, rrf: 0, vector: 0, bm25Rank: 0, vectorRank: 0 }
+    entry.rrf += 1 / (RRF_K + rank + 1)
+    if (source === "vector") {
+      entry.vector = Math.max(entry.vector, vectorScore)
+      entry.vectorRank = rank + 1
+    } else {
+      entry.bm25Rank = rank + 1
+    }
+    scores.set(chunk.id, entry)
+  }
+  vectorHits.slice(0, pool).forEach((hit, rank) => add(hit.chunk, "vector", rank, hit.score))
+  bm25Hits.slice(0, pool).forEach((hit, rank) => add(hit.chunk, "bm25", rank))
+  return [...scores.values()].sort((a, b) => b.rrf - a.rrf)
+}
+
+function messageIdOverlap(a:string[] = [], b:string[] = []) {
+  if (!a.length || !b.length) return 0
+  const set = new Set(a.map(String))
+  const shared = b.filter(id => set.has(String(id)))
+  return shared.length / Math.min(a.length, b.length)
+}
+
+export class SemanticMemoryRetriever {
+ store:SemanticMemoryStore;gateway:EmbeddingGateway;reranker:RerankGateway|null;config:RetrieveConfig;logger:Options["logger"];stats:{queries:number;hits:number;timeouts:number;failures:number;rerankQueries:number;rerankApplied:number}
+  constructor({ store, gateway, reranker = null, config = {}, logger }:Options) {
+    this.store = store
+    this.gateway = gateway
+    this.reranker = reranker
+    this.config = config
+    this.logger = logger
+    this.stats = { queries: 0, hits: 0, timeouts: 0, failures: 0, rerankQueries: 0, rerankApplied: 0 }
+  }
+
+  async search(groupId:string, query:string, { topK, minScore, timeoutMs, candidatePool, rerank = false }:{topK?:number;minScore?:number;timeoutMs?:number;candidatePool?:number;rerank?:boolean} = {}) {
+    const startedAt = Date.now()
+    const budget = Math.max(200, Number(timeoutMs || this.config.retrieveTimeoutMs) || 900)
+    const k = Math.max(1, Number(topK || this.config.topK) || 5)
+    const threshold = Number(minScore ?? this.config.minScore ?? 0.35)
+    const pool = candidatePool || CANDIDATE_POOL
+    const text = String(query || "").trim()
+    if (!text) return { items: [], elapsedMs: 0, reason: "empty query" }
+    try {
+      const queryVector = await Promise.race([
+        this.gateway.embed(text),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), budget).unref?.())
+      ])
+      if (Date.now() - startedAt > budget) {
+        this.stats.timeouts++
+        return { items: [], elapsedMs: Date.now() - startedAt, reason: "timeout" }
+      }
+      const vectorStart = Date.now()
+      const vectorHits = queryVector ? this.store.searchVector(groupId, queryVector, pool) : []
+      const vectorMs = Date.now() - vectorStart
+      const bm25Start = Date.now()
+      const bm25Hits = this.store.searchBM25(groupId, text, pool)
+      const bm25Ms = Date.now() - bm25Start
+
+      const fused = rrfFuse(vectorHits, bm25Hits)
+      // 阈值门控:向量分数是唯一可比的绝对量;纯 BM25 命中需排前 3 才保留(关键词强信号)
+      const gated = fused.filter(entry => entry.vector >= threshold || (entry.bm25Rank >= 1 && entry.bm25Rank <= 3))
+
+      // 记忆演化:强度因子混入排序(0.5~1.0,不翻转相似度主序,只做近期/强化加权),
+      // 低于冻结阈值的视为"已淡忘",不再注入
+      const evolution = this.config.memoryEvolution || {}
+      const evolutionOn = evolution.enabled !== false && Number(evolution.freezeThreshold) > 0
+      let ranked = gated
+      if (evolutionOn) {
+        const now = Date.now()
+        const halfLifeDays = Number(evolution.halfLifeDays) || 7
+        const freezeThreshold = Number(evolution.freezeThreshold) || 0.06
+        ranked = []
+        for (const entry of gated) {
+          entry.effectiveStrength = effectiveStrength(entry.chunk, now, halfLifeDays)
+          if (entry.effectiveStrength < freezeThreshold) continue
+          entry.memoryFactor = 0.5 + 0.5 * entry.effectiveStrength
+          ranked.push(entry)
+        }
+        ranked.sort((a, b) => (b.rrf * (b.memoryFactor ?? 1)) - (a.rrf * (a.memoryFactor ?? 1)))
+      }
+
+      // 可选重排:对门控后的候选池取前 rerankTopN 交给交叉编码器,失败/超时回落 RRF 顺序
+      let candidates = ranked
+      let rerankScores:Map<string,number>|null = null
+      let rerankMs = 0
+      if (rerank && this.reranker && ranked.length > 1) {
+        this.stats.rerankQueries++
+        const rerankTopN = Math.max(k, Number(this.config.rerankTopN) || 20)
+        candidates = ranked.slice(0, rerankTopN)
+        rerankMs = Date.now()
+        rerankScores = await this.reranker.rerank(text, candidates.map(entry => entry.chunk))
+        rerankMs = Date.now() - rerankMs
+        if (rerankScores) {
+          this.stats.rerankApplied++
+          candidates = [...candidates].sort((a, b) =>
+            (rerankScores!.get(String(b.chunk.id)) ?? -1) - (rerankScores!.get(String(a.chunk.id)) ?? -1))
+        }
+      }
+
+      // 相邻窗口去重:与已保留分块消息重叠 >50% 的丢弃
+      const kept:Fused[] = []
+      for (const entry of candidates) {
+        const overlaps = kept.some(item => messageIdOverlap(item.chunk.message_ids, entry.chunk.message_ids) > 0.5)
+        if (!overlaps) kept.push(entry)
+        if (kept.length >= k) break
+      }
+      this.stats.queries++
+      if (kept.length) this.stats.hits++
+      // 召回即强化:被注入的分块重置衰减时钟(内存生效,批量落盘在 store 侧)
+      if (evolutionOn && kept.length) {
+        try {
+          this.store.reinforceChunks(groupId, kept.map(entry => entry.chunk.id))
+        } catch {}
+      }
+      return {
+        items: kept.map(entry => ({
+          chunk: entry.chunk,
+          rrfScore: entry.rrf,
+          vectorScore: entry.vector,
+          vectorRank: entry.vectorRank,
+          bm25Rank: entry.bm25Rank,
+          effectiveStrength: entry.effectiveStrength ?? null,
+          memoryFactor: entry.memoryFactor ?? null,
+          recallCount: Number(entry.chunk.recallCount) || 0,
+          rerankScore: rerankScores ? (rerankScores.get(String(entry.chunk.id)) ?? null) : null
+        })),
+        elapsedMs: Date.now() - startedAt,
+        vectorMs,
+        bm25Ms,
+        rerankMs,
+        reranked: Boolean(rerankScores),
+        candidates: fused.length
+      }
+    } catch (error) {
+      this.stats.failures++
+      this.logger?.warn?.(`[SemanticMemory] 检索失败 group=${groupId}: ${error instanceof Error ? error.message : String(error)}`)
+      return { items: [], elapsedMs: Date.now() - startedAt, reason: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  formatClock(ts:unknown) {
+    const date = new Date(Number(ts) || 0)
+    if (Number.isNaN(date.getTime())) return "??:??"
+    const pad = (n:number) => String(n).padStart(2, "0")
+    return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+
+  // 注入主模型上下文的文本块
+  renderContext(result:{items:{chunk:MemoryChunk}[]}, { maxChars }:{maxChars?:number} = {}) {
+    if (!result?.items?.length) return ""
+    const limit = Math.max(200, Number(maxChars || this.config.contextMaxChars) || 900)
+    const lines = []
+    for (const item of result.items) {
+      const head = `[${this.formatClock(item.chunk.start_ts)}~${this.formatClock(item.chunk.end_ts)}]`
+      lines.push(`${head} ${item.chunk.text}`)
+    }
+    const joined = lines.join("\n")
+    return joined.length > limit ? joined.slice(0, limit) : joined
+  }
+}

@@ -34,3 +34,12 @@ test('clearGroup deletes all four docs', async () => {
   assert.deepEqual(await store.getEntities('g1'), {})
   assert.deepEqual(await store.getAlias('g1'), {})
 })
+
+test('malformed persisted shapes cannot become iterable metadata or knowledge rows',async()=>{
+ const redis=createFakeRedis(),store=new RedisStore({redis})
+ await redis.set('ytbot:mem:g:g:meta',JSON.stringify({optedOut:'broken',failureCount:'invalid'}))
+ await redis.set('ytbot:mem:g:g:knowledge',JSON.stringify([null,3,'bad',{kind:'group_file'}]))
+ assert.deepEqual((await store.getMeta('g')).optedOut,[])
+ assert.equal((await store.getMeta('g')).failureCount,0)
+ assert.deepEqual(await store.getKnowledge('g'),[{kind:'group_file'}])
+})

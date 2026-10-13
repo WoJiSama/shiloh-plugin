@@ -161,3 +161,16 @@ test('registered pure compatibility entries load the exact emitted exports', asy
     }
   }
 })
+
+test('compiled memory factories compose without host globals or network', async () => {
+ const { createMemoryCommands } = await import('../dist/backend/modules/memory/infrastructure/memoryCommands.js')
+ const { createGlobalStyleLearnerClass } = await import('../dist/backend/modules/memory/infrastructure/globalStyleLearner.js')
+ const { createPersonaFeedbackModule } = await import('../dist/backend/modules/memory/infrastructure/personaFeedbackManager.js')
+ const Style = createGlobalStyleLearnerClass({ botId:()=>1, buildExpressionObservation:()=>null })
+ const Persona = createPersonaFeedbackModule({ isToneCorrectionMessage:()=>false }).PersonaFeedbackManager
+ const Commands = createMemoryCommands({ PluginBase:class {}, getSharedMemoryManager:()=>{throw new Error('unexpected memory access')}, getSharedConfig:()=>({}), globalStyleLearnerManager:new Style(), personaFeedbackManager:new Persona(),logger:{warn(){},error(){}},makeForwardMsg:async(_e,messages)=>messages })
+ const payloads=[]
+ await new Commands().replyMemoryForward({reply:async payload=>{payloads.push(payload)}},'fixture',[{title:'fixture',facts:[]}])
+ assert.equal(payloads.length,1)
+ assert.match(JSON.stringify(payloads[0]),/暂无记忆/)
+})
