@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -7,9 +8,14 @@ import { checkTree } from './check-boundaries.mjs';
 
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
-const migrations = [
+export const migrations = [
   { legacy: 'utils/pluginExportLoader.js', implementation: 'src/modules/platform/domain/pluginExportLoader.ts' },
   { legacy: 'utils/forwardBatches.js', implementation: 'src/modules/messaging/domain/forwardBatches.ts' },
+  { legacy: 'utils/turnSession.js', implementation: 'src/modules/runtime/domain/turnSession.ts' },
+  // Reviewed composition only: capability injection belongs to adapters, business to application TS.
+  // A changed shim must be reviewed and registered again; a matching filename is not sufficient.
+  { legacy: 'core/runtime/groupRuntime.js', implementation: 'src/modules/runtime/application/groupRuntime.ts', adapter: 'src/adapters/legacyRuntime.ts', kind: 'composition', reviewedSha256: 'ea846310dec22fdbb3a91813579002446a005fb6a822b83c917bedd90add2f92' },
+  { legacy: 'core/runtime/sharedRuntime.js', implementation: 'src/modules/runtime/application/sharedRuntime.ts', adapter: 'src/adapters/sharedRuntime.ts', kind: 'composition', reviewedSha256: 'ffa53a34e2251ada3e5a589063054e27436bff3b4e06cf143bc7de396c174a0d' },
 ];
 export function classify(path) {
   if (/(?:^|\/)(?:node_modules|vendor|dist|coverage|data)(?:\/|$)/.test(path)) return 'vendor-generated-data';
@@ -54,17 +60,31 @@ function structure(files) {
   }
   return { hostMemberCount: hostMembers.size, hostReferences, globalPropertyAccesses: globalAccesses, pluginBridgePropertyReferences: bridgeReferences, method: 'AST direct named receiver references; alias and computed accesses are not inferred' };
 }
+export function verifyCompatibility(item, source) {
+  if (item.kind === 'composition') return createHash('sha256').update(source).digest('hex') === item.reviewedSha256;
+  const file = ts.createSourceFile(item.legacy, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const emitted = item.implementation.replace(/^src\//, 'dist/backend/').replace(/\.ts$/, '.js');
+  return file.parseDiagnostics.length === 0 && file.statements.length > 0 && file.statements.every(statement =>
+    ts.isExportDeclaration(statement) && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier) &&
+    resolve(item.legacy, '..', statement.moduleSpecifier.text) === resolve(emitted));
+}
+export function discoveredDebt(baselineFiles, currentFiles) {
+  const known = new Set(baselineFiles.map(file => file.path));
+  const discovered = currentFiles.filter(file => file.category === 'business' && file.language === 'js' && !known.has(file.path));
+  return { modules: discovered.length, codeLines: discovered.reduce((sum, file) => sum + file.codeLines, 0), paths: discovered.map(file => file.path) };
+}
 export function report() {
   const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
   const files = [...new Set(paths(['ls-files', '-z', '--cached', '--others', '--exclude-standard']))].filter(path => existsSync(path)).sort().map(path => entry(path, readFileSync(path, 'utf8')));
-  const registered = migrations.map(item => ({ ...item, present: files.some(file => file.path === item.implementation), thinWrapper: existsSync(item.legacy) && readFileSync(item.legacy, 'utf8').includes(item.implementation.replace(/^src\//, 'dist/backend/').replace(/\.ts$/, '.js')) && /^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*export\s+[\s\S]+\s+from\s+['"][^'"]+['"];?\s*$/.test(readFileSync(item.legacy, 'utf8')) }));
+  const registered = migrations.map(item => ({ ...item, present: [item.implementation, ...(item.adapter ? [item.adapter] : [])].every(path => files.some(file => file.path === path)), thinWrapper: existsSync(item.legacy) && verifyCompatibility(item, readFileSync(item.legacy, 'utf8')) }));
   const completed = new Set(registered.filter(item => item.present && item.thinWrapper).map(item => item.legacy));
+  const classifiedFiles = files.map(file => completed.has(file.path) ? { ...file, category: 'compatibility' } : file);
   const summarize = list => list.reduce((result, item) => { const key = `${item.category}:${item.language}`; const value = result[key] ??= { files: 0, codeLines: 0, bytes: 0 }; value.files++; value.codeLines += item.codeLines; value.bytes += item.bytes; return result; }, {});
   const business = files.filter(file => file.category === 'business' && !completed.has(file.path));
   const js = business.filter(file => file.language === 'js').reduce((sum, file) => sum + file.codeLines, 0);
   const tsLines = business.filter(file => file.language === 'ts').reduce((sum, file) => sum + file.codeLines, 0);
   const remaining = baseline.files.filter(file => file.category === 'business' && file.language === 'js' && !completed.has(file.path));
-  return { baselineCommit: baseline.commit, metricVersion: baseline.metricVersion, current: summarize(files), businessJsCodeLinePercent: 100 * js / (js + tsLines), baselineRemaining: { modules: remaining.length, codeLines: remaining.reduce((sum, file) => sum + file.codeLines, 0), paths: remaining.map(file => file.path) }, registeredMigrations: registered, structure: { ...structure(files), sourceBoundaryViolations: checkTree().length }, limitations: 'Registered thin wrappers are counted migrated only when TS source is present; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric.' };
+  return { baselineCommit: baseline.commit, metricVersion: baseline.metricVersion, current: summarize(classifiedFiles), compatibilityEntries: classifiedFiles.filter(file => file.category === 'compatibility'), discoveredBusinessJsDebt: discoveredDebt(baseline.files, classifiedFiles), businessJsCodeLinePercent: 100 * js / (js + tsLines), baselineRemaining: { modules: remaining.length, codeLines: remaining.reduce((sum, file) => sum + file.codeLines, 0), paths: remaining.map(file => file.path) }, registeredMigrations: registered, structure: { ...structure(files), sourceBoundaryViolations: checkTree().length }, limitations: 'Registered re-export wrappers are AST-validated; composition shims require exact reviewed SHA256 and both adapter/application TS sources. Newly discovered JS debt is separate from the immutable baseline; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric.' };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--write-baseline')) {

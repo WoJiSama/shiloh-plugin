@@ -1,3 +1,4 @@
+import { resolveConversationContext } from "../../dist/backend/adapters/conversationContext.js"
 import { collectThinking, sendThinkingForward } from "../../utils/thinkingForward.js"
 // 主聊天回合:触发上下文 → 提示词分层组装 → 历史选择 → 模型调用 → 回答分发。
 // 从 apps/test.js 原样迁出(行为不变,P 重构),this 依赖以 host 注入;
@@ -99,6 +100,8 @@ export async function handleToolInner(host, e) {
     const sessionId = randomUUID()
     e.sessionId = sessionId
     const session = host.getOrCreateSession(sessionId, isPrivateChat ? [] : host.tools)
+    const conversationContext = resolveConversationContext(e)
+    if (conversationContext) session.context = conversationContext
     session.taskContext = taskContext
     // 一个回合一条 trace + 一个出站仲裁：回合内所有出站消息过同一个有序队列
     const turnTrace = createTurnTrace({ groupId, userId, sessionId, logger, archive: { enabled: host.config?.turnTrace?.archiveEnabled !== false, dir: String(host.config?.turnTrace?.archiveDir || "") || resolveTurnTraceArchiveDir(), retentionDays: Number(host.config?.turnTrace?.retentionDays) || 7 } })

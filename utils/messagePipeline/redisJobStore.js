@@ -1,3 +1,4 @@
+import { createRawTaskStore } from "../../dist/backend/adapters/rawTaskStore.js"
 import { randomUUID } from "node:crypto"
 
 const DEFAULT_EVENT_TTL_SECONDS = 6 * 60 * 60
@@ -37,6 +38,7 @@ export class RedisJobStore {
     this.eventTtlSeconds = Math.max(300, Number(eventTtlSeconds) || DEFAULT_EVENT_TTL_SECONDS)
     this.deliveryTtlSeconds = Math.max(3600, Number(deliveryTtlSeconds) || DEFAULT_DELIVERY_TTL_SECONDS)
     this.memory = new Map()
+    this.rawStore = createRawTaskStore({ redis: () => this.redis, memory: this.memory })
   }
 
   key(kind, id) {
@@ -48,20 +50,15 @@ export class RedisJobStore {
   }
 
   async getRaw(key) {
-    if (this.redis?.get) return await this.redis.get(key)
-    return this.memory.get(key) || null
+    return await this.rawStore.getRaw(key)
   }
 
   async setRaw(key, value, options = {}) {
-    if (this.redis?.set) return await this.redis.set(key, value, options)
-    if (options.NX && this.memory.has(key)) return null
-    this.memory.set(key, value)
-    return "OK"
+    return await this.rawStore.setRaw(key, value, options)
   }
 
   async delRaw(key) {
-    if (this.redis?.del) return await this.redis.del(key)
-    return this.memory.delete(key) ? 1 : 0
+    return await this.rawStore.delRaw(key)
   }
 
   async create(kind, id, value) {

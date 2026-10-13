@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classify, codeLines } from '../scripts/migration-report.mjs';
+import { createHash } from 'node:crypto';
+import { classify, codeLines, verifyCompatibility, discoveredDebt } from '../scripts/migration-report.mjs';
 import { checkSource } from '../scripts/check-boundaries.mjs';
 
 const path = 'src/modules/example/domain/policy.ts';
@@ -27,4 +28,31 @@ test('boundaries reject platform globals and extensionless imports but ignore co
   assert.ok(checkSource(path, 'import x from "./policy";').length);
   assert.deepEqual(checkSource(path, '// globalThis.Bot\nconst text = "pluginBridge.instance";'), []);
   assert.deepEqual(checkSource('src/adapters/qq.ts', 'import fs from "node:fs"; const b = globalThis.Bot;'), []);
+});
+
+test('migration wrappers must contain only real re-exports to their registered implementation', () => {
+  const item = { legacy: 'utils/example.js', implementation: 'src/modules/example.ts' };
+  assert.equal(verifyCompatibility(item, "// shim\nexport { foo } from '../dist/backend/modules/example.js';"), true);
+  assert.equal(verifyCompatibility(item, "export { foo } from '../dist/backend/modules/example.js';\nconsole.log('business');"), false);
+  assert.equal(verifyCompatibility(item, "export { foo } from '../dist/backend/modules/other.js';"), false);
+  assert.equal(verifyCompatibility(item, "// export { foo } from '../dist/backend/modules/example.js';"), false);
+  assert.equal(verifyCompatibility(item, "export const logic = 1; export { foo } from '../dist/backend/modules/example.js';"), false);
+});
+test('reviewed composition registration rejects every unreviewed source change', () => {
+  const source = "import { create } from '../dist/backend/adapters/example.js';\nexport const runtime = create();";
+  const item = { kind: 'composition', reviewedSha256: createHash('sha256').update(source).digest('hex') };
+  assert.equal(verifyCompatibility(item, source), true);
+  assert.equal(verifyCompatibility(item, source + '\nexport const hiddenBusiness = 1;'), false);
+  assert.equal(verifyCompatibility({ ...item, reviewedSha256: undefined }, source), false);
+});
+test('newly discovered JS debt is reported without altering fixed baseline or counting compatibility as debt', () => {
+  const baseline = [{ path: 'utils/old.js', category: 'business', language: 'js', codeLines: 10 }];
+  const before = JSON.stringify(baseline);
+  const current = [...baseline,
+    { path: 'core/config/configStore.js', category: 'business', language: 'js', codeLines: 20 },
+    { path: 'core/runtime/shim.js', category: 'compatibility', language: 'js', codeLines: 3 },
+    { path: 'src/new.ts', category: 'business', language: 'ts', codeLines: 30 },
+  ];
+  assert.deepEqual(discoveredDebt(baseline, current), { modules: 1, codeLines: 20, paths: ['core/config/configStore.js'] });
+  assert.equal(JSON.stringify(baseline), before);
 });
