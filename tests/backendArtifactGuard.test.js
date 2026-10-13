@@ -73,3 +73,19 @@ test('new source file invalidates an otherwise matching build', async t => {
   await write(root, 'src/new-module.ts', 'export const next = true')
   await assert.rejects(ensureBackendArtifacts(root), /source file set differs/)
 })
+
+
+test('verified release takes precedence over retained stale source but rejects runtime tampering', async t => {
+  const root = await fixture(t, true)
+  await write(root, 'src/module.ts', 'stale source from previous checkout')
+  await write(root, 'src/old-module.ts', 'old source')
+  await ensureBackendArtifacts(root)
+  await write(root, 'index.js', 'tampered runtime')
+  await assert.rejects(ensureBackendArtifacts(root), /Release runtime differs/)
+})
+
+test('extra stale generated output is rejected even when recorded hashes match', async t => {
+  const root = await fixture(t, true)
+  await write(root, 'dist/backend/old-module.js', 'stale generated file')
+  await assert.rejects(ensureBackendArtifacts(root), /Backend output file set differs/)
+})

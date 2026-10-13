@@ -51,16 +51,21 @@ async function verify(root) {
     const manifest = JSON.parse(await fs.readFile(manifestFile, 'utf8'))
     if (manifest.schema !== 1) throw new Error('Unsupported backend manifest')
     await validateHashes(backendRoot, manifest.files, 'Backend output')
-    if (await exists(path.join(root, 'src'))) {
-      await validateHashes(root, manifest.sources, 'Backend source')
-      const recordedSources = Object.keys(manifest.sources).filter(name => name.startsWith('src/')).sort()
-      if (JSON.stringify(await sourceFiles(root)) !== JSON.stringify(recordedSources)) throw new Error('Backend source file set differs from build manifest')
-    } else {
+    const actualOutputs = (await sourceFiles(root, 'dist/backend')).map(name => name.slice('dist/backend/'.length))
+    const expectedOutputs = [...Object.keys(manifest.files), 'manifest.json'].sort()
+    if (JSON.stringify(actualOutputs) !== JSON.stringify(expectedOutputs)) throw new Error('Backend output file set differs from build manifest')
+    if (await exists(path.join(root, 'release-manifest.json'))) {
       const releaseFile = await checkedFile(root, 'release-manifest.json')
       const release = JSON.parse(await fs.readFile(releaseFile, 'utf8'))
       if (release.schema !== 1 || typeof release.commit !== 'string' || !/^[a-f0-9]{40}$/.test(release.commit)) throw new Error('Invalid release manifest')
       if (!release.files?.['dist/backend/manifest.json']) throw new Error('Release manifest must include backend manifest')
       await validateHashes(root, release.files, 'Release runtime')
+    } else if (await exists(path.join(root, 'src'))) {
+      await validateHashes(root, manifest.sources, 'Backend source')
+      const recordedSources = Object.keys(manifest.sources).filter(name => name.startsWith('src/')).sort()
+      if (JSON.stringify(await sourceFiles(root)) !== JSON.stringify(recordedSources)) throw new Error('Backend source file set differs from build manifest')
+    } else {
+      throw new Error('Neither source checkout nor release manifest exists')
     }
   } catch (error) {
     throw new Error(`Backend artifacts are missing or stale. Run npm run backend:build in the source checkout or install a verified release. ${error.message}`, { cause: error })
