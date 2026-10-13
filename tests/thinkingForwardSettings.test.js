@@ -21,7 +21,8 @@ test('default off; persisted group isolation and live disable across store insta
   assert.equal(reloaded.isEnabled(100), true)
   reloaded.setEnabled(100, false)
   assert.equal(store.isEnabled(100), false)
-  assert.deepEqual(fs.readdirSync(path.dirname(file)), ['thinking-forward.json'])
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ['thinking-forward.json', 'thinking-forward.json.bak'])
+  assert.equal(JSON.parse(fs.readFileSync(file + '.bak', 'utf8')).groups['100'], true)
 })
 
 test('corrupt configuration fails closed without overwriting it', t => {

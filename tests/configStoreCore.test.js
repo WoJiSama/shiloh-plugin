@@ -18,14 +18,14 @@ function makeRoot() {
   return root
 }
 
-test("深合并：用户层覆盖标量、补齐缺省（以默认键为准，多余用户键被裁掉——原initConfig语义）", async () => {
+test("深合并：用户层覆盖标量、补齐缺省并保留未知用户键", async () => {
   const { mergeDeepConfig } = await import("../core/config/configStore.js")
   const merged = mergeDeepConfig(
     { enabled: true, nested: { a: 1, b: 2 }, list: [1, 2] },
     { enabled: false, nested: { b: 99, c: 3 } }
   )
   assert.equal(merged.enabled, false)
-  assert.deepEqual(merged.nested, { a: 1, b: 99 })
+  assert.deepEqual(merged.nested, { a: 1, b: 99, c: 3 })
   assert.deepEqual(merged.list, [1, 2])
 })
 

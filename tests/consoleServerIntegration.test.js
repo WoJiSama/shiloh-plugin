@@ -74,7 +74,7 @@ test("isolated console HTTP saves safely, preserves YAML and credentials, and pr
     allowedGroups: [100001, 200002],
     messagePipeline: { eventConcurrency: 8 }, youtubeRelay: { cookieHeader: "fixture-cookie", poToken: "fixture-po" },
     chatAiConfig: { providers: [
-      { name: "a", apiUrl, model: "model-a", apiKey: "fixture-provider-a-secret", priority: 1 },
+      { name: "a", apiUrl, model: "model-a", apiKey: "fixture-provider-a-secret", priority: 1, supportsImageEdit: true, customExtension: { vendor: "retained" } },
       { name: "b", apiUrl, model: "model-b", apiKey: "fixture-provider-b-secret", priority: 2 }
     ] }
   }).split("\n").filter(Boolean).map(line => `  ${line}\n`).join(""))
@@ -147,11 +147,22 @@ test("isolated console HTTP saves safely, preserves YAML and credentials, and pr
   assert.equal((await request("/api/config/pipeline", { method: "PUT", body: { revision: schema.revision, values: { "messagePipeline.eventConcurrency": 12 } } })).status, 409)
   const reasoning = await request("/api/config/reasoning")
   assert.equal(reasoning.status, 200)
+  // A second process/file writer changes the same field after the browser read.
+  const externalDoc = YAML.parseDocument(fs.readFileSync(configFile, "utf8"))
+  externalDoc.setIn(["pluginSettings", "taskAiConfig", "casual", "reasoningEffort"], "high")
+  fs.writeFileSync(configFile, externalDoc.toString())
+  const externalConflict = await request("/api/config/reasoning", { method: "PUT", body: { revision: reasoning.data.revision, values: { "taskAiConfig.casual.reasoningEffort": "low" } } })
+  assert.equal(externalConflict.status, 409)
+  assert.equal(YAML.parse(fs.readFileSync(configFile, "utf8")).pluginSettings.taskAiConfig.casual.reasoningEffort, "high")
+  reasoning.data = (await request("/api/config/reasoning")).data
   const reasoningSaved = await request("/api/config/reasoning", { method: "PUT", body: { revision: reasoning.data.revision, values: { "taskAiConfig.casual.reasoningEffort": "low" } } })
   assert.equal(reasoningSaved.status, 200)
   assert.equal((await request("/api/config/reasoning")).data.groups[0].fields.find(field => field.field === "taskAiConfig.casual.reasoningEffort").value, "low")
   const ai = (await request("/api/ai/config")).data
   const providers = ai.sections.chatAiConfig.reverse()
+  // The form only submits visible fields; hidden vendor extensions must survive by ID.
+  for (const provider of providers) { delete provider.customExtension; delete provider.supportsImageEdit }
+  providers[1].priority = 9
   assert.equal(JSON.stringify(ai).includes("fixture-provider-a-secret"), false)
   const aiSaved = await request("/api/ai/config", { method: "PUT", body: { configKey: "chatAiConfig", providers, revision: ai.revisions.chatAiConfig } })
   assert.equal(aiSaved.status, 200)
@@ -161,6 +172,8 @@ test("isolated console HTTP saves safely, preserves YAML and credentials, and pr
   const probe = await request("/api/ai/probe-provider", { method: "POST", body: { configKey: "chatAiConfig", provider: { ...aiSaved.data.providers[0], apiKey: "", apiKeyAction: "keep" } } })
   assert.equal(probe.status, 200)
   assert.equal(probe.data.results[0].ok, true)
+  assert.deepEqual(stored.chatAiConfig.providers.find(item => item.name === "a").customExtension, { vendor: "retained" })
+  assert.equal(stored.chatAiConfig.providers.find(item => item.name === "a").supportsImageEdit, true)
   assert.equal(observedAuthorization, "Bearer fixture-provider-b-secret")
   assert.equal((await request("/api/pipeline/jobs?limit=999")).status, 400)
   const library = (await request("/api/persona/library")).data

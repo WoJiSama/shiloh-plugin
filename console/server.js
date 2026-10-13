@@ -16,6 +16,7 @@ await ensureBackendArtifacts();
 import { createImageService } from '../dist/backend/modules/image/application/imageService.js'
 import { createImageResource } from '../dist/backend/modules/image/infrastructure/imageResource.js'
 import { normalizeCustomSize, normalizeQuality } from '../dist/backend/modules/image/domain/imageInput.js'
+import { createConfigRepository, ConfigConflictError } from '../dist/backend/modules/config/infrastructure/configRepository.js'
 import http from "node:http"
 import fs from "node:fs"
 import path from "node:path"
@@ -63,6 +64,7 @@ const FRONTEND_DIST = path.join(PLUGIN_ROOT, "console", "frontend", "dist")
 const PORT = Number(process.env.CONSOLE_PORT || 8787)
 const HOST = process.env.CONSOLE_HOST || "0.0.0.0"
 const MESSAGE_YAML = path.join(PLUGIN_ROOT, "config", "message.yaml")
+const configRepository = createConfigRepository({ file: MESSAGE_YAML })
 
 // ---------- 令牌(并存:供 curl/脚本自动化与 img 直链) ----------
 function loadOrCreateToken() {
@@ -738,9 +740,7 @@ let activeImageJobs = 0
 const imageJobSignals = new Set() // 每个进行中生图任务的外部取消信号
 
 function loadPluginSettings() {
-  const parsed = YAML.parse(fs.readFileSync(MESSAGE_YAML, "utf8"))
-  if (!parsed?.pluginSettings) throw new Error("message.yaml 缺少 pluginSettings 段")
-  return parsed.pluginSettings
+  return configRepository.read().settings
 }
 
 function describeImageProvider(config = {}, index = 0) {
@@ -957,20 +957,13 @@ function configuredConsoleProviders(settings, configKey, def) {
   return identifiableProviders(configKey, normalized, raw.filter(item => normalizeProviderForPanel(item, def)))
 }
 
-// 控制台自己的定点写入器:与 utils/configWriter.applyFlatUpdates 同语义,
-// 但用 PLUGIN_ROOT 定位(后者依赖 process.cwd(),在 console 的 cwd 下会指错位置)。
-function applyConsoleFlatUpdates(updates = {}) {
-  const source = fs.existsSync(MESSAGE_YAML) ? fs.readFileSync(MESSAGE_YAML, "utf8") : "pluginSettings:\n"
-  const doc = YAML.parseDocument(source)
-  if (doc.errors?.length) throw new Error("message.yaml 当前不是有效 YAML，拒绝写入: " + doc.errors[0].message)
-  for (const [flatKey, value] of Object.entries(updates || {})) {
-    // undefined/null 不写:避免表单未加载出的字段把已有配置整个抹掉
-    if (!flatKey || value === undefined || value === null) continue
-    doc.setIn(["pluginSettings", ...String(flatKey).split(".")], value)
+// Repository provides cross-process locking and compare-and-swap over the exact read snapshot.
+function applyConsoleFlatUpdates(updates = {}, expectedRevision) {
+  try { return configRepository.updateFlat(updates, { expectedRevision }) }
+  catch (error) {
+    if (error instanceof ConfigConflictError) throw Object.assign(new Error("配置已被其他进程修改，请重新加载并核对草稿后保存"), { status: 409 })
+    throw error
   }
-  const tmp = `${MESSAGE_YAML}.tmp-console`
-  fs.writeFileSync(tmp, doc.toString(), "utf8")
-  fs.renameSync(tmp, MESSAGE_YAML)
 }
 
 function backupMessageYaml() {
@@ -1022,19 +1015,27 @@ function saveAiProviders(configKey, providers = [], revision) {
   if (!Array.isArray(providers) || !providers.length) {
     throw Object.assign(new Error("渠道列表不能为空(要清空请手工编辑 message.yaml,避免误操作抹掉配置)"), { status: 400 })
   }
-  const settings = withAiProviderPanelDefaults(loadPluginSettings())
+  const snapshot = configRepository.read()
+  const settings = withAiProviderPanelDefaults(snapshot.settings)
   const current = configuredConsoleProviders(settings, configKey, def)
   if (revision !== undefined && revision !== providerRevision(configKey, current)) {
     throw Object.assign(new Error("渠道配置已被其他页面修改，请重新加载后保存"), { status: 409 })
   }
-  const restored = restoreProviderCredentials(providers, current)
+  const restoredCredentials = restoreProviderCredentials(providers, current)
+  const rawSection = snapshot.settings[configKey] || {}
+  const rawProviders = [rawSection.providers, ...(def.legacyProviderFields || []).map(field => rawSection[field])]
+    .find(list => Array.isArray(list) && list.some(item => normalizeProviderForPanel(item, def))) || []
+  const validRaw = rawProviders.filter(item => normalizeProviderForPanel(item, def))
+  const currentById = new Map(current.map((item, index) => [item._consoleId, validRaw[index] || {}]))
+  // Restore unexposed provider extensions by stable identity; omitted channels remain deleted.
+  const restored = restoredCredentials.map(item => ({ ...currentById.get(item._consoleId), ...item }))
   const valid = restored.filter(item => normalizeProviderForPanel(item, def))
   if (!valid.length) throw Object.assign(new Error("渠道列表没有有效配置，未写入"), { status: 400 })
   const updates = normalizeAiProviderUpdates({ [`${configKey}.providers`]: restored })
   // Guoba's pure normalizer intentionally drops UI metadata. Store only the stable, non-secret ID afterward.
   updates[`${configKey}.providers`] = updates[`${configKey}.providers`].map((item, index) => ({ ...item, _consoleId: valid[index]._consoleId }))
   const backup = backupMessageYaml()
-  applyConsoleFlatUpdates(updates)
+  applyConsoleFlatUpdates(updates, snapshot.revision)
   const after = configuredConsoleProviders(withAiProviderPanelDefaults(loadPluginSettings()), configKey, def)
   return { ok: true, backup, providers: after.map(maskProvider), revision: providerRevision(configKey, after),
     applyMode: "hot", applyHint: "渠道配置已持久化；后续模型请求读取更新" }
@@ -1241,9 +1242,10 @@ function schemaConfigView(key) {
 function saveSchemaConfig(key, payload = {}) {
   const entry = CONFIG_SCHEMAS[key]
   if (!entry) throw new Error(`未注册的配置页: ${key}`)
-  const prepared = prepareSchemaUpdates(key, entry, loadPluginSettings(), payload)
+  const snapshot = configRepository.read()
+  const prepared = prepareSchemaUpdates(key, entry, snapshot.settings, payload)
   const backup = prepared.changed ? backupMessageYaml() : null
-  if (prepared.changed) applyConsoleFlatUpdates(prepared.updates)
+  if (prepared.changed) applyConsoleFlatUpdates(prepared.updates, snapshot.revision)
   const revision = schemaConfigView(key).revision
   const modes = [...new Set(prepared.apply.map(field => field.applyMode))]
   return { ok: true, changed: prepared.changed, backup, revision, apply: prepared.apply,

@@ -1,0 +1,1236 @@
+{
+  "baselineCommit": "a93265cd94e2307504dad11d26351cf954cfc071",
+  "metricVersion": 1,
+  "current": {
+    "business:js": {
+      "files": 313,
+      "codeLines": 81922,
+      "bytes": 3726011
+    },
+    "frontend:vue-script": {
+      "files": 25,
+      "codeLines": 3406,
+      "bytes": 292550
+    },
+    "frontend:ts": {
+      "files": 15,
+      "codeLines": 874,
+      "bytes": 30031
+    },
+    "type-declaration:ts": {
+      "files": 1,
+      "codeLines": 1,
+      "bytes": 66
+    },
+    "tests:ts": {
+      "files": 32,
+      "codeLines": 1958,
+      "bytes": 94075
+    },
+    "compatibility:js": {
+      "files": 62,
+      "codeLines": 174,
+      "bytes": 16458
+    },
+    "examples:js": {
+      "files": 2,
+      "codeLines": 2766,
+      "bytes": 99568
+    },
+    "entry:js": {
+      "files": 25,
+      "codeLines": 251,
+      "bytes": 10877
+    },
+    "tooling:js": {
+      "files": 25,
+      "codeLines": 2207,
+      "bytes": 143310
+    },
+    "business:ts": {
+      "files": 86,
+      "codeLines": 7446,
+      "bytes": 349382
+    },
+    "tests:js": {
+      "files": 235,
+      "codeLines": 26782,
+      "bytes": 1312278
+    }
+  },
+  "compatibilityEntries": [
+    {
+      "path": "console/lib/providerCredentials.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 170
+    },
+    {
+      "path": "console/lib/schemaConfig.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 214
+    },
+    {
+      "path": "core/config/configStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 349
+    },
+    {
+      "path": "core/runtime/groupRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 19,
+      "bytes": 1235
+    },
+    {
+      "path": "core/runtime/sharedRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 459
+    },
+    {
+      "path": "model/config.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 696
+    },
+    {
+      "path": "models/Guoba/configInfo.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 763
+    },
+    {
+      "path": "models/Guoba/schemas/aiCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "models/Guoba/schemas/aiModels.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/Guoba/schemas/basic.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/deltaForce.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/dice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "models/Guoba/schemas/emoji.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/emotion.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/expression.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/groupGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/groupNotice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "models/Guoba/schemas/index.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 646
+    },
+    {
+      "path": "models/Guoba/schemas/knowledge.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "models/Guoba/schemas/magnetSearch.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 100
+    },
+    {
+      "path": "models/Guoba/schemas/memory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "models/Guoba/schemas/messageArchive.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 102
+    },
+    {
+      "path": "models/Guoba/schemas/messagePipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 103
+    },
+    {
+      "path": "models/Guoba/schemas/permission.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/persona.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/reasoning.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "models/Guoba/schemas/riskControl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "models/Guoba/schemas/tools.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/tracking.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/Guoba/schemas/umaRace.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/voice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/configSchemas/aiCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "models/configSchemas/basic.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 91
+    },
+    {
+      "path": "models/configSchemas/conversation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/configSchemas/permission.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/configSchemas/reasoning.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/configSchemas/triggers.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "utils/aiProviderProbe.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 524
+    },
+    {
+      "path": "utils/apiClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1037
+    },
+    {
+      "path": "utils/chatCompletionUrl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 102
+    },
+    {
+      "path": "utils/chatFailureDiagnosis.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 1112
+    },
+    {
+      "path": "utils/chatRequestRecovery.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 226
+    },
+    {
+      "path": "utils/configWriter.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 742
+    },
+    {
+      "path": "utils/forwardBatches.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 213
+    },
+    {
+      "path": "utils/guobaAiProviderConfig.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 269
+    },
+    {
+      "path": "utils/imageAspectRatio.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 306
+    },
+    {
+      "path": "utils/imageDimensions.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "utils/imageFailurePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 197
+    },
+    {
+      "path": "utils/imageGenerationFallback.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 778
+    },
+    {
+      "path": "utils/imageRequestGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 304
+    },
+    {
+      "path": "utils/imageResult.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 140
+    },
+    {
+      "path": "utils/imageSourcePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 166
+    },
+    {
+      "path": "utils/imageTaskPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 397
+    },
+    {
+      "path": "utils/modelGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 261
+    },
+    {
+      "path": "utils/multipartFormData.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "utils/pluginExportLoader.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 195
+    },
+    {
+      "path": "utils/providers/ThinkingProcessor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 117
+    },
+    {
+      "path": "utils/sideLLM.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 66
+    },
+    {
+      "path": "utils/thinkingForwardSettings.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 1051
+    },
+    {
+      "path": "utils/turnSession.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 246
+    },
+    {
+      "path": "utils/unicodeText.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 174
+    },
+    {
+      "path": "utils/visibleFailure.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 181
+    }
+  ],
+  "discoveredBusinessJsDebt": {
+    "modules": 2,
+    "codeLines": 82,
+    "paths": [
+      "utils/backendArtifactGuard.js",
+      "utils/pluginUpdateBuild.js"
+    ]
+  },
+  "businessJsCodeLinePercent": 91.66815862501119,
+  "baselineRemaining": {
+    "modules": 311,
+    "codeLines": 82295,
+    "paths": [
+      "apps/CommandHelp.js",
+      "apps/MessageManager.js",
+      "apps/SemanticMemory.js",
+      "apps/ThinkingForward.js",
+      "apps/lib/adminCommands.js",
+      "apps/lib/avatarReference.js",
+      "apps/lib/chatTurn.js",
+      "apps/lib/conversationUtils.js",
+      "apps/lib/messageFormatting.js",
+      "apps/lib/messageSegments.js",
+      "apps/lib/privateChat.js",
+      "apps/lib/promptContext.js",
+      "apps/lib/replyRendering.js",
+      "apps/lib/semanticToolIntent.js",
+      "apps/lib/smartConversation.js",
+      "apps/lib/smartDynamics.js",
+      "apps/lib/splitState.js",
+      "apps/lib/strictConversation.js",
+      "apps/lib/taskStatus.js",
+      "apps/lib/teachingFacts.js",
+      "apps/lib/textPolicy.js",
+      "apps/lib/timingGate.js",
+      "apps/lib/toolExecution.js",
+      "apps/obsLogQuery.js",
+      "apps/qqinfo1.js",
+      "apps/test.js",
+      "apps/update.js",
+      "console/lib/frontendStatic.js",
+      "console/lib/pipelineJobs.js",
+      "console/lib/redisClient.js",
+      "console/server.js",
+      "core/intent/messageIntent.js",
+      "core/intent/modelIntentClassifier.js",
+      "dependence/dependencies.js",
+      "domains/dice/DeckManager.js",
+      "domains/dice/DiceManager.js",
+      "domains/dice/DiceRuleExpression.js",
+      "domains/dice/DiceRulePackManager.js",
+      "domains/dice/DiceRuleSchema.js",
+      "domains/dice/DiceRuleSession.js",
+      "domains/dice/SealExtRuntime.js",
+      "domains/dice/app.js",
+      "domains/dice/diceCommandGateway.js",
+      "domains/dice/diceCommandPolicy.js",
+      "domains/dice/diceReplyCatalog.js",
+      "domains/dice/logRecorder.js",
+      "domains/dice/sealCocDefaults.js",
+      "domains/dice/sealSkillAliases.js",
+      "domains/emoji/EmojiPackManager.js",
+      "domains/emoji/app.js",
+      "domains/emoji/emojiSelection.js",
+      "domains/games/deltaforce/DeltaForceClient.js",
+      "domains/games/deltaforce/DeltaForceObjectCache.js",
+      "domains/games/deltaforce/DeltaForceReportRenderer.js",
+      "domains/games/deltaforce/app.js",
+      "domains/games/deltaforce/model/DeltaForceReport.js",
+      "domains/games/uma/UmaRaceManager.js",
+      "domains/games/uma/UmaRaceReportRenderer.js",
+      "domains/games/uma/app.js",
+      "domains/games/uma/model/UmaRaceReport.js",
+      "domains/group-admin/GroupGuardManager.js",
+      "domains/group-admin/GroupModerationManager.js",
+      "domains/group-admin/GroupNoticeManager.js",
+      "domains/group-admin/adCorpusStore.js",
+      "domains/group-admin/groupGuardQuestion.js",
+      "domains/group-admin/groupModerationRules.js",
+      "domains/group-admin/guardDecrease.js",
+      "domains/group-admin/guardIncrease.js",
+      "domains/group-admin/guardMessage.js",
+      "domains/group-admin/moderationMessage.js",
+      "domains/group-admin/noticeDecrease.js",
+      "domains/group-admin/noticeIncrease.js",
+      "domains/knowledge/KnowledgeExpander.js",
+      "domains/knowledge/KnowledgeSearcher.js",
+      "domains/knowledge/app.js",
+      "domains/media/bilibili/app.js",
+      "domains/media/magnetsearch/MagnetSearchClient.js",
+      "domains/media/magnetsearch/MagnetSearchReportRenderer.js",
+      "domains/media/magnetsearch/app.js",
+      "domains/media/magnetsearch/model/MagnetSearchReport.js",
+      "domains/memory/EmotionManager.js",
+      "domains/memory/ExpressionLearner.js",
+      "domains/memory/GlobalStyleLearnerManager.js",
+      "domains/memory/MemoryManager.js",
+      "domains/memory/PersonProfileInjector.js",
+      "domains/memory/PersonaFeedbackManager.js",
+      "domains/memory/commandsApp.js",
+      "domains/memory/engine/aliasRegistry.js",
+      "domains/memory/engine/boundary.js",
+      "domains/memory/engine/conflictResolver.js",
+      "domains/memory/engine/constants.js",
+      "domains/memory/engine/embeddings.js",
+      "domains/memory/engine/entityModel.js",
+      "domains/memory/engine/extractor.js",
+      "domains/memory/engine/groupKnowledge.js",
+      "domains/memory/engine/groupWorkflow.js",
+      "domains/memory/engine/mentionResolver.js",
+      "domains/memory/engine/redisStore.js",
+      "domains/memory/engine/reflector.js",
+      "domains/memory/engine/retriever.js",
+      "domains/memory/engine/stats.js",
+      "domains/midtermMemory/MidtermSummaryManager.js",
+      "domains/semanticMemory/EmbeddingGateway.js",
+      "domains/semanticMemory/RerankGateway.js",
+      "domains/semanticMemory/SemanticMemoryIndexer.js",
+      "domains/semanticMemory/SemanticMemoryRetriever.js",
+      "domains/semanticMemory/SemanticMemoryStore.js",
+      "domains/semanticMemory/retrievalEval.js",
+      "domains/semanticMemory/runtime.js",
+      "functions/ask-ban.js",
+      "functions/functions_tools/AbstractTool.js",
+      "functions/functions_tools/AiMindMapTool.js",
+      "functions/functions_tools/BananaTool.js",
+      "functions/functions_tools/BingImageSearchTool.js",
+      "functions/functions_tools/ChangeCardTool.js",
+      "functions/functions_tools/ChatHistoryTool.js",
+      "functions/functions_tools/DeltaForceTool.js",
+      "functions/functions_tools/EmojiSearchTool.js",
+      "functions/functions_tools/ExcelWorkbookTool.js",
+      "functions/functions_tools/ForgetGroupKnowledgeTool.js",
+      "functions/functions_tools/GithubTool.js",
+      "functions/functions_tools/GoogleAnalysisTool.js",
+      "functions/functions_tools/GoogleImageEditTool.js",
+      "functions/functions_tools/GrabRedBagTool.js",
+      "functions/functions_tools/JinyanTool.js",
+      "functions/functions_tools/LikeTool.js",
+      "functions/functions_tools/MemberInfoTool.js",
+      "functions/functions_tools/MentionAdminsTool.js",
+      "functions/functions_tools/MentionMembersTool.js",
+      "functions/functions_tools/ModrinthTool.js",
+      "functions/functions_tools/PixivDownloadTool.js",
+      "functions/functions_tools/PixivSearchTool.js",
+      "functions/functions_tools/PokeTool.js",
+      "functions/functions_tools/QQZoneTool.js",
+      "functions/functions_tools/ReactionTool.js",
+      "functions/functions_tools/RecallTool.js",
+      "functions/functions_tools/ReminderTool.js",
+      "functions/functions_tools/SearchInformationTool.js",
+      "functions/functions_tools/SearchMusicTool.js",
+      "functions/functions_tools/SearchVideoTool.js",
+      "functions/functions_tools/SendGiftTool.js",
+      "functions/functions_tools/SendLocalEmojiTool.js",
+      "functions/functions_tools/TextImageTool.js",
+      "functions/functions_tools/TorrentDownloadTool.js",
+      "functions/functions_tools/VideoAnalysisTool.js",
+      "functions/functions_tools/VoiceTool.js",
+      "functions/functions_tools/WaitTool.js",
+      "functions/functions_tools/puppeteer/WebContentExtractor.js",
+      "functions/functions_tools/puppeteer/WebParser.js",
+      "functions/functions_tools/webParserTool.js",
+      "functions/functions_tools/xiaohongshu/api/feed.js",
+      "functions/functions_tools/xiaohongshu/api/homefeed.js",
+      "functions/functions_tools/xiaohongshu/api/sub_comment.js",
+      "functions/functions_tools/xiaohongshu/config/config.js",
+      "functions/functions_tools/xiaohongshu/sign/X-S-Common.js",
+      "functions/functions_tools/xiaohongshu/sign/X-S.js",
+      "functions/other_tools/file.js",
+      "functions/tools/BilibiliVideoSummary.js",
+      "functions/tools/CalculateToken.js",
+      "functions/tools/SearchClient.js",
+      "functions/tools/UploadFile.js",
+      "functions/tools/bilibilivideoanalysis.js",
+      "functions/tools/messageGenerator.js",
+      "functions/tools/preview.js",
+      "functions/tools/processUploadedFile.js",
+      "functions/tools/sendvideos.js",
+      "functions/tools/textract.js",
+      "model/ModrinthCard.js",
+      "model/base.js",
+      "model/friends.js",
+      "model/qqinfo.js",
+      "models/Guoba/index.js",
+      "models/Guoba/pluginInfo.js",
+      "utils/BilibiliAuthManager.js",
+      "utils/LocalToolRegistry.js",
+      "utils/MCPClient.js",
+      "utils/MessageArchiveManager.js",
+      "utils/MessageManager.js",
+      "utils/ModrinthCardRenderer.js",
+      "utils/QQApi.js",
+      "utils/SmartReply.js",
+      "utils/VolcengineVoiceProvider.js",
+      "utils/actionOutcomes.js",
+      "utils/addresseeSignals.js",
+      "utils/agentIntelligence.js",
+      "utils/agentReplyComposer.js",
+      "utils/aiConversationGate.js",
+      "utils/avatarReferencePolicy.js",
+      "utils/bilibiliMediaRelay.js",
+      "utils/bilibiliMessage.js",
+      "utils/botFederation.js",
+      "utils/builtinToolManifests.js",
+      "utils/chatFailureReply.js",
+      "utils/chatTurnDurability.js",
+      "utils/commandGate.js",
+      "utils/commandRegistry.js",
+      "utils/commandsWebApp.js",
+      "utils/common.js",
+      "utils/contextualProgressReply.js",
+      "utils/deliveryObservability.js",
+      "utils/deltaForceIntent.js",
+      "utils/diceRandom.js",
+      "utils/douyinBrowserResolver.js",
+      "utils/douyinMediaRelay.js",
+      "utils/douyinMessage.js",
+      "utils/drawFailureNote.js",
+      "utils/editReferencePipeline.js",
+      "utils/emojiToolPolicy.js",
+      "utils/episodicMemory.js",
+      "utils/excelFileContext.js",
+      "utils/excelRequestPolicy.js",
+      "utils/excelWorkbook.js",
+      "utils/expressionSequence.js",
+      "utils/fileLock.js",
+      "utils/fileUtils.js",
+      "utils/forbiddenWordGuard.js",
+      "utils/groupContextResolver.js",
+      "utils/groupContextState.js",
+      "utils/groupKnowledgeForgetPolicy.js",
+      "utils/groupNames.js",
+      "utils/guobaJumpLink.js",
+      "utils/guobaLoginTrust.js",
+      "utils/intentFastPath.js",
+      "utils/internalStatusLeak.js",
+      "utils/longTaskFeedbackPolicy.js",
+      "utils/mediaTypePolicy.js",
+      "utils/memorySelfCorrection.js",
+      "utils/mentionFailureReply.js",
+      "utils/mentionRoleRouting.js",
+      "utils/mentionTargets.js",
+      "utils/messageCacheTtl.js",
+      "utils/messageContext.js",
+      "utils/messagePipeline/deliveryGateway.js",
+      "utils/messagePipeline/eventEnvelope.js",
+      "utils/messagePipeline/keyedSerialQueue.js",
+      "utils/messagePipeline/leaseHeartbeat.js",
+      "utils/messagePipeline/mediaArtifactStore.js",
+      "utils/messagePipeline/mediaOutbox.js",
+      "utils/messagePipeline/mediaRelayAdminReport.js",
+      "utils/messagePipeline/messagePipeline.js",
+      "utils/messagePipeline/outboundArbiter.js",
+      "utils/messagePipeline/outboundThrottle.js",
+      "utils/messagePipeline/redisJobStore.js",
+      "utils/messagePipeline/riskSignalMonitor.js",
+      "utils/messagePipeline/runtime.js",
+      "utils/messagePipeline/videoThumbnail.js",
+      "utils/messageStats.js",
+      "utils/modrinth.js",
+      "utils/musicShareRelay.js",
+      "utils/narrativeReply.js",
+      "utils/obsLog.js",
+      "utils/observeWebApp.js",
+      "utils/outputGuardPipeline.js",
+      "utils/parallelDownload.js",
+      "utils/personaLibrary.js",
+      "utils/personaMoods.js",
+      "utils/personaReplayCore.js",
+      "utils/personaSource.js",
+      "utils/personaTonePolicy.js",
+      "utils/pixivIntent.js",
+      "utils/pixivMediaRelay.js",
+      "utils/pixivMessage.js",
+      "utils/pixivSearch.js",
+      "utils/pluginBridge.js",
+      "utils/proactiveReplyFreshness.js",
+      "utils/progressReplyBudget.js",
+      "utils/promptCompiler.js",
+      "utils/promptLayerCache.js",
+      "utils/promptLayers.js",
+      "utils/proxiedFetch.js",
+      "utils/qqCodeFenceText.js",
+      "utils/qqFaceTable.js",
+      "utils/qqVoiceAudio.js",
+      "utils/qzoneWebApp.js",
+      "utils/recentImageContinuation.js",
+      "utils/redBagUtils.js",
+      "utils/redis-util.js",
+      "utils/redisClient.js",
+      "utils/reliableImageSender.js",
+      "utils/replyExecutionRoute.js",
+      "utils/replyRhythm.js",
+      "utils/replySanitizer.js",
+      "utils/request.js",
+      "utils/routeDecision.js",
+      "utils/semanticMemoryWebApp.js",
+      "utils/semanticToolPolicy.js",
+      "utils/sendPacing.js",
+      "utils/sharedBrowser.js",
+      "utils/singleFlightResolver.js",
+      "utils/smartLockPolicy.js",
+      "utils/solutionExplanationStyle.js",
+      "utils/systemPromptTemplate.js",
+      "utils/textUtils.js",
+      "utils/thinkingForward.js",
+      "utils/toolContinuationPolicy.js",
+      "utils/toolIntentManifests.js",
+      "utils/toolManifestRegistry.js",
+      "utils/toolResultGrounding.js",
+      "utils/toolSkills.js",
+      "utils/torrentDownload.js",
+      "utils/torrentListCard.js",
+      "utils/turnContinuity.js",
+      "utils/turnDiagnostics.js",
+      "utils/turnPlan.js",
+      "utils/turnPresentation.js",
+      "utils/turnPromptComposer.js",
+      "utils/turnTrace.js",
+      "utils/understandingBrief.js",
+      "utils/youtubeAuth.js",
+      "utils/youtubeMediaRelay.js",
+      "utils/youtubeMessage.js"
+    ]
+  },
+  "registeredMigrations": [
+    {
+      "legacy": "utils/pluginExportLoader.js",
+      "implementation": "src/modules/platform/domain/pluginExportLoader.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/forwardBatches.js",
+      "implementation": "src/modules/messaging/domain/forwardBatches.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnSession.js",
+      "implementation": "src/modules/runtime/domain/turnSession.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/runtime/groupRuntime.js",
+      "implementation": "src/modules/runtime/application/groupRuntime.ts",
+      "adapter": "src/adapters/legacyRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ea846310dec22fdbb3a91813579002446a005fb6a822b83c917bedd90add2f92",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/runtime/sharedRuntime.js",
+      "implementation": "src/modules/runtime/application/sharedRuntime.ts",
+      "adapter": "src/adapters/sharedRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ffa53a34e2251ada3e5a589063054e27436bff3b4e06cf143bc7de396c174a0d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageSourcePolicy.js",
+      "implementation": "src/modules/image/domain/imageSourcePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageResult.js",
+      "implementation": "src/modules/image/domain/imageResult.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/multipartFormData.js",
+      "implementation": "src/modules/image/infrastructure/multipartFormData.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageTaskPolicy.js",
+      "implementation": "src/modules/image/domain/imageTaskPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageFailurePolicy.js",
+      "implementation": "src/modules/image/domain/imageFailurePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageDimensions.js",
+      "implementation": "src/modules/image/domain/imageDimensions.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/visibleFailure.js",
+      "implementation": "src/modules/models/domain/visibleFailure.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageGenerationFallback.js",
+      "implementation": "src/modules/image/domain/providerConfig.ts",
+      "additionalImplementations": [
+        "src/modules/image/application/legacyImageGeneration.ts"
+      ],
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatCompletionUrl.js",
+      "implementation": "src/modules/models/domain/chatCompletionUrl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/sideLLM.js",
+      "implementation": "src/adapters/sideLLM.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageAspectRatio.js",
+      "implementation": "src/modules/image/domain/imageAspectRatio.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/unicodeText.js",
+      "implementation": "src/modules/models/domain/unicodeText.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/modelGateway.js",
+      "implementation": "src/modules/models/domain/modelGateway.ts",
+      "additionalImplementations": [
+        "src/adapters/modelFetch.ts"
+      ],
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatRequestRecovery.js",
+      "implementation": "src/modules/models/application/chatRequestRecovery.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageRequestGuard.js",
+      "implementation": "src/modules/image/domain/imageRequestGuard.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/providers/ThinkingProcessor.js",
+      "implementation": "src/modules/models/domain/thinkingProcessor.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/apiClient.js",
+      "implementation": "src/modules/models/application/modelExecution.ts",
+      "kind": "composition",
+      "reviewedSha256": "bd6c67a0c7b6653c064278f65de06e564ea8589b34e06bb4b0bacb75edf77faf",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/aiProviderProbe.js",
+      "implementation": "src/modules/models/application/aiProviderProbe.ts",
+      "kind": "composition",
+      "reviewedSha256": "dd99187a0e58d1c758786d10edbbf90a931f97155fcb135d86f54f1feea5e397",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatFailureDiagnosis.js",
+      "implementation": "src/modules/models/application/chatFailureDiagnosis.ts",
+      "kind": "composition",
+      "reviewedSha256": "8b0256e61189492d748e74c1d6d6d9bb9611dc13548b81b1a1fadcf8e3d5123b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/guobaAiProviderConfig.js",
+      "implementation": "src/modules/config/domain/aiProviderConfig.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/conversation.js",
+      "implementation": "src/modules/config/domain/schemas/shared/conversation.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/permission.js",
+      "implementation": "src/modules/config/domain/schemas/shared/permission.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/triggers.js",
+      "implementation": "src/modules/config/domain/schemas/shared/triggers.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/aiCore.js",
+      "implementation": "src/modules/config/domain/schemas/shared/aiCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/basic.js",
+      "implementation": "src/modules/config/domain/schemas/shared/basic.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/reasoning.js",
+      "implementation": "src/modules/config/domain/schemas/shared/reasoning.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/riskControl.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/riskControl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/tools.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/tools.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/magnetSearch.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/magnetSearch.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/emoji.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/emoji.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/messageArchive.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/messageArchive.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/persona.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/persona.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/groupGuard.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/groupGuard.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/dice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/dice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/deltaForce.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/deltaForce.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/permission.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/permission.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/memory.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/memory.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/umaRace.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/umaRace.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/aiCore.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/aiCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/tracking.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/tracking.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/emotion.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/emotion.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/expression.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/expression.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/aiModels.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/aiModels.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/knowledge.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/knowledge.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/basic.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/basic.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/messagePipeline.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/messagePipeline.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/voice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/voice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/reasoning.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/reasoning.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/groupNotice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/groupNotice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/schemaConfig.js",
+      "implementation": "src/adapters/config/schemaConfig.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/providerCredentials.js",
+      "implementation": "src/adapters/config/providerCredentials.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/configWriter.js",
+      "implementation": "src/modules/config/infrastructure/configRepository.ts",
+      "kind": "composition",
+      "reviewedSha256": "104062c5197f73ac8cdf75db39a9894307fd3b7783dd57dfe67d8e29b6ffa970",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/config/configStore.js",
+      "implementation": "src/modules/config/infrastructure/configStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "e3e67595b296087799850131e887b99ffdaba71e6202e667e42e82a72a240cb7",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "model/config.js",
+      "implementation": "src/modules/config/infrastructure/namedConfig.ts",
+      "kind": "composition",
+      "reviewedSha256": "6ae8da4cd1cc092020e711d4137010d6e88a775661fd2375b2cdcb34fe2bf582",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/thinkingForwardSettings.js",
+      "implementation": "src/modules/config/infrastructure/thinkingForwardSettings.ts",
+      "kind": "composition",
+      "reviewedSha256": "95b7f4d0dcba636dd3aedb545d075d451f4be5d9ec0b62537255a81365955751",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/index.js",
+      "implementation": "src/modules/config/application/configPanel.ts",
+      "kind": "composition",
+      "reviewedSha256": "a43fc0749d319eb95662567c49d55286253201637949332aa1fadf91004f4284",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/configInfo.js",
+      "implementation": "src/modules/config/application/configPanel.ts",
+      "kind": "composition",
+      "reviewedSha256": "3dbdc0665f8ca75b2b94a7bf61e9bc78a56cf58f290b0a5dfd95b63bdbe0ef2a",
+      "present": true,
+      "thinWrapper": true
+    }
+  ],
+  "structure": {
+    "hostMemberCount": 142,
+    "hostReferences": 488,
+    "globalPropertyAccesses": 518,
+    "pluginBridgePropertyReferences": 26,
+    "method": "AST direct named receiver references; alias and computed accesses are not inferred",
+    "sourceBoundaryViolations": 0
+  },
+  "limitations": "Registered re-export wrappers are AST-validated; composition shims require exact reviewed SHA256 and both adapter/application TS sources. Newly discovered JS debt is separate from the immutable baseline; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric."
+}
