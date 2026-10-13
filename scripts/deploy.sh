@@ -54,7 +54,7 @@ SSH "mkdir -p '$REMOTE_STAGE' '$SNAP_ROOT'"
 "${RSYNC[@]}" "$ARTIFACT/" "$TARGET:$REMOTE_STAGE/" >/dev/null
 SSH "node '$REMOTE_STAGE/scripts/release.mjs' verify '$REMOTE_STAGE'"
 # 依赖必须与锁文件一致；安装在暂存区，不修改在线 node_modules。
-SSH "cd '$REMOTE_STAGE' && npm ci --omit=dev --no-audit --no-fund"
+SSH "cd '$REMOTE_STAGE' && if [ -x /usr/bin/chromium ]; then PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev --no-audit --no-fund; else npm ci --omit=dev --no-audit --no-fund; fi"
 
 # ---------- 3. 停服务后安装；配置/data 不参与覆盖或回滚 ----------
 log "停止入口并安装已验证产物…"
