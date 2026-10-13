@@ -2,6 +2,8 @@
 
 > 状态：待主人审阅 ｜ 起草：2026-09-16 ｜ 决策已定：monorepo 多插件 + 共享 core；sealdice 走 JS 语法兼容层；命令总表先行（已落地）
 
+> 2026-10-13 更新：JS → TS 迁移以 [TypeScript 分阶段迁移计划](architecture/typescript-migration-plan.md) 为当前执行计划，采用模块化单体并保留 standalone 兼容入口。下文保留原始设计和历史交付记录，不作为本次物理多插件拆分的要求。
+
 ## 一、为什么重构
 
 - **单插件巨石化**：20+ app 入口、120 个 utils、22 个配置域挤在一个插件里；`apps/test.js` 8688 行承载了主聊天 agent 与全部共享设施。
