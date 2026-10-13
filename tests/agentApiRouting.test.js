@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
+import { modelExecutor } from './helpers/modelExecutor.js'
 
 function startServer() {
   const hits = { tools: 0, chat: 0 }
@@ -51,7 +52,7 @@ test('YTapi preserves planner text and adaptively routes complex no-tool replies
   let YTapi
   try {
     globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
-    ;({ YTapi } = await import('../utils/apiClient.js'))
+    ;({ YTapi } = modelExecutor())
   } catch (error) {
     if (error?.code === 'ERR_MODULE_NOT_FOUND') {
       t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
@@ -144,7 +145,7 @@ test('YTapi falls back to the chat backend when an optional tools planner is una
   let YTapi
   try {
     globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
-    ;({ YTapi } = await import('../utils/apiClient.js'))
+    ;({ YTapi } = modelExecutor())
   } catch (error) {
     if (error?.code === 'ERR_MODULE_NOT_FOUND') {
       t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
@@ -185,7 +186,7 @@ test('YTapi uses the configured lightweight backend after tools and chat credent
   let YTapi
   try {
     globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
-    ;({ YTapi } = await import('../utils/apiClient.js'))
+    ;({ YTapi } = modelExecutor())
   } catch (error) {
     if (error?.code === 'ERR_MODULE_NOT_FOUND') {
       t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
@@ -230,7 +231,7 @@ test('YTapi falls back from a plain chat request when the configured chat backen
   let YTapi
   try {
     globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
-    ;({ YTapi } = await import('../utils/apiClient.js'))
+    ;({ YTapi } = modelExecutor())
   } catch (error) {
     if (error?.code === 'ERR_MODULE_NOT_FOUND') {
       t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)

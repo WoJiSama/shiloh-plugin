@@ -1,22 +1,2 @@
-export function extractImageResult(content) {
-  const value = String(content || "").trim()
-  if (!value) return null
-  if (/^base64:\/\/[A-Za-z0-9+/=]+$/.test(value)) return value
-  if (/^https?:\/\/\S+$/i.test(value)) return value
-
-  const markdownMatch = value.match(/!\[.*?\]\((data:image\/[^;]+;base64,[^)]+|https?:\/\/[^)]+)\)/)
-  if (markdownMatch) return normalizeImageResult(markdownMatch[1])
-
-  const dataUriMatch = value.match(/data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)/)
-  if (dataUriMatch) return `base64://${dataUriMatch[1]}`
-
-  const urlMatch = value.match(/https?:\/\/[^\s)'"<>]+\.(?:png|jpg|jpeg|gif|webp|bmp)(?:[^\s)'"<>]*)?/i)
-  return urlMatch?.[0] || null
-}
-
-function normalizeImageResult(value) {
-  if (value.startsWith("data:image")) {
-    return `base64://${value.replace(/^data:image\/[^;]+;base64,/, "")}`
-  }
-  return value
-}
+// Compatibility entry for the typed image policy.
+export { extractImageResult } from '../dist/backend/modules/image/domain/imageResult.js'

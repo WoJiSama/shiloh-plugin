@@ -13,6 +13,9 @@ await ensureBackendArtifacts();
 //   - 登录:账密(scrypt 哈希,Cookie 会话)+ 原令牌并存(令牌供 curl/脚本自动化)
 // yaml 包复用插件自身 node_modules,不新增安装项。
 // 部署:systemd 独立服务(见 console/bl-console.service),与 Yunzai 进程解耦。
+import { createImageService } from '../dist/backend/modules/image/application/imageService.js'
+import { createImageResource } from '../dist/backend/modules/image/infrastructure/imageResource.js'
+import { normalizeCustomSize, normalizeQuality } from '../dist/backend/modules/image/domain/imageInput.js'
 import http from "node:http"
 import fs from "node:fs"
 import path from "node:path"
@@ -21,13 +24,12 @@ import { execFile } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { readImageDimensions } from "../utils/imageDimensions.js"
-import { isGrokImageModel, assertGrokImageRatio, applyImageAspectRatioToConfigs, resolveImageAspectRatioIntent } from "../utils/imageAspectRatio.js"
+import { isGrokImageModel, applyImageAspectRatioToConfigs, resolveImageAspectRatioIntent } from "../utils/imageAspectRatio.js"
 import {
   describeImageGenerationConfig,
   resolveImageEditConfigs,
   resolveImageGenerationConfigs,
-  selectImageConfigsByProvider,
-  shouldRetryWithoutUrlResponseFormat
+  selectImageConfigsByProvider
 } from "../utils/imageGenerationFallback.js"
 import { serializeMultipartFormData } from "../utils/multipartFormData.js"
 import {
@@ -727,8 +729,6 @@ async function readContainerQrcode(container) {
 const DRAW_DIR = process.env.CONSOLE_DRAW_DIR || "/var/lib/bl-console/draw"
 const DRAW_HISTORY_KEEP = 100
 const DRAW_HISTORY_LIST = 24
-const IMAGE_GENERATION_TIMEOUT_MS = 120000
-const IMAGE_RESULT_FETCH_TIMEOUT_MS = 30000
 const MAX_CONCURRENT_IMAGE_JOBS = 2
 const MAX_IMAGE_BODY_BYTES = 60 * 1024 * 1024
 const IMAGE_FILE_RE = /^[\w][\w.-]*\.(?:png|jpe?g|webp|gif)$/i
@@ -763,222 +763,27 @@ function imageProviderOverview() {
   }
 }
 
-function buildImageGenerationPayload(config, prompt, responseFormat = "", options = {}) {
-  if (isGrokImageModel(config.model)) {
-    const payload = { model: config.model, prompt, n: options.count || 1, quality: options.quality || config.quality || "high" }
-    if (config.size) payload.size = config.size
-      if (config.aspectRatio && isGrokImageModel(config.model)) payload.aspect_ratio = config.aspectRatio;
-    return payload
+const materializeImageResult = createImageResource()
+const imageService = createImageService({
+  fetch: (url, init) => fetch(url, init),
+  loadReference: async (value, signal) => {
+    if (/^data:image\//.test(value)) return value
+    const { buffer, mime } = await materializeImageResult(value, signal)
+    return `data:${mime};base64,${buffer.toString("base64")}`
+  },
+  encodeMultipart: async (fields, files) => {
+    const form = new FormData()
+    for (const [key, value] of Object.entries(fields)) form.append(key, value)
+    for (const file of files) form.append("image", new Blob([file.data], { type: file.mimeType }), file.filename)
+    return serializeMultipartFormData(form)
+  },
+  resolveImage: async (image, signal) => (await materializeImageResult(image, signal)).buffer,
+  metadata: async bytes => {
+    const dimensions = readImageDimensions(Buffer.from(bytes))
+    if (!dimensions) throw new Error("上游返回的图片无效")
+    return dimensions
   }
-  const payload = { model: config.model, prompt, n: options.count || 1 }
-  if (config.size) payload.size = config.size
-      if (config.aspectRatio && isGrokImageModel(config.model)) payload.aspect_ratio = config.aspectRatio;
-  // quality 仅 gpt-image 家族明确支持,其他渠道发送会被判未知参数
-  if (options.quality && /gpt-image/i.test(String(config.model || ""))) payload.quality = options.quality
-  if (responseFormat) payload.response_format = responseFormat
-  return payload
-}
-
-function parseDataImage(dataUri = "") {
-  const match = String(dataUri || "").match(/^data:([^;,]+);base64,(.+)$/)
-  if (!match) throw new Error("参考图片格式无效(需要 data:image/...;base64)")
-  return { mimeType: match[1], buffer: Buffer.from(match[2], "base64") }
-}
-
-async function buildImageEditRequest(config, prompt, images, responseFormat = "", options = {}) {
-  const form = new FormData()
-  form.append("model", config.model || "gpt-image-2")
-  form.append("prompt", prompt)
-  form.append("n", String(options.count || 1))
-  if (config.size) form.append("size", config.size)
-  if (config.aspectRatio && isGrokImageModel(config.model)) form.append("aspect_ratio", config.aspectRatio)
-  if (options.quality && /gpt-image/i.test(String(config.model || ""))) form.append("quality", options.quality)
-  if (responseFormat) form.append("response_format", responseFormat)
-  let count = 0
-  for (const dataUri of images) {
-    if (!dataUri) continue
-    const image = parseDataImage(dataUri)
-    const ext = EXT_BY_MIME[image.mimeType] || "png"
-    form.append("image", new Blob([image.buffer], { type: image.mimeType }), `reference-${count + 1}.${ext}`)
-    count++
-  }
-  if (!count) throw new Error("没有可用的参考图片")
-  const multipart = await serializeMultipartFormData(form)
-  return {
-    url: config.apiUrl,
-    init: {
-      method: "POST",
-      headers: { ...multipart.headers, Authorization: `Bearer ${config.apiKey || "sk-xxxxxx"}` },
-      body: multipart.body
-    }
-  }
-}
-
-function buildImageGenerationRequest(config, prompt, responseFormat = "", options = {}) {
-  return {
-    url: config.apiUrl,
-    init: {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
-      body: JSON.stringify(buildImageGenerationPayload(config, prompt, responseFormat, options))
-    }
-  }
-}
-
-// 计时器持续到响应体读完为止:上游可能先回 header 再无限拖住 body
-async function fetchImageApiResponse(url, init, timeoutMs = IMAGE_GENERATION_TIMEOUT_MS, externalSignal) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const onExternalAbort = () => controller.abort()
-  externalSignal?.addEventListener("abort", onExternalAbort, { once: true })
-  try {
-    const response = await fetch(url, { ...init, signal: controller.signal })
-    const text = await response.text()
-    let data
-    try { data = JSON.parse(text) } catch { data = { raw: text } }
-    return { response, data }
-  } catch (error) {
-    if (externalSignal?.aborted) throw new Error("已取消")
-    if (error?.name === "AbortError") throw new Error(`图片接口超过 ${Math.ceil(timeoutMs / 1000)} 秒没有返回完整响应`)
-    throw error
-  } finally {
-    clearTimeout(timer)
-    externalSignal?.removeEventListener("abort", onExternalAbort)
-  }
-}
-
-function parseImageGenerationPayload(response, data) {
-  if (!response.ok) {
-    const message = data?.error?.message || data?.detail || data?.raw || response.statusText || "未知错误"
-    return { ok: false, errorMessage: `API请求失败: ${response.status} ${String(message).slice(0, 400)}` }
-  }
-  const items = (Array.isArray(data?.data) ? data.data : []).filter(item => item?.url || item?.b64_json)
-  if (items.length) {
-    return {
-      ok: true,
-      images: items.map(item => item.url ? item.url : `base64://${item.b64_json}`),
-      format: items[0].url ? "url" : "b64_json"
-    }
-  }
-  const keys = Object.keys(data?.data?.[0] || {}).join(",")
-  const revised = data?.data?.[0]?.revised_prompt ? ` revised_prompt=${String(data.data[0].revised_prompt).slice(0, 120)}` : ""
-  const upstreamError = data?.error ? ` error=${String(data.error.message || JSON.stringify(data.error)).slice(0, 200)}` : ""
-  return { ok: false, errorMessage: `未接收到有效图片，上游返回字段: data0=[${keys || "无"}]${upstreamError}${revised}` }
-}
-
-async function runImageCandidate(config, mode, prompt, images, responseFormat, options, externalSignal) {
-  const { url, init } = mode === "edit"
-    ? await buildImageEditRequest(config, prompt, images, responseFormat, options)
-    : buildImageGenerationRequest(config, prompt, responseFormat, options)
-  const { response, data } = await fetchImageApiResponse(url, init, IMAGE_GENERATION_TIMEOUT_MS, externalSignal)
-  const result = parseImageGenerationPayload(response, data)
-  if (result.ok && config.aspectRatio && isGrokImageModel(config.model)) {
-    for (let index = 0; index < result.images.length; index++) {
-      const image = result.images[index]
-      const { buffer } = await materializeImageResult(image, externalSignal)
-      assertGrokImageRatio(config, readImageDimensions(buffer))
-      result.images[index] = `base64://${buffer.toString("base64")}`
-    }
-  }
-  return result
-}
-
-// 与 generateImage*WithFallbacks 同语义的顺序尝试,额外记录每个渠道的耗时与失败原因
-async function runImageConfigsWithAttempts(configs, runOnce, externalSignal) {
-  const attempts = []
-  for (let index = 0; index < configs.length; index++) {
-    const label = describeImageGenerationConfig(configs[index], index)
-    const startedAt = Date.now()
-    try {
-      let result = await runOnce(configs[index], "b64_json")
-      if (!result.ok && shouldRetryWithoutUrlResponseFormat(result.errorMessage)) {
-        result = await runOnce(configs[index], "")
-      }
-      if (result.ok) {
-        attempts.push({ provider: label, ok: true, ms: Date.now() - startedAt })
-        return { images: result.images, format: result.format, provider: label, attempts }
-      }
-      throw new Error(result.errorMessage || "未接收到有效图片")
-    } catch (error) {
-      // 用户取消:立即终止整个循环,不再尝试下一个渠道
-      if (externalSignal?.aborted) {
-        attempts.push({
-          provider: label,
-          ok: false,
-          ms: Date.now() - startedAt,
-          error: "已取消"
-        })
-        const cancelled = new Error("已取消")
-        cancelled.attempts = attempts
-        cancelled.cancelled = true
-        throw cancelled
-      }
-      attempts.push({
-        provider: label,
-        ok: false,
-        ms: Date.now() - startedAt,
-        error: String(error?.message || error || "未知错误").slice(0, 400)
-      })
-    }
-  }
-  const detail = attempts.map(item => `${item.provider}: ${item.error}`).join("；")
-  const error = new Error(attempts.length ? `所有候选渠道都失败了：${detail}` : "没有可用的图片渠道")
-  error.attempts = attempts
-  throw error
-}
-
-function sniffImageMime(buffer) {
-  if (buffer?.length >= 4 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return "image/png"
-  if (buffer?.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg"
-  if (buffer?.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP") return "image/webp"
-  if (buffer?.length >= 3 && buffer.toString("ascii", 0, 3) === "GIF") return "image/gif"
-  return "image/png"
-}
-
-async function fetchImageResultBuffer(url, timeoutMs = IMAGE_RESULT_FETCH_TIMEOUT_MS, externalSignal) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const onAbort = () => controller.abort()
-  externalSignal?.addEventListener("abort", onAbort, { once: true })
-  if (externalSignal?.aborted) controller.abort()
-  try {
-    const response = await fetch(url, { signal: controller.signal })
-    if (!response.ok) throw new Error(`成图 URL 拉取失败: ${response.status} ${response.statusText}`)
-    const chunks = []
-    let bytes = 0
-    for await (const chunk of response.body) {
-      bytes += chunk.length
-      if (bytes > 20 * 1024 * 1024) { controller.abort(); throw new Error("成图超过 20MB 上限") }
-      chunks.push(chunk)
-    }
-    const buffer = Buffer.concat(chunks)
-    if (!buffer.length) throw new Error("成图 URL 返回空内容")
-    const contentType = String(response.headers.get("content-type") || "").split(";")[0]
-    return { buffer, contentType }
-  } catch (error) {
-    if (error?.name === "AbortError") throw new Error(`成图 URL 拉取超过 ${Math.ceil(timeoutMs / 1000)} 秒`)
-    throw error
-  } finally {
-    clearTimeout(timer)
-    externalSignal?.removeEventListener("abort", onAbort)
-  }
-}
-
-async function materializeImageResult(image, externalSignal) {
-  const value = String(image || "")
-  if (value.startsWith("base64://")) {
-    const buffer = Buffer.from(value.slice("base64://".length), "base64")
-    if (!buffer.length) throw new Error("上游返回的图片数据为空")
-    if (buffer.length > 20 * 1024 * 1024 || !readImageDimensions(buffer)) throw new Error("上游返回的图片无效或超过 20MB")
-    return { buffer, mime: sniffImageMime(buffer) }
-  }
-  if (/^https?:\/\//i.test(value)) {
-    const { buffer, contentType } = await fetchImageResultBuffer(value, IMAGE_RESULT_FETCH_TIMEOUT_MS, externalSignal)
-    if (!readImageDimensions(buffer)) throw new Error("成图 URL 未返回有效图片")
-    return { buffer, mime: MIME_BY_EXT[contentType] ? contentType : sniffImageMime(buffer) }
-  }
-  throw new Error(`未知图片结果格式: ${value.slice(0, 60)}`)
-}
+})
 
 function saveDrawResult(buffer, mime, provider, seq = 0) {
   fs.mkdirSync(DRAW_DIR, { recursive: true })
@@ -1030,21 +835,6 @@ function listDrawHistory() {
   } catch { return [] }
 }
 
-// 自定义尺寸:WxH 像素或 2K/4K/auto 分辨率档位(后者为 seedream 类渠道的语言)
-function normalizeCustomSize(value = "") {
-  const size = String(value || "").trim().replace(/[×*]/g, "x").replace(/\s+/g, "")
-  if (!size) return ""
-  if (/^[1-9]\d{0,4}x[1-9]\d{0,4}$/i.test(size)) return size.toLowerCase()
-  if (/^auto$/i.test(size)) return "auto"
-  if (/^[1-9]\d*(?:\.\d+)?k$/i.test(size)) return size.replace(/k$/i, "K")
-  throw new Error(`自定义尺寸格式无效: ${value}(可填 1024x1536、2K、auto 等)`)
-}
-
-function normalizeQuality(value = "") {
-  const quality = String(value || "").trim().toLowerCase()
-  return ["low", "medium", "high"].includes(quality) ? quality : ""
-}
-
 async function handleImageDraw(payload = {}, mode, owner = "token") {
   const prompt = String(payload.prompt || "").trim()
   if (!prompt) throw new Error("提示词不能为空")
@@ -1082,8 +872,7 @@ async function handleImageDraw(payload = {}, mode, owner = "token") {
   const startedAt = Date.now()
   try {
     const { images: rawImages, format, provider: usedProvider, attempts } =
-      await runImageConfigsWithAttempts(configs, (config, responseFormat) =>
-        runImageCandidate(config, mode, prompt, images, responseFormat, { count, quality }, cancelSignal.signal), cancelSignal.signal)
+      await imageService.run(configs, { operation: mode, prompt, images, count, quality, signal: cancelSignal.signal })
     const results = []
     for (let index = 0; index < rawImages.length; index++) {
       if (cancelSignal.signal.aborted) throw new Error("已取消")

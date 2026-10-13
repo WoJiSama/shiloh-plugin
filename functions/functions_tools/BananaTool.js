@@ -1,3 +1,5 @@
+import { createImageResource } from '../../dist/backend/modules/image/infrastructure/imageResource.js';
+import { createImageService, isImagesEditEndpoint } from '../../dist/backend/modules/image/application/imageService.js';
 import { AbstractTool } from './AbstractTool.js';
 import { getBase64Image, normalizeImageUrls } from '../../utils/fileUtils.js';
 import { dependencies } from "../../dependence/dependencies.js";
@@ -9,8 +11,6 @@ import { pluginBridge } from "../../utils/pluginBridge.js";
 import { personaFeedbackManager } from "../../domains/memory/PersonaFeedbackManager.js";
 import {
   DEFAULT_IMAGE_GENERATION_URL,
-  generateImageEditWithFallbacks,
-  generateImageWithFallbacks,
   matchesImageProvider,
   normalizeImageProviderParameter,
   resolveRequestedImageProvider,
@@ -26,15 +26,14 @@ import { formatMessageSendFailure, getImageBufferMetadata, isMessageSendFailed, 
 import { extractImageResult } from "../../utils/imageResult.js";
 import { buildImageFailureReply } from "../../utils/imageFailurePolicy.js";
 import {
-  isGrokImageModel, assertGrokImageRatio, applyImageAspectRatioToConfigs,
+  applyImageAspectRatioToConfigs,
   describeImageAspectRatioIntent,
   resolveImageAspectRatioIntent
 } from "../../utils/imageAspectRatio.js";
 import { generateContextualProgressReply } from "../../utils/contextualProgressReply.js";
 import { reserveProgressReply } from "../../utils/progressReplyBudget.js";
 
-const { mimeTypes, FormData } = dependencies;
-const DEFAULT_CHAT_IMAGE_URL = 'https://api.openai.com/v1/chat/completions';
+const { FormData } = dependencies;
 const IMAGE_GENERATION_TIMEOUT_MS = 120000;
 const IMAGE_GENERATION_DONE_MESSAGES = [
   "画出来啦，你先看看这版像不像你想的那种感觉。",
@@ -54,11 +53,6 @@ function isReferenceGeneration(opts = {}) {
 
 function isTransportDisplayName(name = "") {
   return /^\s*\[(?:有人@我|回复|转发|引用)/.test(String(name || ""));
-}
-
-function imageResponseTimeoutError(timeoutMs, { completeResponse = false } = {}) {
-  const seconds = Math.max(1, Math.ceil(Number(timeoutMs) / 1000));
-  return new Error(`图片接口超过 ${seconds} 秒没有返回${completeResponse ? "完整响应" : "结果"}`);
 }
 
 export class BananaTool extends AbstractTool {
@@ -511,7 +505,6 @@ export class BananaTool extends AbstractTool {
   }
 
   async performDraw(opts, e, options = {}) {
-    const STREAM = false;
     const config = this.loadConfig();
     const { prompt, images: rawImages } = opts;
 
@@ -589,23 +582,7 @@ export class BananaTool extends AbstractTool {
         return referenceGeneration ? '图片生成成功' : '图片编辑成功';
       }
 
-      const imgurls = await this.buildImageMessages(finalPrompt, images);
-      const response = await fetch(apiUrl || DEFAULT_CHAT_IMAGE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey || 'sk-xxxxxx'}`,
-        },
-        body: JSON.stringify({
-          model: model || "gemini-3-pro-image-preview",
-          messages: [{ role: "user", content: imgurls }],
-          stream: STREAM,
-        }),
-      });
-
-      const imageUrl = STREAM
-        ? await this.handleStreamResponse(response)
-        : await this.handleNormalResponse(response);
+      const imageUrl = await this.getImageService().chat({ apiUrl, apiKey, model }, finalPrompt, images);
 
       const processedUrl = this.extractImageUrl(imageUrl);
 
@@ -762,126 +739,57 @@ export class BananaTool extends AbstractTool {
     return toImageEditUrl(apiUrl);
   }
 
-  buildImageGenerationPayload(imageGenerationConfig, prompt, responseFormat = "") {
-    if (isGrokImageModel(imageGenerationConfig.model)) {
-      const payload = {
-        model: imageGenerationConfig.model,
-        prompt,
-        quality: imageGenerationConfig.quality || "high"
-      };
-      if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size
-      if (imageGenerationConfig.aspectRatio && isGrokImageModel(imageGenerationConfig.model)) payload.aspect_ratio = imageGenerationConfig.aspectRatio;
-      return payload;
-    }
-    const payload = {
-      model: imageGenerationConfig.model,
-      prompt,
-      n: 1
-    };
-    if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size
-      if (imageGenerationConfig.aspectRatio && isGrokImageModel(imageGenerationConfig.model)) payload.aspect_ratio = imageGenerationConfig.aspectRatio;
-    if (responseFormat) payload.response_format = responseFormat;
-    return payload;
-  }
-
-  isImagesEditEndpoint(apiUrl = "") {
-    const url = String(apiUrl || "").trim();
-    if (!url) return false;
-    if (/\/chat\/completions\/?$/i.test(url)) return false;
-    return /(?:\/images\/edits\/?|\/v1\/?|\/openai\/v1\/?|\/api\/v1\/?|\/)$/.test(url);
-  }
-
-  parseDataImage(dataUri = "") {
-    const match = String(dataUri || "").match(/^data:([^;,]+);base64,(.+)$/);
-    if (!match) throw new Error("参考图片转换失败");
-    const [, mimeType, base64] = match;
-    return { mimeType, buffer: Buffer.from(base64, "base64") };
-  }
-
-  async buildImageEditFormData(imageEditConfig, prompt, images, responseFormat = "") {
-    const form = new FormData();
-    form.append("model", imageEditConfig.model || "gpt-image-2");
-    form.append("prompt", prompt);
-    form.append("n", "1");
-    if (imageEditConfig.size) form.append("size", imageEditConfig.size);
-    if (imageEditConfig.aspectRatio && isGrokImageModel(imageEditConfig.model)) form.append("aspect_ratio", imageEditConfig.aspectRatio);
-    if (responseFormat) form.append("response_format", responseFormat);
-
-    let imageCount = 0;
-    for (const url of images) {
-      if (!url) continue;
-      const imgData = await getBase64Image(url, `reference-${imageCount + 1}.png`);
-      if (imgData.includes("该图片链接已过期") || imgData.includes("无效的图片下载链接") || imgData.includes("无效的图片格式")) {
-        throw new Error(imgData);
-      }
-      const image = this.parseDataImage(imgData);
-      const ext = mimeTypes.extension(image.mimeType) || "png";
-      form.append("image", image.buffer, {
-        filename: `reference-${imageCount + 1}.${ext}`,
-        contentType: image.mimeType,
-        knownLength: image.buffer.length,
-      });
-      imageCount++;
-    }
-
-    if (!imageCount) throw new Error("没有可用的参考图片");
-    return form;
-  }
-
-  async requestImageEdit(imageEditConfig, prompt, images, responseFormat = "") {
-    const form = await this.buildImageEditFormData(imageEditConfig, prompt, images, responseFormat);
-    const multipart = await serializeMultipartFormData(form);
-    return await this.fetchWithTimeout(imageEditConfig.apiUrl, {
-      method: "POST",
-      headers: {
-        ...multipart.headers,
-        Authorization: `Bearer ${imageEditConfig.apiKey || 'sk-xxxxxx'}`,
+  getImageService() {
+    if (!this.imageService) this.imageService = createImageService({
+      fetch,
+      // Legacy QQ URL renewal/conversion cannot abort mid-download yet; guard both boundaries.
+      loadReference: async (url, signal) => {
+        signal?.throwIfAborted();
+        const value = await getBase64Image(url, 'reference.png');
+        signal?.throwIfAborted();
+        return value;
       },
-      body: multipart.body,
-    }, IMAGE_GENERATION_TIMEOUT_MS);
-  }
-
-  async generateImageEdit(imageEditConfigs, prompt, images) {
-    return await generateImageEditWithFallbacks(imageEditConfigs, prompt, images, {
-      request: (config, inputPrompt, inputImages, responseFormat) =>
-        this.requestImageEdit(config, inputPrompt, inputImages, responseFormat),
-      parseResponse: response => this.parseImageGenerationResponse(response),
-      validateImage: async (image, config) => {
-        if (!config.aspectRatio || !isGrokImageModel(config.model)) return image;
-        const buffer = await resolveImageBuffer(image);
-        assertGrokImageRatio(config, await getImageBufferMetadata(buffer));
-        return buffer;
+      encodeMultipart: async (fields, files) => {
+        const form = new FormData();
+        for (const [key, value] of Object.entries(fields)) form.append(key, value);
+        for (const file of files) form.append('image', Buffer.from(file.data), {
+          filename: file.filename, contentType: file.mimeType, knownLength: file.data.length
+        });
+        return serializeMultipartFormData(form);
       },
-      logInfo: (...args) => this.logInfo(...args),
-      logWarn: (...args) => this.logWarn(...args)
+      resolveImage: async (image, signal) => (await createImageResource({ fetch })(image, signal)).buffer,
+      metadata: bytes => getImageBufferMetadata(Buffer.from(bytes)),
+      logInfo: message => this.logInfo(message), logWarn: message => this.logWarn(message)
     });
+    return this.imageService;
   }
 
-  async requestImageGeneration(imageGenerationConfig, prompt, responseFormat = "") {
-    return await this.fetchWithTimeout(imageGenerationConfig.apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${imageGenerationConfig.apiKey}`,
-      },
-      body: JSON.stringify(this.buildImageGenerationPayload(imageGenerationConfig, prompt, responseFormat)),
-    }, IMAGE_GENERATION_TIMEOUT_MS);
+  buildImageGenerationPayload(config, prompt, format = '') {
+    return this.getImageService().buildGenerationPayload(config, prompt, format);
   }
 
-  async generateImage(imageGenerationConfig, prompt) {
-    return await generateImageWithFallbacks(imageGenerationConfig, prompt, {
-      request: (config, inputPrompt, responseFormat) =>
-        this.requestImageGeneration(config, inputPrompt, responseFormat),
-      parseResponse: response => this.parseImageGenerationResponse(response),
-      validateImage: async (image, config) => {
-        if (!config.aspectRatio || !isGrokImageModel(config.model)) return image;
-        const buffer = await resolveImageBuffer(image);
-        assertGrokImageRatio(config, await getImageBufferMetadata(buffer));
-        return buffer;
-      },
-      logInfo: (...args) => this.logInfo(...args),
-      logWarn: (...args) => this.logWarn(...args)
-    });
+  isImagesEditEndpoint(apiUrl = '') {
+    return isImagesEditEndpoint(apiUrl);
+  }
+
+  async requestImageEdit(config, prompt, images, format = '') {
+    return this.getImageService().requestEdit(config, prompt, images, format);
+  }
+
+  async generateImageEdit(configs, prompt, images) {
+    const result = await this.getImageService().run(configs, { operation: 'edit', prompt, images, count: 1 });
+    const image = result.images[0];
+    return image instanceof Uint8Array ? Buffer.from(image) : image;
+  }
+
+  async requestImageGeneration(config, prompt, format = '') {
+    return this.getImageService().requestGeneration(config, prompt, format);
+  }
+
+  async generateImage(configs, prompt) {
+    const result = await this.getImageService().run(Array.isArray(configs) ? configs : [configs], { operation: 'generate', prompt, count: 1 });
+    const image = result.images[0];
+    return image instanceof Uint8Array ? Buffer.from(image) : image;
   }
 
   shouldRetryWithoutUrlResponseFormat(errorMessage = "") {
@@ -1004,51 +912,7 @@ export class BananaTool extends AbstractTool {
   }
 
   async fetchWithTimeout(url, options = {}, timeoutMs = IMAGE_GENERATION_TIMEOUT_MS) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      const readText = response?.text;
-      if (typeof readText !== "function") {
-        clearTimeout(timer);
-        return response;
-      }
-
-      let timerCleared = false;
-      const clearTimer = () => {
-        if (timerCleared) return;
-        timerCleared = true;
-        clearTimeout(timer);
-      };
-      const readTimedText = async () => {
-        try {
-          return await readText.call(response);
-        } catch (error) {
-          if (controller.signal.aborted) throw imageResponseTimeoutError(timeoutMs, { completeResponse: true });
-          throw error;
-        } finally {
-          clearTimer();
-        }
-      };
-
-      // Keep the abort timer alive until the body is fully consumed. A provider can
-      // send response headers then stall forever while `response.text()` waits.
-      return new Proxy(response, {
-        get(target, property) {
-          if (property === "text") return readTimedText;
-          const value = Reflect.get(target, property, target);
-          return typeof value === "function" ? value.bind(target) : value;
-        }
-      });
-    } catch (error) {
-      if (error?.name === "AbortError") {
-        throw imageResponseTimeoutError(timeoutMs);
-      }
-      throw error;
-    }
+    return this.getImageService().timedFetch(url, options, timeoutMs);
   }
 
   // 加载配置
@@ -1063,117 +927,8 @@ export class BananaTool extends AbstractTool {
     return typeof input === 'string' ? [input] : [];
   }
 
-  // 构建图片消息
-  async buildImageMessages(prompt, images) {
-    const messages = [{ type: "text", text: "你必须至少生成一张高质量的图片:" + prompt }];
-
-    for (const url of images) {
-      if (!url) continue;
-      const imgData = await getBase64Image(url, "other.png");
-
-      if (imgData.includes("该图片链接已过期") || imgData.includes("无效的图片下载链接")) {
-        throw new Error(imgData);
-      }
-
-      const mimeType = mimeTypes.lookup("other.png") || 'application/octet-stream';
-      messages.push(mimeType.startsWith('image/')
-        ? { type: "image_url", image_url: { url: imgData } }
-        : { type: "file", file_url: { url: imgData } }
-      );
-    }
-    return messages;
-  }
-
-  // 处理流式响应
-  async handleStreamResponse(response) {
-    if (!response.ok || !response.body) {
-      throw new Error(`API请求失败: ${response.statusText}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let content = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      for (const line of decoder.decode(value).split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        const dataStr = line.slice(6).trim();
-        if (dataStr === "[DONE]") break;
-
-        try {
-          const data = JSON.parse(dataStr);
-          content += data?.choices?.[0]?.delta?.content || "";
-        } catch { }
-      }
-    }
-
-    if (!content) throw new Error("未接收到有效内容");
-    return content;
-  }
-
-  // 处理普通响应
-  async handleNormalResponse(response) {
-    const data = await this.readJsonResponse(response);
-    if (!response.ok) {
-      throw new Error(this.formatApiError(response, data));
-    }
-    return data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ||
-      data?.choices?.[0]?.message?.images?.[0]?.url ||
-      data?.choices?.[0]?.message?.content;
-  }
-
   async parseImageGenerationResponse(response) {
-    const data = await this.readJsonResponse(response);
-    if (!response.ok) {
-      return { ok: false, errorMessage: this.formatApiError(response, data), data };
-    }
-
-    const item = data?.data?.[0];
-    if (item?.url) {
-      this.logInfo("[图片生成] 上游返回 url");
-      return { ok: true, image: item.url, format: "url" };
-    }
-    if (item?.b64_json) {
-      this.logInfo("[图片生成] 上游返回 b64_json");
-      return { ok: true, image: `base64://${item.b64_json}`, format: "b64_json" };
-    }
-    const detail = this.formatImageGenerationEmptyResponse(data);
-    return { ok: false, errorMessage: detail || "未接收到有效图片", data };
-  }
-
-  formatImageGenerationEmptyResponse(data = {}) {
-    const item = data?.data?.[0] || {};
-    const keys = Object.keys(item);
-    const revised = item?.revised_prompt ? ` revised_prompt=${String(item.revised_prompt).slice(0, 180)}` : "";
-    const upstreamError = data?.error
-      ? ` error=${String(data.error.message || data.error.code || data.error.type || JSON.stringify(data.error)).slice(0, 240)}`
-      : "";
-    const topKeys = Object.keys(data || {}).join(",");
-    if (!keys.length && !topKeys) return "";
-    return `未接收到有效图片，上游返回字段: top=[${topKeys || "无"}] data0=[${keys.join(",") || "无"}]${upstreamError}${revised}`;
-  }
-
-  async handleImageGenerationResponse(response) {
-    const result = await this.parseImageGenerationResponse(response);
-    if (result.ok) return result.image;
-    throw new Error(result.errorMessage);
-  }
-
-  async readJsonResponse(response) {
-    const text = await response.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      return { raw: text };
-    }
-  }
-
-  formatApiError(response, data) {
-    const message = data?.error?.message || data?.detail || data?.raw || response.statusText || "未知错误";
-    return `API请求失败: ${response.status} ${message}`;
+    return this.getImageService().parseResponse(response);
   }
 
   // 提取图片URL

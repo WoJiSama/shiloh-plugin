@@ -148,3 +148,16 @@ test('phase two session and runtime wrappers execute compiled services', async (
   assert.equal(group.getSmartRuntimeState('artifact').pendingCount, 0)
   assert.equal(group.deleteSmartRuntimeState('artifact'), true)
 })
+
+test('registered pure compatibility entries load the exact emitted exports', async () => {
+  const { migrations, verifyCompatibility } = await import('../scripts/migration-report.mjs')
+  for (const item of migrations.filter(item => item.kind !== 'composition')) {
+    assert.equal(verifyCompatibility(item, await fs.readFile(path.join(root, item.legacy), 'utf8')), true, item.legacy)
+    const legacy = await import(new URL('../' + item.legacy, import.meta.url))
+    const targets = await Promise.all([item.implementation, ...(item.additionalImplementations || [])].map(source =>
+      import(new URL('../' + source.replace(/^src\//, 'dist/backend/').replace(/\.ts$/, '.js'), import.meta.url))))
+    for (const [name, value] of Object.entries(legacy)) {
+      assert.ok(targets.some(target => Object.hasOwn(target, name) && target[name] === value), `${item.legacy}:${name}`)
+    }
+  }
+})

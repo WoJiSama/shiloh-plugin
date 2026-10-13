@@ -593,3 +593,19 @@ test('invalid output can fall back before being sent in generation and edit',asy
   assert.equal(result,'good');assert.deepEqual(validated,['bad','good'])
  }
 })
+
+test('QQ image fallback stops on cancellation and keeps candidate identity on failure', async () => {
+  const controller = new AbortController()
+  let calls = 0
+  await assert.rejects(generateImageWithFallbacks([{ name: 'channel-a', model: 'model-a' }, { name: 'channel-b' }], 'draw', {
+    signal: controller.signal,
+    request: async () => { calls++; controller.abort(); return {} },
+    parseResponse: async () => ({ ok: true, image: 'must-not-send' })
+  }), error => {
+    assert.equal(error.cancelled, true)
+    assert.equal(error.attempts[0].providerId, 'channel-a')
+    assert.equal(error.attempts[0].model, 'model-a')
+    return true
+  })
+  assert.equal(calls, 1)
+})

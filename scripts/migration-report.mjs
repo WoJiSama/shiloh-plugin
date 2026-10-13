@@ -16,6 +16,25 @@ export const migrations = [
   // A changed shim must be reviewed and registered again; a matching filename is not sufficient.
   { legacy: 'core/runtime/groupRuntime.js', implementation: 'src/modules/runtime/application/groupRuntime.ts', adapter: 'src/adapters/legacyRuntime.ts', kind: 'composition', reviewedSha256: 'ea846310dec22fdbb3a91813579002446a005fb6a822b83c917bedd90add2f92' },
   { legacy: 'core/runtime/sharedRuntime.js', implementation: 'src/modules/runtime/application/sharedRuntime.ts', adapter: 'src/adapters/sharedRuntime.ts', kind: 'composition', reviewedSha256: 'ffa53a34e2251ada3e5a589063054e27436bff3b4e06cf143bc7de396c174a0d' },
+  { legacy: 'utils/imageSourcePolicy.js', implementation: 'src/modules/image/domain/imageSourcePolicy.ts' },
+  { legacy: 'utils/imageResult.js', implementation: 'src/modules/image/domain/imageResult.ts' },
+  { legacy: 'utils/multipartFormData.js', implementation: 'src/modules/image/infrastructure/multipartFormData.ts' },
+  { legacy: 'utils/imageTaskPolicy.js', implementation: 'src/modules/image/domain/imageTaskPolicy.ts' },
+  { legacy: 'utils/imageFailurePolicy.js', implementation: 'src/modules/image/domain/imageFailurePolicy.ts' },
+  { legacy: 'utils/imageDimensions.js', implementation: 'src/modules/image/domain/imageDimensions.ts' },
+  { legacy: 'utils/visibleFailure.js', implementation: 'src/modules/models/domain/visibleFailure.ts' },
+  { legacy: 'utils/imageGenerationFallback.js', implementation: 'src/modules/image/domain/providerConfig.ts', additionalImplementations: ['src/modules/image/application/legacyImageGeneration.ts'] },
+  { legacy: 'utils/chatCompletionUrl.js', implementation: 'src/modules/models/domain/chatCompletionUrl.ts' },
+  { legacy: 'utils/sideLLM.js', implementation: 'src/adapters/sideLLM.ts' },
+  { legacy: 'utils/imageAspectRatio.js', implementation: 'src/modules/image/domain/imageAspectRatio.ts' },
+  { legacy: 'utils/unicodeText.js', implementation: 'src/modules/models/domain/unicodeText.ts' },
+  { legacy: 'utils/modelGateway.js', implementation: 'src/modules/models/domain/modelGateway.ts', additionalImplementations: ['src/adapters/modelFetch.ts'] },
+  { legacy: 'utils/chatRequestRecovery.js', implementation: 'src/modules/models/application/chatRequestRecovery.ts' },
+  { legacy: 'utils/imageRequestGuard.js', implementation: 'src/modules/image/domain/imageRequestGuard.ts' },
+  { legacy: 'utils/providers/ThinkingProcessor.js', implementation: 'src/modules/models/domain/thinkingProcessor.ts' },
+  { legacy: 'utils/apiClient.js', implementation: 'src/modules/models/application/modelExecution.ts', kind: 'composition', reviewedSha256: 'bd6c67a0c7b6653c064278f65de06e564ea8589b34e06bb4b0bacb75edf77faf' },
+  { legacy: 'utils/aiProviderProbe.js', implementation: 'src/modules/models/application/aiProviderProbe.ts', kind: 'composition', reviewedSha256: 'dd99187a0e58d1c758786d10edbbf90a931f97155fcb135d86f54f1feea5e397' },
+  { legacy: 'utils/chatFailureDiagnosis.js', implementation: 'src/modules/models/application/chatFailureDiagnosis.ts', kind: 'composition', reviewedSha256: '8b0256e61189492d748e74c1d6d6d9bb9611dc13548b81b1a1fadcf8e3d5123b' },
 ];
 export function classify(path) {
   if (/(?:^|\/)(?:node_modules|vendor|dist|coverage|data)(?:\/|$)/.test(path)) return 'vendor-generated-data';
@@ -63,10 +82,10 @@ function structure(files) {
 export function verifyCompatibility(item, source) {
   if (item.kind === 'composition') return createHash('sha256').update(source).digest('hex') === item.reviewedSha256;
   const file = ts.createSourceFile(item.legacy, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-  const emitted = item.implementation.replace(/^src\//, 'dist/backend/').replace(/\.ts$/, '.js');
+  const emitted = [item.implementation, ...(item.additionalImplementations || [])].map(path => resolve(path.replace(/^src\//, 'dist/backend/').replace(/\.ts$/, '.js')));
   return file.parseDiagnostics.length === 0 && file.statements.length > 0 && file.statements.every(statement =>
     ts.isExportDeclaration(statement) && statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier) &&
-    resolve(item.legacy, '..', statement.moduleSpecifier.text) === resolve(emitted));
+    emitted.includes(resolve(item.legacy, '..', statement.moduleSpecifier.text)));
 }
 export function discoveredDebt(baselineFiles, currentFiles) {
   const known = new Set(baselineFiles.map(file => file.path));
@@ -76,7 +95,7 @@ export function discoveredDebt(baselineFiles, currentFiles) {
 export function report() {
   const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
   const files = [...new Set(paths(['ls-files', '-z', '--cached', '--others', '--exclude-standard']))].filter(path => existsSync(path)).sort().map(path => entry(path, readFileSync(path, 'utf8')));
-  const registered = migrations.map(item => ({ ...item, present: [item.implementation, ...(item.adapter ? [item.adapter] : [])].every(path => files.some(file => file.path === path)), thinWrapper: existsSync(item.legacy) && verifyCompatibility(item, readFileSync(item.legacy, 'utf8')) }));
+  const registered = migrations.map(item => ({ ...item, present: [item.implementation, ...(item.additionalImplementations || []), ...(item.adapter ? [item.adapter] : [])].every(path => files.some(file => file.path === path)), thinWrapper: existsSync(item.legacy) && verifyCompatibility(item, readFileSync(item.legacy, 'utf8')) }));
   const completed = new Set(registered.filter(item => item.present && item.thinWrapper).map(item => item.legacy));
   const classifiedFiles = files.map(file => completed.has(file.path) ? { ...file, category: 'compatibility' } : file);
   const summarize = list => list.reduce((result, item) => { const key = `${item.category}:${item.language}`; const value = result[key] ??= { files: 0, codeLines: 0, bytes: 0 }; value.files++; value.codeLines += item.codeLines; value.bytes += item.bytes; return result; }, {});

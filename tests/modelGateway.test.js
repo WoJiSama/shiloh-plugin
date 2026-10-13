@@ -34,12 +34,7 @@ test("tools 注入语义:useTools 且有工具且 toolChoice 非 none 才注入"
   assert.equal(forced.tool_choice.function.name, "t", "强制工具调用对象原样透传")
 })
 
-test("fetchWithTimeout:超时转换为可读错误,正常请求透传响应", async () => {
-  await assert.rejects(
-    () => fetchWithTimeout("https://10.255.255.1/no-route", { method: "GET" }, 50),
-    /秒没有返回/,
-    "超时应转换为可读错误而非裸 AbortError"
-  )
+test("fetchWithTimeout:正常请求透传响应，超时与取消由注入传输单测覆盖", async () => {
   const response = await fetchWithTimeout("data:text/plain,ok", { method: "GET" }, 5000)
   assert.equal(response.status, 200)
 })

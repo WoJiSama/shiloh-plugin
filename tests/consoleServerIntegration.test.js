@@ -169,3 +169,36 @@ test("isolated console HTTP saves safely, preserves YAML and credentials, and pr
   assert.notEqual(librarySaved.data.revision, library.revision)
   assert.equal((await request("/api/persona/library", { method: "PUT", body: { personas: [], revision: library.revision } })).status, 409)
 })
+
+test('console image HTTP uses compiled shared service with multiple provider images', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'console-image-fixture-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true })
+  const token = 'image-fixture-token'
+  fs.writeFileSync(path.join(root, 'config', 'console.json'), JSON.stringify({ token }))
+  const sharp = (await import('sharp')).default
+  const bytes = await sharp({ create: { width: 72, height: 128, channels: 3, background: 'blue' } }).png().toBuffer()
+  const requests = []
+  const provider = http.createServer((req, res) => {
+    let body = ''
+    req.on('data', chunk => { body += chunk })
+    req.on('end', () => {
+      requests.push(JSON.parse(body))
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ data: [{ b64_json: bytes.toString('base64') }, { b64_json: bytes.toString('base64') }] }))
+    })
+  })
+  await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise(resolve => provider.close(resolve)))
+  fs.writeFileSync(path.join(root, 'config', 'message.yaml'), YAML.stringify({ pluginSettings: { imageGenerationAiConfig: { providers: [{ name: 'fixture', model: 'gpt-image-2', apiKey: 'local-fixture-secret', apiUrl: `http://127.0.0.1:${provider.address().port}/v1/images/generations` }] } } }))
+  const base = await startFixtureServer(root, t, { CONSOLE_DRAW_DIR: path.join(root, 'draw') })
+  const response = await fetch(`${base}/api/image/generate`, { method: 'POST', headers: { 'x-console-token': token, 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'fixture', n: 2, quality: 'high' }) })
+  const result = await response.json()
+  assert.equal(response.status, 200, JSON.stringify(result))
+  assert.equal(result.count, 2)
+  assert.equal(result.images.length, 2)
+  assert.equal(result.attempts[0].model, 'gpt-image-2')
+  assert.equal(requests[0].n, 2)
+  assert.equal(requests[0].quality, 'high')
+  assert.deepEqual(Buffer.from(result.images[0].dataUri.split(',')[1], 'base64'), bytes)
+})

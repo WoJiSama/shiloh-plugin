@@ -95,11 +95,9 @@ test('Grok quality variants receive exact aspect_ratio without conflicting squar
  }
 })
 test('console payload sends Grok aspect_ratio and supports prompt-only ratios', async()=>{
- const fs=await import('node:fs/promises')
- const source=await fs.readFile(new URL('../console/server.js',import.meta.url),'utf8')
- const start=source.indexOf('function buildImageGenerationPayload('),end=source.indexOf('\nfunction parseDataImage',start)
- const {isGrokImageModel}=await import('../utils/imageAspectRatio.js')
- const build=new Function('isGrokImageModel',`${source.slice(start,end)};return buildImageGenerationPayload`)(isGrokImageModel)
+ const {createImageService}=await import('../dist/backend/modules/image/application/imageService.js')
+ const unreachable=()=>{throw new Error('payload construction must not perform IO')}
+ const {buildGenerationPayload:build}=createImageService({fetch:unreachable,loadReference:unreachable,encodeMultipart:unreachable,resolveImage:unreachable,metadata:unreachable})
  const [config]=applyImageAspectRatioToConfigs([{model:'grok-imagine-image-quality',size:'1024x1024'}],resolveImageAspectRatioIntent('壁纸比例9:16'))
  const payload=build(config,'prompt','b64_json')
  assert.equal(payload.aspect_ratio,'9:16');assert.equal(payload.size,undefined)

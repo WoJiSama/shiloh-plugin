@@ -56,3 +56,9 @@ test('newly discovered JS debt is reported without altering fixed baseline or co
   assert.deepEqual(discoveredDebt(baseline, current), { modules: 1, codeLines: 20, paths: ['core/config/configStore.js'] });
   assert.equal(JSON.stringify(baseline), before);
 });
+
+test('multi-target wrappers only export audited emitted implementations', () => {
+  const item = { legacy: 'utils/example.js', implementation: 'src/modules/example.ts', additionalImplementations: ['src/modules/second.ts'] };
+  assert.equal(verifyCompatibility(item, "export { a } from '../dist/backend/modules/example.js'; export { b } from '../dist/backend/modules/second.js';"), true);
+  assert.equal(verifyCompatibility(item, "export { b } from '../dist/backend/modules/unaudited.js';"), false);
+});
