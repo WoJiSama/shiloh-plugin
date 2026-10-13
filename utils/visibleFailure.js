@@ -46,6 +46,8 @@ function isUpstreamOverloaded(text = "") {
 
 export function buildVisibleFailureDetail(error = "", { fallback = "执行没有返回可用结果" } = {}) {
   const raw = redactSensitiveFailureText(toErrorText(error))
+  const identity = raw.match(/^【渠道=[^】]+】/)?.[0] || ""
+  if (identity) return `${identity}${buildVisibleFailureDetail(raw.slice(identity.length), { fallback })}`
   if (!raw) return fallback
   const status = extractStatus(raw)
   const message = extractMessage(raw)

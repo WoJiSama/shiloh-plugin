@@ -326,6 +326,7 @@ export function buildImageGenerationPrompt(host, context = {}) {
 
     const compiled = compileImagePrompt({
       task: "image_generation",
+      botNames: [host.getPersonaFor?.(context.e)?.name, host.config?.persona?.name, context.e?.bot?.nickname, ...(Array.isArray(host.config?.triggerPrefixes) ? host.config.triggerPrefixes : [])],
       userPrompt: [basePrompt, avatarReferencePrompt].filter(Boolean).join("\n"),
       quotedContext,
       recentContext,

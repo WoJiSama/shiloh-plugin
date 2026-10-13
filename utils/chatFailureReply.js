@@ -32,6 +32,9 @@ function buildGenericChatFailureReplyInner(userText = "", { isGreeting = false, 
   if (isGreeting) {
     return `我在。这次回复没生成出来，消息本身没问题。${failureDetail ? ` 原因：${failureDetail}` : ""}`
   }
+  if (/余额不足|无可用资源包|insufficient.?quota|insufficient.?balance/i.test(failureDetail)) {
+    return `这次回答未生成：模型渠道余额不足或资源包不可用。 原因：${failureDetail}`
+  }
   if (failureKind === "rate_limit") {
     return `这次请求被限流了，问题我看到了，但没能生成答案。${failureDetail ? ` 原因：${failureDetail}` : ""}`
   }

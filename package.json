@@ -7,7 +7,13 @@
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\"",
     "trace:report": "node scripts/turn-trace-report.mjs",
-    "persona:replay": "node scripts/personaReplay.mjs"
+    "persona:replay": "node scripts/personaReplay.mjs",
+    "console:dev": "npm --prefix console/frontend run dev",
+    "console:build": "npm --prefix console/frontend run build",
+    "console:check": "npm --prefix console/frontend run typecheck",
+    "console:test": "npm --prefix console/frontend test",
+    "console:start": "node console/server.js",
+    "console:smoke": "node tests/consoleFrontendSmoke.mjs"
   },
   "repository": {
     "type": "git",

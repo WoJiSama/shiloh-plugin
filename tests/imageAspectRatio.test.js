@@ -83,3 +83,34 @@ test("reads actual output dimensions from image bytes", async () => {
   })
   assert.equal(await getImageBufferMetadata(Buffer.from("not-an-image")), null)
 })
+
+test('Grok quality variants receive exact aspect_ratio without conflicting square size', async () => {
+ const {isGrokImageModel,assertGrokImageRatio}=await import('../utils/imageAspectRatio.js')
+ for(const model of ['grok-imagine-image','grok-imagine-image-quality','grok-imagine-image-edit']) {
+  assert.equal(isGrokImageModel(model),true)
+  const [config]=applyImageAspectRatioToConfigs([{model,size:'1024x1024'}],resolveImageAspectRatioIntent('', '9:16'))
+  assert.equal(config.aspectRatio,'9:16');assert.equal(config.size,'')
+  assert.doesNotThrow(()=>assertGrokImageRatio(config,{width:720,height:1280}))
+  assert.throws(()=>assertGrokImageRatio(config,{width:1024,height:1024}),/未遵守请求画幅/)
+ }
+})
+test('console payload sends Grok aspect_ratio and supports prompt-only ratios', async()=>{
+ const fs=await import('node:fs/promises')
+ const source=await fs.readFile(new URL('../console/server.js',import.meta.url),'utf8')
+ const start=source.indexOf('function buildImageGenerationPayload('),end=source.indexOf('\nfunction parseDataImage',start)
+ const {isGrokImageModel}=await import('../utils/imageAspectRatio.js')
+ const build=new Function('isGrokImageModel',`${source.slice(start,end)};return buildImageGenerationPayload`)(isGrokImageModel)
+ const [config]=applyImageAspectRatioToConfigs([{model:'grok-imagine-image-quality',size:'1024x1024'}],resolveImageAspectRatioIntent('壁纸比例9:16'))
+ const payload=build(config,'prompt','b64_json')
+ assert.equal(payload.aspect_ratio,'9:16');assert.equal(payload.size,undefined)
+})
+
+test('dimension reader supports PNG, JPEG, WebP and GIF output', async()=>{
+ const {readImageDimensions}=await import('../utils/imageDimensions.js')
+ for(const format of ['png','jpeg','webp','gif']) {
+  const buffer=await sharp({create:{width:72,height:128,channels:3,background:'#123456'}}).toFormat(format).toBuffer()
+  assert.deepEqual(readImageDimensions(buffer),{width:72,height:128},format)
+ }
+ const lossless=await sharp({create:{width:72,height:128,channels:3,background:'#123456'}}).webp({lossless:true}).toBuffer()
+ assert.deepEqual(readImageDimensions(lossless),{width:72,height:128})
+})

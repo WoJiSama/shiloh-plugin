@@ -42,6 +42,7 @@ test("same media in two groups creates and sends two independent delivery jobs",
   const store = new RedisJobStore({ redis: createFakeRedis() })
   const sent = []
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     ...mediaDependencies,
     gateway: { sendGroupForward: async args => { sent.push(args); return { retcode: 0, messageId: sent.length } } },
@@ -62,6 +63,7 @@ test("simultaneous deliveries share metadata refresh and persist stage timings",
   let refreshes = 0
   const sent = []
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     enrichBilibili: async card => {
       refreshes += 1
@@ -99,6 +101,7 @@ test("same video in different groups waits for one shared download before both s
   const downloadStarted = new Promise(resolve => { startDownload = resolve })
   const downloadFinished = new Promise(resolve => { finishDownload = resolve })
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     artifactStore,
     prepareConcurrency: 2,
@@ -140,6 +143,7 @@ test("YouTube uses the shared platform adapter and reuses one media artifact acr
   const sent = []
   let downloads = 0
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     artifactStore,
     enrichYoutube: async card => ({ ...card, metadata_status: "resolved" }),
@@ -173,6 +177,7 @@ test("same-group later media prepares while the prior delivery is still sending"
   let signalFirstSend
   const firstSendStarted = new Promise(resolve => { signalFirstSend = resolve })
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     prepareConcurrency: 2,
     enrichBilibili: async card => card,
@@ -215,6 +220,7 @@ test("delivery job retries from persisted state without duplicating a successful
   let fail = true
   let sends = 0
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     ...mediaDependencies,
     retryBaseMs: 100,
@@ -249,6 +255,7 @@ test("uncertain delivery failure is retained without automatic retry", async () 
   const store = new RedisJobStore({ redis: createFakeRedis() })
   let sends = 0
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     ...mediaDependencies,
     gateway: {
@@ -273,6 +280,7 @@ test("media assembly failure still sends a visible information node", async () =
   const store = new RedisJobStore({ redis: createFakeRedis() })
   let sent
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     enrichBilibili: async card => card,
     enrichDouyin: async card => card,
@@ -310,6 +318,7 @@ test("outbox waits for a live lease and recovers only after it expires", async (
   await store.acquireLock("delivery", job.id, 600000)
 
   const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
     store,
     ...mediaDependencies,
     gateway: { sendGroupForward: async () => ({ retcode: 0, messageId: 10 }) },
@@ -327,4 +336,20 @@ test("outbox waits for a live lease and recovers only after it expires", async (
   await new Promise(resolve => setTimeout(resolve, 30))
   assert.equal((await store.get("delivery", job.id)).state, "sent")
   outbox.stop()
+})
+
+test('known video resource failures retry once then persist a link fallback', async () => {
+  const store = new RedisJobStore({ redis: createFakeRedis() })
+  let forwards=0; let fallback=''
+  const outbox=new MediaOutbox({store, enrichBilibili:async card=>card,
+    buildBilibili:async()=>({segments:[{type:'video',file:'base64://dmlkZW8='}],tempFiles:[]}),
+    prepareThumbnail:async()=>({file:'base64://dGh1bWI=',cleanup:async()=>{}}),
+    gateway:{sendGroupForward:async()=>{forwards++;throw Object.assign(new Error('上传转发消息资源失败：1/2'),{uncertain:false,retryable:false})},sendGroupText:async({text})=>{fallback=text;return {messageId:9}}}, logger:{info(){},warn(){}}})
+  outbox.stopped=true
+  const job=await outbox.enqueue({envelope:envelope(123,990),media:longBilibiliCard()})
+  assert.equal(await outbox.process(job.id),true)
+  const saved=await store.get('delivery',job.id)
+  assert.equal(forwards,2);assert.match(fallback,/https:\/\/www.bilibili.com/)
+  assert.equal(saved.state,'sent');assert.equal(saved.fallbackStatus,'link_sent')
+  await outbox.process(job.id);assert.equal(forwards,2)
 })

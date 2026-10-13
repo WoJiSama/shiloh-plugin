@@ -382,7 +382,7 @@ function getMessageCacheOptions(config = {}) {
 function initializeSharedState(config) {
   if (sharedState) {
     // 热更新：直接覆盖各 Manager 的 config，无需 Manager 侧改动
-    sharedState.messageManager.groupMaxMessages = config.groupMaxMessages || 100
+    sharedState.messageManager.GROUP_MAX_MESSAGES = config.groupMaxMessages || 100
     sharedState.messageManager.setCacheExpire(getMessageCacheOptions(config))
     Object.assign(sharedState.emotionManager.config, {
       decayRate: config.emotionSystem?.decayRate || 0.02,

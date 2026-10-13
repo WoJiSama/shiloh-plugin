@@ -64,6 +64,7 @@ test("配置可改档与关闭", () => {
     deriveTurnPlanRequest(plan, { chatAiConfig: { complexReasoningEffort: "medium" } }).requestOptions.generation.reasoningEffort,
     "medium"
   )
+  assert.equal(deriveTurnPlanRequest(plan, { chatAiConfig: { complexReasoningEffort: "max" } }).requestOptions.generation.reasoningEffort, "max")
   for (const off of ["false", "none", "", "无效值"]) {
     const request = deriveTurnPlanRequest(plan, { chatAiConfig: { complexReasoningEffort: off } })
     assert.equal(request.requestOptions.generation, undefined, `配置 ${off} 应关闭升档`)

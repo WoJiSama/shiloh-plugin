@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>机器人健康报告</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 30px; width: 920px; background: #eaf0f8; color: #24314a; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; }
+    .report { width: 860px; background: #fff; border: 1px solid #dce5f0; border-radius: 26px; overflow: hidden; box-shadow: 0 14px 40px rgba(38, 58, 90, .08); }
+    .header { padding: 34px 34px 28px; background: linear-gradient(125deg, #172b4e, #274a78); color: #fff; }
+    .header-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .eyebrow { margin: 0 0 10px; color: #bfcee4; font-size: 18px; letter-spacing: 3px; }
+    h1 { margin: 0; font-size: 38px; font-weight: 750; letter-spacing: 1px; }
+    .generated { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; color: #d1dcf0; font-size: 18px; }
+    .generated strong { color: #fff; font-size: 24px; font-weight: 550; }
+    .overall { margin-top: 24px; display: inline-flex; gap: 10px; align-items: center; padding: 9px 16px; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; color: #fff; background: rgba(255,255,255,.09); font-size: 22px; }
+    .overall i { width: 9px; height: 9px; border-radius: 50%; background: #85dfbd; }
+    .overall.warning i { background: #ffd285; }
+    .overall.danger i { background: #ffacaf; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: 26px 22px; border-bottom: 1px solid #e9eef5; background: #fbfcff; }
+    .summary-item { padding: 0 20px; border-right: 1px solid #e4eaf3; }
+    .summary-item:last-child { border-right: 0; }
+    .summary-item span { display: block; color: #728199; font-size: 18px; margin-bottom: 10px; }
+    .summary-item strong { font-size: 38px; line-height: 1.2; font-variant-numeric: tabular-nums; font-weight: 700; }
+    .summary-item small { color: #91a0b5; font-size: 22px; font-weight: 400; }
+    .online { color: #138865; }
+    .attention { color: #b37a25; }
+    .content { padding: 30px 30px 0; }
+    .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 16px; }
+    h2 { margin: 0; color: #263650; font-size: 25px; font-weight: 650; }
+    .section-note { color: #8491a5; font-size: 17px; }
+    .bot-card { padding: 20px 22px; border: 1px solid #e1e8f2; border-radius: 16px; margin-bottom: 14px; background: #fff; }
+    .bot-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .bot-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .bot-avatar { flex-shrink: 0; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 13px; background: #edf2fc; color: #5a7ab6; font-size: 20px; font-weight: 650; }
+    .bot-name { min-width: 0; }
+    h3 { margin: 0; font-size: 24px; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
+    .bot-name p { margin: 5px 0 0; font-size: 18px; color: #7e8da3; font-variant-numeric: tabular-nums; }
+    .state-pill { display: inline-flex; flex-shrink: 0; align-items: center; padding: 6px 12px; border-radius: 8px; font-size: 18px; font-weight: 600; }
+    .state-pill.state-ok { background: #e9f7f1; color: #148666; }
+    .state-pill.state-warn { background: #fff3df; color: #ac761c; }
+    .state-pill.state-bad { background: #fcebec; color: #be4b58; }
+    .bot-metrics { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 12px; margin-top: 18px; padding-top: 17px; border-top: 1px solid #eef1f6; }
+    .bot-metric span { display: block; font-size: 16px; color: #91a0b4; margin-bottom: 5px; }
+    .bot-metric strong { font-size: 23px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.4; overflow-wrap: anywhere; }
+    .bot-metric.memory strong { font-size: 19px; color: #60728b; font-weight: 500; }
+    .bot-metric.metric-danger strong { color: #bd4e5c; }
+    .failure-section { margin: 28px 0 0; }
+    .failure-count { display: inline-block; padding: 3px 10px; font-size: 17px; font-weight: 500; background: #f0f3f8; color: #7b889d; border-radius: 8px; margin-left: 8px; vertical-align: middle; }
+    .failure-empty { display: flex; align-items: center; gap: 16px; padding: 22px 24px; border: 1px solid #d8eee4; background: #f2faf6; border-radius: 16px; }
+    .empty-icon { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #d8f1e4; color: #158966; font-size: 24px; font-weight: 650; flex-shrink: 0; }
+    .failure-empty strong { font-size: 22px; color: #217557; font-weight: 600; }
+    .failure-empty p { margin: 6px 0 0; font-size: 17px; color: #779787; line-height: 1.6; }
+    .empty-warning { background: #fff9ef; border-color: #f2e3c9; }
+    .empty-warning .empty-icon { background: #f9e7c6; color: #a47729; }
+    .empty-warning strong { color: #a47729; }
+    .empty-warning p { color: #a19078; }
+    .send-aggregates { margin-top: 18px; padding: 18px 20px; background: #f0f3f8; border-radius: 13px; font-size: 18px; color: #67778e; }
+    .send-aggregates p { margin: 10px 0 0; overflow-wrap: anywhere; }
+    .failure-row { padding: 18px 20px; margin-bottom: 12px; border: 1px solid #f0dfe2; border-radius: 13px; background: #fdf8f9; }
+    .failure-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .failure-heading strong { flex: 1; font-size: 19px; line-height: 1.5; overflow-wrap: anywhere; min-width: 0; }
+    .source { display: inline-block; font-size: 16px; color: #b65165; border-radius: 6px; background: #f9e7eb; padding: 3px 9px; }
+    .failure-row p { margin: 10px 0 0; font-size: 18px; line-height: 1.6; color: #8d6270; overflow-wrap: anywhere; }
+    .badge { font-size: 15px; color: #b07820; background: #fff0d5; padding: 4px 8px; border-radius: 6px; }
+    .empty-bots, .data-warning { color: #aa7a30; background: #fff7e9; padding: 18px 20px; border-radius: 12px; font-size: 18px; line-height: 1.6; margin-bottom: 18px; overflow-wrap: anywhere; }
+    .footer { margin-top: 26px; border-top: 1px solid #e9eef5; padding: 20px 32px 24px; font-size: 16px; line-height: 1.7; color: #9aa7b9; }
+    .footer-top { display: flex; justify-content: space-between; gap: 16px; }
+    .brand { color: #a6b1c3; font-weight: 650; }
+  </style>
+</head>
+<body>
+  <main class="report">
+    <header class="header">
+      <div class="header-top"><div><p class="eyebrow">机器人运行概览</p><h1>健康报告</h1></div><div class="generated"><span>报告时间</span><strong>{{generatedAt}}</strong></div></div>
+      <div class="overall {{statusTone}}"><i></i>{{statusLabel}}</div>
+    </header>
+    <section class="summary">
+      <div class="summary-item"><span>在线机器人</span><strong class="online">{{onlineCount}}<small> / {{botCount}}</small></strong></div>
+      <div class="summary-item"><span>需要关注</span><strong class="attention">{{attentionCount}}</strong></div>
+      <div class="summary-item"><span>今日收信</span><strong>{{recvTotal}}</strong></div>
+      <div class="summary-item"><span>今日发送</span><strong>{{sendTotal}}</strong></div>
+    </section>
+    <div class="content">
+      {{@ healthErrorHtml}}
+      <section><div class="section-heading"><h2>账号运行状态</h2><span class="section-note">{{botCount}} 个机器人</span></div>{{@ botsHtml}}</section>
+      <section class="failure-section"><div class="section-heading"><h2>任务详情<span class="failure-count">{{failureCount}} 条失败 / {{degradedCount}} 条已降级</span></h2><span class="section-note">今日发送失败 {{failTotal}} 次</span></div>{{@ failuresHtml}}{{@ sendAggregatesHtml}}</section>
+    </div>
+    <footer class="footer"><div class="footer-top"><span>{{statsLabel}}</span><span class="brand">SHILOH · 运行监测</span></div><div>{{windowLabel}} · 最多展示 16 条失败摘要</div></footer>
+  </main>
+</body>
+</html>

@@ -5,6 +5,7 @@ import { DeliveryGateway } from "./deliveryGateway.js"
 import { MediaOutbox } from "./mediaOutbox.js"
 import { MediaArtifactStore } from "./mediaArtifactStore.js"
 import { MessagePipeline } from "./messagePipeline.js"
+import { startMediaRelayAdminReport } from "./mediaRelayAdminReport.js"
 import { getMissingRedisJobCapabilities, RedisJobStore } from "./redisJobStore.js"
 import { createStatsEmitterFromSettings } from "../messageStats.js"
 import { BilibiliAuthManager } from "../BilibiliAuthManager.js"
@@ -173,7 +174,8 @@ export function createMessagePipelineRuntime({
     resolveForwardContext: envelope => resolvePipelineForwardContext(envelope, bot),
     stats
   })
-  return { config, pipeline, mediaOutbox, store: jobStore, gateway: deliveryGateway, artifactStore, stats }
+  const adminReportStop = startMediaRelayAdminReport({ store: jobStore, logger })
+  return { config, pipeline, mediaOutbox, store: jobStore, gateway: deliveryGateway, artifactStore, stats, adminReportStop }
 }
 
 export function installMessagePipeline({
@@ -185,6 +187,7 @@ export function installMessagePipeline({
 } = {}) {
   const previous = globalThis[RUNTIME_KEY]
   previous?.pipeline?.stop?.()
+  previous?.adminReportStop?.()
 
   // pixiv.net/pximg.net 国内不可达:所有 Pixiv 富化路径统一走 pixivRelay.proxyUrl 指定的代理。
   setPixivFetchProxy(String(pluginSettings.pixivRelay?.proxyUrl || "").trim())
@@ -202,6 +205,7 @@ export function installMessagePipeline({
     runtime.pipeline.start(bot)
   } catch (error) {
     runtime?.pipeline?.stop?.()
+    runtime?.adminReportStop?.()
     runtime = {
       config,
       pipeline: null,

@@ -588,7 +588,7 @@ export class MessageArchiveManager {
       .filter(item => this.matchRecord(item.record, options))
 
     const around = Math.max(0, Number(options.around || 0))
-    const limit = Math.min(200, Math.max(1, Number(options.limit || 30)))
+    const limit = Math.min(1000, Math.max(1, Number(options.limit || 30)))
     if (!around) return matches.slice(-limit).map(item => item.record)
 
     const picked = new Map()

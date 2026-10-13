@@ -155,8 +155,32 @@ export function applyImageAspectRatioToConfigs(configs = [], intent = null, opti
   const candidates = (Array.isArray(configs) ? configs : [configs]).filter(Boolean)
   return candidates.map(config => ({
     ...config,
-    size: resolveImageProviderSize(config, intent, options)
+    size: isGrokImageModel(config.model) && intent ? "" : resolveImageProviderSize(config, intent, options),
+    ...(isGrokImageModel(config.model) && intent ? { aspectRatio: grokAspectRatio(intent) } : {})
   }))
+}
+
+export function isGrokImageModel(model = "") {
+  return /^grok-imagine-image(?:-[a-z0-9-]+)?$/i.test(compact(model))
+}
+
+function grokAspectRatio(intent) {
+  if (intent.width && intent.height) {
+    const gcd = (a, b) => b ? gcd(b, a % b) : a
+    const divisor = gcd(intent.width, intent.height)
+    return `${intent.width / divisor}:${intent.height / divisor}`
+  }
+  return { portrait: "9:16", landscape: "16:9", square: "1:1" }[intent.orientation]
+}
+
+export function assertGrokImageRatio(config, metadata) {
+  if (!isGrokImageModel(config?.model) || !config?.aspectRatio) return
+  const intent = resolveImageAspectRatioIntent("", config.aspectRatio)
+  if (!metadata?.width || !metadata?.height) throw new Error("无法验证 Grok 返回图片的画幅")
+  const actual = metadata.width / metadata.height
+  if (Math.abs(actual / intent.ratio - 1) > 0.04) {
+    throw new Error(`Grok 未遵守请求画幅 ${config.aspectRatio}，实际返回 ${metadata.width}×${metadata.height}`)
+  }
 }
 
 export function describeImageAspectRatioIntent(intent = null) {

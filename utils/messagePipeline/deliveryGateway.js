@@ -1,3 +1,6 @@
+import { KeyedSerialQueue } from "./keyedSerialQueue.js"
+import { isForwardResourceFailure } from "./videoThumbnail.js"
+const forwardQueue = new KeyedSerialQueue()
 import fs from "node:fs"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
@@ -63,7 +66,11 @@ export async function inlineForwardLocalFileSegment(segment = {}, { artifactStor
 }
 
 export async function inlineForwardVideoSegment(video = {}, options = {}) {
-  return await inlineForwardLocalFileSegment(video, options)
+  const output = await inlineForwardLocalFileSegment(video, options)
+  const data = video?.data || video
+  if (!data?.thumb) return output
+  const thumb = await inlineForwardLocalFileSegment({ type: "image", file: data.thumb }, options)
+  return output?.data ? { ...output, data: { ...output.data, thumb: thumb.file } } : { ...output, thumb: thumb.file }
 }
 
 function deliveryFailure(result) {
@@ -207,31 +214,41 @@ export class DeliveryGateway {
     return root.bots?.[key] || root[key] || (typeof root.sendApi === "function" ? root : null)
   }
 
-  async sendGroupForward({ botId, groupId, nodes }) {
+  async sendGroupForward(args) {
+    return forwardQueue.run(args.botId, () => this.sendGroupPayload(args))
+  }
+
+  async sendGroupText({ botId, groupId, text }) {
+    return forwardQueue.run(botId, () => this.sendGroupPayload({ botId, groupId, nodes: [], text }))
+  }
+
+  async sendGroupPayload({ botId, groupId, nodes, text }) {
+    const channel = text === undefined ? "group_forward" : "group_text"
+    const statsChannel = text === undefined ? "media_forward" : "media_text"
     const root = typeof this.botRoot === "function" ? this.botRoot() : this.botRoot
     const bot = this.resolveBot(botId)
     if (typeof bot?.sendApi !== "function") {
-      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: `missing_bot:${botId || "unknown"}` })
-      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: `missing_bot:${botId || "unknown"}` })
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error: `missing_bot:${botId || "unknown"}` })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: `missing_bot:${botId || "unknown"}` })
       throw new DeliveryError(`Bot ${botId || "unknown"} 当前没有可用的 OneBot sendApi`)
     }
     let result
     try {
-      result = await withForwardMediaTimeout(root, () => bot.sendApi("send_group_forward_msg", {
+      result = await withForwardMediaTimeout(root, () => bot.sendApi(text === undefined ? "send_group_forward_msg" : "send_group_msg", text === undefined ? {
         group_id: Number(groupId),
         messages: buildOneBotForwardNodes(nodes)
-      }))
+      } : { group_id: Number(groupId), message: [{ type: "text", data: { text } }] }))
     } catch (error) {
-      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error })
-      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: "send_api_error" })
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: "send_api_error" })
       throw new DeliveryError(error.message || "OneBot 调用异常", {
         retryable: false,
-        uncertain: true
+        uncertain: !isForwardResourceFailure(error)
       })
     }
     if (!result || typeof result !== "object" || result.retcode === undefined || result.retcode === null) {
-      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: "missing_receipt" })
-      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: "missing_receipt" })
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error: "missing_receipt" })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: "missing_receipt" })
       throw new DeliveryError("OneBot 未返回可验证的发送回执", {
         retryable: false,
         uncertain: true
@@ -239,27 +256,27 @@ export class DeliveryGateway {
     }
     const retcode = Number(result.retcode)
     if (!Number.isFinite(retcode)) {
-      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: `invalid_retcode:${result.retcode}` })
-      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: "invalid_retcode" })
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error: `invalid_retcode:${result.retcode}` })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: "invalid_retcode" })
       throw new DeliveryError(`OneBot 返回了非法 retcode: ${String(result.retcode).slice(0, 50)}`, {
         retryable: false,
         uncertain: true
       })
     }
     if (retcode !== 0) {
-      logDeliveryOutcome(this.logger, { status: "failed", channel: "group_forward", groupId, error: result?.wording || result?.msg || `retcode=${retcode}` })
-      this.stats?.recordFailure({ botId, groupId, channel: "media_forward", code: `retcode:${retcode}` })
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error: result?.wording || result?.msg || `retcode=${retcode}` })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: `retcode:${retcode}` })
       throw new DeliveryError(result?.wording || result?.msg || `OneBot retcode=${retcode}`, { retcode })
     }
     const receipt = compactReceipt(result)
     logDeliveryOutcome(this.logger, {
       status: "sent",
-      channel: "group_forward",
+      channel,
       groupId,
       messageId: receipt.messageId,
       parts: Array.isArray(nodes) ? nodes.length : 1
     })
-    this.stats?.recordSend({ botId, groupId, channel: "media_forward" })
+    this.stats?.recordSend({ botId, groupId, channel: statsChannel })
     return receipt
   }
 }

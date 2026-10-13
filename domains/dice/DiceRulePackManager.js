@@ -999,11 +999,19 @@ export class DiceRulePackManager {
     return { ...validation, pending, sample, report: formatValidationReport(validation, pending, sample) }
   }
 
-  async confirmImport(id, actorId = "") {
+  async confirmImport(id, actorId = "", options = {}) {
     const packId = normalizeText(id)
+    const expectedStageId = options.stageId
+    if (expectedStageId !== undefined && (typeof expectedStageId !== "string" || !expectedStageId.trim())) {
+      throw Object.assign(new Error("缺少有效的预检暂存编号，请重新预检后确认"), { status: 400 })
+    }
     let cleanup = null
     const result = await this.mutateIndex(async index => {
       const pending = index.pending[packId]
+      // Compare inside the same index lock as the commit. Another page/process may replace this pack's stage.
+      if (expectedStageId !== undefined && (!pending || pending.stageId !== expectedStageId)) {
+        throw Object.assign(new Error(`规则包 ${packId} 的预检暂存已改变或已确认，请重新预检并核对最新报告`), { status: 409 })
+      }
       if (!pending) throw new Error(`没有找到待确认规则包：${packId}`)
       if (Date.now() - Number(pending.createdAt || 0) > PENDING_TTL_MS) throw new Error(`规则包 ${packId} 的待确认导入已过期，请重新导入`)
       if (pending.actorId && String(pending.actorId) !== String(actorId || "")) throw new Error("只能由发起预检的主人确认本次导入")

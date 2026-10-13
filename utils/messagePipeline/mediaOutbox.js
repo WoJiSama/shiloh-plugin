@@ -1,3 +1,4 @@
+import { createVideoThumbnail, isForwardResourceFailure } from "./videoThumbnail.js"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs"
 import { buildBilibiliArchiveRelaySegments, cleanupBilibiliArchiveRelayFiles } from "../bilibiliMediaRelay.js"
@@ -76,6 +77,7 @@ export class MediaOutbox {
     getBilibiliAuthCookie = () => "",
     artifactStore = null,
     sharedMedia = null,
+    prepareThumbnail = createVideoThumbnail,
     youtubeRelay = {},
     pixivRelay = {}
   } = {}) {
@@ -101,6 +103,7 @@ export class MediaOutbox {
     this.getBilibiliAuthCookie = getBilibiliAuthCookie
     this.artifactStore = artifactStore
     this.sharedMedia = sharedMedia
+    this.prepareThumbnail = prepareThumbnail
     this.youtubeRelay = youtubeRelay && typeof youtubeRelay === "object" ? youtubeRelay : {}
     this.pixivRelay = pixivRelay && typeof pixivRelay === "object" ? pixivRelay : {}
     this.refreshPromises = new Map()
@@ -407,6 +410,8 @@ export class MediaOutbox {
     let job = await this.store.get("delivery", id)
     let relay = emptyRelay()
     const processStartedAt = Date.now()
+    let thumbnailFailure = ""
+    const thumbnailLeases = []
     const timings = {
       queue: 0,
       refresh: 0,
@@ -461,7 +466,16 @@ export class MediaOutbox {
       const encodeStartedAt = Date.now()
       for (const video of videoSegments) {
         relay.sharedMediaFiles ||= []
-        videos.push(await inlineForwardVideoSegment(video, { artifactStore: this.artifactStore, sharedMedia: this.sharedMediaFor(job.botId), sharedMediaFiles: relay.sharedMediaFiles }))
+        try {
+          const thumbnail = await this.prepareThumbnail((video.data || video).file)
+          thumbnailLeases.push(thumbnail)
+          const withThumb = video.data ? { ...video, data: { ...video.data, thumb: thumbnail.file } } : { ...video, thumb: thumbnail.file }
+          videos.push(await inlineForwardVideoSegment(withThumb, { artifactStore: this.artifactStore, sharedMedia: this.sharedMediaFor(job.botId), sharedMediaFiles: relay.sharedMediaFiles }))
+        } catch (error) {
+          if (!isForwardResourceFailure(error)) throw error
+          thumbnailFailure = String(error.message)
+          break
+        }
       }
       const inlineSegments = []
       for (const item of nonVideoSegments) {
@@ -491,7 +505,32 @@ export class MediaOutbox {
       await heartbeat.assertOwned()
       this.logger?.info?.(`[MediaOutbox] 发送 group=${job.groupId} id=${job.id} attempt=${job.attempts} nodes=${nodes.length}`)
       const sendStartedAt = Date.now()
-      const receipt = await this.gateway.sendGroupForward({ botId: job.botId, groupId: job.groupId, nodes })
+      let receipt
+      const fallbackText = `${this.formatInfo(job, card)}\n${card.page_url || job.media?.page_url || ""}\n（视频转发资源暂不可用，已改为发送原视频链接）`
+      const fallback = async error => {
+        if (typeof this.gateway.sendGroupText !== "function") throw error
+        await heartbeat.assertOwned()
+        const result = await this.gateway.sendGroupText({ botId: job.botId, groupId: job.groupId, text: fallbackText })
+        job = { ...job, fallbackStatus: "link_sent", fallbackReason: /video_thumbnail_missing/.test(error.message) ? "video_thumbnail_missing" : "forward_resource_upload_failed", lastMediaError: cleanError(error) }
+        return result
+      }
+      if (thumbnailFailure) {
+        receipt = await fallback(new Error(thumbnailFailure))
+      } else {
+        try {
+          receipt = await this.gateway.sendGroupForward({ botId: job.botId, groupId: job.groupId, nodes })
+        } catch (error) {
+          if (!videos.length || !isForwardResourceFailure(error) || error.uncertain) throw error
+          // Explicit resource preprocessing failure proves no forward was sent.
+          await heartbeat.assertOwned()
+          try {
+            receipt = await this.gateway.sendGroupForward({ botId: job.botId, groupId: job.groupId, nodes })
+          } catch (retryError) {
+            if (!isForwardResourceFailure(retryError) || retryError.uncertain) throw retryError
+            receipt = await fallback(retryError)
+          }
+        }
+      }
       timings.send += Date.now() - sendStartedAt
       timings.total = Date.now() - processStartedAt
       job = {
@@ -538,6 +577,7 @@ export class MediaOutbox {
       return false
     } finally {
       heartbeat.stop()
+      await Promise.all(thumbnailLeases.map(item => item.cleanup().catch(() => {})))
       await this.releaseRelay(job, relay)
       await this.store.releaseLock("delivery", id, token).catch(error => {
         this.logger?.warn?.(`[MediaOutbox] 释放投递锁失败 id=${id}: ${cleanError(error)}`)

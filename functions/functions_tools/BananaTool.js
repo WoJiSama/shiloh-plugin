@@ -26,7 +26,7 @@ import { formatMessageSendFailure, getImageBufferMetadata, isMessageSendFailed, 
 import { extractImageResult } from "../../utils/imageResult.js";
 import { buildImageFailureReply } from "../../utils/imageFailurePolicy.js";
 import {
-  applyImageAspectRatioToConfigs,
+  isGrokImageModel, assertGrokImageRatio, applyImageAspectRatioToConfigs,
   describeImageAspectRatioIntent,
   resolveImageAspectRatioIntent
 } from "../../utils/imageAspectRatio.js";
@@ -763,13 +763,14 @@ export class BananaTool extends AbstractTool {
   }
 
   buildImageGenerationPayload(imageGenerationConfig, prompt, responseFormat = "") {
-    if (/^grok-imagine-image(?:-edit)?$/i.test(String(imageGenerationConfig.model || "").trim())) {
+    if (isGrokImageModel(imageGenerationConfig.model)) {
       const payload = {
         model: imageGenerationConfig.model,
         prompt,
         quality: imageGenerationConfig.quality || "high"
       };
-      if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size;
+      if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size
+      if (imageGenerationConfig.aspectRatio && isGrokImageModel(imageGenerationConfig.model)) payload.aspect_ratio = imageGenerationConfig.aspectRatio;
       return payload;
     }
     const payload = {
@@ -777,7 +778,8 @@ export class BananaTool extends AbstractTool {
       prompt,
       n: 1
     };
-    if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size;
+    if (imageGenerationConfig.size) payload.size = imageGenerationConfig.size
+      if (imageGenerationConfig.aspectRatio && isGrokImageModel(imageGenerationConfig.model)) payload.aspect_ratio = imageGenerationConfig.aspectRatio;
     if (responseFormat) payload.response_format = responseFormat;
     return payload;
   }
@@ -802,6 +804,7 @@ export class BananaTool extends AbstractTool {
     form.append("prompt", prompt);
     form.append("n", "1");
     if (imageEditConfig.size) form.append("size", imageEditConfig.size);
+    if (imageEditConfig.aspectRatio && isGrokImageModel(imageEditConfig.model)) form.append("aspect_ratio", imageEditConfig.aspectRatio);
     if (responseFormat) form.append("response_format", responseFormat);
 
     let imageCount = 0;
@@ -843,6 +846,12 @@ export class BananaTool extends AbstractTool {
       request: (config, inputPrompt, inputImages, responseFormat) =>
         this.requestImageEdit(config, inputPrompt, inputImages, responseFormat),
       parseResponse: response => this.parseImageGenerationResponse(response),
+      validateImage: async (image, config) => {
+        if (!config.aspectRatio || !isGrokImageModel(config.model)) return image;
+        const buffer = await resolveImageBuffer(image);
+        assertGrokImageRatio(config, await getImageBufferMetadata(buffer));
+        return buffer;
+      },
       logInfo: (...args) => this.logInfo(...args),
       logWarn: (...args) => this.logWarn(...args)
     });
@@ -864,6 +873,12 @@ export class BananaTool extends AbstractTool {
       request: (config, inputPrompt, responseFormat) =>
         this.requestImageGeneration(config, inputPrompt, responseFormat),
       parseResponse: response => this.parseImageGenerationResponse(response),
+      validateImage: async (image, config) => {
+        if (!config.aspectRatio || !isGrokImageModel(config.model)) return image;
+        const buffer = await resolveImageBuffer(image);
+        assertGrokImageRatio(config, await getImageBufferMetadata(buffer));
+        return buffer;
+      },
       logInfo: (...args) => this.logInfo(...args),
       logWarn: (...args) => this.logWarn(...args)
     });

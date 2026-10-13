@@ -1,3 +1,5 @@
+import triggerSchema from "../../configSchemas/triggers.js"
+
 export default [
   // 整组配置都在"对话追踪"这一个 tab 内；内部用 Divider 做小节分隔
   {
@@ -37,18 +39,7 @@ export default [
 
   // ===== 触发模式切换 =====
   { component: "Divider", label: "对话触发模式切换" },
-  {
-    field: "chatTriggerMode",
-    label: "对话触发模式",
-    component: "Select",
-    bottomHelpMessage: "strict=严格模式（必须 @/前缀才回，现状）；smart=智能模式（群里按频率自动让小模型判断要不要插话）。⚠️ 切到 smart 前请确保已在「AI 模型配置」页配置 trackAiConfig，Gate 子代理会复用此模型做决策；未配置时 Gate 永远返回 no_action，bot 不会主动接话",
-    componentProps: {
-      options: [
-        { label: "严格模式（默认，必须 @/前缀触发）", value: "strict" },
-        { label: "智能模式（自动判断要不要插话，需配置 trackAiConfig）", value: "smart" }
-      ]
-    }
-  },
+  ...triggerSchema,
 
   // ===== 智能模式 - 频率与阈值 =====
   { component: "Divider", label: "智能模式 - 频率与阈值 (smart)  ⚠ 依赖 trackAiConfig" },

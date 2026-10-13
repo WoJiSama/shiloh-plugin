@@ -638,6 +638,7 @@ export async function generateImageWithFallbacks(configs, prompt, adapter = {}) 
       }
 
       if (result.ok) {
+        if (adapter.validateImage) result.image = await adapter.validateImage(result.image, config);
         if (index > 0) adapter.logInfo?.(`[图片生成] fallback 成功: ${label}`);
         return result.image;
       }
@@ -674,6 +675,7 @@ export async function generateImageEditWithFallbacks(configs, prompt, images, ad
       }
 
       if (result.ok) {
+        if (adapter.validateImage) result.image = await adapter.validateImage(result.image, config);
         if (index > 0) adapter.logInfo?.(`[图片编辑] fallback 成功: ${label}`);
         return result.image;
       }

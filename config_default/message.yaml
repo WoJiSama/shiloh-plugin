@@ -85,6 +85,33 @@ pluginSettings:
     # 自动搬运先匿名请求；B站明确返回试看或登录限制时，才使用已扫码账号再试一次完整资源。
     autoUseAuthorizedForMemberOnly: true
     highQualityWhitelist: {}
+  # 出站风控闸门:所有 bot 的消息类发送(send_msg/send_group_msg/send_*_forward_msg)
+  # 统一先随机延迟再过令牌桶(豹骰同款行为防护);非消息类 API 零影响。
+  # 控制台"风控管理"页编辑;保存后 10 秒内热生效,无需重启。
+  riskControl:
+    enabled: false
+    delayMinMs: 0
+    delayMaxMs: 400
+    groupIntervalSeconds: 3
+    groupBurst: 3
+    privateIntervalSeconds: 3
+    privateBurst: 3
+    maxWaitSeconds: 8
+    # 出站内容审查(双级词表):拦截级命中→整条丢弃;替换级命中→脱敏符替换后照发
+    censorEnabled: false
+    censorMark: "*"
+    censorReplaceWords: []
+    censorBlockWords: []
+    # 风控信号感知:send 响应特征+机器人被禁言 → 告警到健康报告管理群+该号进入低调模式
+    signalMonitorEnabled: true
+    signalQuietMinutes: 30
+  # 管理群定时健康报告：定期推送卡面——各号登录态与内存占用、今日收发统计、
+  # 失败汇总（搬运投递失败/事件任务失败/发送失败任一出现都会列出）。
+  # 控制台"消息管道"页编辑；每次推送前重读配置，保存即生效。
+  mediaRelayAdminReport:
+    enabled: false
+    groupId: ""
+    intervalHours: 24
   # YouTube 自动搬运：需服务器安装 yt-dlp；只下载最低可用的单文件 MP4。
   youtubeRelay:
     enabled: true
@@ -623,8 +650,8 @@ pluginSettings:
       apiKey: ""
       maxTokensField: max_tokens
       maxOutputTokens: 1200   # 思考型模型的 thinking 也计入 max_tokens,小额度会被思考耗光导致正文为空
-      # 闲聊(短水群/表情反应)不思考:实测 none 比 low 快 2-6 倍且质量无差;只配这档时自动借用 chat 后端
-      reasoningEffort: none
+      # 闲聊默认 low；档位可配置，必须思考的模型不支持 none；只配此档时借用 chat 后端
+      reasoningEffort: low
     progress:
       apiUrl: ""
       model: ""

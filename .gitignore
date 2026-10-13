@@ -19,3 +19,8 @@ torrent-tool-*/
 plugins/
 data/
 .zcode/
+.mimosa/
+
+# Console frontend build products
+console/frontend/dist/
+console/frontend/.vite/

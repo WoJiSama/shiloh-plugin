@@ -1,3 +1,4 @@
+import { collectThinking, sendThinkingForward } from "../../utils/thinkingForward.js"
 // 主聊天回合:触发上下文 → 提示词分层组装 → 历史选择 → 模型调用 → 回答分发。
 // 从 apps/test.js 原样迁出(行为不变,P 重构),this 依赖以 host 注入;
 // 这是全部链路中最大的单块,迁出后 test.js 只保留入口与委托。
@@ -870,6 +871,7 @@ export async function handleToolInner(host, e) {
         // 分发模型回答(tool_calls / 文本);空消息时若走了紧凑快后端,先换主模型重试一次
         // ——思考型模型的 thinking 计入 max_tokens,快后端小额度可能被思考耗光导致正文为空
         const dispatchAssistantMessage = async target => {
+          collectThinking(session, target, e)
           if (target.tool_calls?.length) {
             await host.processToolCalls(target, e, session, session.groupUserMessages, atQq, senderRole)
           } else if (target.content) {
@@ -957,6 +959,7 @@ export async function handleToolInner(host, e) {
         host.clearSession(sessionId)
         return true
 	      } finally {
+	        await sendThinkingForward(host, e, session)
 	        outboundArbiter.settle(session.turnPlan?.outcomes || [])
 	        const traceRecord = turnTrace.finish()
 	        await host.finishConversationTask(taskContext, session)

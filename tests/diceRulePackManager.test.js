@@ -355,6 +355,39 @@ test("pending artifacts are removed after replacement and confirmation", async t
   assert.equal(fs.existsSync(runtime.manager.resolveRulePath(second.normalizedFile)), false)
 })
 
+test("stage-bound confirmation rejects reports replaced by another manager without committing its new source", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const first = await runtime.manager.stageImport(statefulRule, "web-import")
+  const other = new DiceRulePackManager({ diceManager: runtime.diceManager, cwd: runtime.cwd, logger: { warn() {}, info() {}, error() {} } })
+  const second = await other.stageImport(statefulRule.replace("name: 状态规则", "name: 新预检规则"), "web-import")
+  assert.notEqual(first.pending.stageId, second.pending.stageId)
+  const before = fs.readFileSync(runtime.manager.getIndexPath(), "utf8")
+  await assert.rejects(() => runtime.manager.confirmImport("state-pack", "web-import", { stageId: first.pending.stageId }), { status: 409 })
+  assert.equal(fs.readFileSync(runtime.manager.getIndexPath(), "utf8"), before)
+  assert.equal(runtime.manager.readIndex().packages["state-pack"], undefined)
+  assert.equal(runtime.manager.readIndex().pending["state-pack"].stageId, second.pending.stageId)
+  assert.equal(fs.existsSync(runtime.manager.resolveRulePath(second.pending.sourceFile)), true)
+  const imported = await runtime.manager.confirmImport("state-pack", "web-import", { stageId: second.pending.stageId })
+  assert.equal(imported.name, "新预检规则")
+  assert.equal(imported.version, 1)
+  await assert.rejects(() => other.confirmImport("state-pack", "web-import", { stageId: second.pending.stageId }), { status: 409 })
+})
+
+test("stage-bound confirmation validates its identifier and still verifies pending artifact hashes", async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  const staged = await runtime.manager.stageImport(statefulRule, "master")
+  for (const stageId of ["", " ", null, 123]) {
+    await assert.rejects(() => runtime.manager.confirmImport("state-pack", "master", { stageId }), { status: 400 })
+  }
+  const sourceFile = runtime.manager.resolveRulePath(staged.pending.sourceFile)
+  fs.appendFileSync(sourceFile, "\n# changed after preview\n")
+  await assert.rejects(() => runtime.manager.confirmImport("state-pack", "master", { stageId: staged.pending.stageId }), /完整性校验失败/)
+  assert.equal(runtime.manager.readIndex().pending["state-pack"].stageId, staged.pending.stageId)
+  assert.equal(runtime.manager.readIndex().packages["state-pack"], undefined)
+})
+
 test("transient fields reset on every command and never enter character storage", async t => {
   const runtime = createRuntime()
   t.after(runtime.cleanup)

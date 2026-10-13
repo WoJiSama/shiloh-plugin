@@ -55,4 +55,10 @@ installMessagePipeline({
     pluginSettings: config.getConfig("message")?.pluginSettings || {},
     emojiCollector
 });
+// 出站风控闸门:全部 bot 的消息类发送统一"内容审查+随机延迟+令牌桶",控制台"风控管理"页热配置
+const { installOutboundThrottle } = await import("./utils/messagePipeline/outboundThrottle.js");
+installOutboundThrottle({ logger: globalThis.logger });
+// 风控信号感知:被动监听 notice(机器人被禁言等);send 响应特征由闸门直接喂入
+const { installRiskSignalNoticeListener } = await import("./utils/messagePipeline/riskSignalMonitor.js");
+installRiskSignalNoticeListener(globalThis.Bot, globalThis.logger);
 export { apps };

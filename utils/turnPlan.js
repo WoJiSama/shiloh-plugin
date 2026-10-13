@@ -146,9 +146,9 @@ export function deriveTurnPlanRequest(plan = {}, config = {}) {
   const profile = plan?.execution?.modelProfile || "adaptive"
   // reasoning 档真正升 thinking 档位:effort 经 options.generation 直达请求体
   // (apiClient: generation.reasoningEffort 优先于 backend.reasoningEffort)。
-  // 配置 complexReasoningEffort 可改档(minimal/low/medium/high);置 false/none 关闭升档。
+  // 配置 complexReasoningEffort 可改档(minimal/low/medium/high/max);置 false/none 关闭升档。
   const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "high").trim().toLowerCase()
-  const escalateEffort = ["minimal", "low", "medium", "high"].includes(configuredEffort) ? configuredEffort : ""
+  const escalateEffort = ["minimal", "low", "medium", "high", "max"].includes(configuredEffort) ? configuredEffort : ""
   return {
     toolChoice: plan?.execution?.toolChoice || "none",
     requestOptions: profile === "fast"

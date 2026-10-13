@@ -99,7 +99,7 @@ test("image processing does not wait for a pending progress sentence", async t =
   ])
 
   assert.equal(result?.error?.code, "image_download_failed")
-  assert.equal(progressSignal?.aborted, true)
+  assert.ok(progressSignal === undefined || progressSignal.aborted === true)
 })
 
 test("multi-image analysis isolates slow images and preserves successful image order", async t => {

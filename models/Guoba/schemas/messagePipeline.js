@@ -68,6 +68,54 @@ export default [
     bottomHelpMessage: "超过此大小只共享 MP4，不在内存中保留 Base64",
     componentProps: { min: 0, max: 256, step: 16, placeholder: "64" }
   },
+  {
+    field: "messagePipeline.mediaSharedHostDir",
+    label: "共享媒体宿主目录",
+    component: "Input",
+    bottomHelpMessage: "NapCat 等容器可见的宿主目录；配置后视频以文件路径发送，不再以大 Base64 穿过 OneBot WebSocket。多账号自动按 /opt/napcat-<QQ>/config 探测，此项为主号/默认目录",
+    componentProps: { placeholder: "如 /opt/napcat/config/bl-chat-media，留空走 Base64" }
+  },
+  {
+    field: "messagePipeline.mediaSharedContainerDir",
+    label: "共享媒体容器内目录",
+    component: "Input",
+    bottomHelpMessage: "同一目录在 NapCat 容器内的路径，各 napcat 容器一致",
+    componentProps: { placeholder: "如 /app/napcat/config/bl-chat-media，留空走 Base64" }
+  },
+  { component: "SOFT_GROUP_BEGIN", label: "B站高清搬运授权" },
+  {
+    field: "bilibiliQualityRelay.enabled",
+    label: "启用高清搬运命令",
+    component: "Switch",
+    bottomHelpMessage: "开放 .高清搬运 命令；自动搬运始终匿名最低清晰度，不受此开关影响"
+  },
+  {
+    field: "bilibiliQualityRelay.autoUseAuthorizedForMemberOnly",
+    label: "试看内容授权复试",
+    component: "Switch",
+    bottomHelpMessage: "自动搬运匿名请求被判试看或需登录时，用 .B站授权 扫码的账号再试一次完整资源"
+  },
+  { component: "SOFT_GROUP_BEGIN", label: "管理群定时健康报告" },
+  {
+    field: "mediaRelayAdminReport.enabled",
+    label: "启用管理群健康报告",
+    component: "Switch",
+    bottomHelpMessage: "按间隔向管理群推送健康报告卡面：各号登录态与内存占用、今日收发统计、失败汇总（搬运/事件/发送任一失败都会列出）。保存后下一周期生效，无需重启"
+  },
+  {
+    field: "mediaRelayAdminReport.groupId",
+    label: "管理群号",
+    component: "Input",
+    bottomHelpMessage: "接收定时报告的群；机器人需在该群内",
+    componentProps: { placeholder: "如 953676639" }
+  },
+  {
+    field: "mediaRelayAdminReport.intervalHours",
+    label: "推送间隔小时",
+    component: "InputNumber",
+    bottomHelpMessage: "搬运投递统计窗口与推送周期相同；机器人状态与收发统计始终取当下/今日",
+    componentProps: { min: 1, max: 168, step: 1, placeholder: "24" }
+  },
   { component: "SOFT_GROUP_BEGIN", label: "YouTube 自动搬运授权" },
   {
     field: "youtubeRelay.cookieHeader",

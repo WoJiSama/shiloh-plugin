@@ -12,6 +12,7 @@ import { readUserSettings, applyFlatUpdates } from "./configWriter.js"
 import { ensureGuobaJumpLink, watchGuobaJumpLink } from "./guobaJumpLink.js"
 import { checkGuobaLoginToken } from "./guobaLoginTrust.js"
 import { buildDiceReplyPayload } from "../domains/dice/diceReplyCatalog.js"
+import { collectBotGroupNames, collectBotIdentities } from "./groupNames.js"
 import fs2 from "fs"
 import path2 from "path"
 import YAML2 from "yaml"
@@ -305,7 +306,7 @@ function showRuleImportResult(r) {
     confirmBtn.textContent = "确认导入 " + r.packId
     confirmBtn.onclick = async () => {
       try {
-        const c = await api("api/rule-confirm", { id: r.packId })
+        const c = await api("api/rule-confirm", { id: r.packId, stageId: r.stageId })
         toast("已导入：" + (c.message || (c.name ? c.name + "（" + c.id + "）" : "完成")) + "；群里发 .骰规则启用 " + r.packId + " 后生效")
         host.style.display = "none"
         await refreshDiceData()
@@ -1363,6 +1364,13 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
     logger?.warn?.(`[语义记忆页] 挂载失败: ${semanticError?.message || semanticError}`)
   }
 
+  try {
+    const { registerQzoneWebApp } = await import("./qzoneWebApp.js")
+    registerQzoneWebApp(expressApp, readOrCreateTokens(pluginRoot), logger)
+  } catch (qzoneError) {
+    logger?.warn?.(`[说说发布] 挂载失败: ${qzoneError?.message || qzoneError}`)
+  }
+
   expressApp.use(MOUNT_PATH, async (req, res, next) => {
     if (req.path === "/" || req.path === "" || req.path === "/index.html") {
       res.set("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
@@ -1373,6 +1381,14 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
     if (req.path.startsWith("/api/")) {
       if (!(await checkAnyCredential(req, token, pluginRoot))) {
         res.status(401).json({ error: "访问令牌无效" })
+        return
+      }
+      if (req.path === "/api/group-names" && req.method === "GET") {
+        res.json({ groups: collectBotGroupNames() })
+        return
+      }
+      if (req.path === "/api/identities" && req.method === "GET") {
+        res.json({ bots: collectBotIdentities(), groups: collectBotGroupNames() })
         return
       }
       if (req.path === "/api/data") {
@@ -1817,6 +1833,7 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
             ok: Boolean(staged.ok),
             kind: "rule",
             packId: staged.pending?.id || "",
+            stageId: staged.pending?.stageId || "",
             packName: staged.pack?.name || "",
             report: staged.report || staged.errors?.join("\\n") || "",
             staged: Boolean(staged.pending)
@@ -1833,12 +1850,12 @@ export async function registerCommandsWebApp(pluginRoot = process.cwd(), { logge
           const { DiceRulePackManager } = await import("../domains/dice/DiceRulePackManager.js")
           const { diceManager } = await import("../domains/dice/DiceManager.js")
           const manager = new DiceRulePackManager({ diceManager, logger })
-          const result = await manager.confirmImport(id, "web-import")
+          const result = await manager.confirmImport(id, "web-import", { stageId: req.body?.stageId })
           const message = typeof result === "string" ? result : `${result.name}（${result.id}）v${result.version}`
           logger?.info?.(`[命令管理页] 网页确认导入规则包 ${id}`)
           res.json({ ok: true, message })
         } catch (error) {
-          res.status(400).json({ error: error?.message || String(error) })
+          res.status(error?.status || 400).json({ error: error?.message || String(error) })
         }
         return
       }

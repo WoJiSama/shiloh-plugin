@@ -2,6 +2,7 @@ import fs from "fs"
 import path from "path"
 import { buildTurnTraceReport } from "../scripts/turn-trace-report.mjs"
 import { resolveTurnTraceArchiveDir } from "./turnTrace.js"
+import { readCachedGroupNames, collectBotGroupNames, mergeGroupNames } from "./groupNames.js"
 
 // 运行观测页：聚合 TurnTrace NDJSON 归档，回答"bot 今天干了什么、哪里不对劲"。
 // 挂在 /bl-chat/observe，与命令管理页共用同一份令牌。
@@ -45,14 +46,19 @@ function buildHourlyBuckets(records = []) {
   return [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-24)
 }
 
-function buildRecentTurns(records = []) {
+function groupNamesFor(pluginRoot) {
+  return Object.fromEntries(mergeGroupNames(readCachedGroupNames(pluginRoot), collectBotGroupNames()))
+}
+
+function buildRecentTurns(records = [], names = {}) {
   return records
     .filter(record => record?.turnId)
     .slice(-20)
     .reverse()
     .map(record => ({
       at: String(record.at || "").slice(11, 19),
-      group: String(record.groupId || "").slice(-6),
+      group: String(record.groupId || ""),
+      groupName: names[String(record.groupId || "")] || "",
       intent: record.intent ? `${record.intent.kind}${record.intent.source === "fast_path_skip" ? "(快路)" : ""}` : "-",
       trigger: record.trigger?.mode || "-",
       tools: (record.tools || []).map(tool => `${tool.name}${tool.ok === false ? "✗" : ""}`).join(",") || "-",
@@ -79,11 +85,7 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
       let initialData = "{}"
       try {
         const records = readRecentTraceRecords(7, pluginRoot).filter(r => r && r.turnId)
-        const groupNameMap = {}
-        try {
-          const cachePath = path.join(String(pluginRoot || ""), "data", "group_names.json")
-          if (fs.existsSync(cachePath)) Object.assign(groupNameMap, JSON.parse(fs.readFileSync(cachePath, "utf8")))
-        } catch {}
+        const groupNameMap = groupNamesFor(pluginRoot)
         const groupMap = new Map()
         for (const r of records) {
           const gid = String(r.groupId || "")
@@ -98,7 +100,7 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
           groups: [...groupMap.values()].sort((a, b) => b.turns - a.turns).slice(0, 10).map(g => ({
             groupId: g.groupId, groupName: groupNameMap[g.groupId] || "", turns: g.turns, users: g.users.size
           }))
-        })
+        }).replace(/</g, "\\u003c")
       } catch {}
       const html = buildPageHtml(observeToken).replace(
         '<div id="app"></div>',
@@ -193,14 +195,7 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
         const sortedMs = [...msValues].sort((a, b) => a - b)
         const pct = (list, p) => list.length ? list[Math.min(list.length - 1, Math.max(0, Math.ceil((p / 100) * list.length) - 1))] : 0
 
-        // 群名映射:读消息处理时缓存的 group_names.json
-        const groupNameMap = {}
-        try {
-          const cachePath = path.join(String(pluginRoot || ""), "data", "group_names.json")
-          if (fs.existsSync(cachePath)) {
-            Object.assign(groupNameMap, JSON.parse(fs.readFileSync(cachePath, "utf8")))
-          }
-        } catch {}
+        const groupNameMap = groupNamesFor(pluginRoot)
 
         res.json({
           summary: {
@@ -234,7 +229,7 @@ export function registerObserveWebApp(expressApp, pluginRoot, tokens = {}, logge
           failureStages: [...failureStageCounts.entries()].sort((a, b) => b[1] - a[1]),
           topErrors: [...errorCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6),
           hourly: buildHourlyBuckets(records),
-          recentTurns: buildRecentTurns(records),
+          recentTurns: buildRecentTurns(records, groupNameMap),
           generatedAt: new Date().toISOString()
         })
       } catch (error) {
@@ -328,7 +323,7 @@ function render(d) {
 
   const dailyRows = (d.daily || []).map(day => "<tr><td>" + day.date.slice(5) + "</td><td>" + bar(day.turns, Math.max(1, ...d.daily.map(x => x.turns))) + "</td><td>" + day.outbound + "</td><td>" + day.emoji + "</td><td>" + (day.failures || 0) + "</td><td>" + (day.avgMs || 0) + "ms</td></tr>").join("") || emptyRow(6)
 
-  const groupRows = (d.groups || []).map(g => "<tr><td>" + (g.groupName || "…"+g.groupId.slice(-4)) + "<div style='font-size:11px;color:#8a93a5'>" + g.groupId + "</div></td><td>" + bar(g.turns, Math.max(1, ...d.groups.map(x => x.turns))) + "</td><td>" + g.users + "</td><td>" + g.emoji + "</td><td>" + g.outbound + "</td></tr>").join("") || emptyRow(5)
+  const groupRows = (d.groups || []).map(g => "<tr><td>" + escapeHtml(g.groupName || "群名未获取") + "<div style='font-size:11px;color:#8a93a5'>" + escapeHtml(g.groupId) + "</div></td><td>" + bar(g.turns, Math.max(1, ...d.groups.map(x => x.turns))) + "</td><td>" + g.users + "</td><td>" + g.emoji + "</td><td>" + g.outbound + "</td></tr>").join("") || emptyRow(5)
 
   const intentRows = (d.intents || []).map(kv => distRow(kv[0], kv[1], s.turns)).join("") || emptyRow(3)
   const triggerRows = (d.triggers || []).map(kv => distRow(kv[0], kv[1], s.turns)).join("") || emptyRow(3)
@@ -346,8 +341,8 @@ function render(d) {
   const groupNameLookup = {}
   for (const g of d.groups || []) groupNameLookup[g.groupId] = g.groupName || ""
   const recent = (d.recentTurns || []).map(t => {
-    const gName = groupNameLookup[t.group] || t.group
-    return "<tr><td>" + t.at + "</td><td>" + (gName.length > 8 ? gName.slice(0,8)+"…" : gName) + "</td><td>" + t.intent + "</td><td>" + t.trigger + "</td><td>" + escapeHtml(t.tools) + "</td><td>" + t.outbound + "</td><td>" + t.totalMs + "ms</td></tr>"
+    const gName = t.groupName || groupNameLookup[t.group] || "群名未获取"
+    return "<tr><td>" + t.at + "</td><td>" + escapeHtml(gName) + "<div style='font-size:11px;color:#8a93a5'>" + escapeHtml(t.group) + "</div>" + "</td><td>" + t.intent + "</td><td>" + t.trigger + "</td><td>" + escapeHtml(t.tools) + "</td><td>" + t.outbound + "</td><td>" + t.totalMs + "ms</td></tr>"
   }).join("") || emptyRow(7)
 
   $("app").innerHTML =

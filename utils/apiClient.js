@@ -183,7 +183,10 @@ export async function YTapi(requestData, config, toolContent, toolName, options 
                     if (response.ok) return processResponse(await response.json())
                     errorText = await response.text().catch(() => '无法读取错误内容')
                 }
-                const failure = `API 请求失败：${response.status} ${response.statusText} - ${errorText}`;
+                const backend = selectedTextBackend;
+                let host = "未知渠道";
+                try { host = new URL(backend?.apiUrl || url).hostname; } catch {}
+                const failure = `【渠道=${host}；模型=${backend?.model || finalRequestData?.model || "未知"}】API 请求失败：${response.status} ${response.statusText} - ${errorText}`;
                 logger.error(failure);
                 const fallback = await fallbackFromTextBackend(
                     requestData,

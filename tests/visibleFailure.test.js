@@ -34,3 +34,7 @@ test("localizes statusless upstream overload responses", () => {
   const detail = buildVisibleFailureDetail("Our servers are currently overloaded. Please try again later.")
   assert.equal(detail, "上游服务当前负载过高，请稍后重试")
 })
+
+test('failure retains safe model and channel identity',()=>{
+ assert.match(buildVisibleFailureDetail('【渠道=open.bigmodel.cn；模型=glm-5.3-flash】API 请求失败：429 Too Many Requests - {"error":{"message":"余额不足"}}'),/渠道=open.bigmodel.cn；模型=glm-5.3-flash.*429/)
+})

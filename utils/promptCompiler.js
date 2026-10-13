@@ -98,9 +98,23 @@ function shouldUseRecentContext({ prompt = "", recentContext = "", hasContextual
   return Boolean(hasContextualReference) || VAGUE_REFERENCE_RE.test(prompt)
 }
 
+export function cleanImageGenerationAddress(text = "", botNames = []) {
+  const names = [...new Set(botNames.filter(name => typeof name === "string" && name.trim()).map(name => name.trim()))].sort((a, b) => b.length - a.length)
+  if (!names.length) return text
+  const escaped = names.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+  // Strip only an address immediately followed by an explicit drawing request.
+  // Names used as subjects or requested lettering elsewhere stay untouched.
+  const pattern = new RegExp(`^\\s*@?(?:${escaped})[，,：:！!、\\s]*(?:(?:请|麻烦|帮我|给我|替我|帮忙|能不能|可以)\\s*)*(?:画|绘制|生成)(?:(?:一)?(?:张|幅|只|个))?\\s*(.+)$`)
+  return String(text).split("\n").map(line => {
+    const match = line.match(pattern)
+    return match ? match[1].trim() : line
+  }).join("\n")
+}
+
 export function compileImagePrompt(options = {}) {
   const task = inferTask(options.task, options.userPrompt || options.prompt || "")
-  const prompt = compact(options.userPrompt || options.prompt || "", 2400)
+  const rawPrompt = options.userPrompt || options.prompt || ""
+  const prompt = compact(task === "image_generation" ? cleanImageGenerationAddress(rawPrompt, options.botNames || []) : rawPrompt, 2400)
   if (prompt.includes(COMPILED_PROMPT_MARKER)) {
     return compact(prompt, task === "image_edit" ? 4800 : 4400)
   }
@@ -121,6 +135,7 @@ export function compileImagePrompt(options = {}) {
     quotedContext ? `用户引用的原文：\n${quotedContext}` : "",
     recentContext ? `用户明确指代时可参考的近期原文：\n${recentContext}` : "",
     hasReferenceImages ? "请求中附有参考图片；图片用途和顺序以素材清单为准。" : "",
+    "机器人称呼和绘图请求用语不是画面内容，不要把它们画成标签、签名或题字。用户未明确要求文字时不要额外添加文字；明确要求的文字、名字和对话须保留。",
     "不要自动补充质量词、风格词、构图词、情绪词或安全化措辞；只按上述用户原话和明确上下文执行。"
   ].filter(Boolean)
 

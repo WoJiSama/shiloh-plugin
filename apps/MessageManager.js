@@ -1,3 +1,4 @@
+import { sendForwardBatches } from "../utils/forwardBatches.js"
 import { MessageManager } from '../utils/MessageManager.js'
 import { messageArchiveManager } from '../utils/MessageArchiveManager.js'
 import { getBase64Image } from '../utils/fileUtils.js'
@@ -307,14 +308,14 @@ export class MessageRecordPlugin extends plugin {
             if (keywordMatch) opts.keyword = keywordMatch[1].trim();
         }
         opts.contextAround = Math.min(50, Math.max(0, Number(opts.contextAround) || 0));
-        opts.around = Math.min(50, Math.max(0, Number(opts.around) || 0));
+        opts.around = Math.min(1000, Math.max(0, Number(opts.around) || 0));
         if (opts.qq && opts.around && !opts.contextAround) {
             opts.limit = opts.limit === 30 ? opts.around : opts.limit;
             opts.around = 0;
         }
         if (opts.contextAround) opts.around = opts.contextAround;
-        opts.limit = Math.min(100, Math.max(1, Number(opts.limit) || 30));
-        if (!opts.qq && !opts.keyword && !opts.regex && !opts.messageId) {
+        opts.limit = Math.min(1000, Math.max(1, Number(opts.limit) || 30));
+        if (!/(?:数量|条数|limit)[=:：]?\s*\d+/.test(text) && !opts.qq && !opts.keyword && !opts.regex && !opts.messageId) {
             opts.limit = Math.min(opts.limit, 20);
         }
         return opts;
@@ -325,6 +326,7 @@ export class MessageRecordPlugin extends plugin {
         return [
             "用法：.群聊天记录 " + groupHint + " [QQ=123456] [key=关键词] [前后=10] [数量=30]",
             "字段：群=群号，QQ=用户QQ，key/关键词=搜索词，前后=最近条数，上下文=带出前后聊天，数量=最多返回条数",
+            "数量最多 1000 条，每份转发最多 100 个节点，超过会自动分份发送",
             "管理：.群聊天记录 管理员添加 QQ号 / .群聊天记录 管理员删除 QQ号"
         ].join("\n");
     }
@@ -507,10 +509,13 @@ export class MessageRecordPlugin extends plugin {
             const context = await this.buildArchiveRenderContext(records, opts.groupId, e.group);
             const { messages: forwardMsgs, tempFiles } = await this.buildArchiveForwardMessages(records, e.group, context);
             try {
-                const summary = e.group?.makeForwardMsg
-                    ? await e.group.makeForwardMsg(forwardMsgs)
-                    : forwardMsgs.map(item => Array.isArray(item.message) ? item.message.filter(part => typeof part === 'string').join('') : item.message).join("\n\n");
-                await e.reply(summary);
+                await sendForwardBatches(forwardMsgs, {
+                    makeForward: batch => e.group?.makeForwardMsg
+                        ? e.group.makeForwardMsg(batch)
+                        : batch.map(item => Array.isArray(item.message) ? item.message.filter(part => typeof part === 'string').join('') : item.message).join("\n\n"),
+                    send: payload => e.reply(payload),
+                    onProgress: (sent, total) => logger.info(`[MessageArchive] 分批发送 group=${opts.groupId} batch=${sent}/${total}`)
+                });
             } finally {
                 await cleanupBilibiliArchiveRelayFiles(tempFiles);
             }

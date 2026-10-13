@@ -1,3 +1,4 @@
+import { collectThinking } from "../../utils/thinkingForward.js"
 // 工具执行循环:消息规范化/终态判定/后台终态/图片核验接力/单次调用/
 // 多轮循环/最终执行。从 apps/test.js 原样迁出(P2),行为不变;
 // this 依赖以 host(插件实例)注入。
@@ -666,6 +667,7 @@ export async function processToolCalls(host, message, e, session, groupUserMessa
                 generation: { temperature: 0, maxOutputTokens: 1200 }
               }
             )
+            collectThinking(session, compactResponse?.choices?.[0]?.message, e)
             const compactContent = compactResponse?.choices?.[0]?.message?.content
             const translated = parseModrinthTranslationResponse(compactContent, missing.map(item => item.projectId))
             if (!translated) {
@@ -699,6 +701,7 @@ export async function processToolCalls(host, message, e, session, groupUserMessa
         const finalRequest = buildChatRequestData(host.config, currentMessages, [], "none")
         const finalStartedAt = Date.now()
         const finalResponse = await host.retryRequest(finalRequest, session.toolContent, 1, session.toolName)
+        collectThinking(session, finalResponse?.choices?.[0]?.message, e)
         session?.turnTrace?.addModelCall("final", Date.now() - finalStartedAt)
         const finalContent = finalResponse?.choices?.[0]?.message?.content
         if (finalContent) {
@@ -719,6 +722,7 @@ export async function processToolCalls(host, message, e, session, groupUserMessa
 	      const nextRequest = buildChatRequestData(host.config, currentMessages, session.tools, "auto")
 	      const nextResponse = await host.retryRequest(nextRequest, session.toolContent, 1, session.toolName)
 	      const nextMessage = nextResponse?.choices?.[0]?.message
+        collectThinking(session, nextMessage, e)
 	      if (!nextMessage) {
 	        logger.warn(`[回复失败] group=${e?.group_id || ""} user=${e?.user_id || ""} stage=tool_round_summary tool=${session.toolName || ""} error=${nextResponse?.error ? JSON.stringify(nextResponse.error).slice(0, 240) : "no_choices"}`)
 	        break
@@ -746,6 +750,7 @@ export async function processToolCalls(host, message, e, session, groupUserMessa
     const finalRequest = buildChatRequestData(host.config, currentMessages, [], "none")
     const finalStartedAt = Date.now()
     const finalResponse = await host.retryRequest(finalRequest, session.toolContent, 1, session.toolName)
+    collectThinking(session, finalResponse?.choices?.[0]?.message, e)
     session?.turnTrace?.addModelCall("final", Date.now() - finalStartedAt)
 
 	    if (finalResponse?.choices?.[0]?.message?.content) {

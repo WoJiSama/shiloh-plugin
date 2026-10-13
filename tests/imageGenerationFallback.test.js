@@ -584,3 +584,12 @@ test('detects response_format compatibility errors', () => {
   assert.equal(shouldRetryWithoutUrlResponseFormat('service unavailable'), false)
   assert.equal(isImageToolContractError("Tool choice 'image_generation' not found in 'tools' parameter."), true)
 })
+
+test('invalid output can fall back before being sent in generation and edit',async()=>{
+ for(const edit of [false,true]) {
+  const configs=[{model:'bad',apiKey:'k'},{model:'good',apiKey:'k'}];const validated=[]
+  const adapter={request:async config=>config.model,parseResponse:async image=>({ok:true,image}),validateImage:async(image,config)=>{validated.push(config.model);if(image==='bad')throw new Error('wrong ratio');return image}}
+  const result=edit?await generateImageEditWithFallbacks(configs,'prompt',[],adapter):await generateImageWithFallbacks(configs,'prompt',adapter)
+  assert.equal(result,'good');assert.deepEqual(validated,['bad','good'])
+ }
+})
