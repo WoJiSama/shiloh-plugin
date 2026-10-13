@@ -1,0 +1,75 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import { createHash } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
+
+const defaultRoot = fileURLToPath(new URL('../', import.meta.url))
+let defaultCheck
+
+async function exists(file) {
+  try { await fs.access(file); return true }
+  catch (error) { if (error.code === 'ENOENT') return false; throw error }
+}
+
+async function checkedFile(root, relative) {
+  if (typeof relative !== 'string' || !relative || path.isAbsolute(relative) || relative.includes('\\') || relative.split('/').some(part => !part || part === '.' || part === '..')) throw new Error(`Unsafe artifact path: ${relative}`)
+  let current = root
+  for (const part of relative.split('/')) {
+    current = path.join(current, part)
+    if ((await fs.lstat(current)).isSymbolicLink()) throw new Error(`Artifact symlink is not allowed: ${relative}`)
+  }
+  if (!(await fs.stat(current)).isFile()) throw new Error(`Artifact is not a regular file: ${relative}`)
+  return current
+}
+
+async function sourceFiles(root, relative = 'src') {
+  const directory = path.join(root, relative)
+  if ((await fs.lstat(directory)).isSymbolicLink()) throw new Error(`Artifact symlink is not allowed: ${relative}`)
+  const files = []
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const name = `${relative}/${entry.name}`
+    if (entry.isSymbolicLink()) throw new Error(`Artifact symlink is not allowed: ${name}`)
+    if (entry.isDirectory()) files.push(...await sourceFiles(root, name))
+    else if (entry.isFile()) files.push(name)
+  }
+  return files.sort()
+}
+
+async function validateHashes(root, hashes, label) {
+  if (!hashes || typeof hashes !== 'object' || Array.isArray(hashes) || !Object.keys(hashes).length) throw new Error(`Invalid ${label} hashes`)
+  for (const [relative, expected] of Object.entries(hashes)) {
+    const file = await checkedFile(root, relative)
+    const actual = createHash('sha256').update(await fs.readFile(file)).digest('hex')
+    if (actual !== expected) throw new Error(`${label} differs from build manifest: ${relative}`)
+  }
+}
+
+async function verify(root) {
+  try {
+    const backendRoot = path.join(root, 'dist/backend')
+    const manifestFile = await checkedFile(root, 'dist/backend/manifest.json')
+    const manifest = JSON.parse(await fs.readFile(manifestFile, 'utf8'))
+    if (manifest.schema !== 1) throw new Error('Unsupported backend manifest')
+    await validateHashes(backendRoot, manifest.files, 'Backend output')
+    if (await exists(path.join(root, 'src'))) {
+      await validateHashes(root, manifest.sources, 'Backend source')
+      const recordedSources = Object.keys(manifest.sources).filter(name => name.startsWith('src/')).sort()
+      if (JSON.stringify(await sourceFiles(root)) !== JSON.stringify(recordedSources)) throw new Error('Backend source file set differs from build manifest')
+    } else {
+      const releaseFile = await checkedFile(root, 'release-manifest.json')
+      const release = JSON.parse(await fs.readFile(releaseFile, 'utf8'))
+      if (release.schema !== 1 || typeof release.commit !== 'string' || !/^[a-f0-9]{40}$/.test(release.commit)) throw new Error('Invalid release manifest')
+      if (!release.files?.['dist/backend/manifest.json']) throw new Error('Release manifest must include backend manifest')
+      await validateHashes(root, release.files, 'Release runtime')
+    }
+  } catch (error) {
+    throw new Error(`Backend artifacts are missing or stale. Run npm run backend:build in the source checkout or install a verified release. ${error.message}`, { cause: error })
+  }
+}
+
+/** Explicit roots are checked afresh; the normal runtime startup shares one successful check. */
+export function ensureBackendArtifacts(root) {
+  if (root !== undefined) return verify(path.resolve(root))
+  if (!defaultCheck) defaultCheck = verify(defaultRoot).catch(error => { defaultCheck = undefined; throw error })
+  return defaultCheck
+}

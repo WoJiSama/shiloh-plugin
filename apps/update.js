@@ -1,4 +1,4 @@
-import { update as Update } from "../../other/update.js"
+import { explainCompiledPluginUpdate } from "../utils/pluginUpdateBuild.js"
 
 export class BlChatUpdate extends plugin {
   constructor() {
@@ -14,10 +14,6 @@ export class BlChatUpdate extends plugin {
   }
 
   async update(e = this.e) {
-    e.isMaster = true
-    e.msg = `#${e.msg.includes("强制") ? "强制" : ""}更新shiloh-plugin`
-    const up = new Update(e)
-    up.e = e
-    return up.update()
+    return explainCompiledPluginUpdate(e)
   }
 }

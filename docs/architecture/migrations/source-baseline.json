@@ -1,0 +1,4879 @@
+{
+  "metricVersion": 1,
+  "commit": "a93265cd94e2307504dad11d26351cf954cfc071",
+  "method": "TypeScript scanner non-comment token lines; Vue script blocks only; fixed Git source inventory including JS/MJS/CJS/TS/Vue",
+  "files": [
+    {
+      "path": "apps/CommandHelp.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 70,
+      "bytes": 2726
+    },
+    {
+      "path": "apps/MessageManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 733,
+      "bytes": 31953
+    },
+    {
+      "path": "apps/SemanticMemory.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 194,
+      "bytes": 9636
+    },
+    {
+      "path": "apps/ThinkingForward.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 530
+    },
+    {
+      "path": "apps/lib/adminCommands.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 316,
+      "bytes": 13551
+    },
+    {
+      "path": "apps/lib/avatarReference.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 223,
+      "bytes": 11276
+    },
+    {
+      "path": "apps/lib/chatTurn.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 971,
+      "bytes": 56659
+    },
+    {
+      "path": "apps/lib/conversationUtils.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 65,
+      "bytes": 3504
+    },
+    {
+      "path": "apps/lib/messageFormatting.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 190,
+      "bytes": 8717
+    },
+    {
+      "path": "apps/lib/messageSegments.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 96,
+      "bytes": 3552
+    },
+    {
+      "path": "apps/lib/privateChat.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 37,
+      "bytes": 2287
+    },
+    {
+      "path": "apps/lib/promptContext.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 379,
+      "bytes": 20164
+    },
+    {
+      "path": "apps/lib/replyRendering.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 425,
+      "bytes": 18002
+    },
+    {
+      "path": "apps/lib/semanticToolIntent.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 418,
+      "bytes": 23675
+    },
+    {
+      "path": "apps/lib/smartConversation.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 308,
+      "bytes": 17407
+    },
+    {
+      "path": "apps/lib/smartDynamics.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 118,
+      "bytes": 5921
+    },
+    {
+      "path": "apps/lib/splitState.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 430
+    },
+    {
+      "path": "apps/lib/strictConversation.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 489,
+      "bytes": 20674
+    },
+    {
+      "path": "apps/lib/taskStatus.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 230,
+      "bytes": 8856
+    },
+    {
+      "path": "apps/lib/teachingFacts.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 272,
+      "bytes": 11164
+    },
+    {
+      "path": "apps/lib/textPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 88,
+      "bytes": 5298
+    },
+    {
+      "path": "apps/lib/timingGate.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 201,
+      "bytes": 12404
+    },
+    {
+      "path": "apps/lib/toolExecution.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 778,
+      "bytes": 39023
+    },
+    {
+      "path": "apps/obsLogQuery.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 1317
+    },
+    {
+      "path": "apps/qqinfo1.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 60,
+      "bytes": 3121
+    },
+    {
+      "path": "apps/test.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 3140,
+      "bytes": 135173
+    },
+    {
+      "path": "apps/update.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 682
+    },
+    {
+      "path": "console/frontend/src/App.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 71,
+      "bytes": 3047
+    },
+    {
+      "path": "console/frontend/src/components/AccountCard.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 28,
+      "bytes": 7022
+    },
+    {
+      "path": "console/frontend/src/components/AppShell.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 142,
+      "bytes": 9697
+    },
+    {
+      "path": "console/frontend/src/components/DiceAssets.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 335,
+      "bytes": 22848
+    },
+    {
+      "path": "console/frontend/src/components/DiceSettings.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 125,
+      "bytes": 11579
+    },
+    {
+      "path": "console/frontend/src/components/EmojiManager.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 161,
+      "bytes": 13747
+    },
+    {
+      "path": "console/frontend/src/components/IdentityLabel.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 4,
+      "bytes": 933
+    },
+    {
+      "path": "console/frontend/src/components/PageHeader.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 1,
+      "bytes": 437
+    },
+    {
+      "path": "console/frontend/src/components/PageState.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 3,
+      "bytes": 809
+    },
+    {
+      "path": "console/frontend/src/components/QzoneComposer.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 103,
+      "bytes": 7377
+    },
+    {
+      "path": "console/frontend/src/components/SaveBar.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 4,
+      "bytes": 1082
+    },
+    {
+      "path": "console/frontend/src/components/SchemaField.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 79,
+      "bytes": 9847
+    },
+    {
+      "path": "console/frontend/src/composables/useUnsavedGuard.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 52,
+      "bytes": 1628
+    },
+    {
+      "path": "console/frontend/src/env.d.ts",
+      "category": "type-declaration",
+      "language": "ts",
+      "codeLines": 1,
+      "bytes": 66
+    },
+    {
+      "path": "console/frontend/src/lib/api.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 70,
+      "bytes": 2657
+    },
+    {
+      "path": "console/frontend/src/lib/api.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 84,
+      "bytes": 2989
+    },
+    {
+      "path": "console/frontend/src/lib/clientId.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 19,
+      "bytes": 667
+    },
+    {
+      "path": "console/frontend/src/lib/clientId.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 9,
+      "bytes": 548
+    },
+    {
+      "path": "console/frontend/src/lib/commands.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 25,
+      "bytes": 924
+    },
+    {
+      "path": "console/frontend/src/lib/commands.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 79,
+      "bytes": 2263
+    },
+    {
+      "path": "console/frontend/src/lib/diceAssets.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 111,
+      "bytes": 3870
+    },
+    {
+      "path": "console/frontend/src/lib/drawPage.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 114,
+      "bytes": 4231
+    },
+    {
+      "path": "console/frontend/src/lib/identities.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 42,
+      "bytes": 1950
+    },
+    {
+      "path": "console/frontend/src/lib/identities.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 47,
+      "bytes": 1957
+    },
+    {
+      "path": "console/frontend/src/lib/imageRequest.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 17,
+      "bytes": 659
+    },
+    {
+      "path": "console/frontend/src/lib/imageRequest.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 8,
+      "bytes": 426
+    },
+    {
+      "path": "console/frontend/src/lib/navigation.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 52,
+      "bytes": 1659
+    },
+    {
+      "path": "console/frontend/src/lib/operations.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 125,
+      "bytes": 4698
+    },
+    {
+      "path": "console/frontend/src/lib/operations.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 197,
+      "bytes": 6616
+    },
+    {
+      "path": "console/frontend/src/lib/schemaAi.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 117,
+      "bytes": 4256
+    },
+    {
+      "path": "console/frontend/src/lib/schemaKeyboard.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 22,
+      "bytes": 654
+    },
+    {
+      "path": "console/frontend/src/lib/schemaPages.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 344,
+      "bytes": 12930
+    },
+    {
+      "path": "console/frontend/src/lib/schemaState.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 147,
+      "bytes": 5871
+    },
+    {
+      "path": "console/frontend/src/lib/schemaState.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 128,
+      "bytes": 4258
+    },
+    {
+      "path": "console/frontend/src/lib/semanticPage.test.ts",
+      "category": "tests",
+      "language": "ts",
+      "codeLines": 119,
+      "bytes": 4972
+    },
+    {
+      "path": "console/frontend/src/main.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 5,
+      "bytes": 156
+    },
+    {
+      "path": "console/frontend/src/pages/AiPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 337,
+      "bytes": 25562
+    },
+    {
+      "path": "console/frontend/src/pages/AuthPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 38,
+      "bytes": 3172
+    },
+    {
+      "path": "console/frontend/src/pages/BotDetailPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 101,
+      "bytes": 12052
+    },
+    {
+      "path": "console/frontend/src/pages/BotsPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 138,
+      "bytes": 21119
+    },
+    {
+      "path": "console/frontend/src/pages/CommandsPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 181,
+      "bytes": 17047
+    },
+    {
+      "path": "console/frontend/src/pages/DrawPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 251,
+      "bytes": 19167
+    },
+    {
+      "path": "console/frontend/src/pages/EmbeddedPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 17,
+      "bytes": 1676
+    },
+    {
+      "path": "console/frontend/src/pages/GroupsPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 145,
+      "bytes": 11799
+    },
+    {
+      "path": "console/frontend/src/pages/ObservePage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 121,
+      "bytes": 18877
+    },
+    {
+      "path": "console/frontend/src/pages/PersonaPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 436,
+      "bytes": 33935
+    },
+    {
+      "path": "console/frontend/src/pages/PipelinePage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 63,
+      "bytes": 7353
+    },
+    {
+      "path": "console/frontend/src/pages/SchemaPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 303,
+      "bytes": 15852
+    },
+    {
+      "path": "console/frontend/src/pages/SemanticPage.vue",
+      "category": "frontend",
+      "language": "vue-script",
+      "codeLines": 219,
+      "bytes": 16514
+    },
+    {
+      "path": "console/frontend/src/router.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 40,
+      "bytes": 1622
+    },
+    {
+      "path": "console/frontend/vite.config.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 23,
+      "bytes": 739
+    },
+    {
+      "path": "console/frontend/vitest.config.ts",
+      "category": "frontend",
+      "language": "ts",
+      "codeLines": 11,
+      "bytes": 260
+    },
+    {
+      "path": "console/lib/frontendStatic.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 44,
+      "bytes": 2328
+    },
+    {
+      "path": "console/lib/pipelineJobs.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 67,
+      "bytes": 4085
+    },
+    {
+      "path": "console/lib/providerCredentials.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 65,
+      "bytes": 3708
+    },
+    {
+      "path": "console/lib/redisClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 96,
+      "bytes": 3512
+    },
+    {
+      "path": "console/lib/schemaConfig.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 195,
+      "bytes": 11436
+    },
+    {
+      "path": "console/server.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1779,
+      "bytes": 83593
+    },
+    {
+      "path": "core/intent/messageIntent.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 383,
+      "bytes": 22561
+    },
+    {
+      "path": "core/intent/modelIntentClassifier.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 99,
+      "bytes": 5034
+    },
+    {
+      "path": "core/runtime/groupRuntime.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 135,
+      "bytes": 6257
+    },
+    {
+      "path": "core/runtime/sharedRuntime.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 611
+    },
+    {
+      "path": "dependence/dependencies.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 57,
+      "bytes": 1466
+    },
+    {
+      "path": "docs/dice-rules/examples/bishou-zhixin.cjs",
+      "category": "examples",
+      "language": "js",
+      "codeLines": 50,
+      "bytes": 2559
+    },
+    {
+      "path": "docs/dice-rules/examples/daggerheart-seal-ext.js",
+      "category": "examples",
+      "language": "js",
+      "codeLines": 2716,
+      "bytes": 97009
+    },
+    {
+      "path": "domains/dice/DeckManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 227,
+      "bytes": 9331
+    },
+    {
+      "path": "domains/dice/DiceManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 2879,
+      "bytes": 133525
+    },
+    {
+      "path": "domains/dice/DiceRuleExpression.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 441,
+      "bytes": 22106
+    },
+    {
+      "path": "domains/dice/DiceRulePackManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 3292,
+      "bytes": 179306
+    },
+    {
+      "path": "domains/dice/DiceRuleSchema.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 946,
+      "bytes": 58527
+    },
+    {
+      "path": "domains/dice/DiceRuleSession.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 185,
+      "bytes": 7243
+    },
+    {
+      "path": "domains/dice/SealExtRuntime.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 646,
+      "bytes": 28072
+    },
+    {
+      "path": "domains/dice/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 819,
+      "bytes": 36374
+    },
+    {
+      "path": "domains/dice/diceCommandGateway.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 90,
+      "bytes": 4700
+    },
+    {
+      "path": "domains/dice/diceCommandPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 111,
+      "bytes": 6571
+    },
+    {
+      "path": "domains/dice/diceReplyCatalog.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 301,
+      "bytes": 12097
+    },
+    {
+      "path": "domains/dice/logRecorder.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 533
+    },
+    {
+      "path": "domains/dice/sealCocDefaults.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 115,
+      "bytes": 2277
+    },
+    {
+      "path": "domains/dice/sealSkillAliases.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 819,
+      "bytes": 25953
+    },
+    {
+      "path": "domains/emoji/EmojiPackManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1301,
+      "bytes": 54283
+    },
+    {
+      "path": "domains/emoji/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 395,
+      "bytes": 18000
+    },
+    {
+      "path": "domains/emoji/emojiSelection.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 97,
+      "bytes": 4025
+    },
+    {
+      "path": "domains/games/deltaforce/DeltaForceClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 965,
+      "bytes": 39739
+    },
+    {
+      "path": "domains/games/deltaforce/DeltaForceObjectCache.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 152,
+      "bytes": 5314
+    },
+    {
+      "path": "domains/games/deltaforce/DeltaForceReportRenderer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 148,
+      "bytes": 5867
+    },
+    {
+      "path": "domains/games/deltaforce/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 284,
+      "bytes": 10269
+    },
+    {
+      "path": "domains/games/deltaforce/model/DeltaForceReport.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 500
+    },
+    {
+      "path": "domains/games/uma/UmaRaceManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 3810,
+      "bytes": 157967
+    },
+    {
+      "path": "domains/games/uma/UmaRaceReportRenderer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 108,
+      "bytes": 4544
+    },
+    {
+      "path": "domains/games/uma/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 110,
+      "bytes": 4517
+    },
+    {
+      "path": "domains/games/uma/model/UmaRaceReport.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 491
+    },
+    {
+      "path": "domains/group-admin/GroupGuardManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 279,
+      "bytes": 8944
+    },
+    {
+      "path": "domains/group-admin/GroupModerationManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 460,
+      "bytes": 17818
+    },
+    {
+      "path": "domains/group-admin/GroupNoticeManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 176,
+      "bytes": 6036
+    },
+    {
+      "path": "domains/group-admin/adCorpusStore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 147,
+      "bytes": 5015
+    },
+    {
+      "path": "domains/group-admin/groupGuardQuestion.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 1635
+    },
+    {
+      "path": "domains/group-admin/groupModerationRules.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 286,
+      "bytes": 12844
+    },
+    {
+      "path": "domains/group-admin/guardDecrease.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 501
+    },
+    {
+      "path": "domains/group-admin/guardIncrease.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 510
+    },
+    {
+      "path": "domains/group-admin/guardMessage.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 487
+    },
+    {
+      "path": "domains/group-admin/moderationMessage.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 148,
+      "bytes": 5636
+    },
+    {
+      "path": "domains/group-admin/noticeDecrease.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 502
+    },
+    {
+      "path": "domains/group-admin/noticeIncrease.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 508
+    },
+    {
+      "path": "domains/knowledge/KnowledgeExpander.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 161,
+      "bytes": 4799
+    },
+    {
+      "path": "domains/knowledge/KnowledgeSearcher.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 208,
+      "bytes": 5763
+    },
+    {
+      "path": "domains/knowledge/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 240,
+      "bytes": 8198
+    },
+    {
+      "path": "domains/media/bilibili/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 256,
+      "bytes": 11959
+    },
+    {
+      "path": "domains/media/magnetsearch/MagnetSearchClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 405,
+      "bytes": 15154
+    },
+    {
+      "path": "domains/media/magnetsearch/MagnetSearchReportRenderer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 50,
+      "bytes": 1743
+    },
+    {
+      "path": "domains/media/magnetsearch/app.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 79,
+      "bytes": 2644
+    },
+    {
+      "path": "domains/media/magnetsearch/model/MagnetSearchReport.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 506
+    },
+    {
+      "path": "domains/memory/EmotionManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 223,
+      "bytes": 6735
+    },
+    {
+      "path": "domains/memory/ExpressionLearner.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 446,
+      "bytes": 20354
+    },
+    {
+      "path": "domains/memory/GlobalStyleLearnerManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1755,
+      "bytes": 77095
+    },
+    {
+      "path": "domains/memory/MemoryManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1247,
+      "bytes": 63118
+    },
+    {
+      "path": "domains/memory/PersonProfileInjector.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 141,
+      "bytes": 5408
+    },
+    {
+      "path": "domains/memory/PersonaFeedbackManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 356,
+      "bytes": 15939
+    },
+    {
+      "path": "domains/memory/commandsApp.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 524,
+      "bytes": 21500
+    },
+    {
+      "path": "domains/memory/engine/aliasRegistry.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 56,
+      "bytes": 2633
+    },
+    {
+      "path": "domains/memory/engine/boundary.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 1170
+    },
+    {
+      "path": "domains/memory/engine/conflictResolver.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 19,
+      "bytes": 1077
+    },
+    {
+      "path": "domains/memory/engine/constants.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 1292
+    },
+    {
+      "path": "domains/memory/engine/embeddings.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 98,
+      "bytes": 3375
+    },
+    {
+      "path": "domains/memory/engine/entityModel.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 65,
+      "bytes": 2680
+    },
+    {
+      "path": "domains/memory/engine/extractor.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 133,
+      "bytes": 7115
+    },
+    {
+      "path": "domains/memory/engine/groupKnowledge.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 273,
+      "bytes": 11931
+    },
+    {
+      "path": "domains/memory/engine/groupWorkflow.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 114,
+      "bytes": 6124
+    },
+    {
+      "path": "domains/memory/engine/mentionResolver.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 3078
+    },
+    {
+      "path": "domains/memory/engine/redisStore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 2468
+    },
+    {
+      "path": "domains/memory/engine/reflector.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 186,
+      "bytes": 8226
+    },
+    {
+      "path": "domains/memory/engine/retriever.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 199,
+      "bytes": 8482
+    },
+    {
+      "path": "domains/memory/engine/stats.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 30,
+      "bytes": 1730
+    },
+    {
+      "path": "domains/midtermMemory/MidtermSummaryManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 305,
+      "bytes": 11869
+    },
+    {
+      "path": "domains/semanticMemory/EmbeddingGateway.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 124,
+      "bytes": 4586
+    },
+    {
+      "path": "domains/semanticMemory/RerankGateway.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 75,
+      "bytes": 3135
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryIndexer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 163,
+      "bytes": 7423
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryRetriever.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 151,
+      "bytes": 7577
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryStore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 441,
+      "bytes": 17411
+    },
+    {
+      "path": "domains/semanticMemory/retrievalEval.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 114,
+      "bytes": 5098
+    },
+    {
+      "path": "domains/semanticMemory/runtime.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 170,
+      "bytes": 6983
+    },
+    {
+      "path": "functions/ask-ban.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 262
+    },
+    {
+      "path": "functions/functions_tools/AbstractTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 159,
+      "bytes": 5228
+    },
+    {
+      "path": "functions/functions_tools/AiMindMapTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 177,
+      "bytes": 6911
+    },
+    {
+      "path": "functions/functions_tools/BananaTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1269,
+      "bytes": 48129
+    },
+    {
+      "path": "functions/functions_tools/BingImageSearchTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 325,
+      "bytes": 12474
+    },
+    {
+      "path": "functions/functions_tools/ChangeCardTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 88,
+      "bytes": 3281
+    },
+    {
+      "path": "functions/functions_tools/ChatHistoryTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 82,
+      "bytes": 2829
+    },
+    {
+      "path": "functions/functions_tools/DeltaForceTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 239,
+      "bytes": 9955
+    },
+    {
+      "path": "functions/functions_tools/EmojiSearchTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 302,
+      "bytes": 10147
+    },
+    {
+      "path": "functions/functions_tools/ExcelWorkbookTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 305,
+      "bytes": 13555
+    },
+    {
+      "path": "functions/functions_tools/ForgetGroupKnowledgeTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 46,
+      "bytes": 3060
+    },
+    {
+      "path": "functions/functions_tools/GithubTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 160,
+      "bytes": 5698
+    },
+    {
+      "path": "functions/functions_tools/GoogleAnalysisTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 439,
+      "bytes": 21197
+    },
+    {
+      "path": "functions/functions_tools/GoogleImageEditTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 736,
+      "bytes": 29845
+    },
+    {
+      "path": "functions/functions_tools/GrabRedBagTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 147,
+      "bytes": 5426
+    },
+    {
+      "path": "functions/functions_tools/JinyanTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 302,
+      "bytes": 11171
+    },
+    {
+      "path": "functions/functions_tools/LikeTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 132,
+      "bytes": 4560
+    },
+    {
+      "path": "functions/functions_tools/MemberInfoTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 160,
+      "bytes": 4588
+    },
+    {
+      "path": "functions/functions_tools/MentionAdminsTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 75,
+      "bytes": 3880
+    },
+    {
+      "path": "functions/functions_tools/MentionMembersTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 3825
+    },
+    {
+      "path": "functions/functions_tools/ModrinthTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 73,
+      "bytes": 3833
+    },
+    {
+      "path": "functions/functions_tools/PixivDownloadTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 108,
+      "bytes": 4800
+    },
+    {
+      "path": "functions/functions_tools/PixivSearchTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 116,
+      "bytes": 5698
+    },
+    {
+      "path": "functions/functions_tools/PokeTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 281,
+      "bytes": 8467
+    },
+    {
+      "path": "functions/functions_tools/QQZoneTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 73,
+      "bytes": 2613
+    },
+    {
+      "path": "functions/functions_tools/ReactionTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 112,
+      "bytes": 3865
+    },
+    {
+      "path": "functions/functions_tools/RecallTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 91,
+      "bytes": 3062
+    },
+    {
+      "path": "functions/functions_tools/ReminderTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 625,
+      "bytes": 19828
+    },
+    {
+      "path": "functions/functions_tools/SearchInformationTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 235,
+      "bytes": 9194
+    },
+    {
+      "path": "functions/functions_tools/SearchMusicTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 375,
+      "bytes": 13834
+    },
+    {
+      "path": "functions/functions_tools/SearchVideoTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 144,
+      "bytes": 5675
+    },
+    {
+      "path": "functions/functions_tools/SendGiftTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 224,
+      "bytes": 6241
+    },
+    {
+      "path": "functions/functions_tools/SendLocalEmojiTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 206,
+      "bytes": 11276
+    },
+    {
+      "path": "functions/functions_tools/TextImageTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1551,
+      "bytes": 60780
+    },
+    {
+      "path": "functions/functions_tools/TorrentDownloadTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 558,
+      "bytes": 23526
+    },
+    {
+      "path": "functions/functions_tools/VideoAnalysisTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 237,
+      "bytes": 8713
+    },
+    {
+      "path": "functions/functions_tools/VoiceTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 74,
+      "bytes": 3010
+    },
+    {
+      "path": "functions/functions_tools/WaitTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 1735
+    },
+    {
+      "path": "functions/functions_tools/puppeteer/WebContentExtractor.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 281,
+      "bytes": 12558
+    },
+    {
+      "path": "functions/functions_tools/puppeteer/WebParser.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 396,
+      "bytes": 12288
+    },
+    {
+      "path": "functions/functions_tools/webParserTool.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 304,
+      "bytes": 12648
+    },
+    {
+      "path": "functions/functions_tools/xiaohongshu/api/feed.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 54,
+      "bytes": 2992
+    },
+    {
+      "path": "functions/functions_tools/xiaohongshu/api/homefeed.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 54,
+      "bytes": 2234
+    },
+    {
+      "path": "functions/functions_tools/xiaohongshu/api/sub_comment.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 57,
+      "bytes": 2344
+    },
+    {
+      "path": "functions/functions_tools/xiaohongshu/config/config.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 391
+    },
+    {
+      "path": "functions/functions_tools/xiaohongshu/sign/X-S-Common.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 440,
+      "bytes": 21695
+    },
+    {
+      "path": "functions/functions_tools/xiaohongshu/sign/X-S.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 2789,
+      "bytes": 214867
+    },
+    {
+      "path": "functions/other_tools/file.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 73,
+      "bytes": 2502
+    },
+    {
+      "path": "functions/tools/BilibiliVideoSummary.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 198,
+      "bytes": 6492
+    },
+    {
+      "path": "functions/tools/CalculateToken.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 38,
+      "bytes": 1535
+    },
+    {
+      "path": "functions/tools/SearchClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 157,
+      "bytes": 4713
+    },
+    {
+      "path": "functions/tools/UploadFile.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 154,
+      "bytes": 4969
+    },
+    {
+      "path": "functions/tools/bilibilivideoanalysis.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 278,
+      "bytes": 9317
+    },
+    {
+      "path": "functions/tools/messageGenerator.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 136,
+      "bytes": 6561
+    },
+    {
+      "path": "functions/tools/preview.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 978,
+      "bytes": 32530
+    },
+    {
+      "path": "functions/tools/processUploadedFile.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 38,
+      "bytes": 1582
+    },
+    {
+      "path": "functions/tools/sendvideos.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 91,
+      "bytes": 3250
+    },
+    {
+      "path": "functions/tools/textract.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 73,
+      "bytes": 2502
+    },
+    {
+      "path": "guoba.support.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 166
+    },
+    {
+      "path": "index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 2533
+    },
+    {
+      "path": "model/ModrinthCard.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 29,
+      "bytes": 930
+    },
+    {
+      "path": "model/base.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 40,
+      "bytes": 1219
+    },
+    {
+      "path": "model/config.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 104,
+      "bytes": 3001
+    },
+    {
+      "path": "model/friends.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 409
+    },
+    {
+      "path": "model/qqinfo.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 617
+    },
+    {
+      "path": "models/Guoba/configInfo.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 32,
+      "bytes": 1819
+    },
+    {
+      "path": "models/Guoba/index.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 143
+    },
+    {
+      "path": "models/Guoba/pluginInfo.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 13,
+      "bytes": 461
+    },
+    {
+      "path": "models/Guoba/schemas/aiCore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 117
+    },
+    {
+      "path": "models/Guoba/schemas/aiModels.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 105,
+      "bytes": 3184
+    },
+    {
+      "path": "models/Guoba/schemas/basic.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 116
+    },
+    {
+      "path": "models/Guoba/schemas/deltaForce.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 46,
+      "bytes": 1635
+    },
+    {
+      "path": "models/Guoba/schemas/dice.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 88,
+      "bytes": 3064
+    },
+    {
+      "path": "models/Guoba/schemas/emoji.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 185,
+      "bytes": 8672
+    },
+    {
+      "path": "models/Guoba/schemas/emotion.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 40,
+      "bytes": 1292
+    },
+    {
+      "path": "models/Guoba/schemas/expression.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 67,
+      "bytes": 2469
+    },
+    {
+      "path": "models/Guoba/schemas/groupGuard.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 273,
+      "bytes": 9506
+    },
+    {
+      "path": "models/Guoba/schemas/groupNotice.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 84,
+      "bytes": 2682
+    },
+    {
+      "path": "models/Guoba/schemas/index.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 60,
+      "bytes": 1693
+    },
+    {
+      "path": "models/Guoba/schemas/knowledge.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 26,
+      "bytes": 897
+    },
+    {
+      "path": "models/Guoba/schemas/magnetSearch.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 1001
+    },
+    {
+      "path": "models/Guoba/schemas/memory.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 343,
+      "bytes": 13914
+    },
+    {
+      "path": "models/Guoba/schemas/messageArchive.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 83,
+      "bytes": 2693
+    },
+    {
+      "path": "models/Guoba/schemas/messagePipeline.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 134,
+      "bytes": 5526
+    },
+    {
+      "path": "models/Guoba/schemas/permission.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 121
+    },
+    {
+      "path": "models/Guoba/schemas/persona.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 380,
+      "bytes": 14980
+    },
+    {
+      "path": "models/Guoba/schemas/reasoning.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 120
+    },
+    {
+      "path": "models/Guoba/schemas/riskControl.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 98,
+      "bytes": 4113
+    },
+    {
+      "path": "models/Guoba/schemas/tools.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 27,
+      "bytes": 838
+    },
+    {
+      "path": "models/Guoba/schemas/tracking.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 409,
+      "bytes": 19792
+    },
+    {
+      "path": "models/Guoba/schemas/umaRace.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 84,
+      "bytes": 2840
+    },
+    {
+      "path": "models/Guoba/schemas/voice.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 105,
+      "bytes": 3125
+    },
+    {
+      "path": "models/configSchemas/aiCore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 257,
+      "bytes": 9032
+    },
+    {
+      "path": "models/configSchemas/basic.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 74,
+      "bytes": 2641
+    },
+    {
+      "path": "models/configSchemas/conversation.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 28,
+      "bytes": 1763
+    },
+    {
+      "path": "models/configSchemas/permission.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 54,
+      "bytes": 1850
+    },
+    {
+      "path": "models/configSchemas/reasoning.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 12,
+      "bytes": 1425
+    },
+    {
+      "path": "models/configSchemas/triggers.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 652
+    },
+    {
+      "path": "scripts/backfillBilibiliRecords.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 96,
+      "bytes": 3488
+    },
+    {
+      "path": "scripts/coc-command-sim.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 466,
+      "bytes": 38423
+    },
+    {
+      "path": "scripts/enableExcelWorkbookTool.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 921
+    },
+    {
+      "path": "scripts/evaluateEmojiSelectionAgainstCatalog.js",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 51,
+      "bytes": 2740
+    },
+    {
+      "path": "scripts/fix-runtime-config.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 49,
+      "bytes": 2302
+    },
+    {
+      "path": "scripts/gen-commands-doc.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 629
+    },
+    {
+      "path": "scripts/import-knowledge.js",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 134,
+      "bytes": 5107
+    },
+    {
+      "path": "scripts/mem-embedding-check.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 49,
+      "bytes": 2912
+    },
+    {
+      "path": "scripts/mem-intel-live-check.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 35,
+      "bytes": 2344
+    },
+    {
+      "path": "scripts/mem-live-check.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 41,
+      "bytes": 2645
+    },
+    {
+      "path": "scripts/mem-p0-check.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 59,
+      "bytes": 3823
+    },
+    {
+      "path": "scripts/personaReplay.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 119,
+      "bytes": 6294
+    },
+    {
+      "path": "scripts/semantic-memory-eval.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 3710
+    },
+    {
+      "path": "scripts/shadow-e2e.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 207,
+      "bytes": 9446
+    },
+    {
+      "path": "scripts/simulateEmojiConversationScenarios.js",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 99,
+      "bytes": 5402
+    },
+    {
+      "path": "scripts/simulateImageTaskScenarios.js",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 102,
+      "bytes": 7197
+    },
+    {
+      "path": "scripts/simulateThreeImageSuites.js",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 71,
+      "bytes": 6621
+    },
+    {
+      "path": "scripts/turn-trace-report.mjs",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 123,
+      "bytes": 5846
+    },
+    {
+      "path": "scripts/wipe-legacy-memory.js",
+      "category": "tooling",
+      "language": "js",
+      "codeLines": 12,
+      "bytes": 793
+    },
+    {
+      "path": "standalone/bl-dice-plugin/apps/dice.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 317
+    },
+    {
+      "path": "standalone/bl-dice-plugin/apps/diceLog.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 64
+    },
+    {
+      "path": "standalone/bl-dice-plugin/guoba.support.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 19,
+      "bytes": 765
+    },
+    {
+      "path": "standalone/bl-dice-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 665
+    },
+    {
+      "path": "standalone/bl-emoji-plugin/apps/EmojiPackImport.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 160
+    },
+    {
+      "path": "standalone/bl-emoji-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 663
+    },
+    {
+      "path": "standalone/bl-games-plugin/apps/DeltaForcePlugin.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 171
+    },
+    {
+      "path": "standalone/bl-games-plugin/apps/UmaRacePlugin.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 164
+    },
+    {
+      "path": "standalone/bl-games-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 663
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/apps/GroupGuardDecrease.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 182
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/apps/GroupGuardIncrease.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 182
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/apps/GroupGuardMessage.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 181
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/apps/GroupModerationMessage.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 186
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/apps/GroupNoticeDecrease.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 183
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/apps/GroupNoticeIncrease.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 183
+    },
+    {
+      "path": "standalone/bl-group-admin-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 669
+    },
+    {
+      "path": "standalone/bl-knowledge-plugin/apps/knowledge.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 168
+    },
+    {
+      "path": "standalone/bl-knowledge-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 667
+    },
+    {
+      "path": "standalone/bl-media-plugin/apps/BilibiliRelay.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "standalone/bl-media-plugin/apps/MagnetSearchPlugin.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 173
+    },
+    {
+      "path": "standalone/bl-media-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 663
+    },
+    {
+      "path": "standalone/bl-memory-plugin/apps/MemoryCommands.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 170
+    },
+    {
+      "path": "standalone/bl-memory-plugin/index.js",
+      "category": "entry",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 664
+    },
+    {
+      "path": "tests/actionOutcomes.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 1114
+    },
+    {
+      "path": "tests/adCorpusStore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 117,
+      "bytes": 6117
+    },
+    {
+      "path": "tests/agentApiRouting.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 254,
+      "bytes": 9133
+    },
+    {
+      "path": "tests/agentIntelligence.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 117,
+      "bytes": 5781
+    },
+    {
+      "path": "tests/agentReplay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 57,
+      "bytes": 4532
+    },
+    {
+      "path": "tests/agentReplyComposer.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 37,
+      "bytes": 1802
+    },
+    {
+      "path": "tests/aiConversationGate.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 34,
+      "bytes": 2036
+    },
+    {
+      "path": "tests/aiProviderProbe.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 233,
+      "bytes": 9471
+    },
+    {
+      "path": "tests/archiveDisplayRendering.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 167,
+      "bytes": 9186
+    },
+    {
+      "path": "tests/avatarReferencePlanning.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 329,
+      "bytes": 16680
+    },
+    {
+      "path": "tests/avatarReferencePolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 33,
+      "bytes": 1867
+    },
+    {
+      "path": "tests/bananaDurableQueue.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 701,
+      "bytes": 23488
+    },
+    {
+      "path": "tests/batch3Features.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 105,
+      "bytes": 5649
+    },
+    {
+      "path": "tests/bilibiliArchiveMedia.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 152,
+      "bytes": 6024
+    },
+    {
+      "path": "tests/bilibiliAuthManager.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 49,
+      "bytes": 2056
+    },
+    {
+      "path": "tests/bilibiliAutoRelay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 244,
+      "bytes": 9238
+    },
+    {
+      "path": "tests/bilibiliForwardVideo.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 48,
+      "bytes": 2178
+    },
+    {
+      "path": "tests/bilibiliMediaRelay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 221,
+      "bytes": 8927
+    },
+    {
+      "path": "tests/bilibiliMessage.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 351,
+      "bytes": 12883
+    },
+    {
+      "path": "tests/botFederation.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 59,
+      "bytes": 3055
+    },
+    {
+      "path": "tests/cardPresentationGuard.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 35,
+      "bytes": 2104
+    },
+    {
+      "path": "tests/chatCompletionUrl.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 795
+    },
+    {
+      "path": "tests/chatFailureDiagnosis.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 2727
+    },
+    {
+      "path": "tests/chatFailureReply.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 62,
+      "bytes": 3262
+    },
+    {
+      "path": "tests/chatMessageConfigReload.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 92,
+      "bytes": 3783
+    },
+    {
+      "path": "tests/chatRequestRecovery.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 3086
+    },
+    {
+      "path": "tests/chatTurnDurability.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 140,
+      "bytes": 6823
+    },
+    {
+      "path": "tests/cocRuleSealdiceCompat.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 183,
+      "bytes": 9672
+    },
+    {
+      "path": "tests/commandGate.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 90,
+      "bytes": 5877
+    },
+    {
+      "path": "tests/commandRegistry.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 106,
+      "bytes": 4729
+    },
+    {
+      "path": "tests/commandsGuobaAuth.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 34,
+      "bytes": 2056
+    },
+    {
+      "path": "tests/commandsWebApp.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 83,
+      "bytes": 4450
+    },
+    {
+      "path": "tests/configStoreCore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 69,
+      "bytes": 2864
+    },
+    {
+      "path": "tests/consoleConversationConfig.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 157,
+      "bytes": 10578
+    },
+    {
+      "path": "tests/consoleFrontendSmoke.mjs",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 245,
+      "bytes": 27953
+    },
+    {
+      "path": "tests/consoleFrontendStatic.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 53,
+      "bytes": 2863
+    },
+    {
+      "path": "tests/consoleImageRegression.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 1556
+    },
+    {
+      "path": "tests/consoleProviderCredentials.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 41,
+      "bytes": 3279
+    },
+    {
+      "path": "tests/consoleRuntimeRead.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 41,
+      "bytes": 2836
+    },
+    {
+      "path": "tests/consoleSchemaConfig.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 70,
+      "bytes": 6215
+    },
+    {
+      "path": "tests/consoleServerIntegration.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 169,
+      "bytes": 11810
+    },
+    {
+      "path": "tests/contextualProgressReply.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 273,
+      "bytes": 11386
+    },
+    {
+      "path": "tests/conversationRoutingRegression.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 5097
+    },
+    {
+      "path": "tests/danglingReferences.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 116,
+      "bytes": 6020
+    },
+    {
+      "path": "tests/deckManager.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 112,
+      "bytes": 4693
+    },
+    {
+      "path": "tests/deltaForceClient.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 472,
+      "bytes": 17449
+    },
+    {
+      "path": "tests/deltaForceIntent.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 2117
+    },
+    {
+      "path": "tests/deltaForceObjectCache.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 42,
+      "bytes": 1534
+    },
+    {
+      "path": "tests/diceCommandPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 108,
+      "bytes": 4552
+    },
+    {
+      "path": "tests/diceManagerCore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 919,
+      "bytes": 43803
+    },
+    {
+      "path": "tests/diceReplyCatalog.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 3349
+    },
+    {
+      "path": "tests/diceRuleExpression.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 209,
+      "bytes": 9374
+    },
+    {
+      "path": "tests/diceRulePackManager.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 1118,
+      "bytes": 55995
+    },
+    {
+      "path": "tests/diceSealExtras.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 212,
+      "bytes": 10300
+    },
+    {
+      "path": "tests/douyinAutoRelay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 66,
+      "bytes": 2886
+    },
+    {
+      "path": "tests/douyinMediaRelay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 41,
+      "bytes": 2040
+    },
+    {
+      "path": "tests/douyinMessage.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 155,
+      "bytes": 7147
+    },
+    {
+      "path": "tests/douyinNoteImages.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 171,
+      "bytes": 7011
+    },
+    {
+      "path": "tests/drawIntentRouting.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 73,
+      "bytes": 3850
+    },
+    {
+      "path": "tests/editReferencePipeline.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 138,
+      "bytes": 6174
+    },
+    {
+      "path": "tests/emojiAdminRemove.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 63,
+      "bytes": 3677
+    },
+    {
+      "path": "tests/emojiCooldown.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 47,
+      "bytes": 2757
+    },
+    {
+      "path": "tests/emojiFamiliarity.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 50,
+      "bytes": 2677
+    },
+    {
+      "path": "tests/emojiProactiveRouting.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 775
+    },
+    {
+      "path": "tests/emojiSchemaRefresh.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 93,
+      "bytes": 3875
+    },
+    {
+      "path": "tests/emojiSelection.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 72,
+      "bytes": 3753
+    },
+    {
+      "path": "tests/emojiToolPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 168,
+      "bytes": 9784
+    },
+    {
+      "path": "tests/episodicMemory.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 51,
+      "bytes": 3200
+    },
+    {
+      "path": "tests/excelRequestPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 95,
+      "bytes": 4901
+    },
+    {
+      "path": "tests/excelWorkbook.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 365,
+      "bytes": 15597
+    },
+    {
+      "path": "tests/expressionLearnerRhythm.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 137,
+      "bytes": 6431
+    },
+    {
+      "path": "tests/forbiddenWordGuard.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 88,
+      "bytes": 5759
+    },
+    {
+      "path": "tests/forgetGroupKnowledgeTool.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 35,
+      "bytes": 1917
+    },
+    {
+      "path": "tests/forwardBatches.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 51,
+      "bytes": 3654
+    },
+    {
+      "path": "tests/globalStyleSemanticRecall.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 229,
+      "bytes": 11840
+    },
+    {
+      "path": "tests/globalStyleSequence.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 56,
+      "bytes": 3384
+    },
+    {
+      "path": "tests/globalStyleSummary.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 201,
+      "bytes": 7374
+    },
+    {
+      "path": "tests/groupContextResolver.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 125,
+      "bytes": 4778
+    },
+    {
+      "path": "tests/groupContextState.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 32,
+      "bytes": 1492
+    },
+    {
+      "path": "tests/groupGuardQuestion.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 54,
+      "bytes": 2317
+    },
+    {
+      "path": "tests/groupModerationManager.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 202,
+      "bytes": 9599
+    },
+    {
+      "path": "tests/groupNames.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 48,
+      "bytes": 3126
+    },
+    {
+      "path": "tests/guobaAiProviderConfig.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 139,
+      "bytes": 5135
+    },
+    {
+      "path": "tests/guobaJumpLink.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 37,
+      "bytes": 2086
+    },
+    {
+      "path": "tests/guobaProviderRoundtrip.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 113,
+      "bytes": 5087
+    },
+    {
+      "path": "tests/helpers/fakeRedis.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 55,
+      "bytes": 1568
+    },
+    {
+      "path": "tests/helpers/pluginSources.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 1091
+    },
+    {
+      "path": "tests/imageAnalysisProgress.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 149,
+      "bytes": 5420
+    },
+    {
+      "path": "tests/imageAspectRatio.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 105,
+      "bytes": 5935
+    },
+    {
+      "path": "tests/imageEditDurableRecovery.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 48,
+      "bytes": 1730
+    },
+    {
+      "path": "tests/imageEditEmptyRetryPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 136,
+      "bytes": 4885
+    },
+    {
+      "path": "tests/imageEditProgress.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 115,
+      "bytes": 3760
+    },
+    {
+      "path": "tests/imageEndpointRouting.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 836
+    },
+    {
+      "path": "tests/imageGenerationFallback.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 557,
+      "bytes": 22853
+    },
+    {
+      "path": "tests/imageIntentPriority.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 124,
+      "bytes": 8203
+    },
+    {
+      "path": "tests/imagePromptAddress.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 28,
+      "bytes": 2319
+    },
+    {
+      "path": "tests/imagePromptContextPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 115,
+      "bytes": 3925
+    },
+    {
+      "path": "tests/imageProviderTrust.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 78,
+      "bytes": 2502
+    },
+    {
+      "path": "tests/imageRequestGuard.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 58,
+      "bytes": 3361
+    },
+    {
+      "path": "tests/imageResult.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 13,
+      "bytes": 709
+    },
+    {
+      "path": "tests/importContract.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 3219
+    },
+    {
+      "path": "tests/intentFastPath.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 48,
+      "bytes": 3551
+    },
+    {
+      "path": "tests/internalStatusLeak.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 52,
+      "bytes": 3009
+    },
+    {
+      "path": "tests/longTaskFeedbackPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 79,
+      "bytes": 4492
+    },
+    {
+      "path": "tests/magnetSearchClient.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 166,
+      "bytes": 6793
+    },
+    {
+      "path": "tests/mediaArtifactStore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 54,
+      "bytes": 2276
+    },
+    {
+      "path": "tests/mediaOutbox.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 354,
+      "bytes": 15356
+    },
+    {
+      "path": "tests/mediaRelayAdminReport.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 220,
+      "bytes": 10531
+    },
+    {
+      "path": "tests/mediaTypePolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 1144
+    },
+    {
+      "path": "tests/memory/aliasRegistry.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 32,
+      "bytes": 2023
+    },
+    {
+      "path": "tests/memory/boundary.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 21,
+      "bytes": 1020
+    },
+    {
+      "path": "tests/memory/conflictResolver.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 33,
+      "bytes": 1557
+    },
+    {
+      "path": "tests/memory/constants.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 27,
+      "bytes": 1266
+    },
+    {
+      "path": "tests/memory/crossBotHeardFrom.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 62,
+      "bytes": 3579
+    },
+    {
+      "path": "tests/memory/embeddings.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 127,
+      "bytes": 5796
+    },
+    {
+      "path": "tests/memory/entityModel.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 77,
+      "bytes": 4531
+    },
+    {
+      "path": "tests/memory/extractor.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 107,
+      "bytes": 4665
+    },
+    {
+      "path": "tests/memory/extractorLlm.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 1312
+    },
+    {
+      "path": "tests/memory/groupKnowledge.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 231,
+      "bytes": 13297
+    },
+    {
+      "path": "tests/memory/groupWorkflow.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 64,
+      "bytes": 3101
+    },
+    {
+      "path": "tests/memory/helpers/fakeRedis.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 30,
+      "bytes": 874
+    },
+    {
+      "path": "tests/memory/helpers/fakeRedis.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 25,
+      "bytes": 1015
+    },
+    {
+      "path": "tests/memory/manager.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 366,
+      "bytes": 22565
+    },
+    {
+      "path": "tests/memory/mentionResolver.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 59,
+      "bytes": 2798
+    },
+    {
+      "path": "tests/memory/redisStore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 32,
+      "bytes": 1603
+    },
+    {
+      "path": "tests/memory/reflector.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 225,
+      "bytes": 9737
+    },
+    {
+      "path": "tests/memory/retriever.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 123,
+      "bytes": 7087
+    },
+    {
+      "path": "tests/memory/stats.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 57,
+      "bytes": 2285
+    },
+    {
+      "path": "tests/memory/wipeLegacy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 859
+    },
+    {
+      "path": "tests/memorySelfCorrection.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 101,
+      "bytes": 4574
+    },
+    {
+      "path": "tests/mentionAdminsTool.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 43,
+      "bytes": 1647
+    },
+    {
+      "path": "tests/mentionFailureReply.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 976
+    },
+    {
+      "path": "tests/mentionMembersTool.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 35,
+      "bytes": 1348
+    },
+    {
+      "path": "tests/mentionRoleRouting.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 49,
+      "bytes": 2380
+    },
+    {
+      "path": "tests/mentionTargets.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 35,
+      "bytes": 1732
+    },
+    {
+      "path": "tests/messageCacheTtl.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 796
+    },
+    {
+      "path": "tests/messageContext.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 86,
+      "bytes": 6503
+    },
+    {
+      "path": "tests/messageIntentCore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 44,
+      "bytes": 3765
+    },
+    {
+      "path": "tests/messagePipeline.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 264,
+      "bytes": 11285
+    },
+    {
+      "path": "tests/messagePipelineCore.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 137,
+      "bytes": 6601
+    },
+    {
+      "path": "tests/messageRecallArchive.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 151,
+      "bytes": 7127
+    },
+    {
+      "path": "tests/messageStats.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 136,
+      "bytes": 6010
+    },
+    {
+      "path": "tests/messageStorageIdempotence.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 122,
+      "bytes": 5309
+    },
+    {
+      "path": "tests/midtermMemory.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 156,
+      "bytes": 6880
+    },
+    {
+      "path": "tests/modelGateway.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 38,
+      "bytes": 2284
+    },
+    {
+      "path": "tests/modelIntentClassifier.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 56,
+      "bytes": 3109
+    },
+    {
+      "path": "tests/modrinthTool.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 294,
+      "bytes": 13241
+    },
+    {
+      "path": "tests/multipartFormData.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 45,
+      "bytes": 2284
+    },
+    {
+      "path": "tests/musicShareDelivery.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 196,
+      "bytes": 6936
+    },
+    {
+      "path": "tests/musicShareRelay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 74,
+      "bytes": 2921
+    },
+    {
+      "path": "tests/narrativeReply.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 42,
+      "bytes": 2599
+    },
+    {
+      "path": "tests/obsLog.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 57,
+      "bytes": 2338
+    },
+    {
+      "path": "tests/observeIdentityNames.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 2731
+    },
+    {
+      "path": "tests/outboundArbiter.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 115,
+      "bytes": 5357
+    },
+    {
+      "path": "tests/outboundThrottle.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 117,
+      "bytes": 5273
+    },
+    {
+      "path": "tests/outputGuardPipeline.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 108,
+      "bytes": 4824
+    },
+    {
+      "path": "tests/parallelDownload.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 94,
+      "bytes": 3536
+    },
+    {
+      "path": "tests/personaFeedbackManager.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 133,
+      "bytes": 6454
+    },
+    {
+      "path": "tests/personaLibrary.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 211,
+      "bytes": 11923
+    },
+    {
+      "path": "tests/personaMoods.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 89,
+      "bytes": 4285
+    },
+    {
+      "path": "tests/personaPromptCharacterization.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 121,
+      "bytes": 9081
+    },
+    {
+      "path": "tests/personaReplay.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 47,
+      "bytes": 2786
+    },
+    {
+      "path": "tests/personaTonePolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 41,
+      "bytes": 2115
+    },
+    {
+      "path": "tests/pixivIntent.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 121,
+      "bytes": 8969
+    },
+    {
+      "path": "tests/pixivMessage.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 4318
+    },
+    {
+      "path": "tests/pixivSearch.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 145,
+      "bytes": 8096
+    },
+    {
+      "path": "tests/pluginExportLoader.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 933
+    },
+    {
+      "path": "tests/privateChat.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 64,
+      "bytes": 4689
+    },
+    {
+      "path": "tests/proactiveReplyFreshness.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 574
+    },
+    {
+      "path": "tests/progressReplyBudget.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 948
+    },
+    {
+      "path": "tests/promptCompiler.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 151,
+      "bytes": 6374
+    },
+    {
+      "path": "tests/promptLayerCache.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 66,
+      "bytes": 2717
+    },
+    {
+      "path": "tests/promptLayers.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 92,
+      "bytes": 4243
+    },
+    {
+      "path": "tests/qqCodeFenceText.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 64,
+      "bytes": 2903
+    },
+    {
+      "path": "tests/reasoningEffort.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 86,
+      "bytes": 4711
+    },
+    {
+      "path": "tests/recentImageContinuation.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 62,
+      "bytes": 2592
+    },
+    {
+      "path": "tests/reliableImageSender.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 1568
+    },
+    {
+      "path": "tests/replyExecutionRoute.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 27,
+      "bytes": 1093
+    },
+    {
+      "path": "tests/replyRhythm.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 3609
+    },
+    {
+      "path": "tests/replySanitizer.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 47,
+      "bytes": 2301
+    },
+    {
+      "path": "tests/riskCensorSignals.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 166,
+      "bytes": 8223
+    },
+    {
+      "path": "tests/routeDecision.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 183,
+      "bytes": 9128
+    },
+    {
+      "path": "tests/sealExtRuntime.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 274,
+      "bytes": 13165
+    },
+    {
+      "path": "tests/sealSemanticRegression.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 361,
+      "bytes": 17506
+    },
+    {
+      "path": "tests/sealdiceContract.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 198,
+      "bytes": 10861
+    },
+    {
+      "path": "tests/searchProgress.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 113,
+      "bytes": 3999
+    },
+    {
+      "path": "tests/semanticMemory.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 371,
+      "bytes": 19042
+    },
+    {
+      "path": "tests/semanticMemoryEvolution.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 172,
+      "bytes": 7800
+    },
+    {
+      "path": "tests/semanticToolPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1043
+    },
+    {
+      "path": "tests/sendLocalEmojiReplyMode.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 114,
+      "bytes": 4080
+    },
+    {
+      "path": "tests/sendPacing.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 72,
+      "bytes": 4407
+    },
+    {
+      "path": "tests/sessionContinuity.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 70,
+      "bytes": 4052
+    },
+    {
+      "path": "tests/singleFlightResolver.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 80,
+      "bytes": 2396
+    },
+    {
+      "path": "tests/smartLockPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 81,
+      "bytes": 3088
+    },
+    {
+      "path": "tests/smartReplyLogText.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 652
+    },
+    {
+      "path": "tests/solutionExplanationStyle.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 2272
+    },
+    {
+      "path": "tests/systemPromptTemplate.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 3236
+    },
+    {
+      "path": "tests/taskBackendEffort.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 41,
+      "bytes": 1875
+    },
+    {
+      "path": "tests/textImageDocument.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 191,
+      "bytes": 7019
+    },
+    {
+      "path": "tests/textImageMarkdownHeadings.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 2055
+    },
+    {
+      "path": "tests/textImageMath.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 69,
+      "bytes": 3681
+    },
+    {
+      "path": "tests/thinkingForward.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 60,
+      "bytes": 3090
+    },
+    {
+      "path": "tests/thinkingForwardSettings.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 71,
+      "bytes": 3789
+    },
+    {
+      "path": "tests/toolContinuationPolicy.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 886
+    },
+    {
+      "path": "tests/toolGroundingDirect.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 55,
+      "bytes": 2575
+    },
+    {
+      "path": "tests/toolIntentFilterSmoke.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 49,
+      "bytes": 2258
+    },
+    {
+      "path": "tests/toolIntentManifests.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 351,
+      "bytes": 13881
+    },
+    {
+      "path": "tests/toolManifestRegistry.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 50,
+      "bytes": 2712
+    },
+    {
+      "path": "tests/toolResultGrounding.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 89,
+      "bytes": 5504
+    },
+    {
+      "path": "tests/toolSkills.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 59,
+      "bytes": 2329
+    },
+    {
+      "path": "tests/torrentDownload.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 564,
+      "bytes": 24703
+    },
+    {
+      "path": "tests/triggerUnification.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 30,
+      "bytes": 1739
+    },
+    {
+      "path": "tests/turnDiagnostics.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 84,
+      "bytes": 4401
+    },
+    {
+      "path": "tests/turnPlan.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 63,
+      "bytes": 2785
+    },
+    {
+      "path": "tests/turnPromptComposer.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 269,
+      "bytes": 10851
+    },
+    {
+      "path": "tests/turnSession.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 90,
+      "bytes": 4414
+    },
+    {
+      "path": "tests/turnTraceArchive.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 74,
+      "bytes": 4121
+    },
+    {
+      "path": "tests/umaRaceBalance.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 171,
+      "bytes": 6950
+    },
+    {
+      "path": "tests/undefinedIdentifiers.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 93,
+      "bytes": 6321
+    },
+    {
+      "path": "tests/understandingBrief.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 115,
+      "bytes": 6160
+    },
+    {
+      "path": "tests/unicodeText.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 44,
+      "bytes": 1638
+    },
+    {
+      "path": "tests/videoGroupContext.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 44,
+      "bytes": 1290
+    },
+    {
+      "path": "tests/videoThumbnail.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 2346
+    },
+    {
+      "path": "tests/visibleFailure.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 35,
+      "bytes": 2110
+    },
+    {
+      "path": "tests/voiceSystem.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 45,
+      "bytes": 2270
+    },
+    {
+      "path": "tests/youtubeMessage.test.js",
+      "category": "tests",
+      "language": "js",
+      "codeLines": 202,
+      "bytes": 10844
+    },
+    {
+      "path": "utils/BilibiliAuthManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 59,
+      "bytes": 2901
+    },
+    {
+      "path": "utils/LocalToolRegistry.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 350,
+      "bytes": 13619
+    },
+    {
+      "path": "utils/MCPClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1142,
+      "bytes": 36831
+    },
+    {
+      "path": "utils/MessageArchiveManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 769,
+      "bytes": 32662
+    },
+    {
+      "path": "utils/MessageManager.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 509,
+      "bytes": 18002
+    },
+    {
+      "path": "utils/ModrinthCardRenderer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 624
+    },
+    {
+      "path": "utils/QQApi.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 173,
+      "bytes": 5908
+    },
+    {
+      "path": "utils/SmartReply.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 81,
+      "bytes": 3145
+    },
+    {
+      "path": "utils/VolcengineVoiceProvider.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 168,
+      "bytes": 5775
+    },
+    {
+      "path": "utils/actionOutcomes.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 1623
+    },
+    {
+      "path": "utils/addresseeSignals.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 61,
+      "bytes": 3428
+    },
+    {
+      "path": "utils/agentIntelligence.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 238,
+      "bytes": 10801
+    },
+    {
+      "path": "utils/agentReplyComposer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 38,
+      "bytes": 2835
+    },
+    {
+      "path": "utils/aiConversationGate.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 266
+    },
+    {
+      "path": "utils/aiProviderProbe.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 167,
+      "bytes": 8037
+    },
+    {
+      "path": "utils/apiClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 498,
+      "bytes": 22424
+    },
+    {
+      "path": "utils/avatarReferencePolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 2815
+    },
+    {
+      "path": "utils/bilibiliMediaRelay.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 130,
+      "bytes": 5851
+    },
+    {
+      "path": "utils/bilibiliMessage.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 459,
+      "bytes": 20942
+    },
+    {
+      "path": "utils/botFederation.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 67,
+      "bytes": 3982
+    },
+    {
+      "path": "utils/builtinToolManifests.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 521,
+      "bytes": 31729
+    },
+    {
+      "path": "utils/chatCompletionUrl.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 296
+    },
+    {
+      "path": "utils/chatFailureDiagnosis.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 97,
+      "bytes": 4566
+    },
+    {
+      "path": "utils/chatFailureReply.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 55,
+      "bytes": 3459
+    },
+    {
+      "path": "utils/chatRequestRecovery.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 96,
+      "bytes": 4360
+    },
+    {
+      "path": "utils/chatTurnDurability.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 206,
+      "bytes": 8408
+    },
+    {
+      "path": "utils/commandGate.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 69,
+      "bytes": 4056
+    },
+    {
+      "path": "utils/commandRegistry.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 261,
+      "bytes": 10214
+    },
+    {
+      "path": "utils/commandsWebApp.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1814,
+      "bytes": 95753
+    },
+    {
+      "path": "utils/common.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 67
+    },
+    {
+      "path": "utils/configWriter.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 1554
+    },
+    {
+      "path": "utils/contextualProgressReply.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 213,
+      "bytes": 13705
+    },
+    {
+      "path": "utils/deliveryObservability.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 25,
+      "bytes": 859
+    },
+    {
+      "path": "utils/deltaForceIntent.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 81,
+      "bytes": 4921
+    },
+    {
+      "path": "utils/diceRandom.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 13,
+      "bytes": 589
+    },
+    {
+      "path": "utils/douyinBrowserResolver.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 293,
+      "bytes": 16440
+    },
+    {
+      "path": "utils/douyinMediaRelay.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 156,
+      "bytes": 7765
+    },
+    {
+      "path": "utils/douyinMessage.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 273,
+      "bytes": 12379
+    },
+    {
+      "path": "utils/drawFailureNote.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 1686
+    },
+    {
+      "path": "utils/editReferencePipeline.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 232,
+      "bytes": 9685
+    },
+    {
+      "path": "utils/emojiToolPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 220,
+      "bytes": 11861
+    },
+    {
+      "path": "utils/episodicMemory.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 160,
+      "bytes": 7081
+    },
+    {
+      "path": "utils/excelFileContext.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 363,
+      "bytes": 16611
+    },
+    {
+      "path": "utils/excelRequestPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 139,
+      "bytes": 7360
+    },
+    {
+      "path": "utils/excelWorkbook.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 404,
+      "bytes": 16654
+    },
+    {
+      "path": "utils/expressionSequence.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 80,
+      "bytes": 3200
+    },
+    {
+      "path": "utils/fileLock.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 34,
+      "bytes": 1155
+    },
+    {
+      "path": "utils/fileUtils.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 1372,
+      "bytes": 46868
+    },
+    {
+      "path": "utils/forbiddenWordGuard.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 97,
+      "bytes": 4407
+    },
+    {
+      "path": "utils/forwardBatches.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 825
+    },
+    {
+      "path": "utils/groupContextResolver.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 408,
+      "bytes": 15679
+    },
+    {
+      "path": "utils/groupContextState.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 142,
+      "bytes": 6308
+    },
+    {
+      "path": "utils/groupKnowledgeForgetPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 26,
+      "bytes": 1487
+    },
+    {
+      "path": "utils/groupNames.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 52,
+      "bytes": 2394
+    },
+    {
+      "path": "utils/guobaAiProviderConfig.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 262,
+      "bytes": 11371
+    },
+    {
+      "path": "utils/guobaJumpLink.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 56,
+      "bytes": 4316
+    },
+    {
+      "path": "utils/guobaLoginTrust.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 42,
+      "bytes": 1563
+    },
+    {
+      "path": "utils/imageAspectRatio.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 181,
+      "bytes": 7149
+    },
+    {
+      "path": "utils/imageDimensions.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 24,
+      "bytes": 1709
+    },
+    {
+      "path": "utils/imageFailurePolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 52,
+      "bytes": 5386
+    },
+    {
+      "path": "utils/imageGenerationFallback.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 672,
+      "bytes": 26854
+    },
+    {
+      "path": "utils/imageRequestGuard.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 50,
+      "bytes": 3888
+    },
+    {
+      "path": "utils/imageResult.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 853
+    },
+    {
+      "path": "utils/imageSourcePolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 9,
+      "bytes": 780
+    },
+    {
+      "path": "utils/imageTaskPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 64,
+      "bytes": 6725
+    },
+    {
+      "path": "utils/intentFastPath.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 1783
+    },
+    {
+      "path": "utils/internalStatusLeak.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 66,
+      "bytes": 4801
+    },
+    {
+      "path": "utils/longTaskFeedbackPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 60,
+      "bytes": 3339
+    },
+    {
+      "path": "utils/mediaTypePolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 27,
+      "bytes": 1302
+    },
+    {
+      "path": "utils/memorySelfCorrection.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 71,
+      "bytes": 3410
+    },
+    {
+      "path": "utils/mentionFailureReply.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 965
+    },
+    {
+      "path": "utils/mentionRoleRouting.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 46,
+      "bytes": 2388
+    },
+    {
+      "path": "utils/mentionTargets.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 48,
+      "bytes": 2148
+    },
+    {
+      "path": "utils/messageCacheTtl.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 890
+    },
+    {
+      "path": "utils/messageContext.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 231,
+      "bytes": 10655
+    },
+    {
+      "path": "utils/messagePipeline/deliveryGateway.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 266,
+      "bytes": 11745
+    },
+    {
+      "path": "utils/messagePipeline/eventEnvelope.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 105,
+      "bytes": 4792
+    },
+    {
+      "path": "utils/messagePipeline/keyedSerialQueue.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 37,
+      "bytes": 920
+    },
+    {
+      "path": "utils/messagePipeline/leaseHeartbeat.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 39,
+      "bytes": 1088
+    },
+    {
+      "path": "utils/messagePipeline/mediaArtifactStore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 170,
+      "bytes": 5956
+    },
+    {
+      "path": "utils/messagePipeline/mediaOutbox.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 592,
+      "bytes": 25986
+    },
+    {
+      "path": "utils/messagePipeline/mediaRelayAdminReport.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 418,
+      "bytes": 22622
+    },
+    {
+      "path": "utils/messagePipeline/messagePipeline.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 473,
+      "bytes": 18574
+    },
+    {
+      "path": "utils/messagePipeline/outboundArbiter.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 83,
+      "bytes": 3191
+    },
+    {
+      "path": "utils/messagePipeline/outboundThrottle.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 315,
+      "bytes": 13761
+    },
+    {
+      "path": "utils/messagePipeline/redisJobStore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 158,
+      "bytes": 5101
+    },
+    {
+      "path": "utils/messagePipeline/riskSignalMonitor.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 157,
+      "bytes": 7252
+    },
+    {
+      "path": "utils/messagePipeline/runtime.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 220,
+      "bytes": 9937
+    },
+    {
+      "path": "utils/messagePipeline/videoThumbnail.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 1364
+    },
+    {
+      "path": "utils/messageStats.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 156,
+      "bytes": 6851
+    },
+    {
+      "path": "utils/modelGateway.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 33,
+      "bytes": 1696
+    },
+    {
+      "path": "utils/modrinth.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 559,
+      "bytes": 23867
+    },
+    {
+      "path": "utils/multipartFormData.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 32,
+      "bytes": 1159
+    },
+    {
+      "path": "utils/musicShareRelay.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 183,
+      "bytes": 7306
+    },
+    {
+      "path": "utils/narrativeReply.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 66,
+      "bytes": 2979
+    },
+    {
+      "path": "utils/obsLog.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 153,
+      "bytes": 5705
+    },
+    {
+      "path": "utils/observeWebApp.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 366,
+      "bytes": 22582
+    },
+    {
+      "path": "utils/outputGuardPipeline.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 92,
+      "bytes": 4130
+    },
+    {
+      "path": "utils/parallelDownload.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 117,
+      "bytes": 5592
+    },
+    {
+      "path": "utils/personaLibrary.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 347,
+      "bytes": 13726
+    },
+    {
+      "path": "utils/personaMoods.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 51,
+      "bytes": 2258
+    },
+    {
+      "path": "utils/personaReplayCore.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 70,
+      "bytes": 3124
+    },
+    {
+      "path": "utils/personaSource.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 47,
+      "bytes": 5503
+    },
+    {
+      "path": "utils/personaTonePolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 56,
+      "bytes": 4535
+    },
+    {
+      "path": "utils/pixivIntent.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 185,
+      "bytes": 12113
+    },
+    {
+      "path": "utils/pixivMediaRelay.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 150,
+      "bytes": 7144
+    },
+    {
+      "path": "utils/pixivMessage.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 192,
+      "bytes": 9322
+    },
+    {
+      "path": "utils/pixivSearch.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 464,
+      "bytes": 23043
+    },
+    {
+      "path": "utils/pluginBridge.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 70
+    },
+    {
+      "path": "utils/pluginExportLoader.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 645
+    },
+    {
+      "path": "utils/proactiveReplyFreshness.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 522
+    },
+    {
+      "path": "utils/progressReplyBudget.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 470
+    },
+    {
+      "path": "utils/promptCompiler.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 127,
+      "bytes": 8538
+    },
+    {
+      "path": "utils/promptLayerCache.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 38,
+      "bytes": 1499
+    },
+    {
+      "path": "utils/promptLayers.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 79,
+      "bytes": 2676
+    },
+    {
+      "path": "utils/providers/ThinkingProcessor.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 93,
+      "bytes": 3664
+    },
+    {
+      "path": "utils/proxiedFetch.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 22,
+      "bytes": 1290
+    },
+    {
+      "path": "utils/qqCodeFenceText.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 32,
+      "bytes": 1366
+    },
+    {
+      "path": "utils/qqFaceTable.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 1770
+    },
+    {
+      "path": "utils/qqVoiceAudio.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 47,
+      "bytes": 2114
+    },
+    {
+      "path": "utils/qzoneWebApp.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 113,
+      "bytes": 5065
+    },
+    {
+      "path": "utils/recentImageContinuation.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 73,
+      "bytes": 4102
+    },
+    {
+      "path": "utils/redBagUtils.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 976
+    },
+    {
+      "path": "utils/redis-util.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 46,
+      "bytes": 3310
+    },
+    {
+      "path": "utils/redisClient.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 68,
+      "bytes": 2605
+    },
+    {
+      "path": "utils/reliableImageSender.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 82,
+      "bytes": 3456
+    },
+    {
+      "path": "utils/replyExecutionRoute.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 1210
+    },
+    {
+      "path": "utils/replyRhythm.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 87,
+      "bytes": 4434
+    },
+    {
+      "path": "utils/replySanitizer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 173,
+      "bytes": 8848
+    },
+    {
+      "path": "utils/request.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 258,
+      "bytes": 8668
+    },
+    {
+      "path": "utils/routeDecision.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 380,
+      "bytes": 16690
+    },
+    {
+      "path": "utils/semanticMemoryWebApp.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 375,
+      "bytes": 20337
+    },
+    {
+      "path": "utils/semanticToolPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 922
+    },
+    {
+      "path": "utils/sendPacing.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 79,
+      "bytes": 4090
+    },
+    {
+      "path": "utils/sharedBrowser.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 53,
+      "bytes": 1528
+    },
+    {
+      "path": "utils/sideLLM.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 45,
+      "bytes": 2319
+    },
+    {
+      "path": "utils/singleFlightResolver.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 34,
+      "bytes": 1430
+    },
+    {
+      "path": "utils/smartLockPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 2158
+    },
+    {
+      "path": "utils/solutionExplanationStyle.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 40,
+      "bytes": 4800
+    },
+    {
+      "path": "utils/systemPromptTemplate.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 89,
+      "bytes": 8659
+    },
+    {
+      "path": "utils/textUtils.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 2058
+    },
+    {
+      "path": "utils/thinkingForward.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 40,
+      "bytes": 2483
+    },
+    {
+      "path": "utils/thinkingForwardSettings.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 82,
+      "bytes": 3502
+    },
+    {
+      "path": "utils/toolContinuationPolicy.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 1780
+    },
+    {
+      "path": "utils/toolIntentManifests.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 104,
+      "bytes": 6415
+    },
+    {
+      "path": "utils/toolManifestRegistry.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 46,
+      "bytes": 3462
+    },
+    {
+      "path": "utils/toolResultGrounding.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 84,
+      "bytes": 6049
+    },
+    {
+      "path": "utils/toolSkills.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 58,
+      "bytes": 2646
+    },
+    {
+      "path": "utils/torrentDownload.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 547,
+      "bytes": 24438
+    },
+    {
+      "path": "utils/torrentListCard.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 139,
+      "bytes": 6868
+    },
+    {
+      "path": "utils/turnContinuity.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 71,
+      "bytes": 2739
+    },
+    {
+      "path": "utils/turnDiagnostics.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 88,
+      "bytes": 4382
+    },
+    {
+      "path": "utils/turnPlan.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 139,
+      "bytes": 8036
+    },
+    {
+      "path": "utils/turnPresentation.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 24,
+      "bytes": 1895
+    },
+    {
+      "path": "utils/turnPromptComposer.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 257,
+      "bytes": 13083
+    },
+    {
+      "path": "utils/turnSession.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 110,
+      "bytes": 6050
+    },
+    {
+      "path": "utils/turnTrace.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 129,
+      "bytes": 4875
+    },
+    {
+      "path": "utils/understandingBrief.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 119,
+      "bytes": 5438
+    },
+    {
+      "path": "utils/unicodeText.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 60,
+      "bytes": 2144
+    },
+    {
+      "path": "utils/visibleFailure.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 70,
+      "bytes": 3694
+    },
+    {
+      "path": "utils/youtubeAuth.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 54,
+      "bytes": 2188
+    },
+    {
+      "path": "utils/youtubeMediaRelay.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 188,
+      "bytes": 8837
+    },
+    {
+      "path": "utils/youtubeMessage.js",
+      "category": "business",
+      "language": "js",
+      "codeLines": 222,
+      "bytes": 10589
+    }
+  ]
+}

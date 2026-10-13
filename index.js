@@ -1,3 +1,5 @@
+import { ensureBackendArtifacts } from "./utils/backendArtifactGuard.js";
+await ensureBackendArtifacts();
 import fs from "node:fs";
 import path from "path";
 import config from "./model/config.js";

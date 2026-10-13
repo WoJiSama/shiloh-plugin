@@ -1,0 +1,74 @@
+import ts from 'typescript';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { checkTree } from './check-boundaries.mjs';
+
+export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
+export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
+const migrations = [
+  { legacy: 'utils/pluginExportLoader.js', implementation: 'src/modules/platform/domain/pluginExportLoader.ts' },
+  { legacy: 'utils/forwardBatches.js', implementation: 'src/modules/messaging/domain/forwardBatches.ts' },
+];
+export function classify(path) {
+  if (/(?:^|\/)(?:node_modules|vendor|dist|coverage|data)(?:\/|$)/.test(path)) return 'vendor-generated-data';
+  if (/\.d\.(?:ts|mts|cts)$/.test(path)) return 'type-declaration';
+  if (/(?:^|\/)(?:tests?|__tests__|fixtures)(?:\/|$)|\.(?:test|spec)\./.test(path)) return 'tests';
+  if (/(?:^|\/)(?:examples?|samples?)(?:\/|$)/.test(path)) return 'examples';
+  if (path.startsWith('console/frontend/')) return 'frontend';
+  if (/^(?:scripts\/|.*\.config\.)/.test(path)) return 'tooling';
+  if (/^(?:index\.js|guoba\.support\.js|standalone\/)/.test(path)) return 'entry';
+  return 'business';
+}
+// Count lines touched by non-comment tokens, including code inside multiline literals.
+export function codeLines(text) {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text);
+  const starts = ts.computeLineStarts(text);
+  const lineAt = (position) => { let lo = 0, hi = starts.length; while (lo + 1 < hi) { const mid = (lo + hi) >>> 1; if (starts[mid] <= position) lo = mid; else hi = mid; } return lo; };
+  const lines = new Set();
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+    for (let line = lineAt(scanner.getTokenPos()); line <= lineAt(Math.max(scanner.getTokenPos(), scanner.getTextPos() - 1)); line++) lines.add(line);
+  }
+  return lines.size;
+}
+function entry(path, text) {
+  const source = path.endsWith('.vue') ? [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map(match => match[1]).join('\n') : text;
+  return { path, category: classify(path), language: /\.(?:ts|mts|cts)$/.test(path) ? 'ts' : path.endsWith('.vue') ? 'vue-script' : 'js', codeLines: codeLines(source), bytes: Buffer.byteLength(text) };
+}
+function paths(args) { return execFileSync('git', args, { encoding: 'utf8' }).split('\0').filter(path => /\.(?:[cm]?[jt]s|vue)$/.test(path)); }
+function structure(files) {
+  const hostMembers = new Set(); let hostReferences = 0, globalAccesses = 0, bridgeReferences = 0;
+  for (const item of files.filter(item => item.category === 'business')) {
+    const text = readFileSync(item.path, 'utf8');
+    const file = ts.createSourceFile(item.path, text, ts.ScriptTarget.Latest, true);
+    const visit = node => {
+      if (ts.isPropertyAccessExpression(node)) {
+        if (ts.isIdentifier(node.expression) && node.expression.text === 'host') { hostReferences++; hostMembers.add(node.name.text); }
+        if (ts.isIdentifier(node.expression) && ['global', 'globalThis', 'Bot', 'redis'].includes(node.expression.text)) globalAccesses++;
+        if (ts.isIdentifier(node.expression) && node.expression.text === 'pluginBridge') bridgeReferences++;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+  }
+  return { hostMemberCount: hostMembers.size, hostReferences, globalPropertyAccesses: globalAccesses, pluginBridgePropertyReferences: bridgeReferences, method: 'AST direct named receiver references; alias and computed accesses are not inferred' };
+}
+export function report() {
+  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  const files = [...new Set(paths(['ls-files', '-z', '--cached', '--others', '--exclude-standard']))].filter(path => existsSync(path)).sort().map(path => entry(path, readFileSync(path, 'utf8')));
+  const registered = migrations.map(item => ({ ...item, present: files.some(file => file.path === item.implementation), thinWrapper: existsSync(item.legacy) && readFileSync(item.legacy, 'utf8').includes(item.implementation.replace(/^src\//, 'dist/backend/').replace(/\.ts$/, '.js')) && /^\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*export\s+[\s\S]+\s+from\s+['"][^'"]+['"];?\s*$/.test(readFileSync(item.legacy, 'utf8')) }));
+  const completed = new Set(registered.filter(item => item.present && item.thinWrapper).map(item => item.legacy));
+  const summarize = list => list.reduce((result, item) => { const key = `${item.category}:${item.language}`; const value = result[key] ??= { files: 0, codeLines: 0, bytes: 0 }; value.files++; value.codeLines += item.codeLines; value.bytes += item.bytes; return result; }, {});
+  const business = files.filter(file => file.category === 'business' && !completed.has(file.path));
+  const js = business.filter(file => file.language === 'js').reduce((sum, file) => sum + file.codeLines, 0);
+  const tsLines = business.filter(file => file.language === 'ts').reduce((sum, file) => sum + file.codeLines, 0);
+  const remaining = baseline.files.filter(file => file.category === 'business' && file.language === 'js' && !completed.has(file.path));
+  return { baselineCommit: baseline.commit, metricVersion: baseline.metricVersion, current: summarize(files), businessJsCodeLinePercent: 100 * js / (js + tsLines), baselineRemaining: { modules: remaining.length, codeLines: remaining.reduce((sum, file) => sum + file.codeLines, 0), paths: remaining.map(file => file.path) }, registeredMigrations: registered, structure: { ...structure(files), sourceBoundaryViolations: checkTree().length }, limitations: 'Registered thin wrappers are counted migrated only when TS source is present; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric.' };
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--write-baseline')) {
+    const files = paths(['ls-tree', '-r', '--name-only', '-z', baselineCommit]).sort().map(path => entry(path, execFileSync('git', ['show', `${baselineCommit}:${path}`], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 })));
+    writeFileSync(baselinePath, JSON.stringify({ metricVersion: 1, commit: baselineCommit, method: 'TypeScript scanner non-comment token lines; Vue script blocks only; fixed Git source inventory including JS/MJS/CJS/TS/Vue', files }, null, 2) + '\n');
+  } else console.log(JSON.stringify(report(), null, 2));
+}

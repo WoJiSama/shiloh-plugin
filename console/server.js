@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { ensureBackendArtifacts } from "../utils/backendArtifactGuard.js";
+await ensureBackendArtifacts();
 // bl-chat 控制台: Vue 前端静态服务 + 配置与运营 API + 账密登录。
 // 零外部新增依赖:
 //   - 自带迷你 Redis 客户端(RESP,只读 SCAN/GET/HGETALL，支持嵌套 RESP 数组与查询超时)

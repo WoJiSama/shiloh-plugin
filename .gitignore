@@ -24,3 +24,9 @@ data/
 # Console frontend build products
 console/frontend/dist/
 console/frontend/.vite/
+
+# Backend compiler, tests and release artifacts
+/dist/
+/.test-build/
+/.build-*/
+/.release/
