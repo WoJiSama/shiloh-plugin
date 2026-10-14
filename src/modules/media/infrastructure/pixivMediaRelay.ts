@@ -1,0 +1,155 @@
+import type {PixivCard,PixivRequest,PixivRelayOptions,PixivLease} from "../../../contracts/pixiv.js"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
+import { Readable, Transform } from "node:stream"
+import { pipeline } from "node:stream/promises"
+import { isTrustedPixivImageUrl } from "./pixivMessage.js"
+import { buildMediaArtifactKey } from "../../messaging/infrastructure/mediaArtifactStore.js"
+import { fetchWithProxy } from "../../foundation/infrastructure/proxiedFetch.js"
+
+export const PIXIV_ARCHIVE_MAX_PAGES = 5
+export const PIXIV_ARCHIVE_MAX_IMAGE_BYTES = 16 * 1024 * 1024
+export const PIXIV_ARCHIVE_MAX_TOTAL_BYTES = 40 * 1024 * 1024
+const DOWNLOAD_TIMEOUT_MS = 90 * 1000
+
+function extensionForUrl(url = "") {
+  try {
+    const ext = path.extname(new URL(url).pathname).toLowerCase()
+    return [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg"
+  } catch {
+    return ".jpg"
+  }
+}
+
+export async function downloadPixivArchiveImage(imageUrl:string, { maxBytes = PIXIV_ARCHIVE_MAX_IMAGE_BYTES, timeoutMs = DOWNLOAD_TIMEOUT_MS, fetchImpl = null, proxyUrl = "" }:PixivRequest & {maxBytes?:number} = {}) {
+  if (!isTrustedPixivImageUrl(imageUrl)) return ""
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-archive")
+  await fs.promises.mkdir(dir, { recursive: true })
+  const filePath = path.join(dir, `${Date.now()}-${Math.random().toString(16).slice(2)}${extensionForUrl(imageUrl)}`)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), Math.max(1_000, Number(timeoutMs) || DOWNLOAD_TIMEOUT_MS))
+  // i.pximg.net 在国内不可达,默认经代理下载;响应体必须在回调内消费完(代理连接随回调结束关闭)。
+  const headers = { Referer: "https://www.pixiv.net/", "User-Agent": "Mozilla/5.0 (compatible; XiloMediaRelay/1.0)" }
+  let completed=false
+  const writeBody = async (response:{ok:boolean;body:{getReader():{read():Promise<{done?:boolean;value?:unknown}>;releaseLock():void}}|null;headers:{get(key:string):string|null}}) => {
+    if (!response?.ok || !response.body) return ""
+    if (Number(response.headers.get("content-length") || 0) > maxBytes) return ""
+    let size = 0
+    const limiter = new Transform({
+      transform(chunk, encoding, callback) {
+        size += chunk.length
+        if (size > maxBytes) return callback(new Error("Pixiv 图片超过大小上限"))
+        callback(null, chunk)
+      }
+    })
+    await pipeline(Readable.from((async function*(){const reader=response.body!.getReader();try{while(true){const {done,value}=await reader.read();if(done)break;if(!(value instanceof Uint8Array))throw new Error("Invalid image stream");yield value}}finally{reader.releaseLock()}})()), limiter, fs.createWriteStream(filePath))
+    const stat = await fs.promises.stat(filePath)
+    completed=stat.size > 0 && stat.size <= maxBytes;return completed ? filePath : ""
+  }
+  try {
+    return typeof fetchImpl === "function"
+      ? await writeBody(await fetchImpl(imageUrl, { headers, signal: controller.signal }))
+      : await fetchWithProxy(imageUrl, { proxyUrl, headers, signal: controller.signal }, writeBody)
+  } catch {
+    return ""
+  } finally {
+    clearTimeout(timer)
+    const stat = await fs.promises.stat(filePath).catch(() => null)
+    if (!completed || !stat || stat.size <= 0 || stat.size > maxBytes) await fs.promises.unlink(filePath).catch(() => {})
+  }
+}
+
+export async function buildPixivArchiveRelaySegments(card:PixivCard = {}, {
+  segmentApi,
+  artifactStore = null,
+  onTiming = null,
+  pixivRelay = {}
+}:PixivRelayOptions = {}) {
+  const segments:unknown[] = []
+  const tempFiles:string[] = []
+  const artifactLeases:PixivLease[] = []
+  if (!card || card.type !== "pixiv") return { segments, tempFiles, artifactLeases }
+  if (Number(card.x_restrict || 0) > 0 && pixivRelay.allowRestricted !== true) {
+    segments.push("\n（该 Pixiv 作品标记为受限内容，未自动附带图片）")
+    return { segments, tempFiles, artifactLeases }
+  }
+  const maxPages = Math.min(PIXIV_ARCHIVE_MAX_PAGES, Math.max(1, Number(pixivRelay.maxPages) || PIXIV_ARCHIVE_MAX_PAGES))
+  const maxImageBytes = Math.min(PIXIV_ARCHIVE_MAX_IMAGE_BYTES, Math.max(1, Number(pixivRelay.maxImageBytes) || PIXIV_ARCHIVE_MAX_IMAGE_BYTES))
+  const maxTotalBytes = Math.min(PIXIV_ARCHIVE_MAX_TOTAL_BYTES, Math.max(1, Number(pixivRelay.maxTotalBytes) || PIXIV_ARCHIVE_MAX_TOTAL_BYTES))
+  const pages = (Array.isArray(card.pages) ? card.pages : []).filter(page => isTrustedPixivImageUrl(page?.image_url)).slice(0, maxPages)
+  if (!pages.length) {
+    segments.push("\n（Pixiv 未返回可安全下载的作品图片，已保留作品页面）")
+    return { segments, tempFiles, artifactLeases }
+  }
+  let totalBytes = 0
+  let sentPages = 0
+  let failedPages = 0
+  if (artifactStore) {
+    // 自动搬运路径:走产物缓存的串行获取(命中缓存时零下载,租约由调用方统一释放)
+    for (const page of pages) {
+      const remaining = maxTotalBytes - totalBytes
+      if (remaining <= 0) break
+      const perImageLimit = Math.min(maxImageBytes, remaining)
+      const startedAt = Date.now()
+      const key = buildMediaArtifactKey("pixiv", { artwork_id: card.artwork_id, page: page.page })
+      const lease = artifactStore && key
+        ? await artifactStore.acquire(key, () => downloadPixivArchiveImage(page.image_url, { maxBytes: perImageLimit, timeoutMs: pixivRelay.downloadTimeoutMs, fetchImpl: pixivRelay.fetchImpl || null, proxyUrl: pixivRelay.proxyUrl }))
+        : null
+      const filePath = lease?.filePath || ""
+      onTiming?.("download", Date.now() - startedAt)
+      if (!filePath) {
+        failedPages++
+        continue
+      }
+      const stat = await fs.promises.stat(filePath).catch(() => null)
+      if (!stat || stat.size > remaining) {
+        if (lease) await lease.release?.()
+        failedPages++
+        continue
+      }
+      totalBytes += stat.size
+      sentPages++
+      if(lease)artifactLeases.push(lease)
+      if (segmentApi?.image) segments.push("\n", segmentApi.image(filePath))
+    }
+  } else {
+    // 交互式下载路径:并行下载,总大小约束在完成后按页序裁剪,超额的页删除不发
+    const downloadStartedAt = Date.now()
+    const downloads = await Promise.all(pages.map(async page => ({
+      page,
+      filePath: await downloadPixivArchiveImage(page.image_url, {
+        maxBytes: maxImageBytes,
+        timeoutMs: pixivRelay.downloadTimeoutMs,
+        fetchImpl: pixivRelay.fetchImpl || null,
+        proxyUrl: pixivRelay.proxyUrl
+      })
+    })))
+    onTiming?.("download", Date.now() - downloadStartedAt)
+    for (const { filePath } of downloads) {
+      const remaining = maxTotalBytes - totalBytes
+      if (!filePath || remaining <= 0) {
+        if (filePath) await fs.promises.unlink(filePath).catch(() => {})
+        failedPages++
+        continue
+      }
+      const stat = await fs.promises.stat(filePath).catch(() => null)
+      if (!stat || stat.size > remaining) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        failedPages++
+        continue
+      }
+      totalBytes += stat.size
+      sentPages++
+      tempFiles.push(filePath)
+      if (segmentApi?.image) segments.push("\n", segmentApi.image(filePath))
+    }
+  }
+  if (!sentPages) segments.push("\n（作品图片暂时获取失败，已保留作品页面）")
+  else if (failedPages || Number(card.page_count || pages.length) > sentPages) segments.push(`\n（已附带 ${sentPages} 张图片；其余图片因页数或大小限制未附带）`)
+  return { segments, tempFiles, artifactLeases }
+}
+
+export async function cleanupPixivArchiveRelayFiles(tempFiles:string[] = []) {
+  await Promise.all((Array.isArray(tempFiles) ? tempFiles : []).map(file => fs.promises.unlink(file).catch(() => {})))
+}

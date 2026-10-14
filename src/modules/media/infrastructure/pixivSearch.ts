@@ -1,0 +1,494 @@
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
+import { fetchPixivJson, isTrustedPixivImageUrl } from "./pixivMessage.js"
+import { downloadPixivArchiveImage } from "./pixivMediaRelay.js"
+
+
+import type {Browser} from 'puppeteer';
+import type {PixivItem,PixivRequest,PixivSession,PixivScope,PixivRedis} from '../../../contracts/pixiv.js';
+import {pixivRecord as record} from '../../../contracts/pixiv.js';
+export interface PixivSearchPorts {getRedis():PixivRedis|undefined;getSharedBrowser():Promise<Browser>;scheduleSharedBrowserClose():void;logger?:{warn(message:string):void}|undefined}
+export function createPixivSearch(ports:PixivSearchPorts){
+const {getSharedBrowser,scheduleSharedBrowserClose}=ports;
+const SEARCH_TIMEOUT_MS = 12_000
+const ARTIST_RECENT_LIMIT = 8
+const LIST_MAX_ITEMS = 8
+// 搜索会话是短期单槽上下文:5 分钟内不下载就失效;新的搜索立刻覆盖旧会话;成功下载会续期。
+const PIXIV_SEARCH_SESSION_TTL_MS = 5 * 60 * 1000
+const SESSION_KEY_PREFIX = "ytbot:pixiv_search_session:v2:"
+const localSessions = new Map<string,PixivSession>()
+
+function cleanText(value:unknown = "", maxLength = 200) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength)
+}
+
+function normalizeNumber(value:unknown) {
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0 ? number : 0
+}
+
+/** 搜索/画师列表条目统一为 { id, title, userName, userId, pageCount, xRestrict, thumbUrl } */
+function normalizePixivSearchItem(input:unknown = {}):PixivItem|null {
+  const item=record(input);
+  const id = String(item.id || item.illustId || "").trim()
+  if (!/^\d{3,12}$/.test(id)) return null
+  return {
+    id,
+    title: cleanText(item.title || item.alt, 120) || "未命名作品",
+    userName: cleanText(item.userName || record(item.user).name || "", 60),
+    userId: String(item.userId || record(item.user).id || "").trim(),
+    pageCount: Math.max(1, Math.round(normalizeNumber(item.pageCount) || 1)),
+    xRestrict: Math.min(2, Math.max(0, Math.round(normalizeNumber(item.xRestrict)))),
+    thumbUrl: isTrustedPixivImageUrl(item.url || item.profileImageUrl || "") ? String(item.url || item.profileImageUrl) : ""
+  }
+}
+
+/**
+ * 关键词搜索 Pixiv 插画/漫画,匿名 ajax 接口,自动经代理。
+ * order: "newest"(默认,时间倒序) | "oldest"(时间正序) | "popular"(人气)。
+ * 匿名接口会静默忽略 popular_* 排序,人气排序通过并行取详情的收藏数重排实现。
+ */
+const PIXIV_SEARCH_ORDERS = new Set(["newest", "oldest", "popular"])
+const NATIVE_ORDER_MAP:Record<string,string> = { newest: "date_d", oldest: "date" }
+const POPULAR_CANDIDATES = 24
+
+async function searchPixivArtworks(keyword = "", {
+  order = "newest",
+  page = 1,
+  mode = "safe",
+  fetchImpl = null,
+  proxyUrl = "",
+  cookieHeader = "",
+  timeoutMs = SEARCH_TIMEOUT_MS
+}:PixivRequest & {order?:string;page?:number;mode?:string} = {}) {
+  const word = cleanText(keyword, 80)
+  if (!word) throw new Error("缺少搜索关键词")
+  const sortBy = PIXIV_SEARCH_ORDERS.has(order) ? order : "newest"
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), Math.max(3000, Number(timeoutMs) || SEARCH_TIMEOUT_MS))
+  try {
+    // 匿名接口会静默忽略 popular_* 排序;带登录 Cookie 才能用原生全站热门
+    const nativeOrder = sortBy === "popular"
+      ? (cookieHeader ? "popular_d" : "date_d")
+      : (NATIVE_ORDER_MAP[sortBy] || "date_d")
+    const url = `https://www.pixiv.net/ajax/search/artworks/${encodeURIComponent(word)}?word=${encodeURIComponent(word)}&order=${nativeOrder}&mode=${encodeURIComponent(mode)}&p=${Math.max(1, Math.round(page) || 1)}&type=all&lang=zh`
+    const body = record(await fetchPixivJson(url, { fetchImpl, proxyUrl, cookieHeader, signal: controller.signal }))
+    const raw = record(body.illustManga).data || record(body.illust).data || []
+    let items:PixivItem[] = (Array.isArray(raw)?raw:[]).map(normalizePixivSearchItem).filter((item):item is PixivItem=>item!==null)
+    if (!items.length) throw new Error(`Pixiv 没有返回「${word}」的搜索结果`)
+    let total = Number(record(body.illustManga).total || items.length) || items.length
+    let orderSource = "native"
+    if (sortBy === "popular" && !cookieHeader) {
+      // 无 Cookie 降级:官方排行榜匿名可访问,按关键词过滤日/周榜;
+      // 搜索响应的 tagTranslation 可把中文关键词映射回日文标签再匹配。
+      const aliases = expandPixivKeywordAliases(word, body?.tagTranslation)
+      const ranking = await collectPixivRankingMatches(aliases, { fetchImpl, proxyUrl, signal: controller.signal })
+      if (ranking.items.length) {
+        const seen = new Set(ranking.items.map(item => item.id))
+        const reranked = await rankPixivItemsByBookmarks(items.slice(0, POPULAR_CANDIDATES), { fetchImpl, proxyUrl, signal: controller.signal })
+        items = [...ranking.items, ...reranked.filter(item => !seen.has(item.id))].slice(0, Math.max(LIST_MAX_ITEMS, POPULAR_CANDIDATES))
+        total = ranking.total
+        orderSource = "ranking"
+      } else {
+        const ranked = await rankPixivItemsByBookmarks(items.slice(0, POPULAR_CANDIDATES), { fetchImpl, proxyUrl, signal: controller.signal })
+        if (ranked.length) {
+          items = ranked
+          total = Math.min(total, POPULAR_CANDIDATES)
+          orderSource = "rerank"
+        }
+      }
+    }
+    return { keyword: word, order: sortBy, orderSource, total, items }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** 搜索响应的 tagTranslation 是 {日文标签:{zh:中文译名}} 映射:
+ *  中文关键词经它映射回日文标签,用于排行榜匹配 */
+function expandPixivKeywordAliases(keyword = "", tagTranslation:unknown = null) {
+  const aliases = new Set([String(keyword || "").toLowerCase().replace(/\s+/g, "")])
+  const entries = Array.isArray(tagTranslation)
+    ? tagTranslation.flatMap(entry => Object.entries(record(entry)))
+    : Object.entries(tagTranslation && typeof tagTranslation === "object" ? tagTranslation : {})
+  for (const [jaTag, translations] of entries) {
+    const zh = String(record(translations).zh || "").toLowerCase().replace(/\s+/g, "")
+    const ja = String(jaTag || "").toLowerCase().replace(/\s+/g, "")
+    if (!zh || !ja) continue
+    for (const alias of aliases) {
+      if (zh === alias || zh.includes(alias) || alias.includes(zh)) {
+        aliases.add(ja)
+        break
+      }
+    }
+  }
+  return [...aliases].filter(Boolean)
+}
+
+/**
+ * 官方排行榜(ranking.php format=json)匿名可访问且自带收藏数。
+ * 拉日榜+周榜前几页,按关键词列表匹配 tag/标题(小写子串双向)。
+ */
+async function collectPixivRankingMatches(keywords:string[] = [], { fetchImpl = null, proxyUrl = "", signal }:PixivRequest = {}) {
+  const words = [...new Set((Array.isArray(keywords) ? keywords : [keywords]).map(word => String(word || "").toLowerCase().replace(/\s+/g, "")))].filter(Boolean)
+  if (!words.length) return { items: [], total: 0 }
+  const requests = []
+  for (const mode of ["daily", "weekly"]) {
+    for (const page of [1, 2]) {
+      requests.push({ mode, page })
+    }
+  }
+  const pages = await Promise.all(requests.map(async ({ mode, page }) => {
+    try {
+      // ranking.php 的 JSON 是裸结构(无 body 信封),走 raw 模式
+      const payload = record(await fetchPixivJson(`https://www.pixiv.net/ranking.php?mode=${mode}&content=all&format=json&p=${page}`, { fetchImpl, proxyUrl, signal, raw: true }))
+      return (Array.isArray(payload?.contents) ? payload.contents : []).map(entry => normalizePixivRankingEntry(entry))
+    } catch {
+      return []
+    }
+  }))
+  const seen = new Set()
+  const matched = []
+  for (const entry of pages.flat()) {
+    if (!entry || seen.has(entry.id)) continue
+    const haystacks = [entry.title, entry.userName, ...(entry.tags || [])]
+      .map(value => String(value || "").toLowerCase().replace(/\s+/g, ""))
+      .filter(Boolean)
+    const hit = haystacks.some(text => words.some(word => text.includes(word) || (word.length >= 2 && word.includes(text) && text.length >= 2)))
+    if (hit) {
+      seen.add(entry.id)
+      matched.push(entry)
+    }
+  }
+  matched.sort((a, b) => b.bookmarkCount - a.bookmarkCount)
+  return { items: matched.slice(0, POPULAR_CANDIDATES), total: matched.length }
+}
+
+function normalizePixivRankingEntry(input:unknown = {}) {
+  const entry=record(input);
+  const item = normalizePixivSearchItem({
+    id: entry.illust_id,
+    title: entry.title,
+    userName: entry.user_name,
+    userId: entry.user_id,
+    pageCount: 1,
+    xRestrict: 0,
+    url: entry.url
+  })
+  return item ? { ...item, bookmarkCount: Math.max(0, Math.round(Number(entry.rating_count) || 0)), tags: Array.isArray(entry.tags) ? entry.tags.filter((tag):tag is string=>typeof tag==='string').slice(0, 8) : [] } : null
+}
+
+/** 匿名接口拿不到收藏数:并行取详情接口的 bookmarkCount 给候选重排 */
+async function rankPixivItemsByBookmarks(items:PixivItem[] = [], { fetchImpl = null, proxyUrl = "", signal }:PixivRequest = {}) {
+  const ranked = await Promise.all(items.map(async item => {
+    try {
+      const body = record(await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(item.id)}?lang=zh`, { fetchImpl, proxyUrl, signal }))
+      return { ...item, bookmarkCount: Math.max(0, Math.round(Number(body?.bookmarkCount) || 0)) }
+    } catch {
+      return { ...item, bookmarkCount: -1 }
+    }
+  }))
+  const withCount = ranked.filter(item => item.bookmarkCount >= 0)
+  if (!withCount.length) return []
+  return withCount.sort((a, b) => b.bookmarkCount - a.bookmarkCount)
+}
+
+/**
+ * 从搜索结果里找画师:匿名画师搜索接口需要登录,这里用结果里的
+ * userName 与关键词互相包含(忽略大小写)来识别,识别不到返回 null。
+ */
+function resolvePixivArtistFromItems(items:PixivItem[] = [], keyword = "") {
+  const word = cleanText(keyword, 60).toLowerCase()
+  if (!word) return null
+  const counts = new Map<string,{userId:string;userName:string;hits:number}>()
+  for (const item of items) {
+    if (!item.userId || !item.userName) continue
+    const name = item.userName.toLowerCase()
+    if (!name.includes(word) && !word.includes(name)) continue
+    const entry = counts.get(item.userId) || { userId: item.userId, userName: item.userName, hits: 0 }
+    entry.hits += 1
+    counts.set(item.userId, entry)
+  }
+  const best = [...counts.values()].sort((a, b) => b.hits - a.hits)[0]
+  return best && best.hits >= 1 ? { userId: best.userId, userName: best.userName } : null
+}
+
+/** 拉某画师最近的作品:profile/all 全量 ID 取尾部,再批量取详情。 */
+async function listPixivArtistRecentWorks(userId = "", {
+  limit = ARTIST_RECENT_LIMIT,
+  fetchImpl = null,
+  proxyUrl = "",
+  cookieHeader = "",
+  timeoutMs = SEARCH_TIMEOUT_MS
+}:PixivRequest & {limit?:number} = {}) {
+  const uid = String(userId || "").trim()
+  if (!/^\d{3,12}$/.test(uid)) throw new Error("画师 ID 不合法")
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), Math.max(6000, Number(timeoutMs) * 2 || SEARCH_TIMEOUT_MS * 2))
+  const request = { fetchImpl, proxyUrl, cookieHeader, signal: controller.signal }
+  try {
+    const profile = record(await fetchPixivJson(`https://www.pixiv.net/ajax/user/${encodeURIComponent(uid)}/profile/all?lang=zh`, request))
+    const illustIds = Object.keys(record(profile.illusts))
+    if (!illustIds.length) throw new Error("该画师没有可公开查看的作品")
+    const wanted = Math.max(1, Math.min(12, Number(limit) || ARTIST_RECENT_LIMIT))
+    // 多取一倍候选:详情可能因删稿失败,失败跳过后继续补足到目标数量
+    const candidates = illustIds.sort((a, b) => Number(b) - Number(a)).slice(0, wanted * 2)
+    const fetched = await Promise.all(candidates.map(async illustId => {
+      try {
+        const body = record(await fetchPixivJson(`https://www.pixiv.net/ajax/illust/${encodeURIComponent(illustId)}?lang=zh`, request))
+        return normalizePixivSearchItem({
+          id: body?.id || illustId,
+          title: body?.title,
+          userName: body?.userName,
+          userId: body?.userId,
+          pageCount: body?.pageCount,
+          xRestrict: body?.xRestrict,
+          url: record(body.urls).regular || record(body.urls).small
+        })
+      } catch {
+        return null
+      }
+    }))
+    const items = fetched.filter((item):item is PixivItem=>item!==null).slice(0, wanted)
+    if (!items.length) throw new Error("画师作品详情暂时获取失败")
+    return { userId: uid, items }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// ---------- 搜索会话:记住每个群/用户最近一次的搜索结果,供「下载 序号」回查 ----------
+
+function sessionKey(e:PixivScope = {}) {
+  const id = e.group_id || e.user_id || ""
+  return id ? `${SESSION_KEY_PREFIX}${String(e.self_id||"default")}:${e.group_id?"group":"private"}:${String(id)}` : ""
+}
+
+async function savePixivSearchSession(e:PixivScope = {}, searchSession:PixivSession = {keyword:"",order:"newest",items:[]}, { redis = ports.getRedis(), savedAt = Date.now() }:{redis?:PixivRedis|undefined;savedAt?:number} = {}) {
+  const key = sessionKey(e)
+  if (!key || !searchSession?.items?.length) return
+  const record:PixivSession = {
+    keyword: String(searchSession.keyword || ""),
+    mode: String(searchSession.mode || "artworks"),
+    order: PIXIV_SEARCH_ORDERS.has(searchSession.order) ? searchSession.order : "newest",
+    orderSource: ["rerank","ranking"].includes(searchSession.orderSource||"") ? searchSession.orderSource || "native" : "native",
+    artist: searchSession.artist && typeof searchSession.artist === "object" ? { userId: searchSession.artist.userId, userName: searchSession.artist.userName } : null,
+    items: searchSession.items.slice(0, 20).map(({ id, title, userName, pageCount, xRestrict, bookmarkCount }) => ({ id, title, userName, pageCount, xRestrict,...(bookmarkCount!==undefined?{bookmarkCount}:{}) })),
+    savedAt
+  }
+  localSessions.set(key, record)
+  pruneLocalSessions()
+  if (redis?.set) {
+    // 客户端兼容:node-redis v4 只认对象参数 {PX} 且命令是驼峰 pExpire;
+    // 位置参数 "PX" 会被静默忽略导致键永不过期。对象形式失败再退回分离设置。
+    const ttlMs = Math.max(1000, PIXIV_SEARCH_SESSION_TTL_MS - (Date.now() - savedAt))
+    try {
+      await redis.set(key, JSON.stringify(record), { PX: ttlMs })
+    } catch {
+      await redis.set(key, JSON.stringify(record)).catch(() => {})
+      const expire = typeof redis.pExpire === "function" ? redis.pExpire.bind(redis)
+        : typeof redis.pexpire === "function" ? redis.pexpire.bind(redis)
+        : null
+      await expire?.(key, ttlMs).catch?.(() => {})
+    }
+  }
+  return record
+}
+
+async function loadPixivSearchSession(e:PixivScope = {}, { redis = ports.getRedis() }:{redis?:PixivRedis|undefined} = {}) {
+  const key = sessionKey(e)
+  if (!key) return null
+  let record:PixivSession|null = null
+  if (redis?.get) {
+    try {
+      record = decodeSession(JSON.parse(await redis.get(key) || "null"))
+    } catch {}
+  }
+  if (!record) record = localSessions.get(key) || null
+  if (!record || Date.now() - Number(record.savedAt || 0) > PIXIV_SEARCH_SESSION_TTL_MS) {
+    if (record) localSessions.delete(key)
+    return null
+  }
+  return record
+}
+
+/** 同步检查本群/用户是否有可用的 Pixiv 搜索会话(路由规则是同步的,只看进程内存副本) */
+function hasRecentPixivSearch(e:PixivScope = {}) {
+  const key = sessionKey(e)
+  if (!key) return false
+  const record = localSessions.get(key)
+  return Boolean(record && Date.now() - Number(record.savedAt || 0) <= PIXIV_SEARCH_SESSION_TTL_MS)
+}
+
+/** 成功下载后续期会话:把 5 分钟窗口从当前时刻重新起算 */
+async function touchPixivSearchSession(e:PixivScope = {}, { redis = ports.getRedis() }:{redis?:PixivRedis|undefined} = {}) {
+  const record = await loadPixivSearchSession(e, { redis })
+  if (!record) return null
+  return await savePixivSearchSession(e, record, { redis })
+}
+
+function pruneLocalSessions() {
+  for (const [key, record] of localSessions) {
+    if (Date.now() - Number(record?.savedAt || 0) > PIXIV_SEARCH_SESSION_TTL_MS) localSessions.delete(key)
+  }
+  while (localSessions.size > 64) localSessions.delete(localSessions.keys().next().value || "")
+}
+
+/** 「下载 3」或「下载 126649495」→ 作品 ID;找不到返回空串 */
+function resolvePixivDownloadTarget(target = "", searchSession:PixivSession|null = null) {
+  const text = String(target || "").trim()
+  const directId = text.match(/^\d{5,12}$/)?.[0]
+  if (directId) return { id: directId, item: searchSession?.items?.find(item => item.id === directId) || null }
+  const index = Number(text.match(/^(?:#|No\.?|第)?(\d{1,2})$/i)?.[1] || 0)
+  if (index >= 1 && searchSession?.items?.length) {
+    const item = searchSession.items.slice(0, LIST_MAX_ITEMS)[index - 1]
+    if (item) return { id: item.id, item }
+  }
+  return { id: "", item: null }
+}
+
+// ---------- 结果卡面 ----------
+
+function escapeHtml(value:unknown = "") {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+}
+
+// Chromium 在 setContent 页面里默认禁止 file:// 子资源,缩略图必须以 data URI 内嵌
+async function imageDataUri(filePath = "") {
+  if (!filePath) return ""
+  try {
+    const buffer = await fs.promises.readFile(filePath)
+    const mime = buffer[0] === 0x89 && buffer[1] === 0x50 ? "image/png" : "image/jpeg"
+    return `data:${mime};base64,${buffer.toString("base64")}`
+  } catch {
+    return ""
+  }
+}
+
+function formatCount(value:unknown = 0) {
+  const number = Math.max(0, Math.round(Number(value) || 0))
+  if (number >= 10000) return `${(number / 10000).toFixed(1)}万`
+  return String(number)
+}
+
+async function buildPixivListHtml(data:{items:PixivItem[];keyword:string;mode?:string|undefined;subtitle:string}) {
+  const rows = (await Promise.all(data.items.map(async (item, offset) => {
+    const dataUri = await imageDataUri(item.thumbPath)
+    return `
+    <tr class="${item.xRestrict > 0 ? "restricted" : "ok"}">
+      <td class="num">${offset + 1}</td>
+      <td class="thumb">${dataUri ? `<img src="${dataUri}" />` : "<div class='thumb ph'>无图</div>"}</td>
+      <td class="info">
+        <div class="title">${escapeHtml(item.title)}</div>
+        <div class="author">${escapeHtml(item.userName)}${item.pageCount > 1 ? ` · ${item.pageCount}张` : ""}${Number(item.bookmarkCount) > 0 ? ` · ♥${formatCount(item.bookmarkCount)}` : ""}${item.xRestrict > 0 ? " · R-18" : ""}</div>
+      </td>
+      <td class="id">${escapeHtml(item.id)}</td>
+    </tr>`
+  }))).join("")
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: transparent; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .card { width: 720px; background: #f8f9fc; border-radius: 14px; padding: 18px 20px 14px; }
+  .head h1 { font-size: 19px; color: #0096fa; }
+  .head .meta { margin-top: 6px; font-size: 12px; color: #6b7280; }
+  table { margin-top: 12px; border-collapse: collapse; width: 100%; background: #fff; border-radius: 10px; overflow: hidden; }
+  tr.ok { background: #fff; }
+  tr.restricted { background: #fff7f7; }
+  td { padding: 8px 8px; vertical-align: middle; }
+  td.num { width: 26px; font-weight: 700; color: #0096fa; font-size: 15px; text-align: center; }
+  td.thumb { width: 64px; }
+  td.thumb img, .thumb.ph { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; display: block; background: #e5e7eb; }
+  .thumb.ph { display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 10px; }
+  td.info .title { font-size: 13px; color: #1f2937; line-height: 1.35; }
+  td.info .author { margin-top: 3px; font-size: 11px; color: #6b7280; }
+  td.id { width: 88px; font-size: 11px; color: #9ca3af; text-align: right; }
+  .foot { margin-top: 10px; font-size: 12px; color: #374151; }
+  .foot .hint { margin-top: 4px; font-size: 11px; color: #9ca3af; }
+</style></head>
+<body>
+  <div class="card">
+    <div class="head">
+      <h1>Pixiv ${escapeHtml(data.mode === "artist" ? "画师作品" : "搜索")}「${escapeHtml(data.keyword)}」</h1>
+      <div class="meta">${escapeHtml(data.subtitle)}</div>
+    </div>
+    <table><tbody>${rows}</tbody></table>
+    <div class="foot">
+      回复「下载 序号」或「下载 作品ID」即可搬运对应作品
+      <div class="hint">列表保留 5 分钟,下载会续期;新搜索会替换当前列表;R-18 作品默认不提供下载。</div>
+    </div>
+  </div>
+</body></html>`
+}
+
+/**
+ * 渲染搜索结果卡面(缩略图先经代理落盘,再以 file:// 嵌入)。
+ * 返回 { imagePath, tempFiles };发送后由调用方删除 tempFiles。
+ */
+async function renderPixivListCard(searchSession:PixivSession = {keyword:"",order:"newest",items:[]}, { proxyUrl = "", fetchImpl = null, logger = ports.logger }:PixivRequest & {logger?:PixivSearchPorts['logger']} = {}) {
+  const items = (searchSession.items || []).slice(0, LIST_MAX_ITEMS)
+  const tempFiles:string[] = []
+  // 浏览器冷启动与缩略图下载并行,谁慢等谁
+  const browserPromise = getSharedBrowser()
+  const withThumbs = await Promise.all(items.map(async item => {
+    let thumbPath = ""
+    if (item.thumbUrl) {
+      // 8 张并发走代理偶发单张失败,补一次重试再降级占位
+      thumbPath = await downloadPixivArchiveImage(item.thumbUrl, { maxBytes: 3 * 1024 * 1024, timeoutMs: 12_000, proxyUrl, fetchImpl })
+      if (!thumbPath) {
+        thumbPath = await downloadPixivArchiveImage(item.thumbUrl, { maxBytes: 3 * 1024 * 1024, timeoutMs: 12_000, proxyUrl, fetchImpl })
+      }
+      if (thumbPath) tempFiles.push(thumbPath)
+    }
+    return { ...item, thumbPath }
+  }))
+  const total = Number(searchSession.total || items.length) || items.length
+  const orderLabels:Record<string,string> = {
+    newest: "按时间·最新",
+    oldest: "按时间·最早",
+    "popular-native": "按人气·全站收藏排序",
+    "popular-ranking": "按人气·官方排行榜(日/周榜)匹配",
+    "popular-rerank": "按近期人气(最新上传中收藏最多,登录Cookie可解锁全站)"
+  }; const orderLabel=orderLabels[searchSession.orderSource === "rerank" ? "popular-rerank" : searchSession.orderSource === "ranking" ? "popular-ranking" : searchSession.order === "popular" ? "popular-native" : PIXIV_SEARCH_ORDERS.has(searchSession.order) ? searchSession.order : "newest"]
+  const subtitle = searchSession.mode === "artist" && searchSession.artist?.userName
+    ? `画师 ${searchSession.artist.userName} 的最近作品 · 共 ${items.length} 张 · ${orderLabel}`
+    : `共 ${total} 个结果,展示前 ${items.length} 个 · ${orderLabel}`
+  const outputDir = path.join(os.tmpdir(), "shiloh-plugin-pixiv-cards")
+  await fs.promises.mkdir(outputDir, { recursive: true })
+  const outputPath = path.join(outputDir, `pixiv-list-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`)
+
+  const browser = await browserPromise
+  const page = await browser.newPage()
+  try {
+    await page.setViewport({ width: 760, height: 900, deviceScaleFactor: 2 })
+    await page.setContent(await buildPixivListHtml({ keyword: searchSession.keyword, mode: searchSession.mode, subtitle, items: withThumbs }), { waitUntil: "domcontentloaded", timeout: 30_000 })
+    await page.evaluate(async () => {
+      await Promise.all([...document.images].map(img => img.complete ? null : new Promise(resolve => { img.onload = img.onerror = resolve })))
+    }).catch(() => {})
+    const height = await page.evaluate(() => Math.ceil(document.body.getBoundingClientRect().height))
+    // JPEG 截图:比 PNG 小一个量级,大幅缩短随后的 QQ 上传耗时
+    await page.screenshot({ path: outputPath, clip: { x: 0, y: 0, width: 760, height: Math.max(1, height) }, type: "jpeg", quality: 88 })
+    return { imagePath: outputPath, tempFiles }
+  } catch (error) {
+    logger?.warn?.(`[Pixiv] 列表卡面渲染失败: ${String(error instanceof Error?error.message:error).slice(0, 120)}`)
+    await fs.promises.unlink(outputPath).catch(() => {})
+    return { imagePath: "", tempFiles }
+  } finally {
+    await page.close().catch(() => {})
+    scheduleSharedBrowserClose()
+  }
+}
+
+async function cleanupPixivListCard(tempFiles:string[] = []) {
+  await Promise.all((Array.isArray(tempFiles) ? tempFiles : []).map(file => fs.promises.unlink(file).catch(() => {})))
+}
+
+return {PIXIV_SEARCH_SESSION_TTL_MS,PIXIV_SEARCH_ORDERS,normalizePixivSearchItem,searchPixivArtworks,expandPixivKeywordAliases,resolvePixivArtistFromItems,listPixivArtistRecentWorks,savePixivSearchSession,loadPixivSearchSession,hasRecentPixivSearch,touchPixivSearchSession,resolvePixivDownloadTarget,renderPixivListCard,cleanupPixivListCard};
+}
+function decodeSession(value:unknown):PixivSession|null {const raw=record(value);if(typeof raw.keyword!=='string'||typeof raw.order!=='string'||typeof raw.savedAt!=='number'||!Array.isArray(raw.items))return null;const items:PixivItem[]=[];for(const value of raw.items){const item=record(value);if(typeof item.id!=='string'||!/^\d{3,12}$/.test(item.id)||typeof item.title!=='string'||typeof item.userName!=='string'||typeof item.pageCount!=='number'||typeof item.xRestrict!=='number')return null;items.push({id:item.id,title:item.title,userName:item.userName,pageCount:item.pageCount,xRestrict:item.xRestrict,...(typeof item.bookmarkCount==='number'?{bookmarkCount:item.bookmarkCount}:{})});}return {keyword:raw.keyword,order:raw.order,savedAt:raw.savedAt,items,...(typeof raw.mode==='string'?{mode:raw.mode}:{}),...(typeof raw.orderSource==='string'?{orderSource:raw.orderSource}:{})};}

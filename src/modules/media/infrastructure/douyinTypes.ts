@@ -1,0 +1,5 @@
+export interface DouyinCard {type?:string;platform?:string;text?:string;data?:{text?:string};aweme_id?:string;short_url?:string;page_url?:string;video_url?:string;metadata_status?:string;title?:string;description?:string;author?:string;author_uid?:string;duration?:number;cover_url?:string;play_url?:string;images?:string[];media_kind?:string;final_url?:string;stats?:Record<string,number>|null}
+export interface MediaLogger {warn?(message:string):void;info?(message:string):void}
+export interface DouyinOptions {fetchImpl?:typeof fetch;timeoutMs?:number;cacheTtlMs?:number;forceStaticParse?:boolean;logger?:MediaLogger|undefined;browserResolver?:(card:DouyinCard,options:{logger?:MediaLogger|undefined})=>Promise<DouyinCard|null>}
+export function record(value:unknown):Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
+export function errorText(error:unknown):string{return error instanceof Error?error.message:String(error)}

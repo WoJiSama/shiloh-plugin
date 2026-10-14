@@ -194,7 +194,7 @@ test("offers an over-limit multi-file torrent for selection and downloads only t
   const event = {
     group_id: 100000000 + Math.floor(Math.random() * 1000000),
     user_id: 200000000 + Math.floor(Math.random() * 1000000),
-    reply: async value => notices.push(value)
+    reply: async value => { notices.push(value); return {message_id:notices.length} }
   }
   try {
     const initial = await tool.execute({ magnet }, event)
@@ -252,7 +252,7 @@ test("磁链清单统一渲染成卡面图片发送", async () => {
     const result = await tool.execute({ magnet }, {
       group_id: 100000000 + Math.floor(Math.random() * 1000000),
       user_id: 200000000 + Math.floor(Math.random() * 1000000),
-      reply: async value => notices.push(value)
+      reply: async value => { notices.push(value); return {message_id:notices.length} }
     })
     assert.match(result, /selection_required/)
     const imageNotice = notices.find(value => value?.type === "image")

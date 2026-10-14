@@ -29,7 +29,7 @@ async function startFixtureServer(root, t, envOverrides = {}) {
       if (match) { clearTimeout(timeout); resolve(match[1]) }
     })
     child.stderr.on("data", chunk => { output += chunk.toString(); t.diagnostic(chunk.toString()) })
-    child.once("exit", code => { clearTimeout(timeout); if (code) reject(new Error(`fixture server exited ${code}: ${output}`)) })
+    child.once("exit", (code, signal) => { clearTimeout(timeout); reject(new Error(`fixture server exited ${code ?? signal}: ${output}`)) })
   })
 }
 
@@ -67,7 +67,7 @@ test("isolated console HTTP saves safely, preserves YAML and credentials, and pr
     })
   })
   await new Promise(resolve => upstream.listen(0, "127.0.0.1", resolve))
-  t.after(() => new Promise(resolve => upstream.close(resolve)))
+  t.after(() => { upstream.closeAllConnections(); return new Promise(resolve => upstream.close(resolve)) })
   const apiUrl = `http://127.0.0.1:${upstream.address().port}/v1/chat/completions`
   const configFile = path.join(root, "config", "message.yaml")
   fs.writeFileSync(configFile, `# keep this comment\npluginSettings:\n  unrelated: keep-this-value\n` + YAML.stringify({
@@ -202,7 +202,7 @@ test('console image HTTP uses compiled shared service with multiple provider ima
     })
   })
   await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve))
-  t.after(() => new Promise(resolve => provider.close(resolve)))
+  t.after(() => { provider.closeAllConnections(); return new Promise(resolve => provider.close(resolve)) })
   fs.writeFileSync(path.join(root, 'config', 'message.yaml'), YAML.stringify({ pluginSettings: { imageGenerationAiConfig: { providers: [{ name: 'fixture', model: 'gpt-image-2', apiKey: 'local-fixture-secret', apiUrl: `http://127.0.0.1:${provider.address().port}/v1/images/generations` }] } } }))
   const base = await startFixtureServer(root, t, { CONSOLE_DRAW_DIR: path.join(root, 'draw') })
   const response = await fetch(`${base}/api/image/generate`, { method: 'POST', headers: { 'x-console-token': token, 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'fixture', n: 2, quality: 'high' }) })

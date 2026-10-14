@@ -9,4 +9,6 @@ const legacy = (await filesUnder(path.join(root, 'tests'))).filter(file => file.
 const typed = (await filesUnder(path.join(root, '.test-build/tests/typescript'))).filter(file => file.endsWith('.test.js'))
 if (!typed.length || !legacy.length) throw new Error('Both legacy and TypeScript tests must be discovered')
 console.log(`Discovered ${legacy.length} legacy JS test files + ${typed.length} compiled TS test files`)
-run(process.execPath, ['--test', ...legacy, ...typed])
+const concurrency = Number(process.env.BACKEND_TEST_CONCURRENCY || 4)
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) throw new Error('BACKEND_TEST_CONCURRENCY must be an integer between 1 and 32')
+run(process.execPath, ['--test', `--test-concurrency=${concurrency}`, ...legacy, ...typed])
