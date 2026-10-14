@@ -1,3 +1,4 @@
+import type {MediaSegment} from '../../../contracts/mediaRelay.js'
 import type {createArchiveManagerClass} from '../../messaging/infrastructure/messageArchive.js'
 import type {createMessageManagerClass} from '../../messaging/application/recentMessages.js'
 import type {RecentOptions} from '../../../contracts/recentMessages.js'
@@ -12,7 +13,7 @@ export interface HostEvent {msg:string;group_id?:string|number;user_id?:string|n
 export interface HostLogger {warn(message:string):void;error(message:string):void;info(message:string):void}
 export interface ArchiveSearch {type:string;groupId:string;limit:number;around:number;contextAround?:number;qq?:string;keyword?:string;regex?:string;messageId?:string}
 export interface PipelineJob {state?:string;envelope?:{groupId?:unknown};groupId?:unknown;lastError?:unknown;uncertain?:boolean;updatedAt?:number;id?:string}
-export interface MessageHostPorts {MessageManager:new(options:RecentOptions)=>InstanceType<ReturnType<typeof createMessageManagerClass>>;archiveManager:ArchiveManager;getBase64Image(url:string,name:string):Promise<unknown>;getBot():HostBot;logger:HostLogger;segment:{image(value:unknown):unknown;record?(file:string):unknown};getInstalledMessagePipeline():{store?:{list(kind:string):Promise<PipelineJob[]>};unavailableReason?:string;config?:{enabled?:boolean};pipeline?:{stopped?:boolean}}|null|undefined;sendCompleteLocalFile:ReturnType<typeof createDeliveryGatewayModule>['sendCompleteLocalFile']}
+export interface MessageHostPorts {MessageManager:new(options:RecentOptions)=>InstanceType<ReturnType<typeof createMessageManagerClass>>;archiveManager:ArchiveManager;getBase64Image(url:string,name:string):Promise<unknown>;getBot():HostBot;logger:HostLogger;segment:{image(value:unknown):MediaSegment;video?(file:string):MediaSegment;record?(file:string):unknown};getInstalledMessagePipeline():{store?:{list(kind:string):Promise<PipelineJob[]>};unavailableReason?:string;config?:{enabled?:boolean};pipeline?:{stopped?:boolean}}|null|undefined;sendCompleteLocalFile:ReturnType<typeof createDeliveryGatewayModule>['sendCompleteLocalFile']}
 export interface ReplayNode {user_id:string|number;nickname:string;time?:unknown;message:unknown[]}
 export interface HostConfig {pluginSettings:Record<string,unknown>}
 export function hostRecord(value:unknown):Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}

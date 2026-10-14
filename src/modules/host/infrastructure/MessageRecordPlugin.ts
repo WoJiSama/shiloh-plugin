@@ -468,7 +468,7 @@ return class MessageRecordPlugin extends Plugin {
             }
             const bilibili = this.getBilibiliSegment(record);
             if (bilibili) {
-                const relay = await buildBilibiliArchiveRelaySegments(bilibili, { logger });
+                const relay = await buildBilibiliArchiveRelaySegments(bilibili, { logger, segmentApi: segment });
                 message.push(...relay.segments);
                 tempFiles.push(...relay.tempFiles);
             }

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { createImageService } from '../../src/modules/image/application/imageService.js'
 import type { ImageServicePorts } from '../../src/contracts/imageService.js'
 const candidate={apiUrl:'https://fixture.invalid',apiKey:'fixture',model:'gpt-image-2',name:'primary'}
@@ -51,4 +52,49 @@ test('Grok default single-image payload omits n while explicit multi-image keeps
  assert.equal(payloads[1]?.n,3)
  assert.equal(payloads[0]?.quality,'high')
  assert.equal(Object.hasOwn(payloads[0]||{},'response_format'),false)
+})
+
+test('response body deadline fires without transport handles and releases its timer', () => {
+ const serviceUrl = new URL('../../src/modules/image/application/imageService.js', import.meta.url).href
+ const output = execFileSync(process.execPath, ['--input-type=module', '-e', `
+  import { createImageService } from ${JSON.stringify(serviceUrl)}
+  const service = createImageService({
+   fetch: async (_url, { signal }) => ({
+    text: () => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+   })
+  })
+  try {
+   await service.timedFetch('https://fixture.invalid', {}, 25)
+   throw new Error('response deadline did not fire')
+  } catch (error) {
+   process.stdout.write(error.message)
+  }
+ `], { encoding: 'utf8', timeout: 3000 })
+ assert.match(output, /图片接口超过 1 秒没有返回完整响应/)
+})
+
+test('successful response and external cancellation clear long response deadlines', () => {
+ const serviceUrl = new URL('../../src/modules/image/application/imageService.js', import.meta.url).href
+ const output = execFileSync(process.execPath, ['--input-type=module', '-e', `
+  import { createImageService } from ${JSON.stringify(serviceUrl)}
+  const success = createImageService({ fetch: async () => new Response('complete') })
+  const response = await success.timedFetch('https://fixture.invalid', {}, 60000)
+  if (await response.text() !== 'complete') throw new Error('response changed')
+  const controller = new AbortController()
+  const reason = new Error('external cancellation')
+  const cancelled = createImageService({
+   fetch: async (_url, { signal }) => {
+    controller.abort(reason)
+    throw signal.reason
+   }
+  })
+  try {
+   await cancelled.timedFetch('https://fixture.invalid', { signal: controller.signal }, 60000)
+   throw new Error('external cancellation was swallowed')
+  } catch (error) {
+   if (error !== reason) throw new Error('external cancellation reason changed')
+  }
+  process.stdout.write('completed and cancelled')
+ `], { encoding: 'utf8', timeout: 3000 })
+ assert.equal(output, 'completed and cancelled')
 })

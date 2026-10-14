@@ -19,8 +19,11 @@ export function createImageService(ports: ImageServicePorts) {
   return payload
  }
  async function timedFetch(url: string, options: RequestInit, timeoutMs = 120000): Promise<Response> {
-  const timeout = AbortSignal.timeout(timeoutMs)
-  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
+  const deadline = new AbortController()
+  // A pending response body must keep its deadline alive even when the transport
+  // has no other active handles (for example, a paused or mocked response stream).
+  const timer = setTimeout(() => deadline.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError')), timeoutMs)
+  const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal
   try {
    const response = await ports.fetch(url, { ...options, signal })
    // Consume body under the deadline; provider headers alone must not end timeout coverage.
@@ -28,8 +31,10 @@ export function createImageService(ports: ImageServicePorts) {
    return new Response([204,205,304].includes(response.status) ? null : text, { status: response.status, statusText: response.statusText, headers: response.headers })
   } catch (error) {
    if (options.signal?.aborted) throw options.signal.reason
-   if (timeout.aborted) throw new Error(`图片接口超过 ${Math.ceil(timeoutMs / 1000)} 秒没有返回完整响应`)
+   if (deadline.signal.aborted) throw new Error(`图片接口超过 ${Math.ceil(timeoutMs / 1000)} 秒没有返回完整响应`)
    throw error
+  } finally {
+   clearTimeout(timer)
   }
  }
  async function parseResponse(response: Response) {

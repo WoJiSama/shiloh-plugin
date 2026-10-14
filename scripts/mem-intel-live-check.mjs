@@ -9,7 +9,7 @@ const client = createClient({ url: 'redis://127.0.0.1:6379' })
 client.on('error', () => {})
 await client.connect()
 
-const { MemoryManager } = await import('../utils/MemoryManager.js')
+const { MemoryManager } = await import('../domains/memory/MemoryManager.js')
 const G = '__mem_intel_check__'
 const now = Date.now()
 const m = new MemoryManager({ enabled: true }, { redis: client })

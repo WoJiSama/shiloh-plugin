@@ -2,8 +2,8 @@
 // 验证 applyOps 写入的 fact 真的带上了 embedding 向量。临时测试群,跑完清理。
 import fs from 'node:fs'
 import { createClient } from 'redis'
-import { Embeddings, cosineSimilarity } from '../utils/memory/embeddings.js'
-import { MemoryManager } from '../utils/MemoryManager.js'
+import { Embeddings, cosineSimilarity } from '../domains/memory/engine/embeddings.js'
+import { MemoryManager } from '../domains/memory/MemoryManager.js'
 
 globalThis.logger = new Proxy({}, { get: () => () => {} })
 

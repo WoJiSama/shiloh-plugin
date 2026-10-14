@@ -5,6 +5,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { root, run, filesUnder, digestFiles, verifyBackend } from './lib/build-support.mjs'
 
 const protectedRoots = new Set(['.git', 'node_modules', 'config', 'data', 'database', 'logs', 'backups', 'custom_tools'])
+export function selectRuntimeFiles(tracked) {
+  return tracked.filter(name =>
+    (!/^(?:tests|docs|src|\.github)\//.test(name) || name.startsWith('docs/dice-rules/')) &&
+    !['task_plan.md', 'progress.md', 'findings.md'].includes(name) &&
+    !name.startsWith('console/frontend/') && !protectedRoots.has(name.split('/')[0]))
+}
 export function safePath(base, relative) {
   if (typeof relative !== 'string' || !relative || relative.includes('\\') || relative.split('/').some(p => p === '..' || p === '.') || path.isAbsolute(relative) || protectedRoots.has(relative.split('/')[0])) throw new Error(`Unsafe release path: ${relative}`)
   return path.join(base, relative)
@@ -99,7 +105,7 @@ async function pack() {
   const output = path.join(root, '.release', commit)
   await fs.rm(output, { recursive: true, force: true }); await fs.mkdir(output, { recursive: true })
   const tracked = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).stdout.split('\0').filter(Boolean)
-  const runtime = tracked.filter(name => !/^(?:tests|docs|src|\.github)\//.test(name) && !['task_plan.md','progress.md','findings.md'].includes(name) && !name.startsWith('console/frontend/') && !protectedRoots.has(name.split('/')[0]))
+  const runtime = selectRuntimeFiles(tracked)
   for (const name of runtime) {
     const from = path.join(root, name), to = safePath(output, name)
     const stat = await fs.lstat(from)

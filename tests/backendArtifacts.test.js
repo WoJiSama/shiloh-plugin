@@ -3,9 +3,10 @@ import test from 'node:test'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { root, digestFiles, filesUnder, verifyBackend } from '../scripts/lib/build-support.mjs'
-import { verifyRelease, installRelease, rollbackRelease, safePath } from '../scripts/release.mjs'
+import { verifyRelease, installRelease, rollbackRelease, safePath, selectRuntimeFiles } from '../scripts/release.mjs'
 
 async function temporary(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'shiloh-artifact-'))
@@ -61,6 +62,28 @@ test('compiled wrappers load under a host-shaped directory from another cwd; JS 
   `)
   const child = spawnSync(process.execPath, [path.join(plugin, 'smoke.mjs')], { cwd: temp, encoding: 'utf8' })
   assert.equal(child.status, 0, child.stderr)
+})
+
+test('release includes dice command documents and emitted code resolves them inside the installed package', async t => {
+  const temp = await temporary(t)
+  const source = path.join(temp, 'source'), target = path.join(temp, 'host/plugins/shiloh-plugin')
+  const names = ['JS规则包教程.md', '骰娘自定义规则接入指南.md', 'examples/bishou-zhixin.cjs']
+  const runtimeDocuments = (await filesUnder(path.join(root, 'docs/dice-rules')))
+    .map(file => path.relative(root, file).replaceAll('\\', '/'))
+  assert.deepEqual(selectRuntimeFiles(runtimeDocuments), runtimeDocuments)
+  assert.deepEqual(selectRuntimeFiles(['docs/architecture/migrations/phase-7g.md', 'docs/commands.md', 'src/example.ts', 'config/message.yaml']), [])
+  const documents = Object.fromEntries(await Promise.all(names.map(async name => [
+    `docs/dice-rules/${name}`, await fs.readFile(path.join(root, 'docs/dice-rules', name))
+  ])))
+  await release(source, { 'package.json': '{"type":"module"}', ...documents })
+  await fs.mkdir(target, { recursive: true })
+  await installRelease(source, target, path.join(temp, 'backup'))
+  const { resolveDiceDocPath } = await import(pathToFileURL(path.join(target, 'dist/backend/modules/dice/infrastructure/diceCommandPolicy.js')))
+  for (const name of names) {
+    const file = resolveDiceDocPath(name)
+    assert.equal(file, await fs.realpath(path.join(target, 'docs/dice-rules', name)))
+    assert.deepEqual(await fs.readFile(file), documents[`docs/dice-rules/${name}`])
+  }
 })
 
 test('backend manifest rejects corrupted output and stale source fingerprints', async t => {

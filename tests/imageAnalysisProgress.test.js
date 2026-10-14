@@ -2,6 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import YAML from "yaml"
+import { createGoogleImageAnalysisTool } from "../dist/backend/modules/toolSupport/infrastructure/GoogleAnalysisTool.js"
 
 async function loadTool(t) {
   if (!globalThis.logger) {
@@ -79,27 +80,46 @@ test("image analysis tool exposes an optional contextual progress sentence", asy
   assert.doesNotMatch(tool.parameters.properties.progressText.description, /嗯嗯|收到收到/)
 })
 
-test("image processing does not wait for a pending progress sentence", async t => {
-  const GoogleImageAnalysisTool = await loadTool(t)
-  if (!GoogleImageAnalysisTool) return
-
+test("image processing does not wait for a pending progress sentence", async () => {
   let progressSignal
-  const tool = new GoogleImageAnalysisTool()
+  let progressStarted
+  const started = new Promise(resolve => { progressStarted = resolve })
+  const GoogleImageAnalysisTool = createGoogleImageAnalysisTool({
+    loadConfig: () => ({}),
+    normalizeImageUrls: async urls => urls,
+    imageLoader: async () => {
+      await started
+      return "无效的图片下载链接"
+    },
+    progressReplyFactory: async () => "",
+    guardReply: text => text,
+    callApi: async () => ({}),
+    logger: { info() {}, warn() {} }
+  })
+  const tool = new GoogleImageAnalysisTool({ progressDelayMs: 0 })
   tool.sendProgress = async (_event, { signal }) => {
     progressSignal = signal
+    progressStarted()
     return await new Promise(() => {})
   }
 
-  const result = await Promise.race([
-    tool.func({
-      images: ["file:///definitely-missing-image.png"],
-      prompt: "看一下图片"
-    }, { async reply() {} }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error("image handling waited for progress")), 2000))
-  ])
+  let watchdog
+  try {
+    const result = await Promise.race([
+      tool.func({
+        images: ["file:///definitely-missing-image.png"],
+        prompt: "看一下图片"
+      }, { async reply() {} }),
+      new Promise((_, reject) => {
+        watchdog = setTimeout(() => reject(new Error("image handling waited for progress")), 2000)
+      })
+    ])
 
-  assert.equal(result?.error?.code, "image_download_failed")
-  assert.ok(progressSignal === undefined || progressSignal.aborted === true)
+    assert.equal(result?.error?.code, "image_download_failed")
+    assert.equal(progressSignal?.aborted, true)
+  } finally {
+    clearTimeout(watchdog)
+  }
 })
 
 test("multi-image analysis isolates slow images and preserves successful image order", async t => {

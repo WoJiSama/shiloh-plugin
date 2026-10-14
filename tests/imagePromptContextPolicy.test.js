@@ -1,31 +1,18 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { createPromptContext } from "../dist/backend/modules/conversation/infrastructure/promptContext.js"
 
-async function loadPlugin(t) {
-  globalThis.plugin ||= class {}
-  globalThis.logger ||= {
-    info() {},
-    warn() {},
-    error() {},
-    debug() {},
-    mark() {}
+function createPromptHost() {
+  const api = createPromptContext({ formatAvatarDrawReferencePrompt: () => "", info() {} })
+  const host = { config: {} }
+  for (const [name, method] of Object.entries(api)) {
+    host[name] = (...args) => method(host, ...args)
   }
-  try {
-    const modulePath = process.env.IMAGE_PROMPT_PLUGIN_MODULE || "../apps/test.js"
-    const { ExamplePlugin } = await import(modulePath)
-    return Object.create(ExamplePlugin.prototype)
-  } catch (error) {
-    if (error?.code === "ERR_MODULE_NOT_FOUND") {
-      t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
-      return null
-    }
-    throw error
-  }
+  return host
 }
 
-test("final image prompt keeps merged visual supplements and drops an unrelated follow-up", async t => {
-  const plugin = await loadPlugin(t)
-  if (!plugin) return
+test("final image prompt keeps merged visual supplements and drops an unrelated follow-up", async () => {
+  const plugin = createPromptHost()
 
   const prompt = plugin.buildImageGenerationPrompt({
     e: {
@@ -43,9 +30,8 @@ test("final image prompt keeps merged visual supplements and drops an unrelated 
   assert.doesNotMatch(prompt, /明天开会/)
 })
 
-test("continuing a drawing uses only the latest draw thread", async t => {
-  const plugin = await loadPlugin(t)
-  if (!plugin) return
+test("continuing a drawing uses only the latest draw thread", async () => {
+  const plugin = createPromptHost()
 
   const prompt = plugin.buildImageGenerationPrompt({
     args: "继续上一张，换成下午",
@@ -65,9 +51,8 @@ test("continuing a drawing uses only the latest draw thread", async t => {
   assert.doesNotMatch(prompt, /火锅/)
 })
 
-test("explicitly drawing the conversation is allowed to use recent source messages", async t => {
-  const plugin = await loadPlugin(t)
-  if (!plugin) return
+test("explicitly drawing the conversation is allowed to use recent source messages", async () => {
+  const plugin = createPromptHost()
 
   const prompt = plugin.buildImageGenerationPrompt({
     args: "把上面的聊天画成四格漫画",
@@ -82,9 +67,8 @@ test("explicitly drawing the conversation is allowed to use recent source messag
   assert.match(prompt, /才不是特意等你/)
 })
 
-test("an explicit quote does not also pull unrelated recent chat", async t => {
-  const plugin = await loadPlugin(t)
-  if (!plugin) return
+test("an explicit quote does not also pull unrelated recent chat", async () => {
+  const plugin = createPromptHost()
 
   const prompt = plugin.buildImageGenerationPrompt({
     e: { _quotedPromptContext: { text: "白发金瞳、黑色长裙", senderName: "A" } },
@@ -100,9 +84,8 @@ test("an explicit quote does not also pull unrelated recent chat", async t => {
   assert.doesNotMatch(prompt, /明天开会/)
 })
 
-test("executing a quoted draw request keeps its image-generation intent", async t => {
-  const plugin = await loadPlugin(t)
-  if (!plugin) return
+test("executing a quoted draw request keeps its image-generation intent", async () => {
+  const plugin = createPromptHost()
 
   const resolved = plugin.resolveContextualDrawGeneration({
     e: { _quotedPromptContext: { text: "希洛，生成一张白发少女的插画", senderName: "A" } },

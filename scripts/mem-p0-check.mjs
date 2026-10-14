@@ -1,11 +1,11 @@
 // 一次性验证 P0 修复(真实 Redis,临时测试群,跑完清理)。
 import { createClient } from 'redis'
-import { factShortId } from '../utils/memory/entityModel.js'
+import { factShortId } from '../domains/memory/engine/entityModel.js'
 globalThis.logger = new Proxy({}, { get: () => () => {} })
 
 const client = createClient({ url: 'redis://127.0.0.1:6379' }); client.on('error', () => {})
 await client.connect()
-const { MemoryManager } = await import('../utils/MemoryManager.js')
+const { MemoryManager } = await import('../domains/memory/MemoryManager.js')
 const G = '__mem_p0_check__'
 const now = Date.now()
 const m = new MemoryManager({ enabled: true }, { redis: client })

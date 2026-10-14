@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { classify, codeLines, verifyCompatibility, discoveredDebt } from '../scripts/migration-report.mjs';
+import { readFileSync } from 'node:fs';
+import { classify, codeLines, verifyCompatibility, discoveredDebt, verifyRetirements, bootstrapEntries } from '../scripts/migration-report.mjs';
 import { checkSource } from '../scripts/check-boundaries.mjs';
 
 const path = 'src/modules/example/domain/policy.ts';
@@ -65,4 +66,22 @@ test('multi-target wrappers only export audited emitted implementations', () => 
 test('explicitly renamed injected capability keys are not ambient globals', () => {
   assert.deepEqual(checkSource(path, 'const { redis: client } = ports; client.get("key");'), []);
   assert.ok(checkSource(path, 'const { redis } = ports; redis.get("key");').length);
+});
+
+// Deletion is not migration: only documented baseline retirements may close debt.
+test('retirements require absence, a business JS baseline, and explicit evidence', () => {
+  const baseline = [{ path: 'utils/unused.js', category: 'business', language: 'js' }];
+  const item = { legacy: 'utils/unused.js', reason: 'No runtime callers', evidence: 'docs/audit.md' };
+  assert.equal(verifyRetirements([item], [], baseline)[0].verifiedAbsent, true);
+  assert.equal(verifyRetirements([item], [item.legacy], baseline)[0].verifiedAbsent, false);
+  assert.equal(verifyRetirements([item], [], [])[0].verifiedAbsent, false);
+  assert.equal(verifyRetirements([{ ...item, evidence: '' }], [], baseline)[0].verifiedAbsent, false);
+  assert.equal(verifyRetirements([{ ...item, reason: '' }], [], baseline)[0].verifiedAbsent, false);
+});
+
+test('all explicitly registered JS host bootstraps retain their reviewed source', () => {
+  for (const entry of bootstrapEntries) {
+    assert.ok(entry.reason, entry.legacy);
+    assert.equal(verifyCompatibility(entry, readFileSync(entry.legacy, 'utf8')), true, entry.legacy);
+  }
 });

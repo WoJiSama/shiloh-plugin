@@ -9,9 +9,14 @@ import { checkTree } from './check-boundaries.mjs';
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
 export const migrations = [
+  { legacy: 'scripts/import-knowledge.js', implementation: 'src/scripts/importKnowledge.ts', kind: 'composition', reviewedSha256: 'f2ca3715699d58225b2d0270652e5835a3a899d44786b01f7e4f5dc3d3219852' },
+  { legacy: 'scripts/wipe-legacy-memory.js', implementation: 'src/scripts/wipeLegacyMemory.ts' },
+  { legacy: 'scripts/backfillBilibiliRecords.mjs', implementation: 'src/scripts/backfillBilibiliRecords.ts', kind: 'composition', reviewedSha256: 'dcb5ccb961ff0f5636cb54f79e1652ed1f0c5fd00a0a5bdd54a58d016da5b5ac' },
+  { legacy: 'scripts/enableExcelWorkbookTool.mjs', implementation: 'src/scripts/enableExcelWorkbookTool.ts', kind: 'composition', reviewedSha256: 'cb00b602303e4d73eba3ea0a9bfc90a67dba8d7c47cfab8dc448c9bf2a7f15ba' },
+  { legacy: 'scripts/turn-trace-report.mjs', implementation: 'src/scripts/turnTraceReport.ts', kind: 'composition', reviewedSha256: '05f9162c9022ebd16c881ccef8b87dabcea45a526f165aaae05066a3ddef7e14' },
   {"legacy": "console/lib/frontendStatic.js", "implementation": "src/modules/platform/infrastructure/console/frontendStatic.ts", "kind": "composition", "reviewedSha256": "e19a94ad28815bdd157e667dec8d1299fa5793adee90eae85a816b07a0635f9d"},
   {"legacy": "console/lib/redisClient.js", "implementation": "src/modules/platform/infrastructure/console/redisClient.ts", "kind": "composition", "reviewedSha256": "20c0b28b75c83c35a2cca3de0154ebaa2c8a51a8dfbe3c749ba185df43474804"},
-  {"legacy": "console/server.js", "implementation": "src/modules/platform/infrastructure/console/consoleServer.ts", "kind": "composition", "reviewedSha256": "d69b1bca8ed5d02f42af3dcc896ce3d053e1a01a538308d3e09144d1d0f5a859"},
+  {"legacy": "console/server.js", "implementation": "src/modules/platform/infrastructure/console/consoleServer.ts", "kind": "composition", "reviewedSha256": "f7e0d8691386c60f6945a4172b34c02edb8f58fffa25ca763a87a9bd2d2d23ef"},
   {"legacy": "utils/commandsWebApp.js", "implementation": "src/modules/platform/infrastructure/console/commandsWebApp.ts", "kind": "composition", "reviewedSha256": "793478290013499c695e9c79af0f0663d8fd9cd1af5aa49f566dea5b05f69bc4"},
   {"legacy": "utils/observeWebApp.js", "implementation": "src/modules/platform/infrastructure/console/observeWebApp.ts", "kind": "composition", "reviewedSha256": "237bdaa08d4504ed4c3ec8995549c845500fae2ad8942143383608960149aa36"},
   {"legacy": "utils/qzoneWebApp.js", "implementation": "src/modules/platform/infrastructure/console/qzoneWebApp.ts", "kind": "composition", "reviewedSha256": "f33084b5523ec24cfbeef8886ffaae8831dd577afabfb715b6d58a5495b846a5"},
@@ -383,6 +388,171 @@ export const migrations = [
   { legacy: 'utils/messagePipeline/deliveryGateway.js', implementation: 'src/modules/messaging/infrastructure/deliveryGateway.ts', kind: 'composition', reviewedSha256: 'fb5d98a1631d1a1dee3728e8b26966ed19ac0cac0d3a71842770e72b7ce42c9b' },
   { legacy: 'console/lib/pipelineJobs.js', implementation: 'src/modules/messaging/application/pipelineJobs.ts' },
 ];
+export const bootstrapEntries = [
+  {
+    "legacy": "guoba.support.js",
+    "kind": "composition",
+    "reason": "Guoba metadata and configuration assembly",
+    "reviewedSha256": "5f088230a61b78d214964cd0b6e46d1abc7d521d91027300fddb2e932909eae3"
+  },
+  {
+    "legacy": "index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "d362a6c2f5667d3df716fafe32b7b1ea6c448381afe580f0de49428a0a15b415"
+  },
+  {
+    "legacy": "standalone/bl-dice-plugin/apps/dice.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "e8069341db734abaf35a2609cd3b3b5c4facb1e8643c09711856189edc386a2a"
+  },
+  {
+    "legacy": "standalone/bl-dice-plugin/apps/diceLog.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "aaec7a6f745f6988e34444d8e8940662b3e323c61c9a4146bea657e62bedb7f8"
+  },
+  {
+    "legacy": "standalone/bl-dice-plugin/guoba.support.js",
+    "kind": "composition",
+    "reason": "Guoba metadata and configuration assembly",
+    "reviewedSha256": "9b7bb1b6754b7d2939f791cd7fe0c3b5f6eec8245629acd1582fa8be350a0917"
+  },
+  {
+    "legacy": "standalone/bl-dice-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "ff50670abda10d7056116ba9c8278ea54e0965b340c426c38d6bddb38b872314"
+  },
+  {
+    "legacy": "standalone/bl-emoji-plugin/apps/EmojiPackImport.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "a45bfceaf115b16bd0272066608a524f5df382a1f3ed5c774d29dbb8720c8888"
+  },
+  {
+    "legacy": "standalone/bl-emoji-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "21ba5e8f3c9f3e7cc0e059e18721182d5acfb55a37e1fd1a0feb46630d50dcdc"
+  },
+  {
+    "legacy": "standalone/bl-games-plugin/apps/DeltaForcePlugin.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "0881d284b448298206447a7fb00e29bcfa45256da769e65c0f4b8173cbdb866a"
+  },
+  {
+    "legacy": "standalone/bl-games-plugin/apps/UmaRacePlugin.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "04d29f04c09a0aff112ecdba1b36bcebe83fa2cd090fc844f5609a115e75724d"
+  },
+  {
+    "legacy": "standalone/bl-games-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "6ec071126fbeb63c05d41da3a544962de549324994c870e05346be462e915fac"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/apps/GroupGuardDecrease.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "4c473ab717f4d395111175f483f7823583109ae2b36fba6afc1a98f02b563db5"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/apps/GroupGuardIncrease.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "269bc6ef0cb4eb002007d69353202bb7547d20f408ef5d0ed621cd69a02bf472"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/apps/GroupGuardMessage.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "d2dfa070f0ee035fa5f608a437b1004c46258eaa31d8774002f46ac7db899b41"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/apps/GroupModerationMessage.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "65114497ef8d8539243dfbcdb7086ac5324d87f0f126ef738e7c131502304f82"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/apps/GroupNoticeDecrease.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "2835db7e62ea30170ea2ada3ad280f6a6779b5116bd2c0fd729b095e180c5744"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/apps/GroupNoticeIncrease.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "960369fed1f1b42033bb0e2c77fb0ead60e5aa8dce1eb444184cf6087d42d047"
+  },
+  {
+    "legacy": "standalone/bl-group-admin-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "2c9739cfbcb596b9db30576340bb3af7fa16ece756735868e45b4cd63da76648"
+  },
+  {
+    "legacy": "standalone/bl-knowledge-plugin/apps/knowledge.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "ac3c5d320d87170011a4bedb1559851685fce04537bca2fd4f1da7c7444f2b37"
+  },
+  {
+    "legacy": "standalone/bl-knowledge-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "952fe9acf7c945d18391344784c9728fe42e28971f439384764b0c0382146ba4"
+  },
+  {
+    "legacy": "standalone/bl-media-plugin/apps/BilibiliRelay.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "3c4e668e172d8263f563edd924767d70ee72ca19d7cc0fc88d5e771e297c2ca3"
+  },
+  {
+    "legacy": "standalone/bl-media-plugin/apps/MagnetSearchPlugin.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "3274deac9a94e51e82a6f704b3092a68d113153bec9ae68f1ed384747fee1158"
+  },
+  {
+    "legacy": "standalone/bl-media-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "5e21b9692a9fac487024df47869b9f0ed566a9f1a0b60401d54162f937817fd7"
+  },
+  {
+    "legacy": "standalone/bl-memory-plugin/apps/MemoryCommands.js",
+    "kind": "composition",
+    "reason": "Standalone host compatibility re-export",
+    "reviewedSha256": "963c6369ab85ad22ad18a8d93f5f40c7636c5b7778739782ec7f6d5b7384d879"
+  },
+  {
+    "legacy": "standalone/bl-memory-plugin/index.js",
+    "kind": "composition",
+    "reason": "Host module loader and runtime assembly",
+    "reviewedSha256": "1de7d4b9e6e2bce2b92bede1df4f3fe2cbf709ba09daeb5363b6ff700874d5db"
+  }
+];
+export const retiredModules = [
+  { legacy: 'functions/functions_tools/xiaohongshu/api/feed.js', reason: 'Unused Xiaohongshu subtree; no runtime imports or tool registration', evidence: 'docs/architecture/migrations/phase-8.md' },
+  { legacy: 'functions/functions_tools/xiaohongshu/api/homefeed.js', reason: 'Unused Xiaohongshu subtree; no runtime imports or tool registration', evidence: 'docs/architecture/migrations/phase-8.md' },
+  { legacy: 'functions/functions_tools/xiaohongshu/api/sub_comment.js', reason: 'Unused Xiaohongshu subtree; no runtime imports or tool registration', evidence: 'docs/architecture/migrations/phase-8.md' },
+  { legacy: 'functions/functions_tools/xiaohongshu/config/config.js', reason: 'Unused Xiaohongshu subtree; no runtime imports or tool registration', evidence: 'docs/architecture/migrations/phase-8.md' },
+  { legacy: 'functions/functions_tools/xiaohongshu/sign/X-S-Common.js', reason: 'Unused Xiaohongshu subtree; no runtime imports or tool registration', evidence: 'docs/architecture/migrations/phase-8.md' },
+  { legacy: 'functions/functions_tools/xiaohongshu/sign/X-S.js', reason: 'Unused Xiaohongshu subtree; no runtime imports or tool registration', evidence: 'docs/architecture/migrations/phase-8.md' },
+];
+export function verifyRetirements(registry, currentPaths, baselineFiles) {
+  const present = new Set(currentPaths);
+  const baselineBusiness = new Set(baselineFiles.filter(file => file.category === 'business' && file.language === 'js').map(file => file.path));
+  return registry.map(item => ({ ...item, verifiedAbsent: !present.has(item.legacy) && baselineBusiness.has(item.legacy) && Boolean(item.reason?.trim()) && Boolean(item.evidence?.trim()) }));
+}
 export function classify(path) {
   if (/(?:^|\/)(?:node_modules|vendor|dist|coverage|data)(?:\/|$)/.test(path)) return 'vendor-generated-data';
   if (/\.d\.(?:ts|mts|cts)$/.test(path)) return 'type-declaration';
@@ -442,15 +612,17 @@ export function discoveredDebt(baselineFiles, currentFiles) {
 export function report() {
   const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
   const files = [...new Set(paths(['ls-files', '-z', '--cached', '--others', '--exclude-standard']))].filter(path => existsSync(path)).sort().map(path => entry(path, readFileSync(path, 'utf8')));
-  const registered = migrations.map(item => ({ ...item, present: [item.implementation, ...(item.additionalImplementations || []), ...(item.adapter ? [item.adapter] : [])].every(path => files.some(file => file.path === path)), thinWrapper: existsSync(item.legacy) && verifyCompatibility(item, readFileSync(item.legacy, 'utf8')) }));
+  const registered = migrations.map(item => ({ ...item, owner: 'shiloh-plugin maintainers', present: [item.implementation, ...(item.additionalImplementations || []), ...(item.adapter ? [item.adapter] : [])].every(path => files.some(file => file.path === path)), thinWrapper: existsSync(item.legacy) && verifyCompatibility(item, readFileSync(item.legacy, 'utf8')) }));
   const completed = new Set(registered.filter(item => item.present && item.thinWrapper).map(item => item.legacy));
   const classifiedFiles = files.map(file => completed.has(file.path) ? { ...file, category: 'compatibility' } : file);
   const summarize = list => list.reduce((result, item) => { const key = `${item.category}:${item.language}`; const value = result[key] ??= { files: 0, codeLines: 0, bytes: 0 }; value.files++; value.codeLines += item.codeLines; value.bytes += item.bytes; return result; }, {});
   const business = files.filter(file => file.category === 'business' && !completed.has(file.path));
   const js = business.filter(file => file.language === 'js').reduce((sum, file) => sum + file.codeLines, 0);
   const tsLines = business.filter(file => file.language === 'ts').reduce((sum, file) => sum + file.codeLines, 0);
-  const remaining = baseline.files.filter(file => file.category === 'business' && file.language === 'js' && !completed.has(file.path));
-  return { baselineCommit: baseline.commit, metricVersion: baseline.metricVersion, current: summarize(classifiedFiles), compatibilityEntries: classifiedFiles.filter(file => file.category === 'compatibility'), discoveredBusinessJsDebt: discoveredDebt(baseline.files, classifiedFiles), businessJsCodeLinePercent: 100 * js / (js + tsLines), baselineRemaining: { modules: remaining.length, codeLines: remaining.reduce((sum, file) => sum + file.codeLines, 0), paths: remaining.map(file => file.path) }, registeredMigrations: registered, structure: { ...structure(files), sourceBoundaryViolations: checkTree().length }, limitations: 'Registered re-export wrappers are AST-validated; composition shims require exact reviewed SHA256 and both adapter/application TS sources. Newly discovered JS debt is separate from the immutable baseline; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric.' };
+  const retired = verifyRetirements(retiredModules, files.map(file => file.path), baseline.files).map(item => ({ ...item, evidencePresent: existsSync(item.evidence), verifiedAbsent: item.verifiedAbsent && existsSync(item.evidence) }));
+  const retiredPaths = new Set(retired.filter(item => item.verifiedAbsent).map(item => item.legacy));
+  const remaining = baseline.files.filter(file => file.category === 'business' && file.language === 'js' && !completed.has(file.path) && !retiredPaths.has(file.path));
+  return { baselineCommit: baseline.commit, metricVersion: baseline.metricVersion, current: summarize(classifiedFiles), compatibilityEntries: classifiedFiles.filter(file => file.category === 'compatibility'), discoveredBusinessJsDebt: discoveredDebt(baseline.files, classifiedFiles), businessJsCodeLinePercent: 100 * js / (js + tsLines), baselineRemaining: { modules: remaining.length, codeLines: remaining.reduce((sum, file) => sum + file.codeLines, 0), paths: remaining.map(file => file.path) }, registeredMigrations: registered, registeredBootstrapEntries: bootstrapEntries.map(item => ({ ...item, owner: 'shiloh-plugin maintainers', present: existsSync(item.legacy), reviewed: existsSync(item.legacy) && verifyCompatibility(item, readFileSync(item.legacy, 'utf8')) })), toolingJsEntries: classifiedFiles.filter(file => file.category === 'tooling' && file.language === 'js'), retiredModules: retired, unregisteredMissingBaseline: remaining.filter(file => !existsSync(file.path)).map(file => file.path), structure: { ...structure(files), sourceBoundaryViolations: checkTree().length }, limitations: 'Registered re-export wrappers are AST-validated; composition shims require exact reviewed SHA256 and both adapter/application TS sources. Explicit retirements require a registered reason/evidence and verified absent baseline files; arbitrary deletion still counts as remaining debt. Newly discovered JS debt is separate from the immutable baseline; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric.' };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.argv.includes('--write-baseline')) {

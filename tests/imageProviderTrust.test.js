@@ -1,5 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { createGoogleImageEditTool } from "../dist/backend/modules/toolSupport/infrastructure/GoogleImageEditTool.js"
+import { BananaTool as CompiledBananaTool } from "../dist/backend/modules/toolSupport/infrastructure/BananaTool.js"
 
 const CONFIG = {
   imageGenerationAiConfig: {
@@ -15,28 +17,24 @@ const CONFIG = {
   }
 }
 
-async function loadImageTools(t) {
-  if (!globalThis.logger) {
-    globalThis.logger = { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
+function createImageTools() {
+  const unexpectedCall = () => { throw new Error("provider normalization must not perform I/O") }
+  const logger = { info() {}, warn() {}, error() {} }
+  const GoogleImageEditTool = createGoogleImageEditTool({
+    loadConfig: () => CONFIG, logger,
+    normalizeImageUrls: unexpectedCall, imageLoader: unexpectedCall,
+    progressReplyFactory: unexpectedCall, guardReply: unexpectedCall, callApi: unexpectedCall,
+    getRedis: unexpectedCall, getBot: unexpectedCall, sendImageReliably: unexpectedCall,
+    mimeTypes: { extension: unexpectedCall, lookup: unexpectedCall }
+  })
+  class BananaTool extends CompiledBananaTool {
+    constructor() { super({ progressFetchImpl: unexpectedCall }, { logger }) }
   }
-  try {
-    const [{ GoogleImageEditTool }, { BananaTool }] = await Promise.all([
-      import("../functions/functions_tools/GoogleImageEditTool.js"),
-      import("../functions/functions_tools/BananaTool.js")
-    ])
-    return { GoogleImageEditTool, BananaTool }
-  } catch (error) {
-    if (error?.code === "ERR_MODULE_NOT_FOUND") {
-      t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
-      return null
-    }
-    throw error
-  }
+  return { GoogleImageEditTool, BananaTool }
 }
 
-test("image tools discard model-invented providers at the user-text boundary", async t => {
-  const classes = await loadImageTools(t)
-  if (!classes) return
+test("image tools discard model-invented providers at the user-text boundary", async () => {
+  const classes = createImageTools()
 
   for (const ToolClass of [classes.GoogleImageEditTool, classes.BananaTool]) {
     class ConfiguredTool extends ToolClass {
@@ -71,9 +69,8 @@ test("image tools discard model-invented providers at the user-text boundary", a
   }
 })
 
-test("image edit tool description is provider-neutral", async t => {
-  const classes = await loadImageTools(t)
-  if (!classes) return
+test("image edit tool description is provider-neutral", async () => {
+  const classes = createImageTools()
   const tool = new classes.GoogleImageEditTool()
   assert.doesNotMatch(tool.description, /Google|Gemini/i)
   assert.match(tool.description, /已配置的图片编辑渠道/)

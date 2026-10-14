@@ -3,70 +3,68 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { test } from "node:test"
+import { createMessageManagerClass } from "../dist/backend/modules/messaging/application/recentMessages.js"
+import { KeyedSerialQueue } from "../dist/backend/modules/messaging/infrastructure/keyedSerialQueue.js"
 
-test("recent message storage is idempotent under concurrent retries", async t => {
-  globalThis.logger ||= { info() {}, warn() {}, error() {}, debug() {} }
-  let MessageManager
-  try {
-    ;({ MessageManager } = await import("../utils/MessageManager.js"))
-  } catch (error) {
-    if (error?.code === "ERR_MODULE_NOT_FOUND") return t.skip(error.message)
-    throw error
-  }
-  const previousRedis = globalThis.redis
-  const previousBot = globalThis.Bot
+test("recent message storage is idempotent under concurrent retries", async () => {
   const data = new Map()
-  globalThis.redis = {
+  const redis = {
     async get(key) { return data.get(key) || null },
     async set(key, value) { data.set(key, value); return "OK" },
-    async del(key) { data.delete(key) }
+    async del(...keys) { keys.forEach(key => data.delete(key)) },
+    async keys() { return [...data.keys()] }
   }
-  globalThis.Bot = { uin: 3094088525, nickname: "希洛" }
-  try {
-    const manager = new MessageManager({ cacheExpireSeconds: 3600 })
-    const event = {
-      event_id: "event-1",
-      message_type: "group",
-      group_id: 609235590,
-      user_id: 925640859,
-      message_id: 100,
-      time: 1784517000,
-      raw_message: "hello",
-      message: [{ type: "text", text: "hello" }],
-      sender: { user_id: 925640859, nickname: "user", role: "member" }
-    }
-    await Promise.all([
-      manager.recordMessage(event, { preEnrichedMessage: event.message, throwOnError: true }),
-      manager.recordMessage(event, { preEnrichedMessage: event.message, throwOnError: true })
-    ])
-    const redisKey = "ytbot:messages:group:609235590"
-    assert.equal(JSON.parse(data.get(redisKey)).length, 1)
-
-    const newer = { ...event, event_id: "event-newer", message_id: 102, time: event.time + 1, raw_message: "newer", message: [{ type: "text", text: "newer" }] }
-    await manager.recordMessage(newer, { preEnrichedMessage: newer.message, throwOnError: true })
-    await manager.recordMessage(event, { preEnrichedMessage: event.message, throwOnError: true })
-    assert.deepEqual(JSON.parse(data.get(redisKey)).map(item => item.event_id), ["event-newer", "event-1"])
-
-    const beforeReadFailure = data.get(redisKey)
-    globalThis.redis.get = async () => { throw new Error("redis unavailable") }
-    await assert.rejects(
-      manager.recordMessage({ ...newer, event_id: "event-failed", message_id: 103 }, {
-        preEnrichedMessage: newer.message,
-        throwOnError: true
-      }),
-      /redis unavailable/
-    )
-    assert.equal(data.get(redisKey), beforeReadFailure)
-
-    const fileText = await manager.formatMessageContent({
-      message_type: "group",
-      message: [{ type: "file", name: "sheet.xlsx", url: "https://files.example/sheet.xlsx" }]
-    })
-    assert.match(fileText, /https:\/\/files\.example\/sheet\.xlsx/)
-  } finally {
-    globalThis.redis = previousRedis
-    globalThis.Bot = previousBot
+  const MessageManager = createMessageManagerClass({
+    redis, bot: { uin: 3094088525, nickname: "希洛" },
+    logger: { info() {}, warn() {}, error() {} }, queue: new KeyedSerialQueue(),
+    scheduleJob() {}, getUrl: async () => ({ headers: {} }),
+    formatTime: time => new Date(time).toISOString(), parseTime: time => Date.parse(time),
+    refreshTencentImageUrl: async url => url,
+    enrichBilibiliMessageSegments: async message => message || [],
+    enrichDouyinMessageSegments: async message => message || [],
+    formatBilibiliHistoryText: () => "", formatBilibiliHistoryLinks: () => "",
+    formatDouyinHistoryText: () => "", formatDouyinHistoryLinks: () => ""
+  })
+  const manager = new MessageManager({ cacheExpireSeconds: 3600 })
+  const event = {
+    event_id: "event-1",
+    message_type: "group",
+    group_id: 609235590,
+    user_id: 925640859,
+    message_id: 100,
+    time: 1784517000,
+    raw_message: "hello",
+    message: [{ type: "text", text: "hello" }],
+    sender: { user_id: 925640859, nickname: "user", role: "member" }
   }
+  await Promise.all([
+    manager.recordMessage(event, { preEnrichedMessage: event.message, throwOnError: true }),
+    manager.recordMessage(event, { preEnrichedMessage: event.message, throwOnError: true })
+  ])
+  const redisKey = "ytbot:messages:group:609235590"
+  assert.equal(JSON.parse(data.get(redisKey)).length, 1)
+
+  const newer = { ...event, event_id: "event-newer", message_id: 102, time: event.time + 1, raw_message: "newer", message: [{ type: "text", text: "newer" }] }
+  await manager.recordMessage(newer, { preEnrichedMessage: newer.message, throwOnError: true })
+  await manager.recordMessage(event, { preEnrichedMessage: event.message, throwOnError: true })
+  assert.deepEqual(JSON.parse(data.get(redisKey)).map(item => item.event_id), ["event-newer", "event-1"])
+
+  const beforeReadFailure = data.get(redisKey)
+  redis.get = async () => { throw new Error("redis unavailable") }
+  await assert.rejects(
+    manager.recordMessage({ ...newer, event_id: "event-failed", message_id: 103 }, {
+      preEnrichedMessage: newer.message,
+      throwOnError: true
+    }),
+    /redis unavailable/
+  )
+  assert.equal(data.get(redisKey), beforeReadFailure)
+
+  const fileText = await manager.formatMessageContent({
+    message_type: "group",
+    message: [{ type: "file", name: "sheet.xlsx", url: "https://files.example/sheet.xlsx" }]
+  })
+  assert.match(fileText, /https:\/\/files\.example\/sheet\.xlsx/)
 })
 
 test("NDJSON archive appends one line for the same durable event", async t => {

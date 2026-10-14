@@ -267,7 +267,7 @@ memorySystem:
 - 记忆配置集中到 `memorySystem` 和锅巴记忆页。
 - 模型配置继续使用 `memoryAiConfig`、`embeddingAiConfig` 等独立块。
 - 移除仓库里的硬编码第三方 API key、cookie 和 session。
-- 视频分析、ModelScope、小红书等运行时凭据改为配置或环境变量读取。
+- 视频分析、ModelScope 等运行时凭据改为配置或环境变量读取。
 - README 只保留配置入口，不写任何真实密钥。
 
 相关文件：
@@ -277,7 +277,6 @@ memorySystem:
 - `models/Guoba/schemas/aiModels.js`
 - `functions/functions_tools/VoiceTool.js`
 - `functions/functions_tools/VideoAnalysisTool.js`
-- `functions/functions_tools/xiaohongshu/config/config.js`
 - `utils/apiClient.js`
 
 ## 快速安装

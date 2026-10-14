@@ -1,36 +1,23 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import fs from "fs"
-import path from "path"
-import { Readable } from "stream"
+import { createMessageRecordPlugin } from "../dist/backend/modules/host/infrastructure/MessageRecordPlugin.js"
 
-test("archive query attaches cover and only downloads video body at or below 30 minutes", async t => {
-  globalThis.plugin ||= class {}
-  globalThis.Bot ||= { uin: 3094088525, nickname: "希洛" }
-  globalThis.logger ||= { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
-  globalThis.segment = {
-    image: url => ({ type: "image", url }),
-    video: file => ({ type: "video", file })
-  }
+function createArchivePlugin(formatRecord) {
+  const Class = createMessageRecordPlugin(class {}, {
+    MessageManager: class {}, archiveManager: { formatRecord },
+    getBase64Image: async () => null, getInstalledMessagePipeline: () => null,
+    sendCompleteLocalFile: async () => null, getBot: () => ({ uin: 3094088525, nickname: "希洛" }),
+    logger: { info() {}, warn() {}, error() {} },
+    segment: { image: url => ({ type: "image", url }), video: file => ({ type: "video", file }) }
+  })
+  const instance = Object.create(Class.prototype)
+  instance.archiveManager = { formatRecord }
+  return instance
+}
 
-  let MessageRecordPlugin
-  const originalCwd = process.cwd()
-  const trssRoot = path.resolve(originalCwd, "../..")
-  if (fs.existsSync(path.join(trssRoot, "config/default_config"))) process.chdir(trssRoot)
-  try {
-    ;({ MessageRecordPlugin } = await import("../apps/MessageManager.js"))
-  } catch (error) {
-    if (error?.code === "ERR_MODULE_NOT_FOUND") {
-      t.diagnostic(`本机缺少既有运行依赖，完整归档媒体测试留给线上: ${error.message}`)
-      return
-    }
-    throw error
-  } finally {
-    process.chdir(originalCwd)
-  }
-
-  const instance = Object.create(MessageRecordPlugin.prototype)
-  instance.archiveManager = { formatRecord: () => "00:00 测试：B站视频" }
+test("archive query attaches cover and only downloads video body at or below 30 minutes", async () => {
+  const instance = createArchivePlugin(() => "00:00 测试：B站视频")
   const longResult = await instance.buildArchiveForwardMessages([{
     user_id: 1,
     sender: { nickname: "测试" },
@@ -53,27 +40,18 @@ test("archive query attaches cover and only downloads video body at or below 30 
   try {
     globalThis.fetch = async url => {
       if (String(url).includes("x/player/playurl")) {
-        return {
-          ok: true,
-          async json() {
-            return {
-              code: 0,
-              data: {
-                durl: [{
-                  url: "https://video.example/short.mp4?token=temp",
-                  length: 120000,
-                  size: 4
-                }]
-              }
-            }
+        return Response.json({
+          code: 0,
+          data: {
+            durl: [{
+              url: "https://video.example/short.mp4?token=temp",
+              length: 120000,
+              size: 4
+            }]
           }
-        }
+        })
       }
-      return {
-        ok: true,
-        headers: { get: name => name === "content-length" ? "4" : null },
-        body: Readable.toWeb(Readable.from(Buffer.from("test")))
-      }
+      return new Response("test", { headers: { "content-length": "4" } })
     }
     const shortResult = await instance.buildArchiveForwardMessages([{
       user_id: 1,
@@ -100,20 +78,8 @@ test("archive query attaches cover and only downloads video body at or below 30 
   }
 })
 
-test("archive query restores structured forward nodes and keeps old flattened records as text", async t => {
-  globalThis.plugin ||= class {}
-  globalThis.Bot ||= { uin: 3094088525, nickname: "希洛" }
-  globalThis.logger ||= { info() {}, warn() {}, error() {}, debug() {}, mark() {} }
-  let MessageRecordPlugin
-  try {
-    ;({ MessageRecordPlugin } = await import("../apps/MessageManager.js"))
-  } catch (error) {
-    if (error?.code === "ERR_MODULE_NOT_FOUND") return t.skip(error.message)
-    throw error
-  }
-
-  const instance = Object.create(MessageRecordPlugin.prototype)
-  instance.archiveManager = { formatRecord: () => "15:52:46 ()：[合并转发记录]\\n旧摘要" }
+test("archive query restores structured forward nodes and keeps old flattened records as text", async () => {
+  const instance = createArchivePlugin(() => "15:52:46 ()：[合并转发记录]\\n旧摘要")
   const structured = {
     time: "2026-08-19 15:52:46",
     user_id: 3311464409,

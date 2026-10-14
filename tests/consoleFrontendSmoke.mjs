@@ -116,6 +116,13 @@ try {
     await element.click(); await handle.dispose(); await delay(100)
   }
   async function ready(title) { await page.waitForFunction(value => document.querySelector('h1')?.textContent.includes(value), { timeout: 8000 }, title); await page.waitForNetworkIdle({ idleTime: 100, timeout: 5000 }); await delay(120) }
+  async function navigate(route, title) {
+    // Hash routes keep the current document; wait for route/DOM/API readiness
+    // instead of expecting a new document's navigation lifecycle events.
+    await page.evaluate(value => { location.hash = value }, route)
+    await page.waitForFunction(value => location.hash === '#' + value, { timeout: 8000 }, route)
+    await ready(title)
+  }
   async function check(label) {
     await delay(80)
     const result = await page.evaluate(() => ({ width: innerWidth, documentWidth: document.documentElement.scrollWidth, bodyWidth: document.body.scrollWidth, overflow: [...document.querySelectorAll('body *')].filter(element => { const rect = element.getBoundingClientRect(); return rect.width && rect.right > innerWidth + 1 && getComputedStyle(element).position !== 'fixed' }).slice(0, 10).map(element => ({ tag: element.tagName, class: element.className?.baseVal ?? element.className, width: element.getBoundingClientRect().width, right: element.getBoundingClientRect().right })) }))
@@ -134,7 +141,7 @@ try {
     assert.equal(await page.$eval('html', element => element.dataset.theme), theme)
     for (const [route, title] of routes) {
       if (selectedRoutes && !selectedRoutes.includes(route)) continue
-      await page.goto(`${origin}/#${route}`, { waitUntil: 'networkidle0' }); await ready(title)
+      await navigate(route, title)
       const label = `${width}-${theme}-${route.replace(/\//g, '_') || 'home'}`
       await check(label)
       const blankTabs = await page.$$eval('.n-tabs-tab', elements => elements.filter(element => element.getClientRects().length && !element.textContent.trim()).map(element => element.getAttribute('data-name')))
@@ -188,7 +195,7 @@ try {
   }
   // The desktop shortcut really filters, and the mobile drawer navigates with an actual click.
   await page.setViewport({ width: 1440, height: 900 })
-  await page.goto(`${origin}/#/`, { waitUntil: 'networkidle0' }); await ready('机器人')
+  await navigate('/', '机器人')
   await click('重启', '.account-actions button'); await page.waitForSelector('.n-dialog'); assert.match(await page.$eval('.n-dialog', element => element.textContent), /100001 · 长昵称示例机器人与桌游助手/); await click('取消', '.n-dialog button'); await page.waitForSelector('.n-dialog', { hidden: true })
   await page.keyboard.down('Meta'); await page.keyboard.press('k'); await page.keyboard.up('Meta')
   await page.waitForSelector('.search-modal input')
