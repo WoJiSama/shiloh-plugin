@@ -219,14 +219,12 @@ test("notification recipients come exclusively from configured QQ lists", () => 
   )
 })
 
-test("group moderation checks bot admin permission before content extraction", () => {
-  const source = fs.readFileSync(new URL("../domains/group-admin/GroupModerationManager.js", import.meta.url), "utf8")
-  const configCheck = source.indexOf("if (!this.isGroupEnabled(config, groupId)) return false")
-  const botAdminCheck = source.indexOf("if (!await this.isBotAdmin(e, groupId)) return false")
-  const extractContent = source.indexOf("const content = await this.extractContent(e, config)")
-
-  assert.ok(source.includes("async isBotAdmin(e, groupId)"))
-  assert.ok(configCheck >= 0)
-  assert.ok(botAdminCheck > configCheck)
-  assert.ok(extractContent > botAdminCheck)
+test("group moderation checks bot admin permission before content extraction", async () => {
+  const manager = new GroupModerationManager()
+  manager.getConfig=()=>normalizeGroupModerationConfig({enabled:true,enabledGroups:['1']})
+  let roleChecks=0
+  manager.isBotAdmin=async()=>{roleChecks++;return false}
+  manager.extractContent=async()=>{throw Error('must not inspect unprivileged messages')}
+  assert.equal(await manager.handleMessage({group_id:1,user_id:2,self_id:3}),false)
+  assert.equal(roleChecks,1)
 })

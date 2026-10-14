@@ -1,0 +1,4993 @@
+{
+  "baselineCommit": "a93265cd94e2307504dad11d26351cf954cfc071",
+  "metricVersion": 1,
+  "current": {
+    "business:js": {
+      "files": 31,
+      "codeLines": 10984,
+      "bytes": 605156
+    },
+    "compatibility:js": {
+      "files": 346,
+      "codeLines": 1403,
+      "bytes": 132115
+    },
+    "frontend:vue-script": {
+      "files": 25,
+      "codeLines": 3408,
+      "bytes": 292746
+    },
+    "frontend:ts": {
+      "files": 15,
+      "codeLines": 874,
+      "bytes": 30031
+    },
+    "type-declaration:ts": {
+      "files": 1,
+      "codeLines": 1,
+      "bytes": 66
+    },
+    "tests:ts": {
+      "files": 52,
+      "codeLines": 2766,
+      "bytes": 161014
+    },
+    "examples:js": {
+      "files": 2,
+      "codeLines": 2766,
+      "bytes": 99568
+    },
+    "entry:js": {
+      "files": 25,
+      "codeLines": 251,
+      "bytes": 10877
+    },
+    "tooling:js": {
+      "files": 25,
+      "codeLines": 2494,
+      "bytes": 196325
+    },
+    "business:ts": {
+      "files": 427,
+      "codeLines": 78125,
+      "bytes": 3843404
+    },
+    "tests:js": {
+      "files": 275,
+      "codeLines": 28166,
+      "bytes": 1444094
+    }
+  },
+  "compatibilityEntries": [
+    {
+      "path": "apps/SemanticMemory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 531
+    },
+    {
+      "path": "apps/lib/avatarReference.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 429
+    },
+    {
+      "path": "apps/lib/chatTurn.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 60,
+      "bytes": 7002
+    },
+    {
+      "path": "apps/lib/conversationUtils.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 15,
+      "bytes": 1269
+    },
+    {
+      "path": "apps/lib/finalReply.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 1699
+    },
+    {
+      "path": "apps/lib/memoryReplies.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 478
+    },
+    {
+      "path": "apps/lib/messageFormatting.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 297
+    },
+    {
+      "path": "apps/lib/messageSegments.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "apps/lib/privateChat.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 217
+    },
+    {
+      "path": "apps/lib/promptContext.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 681
+    },
+    {
+      "path": "apps/lib/replyRendering.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 13,
+      "bytes": 1172
+    },
+    {
+      "path": "apps/lib/semanticToolIntent.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 1589
+    },
+    {
+      "path": "apps/lib/smartConversation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 660
+    },
+    {
+      "path": "apps/lib/smartDynamics.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 797
+    },
+    {
+      "path": "apps/lib/splitState.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 164
+    },
+    {
+      "path": "apps/lib/strictConversation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 1399
+    },
+    {
+      "path": "apps/lib/taskStatus.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 783
+    },
+    {
+      "path": "apps/lib/teachingFacts.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "apps/lib/textPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 77
+    },
+    {
+      "path": "apps/lib/timingGate.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 803
+    },
+    {
+      "path": "apps/lib/toolExecution.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 26,
+      "bytes": 3119
+    },
+    {
+      "path": "console/lib/pipelineJobs.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 120
+    },
+    {
+      "path": "console/lib/providerCredentials.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 170
+    },
+    {
+      "path": "console/lib/schemaConfig.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 214
+    },
+    {
+      "path": "core/config/configStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 349
+    },
+    {
+      "path": "core/intent/messageIntent.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 125
+    },
+    {
+      "path": "core/intent/modelIntentClassifier.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "core/runtime/groupRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 19,
+      "bytes": 1235
+    },
+    {
+      "path": "core/runtime/sharedRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 459
+    },
+    {
+      "path": "domains/dice/DeckManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 384
+    },
+    {
+      "path": "domains/dice/DiceManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 294
+    },
+    {
+      "path": "domains/dice/DiceRuleExpression.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 85
+    },
+    {
+      "path": "domains/dice/DiceRulePackManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 86
+    },
+    {
+      "path": "domains/dice/DiceRuleSchema.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 81
+    },
+    {
+      "path": "domains/dice/DiceRuleSession.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "domains/dice/SealExtRuntime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 506
+    },
+    {
+      "path": "domains/dice/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 479
+    },
+    {
+      "path": "domains/dice/diceCommandGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 717
+    },
+    {
+      "path": "domains/dice/diceCommandPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 84
+    },
+    {
+      "path": "domains/dice/diceReplyCatalog.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 75
+    },
+    {
+      "path": "domains/dice/logRecorder.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 326
+    },
+    {
+      "path": "domains/dice/sealCocDefaults.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 74
+    },
+    {
+      "path": "domains/dice/sealSkillAliases.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 75
+    },
+    {
+      "path": "domains/emoji/EmojiPackManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 457
+    },
+    {
+      "path": "domains/emoji/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 444
+    },
+    {
+      "path": "domains/emoji/emojiSelection.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "domains/games/deltaforce/DeltaForceClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 87
+    },
+    {
+      "path": "domains/games/deltaforce/DeltaForceObjectCache.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 367
+    },
+    {
+      "path": "domains/games/deltaforce/DeltaForceReportRenderer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 469
+    },
+    {
+      "path": "domains/games/deltaforce/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 304
+    },
+    {
+      "path": "domains/games/deltaforce/model/DeltaForceReport.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 202
+    },
+    {
+      "path": "domains/games/uma/UmaRaceManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 427
+    },
+    {
+      "path": "domains/games/uma/UmaRaceReportRenderer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 448
+    },
+    {
+      "path": "domains/games/uma/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 296
+    },
+    {
+      "path": "domains/games/uma/model/UmaRaceReport.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 197
+    },
+    {
+      "path": "domains/group-admin/GroupGuardManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 361
+    },
+    {
+      "path": "domains/group-admin/GroupModerationManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 627
+    },
+    {
+      "path": "domains/group-admin/GroupNoticeManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 365
+    },
+    {
+      "path": "domains/group-admin/adCorpusStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 273
+    },
+    {
+      "path": "domains/group-admin/groupGuardQuestion.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "domains/group-admin/groupModerationRules.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 85
+    },
+    {
+      "path": "domains/group-admin/guardDecrease.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 251
+    },
+    {
+      "path": "domains/group-admin/guardIncrease.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 251
+    },
+    {
+      "path": "domains/group-admin/guardMessage.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 247
+    },
+    {
+      "path": "domains/group-admin/moderationMessage.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 345
+    },
+    {
+      "path": "domains/group-admin/noticeDecrease.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 258
+    },
+    {
+      "path": "domains/group-admin/noticeIncrease.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 258
+    },
+    {
+      "path": "domains/knowledge/KnowledgeExpander.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "domains/knowledge/KnowledgeSearcher.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "domains/knowledge/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 321
+    },
+    {
+      "path": "domains/media/bilibili/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 686
+    },
+    {
+      "path": "domains/media/magnetsearch/MagnetSearchClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 89
+    },
+    {
+      "path": "domains/media/magnetsearch/MagnetSearchReportRenderer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 487
+    },
+    {
+      "path": "domains/media/magnetsearch/app.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 350
+    },
+    {
+      "path": "domains/media/magnetsearch/model/MagnetSearchReport.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 208
+    },
+    {
+      "path": "domains/memory/EmotionManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 389
+    },
+    {
+      "path": "domains/memory/ExpressionLearner.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 555
+    },
+    {
+      "path": "domains/memory/GlobalStyleLearnerManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 442
+    },
+    {
+      "path": "domains/memory/MemoryManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 550
+    },
+    {
+      "path": "domains/memory/PersonProfileInjector.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 564
+    },
+    {
+      "path": "domains/memory/PersonaFeedbackManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 632
+    },
+    {
+      "path": "domains/memory/commandsApp.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 651
+    },
+    {
+      "path": "domains/memory/engine/aliasRegistry.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 138
+    },
+    {
+      "path": "domains/memory/engine/boundary.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 122
+    },
+    {
+      "path": "domains/memory/engine/conflictResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 110
+    },
+    {
+      "path": "domains/memory/engine/constants.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "domains/memory/engine/embeddings.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 331
+    },
+    {
+      "path": "domains/memory/engine/entityModel.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 168
+    },
+    {
+      "path": "domains/memory/engine/extractor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 396
+    },
+    {
+      "path": "domains/memory/engine/groupKnowledge.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 322
+    },
+    {
+      "path": "domains/memory/engine/groupWorkflow.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 274
+    },
+    {
+      "path": "domains/memory/engine/mentionResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 112
+    },
+    {
+      "path": "domains/memory/engine/redisStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 226
+    },
+    {
+      "path": "domains/memory/engine/reflector.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 282
+    },
+    {
+      "path": "domains/memory/engine/retriever.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 172
+    },
+    {
+      "path": "domains/memory/engine/stats.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "domains/midtermMemory/MidtermSummaryManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 606
+    },
+    {
+      "path": "domains/semanticMemory/EmbeddingGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 253
+    },
+    {
+      "path": "domains/semanticMemory/RerankGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 354
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryIndexer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 265
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryRetriever.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 377
+    },
+    {
+      "path": "domains/semanticMemory/SemanticMemoryStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 417
+    },
+    {
+      "path": "domains/semanticMemory/retrievalEval.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 101
+    },
+    {
+      "path": "domains/semanticMemory/runtime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 446
+    },
+    {
+      "path": "functions/ask-ban.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "functions/functions_tools/AbstractTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "functions/functions_tools/AiMindMapTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 339
+    },
+    {
+      "path": "functions/functions_tools/BananaTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 18,
+      "bytes": 2306
+    },
+    {
+      "path": "functions/functions_tools/BingImageSearchTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 303
+    },
+    {
+      "path": "functions/functions_tools/ChangeCardTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 196
+    },
+    {
+      "path": "functions/functions_tools/ChatHistoryTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 203
+    },
+    {
+      "path": "functions/functions_tools/DeltaForceTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 318
+    },
+    {
+      "path": "functions/functions_tools/EmojiSearchTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 256
+    },
+    {
+      "path": "functions/functions_tools/ExcelWorkbookTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 196
+    },
+    {
+      "path": "functions/functions_tools/ForgetGroupKnowledgeTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "functions/functions_tools/GithubTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 371
+    },
+    {
+      "path": "functions/functions_tools/GoogleAnalysisTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 1031
+    },
+    {
+      "path": "functions/functions_tools/GoogleImageEditTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 19,
+      "bytes": 1334
+    },
+    {
+      "path": "functions/functions_tools/GrabRedBagTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 196
+    },
+    {
+      "path": "functions/functions_tools/JinyanTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 180
+    },
+    {
+      "path": "functions/functions_tools/LikeTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 172
+    },
+    {
+      "path": "functions/functions_tools/MemberInfoTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 199
+    },
+    {
+      "path": "functions/functions_tools/MentionAdminsTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 211
+    },
+    {
+      "path": "functions/functions_tools/MentionMembersTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 215
+    },
+    {
+      "path": "functions/functions_tools/ModrinthTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "functions/functions_tools/PixivDownloadTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 304
+    },
+    {
+      "path": "functions/functions_tools/PixivSearchTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 296
+    },
+    {
+      "path": "functions/functions_tools/PokeTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 172
+    },
+    {
+      "path": "functions/functions_tools/QQZoneTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 206
+    },
+    {
+      "path": "functions/functions_tools/ReactionTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 191
+    },
+    {
+      "path": "functions/functions_tools/RecallTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 183
+    },
+    {
+      "path": "functions/functions_tools/ReminderTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 398
+    },
+    {
+      "path": "functions/functions_tools/SearchInformationTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 459
+    },
+    {
+      "path": "functions/functions_tools/SearchMusicTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 347
+    },
+    {
+      "path": "functions/functions_tools/SearchVideoTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 294
+    },
+    {
+      "path": "functions/functions_tools/SendGiftTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 216
+    },
+    {
+      "path": "functions/functions_tools/SendLocalEmojiTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 649
+    },
+    {
+      "path": "functions/functions_tools/TextImageTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 1046
+    },
+    {
+      "path": "functions/functions_tools/TorrentDownloadTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 742
+    },
+    {
+      "path": "functions/functions_tools/VideoAnalysisTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 9,
+      "bytes": 717
+    },
+    {
+      "path": "functions/functions_tools/VoiceTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 424
+    },
+    {
+      "path": "functions/functions_tools/WaitTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 232
+    },
+    {
+      "path": "functions/functions_tools/puppeteer/WebContentExtractor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 208
+    },
+    {
+      "path": "functions/functions_tools/puppeteer/WebParser.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 324
+    },
+    {
+      "path": "functions/functions_tools/webParserTool.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 361
+    },
+    {
+      "path": "functions/other_tools/file.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 49
+    },
+    {
+      "path": "functions/tools/BilibiliVideoSummary.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 235
+    },
+    {
+      "path": "functions/tools/CalculateToken.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 100
+    },
+    {
+      "path": "functions/tools/SearchClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 107
+    },
+    {
+      "path": "functions/tools/UploadFile.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 662
+    },
+    {
+      "path": "functions/tools/bilibilivideoanalysis.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 294
+    },
+    {
+      "path": "functions/tools/messageGenerator.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 121
+    },
+    {
+      "path": "functions/tools/preview.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 328
+    },
+    {
+      "path": "functions/tools/processUploadedFile.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 485
+    },
+    {
+      "path": "functions/tools/sendvideos.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 295
+    },
+    {
+      "path": "functions/tools/textract.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 345
+    },
+    {
+      "path": "model/ModrinthCard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 165
+    },
+    {
+      "path": "model/base.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 300
+    },
+    {
+      "path": "model/config.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 16,
+      "bytes": 696
+    },
+    {
+      "path": "models/Guoba/configInfo.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 763
+    },
+    {
+      "path": "models/Guoba/schemas/aiCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "models/Guoba/schemas/aiModels.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/Guoba/schemas/basic.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/deltaForce.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/dice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "models/Guoba/schemas/emoji.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/emotion.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/expression.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/groupGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/groupNotice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "models/Guoba/schemas/index.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 646
+    },
+    {
+      "path": "models/Guoba/schemas/knowledge.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "models/Guoba/schemas/magnetSearch.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 100
+    },
+    {
+      "path": "models/Guoba/schemas/memory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "models/Guoba/schemas/messageArchive.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 102
+    },
+    {
+      "path": "models/Guoba/schemas/messagePipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 103
+    },
+    {
+      "path": "models/Guoba/schemas/permission.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/Guoba/schemas/persona.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/reasoning.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 97
+    },
+    {
+      "path": "models/Guoba/schemas/riskControl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 99
+    },
+    {
+      "path": "models/Guoba/schemas/tools.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/Guoba/schemas/tracking.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/Guoba/schemas/umaRace.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/Guoba/schemas/voice.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 93
+    },
+    {
+      "path": "models/configSchemas/aiCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "models/configSchemas/basic.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 91
+    },
+    {
+      "path": "models/configSchemas/conversation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 98
+    },
+    {
+      "path": "models/configSchemas/permission.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 96
+    },
+    {
+      "path": "models/configSchemas/reasoning.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 95
+    },
+    {
+      "path": "models/configSchemas/triggers.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 94
+    },
+    {
+      "path": "utils/BilibiliAuthManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 345
+    },
+    {
+      "path": "utils/LocalToolRegistry.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 80,
+      "bytes": 4674
+    },
+    {
+      "path": "utils/MCPClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 575
+    },
+    {
+      "path": "utils/MessageArchiveManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1428
+    },
+    {
+      "path": "utils/MessageManager.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 1827
+    },
+    {
+      "path": "utils/ModrinthCardRenderer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 337
+    },
+    {
+      "path": "utils/QQApi.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 189
+    },
+    {
+      "path": "utils/SmartReply.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 402
+    },
+    {
+      "path": "utils/VolcengineVoiceProvider.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 88
+    },
+    {
+      "path": "utils/actionOutcomes.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/addresseeSignals.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/agentIntelligence.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 81
+    },
+    {
+      "path": "utils/agentReplyComposer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "utils/aiConversationGate.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 106
+    },
+    {
+      "path": "utils/aiProviderProbe.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 7,
+      "bytes": 524
+    },
+    {
+      "path": "utils/apiClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1037
+    },
+    {
+      "path": "utils/avatarReferencePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 85
+    },
+    {
+      "path": "utils/bilibiliMediaRelay.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 584
+    },
+    {
+      "path": "utils/bilibiliMessage.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/botFederation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 281
+    },
+    {
+      "path": "utils/builtinToolManifests.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 33,
+      "bytes": 2698
+    },
+    {
+      "path": "utils/chatCompletionUrl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 102
+    },
+    {
+      "path": "utils/chatFailureDiagnosis.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 20,
+      "bytes": 1112
+    },
+    {
+      "path": "utils/chatFailureReply.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 483
+    },
+    {
+      "path": "utils/chatRequestRecovery.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 226
+    },
+    {
+      "path": "utils/chatTurnDurability.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 369
+    },
+    {
+      "path": "utils/commandGate.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 462
+    },
+    {
+      "path": "utils/commandRegistry.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "utils/common.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 68
+    },
+    {
+      "path": "utils/configWriter.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 11,
+      "bytes": 742
+    },
+    {
+      "path": "utils/contextualProgressReply.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 457
+    },
+    {
+      "path": "utils/deliveryObservability.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 129
+    },
+    {
+      "path": "utils/deltaForceIntent.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 258
+    },
+    {
+      "path": "utils/diceRandom.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 74
+    },
+    {
+      "path": "utils/douyinBrowserResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 521
+    },
+    {
+      "path": "utils/douyinMediaRelay.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 677
+    },
+    {
+      "path": "utils/douyinMessage.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 12,
+      "bytes": 916
+    },
+    {
+      "path": "utils/drawFailureNote.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 79
+    },
+    {
+      "path": "utils/editReferencePipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 85
+    },
+    {
+      "path": "utils/emojiToolPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 79
+    },
+    {
+      "path": "utils/episodicMemory.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 226
+    },
+    {
+      "path": "utils/excelFileContext.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "utils/excelRequestPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 85
+    },
+    {
+      "path": "utils/excelWorkbook.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/expressionSequence.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 209
+    },
+    {
+      "path": "utils/fileLock.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/fileUtils.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 36,
+      "bytes": 2111
+    },
+    {
+      "path": "utils/forbiddenWordGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 403
+    },
+    {
+      "path": "utils/forwardBatches.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 213
+    },
+    {
+      "path": "utils/groupContextResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 92
+    },
+    {
+      "path": "utils/groupContextState.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 86
+    },
+    {
+      "path": "utils/groupKnowledgeForgetPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 87
+    },
+    {
+      "path": "utils/groupNames.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 419
+    },
+    {
+      "path": "utils/guobaAiProviderConfig.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 269
+    },
+    {
+      "path": "utils/imageAspectRatio.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 306
+    },
+    {
+      "path": "utils/imageDimensions.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "utils/imageFailurePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 197
+    },
+    {
+      "path": "utils/imageGenerationFallback.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 778
+    },
+    {
+      "path": "utils/imageRequestGuard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 304
+    },
+    {
+      "path": "utils/imageResult.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 140
+    },
+    {
+      "path": "utils/imageSourcePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 166
+    },
+    {
+      "path": "utils/imageTaskPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 397
+    },
+    {
+      "path": "utils/intentFastPath.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/internalStatusLeak.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "utils/longTaskFeedbackPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 777
+    },
+    {
+      "path": "utils/mediaTypePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/memorySelfCorrection.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 425
+    },
+    {
+      "path": "utils/mentionFailureReply.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "utils/mentionRoleRouting.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "utils/mentionTargets.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 411
+    },
+    {
+      "path": "utils/messageCacheTtl.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 143
+    },
+    {
+      "path": "utils/messageContext.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/messagePipeline/deliveryGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 10,
+      "bytes": 862
+    },
+    {
+      "path": "utils/messagePipeline/eventEnvelope.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 391
+    },
+    {
+      "path": "utils/messagePipeline/keyedSerialQueue.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 123
+    },
+    {
+      "path": "utils/messagePipeline/leaseHeartbeat.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 124
+    },
+    {
+      "path": "utils/messagePipeline/mediaArtifactStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 458
+    },
+    {
+      "path": "utils/messagePipeline/mediaOutbox.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 23,
+      "bytes": 2377
+    },
+    {
+      "path": "utils/messagePipeline/mediaRelayAdminReport.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 24,
+      "bytes": 1648
+    },
+    {
+      "path": "utils/messagePipeline/messagePipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 17,
+      "bytes": 1364
+    },
+    {
+      "path": "utils/messagePipeline/outboundArbiter.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 108
+    },
+    {
+      "path": "utils/messagePipeline/outboundThrottle.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 14,
+      "bytes": 1131
+    },
+    {
+      "path": "utils/messagePipeline/redisJobStore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 403
+    },
+    {
+      "path": "utils/messagePipeline/riskSignalMonitor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 650
+    },
+    {
+      "path": "utils/messagePipeline/runtime.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 31,
+      "bytes": 2491
+    },
+    {
+      "path": "utils/messagePipeline/videoThumbnail.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 135
+    },
+    {
+      "path": "utils/messageStats.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 634
+    },
+    {
+      "path": "utils/modelGateway.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 261
+    },
+    {
+      "path": "utils/modrinth.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 73
+    },
+    {
+      "path": "utils/multipartFormData.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 169
+    },
+    {
+      "path": "utils/musicShareRelay.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/narrativeReply.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/outputGuardPipeline.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 416
+    },
+    {
+      "path": "utils/parallelDownload.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 235
+    },
+    {
+      "path": "utils/personaLibrary.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 344
+    },
+    {
+      "path": "utils/personaMoods.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 76
+    },
+    {
+      "path": "utils/personaReplayCore.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 81
+    },
+    {
+      "path": "utils/personaSource.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 77
+    },
+    {
+      "path": "utils/personaTonePolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 81
+    },
+    {
+      "path": "utils/pixivIntent.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 68
+    },
+    {
+      "path": "utils/pixivMediaRelay.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 318
+    },
+    {
+      "path": "utils/pixivMessage.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 77
+    },
+    {
+      "path": "utils/pixivSearch.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 727
+    },
+    {
+      "path": "utils/pluginExportLoader.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 195
+    },
+    {
+      "path": "utils/proactiveReplyFreshness.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 136
+    },
+    {
+      "path": "utils/progressReplyBudget.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "utils/promptCompiler.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/promptLayerCache.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 85
+    },
+    {
+      "path": "utils/promptLayers.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 76
+    },
+    {
+      "path": "utils/providers/ThinkingProcessor.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 117
+    },
+    {
+      "path": "utils/proxiedFetch.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 82
+    },
+    {
+      "path": "utils/qqCodeFenceText.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 79
+    },
+    {
+      "path": "utils/qqFaceTable.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 71
+    },
+    {
+      "path": "utils/qqVoiceAudio.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/recentImageContinuation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 289
+    },
+    {
+      "path": "utils/redBagUtils.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 71
+    },
+    {
+      "path": "utils/redis-util.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 327
+    },
+    {
+      "path": "utils/redisClient.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 278
+    },
+    {
+      "path": "utils/reliableImageSender.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 425
+    },
+    {
+      "path": "utils/replyExecutionRoute.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "utils/replyRhythm.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 75
+    },
+    {
+      "path": "utils/replySanitizer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 78
+    },
+    {
+      "path": "utils/request.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 314
+    },
+    {
+      "path": "utils/routeDecision.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 390
+    },
+    {
+      "path": "utils/semanticMemoryWebApp.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 414
+    },
+    {
+      "path": "utils/semanticToolPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 132
+    },
+    {
+      "path": "utils/sendPacing.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 74
+    },
+    {
+      "path": "utils/sharedBrowser.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 427
+    },
+    {
+      "path": "utils/sideLLM.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 66
+    },
+    {
+      "path": "utils/singleFlightResolver.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 90
+    },
+    {
+      "path": "utils/smartLockPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 432
+    },
+    {
+      "path": "utils/solutionExplanationStyle.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 88
+    },
+    {
+      "path": "utils/systemPromptTemplate.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 84
+    },
+    {
+      "path": "utils/textUtils.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 71
+    },
+    {
+      "path": "utils/thinkingForward.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 5,
+      "bytes": 514
+    },
+    {
+      "path": "utils/thinkingForwardSettings.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 8,
+      "bytes": 1051
+    },
+    {
+      "path": "utils/toolContinuationPolicy.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 126
+    },
+    {
+      "path": "utils/toolIntentManifests.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 10,
+      "bytes": 707
+    },
+    {
+      "path": "utils/toolManifestRegistry.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 536
+    },
+    {
+      "path": "utils/toolResultGrounding.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 174
+    },
+    {
+      "path": "utils/toolSkills.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 131
+    },
+    {
+      "path": "utils/torrentDownload.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/torrentListCard.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 6,
+      "bytes": 509
+    },
+    {
+      "path": "utils/turnContinuity.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 83
+    },
+    {
+      "path": "utils/turnDiagnostics.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 3,
+      "bytes": 306
+    },
+    {
+      "path": "utils/turnPlan.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/turnPresentation.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 80
+    },
+    {
+      "path": "utils/turnPromptComposer.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 2,
+      "bytes": 202
+    },
+    {
+      "path": "utils/turnSession.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 246
+    },
+    {
+      "path": "utils/turnTrace.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 81
+    },
+    {
+      "path": "utils/understandingBrief.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 90
+    },
+    {
+      "path": "utils/unicodeText.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 174
+    },
+    {
+      "path": "utils/visibleFailure.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 181
+    },
+    {
+      "path": "utils/youtubeAuth.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 76
+    },
+    {
+      "path": "utils/youtubeMediaRelay.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 4,
+      "bytes": 584
+    },
+    {
+      "path": "utils/youtubeMessage.js",
+      "category": "compatibility",
+      "language": "js",
+      "codeLines": 1,
+      "bytes": 79
+    }
+  ],
+  "discoveredBusinessJsDebt": {
+    "modules": 2,
+    "codeLines": 82,
+    "paths": [
+      "utils/backendArtifactGuard.js",
+      "utils/pluginUpdateBuild.js"
+    ]
+  },
+  "businessJsCodeLinePercent": 12.326476562412326,
+  "baselineRemaining": {
+    "modules": 29,
+    "codeLines": 12365,
+    "paths": [
+      "apps/CommandHelp.js",
+      "apps/MessageManager.js",
+      "apps/ThinkingForward.js",
+      "apps/lib/adminCommands.js",
+      "apps/obsLogQuery.js",
+      "apps/qqinfo1.js",
+      "apps/test.js",
+      "apps/update.js",
+      "console/lib/frontendStatic.js",
+      "console/lib/redisClient.js",
+      "console/server.js",
+      "dependence/dependencies.js",
+      "functions/functions_tools/xiaohongshu/api/feed.js",
+      "functions/functions_tools/xiaohongshu/api/homefeed.js",
+      "functions/functions_tools/xiaohongshu/api/sub_comment.js",
+      "functions/functions_tools/xiaohongshu/config/config.js",
+      "functions/functions_tools/xiaohongshu/sign/X-S-Common.js",
+      "functions/functions_tools/xiaohongshu/sign/X-S.js",
+      "model/friends.js",
+      "model/qqinfo.js",
+      "models/Guoba/index.js",
+      "models/Guoba/pluginInfo.js",
+      "utils/commandsWebApp.js",
+      "utils/guobaJumpLink.js",
+      "utils/guobaLoginTrust.js",
+      "utils/obsLog.js",
+      "utils/observeWebApp.js",
+      "utils/pluginBridge.js",
+      "utils/qzoneWebApp.js"
+    ]
+  },
+  "registeredMigrations": [
+    {
+      "legacy": "domains/group-admin/guardDecrease.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/guardDecrease.ts",
+      "kind": "composition",
+      "reviewedSha256": "f6e1082471f7c47324a0bc5ad2d19ea792feb55f52e8b8a9748bb314178d9557",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/guardMessage.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/guardMessage.ts",
+      "kind": "composition",
+      "reviewedSha256": "3653a2d3799ff75b262209bd109d0a8cf83cfc3dacc82c8f8f020919a6d5b52b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/guardIncrease.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/guardIncrease.ts",
+      "kind": "composition",
+      "reviewedSha256": "67e709a461894fb495b06cae078899e8d333335be7ec36a38f2c73ba06ef20ea",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/noticeDecrease.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/noticeDecrease.ts",
+      "kind": "composition",
+      "reviewedSha256": "bcec742adf0f772091cd67edfe95f50789f0f422cd3a0cb8478cdd7ad8ce8348",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/noticeIncrease.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/noticeIncrease.ts",
+      "kind": "composition",
+      "reviewedSha256": "8b984225fbbf9a308b48030e14d5efb9d900d85c5cacbb3601f01bc4025a2414",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/groupGuardQuestion.js",
+      "implementation": "src/modules/groupAdmin/domain/groupGuardQuestion.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/groupModerationRules.js",
+      "implementation": "src/modules/groupAdmin/domain/groupModerationRules.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/GroupNoticeManager.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/GroupNoticeManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "cb763f86fa203ec9bc8d454af398cf0b2c18608eabae3f208527e5fe63f12af0",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/GroupModerationManager.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/GroupModerationManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "aceae8d0c975f78d0e507842a5abf955e984e9fbfed70fc87cbfc36181b53b92",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/moderationMessage.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/moderationMessage.ts",
+      "kind": "composition",
+      "reviewedSha256": "25f11cd3be7c213eec004adbe07d6c0b6b1ceaa26db5b3acf9da46c2abf5f8b1",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/adCorpusStore.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/adCorpusStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "b132dfd8eb7f9bd67a62c6fa39d75b54d9ed37de9e560c878373ebb0960fa7c8",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/group-admin/GroupGuardManager.js",
+      "implementation": "src/modules/groupAdmin/infrastructure/GroupGuardManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "082720d14a72f6c4cbb7c6a0cbed32f59f860d06a72a976fc838199e124ac2e6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/JinyanTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/JinyanTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "41c5b93b292cee9e11a8092a3c8bb94541b87671154236546f4dbf3cf0604ce4",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/PokeTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/PokeTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "ed6cd275371c27c758329bfff52b2cd6b2e4438a7a0b8d88d2283999163679c3",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/GrabRedBagTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/GrabRedBagTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "a6ffdd0eb1dbe591b106ee4d797f67b72cdbfb40606164ec6915af39c4ef1f4a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/SendGiftTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/SendGiftTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "ed6bc03ba784704b10c951e4d894f9a8bdf9d26444a2d2ae6d8baafe059d8214",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ChangeCardTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/ChangeCardTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "7234b04beaeb5cf71e686f580ba702ab565767e536650abf5d23145c86840451",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/LikeTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/LikeTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "e6b86ecc046e13f1f8a9f561cac91b992eff3a7ecfc2237eedf9186778926cef",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/MemberInfoTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/MemberInfoTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "7d574611c96f3086f3d8dae7a4dd36b0e87546dec6eb9380bab3356594f6b14e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/MentionAdminsTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/MentionAdminsTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "38674a15b5cb1d7b391ae937ccf96b2fd1b41c7d0b6e814ae3477cb2d2371619",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/MentionMembersTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/MentionMembersTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "637fa3f6242995bd7c38a2da1dca939faa0b02fc5861e58d96cc0f0535df6b98",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/QQZoneTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/QQZoneTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "dbd5a78b0de015f6df4b0148f839d0edaae20fbe3f24e735075e5c3556733815",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ReactionTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/ReactionTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "93a877ebf8419b185e5d263680089ba9bcd72fc8df6014c45fb2961fe4f63ae9",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/RecallTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/RecallTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "eb969dc81aff61286ede9f11877cae4660a91b95d6cfb3c6fea54b95cda53a8b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ChatHistoryTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/ChatHistoryTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "ef43de67050c35fa2517bc5a695de7eebb464c2e5cae1880f2ee3c1eae051b62",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ReminderTool.js",
+      "implementation": "src/modules/qqTools/infrastructure/ReminderTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "6024cf64e80299c169deb84d63fa79d16704f12cb1aac7894e4f347f7d3a60eb",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/uma/UmaRaceManager.js",
+      "implementation": "src/modules/games/infrastructure/uma/UmaRaceManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "7e3b624bfb9740a4f80d860ddd4a44fbd8277f9dc19d510b783c42ee76fcb10d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/deltaforce/DeltaForceClient.js",
+      "implementation": "src/modules/games/infrastructure/DeltaForceClient.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/deltaforce/DeltaForceObjectCache.js",
+      "implementation": "src/modules/games/infrastructure/DeltaForceObjectCache.ts",
+      "kind": "composition",
+      "reviewedSha256": "9e9765d394c78565bd5fdec27233c2af5b5df1a20db30ed0e2e7fa3fd847225c",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/deltaForceIntent.js",
+      "implementation": "src/modules/games/domain/deltaForceIntent.ts",
+      "kind": "composition",
+      "reviewedSha256": "2dd9cfdb0e1ebaeb83f2c5fd2685870a570fcbb48a27445681dc0776fbe45fe6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/deltaforce/DeltaForceReportRenderer.js",
+      "implementation": "src/modules/games/infrastructure/DeltaForceReportRenderer.ts",
+      "kind": "composition",
+      "reviewedSha256": "2b15107aa19392f1726b6ba2f26740c1d951659987b9ea3bdacd6a026f42f8d9",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/deltaforce/model/DeltaForceReport.js",
+      "implementation": "src/modules/games/infrastructure/DeltaForceReport.ts",
+      "kind": "composition",
+      "reviewedSha256": "fbbe188304d03bd24d3e84ff1cb8e27a2a8d75e505ec6c1a12da0924c567e9bd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/deltaforce/app.js",
+      "implementation": "src/modules/games/infrastructure/deltaForceApp.ts",
+      "kind": "composition",
+      "reviewedSha256": "bee2528e3409f09671e0536005c972f3ee53b3a8d9a777349856eec2d35e658d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/DeltaForceTool.js",
+      "implementation": "src/modules/games/infrastructure/DeltaForceTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "26a44b3728eead6cf3d01d4c268b4c02fdf02b76ee0607a649f24bcc02880209",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/uma/app.js",
+      "implementation": "src/modules/games/infrastructure/uma/app.ts",
+      "kind": "composition",
+      "reviewedSha256": "629d4384d06ef4c5ec191a80e202b868e9007f2c319b9c9d15214bb0ee2f9749",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/uma/UmaRaceReportRenderer.js",
+      "implementation": "src/modules/games/infrastructure/uma/UmaRaceReportRenderer.ts",
+      "kind": "composition",
+      "reviewedSha256": "a2180516d2f6c62cb59e124fb64d6defaded5bd441c3b32c0de69b642b3d6203",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/games/uma/model/UmaRaceReport.js",
+      "implementation": "src/modules/games/infrastructure/uma/UmaRaceReport.ts",
+      "kind": "composition",
+      "reviewedSha256": "73730ce3daa0d42d90e451419a881201bc9b505dac269253a425e21997edc59a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/DiceRuleExpression.js",
+      "implementation": "src/modules/dice/infrastructure/DiceRuleExpression.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/DiceRuleSession.js",
+      "implementation": "src/modules/dice/infrastructure/DiceRuleSession.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/DiceRulePackManager.js",
+      "implementation": "src/modules/dice/infrastructure/DiceRulePackManager.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/app.js",
+      "implementation": "src/modules/dice/infrastructure/app.ts",
+      "kind": "composition",
+      "reviewedSha256": "80642df3f3c58fbe5cf6128740718363551ca7f6e271edc95ae0ed644d6c05d2",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/DeckManager.js",
+      "implementation": "src/modules/dice/infrastructure/DeckManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "85889f174eedb433b2f916cea546f439de79e27eec6c4ea5bdc3a18f967f88d8",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/DiceManager.js",
+      "implementation": "src/modules/dice/infrastructure/DiceManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "cf18b4d5bb11a16676c00f6c558cfbce9a79964e96513c512567c2fd3190e214",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/SealExtRuntime.js",
+      "implementation": "src/modules/dice/infrastructure/SealExtRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "d53611986a3d456f0fb69c35a302c4b6c25d6493decd3d8d6e6ca53728be0271",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/logRecorder.js",
+      "implementation": "src/modules/dice/infrastructure/logRecorder.ts",
+      "kind": "composition",
+      "reviewedSha256": "31ac7c0b64e45e6e59715d22b339ab999ff0060064b6d930ed67785fa0cdc67e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/diceCommandGateway.js",
+      "implementation": "src/modules/dice/domain/diceCommandGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "fe44b3cc38665672496d18ecd3ce9d15473da57af186c166111cb0425c455d32",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/diceCommandPolicy.js",
+      "implementation": "src/modules/dice/infrastructure/diceCommandPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/diceReplyCatalog.js",
+      "implementation": "src/modules/dice/domain/diceReplyCatalog.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/sealCocDefaults.js",
+      "implementation": "src/modules/dice/domain/sealCocDefaults.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/sealSkillAliases.js",
+      "implementation": "src/modules/dice/domain/sealSkillAliases.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/dice/DiceRuleSchema.js",
+      "implementation": "src/modules/dice/infrastructure/DiceRuleSchema.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/diceRandom.js",
+      "implementation": "src/modules/dice/infrastructure/diceRandom.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/BingImageSearchTool.js",
+      "implementation": "src/modules/content/infrastructure/BingImageSearchTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "e85261496ff30009e9663f84d46e14d80795fdf2b77ef48ac442376ec1660d71",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/SendLocalEmojiTool.js",
+      "implementation": "src/modules/content/infrastructure/SendLocalEmojiTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "1d5a7e8efcd15aaae74c70a00a3df9a2064e11a94c28bee20e7ea7d72dec1563",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/EmojiSearchTool.js",
+      "implementation": "src/modules/content/infrastructure/EmojiSearchTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "dc7ab263f688edac91e5dc592647e9ec3f77a17a90f44c1d433e11d00cf69013",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/emoji/emojiSelection.js",
+      "implementation": "src/modules/emoji/infrastructure/emojiSelection.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/emoji/app.js",
+      "implementation": "src/modules/emoji/infrastructure/app.ts",
+      "kind": "composition",
+      "reviewedSha256": "f5c1cc27bb587796cab1319d8d54bf1cb01b84f31c46f5203c786387e137a5d4",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/emoji/EmojiPackManager.js",
+      "implementation": "src/modules/emoji/infrastructure/EmojiPackManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "17f1821c355b180915949639d4bed37a3bbab7cff5c4de85d058597a3d40b980",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/puppeteer/WebParser.js",
+      "implementation": "src/modules/media/infrastructure/WebParser.ts",
+      "kind": "composition",
+      "reviewedSha256": "4b2379eac10dd1f2e47d306dc74dfe35d68870d0002f5925c9e8f43e4d1f8ebb",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/puppeteer/WebContentExtractor.js",
+      "implementation": "src/modules/media/infrastructure/WebContentExtractor.ts",
+      "kind": "composition",
+      "reviewedSha256": "a6e521e63f629e61bb317c64ddf218d532c43cbda6ee05f81714e20c12b1c38e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/SearchInformationTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/SearchInformationTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "5b99cd4fad9bc9cac99fdb6032fd579c3260924a5216da80ef5f312aba77d043",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/webParserTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/webParserTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "43790c220a2d8a57359d52596033d57c06049d82a98df58fd6f9a30196dcfe21",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/WaitTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/WaitTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "ac3406f269a56739f222e233100589083226ab0fed1e7e05f36ff87016497b74",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/redis-util.js",
+      "implementation": "src/modules/shared/infrastructure/redisUtilities.ts",
+      "kind": "composition",
+      "reviewedSha256": "c049effcea18bcc74d0580087ad8e4f03876d36225c0e6334196c493713fd08b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/personaReplayCore.js",
+      "implementation": "src/modules/conversation/domain/personaReplayCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "model/base.js",
+      "implementation": "src/modules/rendering/infrastructure/base.ts",
+      "kind": "composition",
+      "reviewedSha256": "2e6fcabdaad621c68a1121349db91a65e392c8f715ee44af08eafa4d15c11233",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/preview.js",
+      "implementation": "src/modules/rendering/infrastructure/preview.ts",
+      "kind": "composition",
+      "reviewedSha256": "2be78a85a26eb05be81ab8897ce83b3bc26077b75acb2c47153be9d1b4cd26b3",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/TextImageTool.js",
+      "implementation": "src/modules/rendering/infrastructure/TextImageTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "a275638636c01e93a68bf5447b1f7504133184c9c76059948c27d7321ffe6274",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/media/bilibili/app.js",
+      "implementation": "src/modules/media/infrastructure/BilibiliRelayPlugin.ts",
+      "kind": "composition",
+      "reviewedSha256": "83265cca688771c997fc0d4fde55dddc144dfb6a0dfee802c8640e511460cb75",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/media/magnetsearch/app.js",
+      "implementation": "src/modules/media/infrastructure/MagnetSearchPlugin.ts",
+      "kind": "composition",
+      "reviewedSha256": "ae683067c79c7c2aadd4f71e4648834d2481e667591da3504b46da50ff9375d5",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/media/magnetsearch/model/MagnetSearchReport.js",
+      "implementation": "src/modules/media/infrastructure/MagnetSearchReport.ts",
+      "kind": "composition",
+      "reviewedSha256": "24f7fa3f0d6340ed7dcbff819f32cd05020d14afd8be80a6dcfe8d678633cf2e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/media/magnetsearch/MagnetSearchReportRenderer.js",
+      "implementation": "src/modules/media/infrastructure/MagnetSearchReportRenderer.ts",
+      "kind": "composition",
+      "reviewedSha256": "49ffba9d6db02e9c47c96740e5b829ddc6d71e0be8f99b1f23a0da4fa9ec28f5",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/media/magnetsearch/MagnetSearchClient.js",
+      "implementation": "src/modules/media/infrastructure/MagnetSearchClient.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ModrinthTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/ModrinthTool.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "model/ModrinthCard.js",
+      "implementation": "src/modules/media/infrastructure/ModrinthCard.ts",
+      "kind": "composition",
+      "reviewedSha256": "fb0b2ae5662d45668973c5e12cc33ece8d79a90d961956e554b83390069eeace",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/ModrinthCardRenderer.js",
+      "implementation": "src/modules/media/infrastructure/ModrinthCardRenderer.ts",
+      "kind": "composition",
+      "reviewedSha256": "f9e0ccf0df47a7137e2aa3eb70916db2684b76b934aad295a7e21abd1fd1c979",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/modrinth.js",
+      "implementation": "src/modules/media/infrastructure/modrinth.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/AiMindMapTool.js",
+      "implementation": "src/modules/content/infrastructure/AiMindMapTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "72beb266a369179b43a2ac0eccd8f6466ce8893ed57b9d9df56d16f8b901198a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ExcelWorkbookTool.js",
+      "implementation": "src/modules/content/infrastructure/ExcelWorkbookTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "1ddcdf81156c4713d2c6df4ceeb564920984a2e2709a5d1267230e87d82732b2",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/excelWorkbook.js",
+      "implementation": "src/modules/content/infrastructure/excelWorkbook.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/excelRequestPolicy.js",
+      "implementation": "src/modules/content/infrastructure/excelRequestPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/excelFileContext.js",
+      "implementation": "src/modules/content/infrastructure/excelFileContext.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/GithubTool.js",
+      "implementation": "src/modules/knowledge/infrastructure/GithubTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "a54f4cc956138f897ca8b895bf3e1aa0f3c2df79eadae3a8bf8bd9109015748e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/ForgetGroupKnowledgeTool.js",
+      "implementation": "src/modules/knowledge/infrastructure/ForgetGroupKnowledgeTool.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/groupKnowledgeForgetPolicy.js",
+      "implementation": "src/modules/knowledge/domain/groupKnowledgeForgetPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/knowledge/app.js",
+      "implementation": "src/modules/knowledge/infrastructure/knowledgePlugin.ts",
+      "kind": "composition",
+      "reviewedSha256": "148b7c64e95781c562433fad01adef5a158d3fc2775a88221fa47c0a52162b94",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/knowledge/KnowledgeExpander.js",
+      "implementation": "src/modules/knowledge/infrastructure/KnowledgeExpander.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/knowledge/KnowledgeSearcher.js",
+      "implementation": "src/modules/knowledge/infrastructure/KnowledgeSearcher.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/TorrentDownloadTool.js",
+      "implementation": "src/modules/media/infrastructure/TorrentDownloadTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "2b003a4fce0fa845ae442819cd0f16205304d4a354fd377f6369c9a317bcab2e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/torrentListCard.js",
+      "implementation": "src/modules/media/infrastructure/torrentListCard.ts",
+      "kind": "composition",
+      "reviewedSha256": "25ced9286234ac0dc2e2a0dc96a117ee12437b2eaa2c7f1570b451c6a81a58ec",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/torrentDownload.js",
+      "implementation": "src/modules/media/infrastructure/torrentDownload.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/douyinMessage.js",
+      "implementation": "src/modules/media/infrastructure/douyinMessage.ts",
+      "kind": "composition",
+      "reviewedSha256": "8b69ae250e8b1ddbb223cb5107aa3777013537e202876510e34d7809b85b4ce5",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/douyinMediaRelay.js",
+      "implementation": "src/modules/media/infrastructure/douyinMediaRelay.ts",
+      "kind": "composition",
+      "reviewedSha256": "b257955a20050a63ba4095bb0dbe19330f7de2e702dfea57651405c552d45fce",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/douyinBrowserResolver.js",
+      "implementation": "src/modules/media/infrastructure/douyinBrowserResolver.ts",
+      "kind": "composition",
+      "reviewedSha256": "3cf19069e22189915fba00faa13936b4e586d17b5112d0f384dd342ac4292702",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/VideoAnalysisTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/VideoAnalysisTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "0f824c68f15c7d73155ca17fe8250ec53e3d1c6c72b34b612b7805d5ed445c67",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/SearchVideoTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/SearchVideoTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "4a9903619d60d0b4c3aa76cb6a0d5be6e7890fbbae8c221038088c4124ffbab1",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/PixivDownloadTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/PixivDownloadTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "39a00f30aa47fa8268709587c3885ad2e007d1a3af67dccb8471920cf5982a37",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/PixivSearchTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/PixivSearchTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "6d5122009f05dbf2189dc57ba6aff38b57eefe39ac1bf8b82012ea14f7ec8e32",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/pixivSearch.js",
+      "implementation": "src/modules/media/infrastructure/pixivSearch.ts",
+      "kind": "composition",
+      "reviewedSha256": "9c756ccdeed7c12e2417fe0128160ad1becf6aba8facd0e83bc74364729edba7",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/pixivMediaRelay.js",
+      "implementation": "src/modules/media/infrastructure/pixivMediaRelay.ts",
+      "kind": "composition",
+      "reviewedSha256": "f655c5e37e74e125f4f3b8cbbdf073ab1c4f88f5ed8dc855fd857d6fb7c62c5b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/pixivMessage.js",
+      "implementation": "src/modules/media/infrastructure/pixivMessage.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/pixivIntent.js",
+      "implementation": "src/modules/media/domain/pixivIntent.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/sendvideos.js",
+      "implementation": "src/modules/media/infrastructure/sendvideos.ts",
+      "kind": "composition",
+      "reviewedSha256": "9850d35669e6b3d418679bf54adca07cfa5f56cc5d07a1359e04e49688f95151",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/bilibilivideoanalysis.js",
+      "implementation": "src/modules/media/infrastructure/bilibilivideoanalysis.ts",
+      "kind": "composition",
+      "reviewedSha256": "9e9947f2c3c13822bca28ce3676f976d299ddf21db5a9347bb4ce04f1fd689a7",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/BilibiliVideoSummary.js",
+      "implementation": "src/modules/media/infrastructure/BilibiliVideoSummary.ts",
+      "kind": "composition",
+      "reviewedSha256": "99874de17c1366013c3484333113ebbf47755021ea64696c76fa69c427296622",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/youtubeMediaRelay.js",
+      "implementation": "src/modules/media/infrastructure/youtubeMediaRelay.ts",
+      "kind": "composition",
+      "reviewedSha256": "23fc68db9c583e312e2435655bc2f0553c57310cc6cc166a238397c9b91956da",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/bilibiliMediaRelay.js",
+      "implementation": "src/modules/media/infrastructure/bilibiliMediaRelay.ts",
+      "kind": "composition",
+      "reviewedSha256": "15a1bb70dc8274241cd2eb3555ace5964cb9f3a3e2a9f19a325cb89b8a926ebe",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/BilibiliAuthManager.js",
+      "implementation": "src/modules/media/infrastructure/BilibiliAuthManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "fd9a8c63497e3168d39d6489cc5667687a5d6eec71ad97fab680bceadc88cad3",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/bilibiliMessage.js",
+      "implementation": "src/modules/media/infrastructure/bilibiliMessage.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/youtubeMessage.js",
+      "implementation": "src/modules/media/infrastructure/youtubeMessage.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/youtubeAuth.js",
+      "implementation": "src/modules/media/infrastructure/youtubeAuth.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/SearchMusicTool.js",
+      "implementation": "src/modules/media/infrastructure/SearchMusicTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "a36a4a545196b0612d35e4b4cada0df78a2b513a8b937d8d64400cc222b9e121",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/VoiceTool.js",
+      "implementation": "src/modules/media/infrastructure/VoiceTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "d0038e14dfa8dc2a7c0a27b2a2e401459394234abe0ec11984565c35c619aa11",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/VolcengineVoiceProvider.js",
+      "implementation": "src/modules/media/infrastructure/VolcengineVoiceProvider.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/musicShareRelay.js",
+      "implementation": "src/modules/media/infrastructure/musicShareRelay.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/GoogleImageEditTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/GoogleImageEditTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "07ae44dd92ef3e8309369ea40b9713c58e9cfccb3e6b65802dd0b002f268208a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/GoogleAnalysisTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/GoogleAnalysisTool.ts",
+      "kind": "composition",
+      "reviewedSha256": "25e38316672f5567dc704c30cc536f78e79cc470e4c076c41353cc027e8e737c",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/BananaTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/BananaTool.ts",
+      "additionalImplementations": [
+        "src/modules/toolSupport/infrastructure/bananaAdapters.ts",
+        "src/modules/toolSupport/infrastructure/bananaDecoders.ts"
+      ],
+      "kind": "composition",
+      "reviewedSha256": "510796504029cd9f89c1d1c086692c8ba7c88658d6bf68501ba682f3cbaf7756",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/fileUtils.js",
+      "implementation": "src/modules/shared/infrastructure/fileUtils.ts",
+      "kind": "composition",
+      "reviewedSha256": "2dd7967a736cb46146f4b0ebe3628855b0e64f09192b3cd0dc997a7134d812d0",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/longTaskFeedbackPolicy.js",
+      "implementation": "src/modules/conversation/application/longTaskFeedbackPolicy.ts",
+      "kind": "composition",
+      "reviewedSha256": "b0e4f0c31f490a635068e4836ec8292b695e912533445e20ed3a4cb8fd128649",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/mediaTypePolicy.js",
+      "implementation": "src/modules/image/infrastructure/mediaTypePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/reliableImageSender.js",
+      "implementation": "src/modules/image/infrastructure/reliableImageSender.ts",
+      "kind": "composition",
+      "reviewedSha256": "ad57170c56193e7c6862016064c347387b14ee56d53420d61de5a2ebf2376d25",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/ask-ban.js",
+      "implementation": "src/modules/toolSupport/domain/pluginCommand.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/CalculateToken.js",
+      "implementation": "src/modules/toolSupport/infrastructure/CalculateToken.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/messageGenerator.js",
+      "implementation": "src/modules/toolSupport/infrastructure/messageGenerator.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/SearchClient.js",
+      "implementation": "src/modules/toolSupport/infrastructure/SearchClient.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/textract.js",
+      "implementation": "src/modules/toolSupport/infrastructure/fileExtraction.ts",
+      "kind": "composition",
+      "reviewedSha256": "68763d9ca0151714d19f25ee072c0485434d0d3fa91580fda84b0912e96b0e88",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/other_tools/file.js",
+      "implementation": "src/modules/toolSupport/infrastructure/fileExtraction.ts",
+      "kind": "composition",
+      "reviewedSha256": "7a3f46eca3e8d433375ce32a6932543fbfb7c64ef3947b076a2b92b037fae45a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/UploadFile.js",
+      "implementation": "src/modules/toolSupport/infrastructure/UploadFile.ts",
+      "kind": "composition",
+      "reviewedSha256": "0d29dfb6ae591f8e094341224b34b718aa106e75f81b6a54730438b6fbf9fc0a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/tools/processUploadedFile.js",
+      "implementation": "src/modules/toolSupport/infrastructure/processUploadedFile.ts",
+      "kind": "composition",
+      "reviewedSha256": "20cb5da86bdc556bdfee0887ec48aef91db3b532284e2c55ab69b3f075388cd1",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "functions/functions_tools/AbstractTool.js",
+      "implementation": "src/modules/toolSupport/infrastructure/AbstractTool.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/botFederation.js",
+      "implementation": "src/modules/platform/domain/botFederation.ts",
+      "kind": "composition",
+      "reviewedSha256": "6939852d385731d7e8826572a40e5464df74b4312ef828622b46e5708038d614",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/qqFaceTable.js",
+      "implementation": "src/modules/platform/domain/qqFaceTable.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/redBagUtils.js",
+      "implementation": "src/modules/platform/domain/redBagUtils.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/QQApi.js",
+      "implementation": "src/modules/platform/infrastructure/QQApi.ts",
+      "kind": "composition",
+      "reviewedSha256": "2a57edddf5d40ba5d6f65631d931764f4ba15d30b263a5926fba5a9ae861e0fc",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/commandGate.js",
+      "implementation": "src/modules/platform/infrastructure/commandGate.ts",
+      "kind": "composition",
+      "reviewedSha256": "9ea6a7659a8cab5d6412676da8df4cd94de87cdf1dc7816e5eba1d26900531d2",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/commandRegistry.js",
+      "implementation": "src/modules/platform/infrastructure/commandRegistry.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/groupNames.js",
+      "implementation": "src/modules/platform/infrastructure/groupNames.ts",
+      "kind": "composition",
+      "reviewedSha256": "3cf41969d376e5cf1de2250d4f020ed0918c0047ec97c7476ef2ac5cfa4f3bf6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/qqVoiceAudio.js",
+      "implementation": "src/modules/platform/infrastructure/qqVoiceAudio.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/request.js",
+      "implementation": "src/modules/shared/infrastructure/request.ts",
+      "kind": "composition",
+      "reviewedSha256": "fe8c60259868058ac450882910a896371f00022e5f756d124e520be13267b0e2",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/sharedBrowser.js",
+      "implementation": "src/modules/shared/infrastructure/sharedBrowser.ts",
+      "kind": "composition",
+      "reviewedSha256": "dbe9a72e0bf2b8a5bff6e87ffeba53243f90a3611ccee62c5bc8d5729f51e853",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/parallelDownload.js",
+      "implementation": "src/modules/shared/infrastructure/parallelDownload.ts",
+      "kind": "composition",
+      "reviewedSha256": "5c0e2fb23dd5fc9796f8ef175b5f2558a1201f5290bcd560cf749f42c916cba3",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/common.js",
+      "implementation": "src/modules/foundation/domain/common.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/singleFlightResolver.js",
+      "implementation": "src/modules/foundation/infrastructure/singleFlightResolver.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/fileLock.js",
+      "implementation": "src/modules/foundation/infrastructure/fileLock.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/proxiedFetch.js",
+      "implementation": "src/modules/foundation/infrastructure/proxiedFetch.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/textUtils.js",
+      "implementation": "src/modules/foundation/domain/textUtils.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/LocalToolRegistry.js",
+      "implementation": "src/modules/tools/infrastructure/LocalToolRegistry.ts",
+      "kind": "composition",
+      "reviewedSha256": "be74b601c21d424bd147edc67a083d62a265213eb56f04dce0a958e337198dfd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/toolSkills.js",
+      "implementation": "src/modules/tools/domain/toolSkills.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/semanticToolPolicy.js",
+      "implementation": "src/modules/tools/domain/semanticToolPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/finalReply.js",
+      "implementation": "src/modules/conversation/application/finalReply.ts",
+      "kind": "composition",
+      "reviewedSha256": "6cc1927170a2646d1cd75694ac13902eea1a3b9dd0418d559d65d25a65fad3b8",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/memoryReplies.js",
+      "implementation": "src/modules/conversation/application/memoryReplies.ts",
+      "kind": "composition",
+      "reviewedSha256": "c89a4ffe03b3dc109f01a3c3d33ab7be399a5854b020a4cfe5b16cc30a0a77bf",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messageContext.js",
+      "implementation": "src/modules/conversation/domain/messageContext.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/actionOutcomes.js",
+      "implementation": "src/modules/conversation/domain/actionOutcomes.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/promptLayers.js",
+      "implementation": "src/modules/conversation/domain/promptLayers.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnPresentation.js",
+      "implementation": "src/modules/conversation/domain/turnPresentation.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnPlan.js",
+      "implementation": "src/modules/conversation/infrastructure/turnPlan.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnContinuity.js",
+      "implementation": "src/modules/conversation/application/turnContinuity.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnTrace.js",
+      "implementation": "src/modules/conversation/infrastructure/turnTrace.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/agentIntelligence.js",
+      "implementation": "src/modules/conversation/domain/agentIntelligence.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/promptCompiler.js",
+      "implementation": "src/modules/conversation/domain/promptCompiler.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/systemPromptTemplate.js",
+      "implementation": "src/modules/conversation/domain/systemPromptTemplate.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/promptLayerCache.js",
+      "implementation": "src/modules/conversation/application/promptLayerCache.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/solutionExplanationStyle.js",
+      "implementation": "src/modules/conversation/domain/solutionExplanationStyle.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/avatarReferencePolicy.js",
+      "implementation": "src/modules/conversation/domain/avatarReferencePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/understandingBrief.js",
+      "implementation": "src/modules/conversation/infrastructure/understandingBrief.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnPromptComposer.js",
+      "implementation": "src/modules/conversation/infrastructure/turnPromptComposer.ts",
+      "kind": "composition",
+      "reviewedSha256": "ba10fb1124595312ca4a605ea0eb8c1943a2641ff00da750fa8beeed2c277f54",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnDiagnostics.js",
+      "implementation": "src/modules/conversation/domain/turnDiagnostics.ts",
+      "kind": "composition",
+      "reviewedSha256": "97387298728a5fec86f0eda520be47f4d28e298e1361f37e90d43c52bebf172d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/intentFastPath.js",
+      "implementation": "src/modules/conversation/domain/intentFastPath.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/replyExecutionRoute.js",
+      "implementation": "src/modules/conversation/domain/replyExecutionRoute.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/mentionRoleRouting.js",
+      "implementation": "src/modules/conversation/domain/mentionRoleRouting.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/drawFailureNote.js",
+      "implementation": "src/modules/conversation/domain/drawFailureNote.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/addresseeSignals.js",
+      "implementation": "src/modules/conversation/domain/addresseeSignals.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/internalStatusLeak.js",
+      "implementation": "src/modules/conversation/domain/internalStatusLeak.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/groupContextState.js",
+      "implementation": "src/modules/conversation/application/groupContextState.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/recentImageContinuation.js",
+      "implementation": "src/modules/conversation/application/recentImageContinuation.ts",
+      "kind": "composition",
+      "reviewedSha256": "c48d0d170a50d80b3d7e804555729ecc8ab51535b489d541567554de319df51f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatTurnDurability.js",
+      "implementation": "src/modules/conversation/application/chatTurnDurability.ts",
+      "kind": "composition",
+      "reviewedSha256": "17ceb1ebee497bbdfc6c13ccafe4c8083c9ad3e3090cd6d6e8abc006111b88b9",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/redisClient.js",
+      "implementation": "src/modules/conversation/infrastructure/redisFileRepository.ts",
+      "kind": "composition",
+      "reviewedSha256": "31007cbe62e649e2eadb8cd3c9e53935b18f74e49e340924c987fc2c12eca965",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/mentionTargets.js",
+      "implementation": "src/modules/conversation/domain/mentionTargets.ts",
+      "kind": "composition",
+      "reviewedSha256": "a2e5c3dad9bd68730a4c58f2a6c166122cf1c5b0dd9c964c7987929a2747b912",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/teachingFacts.js",
+      "implementation": "src/modules/conversation/domain/teachingFacts.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/avatarReference.js",
+      "implementation": "src/modules/conversation/infrastructure/avatarReference.ts",
+      "kind": "composition",
+      "reviewedSha256": "3bad179184db16b656d59301a102287c876b6bc516757ab15246f32c1cdbed71",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/promptContext.js",
+      "implementation": "src/modules/conversation/infrastructure/promptContext.ts",
+      "kind": "composition",
+      "reviewedSha256": "1988b7762e0ee8737361ecc364b20c907f427f307ae8977bbc887eaffe45d431",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/taskStatus.js",
+      "implementation": "src/modules/conversation/infrastructure/taskStatus.ts",
+      "kind": "composition",
+      "reviewedSha256": "4c7341b7b16a6389588d15febf5c700fbb67c8937a766772315e6c04a8f77667",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/intent/messageIntent.js",
+      "implementation": "src/modules/conversation/domain/messageIntent.ts",
+      "kind": "composition",
+      "reviewedSha256": "24ebb16007987a6767471a95dc9bdad62173550ffdcebe118444096142f57330",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/chatTurn.js",
+      "implementation": "src/modules/tools/infrastructure/chatTurn.ts",
+      "additionalImplementations": [
+        "src/modules/tools/infrastructure/groupNameCache.ts"
+      ],
+      "kind": "composition",
+      "reviewedSha256": "fc95f9c07abd0f04b32ccbf6e0338385d20619801346d138e5f74f317bdf4427",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/personaSource.js",
+      "implementation": "src/modules/conversation/domain/personaSource.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/personaTonePolicy.js",
+      "implementation": "src/modules/conversation/domain/personaTonePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/personaMoods.js",
+      "implementation": "src/modules/conversation/domain/personaMoods.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/replyRhythm.js",
+      "implementation": "src/modules/conversation/domain/replyRhythm.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/sendPacing.js",
+      "implementation": "src/modules/conversation/domain/sendPacing.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/narrativeReply.js",
+      "implementation": "src/modules/conversation/domain/narrativeReply.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/agentReplyComposer.js",
+      "implementation": "src/modules/conversation/domain/agentReplyComposer.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/progressReplyBudget.js",
+      "implementation": "src/modules/conversation/domain/progressReplyBudget.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/mentionFailureReply.js",
+      "implementation": "src/modules/conversation/domain/mentionFailureReply.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/qqCodeFenceText.js",
+      "implementation": "src/modules/conversation/domain/qqCodeFenceText.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/replySanitizer.js",
+      "implementation": "src/modules/conversation/domain/replySanitizer.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/forbiddenWordGuard.js",
+      "implementation": "src/modules/conversation/domain/forbiddenWordGuard.ts",
+      "kind": "composition",
+      "reviewedSha256": "088bd2638145eecf101e4d3717f61129cba58c2409d3885df5e90decf6c06283",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/emojiToolPolicy.js",
+      "implementation": "src/modules/conversation/domain/emojiToolPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/editReferencePipeline.js",
+      "implementation": "src/modules/conversation/domain/editReferencePipeline.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/outputGuardPipeline.js",
+      "implementation": "src/modules/conversation/application/outputGuardPipeline.ts",
+      "kind": "composition",
+      "reviewedSha256": "729fd1cd9d7a42eb15485ed0a11088ded3ab4e39adb054c0c478cbd81e7725f5",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatFailureReply.js",
+      "implementation": "src/modules/conversation/application/chatFailureReply.ts",
+      "kind": "composition",
+      "reviewedSha256": "51be99e12f4291fcf58733b0eb8cd45c388e12dac06fdde1c16393be536c12ff",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/contextualProgressReply.js",
+      "implementation": "src/modules/conversation/application/contextualProgressReply.ts",
+      "kind": "composition",
+      "reviewedSha256": "2af2f961c1a453eb56aa923151a3ad7ad8b69ed9a167000080ed7f4296c5ac30",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/thinkingForward.js",
+      "implementation": "src/modules/conversation/application/thinkingForward.ts",
+      "kind": "composition",
+      "reviewedSha256": "bdb83af0ef6718270341c824e072b7c2bf22ece2033fa6d24a6340c176642d2a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/routeDecision.js",
+      "implementation": "src/modules/conversation/application/routeDecision.ts",
+      "kind": "composition",
+      "reviewedSha256": "b2f393fdad6ca2dd02c662224a8fe80b0b22bdcfe900382524a9a05c3086958a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/SmartReply.js",
+      "implementation": "src/modules/conversation/application/smartReply.ts",
+      "kind": "composition",
+      "reviewedSha256": "fdfeaeb54c268cc1cd122acb9f48ed37bf35752ca0fab61bd7733023605d9f83",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/personaLibrary.js",
+      "implementation": "src/modules/conversation/infrastructure/personaLibrary.ts",
+      "kind": "composition",
+      "reviewedSha256": "f9226199cac996362cbc18faca8b8cdfd65b8b4903ab8ab3068391051eb5f057",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/intent/modelIntentClassifier.js",
+      "implementation": "src/modules/conversation/application/modelIntentClassifier.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/messageSegments.js",
+      "implementation": "src/modules/conversation/domain/messageSegments.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/textPolicy.js",
+      "implementation": "src/modules/conversation/domain/textPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/replyRendering.js",
+      "implementation": "src/modules/conversation/application/replyRendering.ts",
+      "kind": "composition",
+      "reviewedSha256": "918b8aec1dc1306de6ee32ccb2b0198c18522ae5b062568f7a56996086032f0d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/messageFormatting.js",
+      "implementation": "src/modules/conversation/application/messageFormatting.ts",
+      "kind": "composition",
+      "reviewedSha256": "cdf77c779e47dc9bfb234cbf5d0d64c189b94586935d05460d1705f32a076e90",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/conversationUtils.js",
+      "implementation": "src/modules/conversation/infrastructure/conversationUtils.ts",
+      "kind": "composition",
+      "reviewedSha256": "87835d8ba43bd4f0455dc327ad4b408debd08eb8090a9f9132fea50272124b6c",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/privateChat.js",
+      "implementation": "src/modules/conversation/domain/privateChat.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/smartDynamics.js",
+      "implementation": "src/modules/conversation/domain/smartDynamics.ts",
+      "kind": "composition",
+      "reviewedSha256": "bd87b8b8b203e84d14d47bc2b3d72479646498bdb0ece07c41d4f967c9b3d6c6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/splitState.js",
+      "implementation": "src/modules/conversation/domain/splitState.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/strictConversation.js",
+      "implementation": "src/modules/conversation/infrastructure/strictConversation.ts",
+      "kind": "composition",
+      "reviewedSha256": "6ecf1294167ae44a6bdb2fbcebeb182f938fe6347e42ec913eceb32a26433338",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/smartConversation.js",
+      "implementation": "src/modules/conversation/application/smartConversation.ts",
+      "kind": "composition",
+      "reviewedSha256": "55f1bf6c5fbb16fccd491b7f43de68e2fec14f03e8618b3bb01ad3048b63419f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/timingGate.js",
+      "implementation": "src/modules/conversation/infrastructure/timingGate.ts",
+      "kind": "composition",
+      "reviewedSha256": "0f8e825476d3cb93e265d38814f8884ab5c2032502f7ee54d0a698071ab5e867",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/aiConversationGate.js",
+      "implementation": "src/modules/conversation/domain/aiConversationGate.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/proactiveReplyFreshness.js",
+      "implementation": "src/modules/conversation/domain/proactiveReplyFreshness.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/groupContextResolver.js",
+      "implementation": "src/modules/conversation/infrastructure/groupContextResolver.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/smartLockPolicy.js",
+      "implementation": "src/modules/conversation/domain/smartLockPolicy.ts",
+      "kind": "composition",
+      "reviewedSha256": "2b054a0814d008b7cd8641909bf72180ec42158bf073f00038005d66c31a0351",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/MCPClient.js",
+      "implementation": "src/modules/tools/infrastructure/MCPClient.ts",
+      "kind": "composition",
+      "reviewedSha256": "47271234ae7fd812a8e0b9255ec6e3df16d4a62cdeb4c046a19653a24d4bef33",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/semanticToolIntent.js",
+      "implementation": "src/modules/tools/infrastructure/semanticToolIntent.ts",
+      "kind": "composition",
+      "reviewedSha256": "719b93d592ae3a3899180fce8aabd305894823057b2377a1d1dab67a6e47270e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/lib/toolExecution.js",
+      "implementation": "src/modules/tools/infrastructure/toolExecution.ts",
+      "kind": "composition",
+      "reviewedSha256": "e67c9836620649e0b59cdb56b4b0e6fc1e47d98d4fc7093d0ab8bfe96a081a02",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/toolContinuationPolicy.js",
+      "implementation": "src/modules/tools/domain/toolContinuationPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/toolResultGrounding.js",
+      "implementation": "src/modules/tools/domain/toolResultGrounding.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/toolManifestRegistry.js",
+      "implementation": "src/modules/tools/domain/toolManifestRegistry.ts",
+      "kind": "composition",
+      "reviewedSha256": "bbf3cf8078373e582d79658ffa8bf9b385bc41b37952063657f40a438df581c6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/builtinToolManifests.js",
+      "implementation": "src/modules/tools/domain/builtinToolManifests.ts",
+      "kind": "composition",
+      "reviewedSha256": "e204c55373a423d701be42ec6ef2417ee6fe5c8b6b738040c6dacc357a038ff1",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/toolIntentManifests.js",
+      "implementation": "src/modules/tools/domain/toolIntentManifests.ts",
+      "kind": "composition",
+      "reviewedSha256": "7c2bc36eaa485d30ca59ec62a28a9c7fadf3658a10e5382099db06bfe3e0b42e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/commandsApp.js",
+      "implementation": "src/modules/memory/infrastructure/memoryCommands.ts",
+      "kind": "composition",
+      "reviewedSha256": "35d396f3430f839d52f6fa067f4120b53d78556f2e705a0198ab7b513037a365",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/EmotionManager.js",
+      "implementation": "src/modules/memory/application/emotionManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "dd1a8c0c9c86293d3010d11281ed032e0e8406c931d6fca93d90c4aaa8eb5521",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/ExpressionLearner.js",
+      "implementation": "src/modules/memory/application/expressionLearner.ts",
+      "kind": "composition",
+      "reviewedSha256": "9296fc96a477df36502d9d3745c01da682350f0166f851dc8bf6e69a4cf58a6b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/PersonProfileInjector.js",
+      "implementation": "src/modules/memory/application/personProfileInjector.ts",
+      "kind": "composition",
+      "reviewedSha256": "48ca156a1e4f02939d36f2f2d50b6f108c9099b9b9fea600cb0c35291648a3bd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/PersonaFeedbackManager.js",
+      "implementation": "src/modules/memory/infrastructure/personaFeedbackManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "4e9ec5e3fe4f99e390648fef46728ff8ef69b7a2fe63a4c81d1ee684b105aa01",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/MemoryManager.js",
+      "implementation": "src/modules/memory/infrastructure/memoryManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "4580de7a258dff96ad98fc28803d02f9cf493a8d23c33b2c482bd853fe0f6c50",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/expressionSequence.js",
+      "implementation": "src/modules/memory/domain/expressionSequence.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/constants.js",
+      "implementation": "src/modules/memory/infrastructure/engine/constants.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/boundary.js",
+      "implementation": "src/modules/memory/infrastructure/engine/boundary.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/conflictResolver.js",
+      "implementation": "src/modules/memory/infrastructure/engine/conflictResolver.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/entityModel.js",
+      "implementation": "src/modules/memory/infrastructure/engine/entityModel.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/aliasRegistry.js",
+      "implementation": "src/modules/memory/infrastructure/engine/aliasRegistry.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/stats.js",
+      "implementation": "src/modules/memory/infrastructure/engine/stats.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/mentionResolver.js",
+      "implementation": "src/modules/memory/infrastructure/engine/mentionResolver.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/retriever.js",
+      "implementation": "src/modules/memory/infrastructure/engine/retriever.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/groupKnowledge.js",
+      "implementation": "src/modules/memory/infrastructure/engine/groupKnowledge.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/groupWorkflow.js",
+      "implementation": "src/modules/memory/infrastructure/engine/groupWorkflow.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/embeddings.js",
+      "implementation": "src/modules/memory/infrastructure/engine/embeddings.ts",
+      "kind": "composition",
+      "reviewedSha256": "144503cd7b4ca4f661b96e4e1d099e1abc9b46ea1eb396cb988792987aba92da",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/extractor.js",
+      "implementation": "src/modules/memory/infrastructure/engine/extractor.ts",
+      "kind": "composition",
+      "reviewedSha256": "d5cc1a82669cb7162ee4064c000916447e999bb05771d9546b65d2165362ed8a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/reflector.js",
+      "implementation": "src/modules/memory/infrastructure/engine/reflector.ts",
+      "kind": "composition",
+      "reviewedSha256": "fb8cc6a740012ad9ac09279492402b9abc98b81e9ce1fe4456a52b0f125ea596",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/engine/redisStore.js",
+      "implementation": "src/modules/memory/infrastructure/engine/redisStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "d63615c30b727d978c9e43edef605f7fa7559211383822f71115dc1cf05968ce",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/semanticMemoryWebApp.js",
+      "implementation": "src/modules/memory/infrastructure/semanticMemoryWebApp.ts",
+      "kind": "composition",
+      "reviewedSha256": "2f8ff0d7d5339288da526cf9ed059a1a7544197919f1018bc55094d329e97597",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "apps/SemanticMemory.js",
+      "implementation": "src/modules/memory/infrastructure/semanticMemoryCommands.ts",
+      "kind": "composition",
+      "reviewedSha256": "c4552872fb9def917a0a10aea5b64fa3bffb444e9f8d26542a0be182b5f73dec",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/EmbeddingGateway.js",
+      "implementation": "src/modules/memory/infrastructure/EmbeddingGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "676374c1351095779d4d0722135a4bfeaab9bee0cf3da0560f5c4db8216dac2f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/RerankGateway.js",
+      "implementation": "src/modules/memory/infrastructure/RerankGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "2fe0e1e3bad1f97193d9ed4b53d2c24ad04bf6e32b7d8fe3a7d022e343a1017f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/SemanticMemoryStore.js",
+      "implementation": "src/modules/memory/infrastructure/SemanticMemoryStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "da03a3b98c55802dbd9f31d10ec27b05117cb954f5136a230a32025f4b7e5784",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/SemanticMemoryIndexer.js",
+      "implementation": "src/modules/memory/infrastructure/SemanticMemoryIndexer.ts",
+      "kind": "composition",
+      "reviewedSha256": "c004aa3c3ac0a59c5e1e3bc889a2d04580607a738920dca08dab9874d60fa5f8",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/SemanticMemoryRetriever.js",
+      "implementation": "src/modules/memory/infrastructure/SemanticMemoryRetriever.ts",
+      "kind": "composition",
+      "reviewedSha256": "1f671439f0c939f7fdf7a797f70f6da4236cfefc14b8156f6e44efd147e36705",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/runtime.js",
+      "implementation": "src/modules/memory/infrastructure/semanticRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ffd3d6802b0b8d7c6a300a2dc2b3d099b80bd699786aa389664bf39751fbd724",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/semanticMemory/retrievalEval.js",
+      "implementation": "src/modules/memory/infrastructure/retrievalEval.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/midtermMemory/MidtermSummaryManager.js",
+      "implementation": "src/modules/memory/infrastructure/MidtermSummaryManager.ts",
+      "kind": "composition",
+      "reviewedSha256": "fa24838fcdd419ac46694934898129ad01f5533bdbad41d0a9553bac6cd75afc",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/episodicMemory.js",
+      "implementation": "src/modules/memory/infrastructure/episodicMemory.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/memorySelfCorrection.js",
+      "implementation": "src/modules/memory/infrastructure/memorySelfCorrection.ts",
+      "kind": "composition",
+      "reviewedSha256": "c7a1f836613de19529551b6bc9e7ff0bffd8fd9eb281ac6d19d261b4381bd18e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "domains/memory/GlobalStyleLearnerManager.js",
+      "implementation": "src/modules/memory/infrastructure/globalStyleLearner.ts",
+      "kind": "composition",
+      "reviewedSha256": "22f8c9f9e186c7110e0c88401ed361a83bc94b03e8a9f607d257895c5c9dd878",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/pluginExportLoader.js",
+      "implementation": "src/modules/platform/domain/pluginExportLoader.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/forwardBatches.js",
+      "implementation": "src/modules/messaging/domain/forwardBatches.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/turnSession.js",
+      "implementation": "src/modules/runtime/domain/turnSession.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/runtime/groupRuntime.js",
+      "implementation": "src/modules/runtime/application/groupRuntime.ts",
+      "adapter": "src/adapters/legacyRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ea846310dec22fdbb3a91813579002446a005fb6a822b83c917bedd90add2f92",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/runtime/sharedRuntime.js",
+      "implementation": "src/modules/runtime/application/sharedRuntime.ts",
+      "adapter": "src/adapters/sharedRuntime.ts",
+      "kind": "composition",
+      "reviewedSha256": "ffa53a34e2251ada3e5a589063054e27436bff3b4e06cf143bc7de396c174a0d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageSourcePolicy.js",
+      "implementation": "src/modules/image/domain/imageSourcePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageResult.js",
+      "implementation": "src/modules/image/domain/imageResult.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/multipartFormData.js",
+      "implementation": "src/modules/image/infrastructure/multipartFormData.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageTaskPolicy.js",
+      "implementation": "src/modules/image/domain/imageTaskPolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageFailurePolicy.js",
+      "implementation": "src/modules/image/domain/imageFailurePolicy.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageDimensions.js",
+      "implementation": "src/modules/image/domain/imageDimensions.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/visibleFailure.js",
+      "implementation": "src/modules/models/domain/visibleFailure.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageGenerationFallback.js",
+      "implementation": "src/modules/image/domain/providerConfig.ts",
+      "additionalImplementations": [
+        "src/modules/image/application/legacyImageGeneration.ts"
+      ],
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatCompletionUrl.js",
+      "implementation": "src/modules/models/domain/chatCompletionUrl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/sideLLM.js",
+      "implementation": "src/adapters/sideLLM.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageAspectRatio.js",
+      "implementation": "src/modules/image/domain/imageAspectRatio.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/unicodeText.js",
+      "implementation": "src/modules/models/domain/unicodeText.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/modelGateway.js",
+      "implementation": "src/modules/models/domain/modelGateway.ts",
+      "additionalImplementations": [
+        "src/adapters/modelFetch.ts"
+      ],
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatRequestRecovery.js",
+      "implementation": "src/modules/models/application/chatRequestRecovery.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/imageRequestGuard.js",
+      "implementation": "src/modules/image/domain/imageRequestGuard.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/providers/ThinkingProcessor.js",
+      "implementation": "src/modules/models/domain/thinkingProcessor.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/apiClient.js",
+      "implementation": "src/modules/models/application/modelExecution.ts",
+      "kind": "composition",
+      "reviewedSha256": "bd6c67a0c7b6653c064278f65de06e564ea8589b34e06bb4b0bacb75edf77faf",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/aiProviderProbe.js",
+      "implementation": "src/modules/models/application/aiProviderProbe.ts",
+      "kind": "composition",
+      "reviewedSha256": "dd99187a0e58d1c758786d10edbbf90a931f97155fcb135d86f54f1feea5e397",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/chatFailureDiagnosis.js",
+      "implementation": "src/modules/models/application/chatFailureDiagnosis.ts",
+      "kind": "composition",
+      "reviewedSha256": "8b0256e61189492d748e74c1d6d6d9bb9611dc13548b81b1a1fadcf8e3d5123b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/guobaAiProviderConfig.js",
+      "implementation": "src/modules/config/domain/aiProviderConfig.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/conversation.js",
+      "implementation": "src/modules/config/domain/schemas/shared/conversation.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/permission.js",
+      "implementation": "src/modules/config/domain/schemas/shared/permission.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/triggers.js",
+      "implementation": "src/modules/config/domain/schemas/shared/triggers.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/aiCore.js",
+      "implementation": "src/modules/config/domain/schemas/shared/aiCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/basic.js",
+      "implementation": "src/modules/config/domain/schemas/shared/basic.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/configSchemas/reasoning.js",
+      "implementation": "src/modules/config/domain/schemas/shared/reasoning.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/riskControl.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/riskControl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/tools.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/tools.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/magnetSearch.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/magnetSearch.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/emoji.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/emoji.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/messageArchive.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/messageArchive.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/persona.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/persona.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/groupGuard.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/groupGuard.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/dice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/dice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/deltaForce.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/deltaForce.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/permission.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/permission.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/memory.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/memory.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/umaRace.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/umaRace.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/aiCore.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/aiCore.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/tracking.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/tracking.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/emotion.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/emotion.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/expression.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/expression.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/aiModels.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/aiModels.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/knowledge.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/knowledge.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/basic.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/basic.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/messagePipeline.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/messagePipeline.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/voice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/voice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/reasoning.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/reasoning.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/groupNotice.js",
+      "implementation": "src/modules/config/domain/schemas/guoba/groupNotice.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/schemaConfig.js",
+      "implementation": "src/adapters/config/schemaConfig.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/providerCredentials.js",
+      "implementation": "src/adapters/config/providerCredentials.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/configWriter.js",
+      "implementation": "src/modules/config/infrastructure/configRepository.ts",
+      "kind": "composition",
+      "reviewedSha256": "104062c5197f73ac8cdf75db39a9894307fd3b7783dd57dfe67d8e29b6ffa970",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "core/config/configStore.js",
+      "implementation": "src/modules/config/infrastructure/configStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "e3e67595b296087799850131e887b99ffdaba71e6202e667e42e82a72a240cb7",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "model/config.js",
+      "implementation": "src/modules/config/infrastructure/namedConfig.ts",
+      "kind": "composition",
+      "reviewedSha256": "6ae8da4cd1cc092020e711d4137010d6e88a775661fd2375b2cdcb34fe2bf582",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/thinkingForwardSettings.js",
+      "implementation": "src/modules/config/infrastructure/thinkingForwardSettings.ts",
+      "kind": "composition",
+      "reviewedSha256": "95b7f4d0dcba636dd3aedb545d075d451f4be5d9ec0b62537255a81365955751",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/schemas/index.js",
+      "implementation": "src/modules/config/application/configPanel.ts",
+      "kind": "composition",
+      "reviewedSha256": "a43fc0749d319eb95662567c49d55286253201637949332aa1fadf91004f4284",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "models/Guoba/configInfo.js",
+      "implementation": "src/modules/config/application/configPanel.ts",
+      "kind": "composition",
+      "reviewedSha256": "3dbdc0665f8ca75b2b94a7bf61e9bc78a56cf58f290b0a5dfd95b63bdbe0ef2a",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messageCacheTtl.js",
+      "implementation": "src/modules/messaging/domain/messageCacheTtl.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/deliveryObservability.js",
+      "implementation": "src/modules/messaging/domain/deliveryObservability.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/leaseHeartbeat.js",
+      "implementation": "src/modules/messaging/infrastructure/leaseHeartbeat.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/keyedSerialQueue.js",
+      "implementation": "src/modules/messaging/infrastructure/keyedSerialQueue.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/outboundArbiter.js",
+      "implementation": "src/modules/messaging/application/outboundArbiter.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/videoThumbnail.js",
+      "implementation": "src/modules/messaging/infrastructure/videoThumbnail.ts",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/MessageManager.js",
+      "implementation": "src/modules/messaging/application/recentMessages.ts",
+      "kind": "composition",
+      "reviewedSha256": "595dbc7d8ae8b4978f205bd868278afadb5d2e1763a49331cbce20203e3106cd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/MessageArchiveManager.js",
+      "implementation": "src/modules/messaging/infrastructure/messageArchive.ts",
+      "kind": "composition",
+      "reviewedSha256": "9845549d27c773910460451818044f8963fae04e348ac1b0d724e8a3bf2d66e6",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messageStats.js",
+      "implementation": "src/modules/messaging/application/messageStats.ts",
+      "kind": "composition",
+      "reviewedSha256": "f8c26f4c2984ed59d22c2f69302ea514fdcb4a8b6c49b792a1de192ee1f54bfd",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/mediaArtifactStore.js",
+      "implementation": "src/modules/messaging/infrastructure/mediaArtifactStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "bd551b351319fba8f9db0c415efae081b5964effed79f323604ccaecc497f428",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/mediaOutbox.js",
+      "implementation": "src/modules/messaging/infrastructure/mediaOutbox.ts",
+      "kind": "composition",
+      "reviewedSha256": "d7f2c33371c8304e22475be5b4e9ff40ddc73133ee06baa044f145a1218e402f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/runtime.js",
+      "implementation": "src/adapters/pipelineForwardContext.ts",
+      "kind": "composition",
+      "reviewedSha256": "1e7b0a744b15d4d35b591231fbb64c365af5976a8e805d4224348853f24eaa38",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/riskSignalMonitor.js",
+      "implementation": "src/adapters/riskSignalMonitor.ts",
+      "kind": "composition",
+      "reviewedSha256": "5dc9fda0dcabc2e111fb21fc183b1c7c9384611a62578894bf241463c16d090f",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/mediaRelayAdminReport.js",
+      "implementation": "src/modules/messaging/infrastructure/mediaRelayAdminReport.ts",
+      "kind": "composition",
+      "reviewedSha256": "205b325a338991e394481b03633d40a0f12a99c0d50598ed3f0c314cf0d92adc",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/outboundThrottle.js",
+      "implementation": "src/modules/messaging/application/outboundThrottle.ts",
+      "kind": "composition",
+      "reviewedSha256": "77afba8eebf49e2cf86a30ceb2753322b649df16480d3c104acc5374b9c3048e",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/redisJobStore.js",
+      "implementation": "src/modules/messaging/infrastructure/redisJobStore.ts",
+      "kind": "composition",
+      "reviewedSha256": "2f0644efb97fbac02357db64979da32e42045438986d41865bd237490e7d7c7d",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/eventEnvelope.js",
+      "implementation": "src/modules/messaging/infrastructure/eventEnvelope.ts",
+      "kind": "composition",
+      "reviewedSha256": "23056d33bc40a8639cb451dbbc5a6765a2c1c3dc3c57ed13578f6da60b833870",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/messagePipeline.js",
+      "implementation": "src/modules/messaging/infrastructure/messagePipeline.ts",
+      "kind": "composition",
+      "reviewedSha256": "6cb005e73456bfe3dee24d5d1d14e32a724c1f903b035f27af7b068da7a1d164",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "utils/messagePipeline/deliveryGateway.js",
+      "implementation": "src/modules/messaging/infrastructure/deliveryGateway.ts",
+      "kind": "composition",
+      "reviewedSha256": "fb5d98a1631d1a1dee3728e8b26966ed19ac0cac0d3a71842770e72b7ce42c9b",
+      "present": true,
+      "thinWrapper": true
+    },
+    {
+      "legacy": "console/lib/pipelineJobs.js",
+      "implementation": "src/modules/messaging/application/pipelineJobs.ts",
+      "present": true,
+      "thinWrapper": true
+    }
+  ],
+  "structure": {
+    "hostMemberCount": 173,
+    "hostReferences": 642,
+    "globalPropertyAccesses": 468,
+    "pluginBridgePropertyReferences": 18,
+    "method": "AST direct named receiver references; alias and computed accesses are not inferred",
+    "sourceBoundaryViolations": 0
+  },
+  "limitations": "Registered re-export wrappers are AST-validated; composition shims require exact reviewed SHA256 and both adapter/application TS sources. Newly discovered JS debt is separate from the immutable baseline; typecheck, behavior tests and runtime wiring are separate required gates. Vue measures script blocks only. Git language percentage is not this metric."
+}

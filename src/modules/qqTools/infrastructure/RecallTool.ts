@@ -1,0 +1,95 @@
+import {qqViewApiSucceeded,qqViewRecord,qqViewEvent,qqViewBot,callQqViewApi} from '../../../contracts/qqToolViews.js'
+import type {QqViewEvent,QqViewMember,QqViewPorts} from '../../../contracts/qqToolViews.js'
+import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js';
+
+/**
+ * 消息撤回工具类，用于撤回机器人发送的消息
+ * 适配napcat-onebotv11版本
+ */
+export function createRecallTool(ports:QqViewPorts = {}){
+class RecallTool extends AbstractTool {
+  constructor() {
+    super();
+    this.name = 'recallTool';
+    this.description = '撤回消息，当需要撤回之前发送的消息时调用此工具。可以从聊天历史记录中的[消息ID:xxx]获取message_id参数';
+    this.parameters = {
+      type: 'object',
+      required: [],
+      properties: {
+        message_id: {
+          type: 'string',
+          description: '要撤回的消息ID，可从聊天历史记录中的[消息ID:xxx]获取，不填则尝试撤回引用的消息'
+        }
+      }
+    };
+  }
+
+  /**
+   * 调用OneBotv11 API
+   */
+  async callApi(action:string, params:Record<string,unknown> = {}, event:QqViewEvent = qqViewEvent({})) {return callQqViewApi(event,ports,action,params)}
+
+  /**
+   * 执行撤回操作
+   * @param {Object} opts - 参数选项
+   * @param {Object} e - 事件对象
+   * @returns {Promise<Object|string>} - 操作结果或错误信息
+   */
+  async func(input:unknown, event:unknown) {
+    const opts=qqViewRecord(input), e=qqViewEvent(event)
+    const { message_id } = opts;
+
+    let targetMessageId = message_id ? String(message_id) : null;
+
+    // 如果没有提供message_id，尝试从引用消息获取
+    if (!targetMessageId) {
+      if (e.source?.message_id) {
+        targetMessageId = String(e.source.message_id);
+      } else if (e.reply_id) {
+        targetMessageId = String(e.reply_id);
+      } else if (e.source?.seq) {
+        // 尝试通过seq获取message_id
+        try {
+          const msgInfo = await this.callApi('get_msg', { message_id: String(e.source.seq) },e);
+          if (qqViewRecord(msgInfo.data).message_id) {
+            targetMessageId = String(qqViewRecord(msgInfo.data).message_id);
+          }
+        } catch (err) {
+          // 忽略错误
+        }
+      }
+    }
+
+    if (!targetMessageId) {
+      return '未指定要撤回的消息ID，请提供message_id或引用要撤回的消息';
+    }
+
+    try {
+      const response = await this.callApi('delete_msg', {
+        message_id: targetMessageId
+      },e);
+
+      if (qqViewApiSucceeded(response)) {
+        return {
+          action: 'recall',
+          success: true,
+          message_id: targetMessageId,
+          message: '消息已撤回'
+        };
+      } else {
+        return {
+          action: 'recall',
+          success: false,
+          message_id: targetMessageId,
+          error: response.message || response.wording || '撤回消息失败，可能消息已超过撤回时限或无权限撤回'
+        };
+      }
+    } catch (error) {
+      console.error('撤回消息失败:', error);
+      return `撤回消息失败: ${error instanceof Error?error.message:String(error)}`;
+    }
+  }
+}
+
+return RecallTool
+}

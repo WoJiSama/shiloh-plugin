@@ -16,7 +16,7 @@ function event() {
           [4, { user_id: 4, role: "member" }]
         ])
       },
-      async sendMsg(segments) { sent.push(segments) }
+      async sendMsg(segments) { sent.push(segments); return {message_id:sent.length} }
     },
     sent
   }

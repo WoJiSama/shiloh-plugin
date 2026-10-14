@@ -13,7 +13,7 @@ function event() {
           [3, { user_id: 3, nickname: '乙' }]
         ])
       },
-      async sendMsg(segments) { sent.push(segments) }
+      async sendMsg(segments) { sent.push(segments); return {message_id:sent.length} }
     },
     sent
   }
