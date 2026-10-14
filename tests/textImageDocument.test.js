@@ -196,8 +196,17 @@ test('knowledge template turns structured markdown into distinct knowledge secti
   }
 })
 
-test('knowledge is an explicit template rather than a document fallback', async () => {
-  const source = await fs.readFile(new URL('../functions/functions_tools/TextImageTool.js', import.meta.url), 'utf8')
-  assert.match(source, /rawTemplate === "knowledge"\s*\?\s*"knowledge"/)
-  assert.match(source, /\[textImageTool\] timing template=\$\{template\} render=/)
+test('knowledge template selection emits timing and cleans the rendered file', async () => {
+  const {TextImageTool}=await import('../dist/backend/modules/rendering/infrastructure/TextImageTool.js')
+  const os=await import('node:os'),path=await import('node:path')
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'text-image-template-'))
+  const imagePath=path.join(directory,'card.png'),logs=[],replies=[],renders=[]
+  const tool=new TextImageTool({guardText:text=>text,image:file=>({type:'image',file}),getSharedBrowser:async()=>{throw new Error('unexpected browser')},scheduleSharedBrowserClose(){},logger:{info:message=>logs.push(message)}})
+  tool.renderDocumentImage=async options=>{renders.push(options);await fs.writeFile(imagePath,'png');return imagePath}
+  try {
+    await tool.func({text:'知识内容',template:'knowledge'},{reply:async value=>replies.push(value)})
+    assert.equal(renders[0].template,'knowledge');assert.equal(replies[0].file,imagePath)
+    assert.match(logs[0],/timing template=knowledge render=/)
+    await assert.rejects(fs.stat(imagePath),{code:'ENOENT'})
+  }finally{await fs.rm(directory,{recursive:true,force:true})}
 })

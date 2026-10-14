@@ -1,0 +1,2 @@
+export function renderRecord(value:unknown):Record<string,unknown> {return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
+export function renderError(value:unknown):{message:string;code:string} {const record=renderRecord(value);return {message:value instanceof Error?value.message:typeof record.message==='string'?record.message:String(value),code:typeof record.code==='string'?record.code:''}}

@@ -1,35 +1,3 @@
-import Base from "./base.js"
-
-let renderSequence = 0
-
-function safeSavePart(value = "") {
-  return String(value || "ranking").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 80) || "ranking"
-}
-
-export default class ModrinthCard extends Base {
-  constructor(e) {
-    super(e)
-    this.model = "modrinthCard"
-  }
-
-  async getData(data, scale = 1) {
-    const projectKey = safeSavePart(data?.projectId || data?.rank)
-    const sequence = ++renderSequence
-    return {
-      ...this.screenData,
-      // Parallel cards must never share an HTML temp file. The renderer writes
-      // the template before opening it in Chromium.
-      saveId: `modrinth-${safeSavePart(this.userId)}-${projectKey}-${Date.now()}-${sequence}`,
-      imgType: "jpeg",
-      quality: 82,
-      ...data,
-      sys: {
-        scale: this.scale(scale)
-      }
-    }
-  }
-
-  scale(pct = 1) {
-    return `style=transform:scale(${Math.min(2, Math.max(0.5, pct))})`
-  }
-}
+import Base from './base.js'
+import {createModrinthCard} from '../dist/backend/modules/media/infrastructure/ModrinthCard.js'
+export default createModrinthCard(Base)
