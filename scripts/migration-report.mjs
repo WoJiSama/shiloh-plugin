@@ -9,6 +9,12 @@ import { checkTree } from './check-boundaries.mjs';
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
 export const migrations = [
+  {"legacy": "console/lib/frontendStatic.js", "implementation": "src/modules/platform/infrastructure/console/frontendStatic.ts", "kind": "composition", "reviewedSha256": "e19a94ad28815bdd157e667dec8d1299fa5793adee90eae85a816b07a0635f9d"},
+  {"legacy": "console/lib/redisClient.js", "implementation": "src/modules/platform/infrastructure/console/redisClient.ts", "kind": "composition", "reviewedSha256": "20c0b28b75c83c35a2cca3de0154ebaa2c8a51a8dfbe3c749ba185df43474804"},
+  {"legacy": "console/server.js", "implementation": "src/modules/platform/infrastructure/console/consoleServer.ts", "kind": "composition", "reviewedSha256": "d69b1bca8ed5d02f42af3dcc896ce3d053e1a01a538308d3e09144d1d0f5a859"},
+  {"legacy": "utils/commandsWebApp.js", "implementation": "src/modules/platform/infrastructure/console/commandsWebApp.ts", "kind": "composition", "reviewedSha256": "793478290013499c695e9c79af0f0663d8fd9cd1af5aa49f566dea5b05f69bc4"},
+  {"legacy": "utils/observeWebApp.js", "implementation": "src/modules/platform/infrastructure/console/observeWebApp.ts", "kind": "composition", "reviewedSha256": "237bdaa08d4504ed4c3ec8995549c845500fae2ad8942143383608960149aa36"},
+  {"legacy": "utils/qzoneWebApp.js", "implementation": "src/modules/platform/infrastructure/console/qzoneWebApp.ts", "kind": "composition", "reviewedSha256": "f33084b5523ec24cfbeef8886ffaae8831dd577afabfb715b6d58a5495b846a5"},
   {"legacy": "apps/test.js", "implementation": "src/modules/host/infrastructure/chatPlugin.ts", "kind": "composition", "reviewedSha256": "877e53bfce6974ee24f759ea2bbb3be982e61b049e9f595dc7d4244591d863ca"},
   {"legacy": "apps/CommandHelp.js", "implementation": "src/modules/host/infrastructure/CommandHelp.ts", "kind": "composition", "reviewedSha256": "4eac7fb7e2a046effce61056a45773b65fc4a15548d0f0eb82fbfd6312bb9625"},
   {"legacy": "apps/MessageManager.js", "implementation": "src/modules/host/infrastructure/MessageRecordPlugin.ts", "kind": "composition", "reviewedSha256": "22df702f7de8bc4bcd9a699b4f5e072e4113cde10ab70e42273e739126eedbe3"},

@@ -57,8 +57,8 @@ test("命令表写入与热加载 roundtrip", async () => {
 })
 
 test("管理页 HTML 包含核心交互元素", async () => {
-  const fs2 = await import("node:fs")
-  const src = fs2.readFileSync(path.join(pluginRoot, "utils/commandsWebApp.js"), "utf8")
+  const {readSource}=await import("./helpers/pluginSources.js")
+  const src = readSource("utils/commandsWebApp.js")
   const htmlMatch = src.match(/return `<!doctype html>[\s\S]*?<\/html>`/)
   assert.ok(htmlMatch, "页面模板存在")
   const html = htmlMatch[0]
@@ -68,8 +68,8 @@ test("管理页 HTML 包含核心交互元素", async () => {
 })
 
 test("骰子面板按命令展示 .st 和失败/大失败发送文案", async () => {
-  const fs2 = await import("node:fs")
-  const src = fs2.readFileSync(path.join(pluginRoot, "utils/commandsWebApp.js"), "utf8")
+  const {readSource}=await import("./helpers/pluginSources.js")
+  const src = readSource("utils/commandsWebApp.js")
   assert.ok(src.includes("buildDiceReplyPayload"), "管理页应从回复目录加载内置规则")
   assert.ok(src.includes("await loadDiceExtras()"), "骰子数据必须在渲染前加载完")
   assert.ok(src.includes("cmd-group"), "卡片内应按命令分组")

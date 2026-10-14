@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import sharp from 'sharp'
 import { normalizeCustomSize } from '../dist/backend/modules/image/domain/imageInput.js'
 import { createImageResource } from '../dist/backend/modules/image/infrastructure/imageResource.js'
-const source = await fs.readFile(new URL('../console/server.js', import.meta.url), 'utf8')
+const source = await fs.readFile(new URL('../src/modules/platform/infrastructure/console/consoleServer.ts', import.meta.url), 'utf8')
 test('custom dimensions reject zero', () => {
   assert.throws(() => normalizeCustomSize('0x0'))
   assert.equal(normalizeCustomSize('720×1280'), '720x1280')
@@ -28,7 +28,7 @@ test('resource URL download validates size and aborts before fetching', async ()
 test('console uses shared service and cancellation remains scoped to authenticated owner', () => {
   assert.match(source, /await imageService\.run\(configs/)
   assert.match(source, /signal.owner === \(session\?\.username/)
-  assert.match(source, /materializeImageResult\(rawImages\[index\], cancelSignal.signal\)/)
+  assert.match(source, /materializeImageResult\(rawImages\[index\]!?, cancelSignal.signal\)/)
   assert.doesNotMatch(source, /function (buildImageGenerationPayload|parseImageGenerationPayload|runImageCandidate)\(/)
 })
 
