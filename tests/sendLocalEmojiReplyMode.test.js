@@ -72,7 +72,7 @@ test("the model chooses emoji-only or mixed reply through followUpText", async t
     }, {
       msg: "这也太离谱了",
       group_id: 1,
-      reply: async message => emojiOnlyReplies.push(message)
+      reply: async message => {emojiOnlyReplies.push(message); return {message_id:emojiOnlyReplies.length}}
     })
 
     assert.equal(emojiOnlyReplies.length, 1)
@@ -90,7 +90,7 @@ test("the model chooses emoji-only or mixed reply through followUpText", async t
     }, {
       msg: "发个表情包，再跟他说我马上到",
       group_id: 2,
-      reply: async message => withTextReplies.push(message)
+      reply: async message => {withTextReplies.push(message); return {message_id:withTextReplies.length}}
     })
 
     assert.deepEqual(withTextReplies.map(item => typeof item === "string" ? item : item.type), ["image", "我马上到"])
@@ -104,7 +104,7 @@ test("the model chooses emoji-only or mixed reply through followUpText", async t
     }, {
       msg: "这也太离谱了",
       group_id: 3,
-      reply: async message => threePartReplies.push(message)
+      reply: async message => {threePartReplies.push(message); return {message_id:threePartReplies.length}}
     })
     assert.deepEqual(threePartReplies.map(item => typeof item === "string" ? item : item.type), ["你先等一下", "image", "把前面那句解释清楚"])
     assert.match(threePartResult, /回复模式: text_emoji_text/)

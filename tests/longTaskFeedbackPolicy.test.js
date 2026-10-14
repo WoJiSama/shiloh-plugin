@@ -78,10 +78,15 @@ test("smart lock release path consumes the policy table", () => {
   assert.ok(!testJs.includes("isLongRunningTaskLinkRequest(text)"), "old inline predicate chain should be gone")
 })
 
-test("web parser sends the local opening before fetching", () => {
-  const source = fs.readFileSync(path.join(root, "functions/functions_tools/webParserTool.js"), "utf8")
-  assert.ok(
-    source.includes("await sendLongTaskOpening(e, 'web')"),
-    "webParserTool must send the policy opening after URL validation"
-  )
+test("web parser sends the local opening before fetching", async () => {
+  const {createWebParserTool}=await import('../dist/backend/modules/toolSupport/infrastructure/webParserTool.js')
+  const calls=[]
+  const Tool=createWebParserTool({browser:{launch:async()=>{throw new Error('unused')}},image:x=>x,sendLongTaskOpening:async()=>{calls.push('opening')}})
+  const tool=new Tool()
+  tool.fetchAndCleanContent=async()=>{calls.push('fetch');return {title:'page',text:'content',metadata:{},url:'https://example.com',timestamp:''}}
+  await tool.func({url:'https://example.com'},{reply:async()=>{}})
+  assert.deepEqual(calls,['opening','fetch'])
+  calls.length=0
+  await tool.func({url:'file:///tmp/test'},{reply:async()=>{}})
+  assert.deepEqual(calls,[])
 })

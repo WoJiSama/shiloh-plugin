@@ -111,18 +111,27 @@ test("emoji failures fall silent instead of triggering an apology model call", (
   assert.ok(pluginSource.includes("发送未完成，本轮静默跳过"), "静默跳过有日志可查")
 })
 
-test("selection no longer falls back to a random image on specific misses", () => {
-  const managerSrc = fs.readFileSync(path.join(root, "domains/emoji/EmojiPackManager.js"), "utf8")
-  assert.ok(managerSrc.includes('strategy: "no_match"'), "有明确诉求未命中时返回 no_match 而不是随机图")
-  const toolSrc = fs.readFileSync(path.join(root, "functions/functions_tools/SendLocalEmojiTool.js"), "utf8")
-  assert.ok(toolSrc.includes("本轮请用纯文字回复"), "无匹配返回文字引导（非 error 前缀）")
-  assert.ok(toolSrc.includes("表情库还没建起来"), "库空返回文字引导")
+test("selection no longer falls back to a random image on specific misses", async () => {
+  const {EmojiPackManager}=await import('../dist/backend/modules/emoji/infrastructure/EmojiPackManager.js')
+  const manager=new EmojiPackManager()
+  manager.refreshConfig=()=>{}
+  manager.loadItems=async()=>[{hash:'test',file:'file.png',tags:['开心'],useCases:[],description:'',usedCount:0}]
+  manager.getAbsoluteFilePath=()=>path.join(root,'package.json')
+  manager.config.useEmbedding=false
+  const result=await manager.selectEmoji({tags:['伤心'],query:'伤心'})
+  assert.equal(result.strategy,'no_match');assert.equal(result.item,null)
+
 })
 
-test("clearAll goes through the manager, not external field pokes", () => {
-  const appSrc = fs.readFileSync(path.join(root, "domains/emoji/app.js"), "utf8")
-  assert.ok(appSrc.includes("emojiPackManager.clearAllData()"), "命令层只调用 manager 方法")
-  assert.ok(!appSrc.includes("emojiPackManager.recentPicksByGroup.clear()"), "不再越过封装清内部状态")
+test("clearAll goes through the manager, not external field pokes", async () => {
+  const {createEmojiPackPlugin}=await import('../dist/backend/modules/emoji/infrastructure/app.js')
+  let calls=0
+  const Plugin=createEmojiPackPlugin(class {},{manager:{clearAllData:async()=>{calls++;return 3}},takeImages:async()=>[],makeForwardMsg:async()=>null,image:file=>file})
+  const app=new Plugin(),replies=[]
+  await app.clearAll({msg:'#表情包清空',reply:async message=>replies.push(message)})
+  assert.equal(calls,0)
+  await app.clearAll({msg:'#表情包清空 确认',reply:async message=>replies.push(message)})
+  assert.equal(calls,1);assert.match(replies.at(-1),/删除 3 张/)
 })
 
 test("直接个人提问识别:表情包不得独占这类回复", () => {

@@ -9,6 +9,19 @@ import { checkTree } from './check-boundaries.mjs';
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
 export const migrations = [
+  { legacy: 'functions/functions_tools/BingImageSearchTool.js', implementation: 'src/modules/content/infrastructure/BingImageSearchTool.ts', kind: 'composition', reviewedSha256: 'e85261496ff30009e9663f84d46e14d80795fdf2b77ef48ac442376ec1660d71' },
+  { legacy: 'functions/functions_tools/SendLocalEmojiTool.js', implementation: 'src/modules/content/infrastructure/SendLocalEmojiTool.ts', kind: 'composition', reviewedSha256: '1d5a7e8efcd15aaae74c70a00a3df9a2064e11a94c28bee20e7ea7d72dec1563' },
+  { legacy: 'functions/functions_tools/EmojiSearchTool.js', implementation: 'src/modules/content/infrastructure/EmojiSearchTool.ts', kind: 'composition', reviewedSha256: 'dc7ab263f688edac91e5dc592647e9ec3f77a17a90f44c1d433e11d00cf69013' },
+  { legacy: 'domains/emoji/emojiSelection.js', implementation: 'src/modules/emoji/infrastructure/emojiSelection.ts' },
+  { legacy: 'domains/emoji/app.js', implementation: 'src/modules/emoji/infrastructure/app.ts', kind: 'composition', reviewedSha256: 'f5c1cc27bb587796cab1319d8d54bf1cb01b84f31c46f5203c786387e137a5d4' },
+  { legacy: 'domains/emoji/EmojiPackManager.js', implementation: 'src/modules/emoji/infrastructure/EmojiPackManager.ts', kind: 'composition', reviewedSha256: '17f1821c355b180915949639d4bed37a3bbab7cff5c4de85d058597a3d40b980' },
+  { legacy: 'functions/functions_tools/puppeteer/WebParser.js', implementation: 'src/modules/media/infrastructure/WebParser.ts', kind: 'composition', reviewedSha256: '4b2379eac10dd1f2e47d306dc74dfe35d68870d0002f5925c9e8f43e4d1f8ebb' },
+  { legacy: 'functions/functions_tools/puppeteer/WebContentExtractor.js', implementation: 'src/modules/media/infrastructure/WebContentExtractor.ts', kind: 'composition', reviewedSha256: 'a6e521e63f629e61bb317c64ddf218d532c43cbda6ee05f81714e20c12b1c38e' },
+  { legacy: 'functions/functions_tools/SearchInformationTool.js', implementation: 'src/modules/toolSupport/infrastructure/SearchInformationTool.ts', kind: 'composition', reviewedSha256: '5b99cd4fad9bc9cac99fdb6032fd579c3260924a5216da80ef5f312aba77d043' },
+  { legacy: 'functions/functions_tools/webParserTool.js', implementation: 'src/modules/toolSupport/infrastructure/webParserTool.ts', kind: 'composition', reviewedSha256: '43790c220a2d8a57359d52596033d57c06049d82a98df58fd6f9a30196dcfe21' },
+  { legacy: 'functions/functions_tools/WaitTool.js', implementation: 'src/modules/toolSupport/infrastructure/WaitTool.ts', kind: 'composition', reviewedSha256: 'ac3406f269a56739f222e233100589083226ab0fed1e7e05f36ff87016497b74' },
+  { legacy: 'utils/redis-util.js', implementation: 'src/modules/shared/infrastructure/redisUtilities.ts', kind: 'composition', reviewedSha256: 'c049effcea18bcc74d0580087ad8e4f03876d36225c0e6334196c493713fd08b' },
+  { legacy: 'utils/personaReplayCore.js', implementation: 'src/modules/conversation/domain/personaReplayCore.ts' },
   { legacy: 'model/base.js', implementation: 'src/modules/rendering/infrastructure/base.ts', kind: 'composition', reviewedSha256: '2e6fcabdaad621c68a1121349db91a65e392c8f715ee44af08eafa4d15c11233' },
   { legacy: 'functions/tools/preview.js', implementation: 'src/modules/rendering/infrastructure/preview.ts', kind: 'composition', reviewedSha256: '2be78a85a26eb05be81ab8897ce83b3bc26077b75acb2c47153be9d1b4cd26b3' },
   { legacy: 'functions/functions_tools/TextImageTool.js', implementation: 'src/modules/rendering/infrastructure/TextImageTool.ts', kind: 'composition', reviewedSha256: 'a275638636c01e93a68bf5447b1f7504133184c9c76059948c27d7321ffe6274' },
