@@ -9,6 +9,21 @@ import { checkTree } from './check-boundaries.mjs';
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
 export const migrations = [
+  { legacy: 'domains/dice/DiceRuleExpression.js', implementation: 'src/modules/dice/infrastructure/DiceRuleExpression.ts' },
+  { legacy: 'domains/dice/DiceRuleSession.js', implementation: 'src/modules/dice/infrastructure/DiceRuleSession.ts' },
+  { legacy: 'domains/dice/DiceRulePackManager.js', implementation: 'src/modules/dice/infrastructure/DiceRulePackManager.ts' },
+  { legacy: 'domains/dice/app.js', implementation: 'src/modules/dice/infrastructure/app.ts', kind: 'composition', reviewedSha256: '80642df3f3c58fbe5cf6128740718363551ca7f6e271edc95ae0ed644d6c05d2' },
+  { legacy: 'domains/dice/DeckManager.js', implementation: 'src/modules/dice/infrastructure/DeckManager.ts', kind: 'composition', reviewedSha256: '85889f174eedb433b2f916cea546f439de79e27eec6c4ea5bdc3a18f967f88d8' },
+  { legacy: 'domains/dice/DiceManager.js', implementation: 'src/modules/dice/infrastructure/DiceManager.ts', kind: 'composition', reviewedSha256: 'cf18b4d5bb11a16676c00f6c558cfbce9a79964e96513c512567c2fd3190e214' },
+  { legacy: 'domains/dice/SealExtRuntime.js', implementation: 'src/modules/dice/infrastructure/SealExtRuntime.ts', kind: 'composition', reviewedSha256: 'd53611986a3d456f0fb69c35a302c4b6c25d6493decd3d8d6e6ca53728be0271' },
+  { legacy: 'domains/dice/logRecorder.js', implementation: 'src/modules/dice/infrastructure/logRecorder.ts', kind: 'composition', reviewedSha256: '31ac7c0b64e45e6e59715d22b339ab999ff0060064b6d930ed67785fa0cdc67e' },
+  { legacy: 'domains/dice/diceCommandGateway.js', implementation: 'src/modules/dice/domain/diceCommandGateway.ts', kind: 'composition', reviewedSha256: 'fe44b3cc38665672496d18ecd3ce9d15473da57af186c166111cb0425c455d32' },
+  { legacy: 'domains/dice/diceCommandPolicy.js', implementation: 'src/modules/dice/infrastructure/diceCommandPolicy.ts' },
+  { legacy: 'domains/dice/diceReplyCatalog.js', implementation: 'src/modules/dice/domain/diceReplyCatalog.ts' },
+  { legacy: 'domains/dice/sealCocDefaults.js', implementation: 'src/modules/dice/domain/sealCocDefaults.ts' },
+  { legacy: 'domains/dice/sealSkillAliases.js', implementation: 'src/modules/dice/domain/sealSkillAliases.ts' },
+  { legacy: 'domains/dice/DiceRuleSchema.js', implementation: 'src/modules/dice/infrastructure/DiceRuleSchema.ts' },
+  { legacy: 'utils/diceRandom.js', implementation: 'src/modules/dice/infrastructure/diceRandom.ts' },
   { legacy: 'functions/functions_tools/BingImageSearchTool.js', implementation: 'src/modules/content/infrastructure/BingImageSearchTool.ts', kind: 'composition', reviewedSha256: 'e85261496ff30009e9663f84d46e14d80795fdf2b77ef48ac442376ec1660d71' },
   { legacy: 'functions/functions_tools/SendLocalEmojiTool.js', implementation: 'src/modules/content/infrastructure/SendLocalEmojiTool.ts', kind: 'composition', reviewedSha256: '1d5a7e8efcd15aaae74c70a00a3df9a2064e11a94c28bee20e7ea7d72dec1563' },
   { legacy: 'functions/functions_tools/EmojiSearchTool.js', implementation: 'src/modules/content/infrastructure/EmojiSearchTool.ts', kind: 'composition', reviewedSha256: 'dc7ab263f688edac91e5dc592647e9ec3f77a17a90f44c1d433e11d00cf69013' },

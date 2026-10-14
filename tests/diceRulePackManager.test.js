@@ -1135,3 +1135,36 @@ test("listText footer carries a quick-start tutorial with real ids", async t => 
   assert.match(text, /- 看全部规则：\.骰规则查看 state-pack（命令 → 参数 → 分支逐级列出）/)
   assert.match(text, /- 停用：\.骰规则禁用 包id（人物卡数据保留）/)
 })
+
+test('uncertain private rule delivery remains auditable and cannot be replayed', async t => {
+  const runtime = createRuntime()
+  t.after(runtime.cleanup)
+  await runtime.manager.stageImport(teamRule, 'master')
+  await runtime.manager.confirmImport('team-pack', 'master')
+  await runtime.manager.enableForGroup('10001', 'team-pack')
+  const admin = eventWithMembers('.team 查 secret_note', { sender: { card: '主持人', nickname: 'Keeper', role: 'admin' }, user_id: '40004' })
+  const result = await runtime.manager.handleDynamicCommand(admin)
+  await runtime.manager.settlePrivateDeliveries('10001', 'team-pack', [{deliveryId: result.privateMessages[0].deliveryId, ok:false, state:'unknown', error:'receipt lost'}])
+  const stored=runtime.diceManager.readState().groups['10001'].diceRuleSessions['team-pack'].privateDeliveries[0]
+  assert.equal(stored.state,'unknown')
+  assert.equal(stored.lastError,'receipt lost')
+  assert.match((await runtime.manager.handleDynamicCommand({...admin,msg:'.team 投递 状态'})).text,/待核实：1/)
+  assert.match((await runtime.manager.handleDynamicCommand({...admin,msg:'.team 投递 重试'})).text,/禁止重放/)
+})
+
+test('rule index rejects malformed persisted boundaries before mutation', async t => {
+  const runtime=createRuntime();t.after(runtime.cleanup)
+  const indexPath=runtime.manager.getIndexPath();fs.mkdirSync(path.dirname(indexPath),{recursive:true})
+  const malformed=[
+    {version:1,packages:[],groups:{},pending:{}},
+    {version:1,packages:{bad:{id:'bad',name:'bad',versions:[{version:'1'}]}},groups:{},pending:{}},
+    {version:1,packages:{},groups:{group:{active:{bad:'1'}}},pending:{}},
+    {version:1,packages:{},groups:{},pending:{bad:{id:'bad',createdAt:'yesterday'}}}
+  ]
+  for(const value of malformed){
+    const source=JSON.stringify(value);fs.writeFileSync(indexPath,source)
+    assert.throws(()=>runtime.manager.readIndex(),/索引损坏/)
+    await assert.rejects(runtime.manager.mutateIndex(index=>{index.pending={}}),/索引损坏/)
+    assert.equal(fs.readFileSync(indexPath,'utf8'),source)
+  }
+})

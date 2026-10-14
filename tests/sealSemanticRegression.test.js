@@ -159,23 +159,26 @@ test("H2: vars 四层作用域 $t/$m/$g/无前缀", async () => {
     const cmd = seal.ext.newCmdItemInfo()
     cmd.name = 'v'
     cmd.solve = (ctx, msg, cmdArgs) => {
+      const before = seal.vars.intGet(ctx, '$t计数')
       seal.vars.intSet(ctx, '力量', 10)         // 无前缀→卡
       seal.vars.intSet(ctx, '$g频率', 3)          // $g→群
       seal.vars.intSet(ctx, '$m等级', 5)          // $m→个人
       seal.vars.intSet(ctx, '$t计数', 1)          // $t→临时
-      seal.replyToSender(ctx, msg, 'ok')
+      seal.replyToSender(ctx, msg, JSON.stringify({before,after:seal.vars.intGet(ctx,'$t计数')}))
       return seal.ext.newCmdExecuteResult()
     }
     ext.cmdMap['v'] = cmd
   `)
-  await rt.dispatch("v", { userId: "u1", groupId: "g1" })
+  const first = await rt.dispatch("v", { userId: "u1", groupId: "g1" })
   assert.equal(cardStore.skills["力量"], 10, "无前缀写入卡")
   assert.equal(rt.storage.__scoped["__g:g1:频率"], 3, "$g 写入群作用域")
   assert.equal(rt.storage.__scoped["__m:u1:等级"], 5, "$m 写入个人作用域")
-  assert.equal(rt.tempVars.get("__t:g1:u1:计数"), 1, "$t 写入临时作用域")
-  // 下一次 dispatch 临时变量清零
-  await rt.dispatch("v", { userId: "u1", groupId: "g1" })
-  assert.equal(rt.tempVars.get("__t:g1:u1:计数"), 1, "重新设置后有值")
+  assert.deepEqual(JSON.parse(first.replies[0].text), {before:[0,false],after:[1,true]}, "$t 在命令中可读写")
+  // 每个后续请求包括同用户/群都从空临时作用域开始。
+  for (const options of [{userId:"u1",groupId:"g1"},{userId:"u2",groupId:"g1"},{userId:"u1",groupId:"g2"}]) {
+    const next=await rt.dispatch("v",options)
+    assert.deepEqual(JSON.parse(next.replies[0].text),{before:[0,false],after:[1,true]})
+  }
 })
 
 test("H3: cmdArgs 方法套件", async () => {
