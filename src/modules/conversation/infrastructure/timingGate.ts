@@ -3,11 +3,12 @@ import { sideLLMCall } from '../../../adapters/sideLLM.js'
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from '../../models/domain/chatCompletionUrl.js'
 import { hasBotTextAnchor, getReplySender, messageQuotesUser } from '../domain/messageContext.js'
 import { getMentionTargetId, messageMentionsUser } from '../domain/mentionTargets.js'
+import {buildPersonaParticipationPrompt, type PersonaText} from '../domain/personaSource.js'
 interface AttentionHook {word:string;count:number}
 export interface TimingGateHost {
  config:{smartTrigger?:{gateContextSize?:number;promptHintBusyGroupRate?:number;promptHintRateLimitWarn?:number;attentionDrift?:{enabled?:boolean;windowMinutes?:number;level?:string}};triggerPrefixes?:unknown[];
  trackAiConfig?:{trackAiUrl?:string;trackAiModel?:string;trackAiApikey?:string}};
- getPersonaFor(e:ConversationEvent):unknown;messageManager:{formatMessageHistory(kind:'group',id:string|number,size:number):Promise<string>};computeGroupMsgRate5min(state:ConversationState):number
+ getPersonaFor(e:ConversationEvent):PersonaText|null;messageManager:{formatMessageHistory(kind:'group',id:string|number,size:number):Promise<string>};computeGroupMsgRate5min(state:ConversationState):number
 }
 export interface TimingGatePorts {
  logger:{warn(message:string):void};bot():{uin?:string|number;nickname?:string};now?():number;sideLLMCall?:typeof sideLLMCall;
@@ -125,6 +126,7 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
       userText: currentText,
       persona: host.getPersonaFor(e)
     })
+    const participationPrompt = buildPersonaParticipationPrompt(host.getPersonaFor(e) || {})
     const systemPrompt = `你是 QQ 群聊节奏判断助手。机器人名字叫"${botName}"。
 当前北京时间：${new Date(now()).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
 你需要判断 ${botName} 是否应该现在插话、保持沉默、或稍后再说。
@@ -151,6 +153,7 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
 - 看到"触发原因=continuation_strong"且消息明显在向 ${botName} 提问/反馈：可以 continue；如果只是相关词命中但没有对 ${botName} 说，仍然 no_action
 - 没有明确"应该插"的理由时，必须 no_action
 
+${participationPrompt}
 ${gatePersonaTone ? `\n${gatePersonaTone}\n` : ""}
 只返回严格的 JSON，格式：{"decision":"continue|no_action|wait","wait_seconds":3,"reason":"简短理由"}
 wait 时 wait_seconds 取 3-15 之间。不要任何其他文字、不要 markdown、不要代码块包装。`

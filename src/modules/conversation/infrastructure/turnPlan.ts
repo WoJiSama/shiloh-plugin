@@ -48,6 +48,7 @@ import {needsDeliberateReasoning,isCasualChatTurn} from "../domain/turnPlanPolic
 export function createTurnPlan({
   responseKind = "chat",
   intentText = "",
+  interactionKind,
   availableCapabilities = [],
   requiredCapabilities = [],
   toolChoice = "auto",
@@ -73,7 +74,10 @@ export function createTurnPlan({
       : []
   const optional = available.filter(name => !required.includes(name))
   const hasRequiredAction = required.length > 0
-  const casual = !hasRequiredAction && responseKind === "chat" && isCasualChatTurn(intentText)
+  const seriousAnswer = interactionKind === "serious_answer"
+  const deliveryStatus = interactionKind === "delivery"
+  const groundedReply = seriousAnswer || deliveryStatus
+  const casual = !groundedReply && !hasRequiredAction && responseKind === "chat" && isCasualChatTurn(intentText)
   // A reaction remains optional: `tool_choice: auto` still permits a normal
   // text reply. It must nevertheless reach the tool-capable model, otherwise
   // the emoji tool is silently stripped before the request is made.
@@ -81,7 +85,7 @@ export function createTurnPlan({
   const executionMode = hasRequiredAction || hasOptionalReaction ? "tool" : "chat"
   // 升档不再要求 knowledge 档:技术性追问常被 responseKind 判成 chat(排障类被显式排除在
   // 教育讲解之外),它们同样值得高思考档;casual 已被 isCasualChatTurn 排除,不受影响
-  const reasoning = executionMode === "chat" && needsDeliberateReasoning(intentText)
+  const reasoning = executionMode === "chat" && (groundedReply || needsDeliberateReasoning(intentText))
   const modelProfile = hasOptionalReaction
     ? "casual"
     : executionMode === "tool"
@@ -109,7 +113,11 @@ export function createTurnPlan({
     observability: {
       routeReason: executionMode === "tool"
         ? committedAction ? "committed_action" : hasOptionalReaction ? "optional_reaction" : "requested_action"
-        : optional.length
+        : seriousAnswer
+          ? "serious_answer"
+          : deliveryStatus
+            ? "delivery_status"
+          : optional.length
           ? "optional_capabilities"
           : "no_required_action"
     }
@@ -139,6 +147,9 @@ export function deriveTurnPlanRequest(plan:Partial<TurnPlan> = {}, config:{chatA
   const escalateEffort = ["minimal", "low", "medium", "high", "max"].includes(configuredEffort) ? configuredEffort : ""
   return {
     toolChoice: plan?.execution?.toolChoice || "none",
+    ...(plan.execution?.mode === "chat" ? {
+      executionPrompt: "【本轮执行范围】\n本次只生成并发出当前回复，没有可调用的工具；回复发出后不会自动查询、重试、生成或稍后投递。基于已有结果回答，缺少当前结果就保持未确认。不要用将来会做某件事代替实际调用，也不要替用户重新发起旧任务。"
+    } : {}),
     requestOptions: profile === "fast"
       ? { forceChatBackend: true, routeLabel: "快速知识回复" }
       : profile === "reasoning"

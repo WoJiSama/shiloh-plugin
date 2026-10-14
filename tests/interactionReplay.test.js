@@ -12,13 +12,16 @@ import {createFinalReply} from '../dist/backend/modules/conversation/application
 import {createOutputGuardPipeline} from '../dist/backend/modules/conversation/application/outputGuardPipeline.js'
 import {recordTurnContinuity, loadTurnContinuity, buildTurnContinuityPrompt} from '../dist/backend/modules/conversation/application/turnContinuity.js'
 import {planTextReplyMessages} from '../dist/backend/modules/conversation/domain/replyRhythm.js'
+import {createTurnPlan, deriveTurnPlanRequest, formatTurnPlanLog} from '../dist/backend/modules/conversation/infrastructure/turnPlan.js'
+import {buildChatRequestData} from '../dist/backend/modules/models/domain/modelGateway.js'
+import {modelExecutor} from './helpers/modelExecutor.js'
 
 const scenarios = JSON.parse(fs.readFileSync(new URL('./fixtures/interactionReplayScenarios.json', import.meta.url), 'utf8'))
 let fixtureId = 0
 
-function fixture(scenario, {confirmed = true, directToBot = false} = {}) {
+function fixture(scenario, {confirmed = true, directToBot = false, realPlanning = false, gatewayConfig, optionalEmoji = false} = {}) {
   const groupId = 900000 + ++fixtureId
-  const captures = {compose: [], guards: [], requests: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0}
+  const captures = {compose: [], guards: [], requests: [], planInputs: [], gatewayRequests: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0}
   const logger = {info() {}, warn() {}, debug() {}, error(message, error) { captures.errors.push({message, error}) }}
   const trace = {id: `replay-${groupId}`, setTrigger() {}, setIntent() {}, addModelCall() {}, addTool() {}, finish: () => ({modelCalls: [], tools: []})}
   const members = new Map([[99, {user_id: 99, nickname: '测试机器人', role: 'member'}], [202, {user_id: 202, nickname: '测试群友', role: 'member'}], [303, {user_id: 303, nickname: '另一只机器人', role: 'member'}]])
@@ -35,7 +38,8 @@ function fixture(scenario, {confirmed = true, directToBot = false} = {}) {
       sender: {user_id: quote.userId, nickname: quote.name}, message: [{type: 'text', text: quote.text}]})
     event._quotedPromptContext = {text: quote.text, messageId: quote.messageId, userId: quote.userId, senderUserId: quote.userId, senderName: quote.name}
   }
-  const session = {tools: [], groupUserMessages: []}
+  const availableTools = optionalEmoji ? [{type: 'function', function: {name: 'sendLocalEmojiTool', description: '可选表情反应', parameters: {type: 'object', properties: {}}}}] : []
+  const session = {tools: availableTools, groupUserMessages: []}
   const storage = new Map()
   const redis = {get: async key => storage.get(key) ?? null, set: async (key, value) => { storage.set(key, value) }}
   const composer = createTurnPromptComposer(logger)
@@ -50,10 +54,14 @@ function fixture(scenario, {confirmed = true, directToBot = false} = {}) {
     getActiveConversation: () => undefined, trackingKey: e => `${e.self_id}:${e.group_id}:${e.user_id}`,
     rememberPersonaReply() {}, rememberStyleReply() {}
   })
+  const gateway = gatewayConfig ? modelExecutor(async (url, options) => {
+    captures.gatewayRequests.push({url, body: JSON.parse(options.body)})
+    return new Response(JSON.stringify({choices: [{message: {role: 'assistant', content: scenario.modelReply}}]}))
+  }) : null
   const host = {
     config: {enabled: true, groupHistory: true, systemContent: '你是测试机器人。', persona: {name: '测试机器人'}, promptLayerCache: {enabled: false},
-      episodicMemory: {enabled: true, proactiveEnabled: false}, memorySystem: {enabled: false}, emotionSystem: {enabled: false}, expressionLearning: {enabled: false}, personProfileInjection: {enabled: false}},
-    tools: [], toolInstances: {}, _groupLimiters: new Map(),
+      episodicMemory: {enabled: true, proactiveEnabled: false}, memorySystem: {enabled: false}, emotionSystem: {enabled: false}, expressionLearning: {enabled: false}, personProfileInjection: {enabled: false}, ...gatewayConfig},
+    tools: availableTools, toolInstances: {}, _groupLimiters: new Map(),
     isUserBlacklisted: () => false, scheduleMergedToolRequest: () => true, refreshLocalToolRegistry: async () => {}, waitForMCPReady: async () => {},
     beginConversationTask: async () => ({messageId: event.message_id}), getOrCreateSession: () => session, clearSession() {},
     handleActiveDrawStatusQuestion: async () => false,
@@ -65,8 +73,11 @@ function fixture(scenario, {confirmed = true, directToBot = false} = {}) {
     messageManager: {getMessages: async () => [], recordMessage: async record => captures.archived.push(record)},
     getTaskStatus: async () => null, formatTaskStatusForPrompt: () => '', resolveUnderstandingPrompt: async () => '',
     trimMessageHistory: messages => messages, filterChatByQQ: messages => messages, formatMessages: messages => messages,
-    getToolsByName: () => [], getImageGenerationReferenceImages: images => images,
-    retryRequest: async () => { captures.mainCalls++; return {choices: [{message: {content: scenario.modelReply}}]} },
+    getToolsByName: names => availableTools.filter(tool => names.includes(tool.function.name)), getImageGenerationReferenceImages: images => images,
+    retryRequest: async (requestData, toolContent, _retries, toolName, options) => {
+      captures.mainCalls++
+      return gateway ? gateway.YTapi(requestData, host.config, toolContent, toolName, options) : {choices: [{message: {content: scenario.modelReply}}]}
+    },
     buildMissingToolCommitmentCall: () => null,
     handleTextResponse: (text, e, current, messages) => final.handleTextResponse(host, text, e, current, messages),
     processToolSpecificMessage: text => text, getTextImageTemplateForFinalReply: () => false,
@@ -95,12 +106,21 @@ function fixture(scenario, {confirmed = true, directToBot = false} = {}) {
     recallUserEpisodes: () => [], buildUserCallbackPrompt: () => '', buildMainSystemPrompt, containsInternalStatusLeak: () => false,
     resolveHistorySelectionBudget: () => ({mode: 'compact', recentCount: 3, relevantCount: 0, maxMessages: 3}), selectRelevantGroupHistory: messages => messages,
     shouldUseExcelWorkbookTool: () => false, buildExcelToolParams: () => null,
-    resolveToolRoute: async () => ({toolChoice: 'none', forcedToolCall: null, toolScopeLocked: true, applied: []}),
-    createTurnPlan: () => ({id: `plan-${groupId}`, intent: 'chat', execution: {mode: 'chat', modelProfile: 'chat', toolChoice: 'none'},
-      capabilities: {required: [], optional: [], available: []}, context: {historyMode: 'compact', selectedHistoryCount: 0}, presentation: {kind: 'text'}, observability: {routeReason: 'offline_replay'}}),
+    resolveToolRoute: async () => ({toolChoice: optionalEmoji ? 'auto' : 'none', forcedToolCall: null, toolScopeLocked: !optionalEmoji, applied: []}),
+    // Keep a preselected reaction candidate eligible so the real turn plan must
+    // resolve the conflict between serious interaction and optional expression.
+    filterToolsForMessageIntent: tools => tools,
+    createTurnPlan: input => {
+      captures.planInputs.push(input)
+      return realPlanning ? createTurnPlan(input) : {id: `plan-${groupId}`, intent: 'chat', execution: {mode: 'chat', modelProfile: 'chat', toolChoice: 'none'},
+        capabilities: {required: [], optional: [], available: []}, context: {historyMode: 'compact', selectedHistoryCount: 0}, presentation: {kind: 'text'}, observability: {routeReason: 'offline_replay'}}
+    },
     isEducationalExplanationRequest: () => false, classifyEmojiToolExposure: () => '', resolveCardPresentation: () => '',
-    deriveTurnPlanRequest: () => ({toolChoice: 'none'}), formatTurnPlanLog: () => '', cardAcknowledgement: () => '', buildToolIntentDisclosure: () => '',
-    buildChatRequestData: (_config, messages, tools, choice) => { captures.requests.push(structuredClone(messages)); return {messages, tools, tool_choice: choice} },
+    deriveTurnPlanRequest: realPlanning ? deriveTurnPlanRequest : () => ({toolChoice: 'none'}), formatTurnPlanLog: realPlanning ? formatTurnPlanLog : () => '', cardAcknowledgement: () => '', buildToolIntentDisclosure: () => '',
+    buildChatRequestData: (_config, messages, tools, choice) => {
+      captures.requests.push(structuredClone(messages))
+      return realPlanning ? buildChatRequestData(_config, messages, tools, choice) : {messages, tools, tool_choice: choice}
+    },
     collectThinking() {}, extractEmbeddedToolCalls: () => ({calls: [], remainder: ''}), sendThinkingForward: async () => {},
     recordTurnDiagnostics() {}, buildCommittedActionReply: () => '', buildDrawFailureNoteMessage: () => '', takeDrawFailureNote: () => null
   }
@@ -240,4 +260,82 @@ test('an explicit bot mention keeps the response directed to the bot while an ot
   assert.match(system, /回应对象：bot（99）/)
   assert.doesNotMatch(system, /回应对象：other/)
   assert.ok(system.includes(scenario.quote.text))
+})
+
+function reasoningGatewayConfig(complexReasoningEffort = 'high') {
+  return {
+    providers: 'oneapi', useTools: false,
+    chatAiConfig: {chatApiUrl: 'https://base.invalid/v1', chatApiModel: 'base-reply', chatApiKey: 'fixture-base-key', chatReasoningEffort: 'low', complexReasoningEffort},
+    taskAiConfig: {casual: {apiUrl: 'https://casual.invalid/v1', model: 'casual-reply', apiKey: 'fixture-casual-key', reasoningEffort: 'low'}}
+  }
+}
+
+test('short serious cooling questions reach high reasoning at the real model request despite an optional reaction', async () => {
+  const scenario = {rawUserText: 'CPU已经92℃了，怎么散热？', modelReply: '先停止满载，让机器冷却，再检查散热。'}
+  const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig(), optionalEmoji: true})
+  assert.equal(await f.run(), true)
+  assert.deepEqual(f.captures.errors, [])
+  assert.equal(f.session.interactionContext.kind, 'serious_answer')
+  assert.equal(f.captures.planInputs[0].interactionKind, f.session.interactionContext.kind, 'the current interaction must reach real planning')
+  assert.deepEqual(f.captures.planInputs[0].availableCapabilities, ['sendLocalEmojiTool'])
+  assert.equal(f.session.turnPlan.execution.mode, 'chat', 'serious questions cannot become optional emoji turns')
+  assert.deepEqual(f.session.tools, [])
+  assert.equal(f.captures.gatewayRequests.length, 1, 'one injected fetch proves the outgoing request, without backend retry or network access')
+  const {url, body} = f.captures.gatewayRequests[0]
+  assert.equal(url, 'https://base.invalid/v1/chat/completions')
+  assert.equal(body.model, 'base-reply')
+  assert.equal(body.reasoning_effort, 'high', 'serious short requests must override both base and casual low effort')
+  assert.equal(body.tools, undefined)
+  assert.match(body.messages.at(-1).content, /【本轮执行范围】/)
+  assert.match(body.messages.at(-1).content, /回复发出后不会自动查询、重试、生成或稍后投递/)
+  assert.deepEqual(f.captures.sent, [scenario.modelReply])
+})
+
+test('ordinary banter retains the casual low-effort model through real planning and model execution', async () => {
+  const scenario = {rawUserText: '哈哈哈这个电子体香梗笑死我了', modelReply: '这回连香水钱都省了。'}
+  const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig(), optionalEmoji: true})
+  assert.equal(await f.run(), true)
+  assert.deepEqual(f.captures.errors, [])
+  assert.equal(f.session.interactionContext.kind, 'banter')
+  assert.equal(f.captures.planInputs[0].interactionKind, f.session.interactionContext.kind)
+  assert.deepEqual(f.captures.planInputs[0].availableCapabilities, ['sendLocalEmojiTool'])
+  assert.equal(f.session.turnPlan.execution.modelProfile, 'casual')
+  assert.equal(f.captures.gatewayRequests.length, 1)
+  const {url, body} = f.captures.gatewayRequests[0]
+  assert.equal(url, 'https://casual.invalid/v1/chat/completions')
+  assert.equal(body.model, 'casual-reply')
+  assert.equal(body.reasoning_effort, 'low', 'ordinary banter must retain configured casual effort')
+  assert.ok(!body.messages.some(message => String(message.content).includes('【本轮执行范围】')), 'a tool-capable route must not receive a no-tools statement')
+  assert.deepEqual(f.captures.sent, [scenario.modelReply])
+})
+
+test('disabling reasoning escalation preserves base low effort for a short serious question', async () => {
+  const scenario = {rawUserText: 'CPU已经92℃了，怎么散热？', modelReply: '先停止满载，让机器冷却，再检查散热。'}
+  const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig(false), optionalEmoji: true})
+  assert.equal(await f.run(), true)
+  assert.deepEqual(f.captures.errors, [])
+  assert.equal(f.session.interactionContext.kind, 'serious_answer')
+  assert.equal(f.captures.planInputs[0].interactionKind, 'serious_answer')
+  assert.equal(f.session.turnPlan.execution.mode, 'chat')
+  assert.equal(f.captures.gatewayRequests.length, 1)
+  const {url, body} = f.captures.gatewayRequests[0]
+  assert.equal(url, 'https://base.invalid/v1/chat/completions', 'disabling effort escalation must not reroute a serious turn to casual')
+  assert.equal(body.model, 'base-reply')
+  assert.equal(body.reasoning_effort, 'low', 'the existing base effort remains authoritative when escalation is off')
+  assert.deepEqual(f.captures.sent, [scenario.modelReply])
+})
+
+test('unknown delivery status uses evidence reasoning and an explicit execution contract', async () => {
+  const scenario = {rawUserText: '刚才改背景的图出来了吗？', modelReply: '还不能确认完成，我这边没有结果。', continuity: {botId: '99', route: 'tool', tools: [], lastReply: '收到，我先处理。'}}
+  const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig(), optionalEmoji: true})
+  await f.seedContinuity()
+  assert.equal(await f.run(), true)
+  assert.deepEqual(f.captures.errors, [])
+  assert.equal(f.captures.planInputs[0].interactionKind, 'delivery')
+  assert.equal(f.captures.gatewayRequests.length, 1)
+  const {body} = f.captures.gatewayRequests[0]
+  assert.equal(body.reasoning_effort, 'high')
+  assert.equal(body.tools, undefined)
+  assert.match(body.messages.at(-1).content, /不要替用户重新发起旧任务/)
+  assert.ok(body.messages.some(message => String(message.content).includes('缺少结果时只说明尚未确认')))
 })

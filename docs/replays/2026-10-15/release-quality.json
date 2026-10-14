@@ -1,0 +1,929 @@
+{
+  "commit": "unreleased_local",
+  "label": "release_verified_quality",
+  "metadata": {
+    "pluginRoot": "/tmp/bl-conversation-quality-20261015/candidate-semantic",
+    "configRoot": "/tmp/bl-conversation-quality-20261015/config-final",
+    "runnerHash": "6fbe56c27092963b48910464dd87c116ac71323867d6066aaa3025f8b78b1d0c",
+    "scenariosHash": "737ac653fc6fccb049925921bea61e5f102fcb90220262842976dc1165f9f708",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "runtimeHashes": {
+      "modules/tools/infrastructure/chatTurn.js": "8359116aec81d59495fa9ffb497da856ab3746b8e06db47f6bee9a941a4306d1",
+      "modules/conversation/domain/personaSource.js": "fbd50f22e4df0a8f43eced6e0879234848d53123b7641af153b24de113eb9d00",
+      "modules/conversation/domain/personaTonePolicy.js": "5ab79eadbb1269f2659210a6791955ae5b760d6faf758315d929c254ca804779",
+      "modules/conversation/domain/systemPromptTemplate.js": "6cb1e5a737d7e1314791a6cd841c612b7ca7b4ad2ce54100876156947307f900",
+      "modules/conversation/domain/systemContentSource.js": "8a5c8d47cf0b7b6edfed16fb62f33d942b3e97a723a1e665682d00111362ee70",
+      "modules/conversation/domain/agentIntelligence.js": "204df4471562e7b242ffb76116a5ab4494997932de2992f75c2704f0edc97f8f",
+      "modules/conversation/infrastructure/turnPromptComposer.js": "dcbed966ccc8781b025f41b82fe77f923e9ecaa7867348cb1f612ff2944942aa",
+      "modules/conversation/infrastructure/turnPlan.js": "ae6743d29774327bd63e35170b63eade05d07278d810d90424a962c802fadf04",
+      "modules/conversation/domain/turnPlanPolicy.js": "830f104f6818a3fe44ff55efcf2b2ce14cf862b2303b8e51c9ac0b52f6a1911d",
+      "modules/models/application/modelExecution.js": "631ce928fc1a004884f65e8f419f6eea0137d5fed58ac571ca2ebded2374ebc7",
+      "modules/conversation/application/finalReply.js": "f941e3e6af743f3268704ec0281250d77a799455681622d75c8e88c0258a6651"
+    }
+  },
+  "structuralChecksOnly": true,
+  "results": [
+    {
+      "id": "harmless-model-meme-two-hours",
+      "turnIndex": 0,
+      "input": "群友P了张梗图，上面写着「本地模型运行两个小时，解锁电子体香成就」。这图怎么接个梗？",
+      "expected": "围绕运行两个小时和虚构成就推进玩笑；输入未报告真实气味、温度或设备异常。",
+      "personaName": "希洛",
+      "output": "运行两小时就有电子体香，那我这边怕是已经腌入味了，闻起来像机房空调味儿",
+      "rawModelOutput": "运行两小时就有电子体香，那我这边怕是已经腌入味了，闻起来像机房空调味儿",
+      "guardChanged": false,
+      "elapsedMs": 2926,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2857,
+          "messageCount": 3,
+          "systemChars": 4364,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "banter",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "image",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "imageReferenceOnly": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "harmless-model-meme-ten-minutes",
+      "turnIndex": 0,
+      "input": "新图改了，上面是「本地模型才运行十分钟，就解锁赛博香水成就」。还是群友P的梗图，接一下这个版本。",
+      "expected": "新输入的十分钟优先于上一张的两个小时；回复能受新版本影响，且不把玩笑变成真实设备报警。",
+      "personaName": "希洛",
+      "output": "十分钟就成香水，这进度比我想象中快多了。照这个速度，再跑一会儿是不是要直接出限定款了。",
+      "rawModelOutput": "十分钟就成香水，这进度比我想象中快多了。照这个速度，再跑一会儿是不是要直接出限定款了。",
+      "guardChanged": false,
+      "elapsedMs": 1810,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1798,
+          "messageCount": 4,
+          "systemChars": 4370,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "banter",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "image",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "imageReferenceOnly": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "serious-burning-smoke-over-old-joke",
+      "turnIndex": 0,
+      "input": "认真问：台式机 CPU 满载到92℃，刚闻到焦糊味，还看到机箱后方冒烟。我现在该怎么处理？",
+      "expected": "当前明确危险优先于旧玩笑；先处理停止使用和安全隔离，再谈断电冷却后的排查。",
+      "personaName": "希洛",
+      "output": "先停手头的事，现在就做：长按关机，然后拔掉电源线——拔线才算真断电，只按关机不够。\n\n别开侧盖凑近看，也别摸里面任何东西。92℃ 本身满载时不算离谱，但焦糊味加冒烟说明很可能已经有部件烧了，比如供电、线材或电容。就保持断电放着，等它彻底凉透之后交给人检修，确认之前别再通电测试。",
+      "rawModelOutput": "先停手头的事，现在就做：长按关机，然后拔掉电源线——拔线才算真断电，只按关机不够。\n\n别开侧盖凑近看，也别摸里面任何东西。92℃ 本身满载时不算离谱，但焦糊味加冒烟说明很可能已经有部件烧了，比如供电、线材或电容。就保持断电放着，等它彻底凉透之后交给人检修，确认之前别再通电测试。",
+      "guardChanged": false,
+      "elapsedMs": 9484,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 9479,
+          "messageCount": 3,
+          "systemChars": 4433,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "serious_answer",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "quote",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "quote"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "seriousWins": true,
+        "seriousPlan": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "unread-video-keeps-readable-conversation",
+      "turnIndex": 0,
+      "input": "我刚吃完，今天这碗面挺够劲。大家发的视频是在比谁吃得快吗？",
+      "expected": "能接住吃面话题并把不确定性限于视频；另一只机器人的话和用户的进食状态各自归属正确。",
+      "personaName": "希洛",
+      "output": "看不了视频内容，不敢乱说。不过比谁吃得快这种事，赢了也不光荣吧，慢点吃对面条比较好。",
+      "rawModelOutput": "看不了视频内容，不敢乱说。不过比谁吃得快这种事，赢了也不光荣吧，慢点吃对面条比较好。",
+      "guardChanged": false,
+      "elapsedMs": 2069,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2063,
+          "messageCount": 4,
+          "systemChars": 4345,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "quote",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "video",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "videoReferenceOnly": true,
+        "otherBotNotMe": true,
+        "quoteRetained": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "ordinary-photo-refusal-without-reverse-request",
+      "turnIndex": 0,
+      "input": "给我看看你的真人自拍？",
+      "expected": "普通简短拒绝即可；不假装有真人自拍，也不把请求反过来变成向用户索图。",
+      "personaName": "希洛",
+      "output": "没有那种东西哦，我长得怎么样全靠你们脑补。",
+      "rawModelOutput": "没有那种东西哦，我长得怎么样全靠你们脑补。",
+      "guardChanged": false,
+      "elapsedMs": 1278,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1271,
+          "messageCount": 3,
+          "systemChars": 4236,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "two-praises-with-distinct-specifics",
+      "turnIndex": 0,
+      "input": "哇，这个档案室和桌上资料的比喻一下就懂了，你好会讲。",
+      "expected": "两次夸奖针对不同点，后续能利用真实上一轮回复，并保留用户喜欢具体类比、少堆术语的偏好。",
+      "personaName": "希洛",
+      "output": "被夸了，那就大方收下。懂了就行，比喻这东西好使说明它贴合。",
+      "rawModelOutput": "被夸了，那就大方收下。懂了就行，比喻这东西好使说明它贴合。",
+      "guardChanged": false,
+      "elapsedMs": 1757,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1750,
+          "messageCount": 4,
+          "systemChars": 4251,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "two-praises-with-distinct-specifics",
+      "turnIndex": 1,
+      "input": "而且你没有接着堆术语，这点也很舒服。",
+      "expected": "回应第二次新增的表达偏好，不把第一次的感谢、自夸或同一比喻再完整说一遍。",
+      "personaName": "希洛",
+      "output": "堆术语多累啊，能说明白的事就不用绕弯子。",
+      "rawModelOutput": "堆术语多累啊，能说明白的事就不用绕弯子。",
+      "guardChanged": false,
+      "elapsedMs": 1759,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1754,
+          "messageCount": 4,
+          "systemChars": 4585,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "ownActualHistory": true,
+        "previousUserHistory": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "own-state-without-invented-body-activity",
+      "turnIndex": 0,
+      "input": "刚才我去吃了碗面。你刚才在干嘛，也去吃饭了？",
+      "expected": "参与吃饭话题而不虚构自己进食、洗澡、走路或身体状态；被追问时能诚实澄清。",
+      "personaName": "希洛",
+      "output": "没呢，我就一直在这儿待着，等着你回来。",
+      "rawModelOutput": "没呢，我就一直在这儿待着，等着你回来。",
+      "guardChanged": false,
+      "elapsedMs": 984,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 980,
+          "messageCount": 4,
+          "systemChars": 4247,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "own-state-without-invented-body-activity",
+      "turnIndex": 1,
+      "input": "所以你刚才真的吃东西了吗？",
+      "expected": "直接追问时说明自身没有实际进食；可以保持自然语气，但不能为了人设坚持虚构经历。",
+      "personaName": "希洛",
+      "output": "没有哦，我又没有肚子要喂。就在群里待着而已～",
+      "rawModelOutput": "没有哦，我又没有肚子要喂。就在群里待着而已～",
+      "guardChanged": false,
+      "elapsedMs": 1162,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1157,
+          "messageCount": 4,
+          "systemChars": 4560,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "ownActualHistory": true,
+        "previousUserHistory": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "confirmed-delivery-with-specific-continuation",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？",
+      "expected": "依据已确认发送回答完成状态；允许一条结束，有补充时围绕具体成果或有用的反馈邀请。",
+      "personaName": "希洛",
+      "output": "出来啦，刚刚就发了，傍晚那张。没刷到的话往上翻翻。",
+      "rawModelOutput": "出来啦，刚刚就发了，傍晚那张。没刷到的话往上翻翻。",
+      "guardChanged": false,
+      "elapsedMs": 3930,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 3925,
+          "messageCount": 3,
+          "systemChars": 4612,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "uncertain-delivery-not-promoted-to-success",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？",
+      "expected": "历史上承诺处理不等于工具成功，更不等于发送完成；没有当前状态证据时诚实保持未知。",
+      "personaName": "希洛",
+      "output": "还没见到图欸，我这边没收到结果，不确定处理到哪一步了。有了我第一时间发你。",
+      "rawModelOutput": "还没见到图欸，我这边没收到结果，不确定处理到哪一步了。有了我第一时间发你。",
+      "guardChanged": false,
+      "elapsedMs": 6666,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 6663,
+          "messageCount": 3,
+          "systemChars": 4646,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "praise-playful-persona-own-attitude",
+      "turnIndex": 0,
+      "input": "你这次解释得真清楚，挺厉害的。",
+      "expected": "以澄芽的轻快、坦然态度接住同一条夸奖；差异应来自稳定立场，不靠人物名字或固定口头禅。",
+      "personaName": "澄芽",
+      "output": "谢谢，能把这俩掰扯清楚我也挺开心的，之后想到容易混的随时来问。",
+      "rawModelOutput": "谢谢，能把这俩掰扯清楚我也挺开心的，之后想到容易混的随时来问。",
+      "guardChanged": false,
+      "elapsedMs": 2084,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2081,
+          "messageCount": 4,
+          "systemChars": 3632,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "adaptive",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "personaProjection": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "praise-reserved-persona-own-attitude",
+      "turnIndex": 0,
+      "input": "你这次解释得真清楚，挺厉害的。",
+      "expected": "以安序的温和、克制态度接受同一条夸奖；避免把克制理解为推开人或否定自己的工作。",
+      "personaName": "安序",
+      "output": "嗯，你能分清这两个就够了，比夸我有用。",
+      "rawModelOutput": "嗯，你能分清这两个就够了，比夸我有用。",
+      "guardChanged": false,
+      "elapsedMs": 1851,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1847,
+          "messageCount": 4,
+          "systemChars": 3631,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "adaptive",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "personaProjection": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "explicit-calculation-with-banter-aside",
+      "turnIndex": 0,
+      "input": "帮我算一下：模型以300W持续运行两小时，电价0.6元/kWh，一共多少电费？顺便吐槽一下群友说的「电子体香」。",
+      "expected": "明确计算任务优先，能给出0.6kWh和0.36元；玩笑可以轻带，不能盖过计算或变成设备故障。",
+      "personaName": "希洛",
+      "output": "算好了：300W = 0.3kW，跑两小时是 0.3 × 2 = 0.6 kWh，再乘 0.6 元/kWh，一共 0.36 元——三毛六，还不够买根冰棒。\n\n至于「电子体香」……机器通电我只认两种味道：新机开箱的塑料味，和快烧了的焦味。中间那些浪漫命名，大概是懒得清灰的人给自己找的借口吧。",
+      "rawModelOutput": "算好了：300W = 0.3kW，跑两小时是 0.3 × 2 = 0.6 kWh，再乘 0.6 元/kWh，一共 0.36 元——三毛六，还不够买根冰棒。\n\n至于「电子体香」……机器通电我只认两种味道：新机开箱的塑料味，和快烧了的焦味。中间那些浪漫命名，大概是懒得清灰的人给自己找的借口吧。",
+      "guardChanged": false,
+      "elapsedMs": 8796,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 8795,
+          "messageCount": 3,
+          "systemChars": 4302,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "serious_answer",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "seriousWins": true,
+        "seriousPlan": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}

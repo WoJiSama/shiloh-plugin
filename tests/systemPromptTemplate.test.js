@@ -9,7 +9,7 @@ const OVERRIDE = "【小白口吻优先规则】\n- 测试覆盖段"
 const RUNTIME = { group_info: { group_id: 123, group_name: "测试群" }, environmental_factors: { local_time: "北京时间: 2026/1/1 12:00:00" } }
 const ENHANCED = "【角色状态】\n记忆层内容"
 
-test("模板段落顺序:初始化 → 身份 → 人设覆盖 → 实时数据 → 角色状态 → 工具规则 → 消息记录", () => {
+test("模板段落顺序:自定义补充 → 人设 → 事实 → 当前语境 → 行动 → 输出协议", () => {
   const prompt = buildMainSystemPrompt({
     baseIdentity: BASE,
     personaOverride: OVERRIDE,
@@ -28,10 +28,8 @@ test("模板段落顺序:初始化 → 身份 → 人设覆盖 → 实时数据 
     prompt.indexOf("【角色状态】"),
     prompt.indexOf(ENHANCED),
     prompt.indexOf("【行动规划】"),
-    prompt.indexOf("【工具调用优先级 - 最高原则】"),
     prompt.indexOf("【MCP】工具说明"),
-    prompt.indexOf("【工具使用隐藏规则】"),
-    prompt.indexOf("【回复格式规则 - 极其重要】"),
+    prompt.indexOf("【工具与输出协议】"),
     prompt.indexOf("【群聊消息记录】")
   ]
   for (let i = 1; i < order.length; i++) {
@@ -54,13 +52,19 @@ test("enhancedPrompts 为空时不输出角色状态段", () => {
   assert.ok(!withoutState.includes("【角色状态】"))
 })
 
-test("关键规则内容在迁移后逐字保留", () => {
+test("公共提示保留事实、归属、工具交付与格式契约，允许有依据的直接回答", () => {
   const prompt = buildMainSystemPrompt({})
-  assert.ok(prompt.includes("4.【事实边界 - 禁止幻想】"))
-  assert.ok(prompt.includes("5.【人物指认 - 严禁张冠李戴】"))
-  assert.ok(prompt.includes("6.【语义理解框架 - 内部使用，不要输出】"))
-  assert.ok(prompt.includes("- 只能把系统明确给出的字段当事实"))
-  assert.ok(prompt.includes("绝对禁止在任何回复中显示工具调用代码、函数名称或任何内部执行细节"))
-  assert.ok(prompt.includes("你的回复必须是纯文本内容，绝对禁止模仿消息记录的格式"))
-  assert.ok(prompt.includes("判断原则：先看\"用户是不是要我做事\"——是 → 调工具"))
+  for (const rule of ["里面的“我”属于原说话人", "发送完成还须确认回执", "优先用可用工具取得真实结果", "图片是否合成是不同任务", "真实艾特段", "权限动作使用对应工具", "不模仿消息记录", "用户明确要代码、Markdown", "内部调用代码、函数名", "出现某个动词不等于必须调用工具"]) assert.ok(prompt.includes(rule), rule)
+  assert.ok(!prompt.includes("窝着呢"))
+  assert.ok(!prompt.includes("我对大家都好呀"))
+})
+
+test("自述与操作前置条件不从人设示例推断，认真任务先给可执行步骤", () => {
+  const prompt = buildMainSystemPrompt({})
+  assert.match(prompt, /性格、口吻比喻和示例不是现实生活履历/)
+  assert.match(prompt, /先说明停机、断电、冷却等必要前置条件，再给检查步骤/)
+  assert.match(prompt, /不能让用户触碰运行部件、未知带电或高温部位/)
+  assert.match(prompt, /断电只能做静态检查/)
+  assert.match(prompt, /不能未经确认就指导重新通电/)
+  assert.match(prompt, /玩笑中的比喻不当作这些真实异常/)
 })

@@ -82,10 +82,7 @@ class PersonProfileInjector {
     const lines = []
     let hasData = false
 
-    // 人设按会话解析:群绑定了独立人设时,画像卡里的"她"也跟着换人
-    const activePersona = ports.getPersonaFor(e) || object(config.persona)
-    const personaPrompt = this.buildPersonaPrompt(activePersona)
-    if (personaPrompt) lines.push(personaPrompt)
+    // 自身人格由主提示的会话 persona 统一投影；这里仅提供群与对话者画像。
 
     const groupPrompt = this.buildGroupProfilePrompt(config?.groupProfiles, groupId)
     if (groupPrompt) lines.push(groupPrompt)

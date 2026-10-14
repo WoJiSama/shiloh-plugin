@@ -6,6 +6,7 @@ import { collectMentionTargetIds } from "../../conversation/domain/mentionTarget
 import { buildTurnInteractionContext } from "../../conversation/domain/turnInteractionContext.js"
 import { ROLE_MAP as roleMap, extractMemberLookupTerms, formatMemberLookupPrompt, hasBotTextAnchor, joinIntentParts, matchGroupMembersByTerms, messageQuotesUser, uniqText } from "../../conversation/domain/messageContext.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../../conversation/domain/personaSource.js"
+import { resolveSystemContentSource } from "../../conversation/domain/systemContentSource.js"
 import { summarizeForLog, formatMemberDisplayName } from "../../conversation/domain/messageContext.js"
 import { randomUUID } from "crypto"
 
@@ -564,7 +565,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         // 本回合生效人设:群绑定切换后,主提示词/风格覆盖/名字全部随之变化
         const chatPersona = host.getPersonaFor(e)
         const systemContent = buildMainSystemPrompt({
-          baseIdentity: renderPersonaTemplate(host.config.systemContent, chatPersona),
+          baseIdentity: renderPersonaTemplate(resolveSystemContentSource(host.config.systemContent).text, chatPersona),
           personaOverride: buildPersonaStyleOverride(chatPersona),
           runtimeData,
           enhancedPrompts,
@@ -768,6 +769,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const turnPlan = createTurnPlan({
           responseKind: isEducationalExplanationRequest(currentIntentText) ? "knowledge" : "chat",
           intentText: currentIntentText,
+          interactionKind: session.interactionContext?.kind,
           availableCapabilities: availableToolNames,
           requiredCapabilities: requestedActionCapabilities,
           toolChoice,
@@ -818,7 +820,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
 	        // 抽取规则,不同群的上下文会让它摇摆(反问澄清/换错工具)。把候选工具的
 	        // 披露说明注入本轮请求,让主模型和规划器看到同一套规则。
 	        const toolNamesForRequest = (session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name))
-	        const disclosureForMainModel = buildToolIntentDisclosure(toolNamesForRequest)
+	        const disclosureForMainModel = [turnPlanRequest.executionPrompt, buildToolIntentDisclosure(toolNamesForRequest)].filter(Boolean).join("\n\n")
 	        const requestMessages = disclosureForMainModel
 	          ? [...session.groupUserMessages, { role: "system", content: disclosureForMainModel }]
 	          : session.groupUserMessages

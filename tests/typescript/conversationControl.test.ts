@@ -106,3 +106,15 @@ test('strict tracking model receives event bot identity through direct, queued a
  await runtime.isUserTalkingToBot(host,'legacy')
  assert.match(requests[3]?.messages[0]?.content || '',/main bot.*QQ号1/s)
 })
+
+
+test('timing gate保留当前人设参与偏好和全部边界，不注入固定接夸台词', async()=>{
+ let prompt=''
+ const runtime=createTimingGate({logger,bot:()=>({uin:1}),resolvePersonaName:()=> '安序',computeAddresseeSignal:()=>({groupAddressed:true,targetKind:'group',pronounWithoutBotAnchor:false}),buildPersonaTonePrompt:()=>'',getGroupTopicPrompt:()=>'',getGroupSocialPrompt:()=>'',detectAttentionHook:()=>null,sideLLMCall:async options=>{prompt=String(options?.messages?.[0]?.content);return {ok:true,content:'{"decision":"no_action"}'}}})
+ const boundaries=Array.from({length:10},(_,i)=>`稳定边界${i}`)
+ const host:TimingGateHost={config:{trackAiConfig:{trackAiUrl:'https://example.test',trackAiModel:'m',trackAiApikey:'key'}},getPersonaFor:()=>({name:'安序',preferences:['喜欢有依据的信息'],boundaries}),messageManager:{formatMessageHistory:async()=>''},computeGroupMsgRate5min:()=>0}
+ await runtime.runTimingGate(host,{group_id:'g'},state())
+ assert.match(prompt,/喜欢有依据的信息/)
+ for(const boundary of boundaries)assert.ok(prompt.includes(boundary))
+ assert.ok(!prompt.includes('我对大家都好呀'))
+})

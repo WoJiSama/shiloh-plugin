@@ -136,7 +136,7 @@ export function buildStructuredHistoryMessage(messages:HistoryMessage[] = []) {
   const recent = []
   for (const message of history) {
     const content = message.role === "assistant"
-      ? `[希洛回复] ${compactText(message.content)}`
+      ? `[当前机器人回复] ${compactText(message.content)}`
       : compactText(message.content)
     if (message.contextSection === "relevant") relevant.push(content)
     else recent.push(content)

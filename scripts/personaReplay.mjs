@@ -15,6 +15,7 @@ import YAML from "yaml"
 import { fileURLToPath } from "node:url"
 import { buildMainSystemPrompt } from "../utils/systemPromptTemplate.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../utils/personaSource.js"
+import { resolveSystemContentSource } from "../dist/backend/modules/conversation/domain/systemContentSource.js"
 import { buildPersonaTonePrompt } from "../utils/personaTonePolicy.js"
 import { fetchWithTimeout } from "../utils/modelGateway.js"
 import { normalizeScenarios, runAutoChecks, compareWithBaseline, renderConsoleReport } from "../utils/personaReplayCore.js"
@@ -39,7 +40,7 @@ function loadConfig(configPath) {
 function buildScenarioMessages(config, scenario) {
   const persona = config.persona || {}
   const system = buildMainSystemPrompt({
-    baseIdentity: renderPersonaTemplate(config.systemContent || "", persona),
+    baseIdentity: renderPersonaTemplate(resolveSystemContentSource(config.systemContent).text, persona),
     personaOverride: buildPersonaStyleOverride(persona),
     runtimeData: {
       group_info: { group_id: 609235590, group_name: "人设回放测试群" },

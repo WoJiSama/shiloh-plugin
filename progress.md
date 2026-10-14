@@ -1446,3 +1446,37 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 六脱敏场景固定为JSON；纯域12项和真实主链11项由全量测试执行，另补感知续轮与口吻、continuity、诊断检查。固定模型桩只验证契约，未据此声称模型生成质量改善。
 - 首轮全量1900项发现interaction层特征快照与session字段注册两项漂移，已同步；最终完整1908项1906通过/0失败/2宿主音乐集成跳过，严格类型、模块边界通过。完整输出：/tmp/bl-chat-interaction-regression-20261014.log。
 - 新增docs/ai-conversation-implementation-2026-10-14.md。保留所有原有诊断与规划改动，不提交/推送/部署，不访问生产或调用真实模型。
+
+
+# 2026-10-14 部署与真实回放补验收
+- 隔离工作区已发布 d398a4a；生产快照 /opt/trss-yunzai-backups/deploy-snapshots/20261014-220937。
+- 线上 personaReplay 使用实际 config/message.yaml、glm-5.3；单场景与 16/16 全量均自动检查通过，输出在服务器 /tmp/persona-replay-20261014.log。
+- 真实线上关键四个编译文件与发布 manifest 哈希一致；trss-yunzai/bl-console active；2536/bl-chat/commands、8787/ 均 200。
+- 影子脚本 /tmp/bl-chat-shadow-20261014/replay.mjs 已完成本地六场景 dry-run，全部通过；它复用 chatTurn/composer/messageFormatting/TurnPlan/模型网关/输出守卫/finalReply，禁用工具副作用与增强记忆，所有发送/续聊/归档均内存；当前线上真实单场景执行中。
+- 部署前日志已有表达学习 404 和 EmojiPackManager 400，不属于本次互动改动引入。
+
+- 真实影子六场景完成，结构契约 6/6 通过，记录六个 glm-5.3 HTTP200，耗时2.14–7.17秒/中位2.44秒，无错误/重试/回退日志，出口守卫未改写。只读子代理复核确认无QQ发送或线上数据写入口。
+- 人工判断保留质量缺陷：两个机箱梗仍偏散热提醒，普通照片拒绝附多余索图，故障步骤含不妥的“摸风扇”建议；常规人设会虚构刷手机、夸奖反应重复。自动通过不能称自然度全部达标。
+- 本次产物写回主工作区新文件 docs/ai-conversation-deployment-replay-2026-10-14.md 与 docs/replays/2026-10-14/ 两份脱敏结果；未覆盖原dirty代码或规划文件。
+- 最后健康检查两服务active/NRestarts0、两页面HTTP200、消息管线启动、载入与引用/语法/unhandled错误0。已知表达学习404与表情审查400在发布前存在，未扩大本次发布范围。
+
+
+# 2026-10-14 继续质量迭代
+- 已读取上轮报告/真实模型输出与当前代码；复用隔离deploy工作区，从d398a4a继续。
+- 子代理只读公共提示审计和独占新增回放fixture，主代理负责公共模板/人设/上下文及影子A/B。
+
+- 质量迭代：公共稳定人设改为实际identity/tone/speechStyle/preferences/boundaries/notes投影，场景层只保留当前表达目的；默认补充为空，完整官方旧模板只读停用，custom原文保留。插话判断补回参与偏好，任务人物画像移除重复自身人格，历史机器人标签去掉硬编码名字。
+- 12场景14轮离线结构回放通过；线上旧版同配置快照真实回放已完成，候选真实回放进行中。自动结果仍只证明结构契约，语义自然度需逐条审阅。
+
+## 2026-10-15 质量迭代续轮
+- 恢复隔离工作区、私有副本与回放，生产发布 manifest 验证 d398a4a。下一步接通 serious interaction 到已有 reasoning route、验证请求体，再回放和发布。
+- 恢复时一次读取完整长期规划导致截断，改为 tail；两个推测 glob 无匹配，改按 rg --files 发现路径。未触碰生产配置。
+- TurnPlan已接interactionKind，认真请求先排除可选表情的casual分支，沿用现有high推理请求选项。构建/类型与14项计划、口吻回归通过。
+- 新暂存目录 rsync dist 首次缺父目录导致停止，影子回放未开始模型调用；创建父目录后重新上传。
+- 新增真实planner→model gateway请求体回归：serious high、banter casual low、关闭升档保留base low；33项最终定向通过。更早完整门禁1924项/1922通过/2宿主音乐跳过，前端34通过。最后排障/执行边界修改后将由部署脚本再次完成整门禁。
+- 首轮回放SSH在结果保存后断连，已核实14+6完整JSON和全部请求，未重跑充作新证据；后续SSH加保活。
+- 低档未知交付复测仍承诺自动发送，故将delivery状态确认与serious_answer一同接入现有推理路线；明确工具任务仍task。实际高档定向不再承诺自动重跑，仍需记录未知表述的精确性。35项最终定向通过，最后20轮真实模型回放进行中。
+- 已生成严格服务器配置修订脚本并dry validation：只有systemContent及三条已知persona项，原值比较通过，无其他现场字段变化；尚未应用。
+- 最终14轮因一条多行历史断言退出：生产buildStructuredHistoryMessage会压缩空白，runner此前用原换行直接includes，实际内容未丢。已只对历史核对规范空白，离线桩改成多行验证；保留退出的真实结果，不回写历史结果充当通过。首次apply_patch最后测试锚点不匹配，原子未改文件；核对后一次重施成功。
+- 最终20轮实模：14+6结构通过，glm-5.3共20个HTTP200，high六轮/low十四轮，无重试、回退或出口改写。人工明确保留未知状态未来交付承诺、原焦糊场景通电前提不足两项质量限制；不把结构全过换算为自然度评分。
+- 线上逐项核对1903个manifest托管文件，零漂移，backend清单通过。release.mjs verify本是暂存包校验，不适用于含config/data的安装目录，误用已纠正。一次长Python中文stdin编码异常无文件变化，改用Node复制JSON和apply_patch编辑文档。

@@ -173,3 +173,11 @@ test('direct bot addressee wins over quoted and mentioned others without losing 
   assert.match(prompt, /回应对象：bot（99）/)
   assert.doesNotMatch(prompt, /回应对象：other|你确实说过的上句/)
 })
+
+test('verified continuity confirms prior speech, not literal experiences or task progress', () => {
+  const context=buildTurnInteractionContext({rawUserText:'刚才改背景的图出来了吗？',botId:'99',speaker,continuity:{botId:'99',lastReply:'收到，我先处理。'}})
+  const prompt=buildTurnInteractionPrompt(context)
+  assert.equal(context.previousBotReply?.source,'verified_continuity')
+  assert.match(prompt,/这是发言记录，不独立证明实体经历或任务当前状态/)
+  assert.match(prompt,/缺少结果时只说明尚未确认/)
+})

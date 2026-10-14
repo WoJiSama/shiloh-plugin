@@ -79,7 +79,8 @@ export function buildTurnContinuityPrompt(record:Continuity|null = null) {
   const lines = ["【上一轮任务摘要】（同一用户 10 分钟内）"]
   if (record.intent) lines.push(`- 上一轮意图：${record.intent}${record.route ? `（${record.route}）` : ""}`)
   if (record.tools?.length) lines.push(`- 已用工具：${record.tools.join("、")}`)
+  else lines.push('- 执行证据：此摘要没有可确认的工具结果。上一轮接下任务或表示会处理不等于当前正在运行、已成功或已失败。')
   if (record.lastReply) lines.push(`- 你上一轮的回复（节选）：${record.lastReply}`)
-  lines.push("用户接着说话时，先基于上一轮结果接续：已成功的工具不要重复执行，已失败的不要声称已完成；需要新信息再调用工具。")
+  lines.push("用户接着说话时，先基于上一轮结果接续：已成功的工具不要重复执行，已失败的不要声称已完成；需要新信息再调用工具。发言记录不独立证明进度，缺结果时说明尚未确认，不补运行状态、失败原因或完成时间。")
   return lines.join("\n")
 }

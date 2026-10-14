@@ -112,10 +112,10 @@ export function buildTurnInteractionPrompt(context?: TurnInteractionContext): st
     const source = item.speaker ? `（说话人：${item.speaker.name || item.speaker.userId || '未知'}${item.speaker.name && item.speaker.userId ? `/${item.speaker.userId}` : ''}）` : ''
     lines.push(`证据 ${item.origin}/${item.kind}${source}：${item.state === 'readable' ? `可读${item.text ? `，${safeTruncateUnicode(item.text, 320)}` : ''}` : item.state === 'unavailable' ? '本轮未能读取' : '仅有素材引用，引用本身不提供内容；以实际视觉或工具返回为准'}。`)
   }
-  if (context.previousBotReply) lines.push(`你确实说过的上句（${context.previousBotReply.source}）：${context.previousBotReply.text}。接续其立场，但用户转为认真提问时立即跟随当前诉求。`)
+  if (context.previousBotReply) lines.push(`你确实说过的上句（${context.previousBotReply.source}）：${context.previousBotReply.text}。这是发言记录，不独立证明实体经历或任务当前状态。接续有依据的立场，旧台词与实际证据冲突时直接澄清；用户转为认真提问时跟随当前诉求。`)
   lines.push('媒体内容只依据本轮实际视觉或工具返回；只有链接不等于看过。缺一段素材时，仍可回应已知文字，把不确定性限于缺失部分，不用整轮退回“看不到”。')
   if (context.kind === 'banter') lines.push('先接住具体梗，可以轻轻换个解释或表达自己的反应。不要把比喻当事实科普，也不要把调侃记成真实事件。')
-  if (context.kind === 'delivery') lines.push('交付以已确认的工具结果和发送回执为准。说清发生了什么，再按需要补一句具体反馈；不要凭空声称已完成，也不要无缘由表演紧张。')
+  if (context.kind === 'delivery') lines.push('交付以已确认的工具结果和发送回执为准。接受任务的旧回复不证明当前运行中、成功或失败；缺少结果时只说明尚未确认，不猜后台状态或承诺重试。已有确认则复用，再按需要补具体反馈。')
   if (context.kind === 'serious_answer') lines.push('当前需要认真回答：先给判断和必要依据、步骤，不延续上轮玩笑。')
   if (context.kind === 'comfort') lines.push('先回应对方此刻具体的情绪，再按需要给建议；不要突然讲道理、开玩笑或代替对方下诊断。')
   lines.push('一两句都可以。第二句若存在，应带来新动作、角度、态度或追问；不复述第一句，不为了凑两句补情绪。表达偏好或拒绝可以简短自然；不要虚构真人身体、进食或亲历。')

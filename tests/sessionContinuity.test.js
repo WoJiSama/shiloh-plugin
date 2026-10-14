@@ -157,3 +157,12 @@ test("turn continuity is injected next turn and recorded at turn end", () => {
   assert.ok(src.includes("await recordTurnContinuity({"), "轮末记录延续摘要")
   assert.ok(src.includes("session.lastFinalReply = String(output || \"\").slice(0, 240)"), "最终回复节选入摘要")
 })
+
+test('a confirmed promise is speech history, not evidence of running, success or failure', () => {
+  const record={intent:'image_edit',route:'tool',tools:[],lastReply:'收到，我先处理。',at:Date.now(),botId:'99'}
+  const prompt=buildTurnContinuityPrompt(record)
+  assert.ok(prompt.includes('没有可确认的工具结果'))
+  assert.ok(prompt.includes('不等于当前正在运行、已成功或已失败'))
+  assert.ok(prompt.includes('不补运行状态、失败原因或完成时间'))
+  assert.ok(!prompt.includes('已用工具：'))
+})
