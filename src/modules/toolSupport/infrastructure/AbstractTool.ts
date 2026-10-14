@@ -1,0 +1,175 @@
+interface ParameterSchema {type?:string;items?:{type?:string};pattern?:string;enum?:unknown[];minimum?:number;maximum?:number;[key:string]:unknown}
+interface ToolParameters {type:string;properties:Record<string,ParameterSchema>;required:string[]}
+/**
+ * 抽象工具类，所有具体工具需继承此类并实现func方法
+ */
+import { buildVisibleFailureDetail } from "../../models/domain/visibleFailure.js"
+
+export class AbstractTool {
+ name:string;parameters:ToolParameters;description:string;skill:Record<string,unknown>|null;
+  constructor() {
+    this.name = '';
+    this.parameters = {
+      type: 'object',
+      properties: {},
+      required: []
+    };
+    this.description = '';
+    this.skill = null;
+  }
+
+  getSkill() {
+    return this.skill || {
+      name: this.name,
+      purpose: this.description,
+      instructions: '只在用户意图与该能力匹配时调用；参数必须符合 schema，缺少必要信息时先追问。'
+    };
+  }
+
+  normalizeParameters(params:unknown,_context?:{event:unknown}):Record<string,unknown> {
+    return params && typeof params === 'object' && !Array.isArray(params) ? {...params} : {};
+  }
+
+  /**
+   * 验证参数是否符合工具的要求
+   * @param {Object} params - 参数对象
+   * @returns {boolean|string} - 如果参数有效则返回true，否则返回错误信息
+   */
+  validateParameters(params:Record<string,unknown>) {
+    if (!params || typeof params !== 'object') {
+      return '参数必须是一个对象';
+    }
+  
+    const requiredFields = new Set(this.parameters.required || []);
+    if (this.parameters.required) {
+      for (const required of requiredFields) {
+        if (!(required in params)) {
+          return `缺少必填参数: ${required}`;
+        }
+      }
+    }
+  
+    const { properties } = this.parameters;
+    for (const [key, value] of Object.entries(params)) {
+      const schema = properties[key];
+      if (!schema) continue;
+
+      // Normalizers commonly use an empty value to mean an omitted optional
+      // filter. It must not fail an enum intended for actual supplied values.
+      if (!requiredFields.has(key) && (value === undefined || value === null || value === '')) {
+        continue;
+      }
+  
+      // 处理数组类型
+      if (schema.type === 'array') {
+        // 如果输入是字符串，自动转换为单元素数组
+        if (typeof value === 'string') {
+          params[key] = [value];
+          continue;
+        }
+        
+        // 验证是否为数组
+        if (!Array.isArray(value)) {
+          return `参数 ${key} 类型错误，应为 array`;
+        }
+  
+        // 如果定义了数组元素类型，验证每个元素
+        if (schema.items && schema.items.type) {
+          const invalidItem = value.find(item => typeof item !== schema.items?.type);
+          if (invalidItem !== undefined) {
+            return `参数 ${key} 的数组元素类型错误，应为 ${schema.items.type}`;
+          }
+        }
+        continue;
+      }
+  
+      // 处理其他类型
+      if (schema.type && typeof value !== schema.type) {
+        // 自动类型转换
+        if (schema.type === 'string' && typeof value === 'number') {
+          params[key] = String(value);
+          continue;
+        }
+        if (schema.type === 'number' && typeof value === 'string' && !isNaN(Number(value))) {
+          params[key] = Number(value);
+          continue;
+        }
+        return `参数 ${key} 类型错误，应为 ${schema.type}`;
+      }
+  
+      if (schema.pattern && !new RegExp(schema.pattern).test(String(value))) {
+        return `参数 ${key} 格式不正确`;
+      }
+
+      if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
+        return `参数 ${key} 必须是以下值之一: ${schema.enum.join(', ')}`;
+      }
+  
+      if (['number', 'integer'].includes(schema.type || '') && typeof value==='number') {
+        if (schema.minimum !== undefined && value < schema.minimum) {
+          return `参数 ${key} 不能小于 ${schema.minimum}`;
+        }
+        if (schema.maximum !== undefined && value > schema.maximum) {
+          return `参数 ${key} 不能大于 ${schema.maximum}`;
+        }
+      }
+    }
+  
+    return true;
+  }
+
+  /**
+   * 获取工具的基本信息
+   * @returns {Object} - 工具的名称、描述和参数
+   */
+  getToolInfo() {
+    if (!this.name) {
+      throw new Error('工具名称是必需的');
+    }
+
+    if (!this.description) {
+      throw new Error('工具描述是必需的');
+    }
+
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: this.parameters
+    };
+  }
+
+  /**
+   * 执行工具的主要方法
+   * @param {Object} params - 工具的参数
+   * @param {Object} event - 事件对象
+   * @returns {Promise<unknown>} - 工具执行的结果或错误信息
+   */
+  async execute(params:unknown, event:unknown):Promise<unknown> {
+    let normalizedParams;
+    try {
+      normalizedParams = this.normalizeParameters(params, { event });
+    } catch (error) {
+      return `error: 参数规范化失败: ${buildVisibleFailureDetail(error)}`;
+    }
+    const validation = this.validateParameters(normalizedParams);
+    if (validation !== true) {
+      // 返回错误信息而不是抛出错误
+      return `error: ${validation}`;
+    }
+    try {
+      return await this.func(normalizedParams, event);
+    } catch (error) {
+      // 返回错误信息而不是抛出错误
+      return `error: 工具 ${this.name} 执行失败: ${buildVisibleFailureDetail(error)}`;
+    }
+  }
+
+  /**
+   * 工具函数，具体工具需实现
+   * @param {Object} opts - 参数选项
+   * @param {Object} e - 事件对象
+   */
+  async func(opts:Record<string,unknown>, e:unknown):Promise<unknown> {
+    throw new Error('工具函数必须实现');
+  }
+}

@@ -1,53 +1,6 @@
-import { extractFile } from '../../functions/tools/textract.js';
-import { getBufferFile } from '../../functions/tools/UploadFile.js';
-import { TotalTokens } from '../../functions/tools/CalculateToken.js';
-import { dependencies } from "../../dependence/dependencies.js";
-import { safeTruncateUnicode } from "../../utils/unicodeText.js";
-const { mimeTypes } = dependencies;
-
-/**
- * 处理上传文件
- * @param {string} fileUrl 文件URL
- * @param {string} fileName 文件名称
- * @param {string} userMessage 用户消息
- * @returns {Promise<string>} 处理后的消息文本
- */
-export async function processUploadedFile(fileUrl, fileName, userMessage, maxTokens = 8000) {
-  if (!fileName) {
-    return userMessage;
-  }
-
-  try {
-    const { buffer } = await getBufferFile(fileUrl, fileName) || {};
-    
-    const MimeType = mimeTypes.lookup(fileName) || 'application/octet-stream';
-
-    const result = await extractFile(MimeType, buffer);
-
-    const { completion_tokens: tokens } = await TotalTokens(result);
-    console.log('文件总 token:', tokens);
-
-    const contentText = tokens > maxTokens
-      ? safeTruncateUnicode(result, maxTokens, '...')
-      : result;
-
-    const separator = '='.repeat(50);
-
-    const fileInfoText = `${separator}
-文件名称: ${fileName}
-${separator}
-文件内容:
-${contentText}
-${separator}`;
-
-    const finalMessage = `${fileInfoText}\n\n${userMessage}`;
-    
-    console.log('文件信息:\n', fileInfoText);
-    
-    return finalMessage;
-
-  } catch (error) {
-    console.error('处理文件时出错:', error);
-    return userMessage;
-  }
-}
+import {extractFile} from './textract.js'
+import {getBufferFile} from './UploadFile.js'
+import {TotalTokens} from './CalculateToken.js'
+import {dependencies} from '../../dependence/dependencies.js'
+import {createUploadedFileProcessor} from '../../dist/backend/modules/toolSupport/infrastructure/processUploadedFile.js'
+export const processUploadedFile=createUploadedFileProcessor({extractFile,getBufferFile,TotalTokens,lookup:name=>dependencies.mimeTypes.lookup(name),logger:console})
