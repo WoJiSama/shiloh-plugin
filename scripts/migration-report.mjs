@@ -9,6 +9,17 @@ import { checkTree } from './check-boundaries.mjs';
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
 export const migrations = [
+  { legacy: 'domains/games/uma/UmaRaceManager.js', implementation: 'src/modules/games/infrastructure/uma/UmaRaceManager.ts', kind: 'composition', reviewedSha256: '7e3b624bfb9740a4f80d860ddd4a44fbd8277f9dc19d510b783c42ee76fcb10d' },
+  { legacy: 'domains/games/deltaforce/DeltaForceClient.js', implementation: 'src/modules/games/infrastructure/DeltaForceClient.ts' },
+  { legacy: 'domains/games/deltaforce/DeltaForceObjectCache.js', implementation: 'src/modules/games/infrastructure/DeltaForceObjectCache.ts', kind: 'composition', reviewedSha256: '9e9765d394c78565bd5fdec27233c2af5b5df1a20db30ed0e2e7fa3fd847225c' },
+  { legacy: 'utils/deltaForceIntent.js', implementation: 'src/modules/games/domain/deltaForceIntent.ts', kind: 'composition', reviewedSha256: '2dd9cfdb0e1ebaeb83f2c5fd2685870a570fcbb48a27445681dc0776fbe45fe6' },
+  { legacy: 'domains/games/deltaforce/DeltaForceReportRenderer.js', implementation: 'src/modules/games/infrastructure/DeltaForceReportRenderer.ts', kind: 'composition', reviewedSha256: '2b15107aa19392f1726b6ba2f26740c1d951659987b9ea3bdacd6a026f42f8d9' },
+  { legacy: 'domains/games/deltaforce/model/DeltaForceReport.js', implementation: 'src/modules/games/infrastructure/DeltaForceReport.ts', kind: 'composition', reviewedSha256: 'fbbe188304d03bd24d3e84ff1cb8e27a2a8d75e505ec6c1a12da0924c567e9bd' },
+  { legacy: 'domains/games/deltaforce/app.js', implementation: 'src/modules/games/infrastructure/deltaForceApp.ts', kind: 'composition', reviewedSha256: 'bee2528e3409f09671e0536005c972f3ee53b3a8d9a777349856eec2d35e658d' },
+  { legacy: 'functions/functions_tools/DeltaForceTool.js', implementation: 'src/modules/games/infrastructure/DeltaForceTool.ts', kind: 'composition', reviewedSha256: '26a44b3728eead6cf3d01d4c268b4c02fdf02b76ee0607a649f24bcc02880209' },
+  { legacy: 'domains/games/uma/app.js', implementation: 'src/modules/games/infrastructure/uma/app.ts', kind: 'composition', reviewedSha256: '629d4384d06ef4c5ec191a80e202b868e9007f2c319b9c9d15214bb0ee2f9749' },
+  { legacy: 'domains/games/uma/UmaRaceReportRenderer.js', implementation: 'src/modules/games/infrastructure/uma/UmaRaceReportRenderer.ts', kind: 'composition', reviewedSha256: 'a2180516d2f6c62cb59e124fb64d6defaded5bd441c3b32c0de69b642b3d6203' },
+  { legacy: 'domains/games/uma/model/UmaRaceReport.js', implementation: 'src/modules/games/infrastructure/uma/UmaRaceReport.ts', kind: 'composition', reviewedSha256: '73730ce3daa0d42d90e451419a881201bc9b505dac269253a425e21997edc59a' },
   { legacy: 'domains/dice/DiceRuleExpression.js', implementation: 'src/modules/dice/infrastructure/DiceRuleExpression.ts' },
   { legacy: 'domains/dice/DiceRuleSession.js', implementation: 'src/modules/dice/infrastructure/DiceRuleSession.ts' },
   { legacy: 'domains/dice/DiceRulePackManager.js', implementation: 'src/modules/dice/infrastructure/DiceRulePackManager.ts' },
