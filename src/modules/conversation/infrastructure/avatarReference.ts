@@ -174,7 +174,7 @@ function resolveAvatarDrawReference({ e = {}, text = "", atQq = [], memberMap = 
   }
 }
 
-function formatAvatarDrawReferencePrompt(reference:AvatarReference|null = null) {
+function formatAvatarDrawReferencePrompt(reference:{images:string[];promptHint?:string}|null = null) {
   if (!reference?.images?.length) return ""
   return reference.promptHint || ""
 }

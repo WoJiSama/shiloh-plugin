@@ -70,12 +70,12 @@ export interface ExecutionSession {
  imageVerificationNeedsSearch?:boolean;imageVerificationSearchDone?:boolean;imageVerificationMode?:string;imageVerificationFinalInstructionAdded?:boolean;
  taskDedupeToolTouched?:boolean;backgroundTerminalToolTouched?:boolean;toolName?:string|undefined;toolResults?:ExecutionResult[];
  groupUserMessages?:ExecutionMessage[];editAssets?:{promptHint?:string};avatarEditBase?:{promptHint?:string};avatarDrawReference?:ExecutionAvatar;
- memberMap?:Map<number,SemanticMember>;atQq?:(string|number)[];groupContextAssets?:{replyTargetUserId?:string|number};taskContext?:{messageId?:unknown};
+ memberMap?:Map<number,SemanticMember>|null;atQq?:(string|number)[];groupContextAssets?:{replyTargetUserId?:string|number};taskContext?:{messageId?:unknown};
  turnPlan?:import('./turnPlan.js').TurnPlan;emojiToolSentThisTurn?:number;toolContent?:unknown;modrinthCardItems?:unknown[];
  turnTrace?:{addTool(name:string,success:boolean,elapsed:number):void;addModelCall(kind:string,elapsed:number):void};
  outboundArbiter?:{resolveToolOutcomes():void}
 }
-export interface LocalExecutableTool {execute(params:Record<string,unknown>,event:ExecutionEvent):Promise<unknown>}
+export interface LocalExecutableTool {execute(params:Record<string,unknown>,event:ExecutionEvent):unknown}
 export interface ExecutionConfig {emoji?:{perTurnMax?:number};emojiSystem?:{emojiCooldownMs?:number};taskAiConfig?:{translation?:{model?:string}};chatAiConfig?:{chatApiModel?:string};[key:string]:unknown}
 export interface ExecutionFailureContext {e:ExecutionEvent;session:ExecutionSession;stage:string;error:unknown}
 export interface ToolExecutionHost {

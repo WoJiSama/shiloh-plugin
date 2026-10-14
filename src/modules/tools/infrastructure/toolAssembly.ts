@@ -93,7 +93,7 @@ function getToolsByName(host:ToolAssemblyHost, toolNames:unknown[], options:{for
           }
         }
       })
-      .filter(Boolean)
+      .filter((item):item is NonNullable<typeof item>=>item!==null)
   }
 
 function getToolsDescriptionString(host:ToolAssemblyHost) {

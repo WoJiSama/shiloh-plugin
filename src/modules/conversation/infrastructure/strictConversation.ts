@@ -3,9 +3,9 @@ import { extractChatKeywords } from '../domain/messageIntent.js'
 import { isAiConversationEnabled } from '../domain/aiConversationGate.js'
 import { ROLE_MAP as roleMap, summarizeForLog } from '../domain/messageContext.js'
 import type { ConversationTool } from '../infrastructure/conversationUtils.js'
-interface HistoryItem {role:string;content:string}
-interface Tracking {lastActiveTime:number;chatHistory:HistoryItem[];timer:ReturnType<typeof setTimeout>}
-interface Judgment {conversationKey:string;userMessage:string;chatHistory:HistoryItem[];e:ConversationEvent;resolve(value:boolean):void}
+export interface HistoryItem {role:string;content:string}
+export interface Tracking {lastActiveTime:number;chatHistory:HistoryItem[];timer:ReturnType<typeof setTimeout>}
+export interface Judgment {conversationKey:string;userMessage:string;chatHistory:HistoryItem[];e:ConversationEvent;resolve(value:boolean):void}
 export interface StrictConversationHost {
  config:{enabled?:unknown;conversationTrackingTimeout?:number;batchJudgmentDelay?:number;conversationTrackingThrottle?:number;conversationTrackingEnabled?:boolean;
  chatTriggerMode?:string;trackAiConfig:{trackAiUrl:string;trackAiApikey:string;trackAiModel:string};
@@ -20,7 +20,7 @@ export interface StrictConversationHost {
  expressionLearner:{updateGroupExpressions(groupId:string|number,text:string,context:{userId:string|number|undefined;messageId:unknown;at:number;message:ConversationEvent['message']}):Promise<unknown>};
  isMutedInGroup(e:ConversationEvent):Promise<boolean>;isAutomaticTorrentDownloadEvent(e:ConversationEvent):boolean;handleTool(e:ConversationEvent):Promise<unknown>;
  handleRandomReplySmart(e:ConversationEvent):Promise<unknown>;checkTriggers(e:ConversationEvent):boolean|Promise<boolean>;
- setTrackingWithTimer(key:string):void;scheduleMergedDirectTrigger(e:ConversationEvent,run:(e:ConversationEvent)=>Promise<void>,kind:string):boolean|void;
+ setTrackingWithTimer(key:string):void;scheduleMergedDirectTrigger(e:ConversationEvent,run:(e:ConversationEvent)=>Promise<void>,kind:string):boolean|void|null;
  formatTime():string;addToBatchJudgment(key:string,message:string,history:HistoryItem[],e:ConversationEvent):Promise<boolean>
 }
 export interface StrictConversationPorts {

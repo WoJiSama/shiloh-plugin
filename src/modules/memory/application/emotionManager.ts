@@ -1,5 +1,5 @@
 export interface EmotionState { mood: number; energy: number; lastUpdate: number; recentEvents: { event: string; delta: number; time: number }[] }
-interface EmotionConfig { decayRate?: number; eventWeights?: Record<string, number> }
+interface EmotionConfig { enabled?: boolean; decayRate?: number; eventWeights?: Record<string, number> }
 export interface EmotionPorts { store: { get(key: string): Promise<string | null>; set(key: string, value: string, options: { EX: number }): Promise<unknown> }; logger: { error(message: string): void; debug(message: string): void } }
 function parseState(text: string): EmotionState {
  const value: unknown = JSON.parse(text)

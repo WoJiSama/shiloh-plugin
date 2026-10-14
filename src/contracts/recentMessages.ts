@@ -2,7 +2,7 @@ import type { MessageCacheOptions } from '../modules/messaging/domain/messageCac
 export interface Segment { type: string; url?: string; fid?: string; text?: string; size?: number; name?: string; id?: string | number; qq?: string | number; title?: string; [field: string]: unknown }
 export interface Sender { user_id?: string | number | undefined; nickname?: string | undefined; card?: string; role?: string | undefined; title?: string | undefined; level?: unknown; identity?: string }
 export interface MessageEvent {
- message_type?: string; message?: Segment[]; raw_message?: string; sender?: Sender; time: number
+ self_id?: string | number; message_type?: string; message?: Segment[]; raw_message?: string; sender?: Sender; time: number
  event_id?: unknown; message_id?: unknown; source?: unknown; group_id?: string | number; group_name?: string
  group?: {getFileUrl(fid: string): Promise<string>}; friend?: {getFileUrl(fid: string): Promise<string>}
 }

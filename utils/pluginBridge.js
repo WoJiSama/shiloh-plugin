@@ -1,4 +1,1 @@
-export const pluginBridge = {
-  instance: null,
-  sharedState: null
-}
+export {pluginBridge} from '../dist/backend/modules/platform/infrastructure/admin/pluginBridge.js'

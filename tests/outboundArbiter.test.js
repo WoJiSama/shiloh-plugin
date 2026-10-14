@@ -118,7 +118,7 @@ test("handleTool wires trace and arbiter into the turn", () => {
     "e = outboundArbiter.wrapEvent(e)",
     'outboundArbiter.enqueue("commitment", () => host.sendSegmentedMessage(e, acknowledgement, 0))',
     "session?.outboundArbiter?.resolveToolOutcomes()",
-    "context?.session?.outboundArbiter?.markFailure()",
+    "Reflect.apply(arbiter.markFailure,context.session?.outboundArbiter,[])",
     "outboundArbiter.settle(session.turnPlan?.outcomes || [])",
     "turnTrace.finish()",
     "turnId: e?._turnId"

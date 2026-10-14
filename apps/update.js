@@ -1,19 +1,2 @@
-import { explainCompiledPluginUpdate } from "../utils/pluginUpdateBuild.js"
-
-export class BlChatUpdate extends plugin {
-  constructor() {
-    super({
-      name: "shiloh-plugin更新（#希洛更新/#shiloh更新）",
-      dsc: "#bl更新 #bl强制更新 #对话插件更新 #对话插件强制更新",
-      event: "message",
-      priority: 1000,
-      rule: [
-        { reg: /^#?(shiloh|SHILOH|希洛|bl|BL|对话插件)(强制)?更新$/, fnc: "update", permission: "master" }
-      ]
-    })
-  }
-
-  async update(e = this.e) {
-    return explainCompiledPluginUpdate(e)
-  }
-}
+import {createBlChatUpdate} from '../dist/backend/modules/platform/infrastructure/admin/update.js'
+export const BlChatUpdate=createBlChatUpdate(plugin)

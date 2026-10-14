@@ -1,3 +1,4 @@
+import {readSource} from './helpers/pluginSources.js'
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import path from "node:path"
@@ -88,7 +89,7 @@ test("config_default/commandGate.yaml 默认为空绑定(单号零影响)", asyn
 })
 
 test("命令门禁已接入 CommandHelp 应用", async () => {
-  const source = await import("node:fs").then(fs => fs.readFileSync(path.join(pluginRoot, "apps/CommandHelp.js"), "utf8"))
+  const source = readSource("apps/CommandHelp.js")
   assert.match(source, /guardCommand\(/)
 })
 

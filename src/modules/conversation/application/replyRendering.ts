@@ -17,14 +17,14 @@ import { ThinkingProcessor } from "../../models/domain/thinkingProcessor.js"
 // 发送节流器挂在 host 上,配置引用变化时重建(message.yaml 改动重启后生效)
 import { SendPacer } from "../domain/sendPacing.js"
 type Id = string | number
-interface Member {card?:string;nickname?:string}
-interface Group {getMemberMap():Promise<Map<number,Member>>}
+export interface Member {card?:string;nickname?:string}
+export interface Group {getMemberMap():Promise<Map<number,Member>>}
 export interface ReplyEvent {group_id?:Id;user_id?:Id;self_id?:Id;bot?:{uin?:Id};group?:Group;msg?:string;_proactiveReply?:boolean;_proactiveReplyAnchorAt?:number;_forbiddenAnchorAt?:number;message_type?:string;reply(payload:unknown,quote?:boolean):Promise<unknown>}
 interface ReplyConfig {sendPacing?:ConstructorParameters<typeof SendPacer>[0];forbiddenWords?:import('../domain/forbiddenWordGuard.js').ForbiddenConfig;persona?:{name?:string};personaGuard?:{enabled?:boolean;badPatterns?:string[]};chatTriggerMode?:string;smartTrigger?:{continuationKeywordMaxCount?:number;proactiveReplyNoQuote?:boolean;typingSpeed?:number};replyRhythm?:Parameters<typeof planTextReplyMessages>[1];messageSplitMaxChars?:number;messageSplitMaxSegments?:number}
 export interface ReplyDeliveryPort {
  config:ReplyConfig;_sendPacer?:SendPacer;_sendPacerSource?:ReplyConfig['sendPacing'];
  claimTurnReply?(event:ReplyEvent):Promise<{claimed?:boolean}|null>;sendObservedReply(event:ReplyEvent,payload:unknown,quote:boolean,channel:string):Promise<unknown>;
- getPersonaFor?(event:ReplyEvent):{name?:string};getSmartState(groupId:Id,event:ReplyEvent):{lastBotReplyAt:number;lastBotReplyToUserId:string|null;lastBotReplyKeywords:string[]};
+ getPersonaFor?(event:ReplyEvent):{name?:string};getSmartState(groupId:Id,event:ReplyEvent):{lastBotReplyAt:number;lastBotReplyToUserId:string|number|null;lastBotReplyKeywords:string[]};
  splitMessage(text:string):string[];splitLongMessageByPunctuation(text:string,maxChars:number,maxSegments:number):string[];
  convertAtInString(text:string,group:Group):Promise<{hasAt:boolean;msgSegments:unknown[]|null}>;
  findMember(target:string,members:Map<number,Member>):{qq:number;info:Member}|null

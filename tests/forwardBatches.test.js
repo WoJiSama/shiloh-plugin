@@ -1,3 +1,4 @@
+import {createMessageRecordPlugin} from '../dist/backend/modules/host/infrastructure/MessageRecordPlugin.js'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { sendForwardBatches } from '../utils/forwardBatches.js'
@@ -15,11 +16,7 @@ test('failure stops following batches and reports progress',async()=>{
 })
 
 test('actual archive command parser preserves QQ 前后=200 for two forwards', async () => {
- const { readFile } = await import('node:fs/promises')
- const source = await readFile(new URL('../apps/MessageManager.js',import.meta.url),'utf8')
- const start = source.indexOf('    parseArchiveSearch(')
- const end = source.indexOf('    buildArchiveHelp(',start)
- const parse = new Function(`return ({${source.slice(start,end)}}).parseArchiveSearch`)()
+ const parse = createMessageRecordPlugin(class {}, {}).prototype.parseArchiveSearch
  const options = parse('#查聊天记录 群=763694201 qq=3906061530 前后=200',{group_id:123})
  assert.equal(options.limit,200);assert.equal(options.around,0);assert.equal(options.qq,'3906061530')
  const batches=[]
@@ -30,10 +27,7 @@ test('actual archive command parser preserves QQ 前后=200 for two forwards', a
 })
 
 test('archive parser and query support 400 instead of truncating to 200', async()=>{
- const {readFile}=await import('node:fs/promises')
- const source=await readFile(new URL('../apps/MessageManager.js',import.meta.url),'utf8')
- const start=source.indexOf('    parseArchiveSearch('),end=source.indexOf('    buildArchiveHelp(',start)
- const parse=new Function(`return ({${source.slice(start,end)}}).parseArchiveSearch`)()
+ const parse = createMessageRecordPlugin(class {}, {}).prototype.parseArchiveSearch
  for(const command of ['#查聊天记录 qq=123456 前后=400','#查聊天记录 数量=400']) assert.equal(parse(command,{group_id:123}).limit,400)
  const { MessageArchiveManager } = await import('../utils/MessageArchiveManager.js')
  const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path')

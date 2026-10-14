@@ -2,9 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {normalizeForwardMessageList,normalizeMessageSegments,extractReadableTextFromSegments,getForwardSenderName,extractForwardIdsFromSegments} from '../domain/messageSegments.js'
 import {compactDrawPromptText} from '../domain/textPolicy.js'
-interface HistoryMessage {role:string;content:unknown;[key:string]:unknown}
-interface Group {getForwardMsg?(id:string):Promise<unknown>}
-interface ForwardState {lines?:string[];visited?:Set<string>;depth?:number;maxDepth?:number;maxLines?:number}
+export interface HistoryMessage {role?:string;content?:unknown}
+export interface Group {getForwardMsg?(id:string):Promise<unknown>}
+export interface ForwardState {lines?:string[];visited?:Set<string>;depth?:number;maxDepth?:number;maxLines?:number}
 export interface HistoryHost {messageHistoriesRedisKey:string;messageHistoriesDir:string;MAX_HISTORY:number;clearGroupUserMessages(groupId:string|number,userId:string|number):Promise<void>;saveGroupUserMessages(groupId:string|number,userId:string|number,messages:HistoryMessage[]):Promise<void>;collectForwardPromptLines(group:Group|undefined,forwardId:unknown,state?:ForwardState):Promise<string[]>}
 function parseHistory(value:unknown):HistoryMessage[] {return Array.isArray(value)?value.filter((v):v is HistoryMessage=>Boolean(v&&typeof v==='object'&&typeof v.role==='string'&&'content' in v)):[]}
 export function createConversationHistory(ports:{loadData(key:string,fallback:null):Promise<unknown>;saveData(key:string,file:string,value:HistoryMessage[]):Promise<unknown>;deleteKey(key:string):Promise<unknown>;debug(message:string):void;error(message:string,error:unknown):void}) {
@@ -100,7 +100,7 @@ async function collectForwardPromptLines(host:HistoryHost,group:Group|undefined,
 
     return lines
   }
-async function resolveForwardPromptFromSegments(host:HistoryHost,segments:Record<string,unknown>[] = [], group:Group|undefined) {
+async function resolveForwardPromptFromSegments(host:HistoryHost,segments:unknown[] = [], group?:Group) {
     const forwardIds = extractForwardIdsFromSegments(segments)
     if (!forwardIds.length || !group?.getForwardMsg) return ""
 
@@ -119,13 +119,13 @@ async function resolveForwardPromptFromSegments(host:HistoryHost,segments:Record
 
     return compactDrawPromptText(lines.join("\n"), FORWARD_CONTEXT_MAX_TEXT)
   }
-function filterChatByQQ(host:HistoryHost,chatArray:HistoryMessage[], qqNumber:unknown) {
+function filterChatByQQ<T extends HistoryMessage>(host:HistoryHost,chatArray:T[], qqNumber:unknown):T[] {
     const pattern = /\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/
     const lastIndex = chatArray.reduce((last, curr, i) =>
       typeof curr.content === "string" && curr.content.includes(`(qq号: ${qqNumber})`) && pattern.test(String(curr.content)) ? i : last, -1)
     return lastIndex === -1 ? chatArray : chatArray.slice(0, lastIndex + 1)
   }
-function trimMessageHistory(host:HistoryHost,messages:HistoryMessage[]) {
+function trimMessageHistory<T extends HistoryMessage>(host:HistoryHost,messages:T[]):T[] {
     const nonSystem = messages.filter(m => m.role !== "system")
     if (nonSystem.length <= host.MAX_HISTORY) return messages
 

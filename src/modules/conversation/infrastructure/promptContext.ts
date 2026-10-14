@@ -1,9 +1,34 @@
 import type {createAvatarReference} from './avatarReference.js'
-interface PromptEvent {group_id?:unknown;bot?:{nickname?:string};_quotedPromptContext?:{text?:string;senderName?:string;mediaSummary?:string};_directTriggerMerged?:boolean;_mergedMessageCount?:number;_mergedOriginalTexts?:string[];_groupContextImagePrompt?:string}
-interface History {role?:string;content?:unknown}
-interface UnderstandingConfig {enabled:boolean;maxChars:number;includeRecentContext:boolean;briefEnabled:boolean;briefTimeoutMs:number}
+export interface PromptEvent {msg?:string;raw_message?:string;group_id?:unknown;bot?:{nickname?:string};_quotedPromptContext?:{text?:string;senderName?:string;mediaSummary?:string};_directTriggerMerged?:boolean;_mergedMessageCount?:number;_mergedOriginalTexts?:string[];_groupContextImagePrompt?:string}
+export interface History {role?:string;content?:unknown}
+export interface UnderstandingConfig {enabled:boolean;maxChars:number;includeRecentContext:boolean;briefEnabled:boolean;briefTimeoutMs:number}
 type Avatar=Parameters<ReturnType<typeof createAvatarReference>['formatAvatarDrawReferencePrompt']>[0]
-interface PromptContext {e?:PromptEvent|undefined;args?:string;msg?:string;prompt?:string;userContent?:string|undefined;currentIntentText?:string;images?:string[];videos?:unknown[];groupUserMessages?:History[]|undefined;messages?:History[];modelCommittedToDraw?:boolean;avatarDrawReference?:Avatar;groupContextImagePrompt?:string;session?:{turnTrace?:{addModelCall(stage:string,ms:number):void}}}
+export interface PromptContext {e?:PromptEvent|undefined;args?:string|undefined;msg?:string|undefined;prompt?:string|undefined;userContent?:string|undefined;currentIntentText?:string|undefined;images?:string[]|undefined;videos?:unknown[]|undefined;groupUserMessages?:History[]|undefined;messages?:History[];modelCommittedToDraw?:boolean;avatarDrawReference?:Avatar;groupContextImagePrompt?:string;session?:{turnTrace?:{addModelCall(stage:string,ms:number):void}}}
+export type PromptContextInput = Omit<PromptContext, 'prompt' | 'groupUserMessages' | 'messages' | 'images'> & {
+  prompt?: unknown
+  images?: unknown
+  groupUserMessages?: unknown
+  messages?: unknown
+}
+function decodePromptHistory(value: unknown): History[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item: unknown) => {
+    if (!item || typeof item !== 'object') return []
+    const role = 'role' in item && typeof item.role === 'string' ? item.role : undefined
+    const content = 'content' in item && typeof item.content === 'string' ? item.content : ''
+    return [{ ...(role !== undefined ? { role } : {}), content }]
+  })
+}
+export function decodeImagePromptContext(input: PromptContextInput = {}): PromptContext {
+  const {prompt, groupUserMessages, messages, images, ...context} = input
+  return {
+    ...context,
+    ...(images !== undefined ? {images: Array.isArray(images) ? images.filter((image: unknown): image is string => typeof image === 'string') : []} : {}),
+    ...(typeof prompt === 'string' ? {prompt} : {}),
+    ...(groupUserMessages !== undefined ? {groupUserMessages: decodePromptHistory(groupUserMessages)} : {}),
+    ...(messages !== undefined ? {messages: decodePromptHistory(messages)} : {})
+  }
+}
 interface Materials {cfg:UnderstandingConfig;intentText:string;quotedContext:string;forwardContext:string;recentContext:string;signals:string[]}
 export interface PromptContextHost {config:{understandingEnhancement?:Partial<UnderstandingConfig>;intentAiConfig?:{intentAiUrl?:string;intentAiApikey?:string;intentAiModel?:string};toolsAiConfig?:{toolsAiUrl?:string;toolsAiApikey?:string;toolsAiModel?:string};persona?:{name?:string};triggerPrefixes?:string[]};getPersonaFor?(e:PromptEvent|undefined):{name?:string};getQuotedPromptContextText(e:PromptEvent|undefined,content?:string):string;getRecentDrawContextText(messages:History[],content:string,max:number):string;getRecentPromptContextText(messages:History[],content:string,max:number):string;buildImageGenerationPrompt(context:PromptContext):string;getUnderstandingEnhancementConfig():UnderstandingConfig;shouldInjectUnderstandingContext(context:PromptContext):boolean;extractForwardContextFromUserContent(content:string,max?:number):string;gatherUnderstandingMaterials(context:PromptContext):Materials|null;buildUnderstandingContextPrompt(context:PromptContext):string}
 // 提示上下文构建:引用/近景/生图连续性/理解增强/生图修图 prompt。
@@ -105,7 +130,8 @@ function getRecentDrawContextText(host:PromptContextHost, messages:History[] = [
       : ""
   }
 
-function resolveContextualDrawGeneration(host:PromptContextHost, context:PromptContext = {}) {
+function resolveContextualDrawGeneration(host:PromptContextHost, input:PromptContextInput = {}) {
+    const context = decodeImagePromptContext(input)
     const currentIntentText = String(context.currentIntentText || context.args || context.msg || "").trim()
     const normalized = normalizeIntentText(currentIntentText)
     if (!normalized) return null
@@ -308,7 +334,8 @@ function buildUnderstandingContextPrompt(host:PromptContextHost, context:PromptC
     return compactDrawPromptText(lines.join("\n"), cfg.maxChars)
   }
 
-function buildImageGenerationPrompt(host:PromptContextHost, context:PromptContext = {}) {
+function buildImageGenerationPrompt(host:PromptContextHost, input:PromptContextInput = {}) {
+    const context = decodeImagePromptContext(input)
     const mergedPrompt = Array.isArray(context.e?._mergedOriginalTexts) && context.e._mergedOriginalTexts.length
       ? selectMergedImagePromptTexts(context.e._mergedOriginalTexts).join("\n")
       : ""
@@ -357,7 +384,8 @@ function getImageGenerationReferenceImages(host:PromptContextHost, images:string
     return []
   }
 
-function buildImageEditPrompt(host:PromptContextHost, context:PromptContext = {}) {
+function buildImageEditPrompt(host:PromptContextHost, input:PromptContextInput = {}) {
+    const context = decodeImagePromptContext(input)
     const basePrompt = compactDrawPromptText(
       context.args || context.msg || context.currentIntentText || context.prompt || "请按用户要求编辑这张图片。",
       2400

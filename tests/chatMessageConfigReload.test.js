@@ -1,10 +1,8 @@
 import assert from "node:assert/strict"
-import fs from "node:fs"
-import vm from "node:vm"
 import { test } from "node:test"
 import moment from "moment"
 import { createMessageManagerClass } from "../dist/backend/modules/messaging/application/recentMessages.js"
-import { resolveMessageCacheTtlSeconds } from "../utils/messageCacheTtl.js"
+import {createHostSharedState} from "../dist/backend/modules/host/infrastructure/hostSharedState.js"
 import { KeyedSerialQueue } from "../utils/messagePipeline/keyedSerialQueue.js"
 
 // Execute the actual manager and shared-state reload functions, isolating the
@@ -12,53 +10,24 @@ import { KeyedSerialQueue } from "../utils/messagePipeline/keyedSerialQueue.js"
 function createRuntime() {
   const stored = new Map()
   const writes = []
-  const context = vm.createContext({
-    moment,
-    resolveMessageCacheTtlSeconds,
-    recentMessageWriteQueue: new KeyedSerialQueue(),
-    Bot: { uin: 3094088525, nickname: "bot" },
-    logger: { error() {}, warn() {} },
-    redis: {
-      async get(key) { return stored.get(key) || null },
-      async set(key, value, options) {
-        stored.set(key, value)
-        writes.push({ key, options })
-      }
-    },
-    refreshLocalTools: async () => {},
-    installSemanticMemoryRuntime() {},
-    installMidtermMemoryRuntime() {},
-    messageArchiveManager: {},
-    setSharedRuntime() {},
-    buildMemoryConfig: config => config.memorySystem || {},
-    applyToolRegistrySnapshot: state => state
+  const logger={error(){},warn(){},info(){}}
+  const redis={async get(key){return stored.get(key)||null},async set(key,value,options){stored.set(key,value);writes.push({key,options})}}
+  const MessageManager=createMessageManagerClass({
+    redis,bot:{uin:3094088525,nickname:'bot'},logger,queue:new KeyedSerialQueue(),
+    scheduleJob(){},getUrl:async()=>({headers:{}}),formatTime:time=>moment(time).format('YYYY-MM-DD HH:mm:ss'),parseTime:time=>Number(moment(time,'YYYY-MM-DD HH:mm:ss')),
+    refreshTencentImageUrl:async url=>url,enrichBilibiliMessageSegments:async value=>value||[],enrichDouyinMessageSegments:async value=>value||[],
+    formatBilibiliHistoryText:()=>'',formatBilibiliHistoryLinks:()=>'',formatDouyinHistoryText:()=>'',formatDouyinHistoryLinks:()=>''
   })
-  context.MessageManager = createMessageManagerClass({
-    redis: context.redis, bot: context.Bot, logger: context.logger, queue: new KeyedSerialQueue(),
-    scheduleJob() {}, getUrl: async () => ({headers:{}}), formatTime: time => moment(time).format('YYYY-MM-DD HH:mm:ss'), parseTime: time => Number(moment(time, 'YYYY-MM-DD HH:mm:ss')),
-    refreshTencentImageUrl: async url => url, enrichBilibiliMessageSegments: async value => value || [], enrichDouyinMessageSegments: async value => value || [],
-    formatBilibiliHistoryText: () => '', formatBilibiliHistoryLinks: () => '', formatDouyinHistoryText: () => '', formatDouyinHistoryLinks: () => ''
-  })
-  vm.runInContext(`
-    const manager = new MessageManager({ groupMaxMessages: 4, cacheExpireMinutes: 60 });
-    let sharedState = {
-      messageManager: manager,
-      emotionManager: { config: { eventWeights: {} } },
-      memoryManager: { updateConfig() {} },
-      expressionLearner: { config: {} },
-      knowledgeSearcher: null
-    };
-    globalThis.manager = manager;
-  `, context)
-  const pluginSource = fs.readFileSync(new URL("../apps/test.js", import.meta.url), "utf8")
-  for (const name of ["getMessageCacheOptions", "initializeSharedState"]) {
-    const match = pluginSource.match(new RegExp(`function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n\\}`))
-    assert.ok(match, `${name} runtime function must exist`)
-    vm.runInContext(match[0], context)
-  }
+  class EmotionManager{constructor(){this.config={eventWeights:{}}}}
+  class MemoryManager{updateConfig(){}}
+  class ExpressionLearner{constructor(){this.config={}}}
+  const snapshot={toolInstances:{},functions:[],functionMap:new Map(),toolSkills:[],customToolCount:0,builtInToolCount:0}
+  const shared=createHostSharedState({cwd:'/unused',MessageManager,EmotionManager,MemoryManager,ExpressionLearner,logger,
+    localToolRegistry:{getSnapshot:()=>snapshot,reload:async()=>snapshot},installRuntime(){},publishState(){},toolConfigHasName:()=>false,scheduleJob(){}})
+  shared.initializeSharedState({groupMaxMessages:4,groupChatMemoryMinutes:60})
   return {
-    manager: context.manager,
-    reload(config) { context.config = config; vm.runInContext("initializeSharedState(config)", context) },
+    get manager(){return shared.getState().messageManager},
+    reload(config) { shared.initializeSharedState(config) },
     messages() { return JSON.parse(stored.get("ytbot:messages:group:9527") || "[]") },
     writes
   }

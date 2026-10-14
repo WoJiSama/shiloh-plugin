@@ -1,5 +1,6 @@
-interface Envelope {msg?:string;raw_message?:string;message?:unknown[];sender?:Record<string,unknown>;user_id?:string|number|undefined;group_id?:string|number|undefined;message_id?:string|number|undefined;time?:number;self_id?:string|number;triggerContext?:{mode?:string}|null;turnStartedAt?:number}
-interface Event extends Envelope {bot?:{uin?:string|number};_triggerContext?:{mode?:string};_replyClaimed?:boolean}
+function decodeSender(value:unknown):import('../../../contracts/chatEvent.js').ChatMember {const raw=value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};const sender:import('../../../contracts/chatEvent.js').ChatMember={};if(typeof raw.user_id==='string'||typeof raw.user_id==='number')sender.user_id=raw.user_id;for(const key of ['card','nickname','role','title'] as const)if(typeof raw[key]==='string')sender[key]=raw[key];return sender}
+interface Envelope {msg?:string;raw_message?:string;message?:unknown[];sender?:import('../../../contracts/chatEvent.js').ChatMember;user_id?:string|number|undefined;group_id?:string|number|undefined;message_id?:string|number|undefined;time?:number;self_id?:string|number;triggerContext?:{mode?:string}|null;turnStartedAt?:number}
+interface Event extends Omit<Envelope,'message_id'> {message_id?:unknown;bot?:{uin?:string|number};_triggerContext?:{mode?:string};_replyClaimed?:boolean}
 interface Store {set(key:string,value:string,options:{EX:number;NX?:boolean}):Promise<unknown>;get(key:string):Promise<unknown>;del(key:string):Promise<unknown>;scanIterator?(options:{MATCH:string}):AsyncIterable<unknown>}
 interface Logger {warn?(message:string):void;info?(message:string):void;error?(message:string):void}
 interface Config {enabled?:boolean;staleSeconds?:number;recoverDelayMs?:number;ttlSeconds?:number}
@@ -11,7 +12,7 @@ function parseEnvelope(value:unknown):Envelope|null {
  if(typeof r.group_id!=='string' && typeof r.group_id!=='number')return null
  const id=(v:unknown)=>typeof v==='string'||typeof v==='number'?v:undefined
  const trigger=r.triggerContext && typeof r.triggerContext==='object'?r.triggerContext as Record<string,unknown>:{}
- return {msg:typeof r.msg==='string'?r.msg:'',raw_message:typeof r.raw_message==='string'?r.raw_message:'',message:Array.isArray(r.message)?r.message:[],sender:r.sender && typeof r.sender==='object'&&!Array.isArray(r.sender)?r.sender as Record<string,unknown>:{},user_id:id(r.user_id),group_id:r.group_id,message_id:id(r.message_id),time:typeof r.time==='number'?r.time:0,self_id:id(r.self_id)||'',triggerContext:{mode:typeof trigger.mode==='string'?trigger.mode:''},turnStartedAt:typeof r.turnStartedAt==='number'?r.turnStartedAt:0}
+ return {msg:typeof r.msg==='string'?r.msg:'',raw_message:typeof r.raw_message==='string'?r.raw_message:'',message:Array.isArray(r.message)?r.message:[],sender:decodeSender(r.sender),user_id:id(r.user_id),group_id:r.group_id,message_id:id(r.message_id),time:typeof r.time==='number'?r.time:0,self_id:id(r.self_id)||'',triggerContext:{mode:typeof trigger.mode==='string'?trigger.mode:''},turnStartedAt:typeof r.turnStartedAt==='number'?r.turnStartedAt:0}
 }
 export function createChatTurnDurabilityModule(ports:{getBot(selfId?:string|number):HostBot|null|undefined;getRedis():Store|null|undefined;logger?:Logger}) {
 // 聊天回合持久化（P1 高可用）：
@@ -53,7 +54,7 @@ function serializeChatTurnEnvelope(e:Event = {}):Envelope {
     sender: e?.sender && typeof e.sender === "object" ? { ...e.sender } : { user_id: e?.user_id },
     user_id: e?.user_id,
     group_id: e?.group_id,
-    message_id: e?.message_id,
+    message_id: typeof e?.message_id==='string'||typeof e?.message_id==='number'?e.message_id:undefined,
     time: Number(e?.time) || Math.floor(Date.now() / 1000),
     self_id: e?.self_id || e?.bot?.uin || "",
     triggerContext: e?._triggerContext || null

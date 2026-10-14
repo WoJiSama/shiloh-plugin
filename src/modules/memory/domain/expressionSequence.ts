@@ -1,5 +1,5 @@
 export interface ExpressionObservation { text: string; hasEmojiPack: boolean; sample: string; userId: string; messageId: string; at: number }
-export interface ExpressionMetadata extends Record<string, unknown> { message?: unknown[]; segments?: unknown[] }
+export interface ExpressionMetadata extends Record<string, unknown> { message?: unknown[] | undefined; segments?: unknown[] | undefined }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
 

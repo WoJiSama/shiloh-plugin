@@ -130,7 +130,7 @@ function buildMergedDirectTriggerEvent(host:SchedulingHost,baseEvent:ScheduledEv
     return merged
   }
 
-function buildMergedDirectTriggerPrompt(host:SchedulingHost,e:ScheduledEvent) {
+function buildMergedDirectTriggerPrompt(host:SchedulingHost,e:Pick<ScheduledEvent,'_directTriggerMerged'|'_mergedMessageCount'|'_mergedDroppedMessageCount'>) {
     if (!e?._directTriggerMerged || !e?._mergedMessageCount) return ""
     const count = Number(e._mergedMessageCount) || 0
     const dropped = Number(e._mergedDroppedMessageCount) || 0

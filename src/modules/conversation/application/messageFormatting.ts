@@ -6,8 +6,33 @@ import { getMentionTargetId } from "../domain/mentionTargets.js"
 import { ROLE_MAP as roleMap } from "../domain/messageContext.js"
 interface Segment {type?:string;text?:string;qq?:unknown;user_id?:unknown;url?:unknown;file_url?:unknown;file?:unknown;name?:unknown;data?:{url?:unknown;file_url?:unknown;file?:unknown;name?:unknown;qq?:unknown;user_id?:unknown}}
 interface Reply {sender?:ChatMember;message?:Segment[];raw_message?:string;message_id?:string|number}
-interface Group {getMemberMap():Promise<Map<number,ChatMember>>}
-export interface FormatEvent {message_id?:string|number;group?:Group;message?:Segment[];getReply?():Promise<Reply|null>;_groupContextAssets?:{reply?:Reply;quotedForwardText?:string;currentForwardText?:string};_groupContextImagePrompt?:string;_quotedPromptContext?:{senderName:string;messageId:string;text:string;mediaSummary:string}}
+export interface Group {getMemberMap():Promise<Map<number,ChatMember>>}
+export interface FormatEvent {message_id?:unknown;group?:Group;message?:Segment[];getReply?():Promise<unknown>;_groupContextAssets?:unknown;_groupContextImagePrompt?:string;_quotedPromptContext?:{senderName?:string;messageId?:unknown;text?:string;mediaSummary?:string}}
+function record(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === 'object' ? Object.fromEntries(Object.entries(value)) : {}
+}
+function decodeReply(value: unknown): Reply | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = record(value)
+  const sender = record(raw.sender)
+  const member: ChatMember = {
+    ...(typeof sender.user_id === 'string' || typeof sender.user_id === 'number' ? {user_id: sender.user_id} : {}),
+    ...(typeof sender.nickname === 'string' ? {nickname: sender.nickname} : {}),
+    ...(typeof sender.card === 'string' ? {card: sender.card} : {})
+  }
+  const message = Array.isArray(raw.message) ? raw.message.flatMap((value: unknown): Segment[] => {
+    if (typeof value === 'string') return [{type: 'text', text: value}]
+    const segment = record(value)
+    if (typeof segment.type !== 'string') return []
+    return [{...segment, type: segment.type, ...(typeof segment.text === 'string' ? {text: segment.text} : {}), data: record(segment.data)}]
+  }) : undefined
+  return {
+    ...(raw.sender && typeof raw.sender === 'object' ? {sender: member} : {}),
+    ...(message ? {message} : {}),
+    ...(typeof raw.raw_message === 'string' ? {raw_message: raw.raw_message} : {}),
+    ...(typeof raw.message_id === 'string' || typeof raw.message_id === 'number' ? {message_id: raw.message_id} : {})
+  }
+}
 export interface MessageFormattingPort {resolveForwardPromptFromSegments(segments:Segment[],group?:Group):Promise<string>;formatTime():string}
 export function createMessageFormatting(ports:{botId():unknown;error(message:string,error:unknown):void}) {
 // 消息格式化:用户内容组装(CQ/引用/媒体)与聊天历史格式化。
@@ -23,7 +48,8 @@ function formatTime(host:unknown) {
 
 async function buildMessageContent(host:MessageFormattingPort, sender:ChatMember, msg:string, images:unknown[], atQq:unknown[] = [], group?:Group, e:FormatEvent|null = null) {
     const senderRole = roleMap[sender.role || ""] || "member"
-    const messageId = e?.message_id ? `[消息ID:${e.message_id}]` : ''
+    const messageId = typeof e?.message_id === 'string' || typeof e?.message_id === 'number' ? `[消息ID:${e.message_id}]` : ''
+    const assets = record(e?._groupContextAssets)
     let senderMember = sender
     if (group && sender?.user_id) {
       try {
@@ -47,7 +73,7 @@ async function buildMessageContent(host:MessageFormattingPort, sender:ChatMember
     let quoteContent = ""
     if (e?.getReply) {
       try {
-        const reply = e?._groupContextAssets?.reply || await e.getReply()
+        const reply = decodeReply(assets.reply || await e.getReply())
         if (reply) {
           const quotedSender = reply.sender
           let quotedMsg = ""
@@ -64,7 +90,7 @@ async function buildMessageContent(host:MessageFormattingPort, sender:ChatMember
 
           // 提取被引用消息中的转发记录内容，递归展开嵌套合并转发。
           let forwardContent = ""
-          forwardPromptText = e?._groupContextAssets?.quotedForwardText ||
+          forwardPromptText = (typeof assets.quotedForwardText === 'string' ? assets.quotedForwardText : '') ||
             await host.resolveForwardPromptFromSegments(reply.message || [], e?.group || group)
           if (forwardPromptText) {
             forwardContent = `[转发记录内容:\n${forwardPromptText}\n]`
@@ -170,7 +196,7 @@ async function buildMessageContent(host:MessageFormattingPort, sender:ChatMember
       }
       content.push(`在群里说: ${fullMsg}`)
     }
-    const currentForwardPromptText = e?._groupContextAssets?.currentForwardText ||
+    const currentForwardPromptText = (typeof assets.currentForwardText === 'string' ? assets.currentForwardText : '') ||
       await host.resolveForwardPromptFromSegments(e?.message || [], group)
     if (currentForwardPromptText) {
       content.push(`转发了合并聊天记录:\n${currentForwardPromptText}`)

@@ -201,7 +201,7 @@ class ExpressionLearner {
     return patterns
   }
 
-  updateGroupExpressions(groupId: string, content: string, metadata: ExpressionMetadata = {}) {
+  updateGroupExpressions(groupId: string|number, content: string, metadata: ExpressionMetadata = {}) {
     const key = String(groupId || "")
     if (!key) return Promise.resolve()
     return this.enqueueGroupUpdate(key, () => this._updateGroupExpressions(key, content, metadata))

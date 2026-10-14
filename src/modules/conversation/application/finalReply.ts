@@ -16,21 +16,21 @@ import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 import {isImageGenerationRequest,isImageAnalysisRequest} from '../domain/messageIntent.js'
 import {recordDrawTextFallback,clearDrawFailureNote} from '../domain/drawFailureNote.js'
 import type {ReplyEvent} from './replyRendering.js'
-interface Message {role:string;content:string;tool_call_id?:string;name?:string}
+export interface Message {role:string;content:string;tool_call_id?:string;name?:string}
 export interface FinalEvent extends ReplyEvent {message_id?:string|number;sender?:{card?:string;nickname?:string;role?:string};message_type?:string;message?:import('../../../contracts/chatEvent.js').MessageSegment[]}
 export interface FinalSession {userContent?:string;rawArgs?:string;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
-interface Config {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean};memorySystem?:{enabled?:boolean}}
-interface ArchivedMessage {self_id?:string|number;source?:string;sender?:{self_id?:string|number;user_id?:string|number;nickname?:string};content?:string}
+interface Config {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean}|undefined;memorySystem?:{enabled?:boolean}|undefined}
+interface ArchivedMessage {self_id?:string|number;source?:string;sender?:{self_id?:string|number;user_id?:string|number|undefined;nickname?:string|undefined};content?:string}
 export interface FinalReplyHost {
  config:Config;processToolSpecificMessage(content:string,toolName?:string):string|Promise<string>;getPersonaFor(event:FinalEvent):{name?:string};
  getTextImageTemplateForFinalReply(context:{content:string;output:string;session:FinalSession;toolName?:string|undefined;e:FinalEvent}):string|false|null;
  sendModrinthForwardCards(event:FinalEvent,items:unknown[]):Promise<unknown>;sendModrinthForwardItems(event:FinalEvent,items:string[]):Promise<unknown>;sendFinalReplyAsTextImage(event:FinalEvent,text:string,template:string):Promise<unknown>;sendSegmentedMessage(event:FinalEvent,text:string,chance:number,options:{alreadyGuarded:boolean}):Promise<unknown>;
  formatTime():string;setTrackingWithTimer(key:string,options:{chatHistory:Message[]}):unknown;
- messageManager:{recordMessage(record:Record<string,unknown>):Promise<unknown>;getMessages(type:string,groupId:string|number):Promise<ArchivedMessage[]>};
+ messageManager:{recordMessage(record:import('../../../contracts/recentMessages.js').MessageEvent):Promise<unknown>;getMessages(type:string,groupId:string|number):Promise<ArchivedMessage[]>};
  trimMessageHistory(messages:Message[]):Message[];saveGroupUserMessages(groupId:string|number|undefined,userId:string|number|undefined,messages:Message[]):Promise<unknown>;
  updateEnhancedSystems(event:FinalEvent,userMessage:string,reply:string):Promise<unknown>;
- emotionManager:{updateEmotionFromMessage(groupId:string|number|undefined,text:string,isAtBot:boolean,selfId:string|number):Promise<unknown>};
- memoryManager:{extractAndSaveMemories(groupId:string|number|undefined,userId:string|number|undefined,text:string,reply:string,context:{source:string;messageId?:string|number|undefined;senderName?:string|undefined;heardFrom:string}):Promise<unknown>;extractAndSaveGroupMemories(groupId:string|number,history:{role:string;source:string;content:string}[],context:{heardFrom:string}):Promise<unknown>}
+ emotionManager:{updateEmotionFromMessage(groupId:string|number|undefined,text:string,isAtBot:boolean,selfId:string):Promise<unknown>};
+ memoryManager:{extractAndSaveMemories(groupId:string|number|undefined,userId:string|number|undefined,text:string,reply:string,context:{source:string;messageId?:string|number|undefined;senderName?:string|undefined;heardFrom:string}):unknown;extractAndSaveGroupMemories(groupId:string|number,history:{role:string;source:string;content:string}[],context:{heardFrom:string}):unknown}
 }
 interface FinalPorts {
  randomUUID():string;
@@ -197,13 +197,13 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
       const replySelfId = e.self_id || e.bot?.uin || ports.bot().uin
       const replyPersonaName = resolvePersonaName(host.getPersonaFor(e))
       await host.messageManager.recordMessage({
-        message_type: e.message_type,
-        group_id: e.group_id,
+        ...(e.message_type?{message_type:e.message_type}:{}),
+        ...(e.group_id!==undefined?{group_id:e.group_id}:{}),
         message_id: deliveredMessageId,
+        self_id: replySelfId,
         time: now + 1,
         message: [{ type: "text", text: output }],
         source: "send",
-        self_id: replySelfId,
         sender: { user_id: replySelfId, nickname: replyPersonaName, card: replyPersonaName, role: "member" }
       })
     } catch (error) {
@@ -257,19 +257,19 @@ async function updateEnhancedSystems(host:FinalReplyHost, e:FinalEvent, userMess
     // 1. 更新情感系统
     if (host.config.emotionSystem?.enabled) {
       const isAtBot = messageMentionsUser(e, e?.bot?.uin || e?.self_id || ports.bot().uin)
-      emotionState = await host.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot, e.self_id || ports.bot().uin || "")
+      emotionState = await host.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot, String(e.self_id || ports.bot().uin || ""))
     }
 
     // 2. 提取并保存长期记忆（后台异步）
     if (host.config.memorySystem?.enabled) {
       // 不 await，让它在后台执行
-      host.memoryManager.extractAndSaveMemories(groupId, userId, userMessage, botReply, {
+      Promise.resolve(host.memoryManager.extractAndSaveMemories(groupId, userId, userMessage, botReply, {
         source: "user",
         messageId: e.message_id,
         senderName: e.sender?.card || e.sender?.nickname,
         // 共享记忆盖源:这条事实是"当前 bot"在场时听来的,其他 bot 引用时可说"听XX说过"
         heardFrom: resolvePersonaName(host.getPersonaFor(e))
-      }).catch(error=>logger.warn("[记忆] 用户提取失败",error))
+      })).catch(error=>logger.warn("[记忆] 用户提取失败",error))
       // 提取群全局记忆（传入聊天记录）
       if (groupId) {
         const history = await host.messageManager.getMessages('group', groupId)
@@ -285,9 +285,9 @@ async function updateEnhancedSystems(host:FinalReplyHost, e:FinalEvent, userMess
             content: `${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${msg.content}`
           }
         })
-        host.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory, {
+        Promise.resolve(host.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory, {
           heardFrom: resolvePersonaName(host.getPersonaFor(e))
-        }).catch(error=>logger.warn("[记忆] 群提取失败",error))
+        })).catch(error=>logger.warn("[记忆] 群提取失败",error))
       }
     }
 

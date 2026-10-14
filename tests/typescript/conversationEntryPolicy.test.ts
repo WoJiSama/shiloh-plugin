@@ -15,7 +15,7 @@ function fixture(){
  return {runtime,host,events}
 }
 test('private entry applies command, permission and forbidden-word barriers before chat dispatch',async()=>{
- __resetPrivateChatForTest();const {runtime,host,events}=fixture(),e={group_id:'',message_type:'private',user_id:7,msg:'#command'}
+ __resetPrivateChatForTest();const {runtime,host,events}=fixture(),e={message_type:'private',user_id:7,msg:'#command'}
  assert.equal(await runtime.handlePrivateChat(host,e),false);assert.deepEqual(events,[])
  e.msg='blocked';assert.equal(await runtime.handlePrivateChat(host,e),false);assert.deepEqual(events,['notice'])
  e.msg='hello';await runtime.handlePrivateChat(host,e);assert.deepEqual(events,['notice','tool'])

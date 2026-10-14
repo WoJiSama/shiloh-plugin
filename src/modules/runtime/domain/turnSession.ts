@@ -125,24 +125,26 @@ export const TURN_SESSION_FIELDS = [
   { name: "backgroundTerminalToolTouched", owner: "后台终结工具已触碰" }
 ] as const satisfies ReadonlyArray<{ name: keyof TurnSession; owner: string }>
 
-export function createTurnSessionStore({
-  map = new Map(),
+export interface LifecycleSession<Tool> {tools?:Tool[];__createdAt?:number;__lastActiveAt?:number}
+export interface TypedTurnSessionStore<T,Tool> {map:Map<SessionId,T>;getOrCreate(id:SessionId,tools?:Tool[]):T;get(id:SessionId):T|undefined;clear(id:SessionId):void;refreshTools(tools:Tool[]):void;sweep(now?:number):number;stats():{sessions:number}}
+export function createTurnSessionStore(options:TurnSessionStoreOptions = {}):TurnSessionStore {
+ return createTypedTurnSessionStore<TurnSession,unknown>({...options,createSession:tools=>({...tools===undefined?{}:{tools},groupUserMessages:[],actionOutcomes:[]})})
+}
+export function createTypedTurnSessionStore<T extends LifecycleSession<Tool>,Tool>({
+  map = new Map<SessionId,T>(),
   ttlMs = TURN_SESSION_TTL_MS,
   maxSessions = TURN_SESSION_MAX,
-  now = Date.now
-}: TurnSessionStoreOptions = {}): TurnSessionStore {
+  now = Date.now,
+  createSession
+}: {map?:Map<SessionId,T>;ttlMs?:number;maxSessions?:number;now?:()=>number;createSession:(tools:Tool[]|undefined)=>T}):TypedTurnSessionStore<T,Tool> {
   return {
     // 原始 Map 引用:sharedState 持久化与其他既有遍历兼容
     map,
     getOrCreate(sessionId, tools) {
       let session = map.get(sessionId)
       if (!session) {
-        session = {
-          ...(tools === undefined ? {} : { tools }),
-          groupUserMessages: [],
-          actionOutcomes: [],
-          __createdAt: now()
-        }
+        session = createSession(tools)
+        session.__createdAt = now()
         map.set(sessionId, session)
       }
       session.__lastActiveAt = now()

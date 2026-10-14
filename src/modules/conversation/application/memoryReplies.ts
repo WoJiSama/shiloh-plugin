@@ -1,6 +1,6 @@
 import {extractDeliveryMessageId} from '../../messaging/domain/deliveryObservability.js'
 import {safeTruncateUnicode,splitUnicodeText} from '../../models/domain/unicodeText.js'
-interface Fact {text:string;tags?:string[];confidence?:number;authority?:string;eventAt?:unknown}
+export interface Fact {text:string;tags?:string[];confidence?:number;authority?:string;eventAt?:unknown}
 interface MemoryReplyHost<Event> {memoryAuthoritySource(authority?:string):string;formatMemoryFactLines(facts:Fact[]):string[];sendObservedReply(event:Event,payload:unknown):Promise<unknown>}
 export function createMemoryReplies<Event>(ports:{factShortId(text:string):string;makeForwardMsg(event:Event,messages:string[],title:string):Promise<unknown>;warn(...args:unknown[]):void}) {
 

@@ -14,7 +14,7 @@ export interface ConversationEvent {
  _incomingMessageAt?:number; _directTriggerMerged?:boolean; _longRunningToolTask?:boolean; _deferredReason?:string; forceGrabRedBag?:boolean;
  _triggerContext?:{mode:string;gateDecision?:string;gateReason?:string;phase?:string}
 }
-export type ConversationState = Omit<SmartRuntimeState<ReturnType<typeof setTimeout>>, 'rerunEvent'> & {rerunEvent:ConversationEvent|null}
+export type ConversationState = SmartRuntimeState<ReturnType<typeof setTimeout>>
 export interface ConversationSmartConfig {
  inevitableAtReply?:boolean; mentionedNameReply?:boolean; fadingForceGate?:boolean; timingGateCooldownSeconds?:number|string|null;
  focusDurationMs?:number; focusMaxReplies?:number; fadingDurationMs?:number; focusMaxNoAction?:number;
@@ -31,7 +31,7 @@ export interface SmartConversationHost {
  joinRepeat(e:ConversationEvent,state:ConversationState,text:string):Promise<boolean>; resolveConversationPhase(state:ConversationState):string;
  resolveTalkValue(groupId:string|number):number; idleCompensationMet(state:ConversationState,threshold:number,previous:number):boolean;
  runTimingGate(e:ConversationEvent,state:ConversationState,ctx:{phase:string;prefilter:Prefilter;threshold:number}):Promise<GateResult>;
- scheduleMergedDirectTrigger(e:ConversationEvent,run:(event:ConversationEvent)=>Promise<void>,kind:string):boolean|void;
+ scheduleMergedDirectTrigger(e:ConversationEvent,run:(event:ConversationEvent)=>Promise<void>,kind:string):boolean|void|null;
  handleRandomReplySmart(e:ConversationEvent):Promise<unknown>; applyRateLimitGuard(state:ConversationState,groupId:string|number):boolean;
  applyReplyDebounce(e:ConversationEvent):Promise<boolean>; releaseSmartInFlight(state:ConversationState,e:ConversationEvent,token:number):void;
  handleTool(e:ConversationEvent):Promise<unknown>; scheduleWaitReply(e:ConversationEvent,seconds:number,reason:string):void;

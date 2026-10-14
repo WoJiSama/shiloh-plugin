@@ -65,7 +65,7 @@ test("local opening sends once per event and never blocks the task", async () =>
 })
 
 test("smart lock release path consumes the policy table", () => {
-  const testJs = [path.join(root, "apps/test.js"), path.join(root, "src/modules/conversation/application/smartConversation.ts"), path.join(root, "src/modules/tools/infrastructure/chatTurn.ts")]
+  const testJs = [path.join(root, "src/modules/host/infrastructure/chatPlugin.ts"), path.join(root, "src/modules/conversation/application/smartConversation.ts"), path.join(root, "src/modules/tools/infrastructure/chatTurn.ts")]
     .map(file => fs.readFileSync(file, "utf8")).join("\n")
   assert.ok(
     testJs.includes("const longTaskPolicy = resolveLongTaskFeedbackPolicy(String(e?.msg || \"\"))"),

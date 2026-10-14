@@ -6,13 +6,21 @@ import {normalizeIntentText,isImageGenerationRequest,isImageCompositionEditReque
 import type {ForbiddenConfig} from '../domain/forbiddenWordGuard.js'
 import {renderPersonaTemplate,type PersonaText} from '../domain/personaSource.js'
 import {detectAndPenalize} from '../../memory/infrastructure/memorySelfCorrection.js'
-interface EntryEvent extends ConversationEvent {isMaster?:boolean}
-interface CorrectionRuntime {config?:{selfCorrection?:{enabled?:boolean;penalty?:number;ttlMinutes?:number}};store?:{penalizeChunks(groupId:string,ids:string[],options:{penalty:number}):number}}
+export interface EntryEvent extends Omit<ConversationEvent,'group_id'|'_triggerContext'|'reply'> {group_id?:string|number;reply?:unknown;isMaster?:boolean;_triggerContext?:{mode?:string;gateDecision?:string;gateReason?:string;phase?:string}}
+type ScopedEntryEvent=Omit<EntryEvent,'reply'|'_triggerContext'> & {group_id:string|number}
+function scopeEvent(e:EntryEvent & {group_id:string|number}):ScopedEntryEvent {const {reply,_triggerContext,...scope}=e;return scope}
+function hasEntryGroup(e:EntryEvent):e is EntryEvent & {group_id:string|number}{return typeof e.group_id==='string'||typeof e.group_id==='number'}
+interface CorrectionRuntime {config?:unknown;store?:{penalizeChunks(groupId:string,ids:string[],options:{penalty:number}):number}}
+function correctionConfig(value:unknown):{enabled:boolean;penalty:number;ttlMinutes:number}{
+ const raw=value&&typeof value==='object'&&'selfCorrection'in value?value.selfCorrection:undefined
+ const cfg=raw&&typeof raw==='object'?raw:{}
+ return {enabled:!('enabled'in cfg&&cfg.enabled===false),penalty:'penalty'in cfg&&typeof cfg.penalty==='number'&&Number.isFinite(cfg.penalty)?cfg.penalty:0.5,ttlMinutes:'ttlMinutes'in cfg&&typeof cfg.ttlMinutes==='number'&&Number.isFinite(cfg.ttlMinutes)?cfg.ttlMinutes:10}
+}
 export interface EntryHost {
  config:{privateChat?:PrivateConfig;forbiddenWords?:ForbiddenConfig & {replyText?:string};triggerPrefixes:string[];torrentDownload?:{autoDetect?:boolean};userBlacklist?:{enabled?:boolean;users?:unknown[]}};
  isCommand(e:EntryEvent):boolean;isUserBlacklisted(e:EntryEvent):boolean;handleForbiddenWordHit(e:EntryEvent):boolean;handleTool(e:EntryEvent):Promise<unknown>;
- cancelPendingConversation(groupId:string|number,e:EntryEvent):void;sendObservedReply(e:EntryEvent,text:string,quote:boolean,kind:string):Promise<unknown>;
- getPersonaFor(e:EntryEvent):PersonaText;getSmartState(groupId:string|number,e:EntryEvent):ConversationState
+ cancelPendingConversation(groupId:string|number,e:ScopedEntryEvent):void;sendObservedReply(e:EntryEvent,text:string,quote:boolean,kind:string):Promise<unknown>;
+ getPersonaFor(e:EntryEvent):PersonaText;getSmartState(groupId:string|number,e:ScopedEntryEvent):ConversationState
 }
 export interface EntryPorts {
  logger:{info(message:string):void;warn(message:string):void;mark(message:string):void};bot():{uin?:string|number};
@@ -47,7 +55,7 @@ function handleForbiddenWordHit(host:EntryHost,e:EntryEvent) {
     if (!word) return false
     const scopeKey = chatScopeKey(e)
     markConversationInterrupted(scopeKey)
-    if (e?.group_id) host.cancelPendingConversation(e.group_id, e)
+    if (hasEntryGroup(e)) host.cancelPendingConversation(e.group_id, scopeEvent(e))
     logger.mark(`[违禁词] scope=${scopeKey} user=${e?.user_id} word=${word} 已中断当前对话 msg="${summarizeForLog(text)}"`)
     const replyText = String(cfg?.replyText || "").trim()
     if (replyText) {
@@ -60,19 +68,21 @@ function handleForbiddenWordHit(host:EntryHost,e:EntryEvent) {
 function handleMemorySelfCorrection(host:EntryHost,e:EntryEvent) {
     try {
       const groupId = e?.group_id
-      if (!groupId) return false
+      if (!groupId || !hasEntryGroup(e)) return false
       const runtime = getSemanticMemoryRuntime()
-      if (!runtime || runtime.config?.selfCorrection?.enabled === false) return false
-      const state = host.getSmartState(groupId, e)
+      if (!runtime) return false
+      const correction=correctionConfig(runtime.config)
+      if (!correction.enabled) return false
+      const state = host.getSmartState(groupId, scopeEvent(e))
       detectAndPenalize({
         text: e?.msg || e?.raw_message || "",
         groupId:String(groupId),
-        quotesBot: (() => { try { return messageQuotesUser(e, e?.bot?.uin || ports.bot().uin) } catch { return false } })(),
+        quotesBot: (() => { try { return messageQuotesUser({...(e.source?{source:e.source}:{}),...(e.message?{message:e.message}:{})}, e?.bot?.uin || ports.bot().uin) } catch { return false } })(),
         senderUserId: e?.user_id ?? "",
         lastBotReplyToUserId: state?.lastBotReplyToUserId ?? "",
         runtime,
-        penalty: Number(runtime.config?.selfCorrection?.penalty) || 0.5,
-        ttlMs: (Number(runtime.config?.selfCorrection?.ttlMinutes) || 10) * 60 * 1000
+        penalty: correction.penalty,
+        ttlMs: correction.ttlMinutes * 60 * 1000
       })
     } catch {}
     return false
@@ -85,7 +95,7 @@ function checkTriggers(host:EntryHost,e:EntryEvent) {
 
       const botId = e?.bot?.uin || ports.bot().uin
       const hasAt = messageMentionsUser(e, botId)
-      const hasReplyToBot = messageQuotesUser(e, botId)
+      const hasReplyToBot = messageQuotesUser({...(e.source?{source:e.source}:{}),...(e.message?{message:e.message}:{})}, botId)
 
       return Boolean(hasMessage || hasAt || hasReplyToBot)
     } catch {

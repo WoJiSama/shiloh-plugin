@@ -393,6 +393,7 @@ return class MessageManager {
       content: await this.formatMessageContent(formattedMessage),
       event_id: message.event_id || null,
       message_id: message.message_id,
+      ...(message.self_id !== undefined ? { self_id: message.self_id } : {}),
       message_type: message.message_type,
       source: message.source || null,
       group_id: isGroup ? message.group_id : null,

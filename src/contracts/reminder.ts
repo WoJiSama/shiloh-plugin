@@ -4,5 +4,5 @@ export interface ReminderEvent {user_id:string|number;group_id?:string|number|nu
 export interface ReminderAction {tool:string;params?:Record<string,unknown>}
 export interface ReminderData {id:string;user_id:string;group_id:string|null;bot_id?:string;message_id:string|number|null;content:string;reminder_message:string|null;trigger_time:number;created_at:number;status:'pending'|'sending'|'unknown'|'failed'|'completed';extra_action:ReminderAction|null;extra_attempted?:boolean;retry_count:number}
 export interface ReminderPending {id:string;trigger_time:number}
-export interface ReminderTools {[name:string]:{execute(params:Record<string,unknown>,event:ReminderEvent):Promise<unknown>}}
+export interface ReminderTools {[name:string]:{execute(params:Record<string,unknown>,event:ReminderEvent):unknown}}
 export interface ReminderPorts {redis:ReminderRedis;logger:{warn(...values:unknown[]):void;error(...values:unknown[]):void;info(...values:unknown[]):void;debug(...values:unknown[]):void};getBot(id?:string):ReminderBot|undefined;mcpManager:{isMCPTool(name:string):boolean;executeToolByAlias(name:string,params:Record<string,unknown>):Promise<unknown>}}

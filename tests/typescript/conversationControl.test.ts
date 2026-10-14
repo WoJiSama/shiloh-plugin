@@ -51,7 +51,7 @@ test('smart lock is acquired before awaits; concurrent event queues and failed t
  await start
  assert.equal(s.inFlight,true)
  assert.equal(await runtime.handleRandomReplySmart(host,{group_id:'g',user_id:3,msg:'second'}),false)
- assert.equal(s.queuedWhileInFlight,1);assert.equal(s.rerunEvent?.user_id,3)
+ assert.equal(s.queuedWhileInFlight,1);assert.ok(s.rerunEvent && typeof s.rerunEvent === 'object' && 'user_id' in s.rerunEvent);assert.equal(s.rerunEvent.user_id,3)
  rejectTurn(new Error('send failed'));await assert.rejects(first,/send failed/);assert.equal(s.inFlight,false)
 })
 function strictHost():StrictConversationHost{return {
