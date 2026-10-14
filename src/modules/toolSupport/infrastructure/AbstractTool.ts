@@ -1,5 +1,5 @@
-interface ParameterSchema {type?:string;items?:{type?:string};pattern?:string;enum?:unknown[];minimum?:number;maximum?:number;[key:string]:unknown}
-interface ToolParameters {type:string;properties:Record<string,ParameterSchema>;required:string[]}
+export interface ParameterSchema {type?:string;items?:ParameterSchema;pattern?:string;enum?:unknown[];minimum?:number;maximum?:number;[key:string]:unknown}
+export interface ToolParameters {type:string;properties:Record<string,ParameterSchema>;required:string[];additionalProperties?:boolean}
 /**
  * 抽象工具类，所有具体工具需继承此类并实现func方法
  */

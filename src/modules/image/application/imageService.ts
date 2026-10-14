@@ -11,8 +11,8 @@ export function isImagesEditEndpoint(apiUrl = '') {
 }
 export function createImageService(ports: ImageServicePorts) {
  function buildGenerationPayload(config: ImageServiceCandidate, prompt: string, format = '', count = 1, quality = '') {
-  const payload: Record<string, unknown> = { model: config.model, prompt, n: count }
-  if (isGrokImageModel(config.model)) payload.quality = quality || config.quality || 'high'
+  const payload: Record<string, unknown> = { model: config.model, prompt }
+  if (isGrokImageModel(config.model)) { payload.quality = quality || config.quality || 'high'; if (count > 1) payload.n = count }
   else { payload.n = count; if (format) payload.response_format = format; if (quality && /^gpt-image/i.test(config.model)) payload.quality = quality }
   if (config.size) payload.size = config.size
   if (config.aspectRatio && isGrokImageModel(config.model)) payload.aspect_ratio = config.aspectRatio

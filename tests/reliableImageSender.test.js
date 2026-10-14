@@ -41,3 +41,18 @@ test("sends a downloaded Buffer and rejects failed replies", async () => {
     globalThis.segment = previousSegment
   }
 })
+
+test('unknown send receipt is returned without retry', async () => {
+ let sends = 0
+ const result = await sendImageReliably({reply:async()=>{sends++;return undefined}},Buffer.from('image'),{buildMessage:buffer=>buffer})
+ assert.equal(result,undefined)
+ assert.equal(sends,1)
+})
+test('image download rejects oversized response and preserves metadata decoding', async()=>{
+ await assert.rejects(resolveImageBuffer('https://example.com/image',{maxBytes:2,fetchImpl:async()=>new Response(Buffer.from('large'),{headers:{'content-type':'image/png'}})}),/图片过大/)
+ const {getImageBufferMetadata}=await import('../utils/reliableImageSender.js')
+ assert.equal(await getImageBufferMetadata(Buffer.from('invalid')),null)
+ const {default:sharp}=await import('sharp')
+ const png=await sharp({create:{width:9,height:16,channels:3,background:'#fff'}}).png().toBuffer()
+ assert.deepEqual(await getImageBufferMetadata(png),{width:9,height:16,format:'png',orientation:'portrait'})
+})

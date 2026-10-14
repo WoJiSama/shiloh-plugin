@@ -9,6 +9,13 @@ import { checkTree } from './check-boundaries.mjs';
 export const baselineCommit = 'a93265cd94e2307504dad11d26351cf954cfc071';
 export const baselinePath = 'docs/architecture/migrations/source-baseline.json';
 export const migrations = [
+  { legacy: 'functions/functions_tools/GoogleImageEditTool.js', implementation: 'src/modules/toolSupport/infrastructure/GoogleImageEditTool.ts', kind: 'composition', reviewedSha256: '07ae44dd92ef3e8309369ea40b9713c58e9cfccb3e6b65802dd0b002f268208a' },
+  { legacy: 'functions/functions_tools/GoogleAnalysisTool.js', implementation: 'src/modules/toolSupport/infrastructure/GoogleAnalysisTool.ts', kind: 'composition', reviewedSha256: '25e38316672f5567dc704c30cc536f78e79cc470e4c076c41353cc027e8e737c' },
+  { legacy: 'functions/functions_tools/BananaTool.js', implementation: 'src/modules/toolSupport/infrastructure/BananaTool.ts', additionalImplementations: ['src/modules/toolSupport/infrastructure/bananaAdapters.ts', 'src/modules/toolSupport/infrastructure/bananaDecoders.ts'], kind: 'composition', reviewedSha256: '510796504029cd9f89c1d1c086692c8ba7c88658d6bf68501ba682f3cbaf7756' },
+  { legacy: 'utils/fileUtils.js', implementation: 'src/modules/shared/infrastructure/fileUtils.ts', kind: 'composition', reviewedSha256: '2dd7967a736cb46146f4b0ebe3628855b0e64f09192b3cd0dc997a7134d812d0' },
+  { legacy: 'utils/longTaskFeedbackPolicy.js', implementation: 'src/modules/conversation/application/longTaskFeedbackPolicy.ts', kind: 'composition', reviewedSha256: 'b0e4f0c31f490a635068e4836ec8292b695e912533445e20ed3a4cb8fd128649' },
+  { legacy: 'utils/mediaTypePolicy.js', implementation: 'src/modules/image/infrastructure/mediaTypePolicy.ts' },
+  { legacy: 'utils/reliableImageSender.js', implementation: 'src/modules/image/infrastructure/reliableImageSender.ts', kind: 'composition', reviewedSha256: 'ad57170c56193e7c6862016064c347387b14ee56d53420d61de5a2ebf2376d25' },
   { legacy: 'functions/ask-ban.js', implementation: 'src/modules/toolSupport/domain/pluginCommand.ts' },
   { legacy: 'functions/tools/CalculateToken.js', implementation: 'src/modules/toolSupport/infrastructure/CalculateToken.ts' },
   { legacy: 'functions/tools/messageGenerator.js', implementation: 'src/modules/toolSupport/infrastructure/messageGenerator.ts' },

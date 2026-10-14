@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import {createImageService} from '../dist/backend/modules/image/application/imageService.js'
+import sharp from 'sharp'
 import { pluginBridge } from '../utils/pluginBridge.js'
 
 function response(ok, body, status = 200) {
@@ -48,15 +50,7 @@ async function loadBananaTool(t) {
       mark() {}
     }
   }
-  try {
-    return (await import('../functions/functions_tools/BananaTool.js')).BananaTool
-  } catch (error) {
-    if (error?.code === 'ERR_MODULE_NOT_FOUND') {
-      t.skip(`runtime dependency is not installed in this checkout: ${error.message}`)
-      return null
-    }
-    throw error
-  }
+  return (await import('./helpers/bananaFixture.js')).BananaTool
 }
 
 test('banana durable queue restores unfinished draw job after restart', async t => {
@@ -418,16 +412,18 @@ test('reference-image draw retries a second edit provider and then sends the ima
       }
     }
     async sendProgress() { return true }
-    async requestImageEdit(config, prompt, images, responseFormat) {
-      calls.push(['request', config.name, prompt, images, responseFormat])
-      return config.name === 'gpt-image-2'
-        ? response(false, { error: { message: '503 No available channel for model gpt-image-2' } }, 503)
-        : response(true, { data: [{ b64_json: 'edited-image' }] })
-    }
     async replyImageToRequester(_e, image) { calls.push(['reply-image', image]) }
   }
 
   const tool = new ProviderFallbackTool()
+  const png=await sharp({create:{width:2,height:2,channels:3,background:'red'}}).png().toBuffer()
+  const defaults=tool.ports.imageService
+  tool.imageService=createImageService({...defaults,fetch:async(url,options)=>{
+    const name=String(url).includes('primary')?'gpt-image-2':'backup'
+    assert.ok(Buffer.from(options.body).toString().includes(rawPrompt),'multipart preserves original prompt')
+    calls.push(['request',name,rawPrompt,references,''])
+    return name==='gpt-image-2'?response(false,{error:{message:'503 unavailable'}},503):response(true,{data:[{b64_json:png.toString('base64')}]})
+  }})
   const rawPrompt = '原样保留：黑色丝袜，右手展示拍立得'
   const references = ['https://img.example/avatar.jpg']
   const result = await tool.performDraw({ prompt: rawPrompt, images: references }, { reply: async () => ({ message_id: 1 }) })
@@ -437,7 +433,7 @@ test('reference-image draw retries a second edit provider and then sends the ima
   assert.deepEqual(requests.map(item => item[1]), ['gpt-image-2', 'backup'])
   assert.ok(requests.every(item => item[2] === rawPrompt))
   assert.ok(requests.every(item => item[3][0] === references[0]))
-  assert.deepEqual(calls.at(-1), ['reply-image', 'base64://edited-image'])
+  assert.deepEqual(calls.at(-1), ['reply-image', png])
 })
 
 test('explicit Grok request overrides a higher-priority text-to-image provider', async t => {
@@ -623,9 +619,8 @@ test('image response body timeout is bounded after headers arrive', async t => {
 
   try {
     const tool = new BananaTool()
-    const response = await tool.fetchWithTimeout('https://slow.example/images/generations', {}, 25)
     await assert.rejects(
-      tool.parseImageGenerationResponse(response),
+      tool.fetchWithTimeout('https://slow.example/images/generations', {}, 25),
       /图片接口超过 1 秒没有返回完整响应/
     )
   } finally {
@@ -662,11 +657,10 @@ test('response-body timeout clears the durable draw job and active queue state',
       return [{ name: 'slow', model: 'test-model', apiUrl: 'https://slow.example/images/generations', apiKey: 'test-key' }]
     }
     async sendProgress() { return false }
-    async requestImageGeneration(config, prompt, responseFormat) {
-      return await this.fetchWithTimeout(config.apiUrl, {
-        method: 'POST',
-        body: JSON.stringify({ prompt, responseFormat })
-      }, 25)
+    async generateImage(configs,prompt) {
+      const response=await this.fetchWithTimeout(configs[0].apiUrl,{method:'POST',body:JSON.stringify({prompt})},25)
+      const parsed=await this.parseImageGenerationResponse(response)
+      return parsed.image
     }
   }
 

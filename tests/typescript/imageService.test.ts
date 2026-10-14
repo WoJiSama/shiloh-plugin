@@ -41,3 +41,14 @@ test('multipart reference conversion receives cancellation signal',async()=>{
  await service.run([candidate],{operation:'edit',prompt:'draw',images:['reference'],signal:controller.signal})
  assert.equal(received,controller.signal)
 })
+test('Grok default single-image payload omits n while explicit multi-image keeps count',async()=>{
+ const payloads:Record<string,unknown>[]=[]
+ const service=fixture(async(_url,options)=>{payloads.push(JSON.parse(String(options?.body)) as Record<string,unknown>);return new Response(JSON.stringify({data:[{url:'image'}]}))})
+ const grok={...candidate,model:'grok-imagine-image'}
+ await service.run([grok],{operation:'generate',prompt:'single'})
+ await service.run([grok],{operation:'generate',prompt:'multiple',count:3})
+ assert.equal(Object.hasOwn(payloads[0]||{},'n'),false)
+ assert.equal(payloads[1]?.n,3)
+ assert.equal(payloads[0]?.quality,'high')
+ assert.equal(Object.hasOwn(payloads[0]||{},'response_format'),false)
+})
