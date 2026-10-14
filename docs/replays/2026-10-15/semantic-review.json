@@ -1,5 +1,5 @@
 {
-  "method": "independent_manual_semantic_review",
+  "method": "primary_and_independent_agent_semantic_review",
   "structuralResultsAreNotQualityScores": true,
   "sampleLimit": "Each final input has one stochastic sample. Intermediate runs are retained separately; no output replacement was used.",
   "networkSummary": {"calls": 20, "http200": 20, "model": "glm-5.3", "highEffort": 6, "lowEffort": 14, "retries": 0, "guardChanges": 0},
