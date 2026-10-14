@@ -1,0 +1,1170 @@
+import type {Tool} from "@modelcontextprotocol/sdk/types.js"
+import type {Transport} from "@modelcontextprotocol/sdk/shared/transport.js"
+import type {McpSettings,McpServerConfig,McpLogger,McpSchema} from "../../../contracts/mcp.js"
+import {mcpRecord} from "../../../contracts/mcp.js"
+interface ToolEntry {alias:string;serverName:string;realName:string;client:Client|undefined;toolInfo:Tool;inputSchema:McpSchema;description:string;updatedAt:string}
+interface ClientEntry {client:Client;transport:Transport;type:string;config:McpServerConfig;reconnecting:boolean}
+interface HealthEntry {name:string;type:string;status:string;toolCount:number;error?:string}
+const errorText=(error:unknown)=>error instanceof Error?error.message:String(error)
+// utils/MCPClient.js
+import { createHash } from "crypto"
+import { Client } from "@modelcontextprotocol/sdk/client/index.js"
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
+import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
+
+const DEFAULT_SETTINGS = {
+  connectTimeoutMs: 30000,
+  toolCallTimeoutMs: 60000,
+  toolResultMaxChars: 8000,
+  autoReconnect: true,
+  reconnectMaxAttempts: 3
+}
+
+const UNSUPPORTED_SCHEMA_FIELDS = [
+  "$schema",
+  "$id",
+  "$comment",
+  "examples",
+  "default",
+  "readOnly",
+  "writeOnly",
+  "deprecated",
+  "if",
+  "then",
+  "else",
+  "dependentSchemas",
+  "dependentRequired",
+  "unevaluatedProperties",
+  "unevaluatedItems",
+  "contains",
+  "minContains",
+  "maxContains"
+]
+
+const MODEL_SCHEMA_TYPES = new Set(["object", "string", "number", "integer", "boolean", "array"])
+const SAFE_SCHEMA_FIELDS = new Set(["type", "description", "properties", "required", "items", "enum"])
+
+function sleep(ms:number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function withTimeout<T>(promise:Promise<T>, timeoutMs:number, errorMessage:string):Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) return promise
+
+  let timer:ReturnType<typeof setTimeout>|undefined
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise<T>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    })
+  ])
+}
+
+function stableStringify(value:unknown) {
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+export class MCPClientManager {
+ clients:Map<string,ClientEntry>;tools:Map<string,ToolEntry>;aliases:Map<string,ToolEntry>;serverConfigs:Map<string,McpServerConfig>;
+ settings:McpSettings;onToolsChanged:((tools:ReturnType<MCPClientManager['getAllTools']>)=>void)|null;
+ reconnectTimers:Map<string,ReturnType<typeof setTimeout>>;reconnectAttempts:Map<string,number>;reloadToken:number;
+
+  constructor(private readonly logger:McpLogger={info(){},warn(){},error(){}}, private readonly createHttpTransport?:(url:URL,options:{requestInit:RequestInit})=>Transport) {
+    this.clients = new Map()
+    this.tools = new Map()
+    this.aliases = new Map()
+    this.serverConfigs = new Map()
+    this.settings = { ...DEFAULT_SETTINGS }
+    this.onToolsChanged = null
+    this.reconnectTimers = new Map()
+    this.reconnectAttempts = new Map()
+    this.reloadToken = 0
+  }
+
+  configure(settings:Partial<McpSettings> = {}) {
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...(settings || {})
+    }
+  }
+
+  setToolsChangedCallback(callback:((tools:ReturnType<MCPClientManager['getAllTools']>)=>void)|null) {
+    this.onToolsChanged = typeof callback === "function" ? callback : null
+  }
+
+  notifyToolsChanged() {
+    if (this.onToolsChanged) {
+      try {
+        this.onToolsChanged(this.getAllTools())
+      } catch (error) {
+        this.logger.error("[MCP] 刷新会话工具列表失败:", error)
+      }
+    }
+  }
+
+  sanitizeName(name:unknown, fallback = "tool") {
+    const sanitized = String(name || fallback)
+      .trim()
+      .replace(/[^A-Za-z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+
+    const safe = sanitized || fallback
+    return /^[A-Za-z_]/.test(safe) ? safe : `_${safe}`
+  }
+
+  shortHash(value:unknown) {
+    return createHash("sha1").update(String(value)).digest("hex").slice(0, 8)
+  }
+
+  buildAlias(serverName:string, toolName:string) {
+    const base = `mcp_${this.sanitizeName(serverName, "server")}_${this.sanitizeName(toolName, "tool")}`
+    if (base.length <= 64) return base
+
+    const hash = this.shortHash(`${serverName}:${toolName}`)
+    return `${base.slice(0, 55)}_${hash}`
+  }
+
+  normalizeTransportType(type:unknown) {
+    const value = String(type || "stdio").toLowerCase()
+    if (value === "streamable-http") return "http"
+    return value
+  }
+
+  normalizeList(value:unknown) {
+    if (!value) return []
+    if (Array.isArray(value)) return value.map(v => String(v)).filter(Boolean)
+    return [String(value)].filter(Boolean)
+  }
+
+  isToolAllowed(config:McpServerConfig, toolName:string) {
+    const includeTools = this.normalizeList(config.includeTools)
+    const excludeTools = this.normalizeList(config.excludeTools)
+
+    if (includeTools.length && !includeTools.includes(toolName)) return false
+    if (excludeTools.includes(toolName)) return false
+    return true
+  }
+
+  rememberServerConfig(serverName:string, config:McpServerConfig = {}) {
+    if (this.serverConfigs.has(serverName)) return
+
+    this.serverConfigs.set(serverName, {
+      ...config,
+      type: this.normalizeTransportType(config.type),
+      enabled: config.enabled === true,
+      connected: false,
+      toolCount: 0,
+      toolNames: [],
+      toolAliases: []
+    })
+  }
+
+  async connectServer(serverName:string, config:McpServerConfig = {}) {
+    const token = this.reloadToken
+    this.clearReconnectTimer(serverName)
+
+    try {
+      if (this.clients.has(serverName)) {
+        this.logger.info(`[MCP] 服务器 ${serverName} 已存在，正在重新连接...`)
+        await this.disconnectServer(serverName, { preserveConfig: true })
+      }
+
+      const transportType = this.normalizeTransportType(config.type)
+      const transport = this.createTransport(serverName, { ...config, type: transportType })
+      this.bindTransportStderr(serverName, transport)
+      const client = new Client(
+        {
+          name: "yunzai-mcp-client",
+          version: "1.0.0"
+        },
+        {
+          capabilities: {},
+          listChanged: {
+            tools: {
+              autoRefresh: false,
+              debounceMs: 300,
+              onChanged: error => {
+                if (error) {
+                  this.logger.error(`[MCP] 服务器 ${serverName} 工具列表刷新失败:`, error)
+                  return
+                }
+                this.registerServerTools(serverName, this.clients.get(serverName)?.client || client, config).catch(err => {
+                  this.logger.error(`[MCP] 服务器 ${serverName} 工具列表刷新失败:`, err)
+                })
+              }
+            }
+          }
+        }
+      )
+
+      client.onclose = () => {
+        this.handleUnexpectedClose(serverName, token)
+      }
+      client.onerror = error => {
+        const configInfo = this.serverConfigs.get(serverName)
+        if (configInfo) {
+          configInfo.lastError = error?.message || String(error)
+        }
+        this.logger.warn(`[MCP] 服务器 ${serverName} 连接异常: ${error?.message || error}`)
+      }
+
+      this.logger.info(`[MCP] 正在连接 ${transportType} 服务器: ${serverName}`)
+      await withTimeout(
+        client.connect(transport),
+        Number(config.connectTimeoutMs || this.settings.connectTimeoutMs),
+        `连接 MCP 服务器 ${serverName} 超时`
+      )
+
+      this.clients.set(serverName, {
+        client,
+        transport,
+        type: transportType,
+        config,
+        reconnecting: false
+      })
+
+      this.serverConfigs.set(serverName, {
+        ...config,
+        type: transportType,
+        enabled: config.enabled === true,
+        connected: true,
+        connectedAt: new Date().toISOString(),
+        error: null,
+        lastError: null,
+        reconnectAttempts: 0
+      })
+
+      this.reconnectAttempts.set(serverName, 0)
+      this.logger.info(`[MCP] 已连接服务器: ${serverName} (${transportType})`)
+
+      await this.registerServerTools(serverName, client, config)
+      this.notifyToolsChanged()
+      return true
+    } catch (error) {
+      this.logger.error(`[MCP] 连接服务器 ${serverName} 失败:`, error)
+
+      this.serverConfigs.set(serverName, {
+        ...config,
+        type: this.normalizeTransportType(config.type),
+        enabled: config.enabled === true,
+        connected: false,
+        error: errorText(error),
+        lastError: errorText(error),
+        failedAt: new Date().toISOString()
+      })
+
+      this.removeServerTools(serverName)
+      this.notifyToolsChanged()
+      this.scheduleReconnect(serverName, config, token)
+      return false
+    }
+  }
+
+  createTransport(serverName:string, config:McpServerConfig) {
+    switch (config.type) {
+      case "sse":
+        return this.createSSETransport(serverName, config)
+      case "http":
+        return this.createStreamableHTTPTransport(serverName, config)
+      case "stdio":
+      default:
+        return this.createStdioTransport(serverName, config)
+    }
+  }
+
+  buildHeaders(config:McpServerConfig, defaults:Record<string,string> = {}) {
+    const headers = { ...defaults }
+    if (config.headers && typeof config.headers === "object") {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          headers[key] = String(value).replace(/^["']|["']$/g, "")
+        }
+      })
+    }
+    return headers
+  }
+
+  createSSETransport(serverName:string, config:McpServerConfig) {
+    if (!config.baseUrl) {
+      throw new Error(`SSE 服务器 ${serverName} 需要配置 baseUrl`)
+    }
+
+    this.logger.info(`[MCP] SSE 连接配置: ${config.baseUrl}`)
+    return new SSEClientTransport(new URL(config.baseUrl), {
+      requestInit: {
+        headers: this.buildHeaders(config)
+      }
+    })
+  }
+
+  createStreamableHTTPTransport(serverName:string, config:McpServerConfig) {
+    if (!config.baseUrl) {
+      throw new Error(`Streamable HTTP 服务器 ${serverName} 需要配置 baseUrl`)
+    }
+
+    this.logger.info(`[MCP] Streamable HTTP 连接配置: ${config.baseUrl}`)
+    if (!this.createHttpTransport) throw new Error("MCP HTTP transport factory is not configured")
+    return this.createHttpTransport(new URL(config.baseUrl), {
+      requestInit: {
+        headers: this.buildHeaders(config, {
+          "Content-Type": "application/json",
+          "Accept": "application/json, text/event-stream"
+        })
+      }
+    })
+  }
+
+  createStdioTransport(serverName:string, config:McpServerConfig) {
+    const { command, args = [], env = {} } = config
+
+    if (!command) {
+      throw new Error(`stdio 服务器 ${serverName} 需要配置 command`)
+    }
+
+    const cleanEnv:Record<string,string> = {}
+    if (env && typeof env === "object") {
+      Object.entries(env).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          cleanEnv[key] = String(value)
+        }
+      })
+    }
+
+    return new StdioClientTransport({
+      command,
+      args,
+      stderr: "pipe",
+      env: Object.fromEntries(Object.entries({ ...process.env, ...cleanEnv }).filter((entry):entry is [string,string] => typeof entry[1] === "string"))
+    })
+  }
+
+  bindTransportStderr(serverName:string, transport:Transport) {
+    if (!(transport instanceof StdioClientTransport) || !transport.stderr) return
+    transport.stderr.on("data", (chunk:unknown) => {
+      const text = String(chunk || "").trim()
+      if (!text) return
+      this.logger.warn(`[MCP] 服务器 ${serverName} stderr: ${text.slice(0, 2000)}`)
+    })
+  }
+
+  async listAllTools(client:Client) {
+    const allTools = []
+    let cursor
+
+    do {
+      const result = await client.listTools(cursor ? { cursor } : undefined)
+      allTools.push(...(result?.tools || []))
+      cursor = result?.nextCursor
+    } while (cursor)
+
+    return allTools
+  }
+
+  async registerServerTools(serverName:string, client:Client, config:McpServerConfig = {}) {
+    try {
+      const tools = await this.listAllTools(client)
+      await this.refreshServerToolsFromNotification(serverName, tools, config)
+      return tools
+    } catch (error) {
+      this.logger.error(`[MCP] 获取服务器 ${serverName} 工具列表失败:`, error)
+      return []
+    }
+  }
+
+  async refreshServerToolsFromNotification(serverName:string, tools:Tool[] = [], configOverride:McpServerConfig|null = null) {
+    const clientInfo = this.clients.get(serverName)
+    const config = configOverride || clientInfo?.config || this.serverConfigs.get(serverName) || {}
+
+    this.removeServerTools(serverName)
+
+    const allowedTools = tools.filter(tool => tool?.name && this.isToolAllowed(config, tool.name))
+    const registeredAliases = []
+    for (const tool of allowedTools) {
+      let alias = this.buildAlias(serverName, tool.name)
+      const existing = this.aliases.get(alias)
+      if (existing && (existing.serverName !== serverName || existing.realName !== tool.name)) {
+        const hash = this.shortHash(`${serverName}:${tool.name}`)
+        alias = `${alias.slice(0, 55)}_${hash}`
+      }
+      let counter = 2
+      while (this.aliases.has(alias)) {
+        const suffix = `_${counter++}`
+        alias = `${alias.slice(0, 64 - suffix.length)}${suffix}`
+      }
+      const cleanedSchema = this.prepareInputSchema(tool.inputSchema)
+      const entry = {
+        alias,
+        serverName,
+        realName: tool.name,
+        client: clientInfo?.client,
+        toolInfo: tool,
+        inputSchema: cleanedSchema,
+        description: tool.description || "",
+        updatedAt: new Date().toISOString()
+      }
+
+      this.aliases.set(alias, entry)
+      this.tools.set(alias, entry)
+      registeredAliases.push(alias)
+      this.logger.info(`[MCP] 注册工具: ${alias} -> ${serverName}/${tool.name}`)
+    }
+
+    const serverConfig = this.serverConfigs.get(serverName)
+    if (serverConfig) {
+      serverConfig.toolCount = allowedTools.length
+      serverConfig.toolNames = allowedTools.map(t => t.name)
+      serverConfig.toolAliases = registeredAliases
+      serverConfig.updatedAt = new Date().toISOString()
+    }
+
+    this.notifyToolsChanged()
+  }
+
+  removeServerTools(serverName:string) {
+    for (const [alias, entry] of Array.from(this.aliases.entries())) {
+      if (entry.serverName === serverName) {
+        this.aliases.delete(alias)
+        this.tools.delete(alias)
+      }
+    }
+  }
+
+  resolveRef(ref:unknown, root:unknown):unknown {
+    if (!ref || typeof ref !== "string" || !ref.startsWith("#/")) return null
+
+    const parts = ref.slice(2).split("/").map(part =>
+      part.replace(/~1/g, "/").replace(/~0/g, "~")
+    )
+    let current = root
+    for (const part of parts) {
+      if (!current || typeof current !== "object" || !(part in current)) return null
+      current = mcpRecord(current)[part]
+    }
+    return current
+  }
+
+  dereferenceSchema(schema:unknown, root:unknown = schema, seen = new Set<unknown>()):unknown {
+    if (!schema || typeof schema !== "object") return schema
+    if (Array.isArray(schema)) {
+      return schema.map(item => this.dereferenceSchema(item, root, seen))
+    }
+
+    const record = mcpRecord(schema)
+    if (record.$ref) {
+      if (seen.has(record.$ref)) {
+        const { $ref, ...rest } = record
+        return this.dereferenceSchema(rest, root, seen)
+      }
+
+      const target = this.resolveRef(record.$ref, root)
+      if (target) {
+        seen.add(record.$ref)
+        const { $ref, ...rest } = record
+        const merged = {
+          ...mcpRecord(this.dereferenceSchema(target, root, seen)),
+          ...mcpRecord(this.dereferenceSchema(rest, root, seen))
+        }
+        seen.delete(record.$ref)
+        return merged
+      }
+    }
+
+    const result:Record<string,unknown> = {}
+    for (const [key, value] of Object.entries(schema)) {
+      result[key] = this.dereferenceSchema(value, root, seen)
+    }
+    return result
+  }
+
+  cleanSchema(schema:unknown):unknown {
+    if (!schema || typeof schema !== "object") return schema
+
+    const cleaned = mcpRecord(JSON.parse(JSON.stringify(schema)))
+    const inferEnumType = (values:unknown[]) => {
+      const filtered = (values || []).filter(value => value !== null && value !== undefined)
+      if (!filtered.length) return null
+      if (filtered.every(value => typeof value === "number" && Number.isFinite(value))) {
+        return filtered.every(Number.isInteger) ? "integer" : "number"
+      }
+      if (filtered.every(value => typeof value === "boolean")) return "boolean"
+      if (filtered.every(value => typeof value === "string")) return "string"
+      return "string"
+    }
+    const normalizeType = (type:unknown, enumValues:unknown, obj:McpSchema = {}) => {
+      const enumType = Array.isArray(enumValues) ? inferEnumType(enumValues) : null
+      const declaredTypes = (Array.isArray(type) ? type : [type])
+        .filter(value => value && value !== "null")
+        .map(value => String(value))
+        .filter(value => MODEL_SCHEMA_TYPES.has(value))
+
+      if (enumType && (!declaredTypes.length || !declaredTypes.includes(enumType))) return enumType
+      if (declaredTypes.length) return declaredTypes[0]
+      if (enumType) return enumType
+      if (obj.properties && typeof obj.properties === "object" && !Array.isArray(obj.properties)) return "object"
+      if (obj.items) return "array"
+      return null
+    }
+    const coerceEnumValue = (value:unknown, type:string) => {
+      if (value === null || value === undefined) return undefined
+      if (type === "string") return String(value)
+      if (type === "number") {
+        const number = Number(value)
+        return Number.isFinite(number) ? number : undefined
+      }
+      if (type === "integer") {
+        const number = Number(value)
+        return Number.isInteger(number) ? number : undefined
+      }
+      if (type === "boolean") {
+        if (typeof value === "boolean") return value
+        if (String(value).toLowerCase() === "true") return true
+        if (String(value).toLowerCase() === "false") return false
+        return undefined
+      }
+      return undefined
+    }
+    const mergeVariant = (target:McpSchema, source:Record<string,unknown> = {}) => {
+      for (const [key, value] of Object.entries(source)) {
+        if (["$ref", "$defs", "definitions", "const", "anyOf", "oneOf", "allOf"].includes(key)) continue
+        if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+          target.properties = { ...(target.properties || {}), ...value }
+        } else if (key === "required" && Array.isArray(value)) {
+          target.required = [...new Set([...(target.required || []), ...value])]
+        } else if (key === "enum" && Array.isArray(value)) {
+          target.enum = [...(target.enum || []), ...value]
+        } else if (target[key] === undefined) {
+          target[key] = value
+        }
+      }
+    }
+    const collapseCombinators = (obj:McpSchema) => {
+      if (Array.isArray(obj.allOf)) {
+        for (const variant of obj.allOf) {
+          if (variant && typeof variant === "object" && !Array.isArray(variant)) {
+            mergeVariant(obj, variant)
+          }
+        }
+      }
+
+      for (const key of ["anyOf", "oneOf"]) {
+        if (!Array.isArray(obj[key])) continue
+        const variants = obj[key].filter(
+          variant => variant && typeof variant === "object" && !Array.isArray(variant) && variant.type !== "null"
+        )
+        const enumValues:unknown[] = []
+        for (const variant of variants) {
+          if ("const" in variant) enumValues.push(variant.const)
+          if (Array.isArray(variant.enum)) enumValues.push(...variant.enum)
+        }
+        if (enumValues.length) obj.enum = [...(obj.enum || []), ...enumValues]
+        const base = variants.find(variant => variant.type && variant.type !== "null") || variants[0]
+        if (base) mergeVariant(obj, base)
+      }
+
+      delete obj.allOf
+      delete obj.anyOf
+      delete obj.oneOf
+    }
+    const normalizeEnum = (obj:McpSchema) => {
+      if (!Array.isArray(obj.enum)) return
+      const type = normalizeType(obj.type, obj.enum, obj) || "string"
+      obj.type = type
+
+      if (!["string", "number", "integer", "boolean"].includes(type)) {
+        delete obj.enum
+        return
+      }
+
+      const seen = new Set()
+      const normalized:(string|number|boolean)[] = []
+      for (const value of obj.enum) {
+        const coerced = coerceEnumValue(value, type)
+        if (coerced === undefined) continue
+        const key = `${typeof coerced}:${String(coerced)}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        normalized.push(coerced)
+      }
+
+      if (!normalized.length) {
+        delete obj.enum
+        return
+      }
+
+      if (type === "string" && normalized.every(value => typeof value === "string")) {
+        obj.enum = normalized
+        return
+      }
+
+      const enumText = normalized.map(value => String(value)).join("、")
+      obj.description = obj.description
+        ? `${obj.description}。可选值：${enumText}`
+        : `可选值：${enumText}`
+      delete obj.enum
+    }
+    const visitSchema = (obj:McpSchema) => {
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return
+
+      if ("const" in obj && !Array.isArray(obj.enum)) {
+        obj.enum = [obj.const]
+      }
+      collapseCombinators(obj)
+
+      for (const field of UNSUPPORTED_SCHEMA_FIELDS) {
+        delete obj[field]
+      }
+      delete obj.$ref
+      delete obj.$defs
+      delete obj.definitions
+      delete obj.const
+
+      obj.type = normalizeType(obj.type, obj.enum, obj) || obj.type
+      if (!MODEL_SCHEMA_TYPES.has(String(obj.type))) delete obj.type
+      normalizeEnum(obj)
+
+      if (obj.properties && typeof obj.properties === "object" && !Array.isArray(obj.properties)) {
+        for (const [name, value] of Object.entries(obj.properties)) {
+          if (value && typeof value === "object" && !Array.isArray(value)) {
+            visitSchema(mcpRecord(value))
+          } else {
+            obj.properties[name] = { type: "string" }
+          }
+        }
+      } else {
+        delete obj.properties
+      }
+
+      if (obj.items) {
+        if (Array.isArray(obj.items)) obj.items = obj.items[0] || { type: "string" }
+        if (obj.items && typeof obj.items === "object") visitSchema(mcpRecord(obj.items))
+        else delete obj.items
+      }
+
+      if (obj.type === "object") {
+        if (!obj.properties) obj.properties = {}
+        if (Array.isArray(obj.required)) {
+          obj.required = obj.required
+            .map(value => String(value))
+            .filter(value => Object.prototype.hasOwnProperty.call(obj.properties, value))
+        } else {
+          obj.required = []
+        }
+      } else {
+        delete obj.properties
+        delete obj.required
+      }
+
+      if (obj.type === "array") {
+        if (!obj.items) obj.items = { type: "string" }
+      } else {
+        delete obj.items
+      }
+
+      for (const key of Object.keys(obj)) {
+        if (!SAFE_SCHEMA_FIELDS.has(key)) delete obj[key]
+      }
+    }
+
+    visitSchema(cleaned)
+    return cleaned
+  }
+
+  prepareInputSchema(schema:unknown):McpSchema {
+    try {
+      if (!schema || typeof schema !== "object") {
+        return { type: "object", properties: {}, required: [] }
+      }
+
+      const cloned = JSON.parse(JSON.stringify(schema))
+      const dereferenced = this.dereferenceSchema(cloned, cloned)
+      const cleaned = mcpRecord(this.cleanSchema(dereferenced))
+
+      if (!cleaned || typeof cleaned !== "object") {
+        return { type: "object", properties: {}, required: [] }
+      }
+
+      if (!cleaned.type) cleaned.type = "object"
+      if (cleaned.type === "object" && (!cleaned.properties || typeof cleaned.properties !== "object")) {
+        cleaned.properties = {}
+      }
+      if (cleaned.type === "object" && !Array.isArray(cleaned.required)) {
+        cleaned.required = []
+      }
+
+      return cleaned
+    } catch (error) {
+      this.logger.warn(`[MCP] 工具参数 schema 处理失败，已使用空参数兜底: ${errorText(error)}`)
+      return { type: "object", properties: {}, required: [] }
+    }
+  }
+
+  formatToolForAPI(alias:string, entry = this.aliases.get(alias)) {
+    if (!entry) throw new Error(`MCP 工具不存在: ${alias}`)
+
+    return {
+      type: "function",
+      function: {
+        name: alias,
+        description: `[${entry.serverName}] ${entry.description || "无描述"}`,
+        parameters: entry.inputSchema || { type: "object", properties: {}, required: [] }
+      }
+    }
+  }
+
+  getAllTools() {
+    const tools = []
+    for (const [alias, entry] of this.aliases) {
+      try {
+        tools.push(this.formatToolForAPI(alias, entry))
+      } catch (error) {
+        this.logger.error(`[MCP] 格式化工具 ${alias} 失败:`, error)
+      }
+    }
+    return tools
+  }
+
+  isMCPTool(toolName:string) {
+    return typeof toolName === "string" && toolName.startsWith("mcp_")
+  }
+
+  getRealToolName(toolName:string) {
+    const entry = this.resolveToolEntry(toolName)
+    return entry?.realName || String(toolName || "").replace(/^mcp_/, "")
+  }
+
+  resolveToolEntry(toolName:string) {
+    if (!toolName) return null
+    if (this.aliases.has(toolName)) return this.aliases.get(toolName)
+    return null
+  }
+
+  async executeToolByAlias(alias:string, args:Record<string,unknown> = {}) {
+    const entry = this.resolveToolEntry(alias)
+    if (!entry) throw new Error(`MCP 工具不存在: ${alias}`)
+
+    const clientInfo = this.clients.get(entry.serverName)
+    if (!clientInfo?.client) {
+      throw new Error(`MCP 服务器 ${entry.serverName} 已断开连接`)
+    }
+
+    try {
+      this.logger.info(`[MCP] 执行工具: ${entry.alias} -> ${entry.serverName}/${entry.realName}, 参数: ${JSON.stringify(args)}`)
+      const result = await withTimeout(
+        clientInfo.client.callTool({
+          name: entry.realName,
+          arguments: args
+        }),
+        Number(clientInfo.config?.toolCallTimeoutMs || this.settings.toolCallTimeoutMs),
+        `MCP 工具 ${entry.alias} 执行超时`
+      )
+      this.logger.info(`[MCP] 工具 ${entry.alias} 执行完成`)
+      return this.formatMCPResultForModel(result)
+    } catch (error) {
+      this.logger.error(`[MCP] 执行工具 ${entry.alias} 失败:`, error)
+      throw error
+    }
+  }
+
+  async executeTool(toolName:string, args:Record<string,unknown> = {}) {
+    return this.executeToolByAlias(toolName, args)
+  }
+
+  formatMCPResultForModel(rawResult:unknown, maxChars = this.settings.toolResultMaxChars) {
+    const result=mcpRecord(rawResult)
+    const parts:string[] = []
+
+    if (result?.isError) {
+      parts.push("error: MCP 工具返回错误")
+    }
+
+    if (result?.structuredContent !== undefined) {
+      parts.push(`structuredContent: ${stableStringify(result.structuredContent)}`)
+    }
+
+    if (Array.isArray(result?.content)) {
+      for (const rawItem of result.content) {
+        const item=mcpRecord(rawItem)
+        if (item.type === "text") {
+          parts.push(String(item.text || ""))
+        } else if (item.type === "image") {
+          parts.push(`[图片结果 mimeType=${item.mimeType || "unknown"}]`)
+        } else if (item.type === "audio") {
+          parts.push(`[音频结果 mimeType=${item.mimeType || "unknown"}]`)
+        } else if (item.type === "resource_link") {
+          parts.push(`[资源链接 ${item.name || item.uri || "unknown"}] ${item.uri || ""}`)
+        } else if (item.type === "resource") {
+          const resource = mcpRecord(item.resource)
+          parts.push(`[资源结果 ${resource.uri || resource.mimeType || "unknown"}]`)
+        } else {
+          parts.push(stableStringify(item))
+        }
+      }
+    } else if (rawResult !== undefined && rawResult !== null && parts.length === 0) {
+      parts.push(typeof rawResult === "string" ? rawResult : stableStringify(rawResult))
+    }
+
+    let text = parts.filter(Boolean).join("\n").trim()
+    if (!text) text = "MCP 工具执行完成"
+
+    const limit = Number(maxChars || DEFAULT_SETTINGS.toolResultMaxChars)
+    if (text.length > limit) {
+      text = safeTruncateUnicode(text, limit, "...(MCP工具结果已截断)")
+    }
+    return text
+  }
+
+  handleUnexpectedClose(serverName:string, token = this.reloadToken) {
+    const clientInfo = this.clients.get(serverName)
+    const config = clientInfo?.config || this.serverConfigs.get(serverName)
+
+    this.clients.delete(serverName)
+    this.removeServerTools(serverName)
+
+    const serverConfig = this.serverConfigs.get(serverName)
+    if (serverConfig) {
+      serverConfig.connected = false
+      serverConfig.disconnectedAt = new Date().toISOString()
+      serverConfig.lastError = serverConfig.lastError || "连接已关闭"
+    }
+
+    this.notifyToolsChanged()
+    this.logger.warn(`[MCP] 服务器 ${serverName} 连接已关闭`)
+
+    if (config) this.scheduleReconnect(serverName, config, token)
+  }
+
+  scheduleReconnect(serverName:string, config:McpServerConfig, token = this.reloadToken) {
+    if (!this.settings.autoReconnect || config?.autoReconnect === false) return
+    if (!config?.enabled) return
+    if (token !== this.reloadToken) return
+
+    const maxAttempts = Number(config.reconnectMaxAttempts || this.settings.reconnectMaxAttempts)
+    const attempts = (this.reconnectAttempts.get(serverName) || 0) + 1
+    if (attempts > maxAttempts) {
+      this.logger.warn(`[MCP] 服务器 ${serverName} 已达到最大重连次数 ${maxAttempts}`)
+      return
+    }
+
+    this.reconnectAttempts.set(serverName, attempts)
+    const delay = Math.min(30000, 1000 * 2 ** (attempts - 1))
+    this.clearReconnectTimer(serverName)
+
+    const timer = setTimeout(async () => {
+      if (token !== this.reloadToken) return
+      this.logger.info(`[MCP] 正在重连服务器 ${serverName}（第 ${attempts} 次）`)
+      await this.connectServer(serverName, config)
+    }, delay)
+
+    this.reconnectTimers.set(serverName, timer)
+  }
+
+  clearReconnectTimer(serverName:string) {
+    const timer = this.reconnectTimers.get(serverName)
+    if (timer) clearTimeout(timer)
+    this.reconnectTimers.delete(serverName)
+  }
+
+  async disconnectServer(serverName:string, options:{preserveConfig?:boolean} = {}) {
+    const clientInfo = this.clients.get(serverName)
+    this.clearReconnectTimer(serverName)
+
+    if (!clientInfo) {
+      this.removeServerTools(serverName)
+      return false
+    }
+
+    try {
+      if (clientInfo.client) {
+        delete clientInfo.client.onclose
+        delete clientInfo.client.onerror
+        await clientInfo.client.close().catch(() => {})
+      }
+      if (clientInfo.transport && typeof clientInfo.transport.close === "function") {
+        await clientInfo.transport.close().catch(() => {})
+      }
+    } catch (error) {
+      this.logger.error(`[MCP] 断开服务器 ${serverName} 失败:`, error)
+    } finally {
+      this.clients.delete(serverName)
+      this.removeServerTools(serverName)
+
+      const config = this.serverConfigs.get(serverName)
+      if (config) {
+        config.connected = false
+        config.disconnectedAt = new Date().toISOString()
+      }
+      if (!options.preserveConfig && !this.serverConfigs.get(serverName)?.enabled) {
+        this.serverConfigs.delete(serverName)
+      }
+      this.notifyToolsChanged()
+    }
+
+    this.logger.info(`[MCP] 已断开服务器: ${serverName}`)
+    return true
+  }
+
+  async disconnectAll() {
+    this.reloadToken++
+    for (const serverName of Array.from(this.reconnectTimers.keys())) {
+      this.clearReconnectTimer(serverName)
+    }
+
+    const serverNames = Array.from(this.clients.keys())
+    for (const serverName of serverNames) {
+      await this.disconnectServer(serverName, { preserveConfig: true })
+    }
+
+    this.clients.clear()
+    this.aliases.clear()
+    this.tools.clear()
+    this.serverConfigs.clear()
+    this.reconnectAttempts.clear()
+    this.notifyToolsChanged()
+    this.logger.info("[MCP] 已断开所有服务器连接")
+  }
+
+  getToolsDescription() {
+    return Array.from(this.aliases.values())
+      .map(entry => `${entry.alias}: [${entry.serverName}/${entry.realName}] ${entry.description || "无描述"}`)
+      .join("\n")
+  }
+
+  getConnectedServers() {
+    return Array.from(this.clients.keys())
+  }
+
+  getServerTools(serverName:string) {
+    return Array.from(this.aliases.values())
+      .filter(entry => entry.serverName === serverName)
+      .map(entry => ({
+        name: entry.realName,
+        alias: entry.alias,
+        description: entry.description,
+        inputSchema: entry.inputSchema
+      }))
+  }
+
+  isServerConnected(serverName:string) {
+    return this.clients.has(serverName)
+  }
+
+  async reconnectServer(serverName:string) {
+    const clientInfo = this.clients.get(serverName)
+    const config = clientInfo?.config || this.serverConfigs.get(serverName)
+    if (!config) {
+      this.logger.warn(`[MCP] 服务器 ${serverName} 配置不存在`)
+      return false
+    }
+
+    await this.disconnectServer(serverName, { preserveConfig: true })
+    return this.connectServer(serverName, config)
+  }
+
+  getMCPSystemPrompts(context:{messageType?:string;groupId?:string|number;message?:string} = {}) {
+    const prompts = []
+
+    for (const [serverName, config] of this.serverConfigs) {
+      if (!config.connected || !config.systemPrompt) continue
+
+      if (config.promptConditions) {
+        const conditions = config.promptConditions
+
+        if (conditions.messageType && context.messageType) {
+          if (!conditions.messageType.includes(context.messageType)) continue
+        }
+
+        if (conditions.groups && context.groupId) {
+          if (!conditions.groups.includes(context.groupId)) continue
+        }
+
+        if (conditions.keywords && context.message) {
+          const hasKeyword = conditions.keywords.some(kw =>
+            (context.message || "").toLowerCase().includes(String(kw).toLowerCase())
+          )
+          if (!hasKeyword) continue
+        }
+      }
+
+      prompts.push(`【${serverName}】\n${config.systemPrompt.trim()}`)
+    }
+
+    if (!prompts.length) return ""
+    return "\n\n【MCP扩展能力】\n" + prompts.join("\n\n")
+  }
+
+  getServerSystemPrompt(serverName:string) {
+    const config = this.serverConfigs.get(serverName)
+    if (!config || !config.connected) return null
+    return config.systemPrompt || null
+  }
+
+  isServerEnabled(serverName:string) {
+    const config = this.serverConfigs.get(serverName)
+    return config?.enabled === true && config?.connected === true
+  }
+
+  getServersInfo() {
+    return Array.from(this.serverConfigs.entries()).map(([name, config]) => ({
+      name,
+      type: config.type || "stdio",
+      description: config.description || "",
+      enabled: config.enabled,
+      connected: config.connected === true,
+      toolCount: config.toolCount || 0,
+      toolNames: config.toolNames || [],
+      toolAliases: config.toolAliases || [],
+      hasSystemPrompt: !!config.systemPrompt,
+      connectedAt: config.connectedAt,
+      disconnectedAt: config.disconnectedAt,
+      error: config.error || config.lastError,
+      reconnectAttempts: this.reconnectAttempts.get(name) || 0
+    }))
+  }
+
+  updateServerSystemPrompt(serverName:string, systemPrompt:string) {
+    const config = this.serverConfigs.get(serverName)
+    if (!config) return false
+    config.systemPrompt = systemPrompt
+    return true
+  }
+
+  getToolsSummary() {
+    const serverTools = new Map<string,string[]>()
+    for (const entry of this.aliases.values()) {
+      if (!serverTools.has(entry.serverName)) serverTools.set(entry.serverName, [])
+      serverTools.get(entry.serverName)!.push(entry.alias)
+    }
+
+    const lines = []
+    for (const [server, tools] of serverTools) {
+      const config = this.serverConfigs.get(server)
+      const type = config?.type || "stdio"
+      lines.push(`${server} (${type}): ${tools.length}个工具 (${tools.join(", ")})`)
+    }
+
+    return lines.join("\n") || "无已加载的MCP工具"
+  }
+
+  getToolServer(toolName:string) {
+    const entry = this.resolveToolEntry(toolName)
+    return entry?.serverName || null
+  }
+
+  isToolAvailable(toolName:string) {
+    try {
+      const entry = this.resolveToolEntry(toolName)
+      return !!entry && this.clients.has(entry.serverName)
+    } catch {
+      return false
+    }
+  }
+
+  getToolInfo(toolName:string) {
+    const entry = this.resolveToolEntry(toolName)
+    if (!entry) return null
+
+    return {
+      name: entry.realName,
+      alias: entry.alias,
+      displayName: entry.alias,
+      serverName: entry.serverName,
+      description: entry.description,
+      inputSchema: entry.inputSchema
+    }
+  }
+
+  async executeToolsBatch(toolCalls:{name:string;args?:Record<string,unknown>}[]) {
+    const results = await Promise.allSettled(
+      toolCalls.map(({ name, args }) => this.executeToolByAlias(name, args))
+    )
+
+    return results.map((result, index) => ({
+      toolName: toolCalls[index]!.name,
+      success: result.status === "fulfilled",
+      result: result.status === "fulfilled" ? result.value : null,
+      error: result.status === "rejected" ? errorText(result.reason) : null
+    }))
+  }
+
+  async healthCheck() {
+    const report = {
+      timestamp: new Date().toISOString(),
+      totalServers: this.clients.size,
+      totalTools: this.aliases.size,
+      servers: [] as HealthEntry[]
+    }
+
+    for (const [serverName, { client, type }] of this.clients) {
+      const serverReport:HealthEntry = {
+        name: serverName,
+        type,
+        status: "unknown",
+        toolCount: 0
+      }
+
+      try {
+        const tools = await this.listAllTools(client)
+        serverReport.status = "healthy"
+        serverReport.toolCount = tools.length
+      } catch (error) {
+        serverReport.status = "unhealthy"
+        serverReport.error = errorText(error)
+      }
+
+      report.servers.push(serverReport)
+    }
+
+    return report
+  }
+
+  getStatusSummary() {
+    const servers = this.getServersInfo()
+    if (!servers.length) return "当前没有配置任何 MCP 服务器"
+
+    const lines = ["【MCP 服务器状态】"]
+    for (const server of servers) {
+      lines.push("")
+      lines.push(`${server.connected ? "✅" : "❌"} ${server.name}`)
+      lines.push(`类型: ${server.type}`)
+      lines.push(`状态: ${server.connected ? "已连接" : "未连接"}`)
+      lines.push(`工具数: ${server.toolCount}`)
+      if (server.description) lines.push(`描述: ${server.description}`)
+      if (server.reconnectAttempts) lines.push(`重连次数: ${server.reconnectAttempts}`)
+      if (server.error) lines.push(`错误: ${server.error}`)
+      if (server.toolAliases?.length) {
+        lines.push(`工具: ${server.toolAliases.slice(0, 8).join(", ")}${server.toolAliases.length > 8 ? "..." : ""}`)
+      }
+    }
+    return lines.join("\n")
+  }
+
+  getToolsListText() {
+    const servers = this.getServersInfo()
+    if (!servers.length) return "当前没有配置任何 MCP 服务器"
+
+    const lines = ["【MCP 工具列表】"]
+    for (const server of servers) {
+      lines.push("")
+      lines.push(`${server.connected ? "✅" : "❌"} ${server.name} (${server.type})`)
+      const tools = this.getServerTools(server.name)
+      if (!tools.length) {
+        lines.push("暂无可用工具")
+        continue
+      }
+      for (const tool of tools) {
+        lines.push(`- ${tool.alias}`)
+        lines.push(`  原名: ${tool.name}`)
+        if (tool.description) lines.push(`  描述: ${tool.description}`)
+      }
+    }
+    return lines.join("\n")
+  }
+}
+
+

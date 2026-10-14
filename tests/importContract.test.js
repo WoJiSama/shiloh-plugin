@@ -2,6 +2,7 @@
 // 校验 (1) 目标文件存在 (2) 目标文件确实导出了这些命名。
 // 抓住的 bug 形态:重构弄丢 export(conversationUtils 事故)、
 // import 路径指向不存在的文件(textPolicy 路径事故)。
+import ts from "typescript"
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import fs from "node:fs"
@@ -26,20 +27,26 @@ function stripComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter(line => !line.trim().startsWith("//")).join("\n")
 }
 
-function collectExportedNames(source) {
-  const names = new Set()
-  const patterns = [
-    /export\s+(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/g,
-    /export\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g,
-    /export\s+class\s+([A-Za-z_$][\w$]*)/g
-  ]
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) names.add(match[1])
+function collectExportedNames(filename, seen = new Set()) {
+  if(seen.has(filename)) return new Set()
+  seen.add(filename)
+  const source=ts.createSourceFile(filename,fs.readFileSync(filename,'utf8'),ts.ScriptTarget.Latest,true)
+  const names=new Set()
+  const binding=name=>{
+    if(ts.isIdentifier(name))names.add(name.text)
+    else if(ts.isObjectBindingPattern(name)||ts.isArrayBindingPattern(name))for(const e of name.elements)if(ts.isBindingElement(e))binding(e.name)
   }
-  for (const match of source.matchAll(/export\s*\{([^}]*)\}/g)) {
-    for (const part of match[1].split(",")) {
-      const name = part.split(/\s+as\s+/).pop().trim()
-      if (name) names.add(name)
+  for(const node of source.statements){
+    if(ts.isExportDeclaration(node)){
+      if(node.exportClause && ts.isNamedExports(node.exportClause))for(const e of node.exportClause.elements)names.add(e.name.text)
+      else if(node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)){
+        const target=path.resolve(path.dirname(filename),node.moduleSpecifier.text)
+        if(fs.existsSync(target))for(const name of collectExportedNames(target,seen))names.add(name)
+      }
+    }
+    if(node.modifiers?.some(m=>m.kind===ts.SyntaxKind.ExportKeyword)){
+      if(ts.isVariableStatement(node))for(const d of node.declarationList.declarations)binding(d.name)
+      else if((ts.isFunctionDeclaration(node)||ts.isClassDeclaration(node))&&node.name)names.add(node.name.text)
     }
   }
   return names
@@ -64,7 +71,7 @@ test("全仓库命名导入契约:目标文件存在且确实导出该命名", (
         problems.push(`${path.relative(repoRoot, file)} -> ${match[2]}: 文件不存在`)
         continue
       }
-      const exported = collectExportedNames(fs.readFileSync(target, "utf8"))
+      const exported = collectExportedNames(target)
       for (const rawName of match[1].split(",")) {
         const name = rawName.split(/\s+as\s+/)[0].trim()
         if (name && !exported.has(name)) {

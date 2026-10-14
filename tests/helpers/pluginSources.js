@@ -1,27 +1,19 @@
-// 插件源码聚合读取:源码级合同测试统一入口。
-// 之前合同测试各自手工声明"读哪些文件",每次方法搬家都要改测试清单;
-// 统一聚合(test.js + apps/lib/*)后,搬家零测试改动,合同意图(接线存在)不变。
-import fs from "node:fs"
-import path from "node:path"
-import { fileURLToPath } from "node:url"
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..")
-
-/**
- * 聚合读取主链路源码:apps/test.js + apps/lib/*.js(按文件名序)。
- * 需要额外源文件(routeDecision/turnPromptComposer 等 utils)时,调用方自行 concat。
- */
-export function readPluginSources() {
-  const libDir = path.join(root, "apps/lib")
-  const parts = [fs.readFileSync(path.join(root, "apps/test.js"), "utf8")]
-  for (const file of fs.readdirSync(libDir).filter(f => f.endsWith(".js"))) {
-    parts.push(fs.readFileSync(path.join(libDir, file), "utf8"))
-  }
-  return parts.join("\n")
-}
-
+// Structural checks inspect real authored sources behind registered compatibility entries.
+// Behavioral tests should import emitted modules instead.
+import fs from 'node:fs'
+import path from 'node:path'
+import {fileURLToPath} from 'node:url'
+import {migrations} from '../../scripts/migration-report.mjs'
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..')
+const mapping=new Map(migrations.map(item=>[item.legacy,item]))
 export function readSource(relPath) {
-  return fs.readFileSync(path.join(root, relPath), "utf8")
+ const item=mapping.get(relPath)
+ const paths=[relPath,...(item?[item.implementation,...(item.additionalImplementations||[])]:[])]
+ return paths.map(file=>fs.readFileSync(path.join(root,file),'utf8')).join('\n')
 }
-
-export const pluginRoot = root
+export function readPluginSources() {
+ const parts=[readSource('apps/test.js')]
+ for(const file of fs.readdirSync(path.join(root,'apps/lib')).filter(f=>f.endsWith('.js')))parts.push(readSource('apps/lib/'+file))
+ return parts.join('\n')
+}
+export const pluginRoot=root

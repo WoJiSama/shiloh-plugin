@@ -1,0 +1,4 @@
+export type ToolChoice = string | {type?:string;function?:{name?:string}}
+export interface ForcedToolCall {id?:string;type?:string;function?:{name?:string;arguments?:string}}
+export interface TurnPlan {id:string;intent:string;execution:{mode:string;modelProfile:string;toolChoice:ToolChoice};capabilities:{required:string[];optional:string[];available:string[]};context:{historyMode:string;selectedHistoryCount:number};presentation:{kind:string};observability:{routeReason:string};outcomes?:{toolName:string;success:boolean}[]}
+export interface TurnPlanInput {responseKind?:string;intentText?:string;availableCapabilities?:unknown[];requiredCapabilities?:unknown[];toolChoice?:ToolChoice;toolScopeLocked?:boolean;forcedToolCall?:ForcedToolCall|null;explicitEmojiRequest?:boolean;historyMode?:string;selectedHistoryCount?:number}

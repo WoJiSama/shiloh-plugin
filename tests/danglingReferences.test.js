@@ -1,3 +1,4 @@
+import ts from 'typescript'
 // 悬空引用防护:P2 拆分重构曾批量产生"用了别人模块的符号但没 import"的 bug
 // (isAvatarInspectionRequest/logDeliveryOutcome/extractJsonObject/hasExcelContext TDZ…),
 // 全部要到线上跑起来才炸。本测试静态扫描 apps/lib/* 与 test.js 的包装方法,
@@ -90,12 +91,26 @@ test("apps/lib 拆分模块无悬空引用(引用共享符号但未 import/声�
   const missing = []
   for (const file of libFiles) {
     const source = readFileSync(file, "utf8")
-    const code = stripNoise(source)
+    const tree=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS)
+    const references=new Set()
+    function visit(node) {
+      if(ts.isIdentifier(node)) {
+        const parent=node.parent
+        const propertyKey=(ts.isPropertyAssignment(parent)||ts.isMethodDeclaration(parent)||ts.isPropertyAccessExpression(parent)) && parent.name===node
+        const externalName=ts.isImportSpecifier(parent)||ts.isExportSpecifier(parent)
+        if(!propertyKey && !externalName) references.add(node.text)
+      }
+      ts.forEachChild(node,visit)
+    }
+    visit(tree)
     const own = extractOwnBindings(source)
+    function bind(name) {if(ts.isIdentifier(name)) own.add(name.text); else if(ts.isObjectBindingPattern(name)||ts.isArrayBindingPattern(name)) for(const item of name.elements) if(ts.isBindingElement(item)) bind(item.name)}
+    function bindings(node) {if(ts.isVariableDeclaration(node)||ts.isParameter(node)) bind(node.name);ts.forEachChild(node,bindings)}
+    bindings(tree)
     for (const name of shared) {
       if (own.has(name) || globals.has(name)) continue
       const useRe = new RegExp(`(?<![\\w$.])${name}(?![\\w$])`)
-      if (useRe.test(code)) missing.push(`${file.replace(root + "/", "")}: ${name}`)
+      if (references.has(name)) missing.push(`${file.replace(root + "/", "")}: ${name}`)
     }
   }
   assert.deepEqual(missing, [], `以下符号被使用但未 import/声明——先在文件头补 import:\n${missing.join("\n")}`)

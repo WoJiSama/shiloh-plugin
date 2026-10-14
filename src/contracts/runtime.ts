@@ -9,7 +9,7 @@ export interface RuntimePorts<Timer, Topic, Social> {
 }
 export type RuntimeIdentity = string | number | null | undefined
 export interface SmartRuntimeState<Timer> {
-  pendingCount: number; lastMsgAt: number; replyLatencies: number[]
+  pendingCount: number; lastMsgAt: number; replyLatencies: {at:number;ms:number}[]
   forceContinue: boolean; forceGateCheck: boolean; lastGateNoActionAt: number
   inFlight: boolean; inFlightToken: number; inFlightSince: number; inFlightWatchdog: Timer | null
   needsRerun: boolean; rerunEvent: unknown; queuedWhileInFlight: number; queuedForceGateCheck: boolean

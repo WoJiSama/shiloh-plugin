@@ -65,16 +65,16 @@ test("turn continuity records and rebuilds the last-turn summary", async () => {
 test("gate and main path share the addressee signal module", () => {
   const src = readPluginSources()
   // gate 已拆到 apps/lib/timingGate.js(P 重构),两处必须 import 同一 addresseeSignals 模块
-  const gateSrc = readSource("apps/lib/timingGate.js")
+  const gateSrc = readSource("src/modules/conversation/infrastructure/timingGate.ts")
   assert.ok(gateSrc.includes("const addresseeSignal = computeAddresseeSignal({"), "Gate 使用共享信号")
-  assert.ok(gateSrc.includes('from "../../utils/addresseeSignals.js"'), "Gate 从共享模块 import")
+  assert.match(readSource("apps/lib/timingGate.js"), /import \{ computeAddresseeSignal \} from ['"]\.\.\/\.\.\/utils\/addresseeSignals\.js['"]/, "Gate 注入共享信号实现")
   assert.ok(src.includes("session.addresseeSignal = computeAddresseeSignal({"), "主链路使用共享信号")
   assert.ok(src.includes("buildAddresseePrompt(session.addresseeSignal)"), "对象指认进入主 prompt")
 })
 
 test("turn continuity is injected next turn and recorded at turn end", () => {
   const src = readPluginSources()
-  assert.ok(src.includes("loadTurnContinuity({ redis: globalThis.redis, groupId, userId })"), "下一轮注入上一轮摘要")
+  assert.ok(src.includes("loadTurnContinuity({ groupId, userId })"), "下一轮注入上一轮摘要")
   assert.ok(src.includes("await recordTurnContinuity({"), "轮末记录延续摘要")
   assert.ok(src.includes("session.lastFinalReply = String(output || \"\").slice(0, 240)"), "最终回复节选入摘要")
 })

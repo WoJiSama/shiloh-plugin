@@ -119,13 +119,12 @@ test("最终卡片:简报在前、原文材料为证据层、总长受 maxChars 
   assert.ok(!noEvidence.includes("―― 原文材料"), "无材料时不输出证据层")
 })
 
-test("主链路接线:简报优先 + 失败回退规则卡 + 配置开关", () => {
-  const src = [
-    ...[path.join(root, "apps/test.js"), path.join(root, "apps/lib/chatTurn.js"), path.join(root, "apps/lib/smartConversation.js")].map(file => fs.readFileSync(file, "utf8")),
-    readSource("apps/lib/promptContext.js")
-  ].join("\n")
-  assert.ok(src.includes("this.resolveUnderstandingPrompt({") || src.includes("host.resolveUnderstandingPrompt({"), "注入点改为异步简报解析(现为瀑布stage包裹)")
-  assert.ok(src.includes("requestUnderstandingBrief({"), "模型简报调用已接线")
-  assert.ok(src.includes("回退规则卡 reason="), "回退有观测日志")
-  assert.ok(src.includes("briefEnabled: cfg.briefEnabled !== false"), "配置开关默认开启")
+test("compiled prompt context uses brief first and falls back with config control", async () => {
+  const {createPromptContext}=await import('../dist/backend/modules/conversation/infrastructure/promptContext.js')
+  const api=createPromptContext({formatAvatarDrawReferencePrompt:()=>'',info:()=>{}})
+  const host={config:{},getUnderstandingEnhancementConfig:()=>({enabled:true,maxChars:1400,includeRecentContext:true,briefEnabled:true,briefTimeoutMs:25}),gatherUnderstandingMaterials:()=>({cfg:host.getUnderstandingEnhancementConfig(),intentText:'解释这段内容'}),buildUnderstandingContextPrompt:()=> '规则卡'}
+  assert.equal(api.getUnderstandingEnhancementConfig(host).briefEnabled,true)
+  assert.equal(await api.resolveUnderstandingPrompt(host,{}),'规则卡')
+  host.config.understandingEnhancement={briefEnabled:false}
+  assert.equal(api.getUnderstandingEnhancementConfig(host).briefEnabled,false)
 })

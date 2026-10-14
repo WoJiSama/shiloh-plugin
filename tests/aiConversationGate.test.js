@@ -25,14 +25,27 @@ test("AI conversation entries re-check the master switch", () => {
     .map(file => fs.readFileSync(file, "utf8")).join("\n")
   for (const marker of [
     "async handleRandomReplySmart(e) {", // 类内委托仍在
-    "export async function handleRandomReplySmart(host, e) {\n    if (!isAiConversationEnabled(host.config)) return false",
-    "export async function joinRepeat(host, e, state, text) {\n    if (!isAiConversationEnabled(host.config)) return false",
-    "if (!isAiConversationEnabled(this.config)) return\n        if (!this.checkGroupPermission(e))",
-    "插件总开关已关闭，取消续话",
-    "error: 'plugin_disabled'",
     "async handleToolInner(e) {", // 类内委托仍在
-    "export async function handleToolInner(host, e) {\n    if (!isAiConversationEnabled(host.config)) return false"
   ]) {
     assert.ok(joined.includes(marker.replaceAll("\\n", "\n")), `missing guard: ${marker.split("\n")[0]}`)
   }
+})
+
+test("compiled smart and repeat entry guards reject disabled hosts before using any downstream port", async () => {
+ const {createSmartConversation}=await import('../dist/backend/modules/conversation/application/smartConversation.js')
+ const {createStrictConversation}=await import('../dist/backend/modules/conversation/infrastructure/strictConversation.js')
+ const host={config:{enabled:false}}
+ assert.equal(await createSmartConversation({}).handleRandomReplySmart(host,{}),false)
+ assert.equal(await createStrictConversation({}).joinRepeat(host,{},null,'text'),false)
+})
+
+test("compiled proactive scheduling rejects disabled configuration before accessing anchor or queue",async()=>{
+ const {createConversationScheduling}=await import('../dist/backend/modules/conversation/infrastructure/conversationScheduling.js')
+ const runtime=createConversationScheduling({logger:{info(){}}})
+ assert.deepEqual(await runtime.enqueueProactiveTask({config:{enabled:false}},7,'hello'),{ok:false,error:'plugin_disabled'})
+})
+
+test("compiled chat turn rejects disabled configuration before downstream execution",async()=>{
+ const {createChatTurn}=await import('../dist/backend/modules/tools/infrastructure/chatTurn.js')
+ assert.equal(await createChatTurn({isAiConversationEnabled}).handleToolInner({config:{enabled:false}},{}),false)
 })

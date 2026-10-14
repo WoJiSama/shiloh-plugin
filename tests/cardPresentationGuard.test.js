@@ -1,4 +1,6 @@
 import test from "node:test"
+import {looksLikeCodeOrMarkdown} from "../dist/backend/modules/conversation/domain/textPolicy.js"
+import {resolveCardPresentation,isEducationalExplanationRequest} from "../dist/backend/modules/conversation/domain/turnPresentation.js"
 import { readPluginSources } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
@@ -11,9 +13,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const src = readPluginSources()
 
 test("half-width parens and semicolons no longer count as code signals", () => {
-  // 此前 /\\[{}();\\]/ 让含 "(笑)" 颜文字或英文缩写的普通回复被判成代码 → 整条变文档卡面
-  assert.ok(!src.includes("/[{}();]/.test(line)"), "宽泛的括号/分号信号必须移除")
-  assert.ok(src.includes("/[{}]/.test(line)"), "花括号保留为代码信号")
+  assert.equal(looksLikeCodeOrMarkdown("今天开心(笑)；明天继续吧"),false)
+  assert.equal(looksLikeCodeOrMarkdown("function run() {\n  return 1;\n}"),true)
 })
 
 test("knowledge cards require substance in the actual output", () => {
@@ -24,16 +25,9 @@ test("knowledge cards require substance in the actual output", () => {
 })
 
 test("short knowledge questions no longer promise a card", () => {
-  // resolveCardPresentation 已迁至 utils/turnPresentation.js(提示词组装重构)
-  const presentationSrc = fs.readFileSync(path.join(root, "utils/turnPresentation.js"), "utf8")
-  assert.ok(
-    presentationSrc.includes('responseKind === "knowledge" && normalizeIntentText(userText).length >= 12'),
-    "短问句（如\"什么是黑洞\"）不再发\"整理成卡片\"承诺"
-  )
-  assert.ok(
-    /表情包\|表情\|插件\|机器人\|文件\|导入\|删除\|重启\|禁言\|群名片/.test(presentationSrc),
-    "运营/管理类内容（\"整理一下表情包\"）不再误判为知识讲解"
-  )
+  assert.equal(resolveCardPresentation("什么是黑洞","knowledge"),"")
+  assert.equal(resolveCardPresentation("请系统讲解黑洞是怎么形成的以及有哪些性质","knowledge"),"knowledge")
+  for(const text of ["整理一下表情包","解释机器人怎么导入文件","删除插件然后重启"]){assert.equal(isEducationalExplanationRequest(text),false)}
 })
 
 test("rhythm wiring consumes up to three planned messages", () => {

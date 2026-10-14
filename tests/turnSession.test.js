@@ -82,6 +82,10 @@ test("漂移防护:主链路与 utils 里所有 session.X 字段访问都已登�
       .filter(file => file.endsWith(".js"))
       .map(file => path.join(root, "apps/lib", file))
   ]
+  // Typed business modules now own most session accesses; contracts/declarations are excluded.
+  function collectTyped(dir) {for(const item of fs.readdirSync(dir,{withFileTypes:true})) {const file=path.join(dir,item.name);if(item.isDirectory()) collectTyped(file);else if(item.name.endsWith('.ts') && !item.name.endsWith('.d.ts')) sources.push(file)}}
+  collectTyped(path.join(root,'src/modules/conversation'))
+  collectTyped(path.join(root,'src/modules/tools'))
   const registered = new Set(TURN_SESSION_FIELDS.map(field => field.name))
   const accessed = new Set()
   for (const file of sources) {

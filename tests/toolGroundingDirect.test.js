@@ -1,14 +1,12 @@
 import test from "node:test"
 import { readPluginSources } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
-import fs from "node:fs"
-import path from "node:path"
-import { fileURLToPath } from "node:url"
+import {replyRenderingFixture} from "./helpers/replyRenderingFixture.js"
 import { decideToolContinuation, formatDirectToolResult } from "../utils/toolContinuationPolicy.js"
 
 
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+
 
 test("member info is a known-fact tool that bypasses the polish model", () => {
   assert.equal(decideToolContinuation([{ toolName: "memberInfoTool" }]), "direct_result")
@@ -54,10 +52,12 @@ test("member info direct result is formatted as readable facts without a model",
   assert.equal(formatDirectToolResult("excelWorkbookTool", "error: x\nA1: 3"), "x\nA1: 3")
 })
 
-test("rewrite chain no longer re-guards pre-guarded final replies", () => {
-  const src = readPluginSources()
-  assert.ok(src.includes("{ alreadyGuarded = false } = {}"), "sendSegmentedMessage 需要已守卫标记")
-  assert.ok(src.includes("typeof output === \"string\" && !alreadyGuarded"), "守卫只在未预处理文本上执行")
-  assert.ok(src.includes("this.sendSegmentedMessage(e, output, 0.5, { alreadyGuarded: true })"), "handleTextResponse 最终发送必须声明已守卫")
-  assert.ok(!src.includes("formatToolResult(content, toolName)"), "死代码 formatToolResult 应已删除")
+test("rewrite chain no longer re-guards pre-guarded final replies", async () => {
+  const {api,host,event,sent,guarded}=replyRenderingFixture()
+  await api.sendSegmentedMessage(host,event,"已经守卫的文本",0,{alreadyGuarded:true})
+  assert.deepEqual(guarded,[])
+  assert.deepEqual(sent,["已经守卫的文本"])
+  await api.sendSegmentedMessage(host,event,"原始文本",0)
+  assert.deepEqual(guarded,["原始文本"])
+  assert.equal(sent[1],"原始文本守卫")
 })

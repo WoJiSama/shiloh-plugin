@@ -1,0 +1,159 @@
+import type {TurnPlan,TurnPlanInput,ToolChoice,ForcedToolCall} from "../../../contracts/turnPlan.js"
+import { randomUUID } from "node:crypto"
+
+const OPTIONAL_CAPABILITIES = new Set(["sendLocalEmojiTool"])
+const TOOL_INTENT_BY_NAME: [RegExp,string][] = [
+  [/image|banana/i, "image"],
+  [/video|torrent|media/i, "media"],
+  [/excel|workbook/i, "excel"],
+  [/mention|moderation|redBag/i, "moderation"],
+  [/search|webParser|modrinth/i, "search"]
+]
+
+function normalizeNames(names:unknown[] = []) {
+  return [...new Set((Array.isArray(names) ? names : [])
+    .map(name => String(name || "").trim())
+    .filter(Boolean))]
+}
+
+function forcedToolName(toolChoice:ToolChoice, forcedToolCall:ForcedToolCall|null) {
+  return String(
+    forcedToolCall?.function?.name ||
+    (typeof toolChoice === "object" ? toolChoice.function?.name : "") ||
+    ""
+  ).trim()
+}
+
+function inferIntent(responseKind:string, requiredCapabilities:string[]) {
+  const required = normalizeNames(requiredCapabilities)
+  for (const [pattern, intent] of TOOL_INTENT_BY_NAME) {
+    if (required.some(name => pattern.test(name))) return intent
+  }
+  return responseKind === "knowledge" ? "knowledge" : "chat"
+}
+
+// 复杂度判定:命中即升 reasoning 档(换档位而非换人)。除学术推导类原有关键词外,
+// 覆盖群里真实发生的复杂问法——多约束对比、故障排查、方案规划;
+// 连环追问(疑问信号 ≥3)也算。注意门槛靠 isCasualChatTurn 反向兜底:
+// 命中这些模式的回合不可能是 casual,不会误伤短闲聊的提速路径。
+export {needsDeliberateReasoning,isCasualChatTurn} from "../domain/turnPlanPolicy.js"
+import {needsDeliberateReasoning,isCasualChatTurn} from "../domain/turnPlanPolicy.js"
+
+/**
+ * The single policy object for a reply turn. Available capabilities are kept
+ * for observability, while required capabilities decide whether an action is
+ * mandatory. A short casual turn may also keep an optional reaction tool in
+ * the initial request so the tool model can choose between text and a meme.
+ */
+export function createTurnPlan({
+  responseKind = "chat",
+  intentText = "",
+  availableCapabilities = [],
+  requiredCapabilities = [],
+  toolChoice = "auto",
+  toolScopeLocked = false,
+  forcedToolCall = null,
+  explicitEmojiRequest = false,
+  historyMode = "full",
+  selectedHistoryCount = 0
+}:TurnPlanInput = {}):TurnPlan {
+  const available = normalizeNames(availableCapabilities)
+  const requested = normalizeNames(requiredCapabilities)
+  const forcedName = forcedToolName(toolChoice, forcedToolCall)
+  const committedAction = Boolean(toolScopeLocked || forcedToolCall || forcedName)
+  const requestedRequired = requested.filter(name =>
+    explicitEmojiRequest || !OPTIONAL_CAPABILITIES.has(name)
+  )
+  const required = requestedRequired.length
+    ? requestedRequired
+    : committedAction
+    ? normalizeNames(available.length ? available : [forcedName])
+    : explicitEmojiRequest
+      ? normalizeNames(["sendLocalEmojiTool"])
+      : []
+  const optional = available.filter(name => !required.includes(name))
+  const hasRequiredAction = required.length > 0
+  const casual = !hasRequiredAction && responseKind === "chat" && isCasualChatTurn(intentText)
+  // A reaction remains optional: `tool_choice: auto` still permits a normal
+  // text reply. It must nevertheless reach the tool-capable model, otherwise
+  // the emoji tool is silently stripped before the request is made.
+  const hasOptionalReaction = casual && optional.some(name => OPTIONAL_CAPABILITIES.has(name))
+  const executionMode = hasRequiredAction || hasOptionalReaction ? "tool" : "chat"
+  // 升档不再要求 knowledge 档:技术性追问常被 responseKind 判成 chat(排障类被显式排除在
+  // 教育讲解之外),它们同样值得高思考档;casual 已被 isCasualChatTurn 排除,不受影响
+  const reasoning = executionMode === "chat" && needsDeliberateReasoning(intentText)
+  const modelProfile = hasOptionalReaction
+    ? "casual"
+    : executionMode === "tool"
+      ? "task"
+      : reasoning
+      ? "reasoning"
+      : casual
+        ? "casual"
+      : responseKind === "knowledge"
+        ? "fast"
+        : "adaptive"
+  const intent = inferIntent(responseKind, required)
+
+  return {
+    id: randomUUID(),
+    intent,
+    execution: {
+      mode: executionMode,
+      modelProfile,
+      toolChoice: executionMode === "tool" ? toolChoice : "none"
+    },
+    capabilities: { required, optional, available },
+    context: { historyMode, selectedHistoryCount },
+    presentation: { kind: responseKind === "knowledge" ? "knowledge" : "text" },
+    observability: {
+      routeReason: executionMode === "tool"
+        ? committedAction ? "committed_action" : hasOptionalReaction ? "optional_reaction" : "requested_action"
+        : optional.length
+          ? "optional_capabilities"
+          : "no_required_action"
+    }
+  }
+}
+
+/** Record the actual action chosen by the model without making rendering code
+ * infer success from unstructured tool text. */
+export function recordTurnPlanToolOutcome(plan:TurnPlan|null|undefined, { toolName = "", success = false } = {}) {
+  if (!plan || !toolName) return plan
+  const name = String(toolName).trim()
+  if (!plan.capabilities.required.includes(name)) plan.capabilities.required.push(name)
+  plan.capabilities.optional = plan.capabilities.optional.filter(item => item !== name)
+  plan.execution.mode = "tool"
+  plan.execution.modelProfile = "task"
+  plan.intent = inferIntent(plan.intent === "knowledge" ? "knowledge" : "chat", plan.capabilities.required)
+  plan.outcomes = [...(plan.outcomes || []), { toolName: name, success: Boolean(success) }]
+  return plan
+}
+
+export function deriveTurnPlanRequest(plan:Partial<TurnPlan> = {}, config:{chatAiConfig?:{complexReasoningEffort?:unknown}} = {}) {
+  const profile = plan?.execution?.modelProfile || "adaptive"
+  // reasoning 档真正升 thinking 档位:effort 经 options.generation 直达请求体
+  // (apiClient: generation.reasoningEffort 优先于 backend.reasoningEffort)。
+  // 配置 complexReasoningEffort 可改档(minimal/low/medium/high/max);置 false/none 关闭升档。
+  const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "high").trim().toLowerCase()
+  const escalateEffort = ["minimal", "low", "medium", "high", "max"].includes(configuredEffort) ? configuredEffort : ""
+  return {
+    toolChoice: plan?.execution?.toolChoice || "none",
+    requestOptions: profile === "fast"
+      ? { forceChatBackend: true, routeLabel: "快速知识回复" }
+      : profile === "reasoning"
+        ? {
+            routeLabel: "复杂知识推理",
+            ...(escalateEffort ? { generation: { reasoningEffort: escalateEffort } } : {})
+          }
+        : profile === "casual"
+          ? { taskBackend: "casual", routeLabel: "短闲聊模型" }
+        : {}
+  }
+}
+
+export function formatTurnPlanLog(plan:Partial<TurnPlan> = {}) {
+  return `turn=${plan.id || ""} intent=${plan.intent || "chat"} mode=${plan.execution?.mode || "chat"} profile=${plan.execution?.modelProfile || "adaptive"} presentation=${plan.presentation?.kind || "text"} reason=${plan.observability?.routeReason || ""}`
+}
+
+export { OPTIONAL_CAPABILITIES }

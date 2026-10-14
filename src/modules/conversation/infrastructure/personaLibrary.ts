@@ -1,0 +1,367 @@
+interface PersonaEntry { [key:string]:unknown; name?:string; id?:string }
+interface SavedPersona extends PersonaEntry {id:string}
+interface LibraryState {personas:SavedPersona[];groupBindings:Record<string,string>;accountBindings:Record<string,string>;privateBinding:string}
+interface LibraryOptions {libraryPath?:string;getBasePersona?:()=>PersonaEntry;logger?:{error?(...args:unknown[]):void}}
+function record(value:unknown):Record<string,unknown>{return value && typeof value==='object' && !Array.isArray(value)?value as Record<string,unknown>:{}}
+// 多人设库:支持保存多套人设并按群/账号绑定切换。
+// 存储:config/persona-library.yaml { personas: [...], groupBindings: { 群号: 人设id },
+//   accountBindings: { botQQ: 人设id }, privateBinding: "" }
+// - personas 只存"与默认人设的差异"以外的完整字段,缺省字段回退 message.yaml 的 persona(和 configStore 深合并同思路);
+// - 默认人设(id=default)永远可用且不可删,来源是 message.yaml,随主配置热更新;
+// - 解析优先级:群绑定/私聊绑定 > 账号默认(bot QQ 的身份定位) > 全局默认;
+// - 读取走 mtime 缓存,手动编辑 yaml 下一轮对话即生效,无需重启。
+import fs from "node:fs"
+import path from "node:path"
+import YAML from "yaml"
+
+// 人设条目可写字段(与 message.yaml pluginSettings.persona 对齐)
+export const PERSONA_ENTRY_FIELDS = [
+  "name",
+  "identity",
+  "tone",
+  "speechStyle",
+  "preferences",
+  "boundaries",
+  "notes",
+  "moods"
+]
+
+const PRIVATE_BINDING_KEY = "__private__" // 兼容旧 bindings() 平铺形态的私聊键,现仅作历史标识保留
+void PRIVATE_BINDING_KEY
+
+function normalizeListValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(item => String(item || "").trim()).filter(Boolean)
+  }
+  const text = String(value || "").trim()
+  if (!text) return []
+  return text.split(/[,\n，]/).map(item => item.trim()).filter(Boolean)
+}
+
+// 只保留人设合法字段;列表字段规整为字符串数组,文本字段规整为 trim 后的字符串
+export function normalizePersonaEntry(entry: PersonaEntry = {}) {
+  const normalized: PersonaEntry = {}
+  for (const field of PERSONA_ENTRY_FIELDS) {
+    if (entry == null || !(field in entry)) continue
+    const value = entry[field]
+    if (["speechStyle", "preferences", "boundaries"].includes(field)) {
+      normalized[field] = normalizeListValue(value)
+    } else if (field === "moods") {
+      // 调皮情绪时刻: [{name, hint, probability}],结构体数组原样透传(掷骰侧再归一)
+      if (Array.isArray(value)) normalized.moods = value
+    } else {
+      normalized[field] = String(value ?? "").trim()
+    }
+  }
+  return normalized
+}
+
+function randomId() {
+  return `p${Math.random().toString(36).slice(2, 8)}`
+}
+
+function sameName(a = "", b = "") {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase()
+}
+
+// 空状态必须是每次新建的:模块级共享常量会被多个实例的 upsert 交叉污染
+function emptyState(): LibraryState {
+  return { personas: [], groupBindings: {}, accountBindings: {}, privateBinding: "" }
+}
+
+export function createPersonaLibrary({
+  libraryPath,
+  getBasePersona = () => ({}),
+  logger
+}: LibraryOptions = {}) {
+  const file = String(libraryPath || "")
+  let cache: LibraryState | null = null
+  let lastStat = ""
+
+  function logError(...args: unknown[]) {
+    try { logger?.error?.(...args) } catch {}
+  }
+
+  function statKey() {
+    try {
+      const stat = fs.statSync(file)
+      return `${stat.mtimeMs}:${stat.size}`
+    } catch {
+      return "missing"
+    }
+  }
+
+  function loadState() {
+    const key = statKey()
+    if (cache && key === lastStat) return cache
+    let state = emptyState()
+    if (key !== "missing") {
+      try {
+        const parsed = record(YAML.parse(fs.readFileSync(file, "utf8")))
+        const personas = Array.isArray(parsed.personas)
+          ? parsed.personas
+              .map((item: unknown) => (item && typeof item === "object" ? { ...normalizePersonaEntry(record(item)), id: String(record(item).id || "").trim() || randomId() } : null))
+              .filter((item): item is SavedPersona => Boolean(item && String(item.name || "").trim()))
+          : []
+        const groupBindings: Record<string,string> = {}
+        if (parsed.groupBindings && typeof parsed.groupBindings === "object") {
+          for (const [groupId, personaId] of Object.entries(parsed.groupBindings)) {
+            const groupKey = String(groupId || "").trim()
+            const id = String(personaId || "").trim()
+            if (groupKey && id) groupBindings[groupKey] = id
+          }
+        }
+        const accountBindings: Record<string,string> = {}
+        if (parsed.accountBindings && typeof parsed.accountBindings === "object") {
+          for (const [qq, personaId] of Object.entries(parsed.accountBindings)) {
+            const qqKey = String(qq || "").trim()
+            const id = String(personaId || "").trim()
+            if (qqKey && id) accountBindings[qqKey] = id
+          }
+        }
+        state = {
+          personas,
+          groupBindings,
+          accountBindings,
+          privateBinding: String(parsed.privateBinding || "").trim()
+        }
+      } catch (err) {
+        // yaml 手改坏了:沿用上一份好状态,不让人设库拖垮聊天
+        logError(`[人设库] 读取失败(${file}),沿用缓存:`, err instanceof Error ? err.message : err)
+        if (cache) return cache
+      }
+    }
+    cache = state
+    lastStat = key
+    return state
+  }
+
+  function saveState(state: LibraryState) {
+    const dir = path.dirname(file)
+    fs.mkdirSync(dir, { recursive: true })
+    const header = [
+      "# 多人设库:每套人设一个条目,未写的字段回退 message.yaml 默认人设",
+      "# 群绑定:groupBindings 填 { 群号: 人设id };privateBinding 为私聊用人设id(留空=默认人设)",
+      "# 账号绑定:accountBindings 填 { botQQ: 人设id },作为该账号的默认身份(群/私聊绑定优先)",
+      "# 手动编辑保存后自动生效;也可用 #人设列表/#人设详情/#切换人设/#保存人设/#删除人设 指令管理",
+      ""
+    ].join("\n")
+    fs.writeFileSync(file, header + YAML.stringify(state), "utf8")
+    cache = state
+    lastStat = statKey()
+  }
+
+  function find(idOrName: unknown) {
+    const key = String(idOrName || "").trim()
+    if (!key || key === "default") return null
+    const state = loadState()
+    return state.personas.find(p => p.id === key) ||
+      state.personas.find(p => sameName(p.name, key)) || null
+  }
+
+  // 群绑定的人设被删时回退默认,不报错
+  function findBound(id: unknown) {
+    const key = String(id || "").trim()
+    if (!key || key === "default") return null
+    return loadState().personas.find(p => p.id === key) || null
+  }
+
+  function mergePersona(base:PersonaEntry = {}, entry:PersonaEntry = {}) {
+    const merged = { ...base }
+    const normalized = normalizePersonaEntry(entry)
+    for (const field of Object.keys(normalized)) merged[field] = normalized[field]
+    return merged
+  }
+
+  return {
+    file,
+
+    // 列表:默认人设 + 库内人设
+    list() {
+      return [
+        { id: "default", name: String(getBasePersona()?.name || "").trim() || "默认", source: "default" },
+        ...loadState().personas.map(p => ({ id: p.id, name: p.name, source: "library" }))
+      ]
+    },
+
+    detail(idOrName: unknown) {
+      if (!idOrName || idOrName === "default") {
+        return { id: "default", source: "default", persona: { ...getBasePersona() } }
+      }
+      const entry = find(idOrName)
+      if (!entry) return null
+      return { id: entry.id, source: "library", persona: mergePersona(getBasePersona(), entry) }
+    },
+
+    // 以名字为准 upsert:重名覆盖旧条目(保留原 id,绑定关系不断)
+    upsert(persona:PersonaEntry, { preferId = "" } = {}) {
+      const name = String(persona?.name || "").trim()
+      if (!name) throw new Error("人设名字不能为空")
+      const state = loadState()
+      const normalized = normalizePersonaEntry(persona)
+      normalized.name = name
+      const existing = state.personas.find(p => sameName(p.name, name))
+      let saved
+      if (existing) {
+        existing.id = String(preferId || "").trim() || existing.id
+        Object.assign(existing, normalized)
+        saved = existing
+      } else {
+        saved = { id: String(preferId || "").trim() || randomId(), ...normalized }
+        state.personas.push(saved)
+      }
+      saveState(state)
+      return saved
+    },
+
+    remove(idOrName:unknown) {
+      const entry = find(idOrName)
+      if (!entry) return null
+      const state = loadState()
+      state.personas = state.personas.filter(p => p.id !== entry.id)
+      for (const [groupId, personaId] of Object.entries(state.groupBindings)) {
+        if (personaId === entry.id) delete state.groupBindings[groupId]
+      }
+      for (const [qq, personaId] of Object.entries(state.accountBindings || {})) {
+        if (personaId === entry.id) delete state.accountBindings[qq]
+      }
+      if (state.privateBinding === entry.id) state.privateBinding = ""
+      saveState(state)
+      return entry
+    },
+
+    // 网页管理页整库读写:导出深拷贝快照,replaceAll 校验后整体落盘
+    exportState() {
+      const state = loadState()
+      return JSON.parse(JSON.stringify({
+        personas: state.personas,
+        groupBindings: state.groupBindings,
+        accountBindings: state.accountBindings || {},
+        privateBinding: state.privateBinding
+      }))
+    },
+
+    replaceAll({ personas = [], groupBindings = {}, accountBindings, privateBinding = "" }: {personas?:unknown[];groupBindings?:Record<string,unknown>;accountBindings?:Record<string,unknown>;privateBinding?:unknown} = {}) {
+      if (!Array.isArray(personas)) throw new Error("personas 必须是数组")
+      const seenNames = new Set()
+      const seenIds = new Set()
+      const cleaned = []
+      for (const raw of personas) {
+        if (!raw || typeof raw !== "object") continue
+        const normalized = normalizePersonaEntry(record(raw))
+        const name = String(normalized.name || "").trim()
+        if (!name) throw new Error("有人设没填名字")
+        const nameKey = name.toLowerCase()
+        if (seenNames.has(nameKey)) throw new Error(`人设名字重复：「${name}」`)
+        seenNames.add(nameKey)
+        let id = String(record(raw).id || "").trim()
+        if (!id || id === "default" || seenIds.has(id)) id = randomId()
+        seenIds.add(id)
+        cleaned.push({ id, ...normalized, name })
+      }
+      const idSet = new Set(cleaned.map(p => p.id))
+      const cleanedBindings: Record<string,string> = {}
+      for (const [groupId, personaId] of Object.entries(groupBindings || {})) {
+        const groupKey = String(groupId || "").trim()
+        const id = String(personaId || "").trim()
+        // 指向已删人设的绑定直接丢弃(回默认),不让人设库进入坏状态
+        if (groupKey && id && idSet.has(id)) cleanedBindings[groupKey] = id
+      }
+      const cleanedPrivate = idSet.has(String(privateBinding || "").trim())
+        ? String(privateBinding).trim()
+        : ""
+      // accountBindings 未显式传入时保留现状(旧调用方整库写回不抹账号绑定)
+      const cleanedAccounts: Record<string,string> = {}
+      if (accountBindings && typeof accountBindings === "object") {
+        for (const [qq, personaId] of Object.entries(accountBindings)) {
+          const qqKey = String(qq || "").trim()
+          const id = String(personaId || "").trim()
+          if (qqKey && id && idSet.has(id)) cleanedAccounts[qqKey] = id
+        }
+      } else {
+        Object.assign(cleanedAccounts, loadState().accountBindings || {})
+      }
+      const state = { personas: cleaned, groupBindings: cleanedBindings, accountBindings: cleanedAccounts, privateBinding: cleanedPrivate }
+      saveState(state)
+      return state
+    },
+
+    bindings() {
+      const state = loadState()
+      return {
+        groups: { ...state.groupBindings },
+        accounts: { ...(state.accountBindings || {}) },
+        private: state.privateBinding
+      }
+    },
+
+    setAccountBinding(qq:unknown, personaId:unknown) {
+      const key = String(qq || "").trim()
+      if (!/^\d{4,12}$/.test(key)) throw new Error("bot QQ 号格式不正确")
+      const state = loadState()
+      if (!personaId || personaId === "default") {
+        delete state.accountBindings[key]
+      } else {
+        const entry = findBound(personaId) || find(personaId)
+        if (!entry) throw new Error(`没有找到人设「${personaId}」`)
+        state.accountBindings[key] = entry.id
+      }
+      saveState(state)
+      return state.accountBindings[key] || "default"
+    },
+
+    setGroupBinding(groupId:unknown, personaId:unknown) {
+      const key = String(groupId || "").trim()
+      if (!key) throw new Error("群号不能为空")
+      const state = loadState()
+      if (!personaId || personaId === "default") {
+        delete state.groupBindings[key]
+      } else {
+        const entry = findBound(personaId) || find(personaId)
+        if (!entry) throw new Error(`没有找到人设「${personaId}」`)
+        state.groupBindings[key] = entry.id
+      }
+      saveState(state)
+      return state.groupBindings[key] || "default"
+    },
+
+    setPrivateBinding(personaId:unknown) {
+      const state = loadState()
+      if (!personaId || personaId === "default") {
+        state.privateBinding = ""
+      } else {
+        const entry = findBound(personaId) || find(personaId)
+        if (!entry) throw new Error(`没有找到人设「${personaId}」`)
+        state.privateBinding = entry.id
+      }
+      saveState(state)
+      return state.privateBinding || "default"
+    },
+
+    // 当前会话生效人设:群按群绑定/私聊按 privateBinding,其次账号默认,否则全局默认
+    resolve({ messageType = "", groupId = "", selfId = "" } = {}) {
+      const base = getBasePersona() || {}
+      const state = loadState()
+      let entry = null
+      if (messageType === "group" && groupId) {
+        entry = findBound(state.groupBindings[String(groupId)] || "")
+      } else if (messageType === "private") {
+        entry = findBound(state.privateBinding)
+      }
+      if (!entry && selfId) {
+        // 账号默认身份:该 bot QQ 未被群/私聊绑定覆盖时的人设
+        entry = findBound((state.accountBindings || {})[String(selfId).trim()] || "")
+      }
+      if (entry) {
+        return { id: entry.id, source: "library", persona: mergePersona(base, entry) }
+      }
+      return { id: "default", source: "default", persona: { ...base } }
+    },
+
+    reload() {
+      cache = null
+      lastStat = ""
+      return loadState()
+    }
+  }
+}

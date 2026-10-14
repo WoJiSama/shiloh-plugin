@@ -37,11 +37,11 @@ test("skipped turns sample shadow verification at a bounded rate", () => {
   assert.ok(hits > 100 && hits < 300, `2000 次按 10% 抽样应约 200 次，实际 ${hits}`)
 })
 
-test("handleTool wires the fast path with shadow sampling", () => {
+test("handleTool wires the fast path without shadow sampling", () => {
   const src = readSource("apps/lib/chatTurn.js") // 主链路已迁 lib(P 重构)
   // 闲聊快路的层裁剪已迁入 utils/turnPromptComposer.js(提示词组装重构)
-  const composerSrc = fs.readFileSync(path.join(root, "utils/turnPromptComposer.js"), "utf8")
-  assert.ok(src.includes("const skipIntentModel = shouldSkipIntentModel({"), "快路判定接入")
+  const composerSrc = readSource("utils/turnPromptComposer.js")
+  assert.ok(src.includes("let skipIntentModel = shouldSkipIntentModel({"), "快路判定接入")
   assert.ok(src.includes('turnTrace.setIntent("chat", null, "fast_path_skip")'), "快路来源写入 trace")
   // P4 已转正：影子抽样验证随之移除，快路跳过不再并行跑模型
   assert.ok(!src.includes("shouldSampleSkippedIntent"), "影子抽样已随转正移除")

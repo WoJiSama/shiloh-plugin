@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 
 const source = readPluginSources()
-const routeSource = fs.readFileSync(new URL("../utils/routeDecision.js", import.meta.url), "utf8")
+const routeSource = readSource("utils/routeDecision.js")
 const semanticSource = readSource("apps/lib/semanticToolIntent.js")
 
 
@@ -49,8 +49,8 @@ test("knowledge replies use TurnPlan instead of optional emoji capability routin
 
 test("card replies acknowledge before generation and keep the card body free of process text", () => {
   // resolveCardPresentation 迁至 utils/turnPresentation.js,卡面正文边界层迁至 utils/turnPromptComposer.js
-  const presentationSrc = fs.readFileSync(new URL("../utils/turnPresentation.js", import.meta.url), "utf8")
-  const composerSrc = fs.readFileSync(new URL("../utils/turnPromptComposer.js", import.meta.url), "utf8")
+  const presentationSrc = readSource("utils/turnPresentation.js")
+  const composerSrc = readSource("utils/turnPromptComposer.js")
   assert.match(presentationSrc, /function resolveCardPresentation/)
   assert.ok(source.includes('cardAcknowledgement(') || source.includes('from "./lib/textPolicy.js"'), '卡面确认函数可用(已迁 lib)')
   assert.match(source, /session\.cardPresentation = resolveCardPresentation/)
@@ -80,5 +80,5 @@ test("proactive freshness is anchored to the source message and checked before s
 test("all direct replies in the main agent use one observed delivery method", () => {
   const directReplies = source.match(/await e\.reply\(/g) || []
   assert.equal(directReplies.length, 1)
-  assert.match(source, /async sendObservedReply\(/)
+  assert.match(source, /async (?:function )?sendObservedReply\(/)
 })

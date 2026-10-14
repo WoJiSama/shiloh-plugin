@@ -138,7 +138,7 @@ test('injects learned rhythm while preserving default single-message boundary', 
 
 test('production observes expression order before the first asynchronous group check', () => {
   const source = readPluginSources()
-  const handlerStart = source.indexOf('async function handleRandomReply(host, e)')
+  const handlerStart = source.search(/async function handleRandomReply\(host(?::[^,]+)?, e(?::[^)]+)?\)/)
   const expressionCall = source.indexOf('host.expressionLearner.updateGroupExpressions', handlerStart)
   const firstAwait = source.indexOf('await host.isMutedInGroup(e)', handlerStart)
   assert.ok(handlerStart >= 0 && expressionCall > handlerStart)

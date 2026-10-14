@@ -1,5 +1,15 @@
+import {createToolAssembly} from "../dist/backend/modules/tools/infrastructure/toolAssembly.js"
+import {applyToolRegistrySnapshot as applyTypedToolRegistrySnapshot,refreshLocalToolSnapshot} from "../dist/backend/modules/tools/infrastructure/LocalToolRegistry.js"
+import {createConversationEntryPolicy} from '../dist/backend/modules/conversation/infrastructure/conversationEntryPolicy.js'
+import {handleTextResponse,updateEnhancedSystems,getFriendlyFailureMessage,sendFinalReplyAsTextImage} from './lib/finalReply.js'
+import {formatMemoryFactLines,formatMemoryFacts,replyMemoryForward,replyLongForward} from './lib/memoryReplies.js'
+import {createConversationHistory} from '../dist/backend/modules/conversation/infrastructure/conversationHistory.js'
+const conversationHistory=createConversationHistory({loadData,saveData,deleteKey:key=>globalThis.redis.del(key),debug:message=>globalThis.logger?.debug?.(message),error:(message,error)=>globalThis.logger?.error?.(message,error)})
+import {createMutedGroupPolicy} from '../dist/backend/modules/conversation/infrastructure/mutedGroupPolicy.js'
+import {createConversationPrefilter} from '../dist/backend/modules/conversation/infrastructure/conversationPrefilter.js'
+import {createConversationScheduling} from '../dist/backend/modules/conversation/infrastructure/conversationScheduling.js'
 import { EmotionManager } from "../domains/memory/EmotionManager.js"
-import { lastIncomingMsgAt, activeDedupeToolRuns, LOCAL_EMOJI_TOOL_NAME } from "./lib/splitState.js"
+import { lastIncomingMsgAt, activeDedupeToolRuns, LOCAL_EMOJI_TOOL_NAME, smartConversationKey } from "./lib/splitState.js"
 import {
   hasExplicitRememberSignal,
   cleanTeachingAlias,
@@ -302,17 +312,21 @@ const _path = process.cwd()
 
 // 清空群记忆二次确认（P0-1）：进程内 pending，key: `${groupId}_${userId}`, value: 过期时间戳。
 
-const directTriggerMergeTimers = new Map()
-const toolRequestMergeTimers = new Map()
+
+
 // smart 模式：每群独立的频率状态，进程内 Map，重启清零
 // 群连续被新消息打断的累计计数（达到上限后下一轮强制走完不再让步）
-const consecutiveInterrupts = new Map() // groupId -> count
+const conversationEntryPolicy=createConversationEntryPolicy({logger:globalThis.logger,bot:()=>globalThis.Bot || {},anchorEventConversation,findForbiddenWord,chatScopeKey,markConversationInterrupted,getSemanticMemoryRuntime,resolveNaturalDeltaForceToolCall,shouldUseExcelWorkbookTool,extractValidBtihMagnetUri})
+const conversationPrefilter=createConversationPrefilter({bot:()=>globalThis.Bot || {},resolvePersonaName,logger:globalThis.logger})
+const conversationScheduling=createConversationScheduling({logger:globalThis.logger,resolveToolRequestMergeMs,shouldBypassMergeForExcel,isDrawTaskStatusInquiry})
+const {consecutiveInterrupts} = conversationScheduling
 // smart 锁持有令牌：看门狗强制释放后旧轮次的 finally 不得误释放新轮次的锁
 // redis 抖动/断连时命令可能既不成功也不失败（挂起）。任务状态只是去重辅助，
 // 超时降级为"无状态"，绝不能卡住会话收尾（进而卡死 smart 锁）。
 
 // 禁言状态短期缓存：避免每条群消息都查一次 ws RPC pickMember.getInfo()
-const mutedStatusCache = new Map() // groupId -> { isMuted, at }
+const mutedGroupPolicy=createMutedGroupPolicy(()=>globalThis.Bot || {})
+const {mutedStatusCache}=mutedGroupPolicy
 const MUTED_CACHE_TTL_MS = 30000
 const groupContextCache = new Map()
 const GROUP_CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000
@@ -333,34 +347,15 @@ let mcpInitPromise = null
 
 
 
-function buildInternalStatusSafeReply(toolName = "", session = {}) {
-  const text = [session?.rawArgs, session?.userContent].filter(Boolean).join("\n")
-  if (toolName === "bananaTool" || isImageGenerationRequest(text)) {
-    return "这次图片没有完成，不代表你的描述有问题。你可以稍后按原话再试。"
-  }
-  if (toolName === "googleImageAnalysisTool" || isImageAnalysisRequest(text)) {
-    return "图片我收到了，但这次识图服务没有返回可用结果。不是你没发图，我先不乱猜。"
-  }
-  return buildGenericChatFailureReply(text, { failureKind: "upstream" })
-}
 
 
 
 
 
-function applyToolRegistrySnapshot(state, snapshot = localToolRegistry.getSnapshot()) {
-  state.toolInstances = snapshot.toolInstances
-  state.functions = snapshot.functions
-  state.functionMap = snapshot.functionMap
-  state.customToolCount = snapshot.customToolCount || 0
-  state.builtInToolCount = snapshot.builtInToolCount || 0
-  return state
-}
 
-async function refreshLocalTools(state, options = {}) {
-  const snapshot = await localToolRegistry.reload(options)
-  return applyToolRegistrySnapshot(state, snapshot)
-}
+function applyToolRegistrySnapshot(state,snapshot=localToolRegistry.getSnapshot()){return applyTypedToolRegistrySnapshot(state,snapshot)}
+
+function refreshLocalTools(state,options={}){return refreshLocalToolSnapshot(state,localToolRegistry,options)}
 
 function buildMemoryConfig(config) {
   const memorySystem = config.memorySystem || {}
@@ -740,7 +735,7 @@ export class ExamplePlugin extends plugin {
       const cutoff = Date.now() - Math.max(1, Number(ttlHours) || 24) * 3600 * 1000
       let removed = 0
       for (const gid of smartRuntimeGroupIds()) {
-        const st = getSmartState(gid)
+        const st = getSmartRuntimeState(gid)
         if ((st.lastMsgAt || 0) < cutoff) {
           lastIncomingMsgAt.delete(gid)
           consecutiveInterrupts.delete(gid)
@@ -773,46 +768,9 @@ export class ExamplePlugin extends plugin {
     activeChatLruTimer.unref?.()
   }
 
-  async refreshLocalToolRegistry(options = {}) {
-    const state = await refreshLocalTools(sharedState, options)
-    this.toolInstances = state.toolInstances
-    this.functions = state.functions
-    this.functionMap = state.functionMap
-    this.localToolsReady = true
-    this.updateToolsList({ silent: options.silent === true })
-    return state
-  }
+  refreshLocalToolRegistry(...args) {return toolAssembly.refreshLocalToolRegistry(this,...args)}
 
-  initTools() {
-    applyToolRegistrySnapshot(sharedState)
-    this.toolInstances = sharedState.toolInstances
-    this.functions = sharedState.functions
-    this.functionMap = sharedState.functionMap
-
-    const provider = this.config.providers.toLowerCase()
-    const toolConfig = {
-      oneapi: this.config.oneapi_tools
-    }
-
-    this.syncDedupeToolConfig(this.config.oneapi_tools || [])
-    // 白名单缺省 = 全部已注册工具:新增工具不再要求同步改配置,漏改白名单的
-    // 事故类型(工具静默不可见)从根上消除。配置了白名单时对排除项打告警提示。
-    const configuredList = toolConfig[provider] || this.config.openai_tools
-    const allRegisteredNames = Object.keys(this.toolInstances || {})
-    const effectiveList = Array.isArray(configuredList) && configuredList.length ? configuredList : allRegisteredNames
-    if (Array.isArray(configuredList) && configuredList.length) {
-      const configuredNames = new Set(configuredList.map(entry => String(entry).replace(/\s*\(dedupe\)\s*$/i, "").trim()).filter(Boolean))
-      const excluded = allRegisteredNames.filter(name => !configuredNames.has(name))
-      if (excluded.length) {
-        logger.warn(`[工具清单] oneapi_tools 白名单未包含以下已注册工具(如需启用请补进配置): ${excluded.join(", ")}`)
-      }
-    }
-    const localTools = this.getToolsByName(effectiveList, {
-      warnMissing: this.localToolsReady !== false
-    })
-    const mcpTools = mcpManager.getAllTools() || []
-    this.tools = [...localTools, ...mcpTools]
-  }
+  initTools(...args) {return toolAssembly.initTools(this,...args)}
 
   initMessageHistory() {
     this.messageHistoriesRedisKey = "group_user_message_history"
@@ -1029,20 +987,7 @@ export class ExamplePlugin extends plugin {
     return false
   }
 
-  async sendFinalReplyAsTextImage(e, output, template = "chat") {
-    const tool = this.toolInstances?.textImageTool
-    try {
-      const result = await tool.execute({ text: output, template }, e)
-      if (typeof result === "string" && result.trim().startsWith("error:")) {
-        throw new Error(result)
-      }
-      logger.info(`[textImageTool] 最终回复已转为图片发送 template=${template}`)
-      return null
-    } catch (error) {
-      logger.warn(`[textImageTool] 最终回复转图失败，回退为普通文本: ${error.message}`)
-      return await this.sendSegmentedMessage(e, output)
-    }
-  }
+  async sendFinalReplyAsTextImage(...args) { return await sendFinalReplyAsTextImage(this, ...args) }
 
   async sendModrinthForwardItems(e, items = []) {
     const nodes = (Array.isArray(items) ? items : []).filter(Boolean).map(text => ({
@@ -1129,115 +1074,7 @@ export class ExamplePlugin extends plugin {
    *   'continuation_strong' - 命中 R1/R2/R3/R4 任一，应走 Gate
    *   'regular' - 默认
    */
-  prefilterMessage(e, state) {
-    const smartCfg = this.config.smartTrigger || {}
-    try {
-      // bot 自己发的消息（防自激励）
-      const botId = e?.bot?.uin || (typeof Bot !== 'undefined' && Bot.uin)
-      if (botId && String(e?.user_id) === String(botId)) {
-        return { kind: 'bot_self_echo', reason: 'sender_is_self' }
-      }
-      const atSelf = messageMentionsUser(e, botId)
-      const quotesSelf = messageQuotesUser(e, botId)
-      const text = String(e?.msg || '')
-      // 喊名判定用当前账号的人设名(多账号下 Bot.nickname 是主号昵称,会串台唤醒)
-      const hasBotName = hasBotTextAnchor(text, resolvePersonaName(this.getPersonaFor(e)), this.config.triggerPrefixes)
-      const explicitlyAddressesBot = atSelf || quotesSelf || hasBotName
-
-      // @ 别人（且没有明确点名 bot）→ 跳过。
-      // QQ 引用别人时常会自动带 @原作者；如果正文已经写了"希洛/触发前缀"，应视为找 bot。
-      if (smartCfg.skipWhenAddressedOther !== false && Array.isArray(e?.message)) {
-        const mentionedOthers = collectMentionTargetIds(e, botId)
-        if (mentionedOthers.length > 0) {
-          if (!explicitlyAddressesBot) {
-            return { kind: 'addressed_other', reason: 'at_other_user' }
-          }
-        }
-      }
-      // 空文本（纯表情/图片/转账）→ 跳过。合并转发虽然本体没有 text segment，
-      // 但可展开为后续问答和历史可用的上下文，不能在这里提前丢弃。
-      if (smartCfg.skipWhenEmptyText !== false) {
-        const rawText = (typeof e?.msg === 'string' ? e.msg : '').trim()
-        if (!rawText && !atSelf && !quotesSelf) {
-          if (extractForwardIdsFromSegments(e?.message || []).length) {
-            return { kind: 'regular', reason: 'forward_context' }
-          }
-          return { kind: 'empty_content', reason: 'no_text' }
-        }
-      }
-
-      // 以下为 continuation_strong 识别（必须距 bot 上次发言不远）
-      const sinceLastBotReply = state.lastBotReplyAt ? Date.now() - state.lastBotReplyAt : Infinity
-      const quickResponseMs = Math.max(0, Number(smartCfg.quickResponseMs) || 0)
-      const lookbackMs = Number(smartCfg.continuationLookbackMs) || 180000
-      const sameUserAsLastReply = state.lastBotReplyToUserId && String(e?.user_id || '') === String(state.lastBotReplyToUserId)
-      let quotesBot = quotesSelf
-      let quotesOther = false
-      if (Array.isArray(e?.message)) {
-        if (!quotesBot) quotesBot = e.message.some(seg => {
-          if (seg?.type !== 'reply') return false
-          const repliedUid = getReplySender(seg)
-          return repliedUid && String(repliedUid) === String(botId)
-        })
-        quotesOther = e.message.some(seg => {
-          if (seg?.type !== 'reply') return false
-          const repliedUid = getReplySender(seg)
-          return repliedUid && String(repliedUid) !== String(botId)
-        })
-      }
-      const groupAddressed = looksGroupAddressed(text)
-      const previousMessage = getPreviousRecentMessage(state, e)
-
-      if (!atSelf && !hasBotName && !quotesBot && quotesOther) {
-        return { kind: 'addressed_other', reason: 'reply_other_user' }
-      }
-
-      if (!atSelf && !hasBotName && !quotesBot && !sameUserAsLastReply && !groupAddressed && looksDirectedAtBotByPronoun(text)) {
-        return { kind: 'likely_addressed_other', reason: 'pronoun_without_bot_anchor' }
-      }
-
-      if (!atSelf && !hasBotName && !quotesBot && !sameUserAsLastReply && looksAddressedToPreviousSpeaker(text, previousMessage, e?.user_id, botId)) {
-        return { kind: 'likely_addressed_other', reason: 'reply_previous_speaker' }
-      }
-
-      // R1：秒回反应。仅限同一用户接话、引用 bot、或直接点名 bot；避免群友之间一句"你"被误判。
-      if (atSelf) {
-        return { kind: 'continuation_strong', reason: 'at_bot' }
-      }
-      if (quotesBot) {
-        return { kind: 'continuation_strong', reason: 'reply_bot' }
-      }
-      if (sinceLastBotReply <= lookbackMs && sameUserAsLastReply && smartCfg.continuationFollowupMatch !== false && isLikelyFollowupMessage(text)) {
-        return { kind: 'continuation_strong', reason: 'R0_same_user_followup' }
-      }
-      if (quickResponseMs > 0 && sinceLastBotReply <= quickResponseMs && (sameUserAsLastReply || quotesBot || hasBotName)) {
-        return { kind: 'continuation_strong', reason: 'R1_quick_response' }
-      }
-      // R2/R3/R4 共同前提：在 lookback 窗口内
-      if (sinceLastBotReply <= lookbackMs && (sameUserAsLastReply || quotesBot || hasBotName)) {
-        // R2 关键词匹配
-        if (smartCfg.continuationKeywordMatch !== false && Array.isArray(state.lastBotReplyKeywords)) {
-          for (const kw of state.lastBotReplyKeywords) {
-            if (kw && text.includes(kw)) {
-              return { kind: 'continuation_strong', reason: `R2_keyword:${kw}` }
-            }
-          }
-        }
-        // R3 问句
-        if (smartCfg.continuationQuestionMatch !== false && isQuestionMessage(text)) {
-          return { kind: 'continuation_strong', reason: 'R3_question' }
-        }
-        // R4 反馈词
-        if (smartCfg.continuationFeedbackMatch !== false && isFeedbackMessage(text)) {
-          return { kind: 'continuation_strong', reason: 'R4_feedback' }
-        }
-      }
-      return { kind: 'regular', reason: '' }
-    } catch (err) {
-      logger.warn(`[Prefilter] 异常，按 regular 处理：${err.message}`)
-      return { kind: 'regular', reason: 'exception' }
-    }
-  }
+  prefilterMessage(e,state) {return conversationPrefilter.prefilterMessage(this,e,state)}
 
   /**
    * 计算群最近 5 分钟消息数（含 bot 自己的回复，用于 Gate prompt 活跃度信号）。
@@ -1261,48 +1098,7 @@ export class ExamplePlugin extends plugin {
    * 注意：本函数通常在 inFlight=true 时（主流程 try 块内）被调用，因此**不要**用 inFlight 守卫；
    * 真正的并发保护放在 setTimeout 回调里（callback 触发时再检查 inFlight）。
    */
-  scheduleDeferredGateCheck(e, state) {
-    const smartCfg = this.config.smartTrigger || {}
-    if (smartCfg.deferredGateEnabled === false) return
-    if (!e?.group_id) return
-    if (state.conversationPhase !== 'cold') return
-
-    if (state.deferredTimer) clearTimeout(state.deferredTimer)
-
-    const talkValue = this.resolveTalkValue(e.group_id)
-    const threshold = Math.max(1, Math.ceil(1 / Math.max(0.01, talkValue)))
-    const avgMs = this.computeAvgReplyLatency(state) || Number(smartCfg.avgLatencyDefaultMs) || 60000
-    const idleMs = Math.max(0, Date.now() - (state.lastMsgAt || Date.now()))
-    const currentEquiv = (state.pendingCount || 0) + idleMs / avgMs
-    const remaining = Math.max(0, threshold - currentEquiv)
-
-    const minMs = Number(smartCfg.minDeferredMs) || 120000
-    const maxMs = Number(smartCfg.maxDeferredMs) || 900000
-    const delayMs = Math.max(minMs, Math.min(maxMs, Math.ceil(remaining * avgMs)))
-
-    const groupId = e.group_id
-    state.deferredTimer = setTimeout(async () => {
-      state.deferredTimer = null
-      try {
-        const mode = String(this.config?.chatTriggerMode || 'strict').toLowerCase()
-        if (mode !== 'smart') return
-        if (!isAiConversationEnabled(this.config)) return
-        if (!this.checkGroupPermission(e)) return
-        if (this.isUserBlacklisted(e)) return
-        if (await this.isMutedInGroup(e)) return
-        if (state.inFlight) return
-        state.forceGateCheck = true
-        const wrapped = Object.create(e)
-        wrapped._smartWaitRerun = true
-        wrapped._deferredReason = 'cold_idle'
-        logger.info(`[DeferredGate] group=${groupId} fired delay=${delayMs}ms`)
-        await this.handleRandomReplySmart(wrapped)
-      } catch (err) {
-        logger.error('[DeferredGate] 失败:', err)
-      }
-    }, delayMs)
-    state.deferredTimer.unref?.()
-  }
+  scheduleDeferredGateCheck(e,state) { return conversationScheduling.scheduleDeferredGateCheck(this,e,state) }
 
   /**
    * 执行参与复读：直接 e.reply(原文) 跳过 Gate / handleTool（规避 LLM 改写），
@@ -1334,45 +1130,11 @@ export class ExamplePlugin extends plugin {
    * 短期 LRU 缓存（30s）避免每条群消息都发一次 ws RPC；
    * 任何异常都视为"未禁言"，避免误阻塞。
    */
-  async isMutedInGroup(e) {
-    if (!e?.group_id) return false
-    const cached = mutedStatusCache.get(e.group_id)
-    if (cached && Date.now() - cached.at < MUTED_CACHE_TTL_MS) return cached.isMuted
+  async isMutedInGroup(e) {return await mutedGroupPolicy.isMutedInGroup(e)}
 
-    const nowSec = Math.floor(Date.now() / 1000)
-    let isMuted = false
-    try {
-      const grp = e.group
-      if (grp) {
-        // ICQQ 风格：剩余秒数 / GroupInfo 字段
-        if (Number(grp.mute_left) > 0) isMuted = true
-        else {
-          const gi = grp.info || grp
-          if (Number(gi?.shutup_time_whole) > 0) isMuted = true
-          else if (Number(gi?.shutup_time_me) > 0) isMuted = true
-          // OneBot v11 / Napcat 风格全员禁言字段（不同实现可能用不同名）
-          else if (Number(gi?.group_all_shut) > 0) isMuted = true
-          else if (Number(gi?.shut_up_timestamp_whole) > nowSec) isMuted = true
-        }
-      }
-      // 个人禁言：拉自己的 member 信息（昂贵的 RPC，仅在群信息没显示已禁言时调）
-      if (!isMuted) {
-        const selfId = e.self_id || e.bot?.uin || Bot.uin
-        const me = await e.group?.pickMember?.(selfId)?.getInfo?.()
-        if (me) {
-          if (Number(me.shutup_time) > 0) isMuted = true
-          else if (Number(me.shut_up_timestamp) > nowSec) isMuted = true
-        }
-      }
-    } catch {}
-
-    mutedStatusCache.set(e.group_id, { isMuted, at: Date.now() })
-    return isMuted
-  }
-
-  getSmartState(groupId) {
+  getSmartState(groupId, e) {
     // 群运行时状态统一门面:smart 状态存储已迁 core/runtime/groupRuntime.js(行为不变)
-    return getSmartRuntimeState(groupId)
+    return getSmartRuntimeState(smartConversationKey(groupId, e))
   }
 
   getDirectTriggerMergeMs() {
@@ -1383,191 +1145,25 @@ export class ExamplePlugin extends plugin {
     return getDirectTriggerMergeMaxMessages(this)
   }
 
-  getMergeMsForEvent(e = {}) {
-    const availableToolNames = (this.tools || []).map(tool => tool?.function?.name).filter(Boolean)
-    return resolveToolRequestMergeMs(e.msg || "", availableToolNames, {
-      defaultMs: this.getDirectTriggerMergeMs(),
-      fastMs: this.config.smartTrigger?.toolRequestMergeMs
-    })
-  }
+  getMergeMsForEvent(e = {}) { return conversationScheduling.getMergeMsForEvent(this,e) }
 
-  isMergeableDirectTrigger(e = {}) {
-    if (!e?.group_id || !e?.user_id || e?._directTriggerMerged || e?._smartWaitRerun || e?._smartQueuedRerun || e?._proactiveReply) return false
-    if (e.forceGrabRedBag || this.isCommand(e)) return false
-    if (shouldBypassMergeForExcel(e.msg || "")) return false
-    const message = Array.isArray(e.message) ? e.message : []
-    return !message.some(seg => ["image", "video", "record", "file"].includes(seg?.type))
-  }
+  isMergeableDirectTrigger(e = {}) { return conversationScheduling.isMergeableDirectTrigger(this,e) }
 
-  buildMergedDirectTriggerEvent(baseEvent, messages = []) {
-    const latest = messages.at(-1)?.event || baseEvent
-    const merged = Object.create(latest)
-    const textLines = messages
-      .map(item => String(item.text || item.event?.msg || "").trim())
-      .filter(Boolean)
-    const droppedCount = Number(messages.droppedCount) || 0
-    const totalCount = textLines.length + droppedCount
-    const mergedText = textLines.length > 1
-      ? `同一个人连续发了 ${totalCount} 条消息${droppedCount > 0 ? `（这里只保留最后 ${textLines.length} 条）` : ""}：\n${textLines.map((text, index) => `${index + 1}. ${text}`).join("\n")}`
-      : textLines.join("\n")
-    merged.msg = mergedText
-    merged.raw_message = mergedText
-    // 合并不能丢 @:重建 message 时把各条消息的 at 段按出现顺序补回,
-    // 否则下游(头像参考/成员指认)只能看到最后一个 @ (e.at)。
-    const atTargets = []
-    for (const item of messages) {
-      for (const qq of collectMentionTargetIds(item.event || {}, latest.self_id)) {
-        if (!atTargets.includes(String(qq))) atTargets.push(String(qq))
-      }
-    }
-    merged.message = [
-      { type: "text", text: mergedText },
-      ...atTargets.map(qq => ({ type: "at", qq }))
-    ]
-    // 保留各条原始 CQ 文本(e.msg 已被剥掉 @,无法还原位置),供语义分类器做 @ 注解
-    merged._mergedRawCqTexts = messages
-      .map(item => String(item.event?.raw_message || ""))
-      .filter(text => text.includes("[CQ:at"))
-    merged._directTriggerMerged = true
-    merged._mergedMessageCount = totalCount
-    merged._mergedRetainedMessageCount = textLines.length
-    merged._mergedDroppedMessageCount = droppedCount
-    merged._mergedOriginalTexts = textLines
-    return merged
-  }
+  buildMergedDirectTriggerEvent(baseEvent,messages = []) { return conversationScheduling.buildMergedDirectTriggerEvent(this,baseEvent,messages) }
 
-  buildMergedDirectTriggerPrompt(e = {}) {
-    if (!e?._directTriggerMerged || !e?._mergedMessageCount) return ""
-    const count = Number(e._mergedMessageCount) || 0
-    const dropped = Number(e._mergedDroppedMessageCount) || 0
-    const droppedText = dropped > 0 ? `其中前面 ${dropped} 条较早消息已为防刷屏省略，只保留最后几条。` : ""
-    return [
-      "【连续点名合并】",
-      `同一位群友刚刚连续叫你/触发你 ${count} 次。${droppedText}`,
-      "请把这些内容当作同一轮连续发言来理解，只自然回复一次。",
-      "不要逐条编号回答，不要提到“合并”“系统”“触发窗口”或内部处理。"
-    ].join("\n")
-  }
+  buildMergedDirectTriggerPrompt(e = {}) { return conversationScheduling.buildMergedDirectTriggerPrompt(this,e) }
 
-  scheduleMergedDirectTrigger(e, handler, reason = "direct") {
-    const mergeMs = this.getMergeMsForEvent(e)
-    if (mergeMs <= 0 || !this.isMergeableDirectTrigger(e)) return null
+  scheduleMergedDirectTrigger(e,handler,reason = "direct") { return conversationScheduling.scheduleMergedDirectTrigger(this,e,handler,reason) }
 
-    const key = `${e.group_id}:${e.user_id}`
-    const previous = directTriggerMergeTimers.get(key)
-    if (previous?.timer) clearTimeout(previous.timer)
+  isMergeableToolRequest(e = {}) { return conversationScheduling.isMergeableToolRequest(this,e) }
 
-    const messages = previous?.messages || []
-    messages.push({
-      event: e,
-      text: stripCqMarkup(e.msg || ""),
-      at: Date.now()
-    })
-    const maxMessages = this.getDirectTriggerMergeMaxMessages()
-    let droppedCount = previous?.droppedCount || 0
-    while (messages.length > maxMessages) {
-      messages.shift()
-      droppedCount++
-    }
-    messages.droppedCount = droppedCount
+  isLikelyToolRequestText(text = "") {return conversationEntryPolicy.isLikelyToolRequestText(this,text)}
 
-    const timer = setTimeout(async () => {
-      const entry = directTriggerMergeTimers.get(key)
-      if (!entry || entry.timer !== timer) return
-      directTriggerMergeTimers.delete(key)
-      const mergedEvent = this.buildMergedDirectTriggerEvent(e, entry.messages)
-      logger.info(`[触发合并] group=${e.group_id} user=${e.user_id} total=${entry.messages.length + (entry.droppedCount || 0)} retained=${entry.messages.length} dropped=${entry.droppedCount || 0} reason=${reason} latest="${summarizeForLog(entry.messages.at(-1)?.text || "")}"`)
-      try {
-        await handler(mergedEvent)
-      } catch (error) {
-        logger.error(`[触发合并] 执行失败:`, error)
-      }
-    }, mergeMs)
+  isAutomaticTorrentDownloadEvent(e = {}) {return conversationEntryPolicy.isAutomaticTorrentDownloadEvent(this,e)}
 
-    directTriggerMergeTimers.set(key, { timer, messages, droppedCount, reason })
-    logger.info(`[触发合并] group=${e.group_id} user=${e.user_id} wait=${mergeMs}ms count=${messages.length} dropped=${droppedCount} reason=${reason} msg="${summarizeForLog(e.msg || "")}"`)
-    return false
-  }
+  buildMergedToolRequestEvent(baseEvent,messages = []) { return conversationScheduling.buildMergedToolRequestEvent(this,baseEvent,messages) }
 
-  isMergeableToolRequest(e = {}) {
-    if (!e?.group_id || !e?.user_id || e?._toolRequestMerged || e?._directTriggerMerged || e?._smartWaitRerun || e?._smartQueuedRerun || e?._proactiveReply) return false
-    if (e.forceGrabRedBag || this.isCommand(e)) return false
-    const text = String(e.msg || "").trim()
-    if (!text || isDrawTaskStatusInquiry(text)) return false
-    // 每个磁链都是独立下载任务。不要把连续磁链合并后只处理其中一个。
-    if (this.isAutomaticTorrentDownloadEvent(e)) return false
-    if (shouldBypassMergeForExcel(text)) return false
-    const message = Array.isArray(e.message) ? e.message : []
-    if (message.some(seg => ["image", "video", "record", "file"].includes(seg?.type))) return false
-    return this.isLikelyToolRequestText(text)
-  }
-
-  isLikelyToolRequestText(text = "") {
-    const content = normalizeIntentText(text)
-    if (!content) return false
-    return Boolean(
-      isImageGenerationRequest(content) ||
-      isImageCompositionEditRequest(content) ||
-      isImageAnalysisRequest(content) ||
-      isRealtimeInfoRequest(content) ||
-      isExplicitSearchRequest(content) ||
-      isExplicitToolIntent(content) ||
-      resolveNaturalDeltaForceToolCall(content) ||
-      shouldUseExcelWorkbookTool(content)
-    )
-  }
-
-  isAutomaticTorrentDownloadEvent(e = {}) {
-    if (!e?.group_id || String(e?.user_id || "") === String(e?.self_id || e?.bot?.uin || Bot.uin || "")) return false
-    if (this.config?.torrentDownload?.autoDetect === false) return false
-    return Boolean(extractValidBtihMagnetUri(e?.msg || ""))
-  }
-
-  buildMergedToolRequestEvent(baseEvent, messages = []) {
-    const merged = this.buildMergedDirectTriggerEvent(baseEvent, messages)
-    merged._toolRequestMerged = true
-    return merged
-  }
-
-  scheduleMergedToolRequest(e, handler) {
-    const mergeMs = this.getMergeMsForEvent(e)
-    if (mergeMs <= 0 || !this.isMergeableToolRequest(e)) return null
-
-    const key = `${e.group_id}:${e.user_id}:tool_request`
-    const previous = toolRequestMergeTimers.get(key)
-    if (previous?.timer) clearTimeout(previous.timer)
-
-    const messages = previous?.messages || []
-    messages.push({
-      event: e,
-      text: stripCqMarkup(e.msg || ""),
-      at: Date.now()
-    })
-    const maxMessages = this.getDirectTriggerMergeMaxMessages()
-    let droppedCount = previous?.droppedCount || 0
-    while (messages.length > maxMessages) {
-      messages.shift()
-      droppedCount++
-    }
-    messages.droppedCount = droppedCount
-
-    const timer = setTimeout(async () => {
-      const entry = toolRequestMergeTimers.get(key)
-      if (!entry || entry.timer !== timer) return
-      toolRequestMergeTimers.delete(key)
-      const mergedEvent = this.buildMergedToolRequestEvent(e, entry.messages)
-      logger.info(`[工具请求合并] group=${e.group_id} user=${e.user_id} total=${entry.messages.length + (entry.droppedCount || 0)} retained=${entry.messages.length} dropped=${entry.droppedCount || 0} latest="${summarizeForLog(entry.messages.at(-1)?.text || "")}"`)
-      try {
-        await handler(mergedEvent)
-      } catch (error) {
-        logger.error(`[工具请求合并] 执行失败:`, error)
-      }
-    }, mergeMs)
-
-    toolRequestMergeTimers.set(key, { timer, messages, droppedCount })
-    logger.info(`[工具请求合并] group=${e.group_id} user=${e.user_id} wait=${mergeMs}ms count=${messages.length} dropped=${droppedCount} msg="${summarizeForLog(e.msg || "")}"`)
-    return false
-  }
+  scheduleMergedToolRequest(e,handler) { return conversationScheduling.scheduleMergedToolRequest(this,e,handler) }
 
   /**
    * smart 模式触发入口：每条群消息进入此函数，按 talkValue 阈值/空窗补偿/强制覆盖三种条件决定是否调 Timing Gate
@@ -1580,38 +1176,11 @@ export class ExamplePlugin extends plugin {
     return resolveLongTaskFeedbackPolicy(String(e?.msg || ""))?.releaseSmartLock === true
   }
 
-  releaseSmartInFlight(state, e, expectedToken) {
-    if (!state) return
-    // 看门狗强制释放（或长任务提前释放）后锁可能已交给新轮次；旧轮次的 finally 不得误释放
-    if (expectedToken !== undefined && state.inFlightToken !== expectedToken) return
-    clearSmartLockWatchdog(state)
-    state.inFlight = false
-    if (!state.needsRerun) return
+  releaseSmartInFlight(state,e,expectedToken) { return conversationScheduling.releaseSmartInFlight(this,state,e,expectedToken) }
 
-    const rerunEvent = state.rerunEvent || e
-    const queuedForceGateCheck = !!state.queuedForceGateCheck
-    state.needsRerun = false
-    state.rerunEvent = null
-    state.queuedForceGateCheck = false
-    const wrappedRerun = Object.create(rerunEvent)
-    wrappedRerun._smartQueuedRerun = true
-    if (queuedForceGateCheck) wrappedRerun._smartQueuedGateCheck = true
-    this.handleRandomReplySmart(wrappedRerun).catch(err => logger.error('[TimingGate] 重跑失败:', err))
-  }
+  getSmartLockTimeoutMs() { return conversationScheduling.getSmartLockTimeoutMs(this) }
 
-  getSmartLockTimeoutMs() {
-    const raw = this.config?.smartTrigger?.smartLockTimeoutMs
-    const value = raw === undefined || raw === null || raw === '' ? NaN : Number(raw)
-    return Number.isFinite(value) ? Math.max(0, value) : 180000
-  }
-
-  scheduleSmartLockWatchdog(state) {
-    armSmartLockWatchdog(state, {
-      timeoutMs: this.getSmartLockTimeoutMs(),
-      logger,
-      onForceRelease: () => this.releaseSmartInFlight(state, null, state.inFlightToken)
-    })
-  }
+  scheduleSmartLockWatchdog(state) { return conversationScheduling.scheduleSmartLockWatchdog(this,state) }
 
   /**
    * 调用 Timing Gate 子代理，返回 { decision: 'continue'|'no_action'|'wait', wait_seconds?, reason? }
@@ -1626,27 +1195,7 @@ export class ExamplePlugin extends plugin {
    * 有新消息且未到 maxConsecutiveInterrupts 上限 → 让步本轮（return false）；
    * 否则放行（return true）。force 路径应在调用方跳过本检查。
    */
-  async applyReplyDebounce(e) {
-    const debounceMs = Math.max(0, Number(this.config.smartTrigger?.replyDebounceMs) || 0)
-    if (debounceMs <= 0 || !e?.group_id) return true
-    const debounceStartAt = Date.now()
-    await new Promise(r => setTimeout(r, debounceMs))
-    const newestAt = lastIncomingMsgAt.get(e.group_id) || 0
-    if (newestAt > debounceStartAt) {
-      const max = Math.max(0, Number(this.config.smartTrigger?.maxConsecutiveInterrupts) || 0)
-      const cur = (consecutiveInterrupts.get(e.group_id) || 0) + 1
-      if (max === 0 || cur <= max) {
-        consecutiveInterrupts.set(e.group_id, cur)
-        logger.info(`[Debounce] group=${e.group_id} 检测到新消息打断，让步本轮 (${cur}/${max || '∞'})`)
-        return false
-      }
-      logger.info(`[Debounce] group=${e.group_id} 连续打断达上限 ${max} 次，强制走完不让步`)
-      consecutiveInterrupts.set(e.group_id, 0)
-      return true
-    }
-    consecutiveInterrupts.set(e.group_id, 0)
-    return true
-  }
+  async applyReplyDebounce(e) { return await conversationScheduling.applyReplyDebounce(this,e) }
 
   /**
    * 解析 talkValue：优先用时段化规则，否则用全局 talkValue
@@ -1675,57 +1224,14 @@ export class ExamplePlugin extends plugin {
   /**
    * 记录一次"用户消息→bot 回复"的延迟，给空窗补偿用。两种模式都调用。
    */
-  recordReplyLatency(groupId, latencyMs) {
-    return recordReplyLatency(this, groupId, latencyMs)
+  recordReplyLatency(groupId, latencyMs, e) {
+    return recordReplyLatency(this, groupId, latencyMs, e)
   }
 
   /**
    * 安排 N 秒后强制再触发一轮 Gate，让 LLM 决定要不要补一句（wait 工具/Gate wait 决策共用）
    */
-  scheduleWaitReply(e, seconds, reason) {
-    const groupId = e.group_id
-    if (!groupId) {
-      logger.warn(`[WaitTool] 私聊场景暂不支持自动续话: user=${e.user_id}`)
-      return
-    }
-    const state = this.getSmartState(groupId)
-    const userKey = `${groupId}_${e.user_id}`
-    const old = state.waitTimers.get(userKey)
-    if (old) clearTimeout(old)
-
-    const timer = setTimeout(async () => {
-      state.waitTimers.delete(userKey)
-      // 触发时再次校验：模式可能已切回 strict、bot 可能已被禁言、群可能已退出白名单
-      const mode = String(this.config?.chatTriggerMode || 'strict').toLowerCase()
-      if (mode !== 'smart') {
-        logger.info(`[WaitTool] group=${groupId} 已切出 smart 模式，取消续话`)
-        return
-      }
-      if (!this.checkGroupPermission(e)) {
-        logger.info(`[WaitTool] group=${groupId} 不在白名单，取消续话`)
-        return
-      }
-      if (this.isUserBlacklisted(e)) {
-        logger.info(`[WaitTool] group=${groupId} user=${e.user_id} 命中用户黑名单，取消续话`)
-        return
-      }
-      if (await this.isMutedInGroup(e)) {
-        logger.info(`[WaitTool] group=${groupId} 被禁言，取消续话`)
-        return
-      }
-      state.forceContinue = false
-      state.forceGateCheck = true
-      logger.info(`[WaitTool] group=${groupId} user=${e.user_id} fired after ${seconds}s reason=${reason || ''}`)
-      try {
-        const wrapped = Object.create(e)
-        wrapped._smartWaitRerun = true
-        await this.handleRandomReplySmart(wrapped)
-      } catch (err) {
-        logger.error(`[WaitTool] 续话失败:`, err)
-      }
-    }, seconds * 1000)
-    state.waitTimers.set(userKey, timer)
-  }
+  scheduleWaitReply(e,seconds,reason) { return conversationScheduling.scheduleWaitReply(this,e,seconds,reason) }
 
   /**
    * 外部插件主动触发：注入 intent 到群历史 + 强制下一轮 Gate continue
@@ -1733,50 +1239,7 @@ export class ExamplePlugin extends plugin {
    * @param {string} intent 主动想说的话题/意图
    * @param {object} opts { source: '插件名', anchorE: 可选锚点 e }
    */
-  async enqueueProactiveTask(groupId, intent, opts = {}) {
-    if (!isAiConversationEnabled(this.config)) {
-      logger.info('[Proactive] 插件总开关已关闭，取消续话')
-      return { ok: false, error: 'plugin_disabled' }
-    }
-    if (!groupId || !intent) return { ok: false, error: 'missing_params' }
-    const anchor = opts.anchorE
-    if (!anchor) {
-      logger.warn(`[Proactive] group=${groupId} 缺少锚点 e，无法触发；intent="${String(intent).slice(0, 40)}"`)
-      return { ok: false, error: 'missing_anchor' }
-    }
-    if (String(anchor.group_id) !== String(groupId)) {
-      logger.warn(`[Proactive] anchor.group_id(${anchor.group_id}) 与传入 groupId(${groupId}) 不匹配，拒绝触发`)
-      return { ok: false, error: 'anchor_group_mismatch' }
-    }
-    if (!this.checkGroupPermission(anchor)) {
-      return { ok: false, error: 'not_whitelisted' }
-    }
-    if (this.isUserBlacklisted(anchor)) {
-      return { ok: false, error: 'user_blacklisted' }
-    }
-    if (await this.isMutedInGroup(anchor)) {
-      return { ok: false, error: 'muted' }
-    }
-
-    logger.info(`[Proactive] group=${groupId} source=${opts.source || 'unknown'} intent="${String(intent).slice(0, 40)}"`)
-    try {
-      const wrapped = Object.create(anchor)
-      wrapped.msg = `[系统主动触发 来自 ${opts.source || '插件'}] ${intent}`
-      const mode = String(this.config?.chatTriggerMode || 'strict').toLowerCase()
-      if (mode === 'smart') {
-        const state = this.getSmartState(groupId)
-        state.forceContinue = true
-        markProactiveReply(wrapped, lastIncomingMsgAt.get(groupId) || Date.now())
-        setImmediate(() => this.handleRandomReplySmart(wrapped).catch(err => logger.error('[Proactive] 处理失败:', err)))
-      } else {
-        // strict 模式没有 Gate，直接走 handleTool（绕过 @/前缀破冰）
-        setImmediate(() => this.handleTool(wrapped).catch(err => logger.error('[Proactive] 处理失败:', err)))
-      }
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err.message }
-    }
-  }
+  async enqueueProactiveTask(groupId,intent,opts = {}) { return await conversationScheduling.enqueueProactiveTask(this,groupId,intent,opts) }
 
   async scanRedisKeys(pattern) {
     try {
@@ -1950,66 +1413,11 @@ export class ExamplePlugin extends plugin {
       /^(?:[^\n]{0,48})(?:请求|查询|分析|下载|解析|发送|处理|执行|生成|编辑).{0,20}(?:失败|错误|异常|超时)/i.test(text)
   }
 
-  syncDedupeToolConfig(toolNames = this.config.oneapi_tools || []) {
-    this.dedupeToolNames = new Set(
-      (Array.isArray(toolNames) ? toolNames : [])
-        .map(item => parseToolConfigEntry(item))
-        .filter(item => item.name && item.dedupe)
-        .map(item => item.name)
-    )
-  }
+  syncDedupeToolConfig(...args) {return toolAssembly.syncDedupeToolConfig(this,...args)}
 
-  getToolsByName(toolNames, options = {}) {
-    if (!toolNames || !Array.isArray(toolNames)) return []
-    const warnMissing = options.warnMissing !== false
+  getToolsByName(...args) {return toolAssembly.getToolsByName(this,...args)}
 
-    return toolNames
-      .map(item => {
-        const { name } = parseToolConfigEntry(item)
-        if (name === 'sendLocalEmojiTool' && !this.config?.emojiSystem?.enabled) {
-          return null
-        }
-        if (name === 'waitTool') {
-          const mode = String(this.config?.chatTriggerMode || 'strict').toLowerCase()
-          if (mode !== 'smart' || !this.config?.smartTrigger?.waitToolEnabled) return null
-        }
-        const func = this.functionMap.get(name)
-        if (!func) {
-          if (warnMissing) console.warn(`未找到工具 "${name}"`)
-          return null
-        }
-        return {
-          type: "function",
-          function: {
-            name: func.name,
-            description: func.description,
-            parameters: {
-              type: "object",
-              properties: func.parameters.properties,
-              required: func.parameters.required || []
-            }
-          }
-        }
-      })
-      .filter(Boolean)
-  }
-
-  getToolsDescriptionString() {
-    if (!this.tools?.length) return "当前没有可用的工具。"
-
-    const localDesc = this.tools
-      ?.filter(t => !mcpManager.isMCPTool(t.function?.name))
-      .map(t => `${t.function.name}: ${t.function.description}`)
-      .join("\n") || ""
-
-    const mcpDesc = mcpManager.getToolsDescription ? mcpManager.getToolsDescription() : ""
-
-    const parts = []
-    if (localDesc) parts.push("【本地工具】\n" + localDesc)
-    if (mcpDesc) parts.push("【MCP工具】\n" + mcpDesc)
-
-    return parts.length ? parts.join("\n\n") : "当前没有可用的工具。"
-  }
+  getToolsDescriptionString(...args) {return toolAssembly.getToolsDescriptionString(this,...args)}
 
   ensureConfigFiles() {
     if (!sharedConfigStore) this.initConfigStore()
@@ -2090,27 +1498,7 @@ export class ExamplePlugin extends plugin {
     return merged
   }
 
-  mergeMCPConfig(defaults, user) {
-    const merged = this.mergeConfigPreserveUser(defaults || {}, user || {})
-
-    if (merged.settings && typeof merged.settings === "object") {
-      delete merged.settings.legacyAliasEnabled
-    }
-
-    if (user?.servers && typeof user.servers === "object" && !Array.isArray(user.servers)) {
-      merged.servers = { ...user.servers }
-      for (const [serverName, serverConfig] of Object.entries(user.servers)) {
-        if (defaults?.servers?.[serverName]) {
-          merged.servers[serverName] = this.mergeConfigPreserveUser(
-            defaults.servers[serverName],
-            serverConfig
-          )
-        }
-      }
-    }
-
-    return merged
-  }
+  mergeMCPConfig(...args) {return toolAssembly.mergeMCPConfig(this,...args)}
 
   checkGroupPermission(e) {
     if (!this.config.enableGroupWhitelist) return true
@@ -2118,240 +1506,45 @@ export class ExamplePlugin extends plugin {
   }
 
   // 私聊回合入口:门禁(开关/白名单/节流) → 违禁词 → 锚点 → 主回合
-  async handlePrivateChat(e) {
-    if (this.isCommand(e)) return false // #指令仍走指令规则(人设列表等本就支持私聊)
-    const gate = evaluatePrivateChatGate({ config: this.config, e, isMaster: e?.isMaster })
-    if (!gate.allowed) {
-      if (gate.reason === "disabled" || gate.reason === "master_only" || gate.reason === "not_allowed") {
-        logger.info(`[私聊] user=${e.user_id} 忽略(${gate.reason})`)
-      }
-      return false
-    }
-    if (this.isUserBlacklisted(e)) return false
-    if (this.handleForbiddenWordHit(e)) return false
-    anchorEventConversation(e)
-    e._triggerContext = { mode: "private_chat" }
-    logger.info(`[私聊] user=${e.user_id} 进入私聊回合 msg="${summarizeForLog(e.msg || "")}"`)
-    return await this.handleTool(e)
-  }
+  async handlePrivateChat(e) {return await conversationEntryPolicy.handlePrivateChat(this,e)}
 
-  isUserBlacklisted(e) {
-    const blacklist = this.config?.userBlacklist
-    if (!blacklist?.enabled) return false
-    const userId = e?.user_id
-    if (userId === undefined || userId === null) return false
-    const users = Array.isArray(blacklist.users) ? blacklist.users : []
-    return users.some(id => String(id).trim() === String(userId))
-  }
+  isUserBlacklisted(e) {return conversationEntryPolicy.isUserBlacklisted(this,e)}
 
   // 违禁词命中处理:标记会话中断(掐掉该群所有早于此的进行中回合) + 取消排队续话。
   // 返回 true 表示本条消息已被黑名单吞掉,调用方直接 return。
-  handleForbiddenWordHit(e) {
-    const cfg = this.config?.forbiddenWords
-    if (cfg?.enabled === false) return false
-    const text = String(e?.msg || e?.raw_message || "")
-    const word = findForbiddenWord(text, cfg)
-    if (!word) return false
-    const scopeKey = chatScopeKey(e)
-    markConversationInterrupted(scopeKey)
-    if (e?.group_id) this.cancelPendingConversation(e.group_id)
-    logger.mark(`[违禁词] scope=${scopeKey} user=${e?.user_id} word=${word} 已中断当前对话 msg="${summarizeForLog(text)}"`)
-    const replyText = String(cfg?.replyText || "").trim()
-    if (replyText) {
-      this.sendObservedReply(e, renderPersonaTemplate(replyText, this.getPersonaFor(e)), false, "forbidden_notice")
-        .catch(error => logger.warn(`[违禁词] 提示语发送失败: ${error?.message || error}`))
-    }
-    return true
-  }
+  handleForbiddenWordHit(e) {return conversationEntryPolicy.handleForbiddenWordHit(this,e)}
 
   // 记忆自纠错:群友指出"你记错了"时,自动降权她上一轮引用的记忆(降权非删除,重复纠错自然淡忘)
-  handleMemorySelfCorrection(e) {
-    try {
-      const groupId = e?.group_id
-      if (!groupId) return false
-      const runtime = getSemanticMemoryRuntime()
-      if (!runtime || runtime.config?.selfCorrection?.enabled === false) return false
-      const state = this.getSmartState(groupId)
-      detectAndPenalize({
-        text: e?.msg || e?.raw_message || "",
-        groupId,
-        quotesBot: (() => { try { return messageQuotesUser(e, e?.bot?.uin || Bot.uin) } catch { return false } })(),
-        senderUserId: e?.user_id,
-        lastBotReplyToUserId: state?.lastBotReplyToUserId,
-        runtime,
-        penalty: Number(runtime.config?.selfCorrection?.penalty) || 0.5,
-        ttlMs: (Number(runtime.config?.selfCorrection?.ttlMinutes) || 10) * 60 * 1000
-      })
-    } catch {}
-    return false
-  }
+  handleMemorySelfCorrection(e) {return conversationEntryPolicy.handleMemorySelfCorrection(this,e)}
 
   // 中断后的排队清理:延迟触发/续话定时器/待重跑事件全部作废,新消息可开新对话
-  cancelPendingConversation(groupId) {
-    try {
-      const state = this.getSmartState(groupId)
-      if (state.deferredTimer) {
-        clearTimeout(state.deferredTimer)
-        state.deferredTimer = null
-      }
-      for (const timer of state.waitTimers?.values() || []) clearTimeout(timer)
-      state.waitTimers?.clear?.()
-      state.rerunEvent = null
-      state.forceContinue = false
-      state.forceGateCheck = false
-      state.queuedForceGateCheck = false
-      state.needsRerun = false
-    } catch (error) {
-      logger.warn(`[违禁词] 清理排队续话失败 group=${groupId}: ${error?.message || error}`)
-    }
-  }
+  cancelPendingConversation(groupId,e) { return conversationScheduling.cancelPendingConversation(this,groupId,e) }
 
-  async getGroupUserMessages(groupId, userId) {
-    const redisKey = `${this.messageHistoriesRedisKey}:${groupId}:${userId}`
-    const filePath = path.join(this.messageHistoriesDir, `${groupId}_${userId}.json`)
+  getGroupUserMessages(...args) { return conversationHistory.getGroupUserMessages(this,...args) }
 
-    try {
-      const redisData = await loadData(redisKey, null)
-      if (redisData) return redisData
+  saveGroupUserMessages(...args) { return conversationHistory.saveGroupUserMessages(this,...args) }
 
-      const fileData = await fs.promises.readFile(filePath, "utf-8").catch(() => null)
-      if (fileData) {
-        const parsed = JSON.parse(fileData)
-        await saveData(redisKey, filePath, parsed)
-        return parsed
-      }
-      return []
-    } catch (error) {
-      console.error(`获取消息历史失败:`, error)
-      return []
-    }
-  }
+  clearGroupUserMessages(...args) { return conversationHistory.clearGroupUserMessages(this,...args) }
 
-  async saveGroupUserMessages(groupId, userId, messages) {
-    const redisKey = `${this.messageHistoriesRedisKey}:${groupId}:${userId}`
-    const filePath = path.join(this.messageHistoriesDir, `${groupId}_${userId}.json`)
-    await Promise.all([
-      saveData(redisKey, filePath, messages),
-      fs.promises.writeFile(filePath, JSON.stringify(messages, null, 2), "utf-8")
-    ]).catch(err => console.error(`保存消息历史失败:`, err))
-  }
-
-  async clearGroupUserMessages(groupId, userId) {
-    const redisKey = `${this.messageHistoriesRedisKey}:${groupId}:${userId}`
-    const filePath = path.join(this.messageHistoriesDir, `${groupId}_${userId}.json`)
-    await Promise.all([
-      redis.del(redisKey),
-      fs.promises.unlink(filePath).catch(() => { })
-    ])
-  }
-
-  async resetGroupUserMessages(groupId, userId) {
-    await this.clearGroupUserMessages(groupId, userId)
-    await this.saveGroupUserMessages(groupId, userId, [])
-  }
+  resetGroupUserMessages(...args) { return conversationHistory.resetGroupUserMessages(this,...args) }
 
   formatTime() {
     return formatTime(this)
   }
 
-  async collectForwardPromptLines(group, forwardId, state = {}) {
-    const id = String(forwardId || "").trim()
-    if (!group?.getForwardMsg || !id) return state.lines || []
+  collectForwardPromptLines(...args) { return conversationHistory.collectForwardPromptLines(this,...args) }
 
-    const lines = state.lines || []
-    const visited = state.visited || new Set()
-    const depth = Number(state.depth) || 0
-    const maxDepth = Number(state.maxDepth) || FORWARD_CONTEXT_MAX_DEPTH
-    const maxLines = Number(state.maxLines) || FORWARD_CONTEXT_MAX_LINES
-    if (depth >= maxDepth || lines.length >= maxLines) return lines
-    if (visited.has(id)) {
-      lines.push(`${"  ".repeat(depth)}[嵌套转发记录重复，已跳过]`)
-      return lines
-    }
-
-    visited.add(id)
-    let forwardMsgs = []
-    try {
-      forwardMsgs = normalizeForwardMessageList(await group.getForwardMsg(id))
-    } catch (err) {
-      logger.debug(`[获取转发记录失败] id=${id} ${err}`)
-      return lines
-    }
-
-    const indent = "  ".repeat(depth)
-    for (const fMsg of forwardMsgs) {
-      if (lines.length >= maxLines) break
-      const segments = normalizeMessageSegments(fMsg)
-      const text = extractReadableTextFromSegments(segments, fMsg.raw_message || fMsg.message_text || fMsg.content_text || "")
-      const name = getForwardSenderName(fMsg)
-      if (text) lines.push(`${indent}${name}: ${text}`)
-
-      const nestedForwardIds = extractForwardIdsFromSegments(segments)
-      for (const nestedId of nestedForwardIds) {
-        if (lines.length >= maxLines) break
-        lines.push(`${indent}${name}: [嵌套转发记录]`)
-        await this.collectForwardPromptLines(group, nestedId, {
-          lines,
-          visited,
-          depth: depth + 1,
-          maxDepth,
-          maxLines
-        })
-      }
-    }
-
-    return lines
-  }
-
-  async resolveForwardPromptFromSegments(segments = [], group) {
-    const forwardIds = extractForwardIdsFromSegments(segments)
-    if (!forwardIds.length || !group?.getForwardMsg) return ""
-
-    const lines = []
-    const visited = new Set()
-    for (const forwardId of forwardIds) {
-      if (lines.length >= FORWARD_CONTEXT_MAX_LINES) break
-      await this.collectForwardPromptLines(group, forwardId, {
-        lines,
-        visited,
-        depth: 0,
-        maxDepth: FORWARD_CONTEXT_MAX_DEPTH,
-        maxLines: FORWARD_CONTEXT_MAX_LINES
-      })
-    }
-
-    return compactDrawPromptText(lines.join("\n"), FORWARD_CONTEXT_MAX_TEXT)
-  }
+  resolveForwardPromptFromSegments(...args) { return conversationHistory.resolveForwardPromptFromSegments(this,...args) }
 
   async buildMessageContent(sender, msg, images, atQq = [], group, e = null) {
     return await buildMessageContent(this, sender, msg, images, atQq, group, e)
   }
 
-  checkTriggers(e) {
-    try {
-      const hasMessage = e.msg && typeof e.msg === "string" &&
-        this.config.triggerPrefixes.some(p => p && e.msg.toLowerCase().includes(p.toLowerCase()))
+  checkTriggers(e) {return conversationEntryPolicy.checkTriggers(this,e)}
 
-      const botId = e?.bot?.uin || Bot.uin
-      const hasAt = messageMentionsUser(e, botId)
-      const hasReplyToBot = messageQuotesUser(e, botId)
+  isCommand(e) {return conversationEntryPolicy.isCommand(this,e)}
 
-      return hasMessage || hasAt || hasReplyToBot
-    } catch {
-      return false
-    }
-  }
-
-  isCommand(e) {
-    return e.msg?.startsWith("#")
-  }
-
-  filterChatByQQ(chatArray, qqNumber) {
-    const pattern = /\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/
-    const lastIndex = chatArray.reduce((last, curr, i) =>
-      curr.content?.includes(`(qq号: ${qqNumber})`) && pattern.test(curr.content) ? i : last, -1)
-    return lastIndex === -1 ? chatArray : chatArray.slice(0, lastIndex + 1)
-  }
+  filterChatByQQ(...args) { return conversationHistory.filterChatByQQ(this,...args) }
 
   getOrCreateSession(sessionId, tools) {
     return this.sessionStore.getOrCreate(sessionId, tools)
@@ -2361,21 +1554,15 @@ export class ExamplePlugin extends plugin {
     this.sessionStore.clear(sessionId)
   }
 
-  trimMessageHistory(messages) {
-    const nonSystem = messages.filter(m => m.role !== "system")
-    if (nonSystem.length <= this.MAX_HISTORY) return messages
-
-    const system = messages.filter(m => m.role === "system")
-    return [...system, ...nonSystem.slice(-this.MAX_HISTORY)]
-  }
+  trimMessageHistory(...args) { return conversationHistory.trimMessageHistory(this,...args) }
 
   /**
    * AI判断用户是否在继续跟机器人对话
    * @param {string} userMessage - 用户新消息
    * @param {Array} chatHistory - 对话历史数组 [{role: 'bot'|'user', content: '...'}]
    */
-  async isUserTalkingToBot(userMessage, chatHistory = []) {
-    return await isUserTalkingToBot(this, userMessage, chatHistory)
+  async isUserTalkingToBot(userMessage, chatHistory = [], e) {
+    return await isUserTalkingToBot(this, userMessage, chatHistory, e)
   }
 
   /**
@@ -2422,80 +1609,9 @@ export class ExamplePlugin extends plugin {
    * 格式化工具返回结果（截断过长内容）
    */
 
-	  async retryRequest(requestData, toolContent, retries = 1, toolName, options = {}) {
-	    return executeChatRequestWithRecovery(
-	      currentRequest => YTapi(currentRequest, this.config, toolContent, toolName, options),
-	      requestData,
-	      {
-	        retries,
-	        onRetry: ({ failure, requestData: retryData, retriesLeft }) => {
-	          const choice = typeof retryData?.tool_choice === "string"
-	            ? retryData.tool_choice
-	            : retryData?.tool_choice?.function?.name || "auto"
-	          logger.warn(`[API重试] kind=${failure.kind} status=${failure.status || ""} toolChoice=${choice} retriesLeft=${retriesLeft}`)
-	        }
-	      }
-	    )
-	  }
+	  retryRequest(...args) {return toolAssembly.retryRequest(this,...args)}
 
-  getFriendlyFailureMessage(toolName = "", context = {}) {
-    const committedReply = buildCommittedActionReply(context?.session)
-    if (committedReply) return committedReply
-    if (toolName === "mentionMembersTool") {
-      return buildMentionMembersFailureReply(context?.error || context?.failedResult || "")
-    }
-    if (toolName === "bananaTool") {
-      const errorText = String(context?.error || context?.failedResult || "")
-      return buildImageFailureReply(errorText)
-    }
-    if (toolName === "googleImageAnalysisTool") {
-      return appendVisibleFailureDetail(
-        "图片我收到了，但这次识图服务没有返回可用结果。不是你没发图，我先不乱猜。",
-        context?.error || context?.failedResult || ""
-      )
-    }
-    if (toolName === "googleImageEditTool") {
-      const errorText = String(context?.error || context?.failedResult || "")
-      return buildImageFailureReply(errorText, { operation: "edit" })
-    }
-    if (toolName === "searchInformationTool" || toolName === "webParserTool" || toolName === "githubRepoTool") {
-      return appendVisibleFailureDetail(
-        "你的问题我收到了，但检索服务这次没有完成。我不拿不完整的结果凑答案，也不会说成是你没发清楚。",
-        context?.error || context?.failedResult || ""
-      )
-    }
-    if (toolName === "deltaForceTool") {
-      const text = String(context?.error || context?.failedResult || "").replace(/^error:\s*/i, "").replace(/^工具\s+deltaForceTool\s+执行失败:\s*/i, "").trim()
-      return text ? `三角洲查询失败：${buildVisibleFailureDetail(text)}` : "三角洲接口这次没查成，但你的查询条件已经收到了。"
-    }
-    if (toolName === "modrinthTool") {
-      return appendVisibleFailureDetail(
-        "Modrinth 排名数据已经查到，但简介翻译服务这次没有返回完整结果。我先不把缺字段或错位译文发出来。",
-        context?.error || context?.failedResult || ""
-      )
-    }
-    if (toolName === "torrentDownloadTool") {
-      const rawFailure = String(context?.error || context?.failedResult || "")
-        .replace(/^error[:：]\s*/i, "")
-        .replace(/^工具\s+torrentDownloadTool\s+执行失败[:：]\s*/i, "")
-      const detail = rawFailure.trim()
-        ? buildVisibleFailureDetail(rawFailure, { fallback: "没有拿到可下载的文件" })
-        : ""
-      return detail ? `这个磁链没有开始或完成下载：${detail}` : "这个磁链没有完成下载，我不会把未完成的文件说成已经发出。"
-    }
-
-    const userText = [
-      context?.session?.rawArgs,
-      context?.session?.userContent,
-      context?.e?.msg
-    ].filter(Boolean).join("\n")
-    const failure = classifyChatRequestFailure({ error: context?.error || context?.failedResult || "" })
-    return buildGenericChatFailureReply(userText, {
-      isGreeting: isCasualBotGreeting(userText),
-      failureKind: failure?.kind || "unknown",
-      failureDetail: buildVisibleChatFailureDetail(context?.error || context?.failedResult || "")
-    })
-  }
+  getFriendlyFailureMessage(...args) { return getFriendlyFailureMessage(...args) }
 
   async composeToolFailureReply(toolName = "", context = {}) {
     const fallback = context.factualReply || this.getFriendlyFailureMessage(toolName, context)
@@ -2637,244 +1753,12 @@ export class ExamplePlugin extends plugin {
   async processToolCalls(...args) { return await processToolCalls(this, ...args) }
   async executeTool(...args) { return await executeTool(this, ...args) }
 
-  async handleTextResponse(content, e, session, messages, toolName) {
-    let output = await this.processToolSpecificMessage(content, toolName)
-    if (!output) {
-      logger.warn("[最终回复清理] 模型回复只包含伪工具格式，已跳过发送")
-      return
-    }
-    const cleaned = redactInternalStatusLeaks(output)
-    if (cleaned.redactedChars > 0) {
-      if (cleaned.heavy) {
-        logger.warn(`[最终回复清理] 内部信息占比过高(${cleaned.kinds.join(",")} ${(cleaned.ratio * 100).toFixed(0)}%)，整段回退: ${output.slice(0, 120)}`)
-        output = buildInternalStatusSafeReply(toolName, session)
-      } else {
-        logger.warn(`[最终回复清理] 已脱敏内部片段(${cleaned.kinds.join(",")} ${cleaned.redactedChars}字)，保留其余回复`)
-        output = cleaned.text
-      }
-    }
-    const modrinthItems = toolName === "modrinthTool" ? extractModrinthForwardItems(output) : []
-    const modrinthCardItems = modrinthItems.length && Array.isArray(session?.modrinthCardItems)
-      ? session.modrinthCardItems
-      : []
-    if (session?.modrinthCardItems) session.modrinthCardItems = null
-    if (toolName === "modrinthTool") output = stripModrinthForwardMarkers(output)
-    if (!modrinthItems.length) {
-      output = applyOutputPersonaGuards(output, {
-        userText: session?.userContent || e?.msg || "",
-        toolName,
-        botNames: [Bot?.nickname, this.getPersonaFor(e)?.name],
-        personaGuard: this.config.personaGuard,
-        polish: true
-      })
-    } else {
-      output = modrinthItems.join("\n\n")
-    }
-    if (!output) {
-      logger.warn("[最终回复清理] 风格拦截后回复为空，已跳过发送")
-      return
-    }
-    const narrativeReply = !modrinthItems.length
-      ? splitNarrativeReply(output, session?.userContent || e?.msg || "")
-      : null
-    if (narrativeReply?.lead) {
-      output = narrativeReply.story
-      logger.info(`[叙事呈现] 已剥离模型开场 lead=${narrativeReply.lead.length} story=${output.length}`)
-    }
-    const textImageTemplate = !modrinthItems.length && this.getTextImageTemplateForFinalReply({
-      content,
-      output,
-      session,
-      toolName,
-      e
-    })
-    session.responseAttempted = true
-    // 最终出口 markdown 兜底:无论上游路径如何判定,只要最终文本含
-    // markdown 结构(粗体/列表/围栏)就转卡面——绝不让 **星号裸发到 QQ
-    const markdownFallback = !modrinthItems.length && !narrativeReply?.lead && !textImageTemplate && looksLikeCodeOrMarkdown(output)
-    const botMessageId = modrinthItems.length
-      ? modrinthCardItems.length === modrinthItems.length
-        ? await this.sendModrinthForwardCards(e, modrinthCardItems)
-        : await this.sendModrinthForwardItems(e, modrinthItems)
-      : narrativeReply?.lead
-        ? await this.sendFinalReplyAsTextImage(e, output, "document")
-        : textImageTemplate || markdownFallback
-        ? await this.sendFinalReplyAsTextImage(e, output, textImageTemplate || "document")
-        : await this.sendSegmentedMessage(e, output, 0.5, { alreadyGuarded: true })
-
-    // 画图请求最终走了纯文字回复且本回合没有出图：给下一轮留失败标记，让模型能接住用户的不满
-    if (session?.turnDrawRequested && e.group_id) {
-      try {
-        const delivered = await findRecentBotImage(e, { botId: e?.bot?.uin || e?.self_id || Bot.uin, maxAgeMs: 90000, limit: 12 })
-        if (delivered) {
-          clearDrawFailureNote(e.group_id)
-        } else {
-          recordDrawTextFallback(e.group_id, session.rawArgs || session.userContent || e?.msg || "")
-          logger.info(`[画图失败标记] group=${e.group_id} 画图请求只得到文字回复，已记录失败标记`)
-        }
-      } catch (noteError) {
-        logger.warn(`[画图失败标记] group=${e.group_id} 记录失败: ${noteError?.message || noteError}`)
-      }
-    }
-
-    // 轮末延续摘要：同用户 10 分钟内再来说话时注入上一轮做了什么、回了什么
-    session.lastFinalReply = String(output || "").slice(0, 240)
-    if (this.config?.episodicMemory?.enabled !== false && e?.group_id) {
-      recordEpisode({
-        groupId: e.group_id,
-        userId: e?.user_id,
-        userName: e?.sender?.card || e?.sender?.nickname || "",
-        summary: String(session?.userContent || e?.msg || "").slice(0, 120),
-        reply: session.lastFinalReply,
-        maxPerGroup: Number(this.config?.episodicMemory?.maxPerGroup) || 200
-      })
-    }
-    await recordTurnContinuity({
-      redis: globalThis.redis,
-      groupId: e?.group_id,
-      userId: e?.user_id,
-      intent: session?.modelIntentDecision?.intent || "",
-      route: session?.initialExecutionRoute?.mode || "",
-      tools: (session?.turnPlan?.outcomes || []).map(outcome => `${outcome.toolName}${outcome.success === false ? "(失败)" : "(成功)"}`).slice(0, 6),
-      lastReply: session.lastFinalReply
-    }).catch(() => {})
-
-    // 更新会话追踪中的对话历史
-    if (this.config.conversationTrackingEnabled && e.group_id && e.user_id) {
-      const conversationKey = `${e.group_id}_${e.user_id}`
-      const activeConv = activeConversations.get(conversationKey)
-      if (activeConv) {
-        // 获取当前对话历史
-        let chatHistory = activeConv.chatHistory || []
-
-        // 添加用户消息
-        const senderRole = roleMap[e.sender?.role] || "member"
-        const senderName = e.sender?.card || e.sender?.nickname || "未知用户"
-        const userMsg = `${this.formatTime()} ${senderName}(qq号: ${e.user_id})[群身份: ${senderRole}]: 在群里说: ${safeTruncateUnicode(session.userContent || e.msg || '', 200)}`
-        chatHistory.push({ role: 'user', content: userMsg })
-
-        // 添加机器人回复
-        const turnSelfId = e?.self_id || e?.bot?.uin || Bot.uin
-        const botMsg = `${this.formatTime()} ${resolvePersonaName(this.getPersonaFor(e))}(qq号:${turnSelfId})[群身份: member]: 在群里说: ${safeTruncateUnicode(output, 200)}`
-        chatHistory.push({ role: 'bot', content: botMsg })
-
-        // 只保留最近10条
-        if (chatHistory.length > 10) {
-          chatHistory = chatHistory.slice(-10)
-        }
-
-        // 重置定时器并更新数据
-        this.setTrackingWithTimer(conversationKey, { chatHistory })
-      }
-    }
-
-    const now = Math.floor(Date.now() / 1000)
-
-    try {
-      // 工具结果只保留在本轮上下文和日志中，不写入群聊历史，避免后续普通回复泄露内部状态。
-      // 多账号:回复归档用事件自身的 bot 身份与人设名,不再写死主号
-      const replySelfId = e.self_id || e.bot?.uin || Bot.uin
-      const replyPersonaName = resolvePersonaName(this.getPersonaFor(e))
-      await this.messageManager.recordMessage({
-        message_type: e.message_type,
-        group_id: e.group_id,
-        message_id: botMessageId,
-        time: now + 1,
-        message: [{ type: "text", text: output }],
-        source: "send",
-        self_id: replySelfId,
-        sender: { user_id: replySelfId, nickname: replyPersonaName, card: replyPersonaName, role: "member" }
-      })
-    } catch (error) {
-      logger.error("[MessageRecord] 记录消息失败：", error)
-    }
-
-    try {
-      personaFeedbackManager.rememberBotReply({ ...e, message_id: botMessageId }, output)
-      globalStyleLearnerManager.rememberBotReply(e, output, this.config.globalStyleLearning)
-    } catch (error) {
-      logger.warn(`[希洛反馈] 记录最近回复或自主风格轮次失败: ${error.message}`)
-    }
-
-    // 保存到 messages 数组
-    if (session.toolResults?.length) {
-      const existingToolResultIds = new Set(
-        messages
-          .filter(msg => msg.role === "tool" && msg.tool_call_id)
-          .map(msg => msg.tool_call_id)
-      )
-      for (const { toolCall, toolName: tName, result } of session.toolResults) {
-        if (result && result.trim() !== '') {
-          const toolCallId = toolCall?.id || randomUUID()
-          if (existingToolResultIds.has(toolCallId)) continue
-          existingToolResultIds.add(toolCallId)
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCallId,
-            name: tName,
-            content: result
-          })
-        }
-      }
-    }
-
-    messages.push({ role: "assistant", content: output })
-    session.groupUserMessages = this.trimMessageHistory(messages)
-    await this.saveGroupUserMessages(e.group_id, e.user_id, messages)
-
-    // 更新情感、记忆、表达学习（异步，不阻塞）
-    // 使用 e.msg 纯消息内容，而不是格式化的 userContent
-    this.updateEnhancedSystems(e, e.msg || '', output).catch(err => {
-      logger.error('[增强系统] 更新失败:', err)
-    })
-  }
+  async handleTextResponse(...args) { return await handleTextResponse(this, ...args) }
 
   /**
    * 异步更新情感系统、长期记忆
    */
-  async updateEnhancedSystems(e, userMessage, botReply) {
-    const { group_id: groupId, user_id: userId } = e
-    let emotionState = null
-
-    // 1. 更新情感系统
-    if (this.config.emotionSystem?.enabled) {
-      const isAtBot = messageMentionsUser(e, e?.bot?.uin || e?.self_id || Bot.uin)
-      emotionState = await this.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot, e.self_id || Bot.uin || "")
-    }
-
-    // 2. 提取并保存长期记忆（后台异步）
-    if (this.config.memorySystem?.enabled) {
-      // 不 await，让它在后台执行
-      this.memoryManager.extractAndSaveMemories(groupId, userId, userMessage, botReply, {
-        source: "user",
-        messageId: e.message_id,
-        senderName: e.sender?.card || e.sender?.nickname,
-        // 共享记忆盖源:这条事实是"当前 bot"在场时听来的,其他 bot 引用时可说"听XX说过"
-        heardFrom: resolvePersonaName(this.getPersonaFor(e))
-      })
-      // 提取群全局记忆（传入聊天记录）
-      if (groupId) {
-        const history = await this.messageManager.getMessages('group', groupId)
-        const eventBotId = String(e?.self_id || e?.bot?.uin || Bot.uin)
-        const chatHistory = (history || []).slice(0, 40).map(msg => {
-          // 归档的发送记录带 self_id;旧记录回退按 sender 匹配任一已知身份
-          const recordSelfId = String(msg.self_id || msg.sender?.self_id || "")
-          const isBotMsg = msg.source === "send" || recordSelfId === eventBotId ||
-            String(msg.sender?.user_id || "") === eventBotId
-          return {
-            role: isBotMsg ? 'assistant' : 'user',
-            source: msg.source || (isBotMsg ? "send" : "user"),
-            content: `${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${msg.content}`
-          }
-        })
-        this.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory, {
-          heardFrom: resolvePersonaName(this.getPersonaFor(e))
-        })
-      }
-    }
-
-    // 表达学习已移至 handleRandomReply 静默收集，不在此处调用
-  }
+  async updateEnhancedSystems(...args) { return await updateEnhancedSystems(this, ...args) }
 
   async sendObservedReply(...args) { return await sendObservedReply(this, ...args) }
   async sendSegmentedMessage(...args) { return await sendSegmentedMessage(this, ...args) }
@@ -2884,104 +1768,14 @@ export class ExamplePlugin extends plugin {
   findMember(...args) { return findMember(this, ...args) }
   processToolSpecificMessage(...args) { return processToolSpecificMessage(this, ...args) }
 
-  async initMCP() {
-    try {
-      const configDir = path.join(process.cwd(), "plugins/shiloh-plugin/config")
-      const configDefaultDir = path.join(process.cwd(), "plugins/shiloh-plugin/config_default")
-      const configPath = path.join(configDir, "mcp-servers.yaml")
-      const defaultConfigPath = path.join(configDefaultDir, "mcp-servers.yaml")
-
-      if (!fs.existsSync(configDir)) {
-        fs.mkdirSync(configDir, { recursive: true })
-      }
-
-      if (!fs.existsSync(configPath)) {
-        if (fs.existsSync(defaultConfigPath)) {
-          fs.copyFileSync(defaultConfigPath, configPath)
-          logger.info(`[MCP] 已从 config_default 复制配置文件: mcp-servers.yaml`)
-          logger.info(`[MCP] 请根据需要修改配置并启用相应的MCP服务器`)
-        } else {
-          logger.warn(`[MCP] 默认配置文件不存在: ${defaultConfigPath}`)
-          logger.warn(`[MCP] 请在 config_default 目录下创建 mcp-servers.yaml 文件`)
-          return
-        }
-      }
-
-      if (!fs.existsSync(configPath)) {
-        logger.info("[MCP] MCP配置文件不存在，跳过初始化")
-        return
-      }
-
-      let mcpConfig = YAML.parse(fs.readFileSync(configPath, "utf8"))
-      if (fs.existsSync(defaultConfigPath)) {
-        const defaultMcpConfig = YAML.parse(fs.readFileSync(defaultConfigPath, "utf8"))
-        const mergedMcpConfig = this.mergeMCPConfig(defaultMcpConfig, mcpConfig || {})
-        if (JSON.stringify(mcpConfig || {}) !== JSON.stringify(mergedMcpConfig)) {
-          fs.writeFileSync(configPath, YAML.stringify(mergedMcpConfig))
-          logger.info("[MCP] 已自动补齐 mcp-servers.yaml 新增默认配置项")
-        }
-        mcpConfig = mergedMcpConfig
-      }
-      mcpManager.configure(mcpConfig?.settings || {})
-
-      if (!mcpConfig?.servers) {
-        logger.info("[MCP] MCP配置为空或无服务器配置")
-        this.updateToolsList()
-        return
-      }
-
-      for (const [serverName, config] of Object.entries(mcpConfig.servers)) {
-        mcpManager.rememberServerConfig(serverName, config)
-      }
-
-      const enabledServers = Object.entries(mcpConfig.servers).filter(([_, config]) => config.enabled)
-
-      if (enabledServers.length === 0) {
-        logger.info("[MCP] 没有启用的MCP服务器")
-        this.updateToolsList()
-        return
-      }
-
-      for (const [serverName, config] of enabledServers) {
-        await mcpManager.connectServer(serverName, config)
-      }
-
-      this.updateToolsList()
-
-      logger.info(`[MCP] 初始化完成，共加载 ${mcpManager.aliases?.size || mcpManager.tools.size} 个MCP工具`)
-    } catch (error) {
-      logger.error("[MCP] 初始化失败:", error)
-    }
-  }
+  initMCP(...args) {return toolAssembly.initMCP(this,...args)}
 
   /**
    * 更新工具列表（合并本地工具和MCP工具）
    */
-  updateToolsList(options = {}) {
-    this.syncDedupeToolConfig(this.config.oneapi_tools || [])
-    const localTools = this.getToolsByName(this.config.oneapi_tools || [], {
-      warnMissing: this.localToolsReady !== false
-    })
-    const mcpTools = mcpManager.getAllTools() || []
+  updateToolsList(...args) {return toolAssembly.updateToolsList(this,...args)}
 
-    this.tools = [...localTools, ...mcpTools]
-
-    this.sessionStore.refreshTools(this.tools)
-
-  }
-
-  async waitForMCPReady(timeoutMs = 5000) {
-    if (!mcpInitPromise) return
-    try {
-      await Promise.race([
-        mcpInitPromise,
-        delay(timeoutMs).then(() => "timeout")
-      ])
-      this.updateToolsList()
-    } catch (error) {
-      logger.warn(`[MCP] 等待初始化完成失败: ${error.message}`)
-    }
-  }
+  waitForMCPReady(...args) {return toolAssembly.waitForMCPReady(this,...args)}
 
   /**
    * 清除当前群的所有记忆（群记忆 + 用户记忆）
@@ -2995,65 +1789,13 @@ export class ExamplePlugin extends plugin {
 
   // 对齐新 fact 模型（entityModel.makeFact）：factShortId(text) 作 id、tags[0] 作分类、
   // text、confidence、authority 中文来源；eventAt 存在附"(待回扣)"。
-  formatMemoryFactLines(facts = []) {
-    return (Array.isArray(facts) ? facts : []).map(fact => {
-      const shortId = factShortId(fact.text)
-      const category = (Array.isArray(fact.tags) && fact.tags[0]) || "未分类"
-      const confidence = Number(fact.confidence ?? 0).toFixed(2)
-      const source = this.memoryAuthoritySource(fact.authority)
-      const pending = fact.eventAt ? " (待回扣)" : ""
-      return `ID:${shortId} [${category}] ${fact.text}（来源:${source}，置信度:${confidence}）${pending}`
-    })
-  }
+  formatMemoryFactLines(...args) { return formatMemoryFactLines(this, ...args) }
 
-  formatMemoryFacts(title, facts = []) {
-    if (!facts.length) return `${title}\n暂无记忆`
-    const lines = this.formatMemoryFactLines(facts)
-    return `${title}\n${lines.join("\n")}\n\n删除单条记忆可发送：#删除记忆 my:<id>（删自己事实）或 #删除记忆 alias:<别名> / #删除记忆 fact:<群事实前缀>`.slice(0, 4500)
-  }
+  formatMemoryFacts(...args) { return formatMemoryFacts(this, ...args) }
 
-  async replyMemoryForward(e, title, sections = []) {
-    const msgs = []
-    for (const section of sections) {
-      const facts = section.facts || []
-      if (!facts.length) {
-        msgs.push(`${section.title}\n暂无记忆`)
-        continue
-      }
+  async replyMemoryForward(...args) { return await replyMemoryForward(this, ...args) }
 
-      const lines = this.formatMemoryFactLines(facts)
-      for (let i = 0; i < lines.length; i += 12) {
-        const page = Math.floor(i / 12) + 1
-        const total = Math.ceil(lines.length / 12)
-        const header = total > 1 ? `${section.title} (${page}/${total})` : section.title
-        msgs.push(`${header}\n${lines.slice(i, i + 12).join("\n")}`)
-      }
-    }
-
-    msgs.push("删除单条记忆可发送：#删除记忆 my:<id>（删自己事实）或 #删除记忆 alias:<别名> / #删除记忆 fact:<群事实前缀>")
-
-    try {
-      const forwardMsg = await common.makeForwardMsg(e, msgs, title)
-      await this.sendObservedReply(e, forwardMsg)
-    } catch (error) {
-      logger.warn("[记忆管理] 转发消息发送失败，回退为普通文本:", error)
-      await this.sendObservedReply(e, safeTruncateUnicode(msgs.join("\n\n"), 4500))
-    }
-  }
-
-  async replyLongForward(e, title, text, pageSize = 3000) {
-    const content = String(text || "")
-    const msgs = splitUnicodeText(content, pageSize)
-    if (!msgs.length) msgs.push("暂无内容")
-
-    try {
-      const forwardMsg = await common.makeForwardMsg(e, msgs, title)
-      await this.sendObservedReply(e, forwardMsg)
-    } catch (error) {
-      logger.warn("[消息发送] 转发消息发送失败，回退为普通文本:", error)
-      await this.sendObservedReply(e, safeTruncateUnicode(content, 4500) || "暂无内容")
-    }
-  }
+  async replyLongForward(...args) { return await replyLongForward(this, ...args) }
 
   // P1-4：进程内调用计数/耗时统计（主人或群管理员可见）。重启归零。
 
@@ -3183,3 +1925,5 @@ export class ExamplePlugin extends plugin {
     return await handlePersonaBindings(this, e)
   }
 }
+
+const toolAssembly=createToolAssembly({logger:{info:message=>globalThis.logger?.info?.(message),warn:message=>globalThis.logger?.warn?.(message),error:(message,error)=>globalThis.logger?.error?.(message,error)},refreshLocalTools:options=>refreshLocalTools(sharedState,options),applyToolRegistrySnapshot:()=>applyToolRegistrySnapshot(sharedState),mcpManager,getMcpInitPromise:()=>mcpInitPromise,parseToolConfigEntry,YTapi})

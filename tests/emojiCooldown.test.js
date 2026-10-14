@@ -39,7 +39,7 @@ test("冷却期间 casual 暴露返回空工具列表", () => {
 
 test("test.js 已接线：终态表情后记录冷却、暴露过滤传冷却参数", () => {
   const pluginSource = readPluginSources()
-  const routeSrc = fs.readFileSync(path.join(root, "utils/routeDecision.js"), "utf8")
+  const routeSrc = fs.readFileSync(path.join(root, "src/modules/conversation/application/routeDecision.ts"), "utf8")
   assert.ok(pluginSource.includes("recordEmojiOnlySend(e.group_id"), "终态表情回复记录冷却")
   assert.ok(pluginSource.includes("emojiCooldownMs: Number(host.config?.emojiSystem?.emojiCooldownMs"), "暴露过滤带冷却配置")
   assert.ok(routeSrc.includes("suppressEmojiByCooldown(ctx.intentText, ctx.groupId, ctx.emojiCooldownMs)"), "强制快路尊重冷却")

@@ -16,9 +16,9 @@ test("turn trace carries trigger provenance", () => {
 })
 
 test("timing gate shares the persona and trigger decisions flow into the turn", () => {
-  const src = readPluginSources()
+  const src = readPluginSources()+["src/modules/conversation/application/smartConversation.ts","src/modules/conversation/infrastructure/strictConversation.ts","src/modules/tools/infrastructure/chatTurn.ts"].map(readSource).join("\n")
   // gate 已拆到 apps/lib/timingGate.js(P 重构),人设注入断言看新家
-  const gateSrc = readSource("apps/lib/timingGate.js")
+  const gateSrc = readSource("src/modules/conversation/infrastructure/timingGate.ts")
   assert.ok(gateSrc.includes("gatePersonaTone"), "Gate prompt 需要注入人设语气")
   assert.ok(gateSrc.includes("触发决策与主链路共享同一份人设"), "Gate 与主链路共享人设的说明")
   for (const marker of [

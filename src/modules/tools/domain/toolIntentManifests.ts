@@ -1,0 +1,134 @@
+import { toolRecord, type ToolIntentContext } from "../../../contracts/toolExecution.js"
+import { getAllRegisteredIntentManifests } from "./toolManifestRegistry.js"
+export function createToolIntentManifests(classifyEmojiToolExposure:(text:string)=>string) {
+function normalizeText(text = "") {
+  return String(text || "")
+    .replace(/\[CQ:[^\]]+\]/g, " ")
+    // TRSS strips a configured bot alias before this layer. Preserve the request
+    // while removing the punctuation left by forms such as "希洛，查一下...".
+    .replace(/^\s*[，,、。:：;；!?！？]+\s*/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+
+function selectToolIntentCandidates(text = "", availableToolNames: string[] = [], context: ToolIntentContext = {}) {
+  const content = normalizeText(text)
+  if (!content) return []
+  const available = new Set(availableToolNames)
+  const candidates: string[] = []
+  for (const [toolName, manifest] of Object.entries(allIntentManifests())) {
+    if (!available.has(toolName)) continue
+    if (toolName === "sendLocalEmojiTool") {
+      if (classifyEmojiToolExposure(content) !== "none") candidates.push(toolName)
+      continue
+    }
+    if (Array.isArray(manifest.triggers) && manifest.triggers.some(pattern => pattern.test(content))) candidates.push(toolName)
+  }
+  return resolveCandidateConflicts(candidates, content, context)
+}
+
+function resolveCandidateConflicts(candidates: string[] = [], content = "", context: ToolIntentContext = {}) {
+  let resolved = [...candidates]
+
+  // A reaction image must never turn an explicit operational request back into
+  // a free-form chat turn. Explicitly asking for an emoji remains an override.
+  if (resolved.includes("sendLocalEmojiTool") && classifyEmojiToolExposure(content) !== "explicit") {
+    const hasOperationalTool = resolved.some(name => name !== "sendLocalEmojiTool")
+    if (hasOperationalTool) {
+      resolved = resolved.filter(name => name !== "sendLocalEmojiTool")
+    }
+  }
+
+  // 「下载 N」在磁链选择与 Pixiv 列表之间有歧义:
+  // - 磁链或多选编号始终归磁链工具;
+  // - 5 位以上纯数字更像 Pixiv 作品ID;
+  // - 短序号看哪边有活跃会话( Pixiv 侧用进程内存同步检查)。
+  if (resolved.includes("pixivDownloadTool") && resolved.includes("torrentDownloadTool")) {
+    const looksTorrent = /magnet:\?|磁链|磁力链接/.test(content) || /(?:下载|下|选择|选)\s*(?:第\s*)?\d+(?:\s*(?:,|，|、)\s*(?:第\s*)?\d+)+/.test(content)
+    const looksPixivId = /(?:下载|下|搬运)\s*(?:id|ID)?\s*\d{5,12}/i.test(content)
+    const preferPixiv = !looksTorrent && (looksPixivId || context.hasPixivSearchSession === true)
+    resolved = resolved.filter(name => (preferPixiv ? name !== "torrentDownloadTool" : name !== "pixivDownloadTool"))
+  }
+
+  if (resolved.includes("githubRepoTool")) {
+    resolved = resolved.filter(name => name !== "webParserTool" && name !== "searchInformationTool")
+  }
+  if (resolved.includes("modrinthTool")) {
+    resolved = resolved.filter(name => name !== "webParserTool" && name !== "searchInformationTool")
+  }
+  if (resolved.includes("mentionAdminsTool")) {
+    resolved = resolved.filter(name => name !== "mentionMembersTool")
+  }
+
+  const specificTools = resolved.filter(name => !["searchInformationTool", "webParserTool"].includes(name))
+  if (specificTools.length) {
+    resolved = resolved.filter(name => name !== "searchInformationTool")
+  }
+
+  return resolved
+}
+
+function buildToolIntentDisclosure(toolNames: string[] = []) {
+  const parts = []
+  for (const name of toolNames) {
+    const text = allIntentManifests()[name]?.disclosure
+    if (text) parts.push(text)
+  }
+  return parts.join("\n\n")
+}
+
+function hasToolIntentManifest(toolName = "") {
+  return Boolean(allIntentManifests()[toolName])
+}
+
+function allIntentManifests() {
+  return getAllRegisteredIntentManifests()
+}
+
+
+
+function resolveDeterministicToolIntent(text = "", availableToolNames: string[] = [], context: ToolIntentContext = {}) {
+  const candidates = selectToolIntentCandidates(text, availableToolNames, context)
+  if (candidates.length !== 1) return null
+  const toolName = candidates[0]!
+  const resolver = getAllRegisteredIntentManifests()[toolName]?.deterministicResolver
+  if (!resolver) return null
+  const params = resolver(normalizeText(text), context)
+  if (!params || typeof params !== "object") return null
+  return { intent: "tool", toolName, params, reason: "deterministic_manifest" }
+}
+
+function resolveToolRequestMergeMs(text = "", availableToolNames: string[] = [], options: ToolIntentContext & {defaultMs?:number;fastMs?:number} = {}) {
+  const defaultValue = Number(options.defaultMs)
+  const defaultMs = Number.isFinite(defaultValue) ? Math.max(0, defaultValue) : 3000
+  const fastValue = Number(options.fastMs)
+  const fastMs = Number.isFinite(fastValue) ? Math.max(0, fastValue) : 600
+  if (resolveDeterministicToolIntent(text, availableToolNames, options)) return fastMs
+  // 句尾已是完结标点(。!?)大概率说完了,缩短等待;悬着的半句才等满窗口
+  if (Number.isFinite(defaultValue)) return defaultMs
+  return /[。．.!！?？~～]$|\n\s*$/.test(String(text || "").trimEnd()) ? 1200 : defaultMs
+}
+
+// 工具模型不可用降级到聊天模型时,模型常把工具调用写成 ```json 文本块而不是
+// 原生 tool_calls。这段中间产物一旦被当作最终回复渲染成卡面,用户只会看到
+// 一块巨大的深色代码块。解析出这些内嵌调用供执行,剩余文本用于兜底回复。
+function extractEmbeddedToolCalls(content = "") {
+  const text = String(content || "")
+  const calls = []
+  let remainder = text
+  for (const match of text.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/g)) {
+    let parsed: Record<string,unknown> = {}
+    try { parsed = toolRecord(JSON.parse(match[1]!)) } catch { continue }
+    const name = String(parsed?.name || parsed?.toolName || parsed?.tool_name || "").trim()
+    if (!name || typeof name !== "string") continue
+    if (!/Tool$|^(searchInformationTool)$/.test(name) && !/[a-zA-Z]+Tool/.test(name)) continue
+    calls.push({ name, params: parsed?.params && typeof parsed.params === "object" ? parsed.params : (parsed?.arguments || {}), raw: match[0] })
+    remainder = remainder.replace(match[0], "")
+  }
+  remainder = remainder.replace(/\n{3,}/g, "\n\n").trim()
+  return { calls, remainder }
+}
+
+return {selectToolIntentCandidates,buildToolIntentDisclosure,hasToolIntentManifest,resolveDeterministicToolIntent,resolveToolRequestMergeMs,extractEmbeddedToolCalls}
+}
