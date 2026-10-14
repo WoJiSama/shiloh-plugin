@@ -1,0 +1,52 @@
+[
+  {
+    "id": "local-model-image-meme",
+    "rawUserText": "本地模型连续运行两个小时，机箱有股味道，这算电子体香吗？",
+    "expectedKind": "banter",
+    "imageSource": "https://assets.example.invalid/model-meme.png",
+    "readableImageText": "本地模型连续运行两个小时，机箱有股味道，这算电子体香吗？",
+    "modelReply": "哈哈，你这是拿机箱当香薰了。下次是不是还要给风扇挑个香调？",
+    "expect": "保留运行时长与电子体香的玩笑线索；图片链接只代表素材引用，不声称完成识图。"
+  },
+  {
+    "id": "duration-variant",
+    "rawUserText": "本地模型才跑十分钟，机箱就有味道了，这算赛博香水吗？",
+    "expectedKind": "banter",
+    "imageSource": "https://assets.example.invalid/ten-minute-meme.png",
+    "readableImageText": "才跑十分钟就开始散发赛博香水了。",
+    "modelReply": "十分钟就营业了？这香水的预热还挺快。",
+    "expect": "保留十分钟的新输入；上下文和提示不把两小时、硅脂或固定笑话当模板。"
+  },
+  {
+    "id": "serious-cooling-fault",
+    "rawUserText": "认真问，CPU 连续满载 92℃ 并有焦糊味，怎么排查散热？",
+    "expectedKind": "serious_answer",
+    "quote": { "userId": "99", "messageId": "prior-joke", "name": "测试机器人", "text": "这算电子体香吗？" },
+    "modelReply": "先停止负载并断电检查，有焦糊味就不要继续运行。冷却后再检查风扇、散热器安装和供电接头。",
+    "expect": "当前故障和认真请求优先于旧玩笑；数值、气味与引用来源各自保留。"
+  },
+  {
+    "id": "unread-video-keeps-text",
+    "rawUserText": "大家在聊吃饭，我刚吃完；视频里的吃法是什么？",
+    "expectedKind": "conversation",
+    "videoSource": "https://assets.example.invalid/unread-meal.mp4",
+    "quote": { "userId": "303", "messageId": "other-bot-comment", "name": "另一只机器人", "text": "他俩吃饭像饕餮。" },
+    "modelReply": "吃饭这个话题我跟上了。视频这段还没读到，你们说的是哪种吃法？",
+    "expect": "视频未读仅影响该素材；保留可读聊天，不把另一只机器人的话当作自己说过。"
+  },
+  {
+    "id": "ordinary-refusal",
+    "rawUserText": "发张你的真人照片看看？",
+    "expectedKind": "conversation",
+    "modelReply": "真人照片没有。给你换张头像倒是可以。",
+    "expect": "允许普通简短拒绝，保留模型回复，不强制加身体经历、免责声明或额外情绪。"
+  },
+  {
+    "id": "delivery-second-beat",
+    "rawUserText": "刚才改背景的图出来了吗？",
+    "expectedKind": "delivery",
+    "continuity": { "botId": "99", "intent": "image_edit", "route": "tool", "tools": ["imageEdit(成功)"], "lastReply": "背景已换成傍晚，图片已经发送。" },
+    "modelReply": "背景已经换成傍晚了。你看看这次的光线合不合适。",
+    "expect": "复用已确认交付；第二句的具体反馈邀请与第一句结果说明都完整保留，不固定补紧张。"
+  }
+]

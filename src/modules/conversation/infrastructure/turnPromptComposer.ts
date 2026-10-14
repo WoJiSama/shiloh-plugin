@@ -1,10 +1,11 @@
 import type {createGlobalStyleLearnerClass} from '../../memory/infrastructure/globalStyleLearner.js'
 import type {createPersonProfileClass} from '../../memory/application/personProfileInjector.js'
 import type {PersonaText} from '../domain/personaSource.js'
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
 type Style=InstanceType<ReturnType<typeof createGlobalStyleLearnerClass>>
 type Profile=InstanceType<ReturnType<typeof createPersonProfileClass>>
 interface ComposerConfig {emotionSystem?:{enabled?:boolean};memorySystem?:{enabled?:boolean};expressionLearning?:{enabled?:boolean};personProfileInjection?:{enabled?:boolean};midtermMemory?:{enabled?:boolean};globalStyleLearning?:Parameters<Style['buildPrompt']>[0] & {semanticPromptWaitMs?:number};embeddingAiConfig?:{embeddingApiUrl?:string;embeddingApiKey?:string;embeddingApiModel?:string};persona?:PersonaText;personaGuard?:Record<string,unknown>;promptLayerCache?:{enabled?:boolean}}
-interface ComposerTurn {groupId?:string|number;userId?:string|number;event?:Parameters<Profile['build']>[2];viewerSelfId?:unknown;viewerBotName?:string;messageText?:string;memoryText?:string;rawMessageText?:string;toneText?:string;cardText?:string;cardResponseKind?:string;moodHint?:Parameters<typeof formatMoodPrompt>[0]}
+interface ComposerTurn {groupId?:string|number;userId?:string|number;event?:Parameters<Profile['build']>[2];viewerSelfId?:unknown;viewerBotName?:string;messageText?:string;memoryText?:string;rawMessageText?:string;toneText?:string;cardText?:string;cardResponseKind?:string;moodHint?:Parameters<typeof formatMoodPrompt>[0];interactionContext?:TurnInteractionContext}
 interface ComposerDeps {emotionManager?:{getEmotionPromptForGroup(groupId:unknown,botId:string):Promise<string>};memoryManager?:{getContextualMemoryPrompt(groupId:unknown,userId:unknown,text:string,now:number,options:{viewerBotName:string}):Promise<string>;getGroupWorkflowPrompt(groupId:unknown,text:string):Promise<string>;getGroupKnowledgePrompt(groupId:unknown,options:{speakerQQ:unknown;message:string}):Promise<string>};expressionLearner?:{getExpressionPromptForGroup(groupId:unknown):Promise<string>};knowledgeSearcher?:{search(text:string):Promise<{knowledgeContext?:string}|null>};personaFeedbackManager?:{buildFeedbackPrompt(config:Record<string,unknown>|undefined,options:{personaName?:string}):string};globalStyleLearnerManager?:Pick<Style,'buildRelevantPrompt'|'buildPrompt'>;personProfileInjector?:Pick<Profile,'build'>;midtermSummaryManager?:{getSummaryPrompt(groupId:unknown):string}}
 interface ComposerOptions {config?:ComposerConfig;profile?:{profile?:string;reason?:string;layers?:string[]};turn?:ComposerTurn;precomputed?:Partial<Record<'identityBindings'|'workflowTeaching'|'knowledgeTeaching'|'memberLookup'|'mergedTrigger',string>>;deps?:ComposerDeps}
 interface ComposerLogger {warn?(message:string):void;error?(message:string):void;info?(message:string):void}
@@ -22,6 +23,7 @@ function message(error:unknown){return error instanceof Error?error.message:Stri
 // 保证测试可以直接用假依赖驱动。
 import { applyPromptLayerProfile } from "../domain/promptLayers.js"
 import { buildPersonaTonePrompt } from "../domain/personaTonePolicy.js"
+import { buildTurnInteractionPrompt } from "../domain/turnInteractionContext.js"
 import { formatMoodPrompt } from "../domain/personaMoods.js"
 import { isNarrativeWritingRequest } from "../domain/narrativeReply.js"
 import { buildSolutionExplanationStylePrompt } from "../domain/solutionExplanationStyle.js"
@@ -212,10 +214,11 @@ async function composeTurnPromptLayers({
   // ── 纯文本层 ──
   // 人设语气层顺带携带"本回合心情"(调皮情绪时刻):test.js 每回合掷骰后经 turn.moodHint 传入,
   // 命中时只给这一回合加一点情绪着色,不换人格。
-  const moodHintPrompt = formatMoodPrompt(turn.moodHint || undefined)
+  const moodHintPrompt = turn.interactionContext && !turn.interactionContext.allowPlayfulness ? '' : formatMoodPrompt(turn.moodHint || undefined)
   const personaTonePrompt = [
     buildPersonaTonePrompt({
-      userText: toneText,
+      userText: turn.interactionContext?.rawUserText ?? toneText,
+      ...(turn.interactionContext ? {interactionContext: turn.interactionContext} : {}),
       persona: config.persona || {}
     }),
     moodHintPrompt
@@ -250,6 +253,7 @@ async function composeTurnPromptLayers({
     memory: memoryPrompt,
     midtermMemory: midtermMemoryPrompt,
     expression: expressionPrompt,
+    interaction: buildTurnInteractionPrompt(turn.interactionContext),
     personaTone: personaTonePrompt,
     narrativeWriting: narrativeWritingPrompt,
     solutionExplanation: solutionExplanationPrompt,

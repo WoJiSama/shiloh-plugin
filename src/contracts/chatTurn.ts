@@ -7,7 +7,8 @@ export interface ChatTurnMember extends SemanticMember {group_name?:string}
 export interface ChatGroup {group_name?:string;getMemberMap():Promise<Map<number,ChatTurnMember>>;pickMember(id:ChatId|null|undefined):{info:ChatTurnMember|Promise<ChatTurnMember>}}
 export interface ChatTurnEvent extends ExecutionEvent {message_type?:string;self_id?:ChatId;group?:ChatGroup;group_name?:string;sender:ChatTurnMember;bot:{uin?:ChatId;nickname?:string;pickGroup(id:ChatId|undefined):ChatGroup};message?:import('./chatEvent.js').MessageSegment[];isMaster?:boolean;sessionId?:string;_turnId?:string;_triggerContext?:{mode?:string;[key:string]:unknown};_progressReplyState?:{sent:boolean;reserved:boolean};_receivedAt?:number;_groupContextAssets?:GroupAssets;reply_id?:unknown;getReply?():Promise<QuotedMessage|null>;_prefilterKind?:string;forceGrabRedBag?:boolean;_mergedMessageCount?:number;_quotedPromptContext?:{text?:string;messageId?:unknown}}
 export interface QuotedMessage {message?:unknown;[key:string]:unknown}
-export interface GroupAssets {images:{source:string}[];currentImages:unknown[];quotedImages:unknown[];forwardImages:unknown[];videos:string[];media?:unknown[];files?:unknown[];replyTargetUserId?:ChatId;replyTargetLabel?:string}
+export interface GroupMediaReference {source?:string;type?:string;origin?:string}
+export interface GroupAssets {images:{source:string;origin?:string}[];currentImages:unknown[];quotedImages:unknown[];forwardImages:unknown[];videos:(string|GroupMediaReference)[];media?:GroupMediaReference[];files?:unknown[];replyTargetUserId?:ChatId;replyTargetLabel?:string;currentForwardText?:string;quotedForwardText?:string}
 export interface AvatarAssets extends ExecutionAvatar {targets:{userId:string;label:string}[];references?:{id:string}[]}
 export interface TraceRecord {modelCalls:unknown[];tools:unknown[]}
 export interface ChatTrace {id:string;setTrigger(mode:string|undefined,context:unknown):void;setIntent(intent:string,confidence:number|null|undefined,source:string):void;addModelCall(kind:string,elapsed:number,options?:{tokens:number}):void;addTool(name:string,success:boolean,elapsed:number):void;finish():TraceRecord}
@@ -51,7 +52,7 @@ export interface ChatTurnHost {
 export interface ChatTurnRoute {warn?:string;aborted?:string;toolChoice:ToolChoice;forcedToolCall:ToolCall|null;toolScopeLocked:boolean;applied:string[]}
 export interface ChatTurnPorts {
  logger:{info(message:string,meta?:unknown):void;warn(message:string):void;error(message:string,error?:unknown):void;debug(message:string):void};
- botIdentity(e:ChatTurnEvent):{uin:ChatId;nickname:string};cacheGroupName(groupId:ChatId,name:string):Promise<void>;loadTurnContinuity(context:{groupId:ChatId|undefined;userId:ChatId|undefined}):Promise<{intent?:string;tools?:unknown[]}|null>;
+ botIdentity(e:ChatTurnEvent):{uin:ChatId;nickname:string};cacheGroupName(groupId:ChatId,name:string):Promise<void>;loadTurnContinuity(context:{groupId:ChatId|undefined;userId:ChatId|undefined;botId:ChatId}):Promise<{botId?:string;lastReply?:string;intent?:string;tools?:unknown[]}|null>;
  resolveConversationContext(e:ChatTurnEvent):unknown;collectThinking(session:ChatTurnSession,message:ExecutionMessage,e:ChatTurnEvent):void;sendThinkingForward(host:ChatTurnHost,e:ChatTurnEvent,session:ChatTurnSession):Promise<unknown>;
  globalStyleLearnerManager:unknown;personProfileInjector:unknown;personaFeedbackManager:unknown;getMidtermMemoryManager():unknown;
  formatGroupKnowledgeTeachingPrompt(entries:unknown[]):string;formatGroupWorkflowTeachingPrompt(entries:unknown[]):string;

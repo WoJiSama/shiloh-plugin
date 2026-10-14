@@ -6,6 +6,7 @@ import assert from "node:assert/strict"
 import { composeTurnPromptLayers } from "../utils/turnPromptComposer.js"
 import { FULL_PROMPT_LAYERS, CHAT_PROMPT_LAYERS, resolvePromptLayerProfile } from "../utils/promptLayers.js"
 import { clearPromptLayerCache } from "../utils/promptLayerCache.js"
+import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
 
 // 层缓存是模块级全局状态,测试间必须隔离
 beforeEach(() => clearPromptLayerCache())
@@ -75,7 +76,8 @@ const TURN = {
   rawMessageText: "查一下这个",
   toneText: "查一下这个",
   cardText: "查一下这个",
-  cardResponseKind: "chat"
+  cardResponseKind: "chat",
+  interactionContext: buildTurnInteractionContext({rawUserText: '查一下这个', botId: '99', speaker: {userId: '202'}})
 }
 
 const PRECOMPUTED = {
@@ -145,7 +147,7 @@ test("闲聊回合:只保留保底层,知识库与语义风格不取数", async 
   const result = await composeTurnPromptLayers({
     config: CONFIG,
     profile,
-    turn: { ...TURN, messageText: "哈哈", memoryText: "哈哈", rawMessageText: "哈哈", toneText: "哈哈", cardText: "哈哈" },
+    turn: { ...TURN, messageText: "哈哈", memoryText: "哈哈", rawMessageText: "哈哈", toneText: "哈哈", cardText: "哈哈", interactionContext: buildTurnInteractionContext({rawUserText: '哈哈', botId: '99'}) },
     precomputed: PRECOMPUTED,
     deps
   })
@@ -157,6 +159,7 @@ test("闲聊回合:只保留保底层,知识库与语义风格不取数", async 
     assert.ok(result.layerValues[name], `闲聊保底层 ${name} 不应为空`)
   }
   assert.ok(!result.prompt.includes("【知识库参考】"), "闲聊不应注入知识库层")
+  assert.ok(result.prompt.includes('【本轮互动】'), '互动层应在闲聊与任务两档中保留')
   assert.equal(result.layerValues.semanticStyle, "", "闲聊不应有语义风格层")
   assert.equal(result.layerValues.workflow, "【工作流】W", "层值仍会取数,由画像裁剪决定是否注入")
 })

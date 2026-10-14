@@ -16,9 +16,10 @@ import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 import {isImageGenerationRequest,isImageAnalysisRequest} from '../domain/messageIntent.js'
 import {recordDrawTextFallback,clearDrawFailureNote} from '../domain/drawFailureNote.js'
 import type {ReplyEvent} from './replyRendering.js'
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
 export interface Message {role:string;content:string;tool_call_id?:string;name?:string}
 export interface FinalEvent extends ReplyEvent {message_id?:string|number;sender?:{card?:string;nickname?:string;role?:string};message_type?:string;message?:import('../../../contracts/chatEvent.js').MessageSegment[]}
-export interface FinalSession {userContent?:string;rawArgs?:string;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
+export interface FinalSession {userContent?:string;rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
 interface Config {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean}|undefined;memorySystem?:{enabled?:boolean}|undefined}
 interface ArchivedMessage {self_id?:string|number;source?:string;sender?:{self_id?:string|number;user_id?:string|number|undefined;nickname?:string|undefined};content?:string}
 export interface FinalReplyHost {
@@ -37,10 +38,10 @@ interface FinalPorts {
  logger:{warn(...args:unknown[]):void;info(...args:unknown[]):void;error(...args:unknown[]):void};bot():{uin:string|number;nickname?:string};
  buildGenericChatFailureReply(text:string,options:{failureKind:string;isGreeting?:boolean;failureDetail?:string}):string;
  extractModrinthForwardItems(text:string):string[];stripModrinthForwardMarkers(text:string):string;
- applyOutputPersonaGuards(text:string,options:{userText:string;toolName?:string|undefined;botNames:string[];personaGuard?:Config['personaGuard'];polish:boolean}):string;
+ applyOutputPersonaGuards(text:string,options:{userText:string;toolName?:string|undefined;botNames:string[];personaGuard?:Config['personaGuard'];polish:boolean;interactionContext?:TurnInteractionContext}):string;
  findRecentBotImage(event:FinalEvent,options:{botId:string|number;maxAgeMs:number;limit:number}):Promise<unknown>;
  recordEpisode(options:{groupId:string|number;userId?:string|number|undefined;userName:string;summary:string;reply:string;maxPerGroup:number}):unknown;
- recordTurnContinuity(options:{groupId?:string|number|undefined;userId?:string|number|undefined;intent:string;route:string;tools:string[];lastReply:string}):Promise<unknown>;
+ recordTurnContinuity(options:{groupId?:string|number|undefined;userId?:string|number|undefined;botId:string|number;intent:string;route:string;tools:string[];lastReply:string}):Promise<unknown>;
  getActiveConversation(event:FinalEvent):{chatHistory?:Message[]}|undefined;trackingKey(event:FinalEvent):string;
  rememberPersonaReply(event:FinalEvent & {message_id?:unknown},text:string):unknown;rememberStyleReply(event:FinalEvent,text:string,config:unknown):unknown;
 }
@@ -54,6 +55,7 @@ function buildInternalStatusSafeReply(toolName = '', session:FinalSession = {}) 
 }
 
 async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEvent, session:FinalSession, messages:Message[], toolName?:string) {
+    const rawUserText = session.rawUserText ?? session.interactionContext?.rawUserText ?? session.rawArgs ?? e.msg ?? ''
     let output = await host.processToolSpecificMessage(content, toolName)
     if (!output) {
       logger.warn("[最终回复清理] 模型回复只包含伪工具格式，已跳过发送")
@@ -77,7 +79,8 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     if (toolName === "modrinthTool") output = stripModrinthForwardMarkers(output)
     if (!modrinthItems.length) {
       output = applyOutputPersonaGuards(output, {
-        userText: session?.userContent || e?.msg || "",
+        userText: rawUserText,
+        ...(session.interactionContext ? {interactionContext: session.interactionContext} : {}),
         toolName,
         botNames: [ports.bot().nickname, host.getPersonaFor(e)?.name].filter((name):name is string=>typeof name === "string"),
         personaGuard: host.config.personaGuard,
@@ -91,7 +94,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
       return
     }
     const narrativeReply = !modrinthItems.length
-      ? splitNarrativeReply(output, session?.userContent || e?.msg || "")
+      ? splitNarrativeReply(output, rawUserText)
       : null
     if (narrativeReply?.lead) {
       output = narrativeReply.story
@@ -146,7 +149,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
         groupId: e.group_id,
         userId: e?.user_id,
         userName: e?.sender?.card || e?.sender?.nickname || "",
-        summary: String(session?.userContent || e?.msg || "").slice(0, 120),
+        summary: safeTruncateUnicode(rawUserText, 120),
         reply: session.lastFinalReply,
         maxPerGroup: Number(host.config?.episodicMemory?.maxPerGroup) || 200
       })
@@ -154,6 +157,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     await recordTurnContinuity({
       groupId: e?.group_id,
       userId: e?.user_id,
+      botId: e.self_id || e.bot?.uin || ports.bot().uin,
       intent: session?.modelIntentDecision?.intent || "",
       route: session?.initialExecutionRoute?.mode || "",
       tools: (session?.turnPlan?.outcomes || []).map(outcome => `${outcome.toolName}${outcome.success === false ? "(失败)" : "(成功)"}`).slice(0, 6),
@@ -171,7 +175,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
         // 添加用户消息
         const senderRole = roleMap[e.sender?.role || ""] || "member"
         const senderName = e.sender?.card || e.sender?.nickname || "未知用户"
-        const userMsg = `${host.formatTime()} ${senderName}(qq号: ${e.user_id})[群身份: ${senderRole}]: 在群里说: ${safeTruncateUnicode(session.userContent || e.msg || '', 200)}`
+        const userMsg = `${host.formatTime()} ${senderName}(qq号: ${e.user_id})[群身份: ${senderRole}]: 在群里说: ${safeTruncateUnicode(rawUserText, 200)}`
         chatHistory.push({ role: 'user', content: userMsg })
 
         // 添加机器人回复
@@ -244,8 +248,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     await host.saveGroupUserMessages(e.group_id, e.user_id, messages)
 
     // 更新情感、记忆、表达学习（异步，不阻塞）
-    // 使用 e.msg 纯消息内容，而不是格式化的 userContent
-    host.updateEnhancedSystems(e, e.msg || '', output).catch(err => {
+    host.updateEnhancedSystems(e, rawUserText, output).catch(err => {
       logger.error('[增强系统] 更新失败:', err)
     })
   }

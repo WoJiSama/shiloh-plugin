@@ -1,4 +1,5 @@
 import type { ConversationContext } from '../../../contracts/conversation.js'
+import type { TurnInteractionContext } from '../../../contracts/turnInteraction.js'
 
 /** Legacy payloads remain opaque until their owning domain is migrated. No arbitrary fields. */
 export interface TurnSession {
@@ -10,6 +11,8 @@ export interface TurnSession {
   toolResults?: unknown[]
   toolContent?: unknown
   rawArgs?: string
+  rawUserText?: string
+  interactionContext?: TurnInteractionContext
   userContent?: unknown
   turnPlan?: unknown
   turnTrace?: unknown
@@ -84,6 +87,8 @@ export const TURN_SESSION_FIELDS = [
   { name: "toolResults", owner: "工具执行结果累积" },
   { name: "toolContent", owner: "工具消息内容" },
   { name: "rawArgs", owner: "原始命令参数" },
+  { name: "rawUserText", owner: "本轮当前正文;与时间/身份/引用前缀分开保留" },
+  { name: "interactionContext", owner: "本轮互动线索、对象与证据;主提示/感知续轮/最终出口共用" },
   { name: "userContent", owner: "构造后的用户消息内容(buildMessageContent)" },
   { name: "turnPlan", owner: "回合执行计划(turnPlan.js)" },
   { name: "turnTrace", owner: "回合观测 trace" },

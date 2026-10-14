@@ -1,11 +1,14 @@
 import type {ToolExecutionHost,ToolExecutionPorts,ExecutionMessage,ExecutionSession,ExecutionEvent,ExecutionResult,ToolCall,LocalExecutableTool,ToolExecutorPort} from "../../../contracts/toolExecution.js"
 import {toolRecord} from "../../../contracts/toolExecution.js"
+import type {TurnEvidence} from '../../../contracts/turnInteraction.js'
+import {buildTurnInteractionPrompt,withTurnInteractionEvidence} from '../../conversation/domain/turnInteractionContext.js'
+import {buildPersonaReplyModePrompt} from '../../conversation/domain/personaTonePolicy.js'
 import {TERMINAL_TOOL_NAMES,BACKGROUND_TERMINAL_TOOL_NAMES,getImageVerificationMode,isExplicitSearchRequest,isRealtimeInfoRequest} from "../../conversation/domain/messageIntent.js"
 import {safeTruncateUnicode} from "../../models/domain/unicodeText.js"
 import {joinIntentParts} from "../../conversation/domain/messageContext.js"
 import {replaceCqMentions} from "../../conversation/domain/mentionTargets.js"
 import {buildVisibleFailureDetail} from "../../models/domain/visibleFailure.js"
-import {buildToolGroundingInstruction,hasUsableToolResult,buildUnavailableToolReply} from "../domain/toolResultGrounding.js"
+import {buildToolGroundingInstruction,hasUsableToolResult,buildUnavailableToolReply,classifyToolResult} from "../domain/toolResultGrounding.js"
 import {decideToolContinuation,formatDirectToolResult} from "../domain/toolContinuationPolicy.js"
 import {activeDedupeToolRuns,LOCAL_EMOJI_TOOL_NAME} from "../../conversation/domain/splitState.js"
 export function createToolExecution(ports:ToolExecutionPorts) {
@@ -527,6 +530,25 @@ async function processToolCalls(host: ToolExecutionHost, message: ExecutionMessa
         name: toolName,
         content: result
       })))
+
+      if (session.interactionContext) {
+        const mediaEvidence: TurnEvidence[] = validResults.flatMap(({toolName, toolCall, result}) => {
+          const kind = toolName === 'googleImageAnalysisTool' ? 'image' : toolName === 'videoAnalysisTool' ? 'video' : null
+          if (!kind) return []
+          return [{origin: 'tool', kind, toolName, ...(toolCall.id ? {toolCallId: toolCall.id} : {}), state: classifyToolResult(result).kind === 'success' ? 'readable' : 'unavailable', text: extractToolResultText(host, result)}]
+        })
+        if (mediaEvidence.length) {
+          session.interactionContext = withTurnInteractionEvidence(session.interactionContext, mediaEvidence)
+          currentMessages.push({
+            role: 'system',
+            content: [
+              '【媒体证据已更新】以下互动线索替代本轮此前的判断；保留原有身份、偏好与关系边界。',
+              buildTurnInteractionPrompt(session.interactionContext),
+              buildPersonaReplyModePrompt({userText: session.interactionContext.rawUserText, interactionContext: session.interactionContext, ...(session.toolName ? {toolName: session.toolName} : {})})
+            ].join('\n')
+          })
+        }
+      }
 
       const imageVerificationSearchCall = host.buildImageVerificationSearchToolCall(validResults, session, e)
       if (imageVerificationSearchCall) {

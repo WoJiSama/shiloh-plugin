@@ -5,6 +5,7 @@ import {
   enforcePersonaToneBoundary,
   resolvePersonaReplyMode
 } from "../utils/personaTonePolicy.js"
+import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
 
 test("uses a precise mode for explanations and technical questions", () => {
   assert.equal(resolvePersonaReplyMode({ userText: "解释一下 Redis 为什么连不上" }), "precise")
@@ -43,4 +44,16 @@ test("removes only misplaced reaction openers from serious output", () => {
     enforcePersonaToneBoundary("你少来，这个梗我懂。", { userText: "哈哈你又开始了" }),
     "你少来，这个梗我懂。"
   )
+})
+
+test('grounded banter can use technical words without losing its reaction, but a real task wins', () => {
+  const userText = '本地模型运行十分钟，为什么像赛博香水？'
+  const interactionContext = buildTurnInteractionContext({rawUserText: userText})
+  assert.equal(resolvePersonaReplyMode({userText, interactionContext}), 'social')
+  assert.equal(resolvePersonaReplyMode({userText, interactionContext, toolName: 'googleImageAnalysisTool'}), 'social')
+  assert.equal(resolvePersonaReplyMode({userText, interactionContext, toolName: 'bananaTool'}), 'operational')
+  assert.equal(enforcePersonaToneBoundary('哈哈，这香水预热真快。下次给风扇挑个香调？', {userText, interactionContext}), '哈哈，这香水预热真快。下次给风扇挑个香调？')
+  const serious = buildTurnInteractionContext({rawUserText: '吐槽归吐槽，帮我排查 CPU 散热异常。'})
+  assert.equal(serious.kind, 'serious_answer')
+  assert.equal(resolvePersonaReplyMode({userText: serious.rawUserText, interactionContext: serious}), 'precise')
 })

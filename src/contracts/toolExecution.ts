@@ -1,3 +1,4 @@
+import type {TurnInteractionContext} from './turnInteraction.js'
 export interface ToolCall {id?:string;type?:string;function?:{name?:string;arguments?:string};[key:string]:unknown}
 export interface ToolResult {toolName:string;result:unknown;toolCallId?:string}
 export type ToolContinuation = 'direct_result'|'chat_only'|'tool_loop'
@@ -66,7 +67,7 @@ export interface ExecutionMessage {role?:string;content?:string;tool_calls?:Tool
 export interface ExecutionResult {toolCall:ToolCall;toolName:string;result:string;elapsed?:number}
 export interface ExecutionAvatar {images:string[];targets?:{userId:string;label:string}[];promptHint?:string}
 export interface ExecutionSession {
- rawArgs?:string;userContent?:string;groupContextImagePrompt?:string;tools?:ToolDefinition[];images?:string[];
+ rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;userContent?:string;groupContextImagePrompt?:string;tools?:ToolDefinition[];images?:string[];
  imageVerificationNeedsSearch?:boolean;imageVerificationSearchDone?:boolean;imageVerificationMode?:string;imageVerificationFinalInstructionAdded?:boolean;
  taskDedupeToolTouched?:boolean;backgroundTerminalToolTouched?:boolean;toolName?:string|undefined;toolResults?:ExecutionResult[];
  groupUserMessages?:ExecutionMessage[];editAssets?:{promptHint?:string};avatarEditBase?:{promptHint?:string};avatarDrawReference?:ExecutionAvatar;

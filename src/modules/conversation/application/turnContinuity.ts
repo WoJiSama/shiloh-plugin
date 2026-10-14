@@ -1,18 +1,18 @@
 interface Store {get(key:string):Promise<unknown>;set(key:string,value:string,options:{EX:number}):Promise<unknown>}
-interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number}
-interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number}
+export interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number;botId?:string}
+interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number;botId?:string|number}
 function parseRecord(value:unknown):Continuity|null {
  if(!value||typeof value!=='object')return null
  const r=value as Record<string,unknown>
  if(typeof r.at!=='number'||!Number.isFinite(r.at))return null
- return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply:typeof r.lastReply==='string'?r.lastReply:'',at:r.at}
+ return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply:typeof r.lastReply==='string'?r.lastReply:'',at:r.at,...(typeof r.botId==='string'?{botId:r.botId}:{})}
 }
 const TURN_CONTINUITY_TTL_MS = 10 * 60 * 1000
 const KEY_PREFIX = "blchat:turn_continuity:"
 const memoryFallback = new Map<string,Continuity>()
 
-function scopeKey(groupId:string|number = "", userId:string|number = "") {
-  return `${KEY_PREFIX}${groupId}:${userId}`
+function scopeKey(groupId:string|number = "", userId:string|number = "", botId?:string|number) {
+  return `${KEY_PREFIX}${groupId}:${userId}${botId === undefined ? "" : `:${String(botId)}`}`
 }
 
 function isRedisLike(store:Store|null) {
@@ -28,6 +28,7 @@ export async function recordTurnContinuity({
   redis:client = null,
   groupId = "",
   userId = "",
+  botId,
   intent = "",
   route = "",
   tools = [],
@@ -39,9 +40,10 @@ export async function recordTurnContinuity({
     route: String(route || "").slice(0, 20),
     tools: (Array.isArray(tools) ? tools : []).map(item => String(item || "").slice(0, 60)).slice(0, 6),
     lastReply: String(lastReply || "").slice(0, 240),
-    at
+    at,
+    ...(botId === undefined ? {} : { botId: String(botId) })
   }
-  const key = scopeKey(groupId, userId)
+  const key = scopeKey(groupId, userId, botId)
   memoryFallback.set(key, record)
   const store = isRedisLike(client) ? client : null
   if (!store) return record
@@ -53,8 +55,8 @@ export async function recordTurnContinuity({
   return record
 }
 
-export async function loadTurnContinuity({ redis:client = null, groupId = "", userId = "" }:Scope = {}) {
-  const key = scopeKey(groupId, userId)
+export async function loadTurnContinuity({ redis:client = null, groupId = "", userId = "", botId }:Scope = {}) {
+  const key = scopeKey(groupId, userId, botId)
   let record:Continuity|null = null
   const store = isRedisLike(client) ? client : null
   if (store) {
@@ -66,6 +68,8 @@ export async function loadTurnContinuity({ redis:client = null, groupId = "", us
     }
   }
   if (!record) record = memoryFallback.get(key) || null
+  // 带 bot 身份的调用只读取该 bot 自己的记录，不借用旧的无来源摘要。
+  if (botId !== undefined && record?.botId !== String(botId)) return null
   if (!record || Number.isFinite(record.at) !== true || Date.now() - Number(record.at) > TURN_CONTINUITY_TTL_MS) return null
   return record
 }

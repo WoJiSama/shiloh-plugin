@@ -1376,3 +1376,73 @@
 - 当前代码基线 `a93265cd94e2307504dad11d26351cf954cfc071` 已提交并推送至 origin/main，远端 `ls-remote` 核验一致；首次直连 GitHub 超时，改本机现有系统代理按命令重试成功，没有改变 Git 全局配置。推送后工作区干净。
 - 新增 `docs/architecture/typescript-migration-plan.md`：8 阶段及各子阶段单测/类型/编译产物验收、完整源码统计口径、NodeNext + JS 兼容入口、公开端口分层、发布/回滚和阶段报告模板。旧蓝图增加当前计划链接，历史记录保留。计划中的新增构建/验证命令明确标为尚未实现。
 - 两项只读复核完成，统计口径与测试门槛无遗漏；将阶段 5 的投递验收限定为已确认回执不重复发送、未知结果不自动重试，并新增发送/保存回执之间的崩溃恢复用例，与现有消息管道语义一致。计划文档准备独立提交并推送；本轮未执行 TS 迁移或部署。
+
+# 2026-10-13 小馒头群聊样本与希洛架构诊断
+- 已完成记忆快速检索、工作区状态和部署路径检查，生产连接成功。
+- 已并行委派两项只读代码审计：人设/生成链路，群聊/记忆/评测。
+- 正在定位 609235590 群 2026-10-13 14:37 的原始记录。
+- 目标转发已获取并统计，原始证据保存在 /tmp/bl-chat-humanlike-20261013（0700 目录），未调用发消息接口。
+- 正在只读检查生产人设绑定、模型和开关，并核对关键代码 hash。
+- 已核对生产人设、聊天/工具模型及开关（未输出凭据）；主聊天与工具都配置 gpt-6-1-sol，不能把当前表现直接归因于便宜模型。
+- 发现80节点截断风险，追加核对原始转发。抽查3张相关图片：50元图片、问号脸表情和夸张人脸，与文字梗能关联，但无法证明对方真实视觉实现。
+- 已补齐原始99节点并读完后19节点，纠正此前“80条完整”的说法；正在形成按优先级的诊断文档与验收路径。
+- 诊断文档完成：docs/ai-conversation-diagnosis-2026-10-13.md；包含样本证据、生产断点、人格草案、共享对话状态设计、P0/P1/P2及连续回放验收。
+- 文档与改动 whitespace 检查通过，未在文档中写入凭据或原始媒体链接；未运行真实模型A/B。最终服务active、PID1016410与取证前一致、NRestarts=0。业务代码与生产配置未修改。
+
+## 2026-10-13 TypeScript 阶段 1 实施
+后端严格 TS 工具链、纯模块迁移、JS 入口兼容、测试发现/产物加载、迁移统计与发布更新路径。保留其他会话诊断文档，不部署生产。分支 codex/ts-phase-1-foundation。
+
+阶段1实现提交7994c57。严格类型/边界/前端34项测试构建通过；后端最终1492项，1440通过、52宿主/Chromium跳过。两纯模块迁移11项TS测试无跳过，安装回滚7项通过；群内源码直拉更新暂时拦截，使用编译发布。其他会话诊断内容保留。
+
+## 2026-10-13 时区修复与后续 TS 阶段
+用户授权修复CI时区差异并按阶段2→8推进，每阶段单测/严格类型/编译产物门槛，独立提交回滚与JS余量记录，直接main。时区修复c5d530b：UTC/Shanghai各20项通过，新增三时区回归通过；阶段2会话和群运行时迁移进行中。保留其他会话诊断文件。
+
+2026-10-13 TS6A：记忆引擎14模块、语义/中期/表达/情绪/反馈/画像/命令迁移完毕整合中。专项130引擎、16GlobalStyle、178manager、命令4及新增磁盘/缓存回归通过。全仓首轮只emojiSchemaRefresh旧源码断言失败，已修。仍待双记忆archive hook交错启停修复后完整门禁。生产仍phase1，阶段2-5已push未部署。
+
+TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端34）；6B并行主回合、工具/MCP、会话调度与回复链迁移。Root提示上下文/trace/历史策略等68专项通过。发现并修复const重赋值、emoji未定义变量、私聊群访问、双重私聊门禁、未知投递重发；尚未完成6B门禁，apps/test继续拆业务，未部署。
+
+## 2026-10-14 TS migration continuation
+- 6B completed and pushed `bc79771`: full UTC phase gate, backend 1673 (1628 pass / 45 conditional skip), frontend 34. Business JS 178.
+- 7A completed and pushed `b63158f`: full UTC phase gate, backend 1692 (1647 pass / 45 conditional skip), frontend 34. Business JS 153. Independent reports/metrics committed.
+- 7B1 in progress: image tool composition plus file/image helpers. No deployment yet; production remains phase1. Do not proceed to next stage until current full gate passes.
+- 7B1 completed/pushed `eb3efce`: full gate 1711 backend (1699 pass, 12 skip), 34 frontend; business JS 146. 20 formerly skipped Banana queue tests now execute compiled classes.
+- 7B2 media domain active: Bilibili/YouTube, Douyin/torrent, Pixiv/video, music-share/voice. Current gate not yet run, no production deployment. Preserve shared planning docs outside commits.
+
+### 2026-10-14 7D integration continuation
+- Confirmed phase 7C2 commit 3ffd15b is on origin/main; production still awaits final release.
+- Dice command app moved to injected typed factory; compatibility registry in progress.
+- Added compiled command split/permission/log-receipt/private-delivery tests. Unknown private delivery will be retained for verification and excluded from retry.
+- PackManager migration split among agents within this stage. Full gate has not run yet; do not advance until it passes.
+
+### 7D complete / 7E active
+- 7D committed and pushed 0221be8 after full gates: backend 1774 passed / 11 skipped, frontend 34. Business JS 68 remaining.
+- 7E game domain migration underway; Delta and Uma typecheck passed while persistence decoder tests are being finalized. No production deploy yet.
+
+### 7E complete / 7F gates running
+- 7E committed be6c5c6 after full gate (1789 pass/11 skip backend, 34 frontend); pushed to origin/main.
+- 7F group administration, QQ tools, Reminder migrated. Focused compiled/legacy tests 45/45; full gate running /tmp/phase7f-final.log.
+
+# 2026-10-14 重构后群聊智能与人设复核
+- 已核对 HEAD、原有未提交诊断内容及最新迁移报告入口；两个现有人设/记忆审计 subagent 正在重新阅读 TS 实现。
+- 目前只修改诊断笔记，业务代码不动。
+- 已完成两个TS调用链审计及合成离线复现，确认旧const问题已修，其他关键语义断点仍存，补充多人格缓存和第一人称情节串用证据。
+- 17个相关现有测试文件98项通过、0失败0跳过；backend:typecheck与test:boundaries通过。
+- 新增docs/ai-conversation-review-2026-10-14.md，包含已修/仍存、精确TS位置、分批落点、社交状态数据流和验收；保留昨天取证报告。
+- 本轮未连接生产、未调真实模型、未发QQ消息、未改业务代码/配置、未部署。文档38个本地引用有效，git diff --check通过；最终HEAD仍de03521，原有其他会话改动保留。
+
+# 2026-10-14 最新三个合并转发体验分析
+- 用户进一步要求阅读群609235590最新三个合并转发；已通过生产归档定位发送者和时间，正在用NapCat既有只读get_forward_msg补齐节点。
+- 私有原始记录写入/tmp/bl-chat-latest-three-20261014，不写仓库；沿用planning-with-files记录进展。
+- 已读三条归档共22节点；原始接口未初始化，三账号只读查询均无法取得原始转发，不改动QQ登录或适配器。
+- 已核对关键“电子体香”原图并验证MD5一致；其他失败媒体不据此补结论。文字样本与图片证据相互支持。
+- 新增docs/ai-conversation-samples-2026-10-14.md，并在重构审查报告链接补充；聚焦语境重组、自身立场、局部不确定性、情绪当轮依据，补回放验收。业务代码未改，未发消息或真实模型请求。
+- 完成文档差异检查，43个本地引用有效，关键图MD5一致，私有目录0700/文件0600。只读业务审查完成，保留原有其他会话文件。
+
+# 2026-10-14 群聊互动最小闭环实施
+- 用户已授权“做”。基线de03521，原有诊断文档和三份规划文件保留；新两个subagent只读检查契约/测试入口。
+- 首轮确认：interaction层必须进入CHAT与FULL选择；continuity不可无来源冒充上一立场；图片证据需要保留真实可见素材或实际工具结果，不能猜OCR。
+- 已实现窄TurnInteractionContext与原始text/data.text正文保留，接入chatTurn/composer/final与实际感知续轮；互动层进入CHAT/FULL，当前明确任务优先，最终守卫使用相同互动上下文。
+- 续聊按bot来源隔离；明确@bot引用其他人时保留回应对象；工具证据按调用ID积累，不因后图失败丢掉前图可读结果。工具证据采用既有success/empty/not_found/error分类，续轮只更新互动和口吻，不引入默认人格。
+- 六脱敏场景固定为JSON；纯域12项和真实主链11项由全量测试执行，另补感知续轮与口吻、continuity、诊断检查。固定模型桩只验证契约，未据此声称模型生成质量改善。
+- 首轮全量1900项发现interaction层特征快照与session字段注册两项漂移，已同步；最终完整1908项1906通过/0失败/2宿主音乐集成跳过，严格类型、模块边界通过。完整输出：/tmp/bl-chat-interaction-regression-20261014.log。
+- 新增docs/ai-conversation-implementation-2026-10-14.md。保留所有原有诊断与规划改动，不提交/推送/部署，不访问生产或调用真实模型。

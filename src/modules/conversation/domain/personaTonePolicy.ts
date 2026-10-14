@@ -1,5 +1,6 @@
 import type {PersonaText} from './personaSource.js'
-interface ToneContext { userText?: string; toolName?: string; persona?: PersonaText }
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
+interface ToneContext { userText?: string; toolName?: string; persona?: PersonaText; interactionContext?: TurnInteractionContext }
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
 import { resolvePersonaName } from "./personaSource.js"
 
@@ -15,7 +16,15 @@ function personaLines(value: unknown, limit = 6) {
     .slice(0, limit)
 }
 
-export function resolvePersonaReplyMode({ userText = "", toolName = "" } = {}) {
+export function resolvePersonaReplyMode({ userText = "", toolName = "", interactionContext }: ToneContext = {}) {
+  if (interactionContext?.kind === 'serious_answer') return 'precise'
+  if (interactionContext?.kind === 'delivery') return 'operational'
+  if (interactionContext?.kind === 'comfort' && !toolName) return 'social'
+  // Perception can support a joke; running an action still needs an operational delivery.
+  if (interactionContext?.kind === 'banter' && interactionContext.allowPlayfulness) {
+    if (!toolName || /^(?:googleImageAnalysisTool|videoAnalysisTool)$/.test(toolName)) return 'social'
+    if (OPERATIONAL_TOOL_RE.test(toolName)) return 'operational'
+  }
   const text = String(userText || "")
   if (PRECISE_CONTEXT_RE.test(text)) return "precise"
   if (OPERATIONAL_TOOL_RE.test(String(toolName || ""))) return "operational"
@@ -23,7 +32,6 @@ export function resolvePersonaReplyMode({ userText = "", toolName = "" } = {}) {
 }
 
 export function buildPersonaTonePrompt(context: ToneContext = {}) {
-  const mode = resolvePersonaReplyMode(context)
   const name = resolvePersonaName(context?.persona)
   const preferences = personaLines(context?.persona?.preferences)
   const boundaries = personaLines(context?.persona?.boundaries)
@@ -37,14 +45,16 @@ export function buildPersonaTonePrompt(context: ToneContext = {}) {
   ]
   if (preferences.length) shared.push(`【稳定偏好】${preferences.join("；")}。这些会影响你愿意主动聊什么、怎样接话，但不应妨碍正常完成明确任务。`)
   if (boundaries.length) shared.push(`【固定边界】${boundaries.join("；")}。这些不是口号；与其冲突时优先保持边界。`)
-  if (mode === "precise") {
-    shared.push("本轮是科普、技术、事实或需要准确性的解释：语气清楚克制，直接给结论、依据和必要步骤。可以有一点自然口语，但不要加‘嘿嘿/啊这/你少来/吃瓜/6’这类反应词，也不要把认真内容演成角色台词。")
-  } else if (mode === "operational") {
-    shared.push("本轮是在交付或说明一个具体动作的结果：先说发生了什么和下一步，短而自然。不要客服播报，也不要无缘由撒娇、装委屈或承诺‘一直盯着’。")
-  } else {
-    shared.push("本轮是普通群聊：可以自然松一点、慢半拍、懒洋洋的，偶尔有停顿或轻微吐槽，但要先接住具体话题。不要为了像人而硬塞表情、害羞或嘴硬。")
-  }
+  shared.push(buildPersonaReplyModePrompt(context))
   return shared.join("\n")
+}
+
+/** A continuation may update tone without introducing another persona's name or preferences. */
+export function buildPersonaReplyModePrompt(context: ToneContext = {}): string {
+  const mode = resolvePersonaReplyMode(context)
+  if (mode === 'precise') return "本轮是科普、技术、事实或需要准确性的解释：语气清楚克制，直接给结论、依据和必要步骤。可以有一点自然口语，但不要加‘嘿嘿/啊这/你少来/吃瓜/6’这类反应词，也不要把认真内容演成角色台词。"
+  if (mode === 'operational') return "本轮是在交付或说明一个具体动作的结果：先说发生了什么和下一步，短而自然。不要客服播报，也不要无缘由撒娇、装委屈或承诺‘一直盯着’。"
+  return "本轮是普通群聊：可以自然松一点、慢半拍、懒洋洋的，偶尔有停顿或轻微吐槽，但要先接住具体话题。不要为了像人而硬塞表情、害羞或嘴硬。"
 }
 
 export function enforcePersonaToneBoundary(text = "", context: ToneContext = {}) {

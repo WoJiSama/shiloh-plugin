@@ -66,6 +66,14 @@ test("格式化输出包含分层/路由/守卫三块信息", () => {
   assert.ok(text.includes("守卫累计: 应用0次"))
 })
 
+test('interaction diagnostics keep only classification and evidence counts', () => {
+  const interaction = {kind: 'banter', evidenceCount: 3, referenceOnlyCount: 1, unavailableCount: 0}
+  recordTurnDiagnostics({groupId: '123', interaction})
+  interaction.evidenceCount = 99
+  assert.equal(getRecentTurns('123')[0].interaction.evidenceCount, 3)
+  assert.match(formatTurnDiagnosticsText({groupId: '123'}), /互动: banter 证据=3 素材引用=1 读取失败=0/)
+})
+
 test("无回合时给出可行动的提示;无命中回合的路由显示模型自选", () => {
   assert.ok(formatTurnDiagnosticsText({ groupId: "999" }).includes("还没有已记录的回合"))
   recordTurnDiagnostics({ groupId: "1", userId: "1", promptLayerReport: buildReport([]) })

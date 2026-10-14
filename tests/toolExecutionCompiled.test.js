@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createToolExecution } from '../dist/backend/modules/tools/infrastructure/toolExecution.js'
 import { createSemanticToolIntent } from '../dist/backend/modules/tools/infrastructure/semanticToolIntent.js'
+import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
 const logger={info(){},warn(){},error(){}}
 
 test('compiled executor dispatches MCP and retries local execution once',async()=>{
@@ -37,4 +38,46 @@ test('compiled planner treats null and malformed JSON as no decision',()=>{
  assert.equal(api.normalizeToolDecision({},null),null)
  assert.equal(api.extractJsonObject({},'{'),null)
  assert.deepEqual(api.extractJsonObject({},'```json\n{"intent":"chat"}\n```'),{intent:'chat'})
+})
+
+test('actual perception resolves a picture joke in the existing continuation request', async () => {
+  const requests=[],replies=[]
+  const api=createToolExecution({logger,resolveToolRoundLimit:()=>2,resolveEmojiTurnSkips:()=>[false],recordTurnPlanToolOutcome(){},buildChatRequestData:(_config,messages)=>{requests.push(structuredClone(messages));return{}},collectThinking(){}})
+  const call={id:'read-image',type:'function',function:{name:'googleImageAnalysisTool',arguments:'{}'}}
+  const session={rawUserText:'这个',interactionContext:buildTurnInteractionContext({rawUserText:'这个',botId:99,evidence:[{origin:'current',kind:'image',state:'reference_only',source:'https://example.invalid/image.png'}]})}
+  const host={config:{},dedupeToolCalls:c=>c,getToolCallName:c=>c.function.name,normalizeAssistantToolMessage:m=>m,shouldRunTerminalToolsInBackground:()=>false,runToolCall:async c=>({toolCall:c,toolName:'googleImageAnalysisTool',result:'图中文字：本地模型才跑十分钟就开始散发赛博香水了。'}),isToolResultError:()=>false,buildImageVerificationSearchToolCall:()=>null,retryRequest:async()=>({choices:[{message:{role:'assistant',content:'这香水预热真快。'}}]}),handleTextResponse:async(text,_event,current)=>replies.push({text,context:current.interactionContext})}
+  await api.processToolCalls(host,{tool_calls:[call]},{group_id:'123',msg:'这个'},session,[],[])
+  assert.equal(requests.length,1,'only the existing tool summary request is used')
+  assert.equal(session.interactionContext.kind,'banter')
+  assert.ok(session.interactionContext.evidence.some(item=>item.origin==='tool' && item.state==='readable' && item.text.includes('十分钟')))
+  assert.equal(replies[0].context,session.interactionContext)
+  const updated=requests[0].filter(message=>message.role==='system').map(message=>message.content).join('\n')
+  assert.match(updated,/【本轮互动】/)
+  assert.match(updated,/十分钟/)
+  assert.match(updated,/本轮是普通群聊/)
+  assert.doesNotMatch(updated,/【希洛场景口吻】/,'a perception update must not introduce a default persona')
+})
+
+test('media evidence uses shared success/empty classification, preserving readable OCR words', async () => {
+  for (const [result, state] of [
+    ['{}', 'unavailable'],
+    ['{"kind":"tool_outcome","status":"empty"}', 'unavailable'],
+    ['{"kind":"tool_outcome","status":"not_found"}', 'unavailable'],
+    ['{"analysis":"图中文字：错误地把机箱当电子香薰。"}', 'readable']
+  ]) {
+    const requests=[],sent=[]
+    const api=createToolExecution({logger,resolveToolRoundLimit:()=>2,resolveEmojiTurnSkips:()=>[false],recordTurnPlanToolOutcome(){},buildChatRequestData:(_config,messages)=>{requests.push(structuredClone(messages));return{}},collectThinking(){}})
+    const call={id:'perception',type:'function',function:{name:'googleImageAnalysisTool',arguments:'{}'}}
+    const session={rawUserText:'这个',interactionContext:buildTurnInteractionContext({rawUserText:'这个'})}
+    const host={config:{},dedupeToolCalls:c=>c,getToolCallName:c=>c.function.name,normalizeAssistantToolMessage:m=>m,shouldRunTerminalToolsInBackground:()=>false,runToolCall:async c=>({toolCall:c,toolName:'googleImageAnalysisTool',result}),isToolResultError:value=>value.includes('错误'),buildImageVerificationSearchToolCall:()=>null,retryRequest:async()=>({choices:[{message:{content:'这是图中文字。'}}]}),handleTextResponse:async text=>sent.push(text),handleToolFailureResponse:async()=>{}}
+    await api.processToolCalls(host,{tool_calls:[call]},{msg:'这个'},session,[],[])
+    const evidence=session.interactionContext.evidence.find(item=>item.toolCallId==='perception')
+    assert.equal(evidence.state,state,result)
+    if (state==='readable') {
+      assert.equal(evidence.text,'图中文字：错误地把机箱当电子香薰。')
+      const update=requests[0].find(message=>message.role==='system' && message.content.includes('【媒体证据已更新】')).content
+      assert.match(update,/具体动作的结果/,'continuation and final guards use the same operational mode for ordinary analysis')
+      assert.doesNotMatch(update,/【希洛场景口吻】/)
+    } else assert.equal(requests.length,0,'unusable tool results retain the existing factual failure path')
+  }
 })

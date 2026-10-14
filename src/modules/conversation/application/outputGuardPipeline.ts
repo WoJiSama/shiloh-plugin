@@ -9,9 +9,10 @@
 // (getOutputGuardStats 可随时取数)。
 import { enforcePersonaToneBoundary } from "../domain/personaTonePolicy.js"
 import { polishHumanReplyText } from "../domain/replySanitizer.js"
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
 type GuardConfig = { enabled?: boolean; badPatterns?: string[] }
 interface GuardManager {guardReply(text:string,config: GuardConfig | undefined,context:{userText:string;botNames:string[];onPatternHit(pattern:string):void}):string}
-interface GuardOptions {userText?:string;toolName?:string;botNames?:string[];personaGuard?:GuardConfig;polish?:boolean;personaFeedbackManager?:GuardManager}
+interface GuardOptions {userText?:string;toolName?:string;botNames?:string[];personaGuard?:GuardConfig;polish?:boolean;personaFeedbackManager?:GuardManager;interactionContext?:TurnInteractionContext}
 export function createOutputGuardPipeline(ports:{manager:GuardManager;info(message:string):void}) {
 const personaFeedbackManager=ports.manager
 
@@ -82,6 +83,7 @@ function maybeLogSummary() {
 function applyOutputPersonaGuards(text = "", {
   userText = "",
   toolName = "",
+  interactionContext,
   botNames = [],
   personaGuard,
   polish = false,
@@ -95,7 +97,7 @@ function applyOutputPersonaGuards(text = "", {
     recordStage("polish", output, polished)
     output = polished
   }
-  const bounded = enforcePersonaToneBoundary(output, { userText, toolName })
+  const bounded = enforcePersonaToneBoundary(output, { userText, toolName, ...(interactionContext ? {interactionContext} : {}) })
   recordStage("toneBoundary", output, bounded)
   output = bounded
 
