@@ -1,0 +1,142 @@
+{
+  "checkedAt": "2026-10-15T06:47:34.202Z",
+  "kind": "phase_diagnostic_not_formal_replay",
+  "configuredModel": "deepseek-v4-flash",
+  "productionBudgetMs": 8000,
+  "syntheticScenarioId": "unsupported-table-timing",
+  "toolExecutions": 0,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "label": "previous-minimal-diagnostic",
+      "budgetMs": 20000,
+      "requestBytes": 281,
+      "systemChars": 23,
+      "bodyKeys": [
+        "model",
+        "temperature",
+        "stream",
+        "messages"
+      ],
+      "messageRoles": [
+        "system",
+        "user"
+      ],
+      "headersMs": 147,
+      "firstBodyMs": 1001,
+      "bodyCompleteMs": 1001,
+      "status": 200,
+      "bytes": 955,
+      "contentType": "application/json",
+      "jsonParsed": true,
+      "responseModel": "deepseek-flash",
+      "finishReason": "stop",
+      "contentChars": 32,
+      "reasoningChars": 182,
+      "usage": {
+        "prompt_tokens": 62,
+        "completion_tokens": 89,
+        "total_tokens": 151,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 78
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 62
+      },
+      "contentHash": "71eef327069ccabf409be3afe8438be0253a5cfe83c08edb0fce1028f7703f8a",
+      "intent": "chat",
+      "elapsedMs": 1002,
+      "withinProductionBudget": true
+    },
+    {
+      "label": "full-classifier-default",
+      "budgetMs": 20000,
+      "requestBytes": 6326,
+      "systemChars": 2371,
+      "bodyKeys": [
+        "model",
+        "stream",
+        "temperature",
+        "messages"
+      ],
+      "messageRoles": [
+        "system",
+        "user"
+      ],
+      "headersMs": 102,
+      "firstBodyMs": 1670,
+      "bodyCompleteMs": 1671,
+      "status": 200,
+      "bytes": 1159,
+      "contentType": "application/json",
+      "jsonParsed": true,
+      "responseModel": "deepseek-flash",
+      "finishReason": "stop",
+      "contentChars": 191,
+      "reasoningChars": 258,
+      "usage": {
+        "prompt_tokens": 1438,
+        "completion_tokens": 142,
+        "total_tokens": 1580,
+        "prompt_tokens_details": {
+          "cached_tokens": 896
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 61
+        },
+        "prompt_cache_hit_tokens": 896,
+        "prompt_cache_miss_tokens": 542
+      },
+      "contentHash": "4be478fc0ffcea195c7ea39578a1d480ba591118446beb01eb76dc87240270dc",
+      "intent": "chat",
+      "elapsedMs": 1671,
+      "withinProductionBudget": true
+    },
+    {
+      "label": "full-classifier-thinking-disabled",
+      "budgetMs": 20000,
+      "requestBytes": 6357,
+      "systemChars": 2371,
+      "bodyKeys": [
+        "model",
+        "stream",
+        "temperature",
+        "messages",
+        "thinking"
+      ],
+      "messageRoles": [
+        "system",
+        "user"
+      ],
+      "headersMs": 94,
+      "firstBodyMs": 1244,
+      "bodyCompleteMs": 1244,
+      "status": 200,
+      "bytes": 812,
+      "contentType": "application/json",
+      "jsonParsed": true,
+      "responseModel": "deepseek-flash",
+      "finishReason": "stop",
+      "contentChars": 189,
+      "reasoningChars": 0,
+      "usage": {
+        "prompt_tokens": 1413,
+        "completion_tokens": 80,
+        "total_tokens": 1493,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 1413
+      },
+      "contentHash": "badc65e429d9840c938295b0529a6a8461aa1bb2490ed6c64632d67b9c4ae2e0",
+      "intent": "chat",
+      "elapsedMs": 1244,
+      "withinProductionBudget": true
+    }
+  ]
+}

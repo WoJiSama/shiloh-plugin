@@ -1,0 +1,36 @@
+{
+  "checkedAtUtc": "2026-10-15T06:49:37.673331+00:00",
+  "transportFileHashes": {
+    "baseline": {
+      "dist/backend/adapters/modelFetch.js": "681cae117a5ddef677fd9b4320e5bdbc6c6f8be65a365248aabbf72278854b00",
+      "utils/modelGateway.js": "ec7bef53a787c7440209d999178e153af07bbe702774d609e2aef3ad32a20d16",
+      "dist/backend/modules/models/domain/chatCompletionUrl.js": "5bd4bebc74b8632afbdc3b09320b76b01c2b9d51ea2a4c860a8d48d11cda2923"
+    },
+    "candidate": {
+      "dist/backend/adapters/modelFetch.js": "681cae117a5ddef677fd9b4320e5bdbc6c6f8be65a365248aabbf72278854b00",
+      "utils/modelGateway.js": "ec7bef53a787c7440209d999178e153af07bbe702774d609e2aef3ad32a20d16",
+      "dist/backend/modules/models/domain/chatCompletionUrl.js": "5bd4bebc74b8632afbdc3b09320b76b01c2b9d51ea2a4c860a8d48d11cda2923"
+    },
+    "live": {
+      "dist/backend/adapters/modelFetch.js": "681cae117a5ddef677fd9b4320e5bdbc6c6f8be65a365248aabbf72278854b00",
+      "utils/modelGateway.js": "ec7bef53a787c7440209d999178e153af07bbe702774d609e2aef3ad32a20d16",
+      "dist/backend/modules/models/domain/chatCompletionUrl.js": "5bd4bebc74b8632afbdc3b09320b76b01c2b9d51ea2a4c860a8d48d11cda2923"
+    }
+  },
+  "allTransportHashesEqual": true,
+  "productionPlannerSinceRelease": {
+    "records": 1,
+    "successes": 1,
+    "timeouts": 0,
+    "sanitizedRecords": [
+      {
+        "elapsedMs": 1401,
+        "intent": "chat",
+        "timeout": false,
+        "failure": false
+      }
+    ]
+  },
+  "platformTestMessagesSent": 0,
+  "productionMemoryTestWrites": 0
+}

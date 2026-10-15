@@ -49,13 +49,28 @@
 
 证据：[基线全部输出](replays/2026-10-15-boundaries/baseline.json)、[候选全部输出](replays/2026-10-15-boundaries/candidate.json)、[基线评审](replays/2026-10-15-boundaries/baseline-review.json)、[候选评审](replays/2026-10-15-boundaries/candidate-review.json)、[逐会话对照](replays/2026-10-15-boundaries/comparison-review.json)、[冻结输入与完整性](replays/2026-10-15-boundaries/comparison-integrity.json)、[冻结判据](replays/2026-10-15-boundaries/frozen-review-rubric.json)、[准备失败摘要](replays/2026-10-15-boundaries/initialization-failure-summary.json)。
 
-## 前置意图模型仍有可用性缺口
+## 前置意图模型超时记录与后续复核
 
 独立影子harness固定9组场景、每组3次，使用合成搜索、提醒和MCP schema，禁止工具执行、QQ发送和生产存储。两版各27次 `deepseek-v4-flash` 请求均8秒超时，**共54次没有获得有效分类决策**。原参数和显式关闭thinking的两次独立最小诊断也各45秒超时。
 
-这证明当前前置模型可用性有问题，不能计成54个语义误判，也不能宣称它已正确区分预约、提醒和讨论。未因此擅改线上provider或超时配置。编译主链对明确聊天、能力快照和执行边界的回归通过，不能替代真实分类器验证。
+这证明当时54次影子分类请求未在8秒内完成，不能计成54个语义误判。后续同机复核已正常完成，不能将历史超时概括为模型本身或当前服务不可用。未因此擅改线上provider或超时配置。编译主链对明确聊天、能力快照和执行边界的回归通过，不能替代真实分类器验证。
 
 证据：[分类器完整性](replays/2026-10-15-boundaries/classifier-comparison-integrity.json)、[基线27次](replays/2026-10-15-boundaries/baseline-tool-decisions.json)、[候选27次](replays/2026-10-15-boundaries/candidate-tool-decisions.json)、[独立诊断](replays/2026-10-15-boundaries/intent-provider-diagnostic.json)、[harness](replays/2026-10-15-boundaries/tool-boundary-shadow.mjs)。
+
+### 用户反馈模型正常后的原因复核
+
+10月15日14:44之后，在原服务器上以同一地址、密钥和 `deepseek-v4-flash` 模型做独立诊断。当前有效路由与冻结配置相同，baseline、candidate及线上三个目录的modelFetch、兼容入口与URL解析文件哈希全部相同；代理相关环境变量也未见服务进程与独立进程差异。
+
+- 两次最小请求均HTTP200，完整响应分别约735毫秒和650毫秒。
+- 先前超时的最小分类诊断原参数重测HTTP200，约1001毫秒；完整分类请求默认推理模式约1671毫秒，关闭thinking的独立诊断约1244毫秒，均HTTP200且低于原8秒预算。此单次对照不作性能或因果结论，线上参数未改。
+- 原样运行旧harness、冻结配置、c62候选runtime及3并发，新的27次全部HTTP200、0警告，27次均匹配原合成场景的预期判断。script、schema、scenario、config及运行版本元数据与旧候选完全相同。该次是后续诊断，未替换或重采样原正式A/B数据。
+- 发布后现存生产日志另有1条前置分类成功记录，耗时1401毫秒。有限日志与本次成功请求不能证明长期可用性或所有生产路由行为。
+
+**具体历史原因仍未知。** `fetchWithTimeout`的预算覆盖收到响应头之前和完整正文读取两个阶段，两阶段都可能抛出相同的“请求超过8秒没有返回”。旧harness只在该函数完成后记录status，所以 `status:null` 不能证明没有收到HTTP响应头；原不可变证据中的 `noHttpResponse` 字段也只是由该值推导，命名过强，应按“没有获得完整响应”解释。旧日志没有分阶段时间，无法事后判定卡在连接、上游排队还是正文接收；两次45秒历史诊断也不足以区分这些原因。当前正常结果排除了持续复现故障，但不能反推出当时一定是网络或模型问题。
+
+本次没有改业务代码、线上配置、provider、超时或thinking设置，没有重启服务、发QQ测试、执行工具或写生产记忆。新诊断共32次模型请求，与原54次及两次45秒诊断分开保存。
+
+复核证据：[结论与限制](replays/2026-10-15-intent-timeout-diagnosis/diagnosis-summary.json)、[分阶段最小请求](replays/2026-10-15-intent-timeout-diagnosis/minimal-phase-results.json)、[完整分类分阶段请求](replays/2026-10-15-intent-timeout-diagnosis/classifier-phase-results.json)、[旧harness原样27次](replays/2026-10-15-intent-timeout-diagnosis/unchanged-harness-rerun.json)、[运行文件及生产日志复核](replays/2026-10-15-intent-timeout-diagnosis/server-evidence.json)、[新诊断索引](replays/2026-10-15-intent-timeout-diagnosis/evidence-index.json)。
 
 ## 发布门禁、版本对应与线上核验
 
@@ -77,6 +92,6 @@
 
 证据：[改动保全审计](replays/2026-10-15-boundaries/preservation-audit.json)、[写回验证日志](replays/2026-10-15-boundaries/writeback-validation.log.gz)。早期 [写回预检](replays/2026-10-15-boundaries/writeback-preflight.json) 记录22个目标；最终增加1个验收测试，实际23个目标以保全审计为准。
 
-后续需优先解决前置模型的响应可用性，再用真实分类器验证目标判断和工具选择。生成质量仍需处理重复追问、多余建议和无依据群历史断言，继续使用完整多轮对照，不能用固定笑话或输出替换遮蔽。前轮已知温度判断、未登记未来投递承诺，以及Reminder附加动作的创建／触发边界，本轮没有扩展解决，也不因工具边界回归通过而视为已验收。
+前置模型同路复测已恢复正常，后续应补请求分阶段观测，以便再次超时时定位原因。新的27次合成判断匹配不能代替完整生产路由验收，也不改变主聊天自然度评审。生成质量仍需处理重复追问、多余建议和无依据群历史断言，继续使用完整多轮对照，不能用固定笑话或输出替换遮蔽。前轮已知温度判断、未登记未来投递承诺，以及Reminder附加动作的创建／触发边界，本轮没有扩展解决，也不因工具边界回归通过而视为已验收。
 
 脱敏证据共37个文件（含索引），[evidence-index.json](replays/2026-10-15-boundaries/evidence-index.json) 记录每份来源SHA和导出SHA。仅替换私有人设称呼与模型端点，保留全部合成回放、失败、不确定判定和两次发布门禁记录；未纳入原始群记录、私有配置、人设全文或原始模型请求。

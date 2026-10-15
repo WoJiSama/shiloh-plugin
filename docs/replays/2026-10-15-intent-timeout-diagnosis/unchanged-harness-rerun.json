@@ -1,0 +1,938 @@
+{
+  "complete": true,
+  "label": "diagnostic-current-c62ad84-20261015-1447",
+  "repetitions": 3,
+  "concurrency": 3,
+  "fixtureKind": "fixed_synthetic_tool_schemas_with_real_classifier_model",
+  "toolExecutions": 0,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "metadata": {
+    "runtimeCommit": "c62ad84f81c589aeef7533deaa619aaefcaefe69",
+    "scriptHash": "126d104755c7de2a499cd39c469f74f5c5983fb598ee3dea382458dca2ef146f",
+    "scenariosHash": "49df89f6e07dd6fc98c077b8166fc01d0baaaa31cdecf41075b317a89bd68587",
+    "schemasHash": "a9aec483e14ed3ae3ce1825a6a37c291f723ec04db912020f51a3b7a568e284a",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "configuredIntentModel": "deepseek-v4-flash"
+  },
+  "results": [
+    {
+      "id": "unsupported-table-timing",
+      "sampleIndex": 1,
+      "input": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人代为预约今晚七点的餐厅双人位并从群主钱包付定金"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "让机器人代为预约今晚七点的餐厅双人位并从群主钱包付定金",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "query": "",
+        "reason": "当前能力只有提醒和搜索，均不能完成预约或付款；且无权动用他人钱包。应说明缺口而非用提醒替代。"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "unsupported-table-timing",
+      "sampleIndex": 2,
+      "input": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人预约今晚七点餐厅双人位并用群主钱包付定金"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "让机器人预约今晚七点餐厅双人位并用群主钱包付定金",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "当前没有订位/支付类能力，提醒与搜索都不能替代实际预约和付款，缺具体办理工具。"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "unsupported-table-timing",
+      "sampleIndex": 3,
+      "input": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人代订今晚七点餐厅双人位并用群主钱包付定金"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.93,
+        "goal": "让机器人代订今晚七点餐厅双人位并用群主钱包付定金",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "当前只有提醒与搜索能力，均无法完成订座与代付，缺少实际预约/支付能力，需说明缺口"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "no-search-banter",
+      "sampleIndex": 1,
+      "input": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "用户明确说不要搜索、不要执行，只是接个梗闲聊"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "用户明确说不要搜索、不要执行，只是接个梗闲聊",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户显式声明不用搜索也不要执行，仅玩梗，属闲聊"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "no-search-banter",
+      "sampleIndex": 2,
+      "input": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "用户只想接梗闲聊，明确拒绝搜索或执行"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.97,
+        "goal": "用户只想接梗闲聊，明确拒绝搜索或执行",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确说不用搜索、不要执行，只接梗"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "no-search-banter",
+      "sampleIndex": 3,
+      "input": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "接梗式闲聊，不搜索也不执行"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.97,
+        "goal": "接梗式闲聊，不搜索也不执行",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户明确说不用搜索、不要执行，只要接梗，属于闲聊"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "quote-reminder-discussion",
+      "sampleIndex": 1,
+      "input": "你觉得他这句怎么接梗？只讨论说法。",
+      "quote": "十分钟后提醒我喝水。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "就引用的“十分钟后提醒我喝水”这句，讨论怎么接梗的说法"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "就引用的“十分钟后提醒我喝水”这句，讨论怎么接梗的说法",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户明确说“只讨论说法”，是对引用内容的玩梗评论，不要求执行提醒"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "quote-reminder-discussion",
+      "sampleIndex": 2,
+      "input": "你觉得他这句怎么接梗？只讨论说法。",
+      "quote": "十分钟后提醒我喝水。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "讨论如何给引用的“十分钟后提醒我喝水”接梗，不对引用内容执行提醒"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "讨论如何给引用的“十分钟后提醒我喝水”接梗，不对引用内容执行提醒",
+        "toolName": "",
+        "params": {},
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确说只讨论接梗说法，引用里的提醒请求只是材料，不是本轮指令"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "quote-reminder-discussion",
+      "sampleIndex": 3,
+      "input": "你觉得他这句怎么接梗？只讨论说法。",
+      "quote": "十分钟后提醒我喝水。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "讨论引用那句话怎么接梗，不做任何执行"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.98,
+        "goal": "讨论引用那句话怎么接梗，不做任何执行",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户明确表示只讨论说法，引用中的提醒请求不是本轮指令"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "real-reminder",
+      "sampleIndex": 1,
+      "input": "十分钟后提醒我自己去订餐，只发提醒。",
+      "expected": "reminderTool",
+      "actual": "reminderTool",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "reminderTool",
+        "params": {
+          "action": "create",
+          "content": "去订餐",
+          "time": "2026/10/15 14:58:13"
+        },
+        "goal": "十分钟后收到一条提醒自己去订餐的消息"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.96,
+        "goal": "十分钟后收到一条提醒自己去订餐的消息",
+        "toolName": "reminderTool",
+        "params": {
+          "action": "create",
+          "content": "去订餐",
+          "time": "2026/10/15 14:58:13"
+        },
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "明确要求定时提醒，仅发提醒，不代办订餐"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "real-reminder",
+      "sampleIndex": 2,
+      "input": "十分钟后提醒我自己去订餐，只发提醒。",
+      "expected": "reminderTool",
+      "actual": "reminderTool",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "reminderTool",
+        "params": {
+          "action": "create",
+          "content": "提醒你该去订餐了",
+          "time": "2026/10/15 14:58"
+        },
+        "goal": "十分钟后给用户发送一条提醒，提醒其自己去订餐"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.97,
+        "goal": "十分钟后给用户发送一条提醒，提醒其自己去订餐",
+        "toolName": "reminderTool",
+        "params": {
+          "action": "create",
+          "content": "提醒你该去订餐了",
+          "time": "2026/10/15 14:58"
+        },
+        "query": "",
+        "reason": "用户明确要求十分钟后提醒自己去订餐，且仅发提醒，对应提醒工具创建动作"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "real-reminder",
+      "sampleIndex": 3,
+      "input": "十分钟后提醒我自己去订餐，只发提醒。",
+      "expected": "reminderTool",
+      "actual": "reminderTool",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "reminderTool",
+        "params": {
+          "action": "create",
+          "content": "去订餐",
+          "time": "2026-10-15 14:58:00"
+        },
+        "goal": "十分钟后给自己发一条去订餐的提醒"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.96,
+        "goal": "十分钟后给自己发一条去订餐的提醒",
+        "toolName": "reminderTool",
+        "params": {
+          "action": "create",
+          "content": "去订餐",
+          "time": "2026-10-15 14:58:00"
+        },
+        "references": [],
+        "query": "",
+        "reason": "用户明确要求十分钟后只发提醒，属于定时提醒，不对应订餐本身"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "real-search",
+      "sampleIndex": 1,
+      "input": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+      "expected": "searchInformationTool",
+      "actual": "searchInformationTool",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "searchInformationTool",
+        "params": {
+          "query": "上海南京东路附近餐厅 今天营业时间"
+        },
+        "goal": "查询上海南京东路附近餐厅今天的营业时间"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.95,
+        "goal": "查询上海南京东路附近餐厅今天的营业时间",
+        "toolName": "searchInformationTool",
+        "params": {
+          "query": "上海南京东路附近餐厅 今天营业时间"
+        },
+        "references": [],
+        "prompt": "",
+        "query": "上海南京东路附近餐厅 今天营业时间",
+        "reason": "用户明确要求查询实时营业信息，对应搜索工具"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "real-search",
+      "sampleIndex": 2,
+      "input": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+      "expected": "searchInformationTool",
+      "actual": "searchInformationTool",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "searchInformationTool",
+        "params": {
+          "query": "上海南京东路附近餐厅今天营业时间"
+        },
+        "goal": "查询上海南京东路附近餐厅今天的营业时间"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.95,
+        "goal": "查询上海南京东路附近餐厅今天的营业时间",
+        "toolName": "searchInformationTool",
+        "params": {
+          "query": "上海南京东路附近餐厅今天营业时间"
+        },
+        "references": [],
+        "prompt": "",
+        "query": "上海南京东路附近餐厅今天营业时间",
+        "reason": "用户明确要求查询实时营业时间信息，对应搜索工具"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "real-search",
+      "sampleIndex": 3,
+      "input": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+      "expected": "searchInformationTool",
+      "actual": "searchInformationTool",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "searchInformationTool",
+        "params": {
+          "query": "上海南京东路附近餐厅 今日营业时间"
+        },
+        "goal": "查询上海南京东路附近餐厅今天的营业时间"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.95,
+        "goal": "查询上海南京东路附近餐厅今天的营业时间",
+        "toolName": "searchInformationTool",
+        "params": {
+          "query": "上海南京东路附近餐厅 今日营业时间"
+        },
+        "references": [],
+        "prompt": "",
+        "query": "上海南京东路附近餐厅 今日营业时间",
+        "reason": "用户明确要求查询实时信息（营业时间），对应搜索能力"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "advice-not-search",
+      "sampleIndex": 1,
+      "input": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人讲讲两个人看电影时怎么挑座位（不要买票、不要搜索实时场次）"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.96,
+        "goal": "让机器人讲讲两个人看电影时怎么挑座位（不要买票、不要搜索实时场次）",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确排除购票与搜索，只要闲聊式建议，属普通对话"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "advice-not-search",
+      "sampleIndex": 2,
+      "input": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "聊聊两个人看电影时怎么挑座位"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "聊聊两个人看电影时怎么挑座位",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确否定买票和搜索，只要闲聊建议，属普通对话"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "advice-not-search",
+      "sampleIndex": 3,
+      "input": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人讲讲两个人一起看电影时如何挑选座位"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.97,
+        "goal": "让机器人讲讲两个人一起看电影时如何挑选座位",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户明确排除买票与搜索实时场次，只要求经验性建议，属普通闲聊"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "mcp-reservation-available",
+      "sampleIndex": 1,
+      "input": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+      "expected": "mcp_reserve_table",
+      "actual": "mcp_reserve_table",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "mcp_reserve_table",
+        "params": {
+          "restaurant": "云庭餐厅",
+          "dateTime": "2026-10-16 19:00",
+          "partySize": 2
+        },
+        "goal": "通过餐厅订位系统提交2026年10月16日19点云庭餐厅两人餐位预约"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.96,
+        "goal": "通过餐厅订位系统提交2026年10月16日19点云庭餐厅两人餐位预约",
+        "toolName": "mcp_reserve_table",
+        "params": {
+          "restaurant": "云庭餐厅",
+          "dateTime": "2026-10-16 19:00",
+          "partySize": 2
+        },
+        "query": "",
+        "reason": "用户明确要求用现有餐厅订位系统提交预约，餐厅、时间、人数均齐全"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "mcp-reservation-available",
+      "sampleIndex": 2,
+      "input": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+      "expected": "mcp_reserve_table",
+      "actual": "mcp_reserve_table",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "mcp_reserve_table",
+        "params": {
+          "restaurant": "云庭餐厅",
+          "dateTime": "2026-10-16 19:00",
+          "partySize": 2
+        },
+        "goal": "提交2026年10月16日19点云庭餐厅的两人餐位预约"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.96,
+        "goal": "提交2026年10月16日19点云庭餐厅的两人餐位预约",
+        "toolName": "mcp_reserve_table",
+        "params": {
+          "restaurant": "云庭餐厅",
+          "dateTime": "2026-10-16 19:00",
+          "partySize": 2
+        },
+        "references": [],
+        "query": "",
+        "reason": "用户明确要求通过餐厅订位系统提交预约，且餐厅、时间、人数齐全"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "mcp-reservation-available",
+      "sampleIndex": 3,
+      "input": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+      "expected": "mcp_reserve_table",
+      "actual": "mcp_reserve_table",
+      "passed": true,
+      "decision": {
+        "intent": "tool",
+        "toolName": "mcp_reserve_table",
+        "params": {
+          "restaurant": "云庭餐厅",
+          "dateTime": "2026-10-16 19:00",
+          "partySize": 2
+        },
+        "goal": "通过餐厅订位系统提交云庭餐厅2026年10月16日19点两人预约"
+      },
+      "rawDecision": {
+        "intent": "tool",
+        "confidence": 0.96,
+        "goal": "通过餐厅订位系统提交云庭餐厅2026年10月16日19点两人预约",
+        "toolName": "mcp_reserve_table",
+        "params": {
+          "restaurant": "云庭餐厅",
+          "dateTime": "2026-10-16 19:00",
+          "partySize": 2
+        },
+        "query": "",
+        "reason": "用户明确要求用当前订位系统提交真实餐位预约，餐厅、时间、人数齐全"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "mcp-capability-discussion",
+      "sampleIndex": 1,
+      "input": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "了解餐厅订位系统一般如何确认双人位，不执行任何提交动作"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.86,
+        "goal": "了解餐厅订位系统一般如何确认双人位，不执行任何提交动作",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确否定提交预约，只询问确认双人位的一般机制，无实时检索或办理要求"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "mcp-capability-discussion",
+      "sampleIndex": 2,
+      "input": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "了解餐厅订位系统确认双人位的通用流程，不提交任何预约"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.86,
+        "goal": "了解餐厅订位系统确认双人位的通用流程，不提交任何预约",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确拒绝提交预约，只询问一般确认流程，属解释性闲聊，无需调用工具"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "mcp-capability-discussion",
+      "sampleIndex": 3,
+      "input": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "用户在咨询餐厅订位系统通常如何确认双人位，并明确表示不要提交预约"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.86,
+        "goal": "用户在咨询餐厅订位系统通常如何确认双人位，并明确表示不要提交预约",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "用户明确否定提交预约，仅想了解一般性流程，属于知识咨询，无实时检索或办理需求"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "self-paid-unavailable",
+      "sampleIndex": 1,
+      "input": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人在今晚七点实际替自己预订一个餐厅双人位（用户自行付款），而不是创建提醒"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "让机器人在今晚七点实际替自己预订一个餐厅双人位（用户自行付款），而不是创建提醒",
+        "toolName": "",
+        "params": {},
+        "references": [],
+        "prompt": "",
+        "query": "",
+        "reason": "当前可用能力只有提醒和搜索，均不能完成餐厅预订或付款，用户已明确排除提醒，故无匹配工具，需说明缺口"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "self-paid-unavailable",
+      "sampleIndex": 2,
+      "input": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人实际帮自己预订今晚七点的餐厅双人位并自行付款"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "让机器人实际帮自己预订今晚七点的餐厅双人位并自行付款",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户明确要求真实订座并付款，现有能力只有提醒和搜索，均无法完成预订或支付，属于能力缺口。"
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "self-paid-unavailable",
+      "sampleIndex": 3,
+      "input": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+      "expected": "chat",
+      "actual": "chat",
+      "passed": true,
+      "decision": {
+        "intent": "chat",
+        "goal": "让机器人实际帮忙预订今晚七点的餐厅双人位并完成付款"
+      },
+      "rawDecision": {
+        "intent": "chat",
+        "confidence": 0.95,
+        "goal": "让机器人实际帮忙预订今晚七点的餐厅双人位并完成付款",
+        "toolName": "",
+        "params": {},
+        "query": "",
+        "reason": "用户明确要求代为订餐付款，不是提醒；当前只有提醒和搜索能力，无法完成预订或付款，存在能力缺口。",
+        "prompt": ""
+      },
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": 200
+        }
+      ],
+      "warnings": []
+    }
+  ]
+}

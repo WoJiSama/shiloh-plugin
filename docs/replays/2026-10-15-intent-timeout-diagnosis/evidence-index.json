@@ -1,0 +1,47 @@
+{
+  "privacy": "No credentials, actual endpoint hostname, private config or raw model requests are exported. All user messages in the classifier rerun are synthetic.",
+  "priorEvidenceUnchanged": true,
+  "files": [
+    {
+      "sourcePrivateBasename": "phase-probe-results.json",
+      "sourceSha256": "1f80451c0b21ce645ddf174e251ef210bf279665346d54bd1095644dac5d25c8",
+      "exportedFile": "minimal-phase-results.json",
+      "exportedSha256": "1f80451c0b21ce645ddf174e251ef210bf279665346d54bd1095644dac5d25c8"
+    },
+    {
+      "sourcePrivateBasename": "classifier-phase-results.json",
+      "sourceSha256": "b762989a3d5249981645f5ad44352aa824528e98f4ba27cc7266823c31532d82",
+      "exportedFile": "classifier-phase-results.json",
+      "exportedSha256": "b762989a3d5249981645f5ad44352aa824528e98f4ba27cc7266823c31532d82"
+    },
+    {
+      "sourcePrivateBasename": "diagnostic-current-c62ad84-20261015-1447-tool-decisions.json",
+      "sourceSha256": "d47d9d5d6a99fe98f2b3ef99986c483ce2fdc98b236c22497edf5a0e320bec66",
+      "exportedFile": "unchanged-harness-rerun.json",
+      "exportedSha256": "b769cc3ee11a1d4fb4f6cc7afcae6a9c84e4df4cd7e6654361e9880b608c9d6a"
+    },
+    {
+      "sourcePrivateBasename": "server-evidence.json",
+      "sourceSha256": "853685a239eb8d3347040301e1f09c737c819ebe7c0359773636ec6e7878c2c2",
+      "exportedFile": "server-evidence.json",
+      "exportedSha256": "831c4eddaefa64af76d7fb289dc33c18da32dced5ab45a6ab1d0494497e81043"
+    },
+    {
+      "sourcePrivateBasename": "phase-probe.mjs",
+      "sourceSha256": "e3b6e6dd42baadf77eca1edbadb34cfa44dd7e1a66875f955650de514ba8ae5d",
+      "exportedFile": "phase-probe.mjs",
+      "exportedSha256": "e3b6e6dd42baadf77eca1edbadb34cfa44dd7e1a66875f955650de514ba8ae5d"
+    },
+    {
+      "sourcePrivateBasename": "classifier-phase-probe.mjs",
+      "sourceSha256": "70b80c8fffcd4e503ee2fbde06bbccd90c79a1abb8d9d875ea9d745ec9d19042",
+      "exportedFile": "classifier-phase-probe.mjs",
+      "exportedSha256": "70b80c8fffcd4e503ee2fbde06bbccd90c79a1abb8d9d875ea9d745ec9d19042"
+    },
+    {
+      "exportedFile": "diagnosis-summary.json",
+      "exportedSha256": "b66701d6c3432dcd92da86ca1ba75c30fb04e09164d2f1cf2dd771ad2c8802bb",
+      "generatedFrom": "The six indexed diagnostic files plus immutable prior classifier evidence."
+    }
+  ]
+}
