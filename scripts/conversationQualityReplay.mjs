@@ -4,11 +4,12 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {createRequire} from 'node:module';
 import {pathToFileURL,fileURLToPath} from 'node:url';
-export const replayUsage='Usage: node scripts/conversationQualityReplay.mjs [--dry-run] [--plugin-root path] [--config-root path] [--scenarios file] [--output-dir path] [--scenario id] [--label name] [--repetitions positive-integer]\nWithout --dry-run this calls the configured model. It never connects to QQ or writes user memory. Repetitions default to 1; use 5 to examine stability. Each sample starts a fresh in-memory conversation. Structural checks do not score naturalness.';
+import {createReplayMemory} from './conversationReplayMemory.mjs';
+export const replayUsage='Usage: node scripts/conversationQualityReplay.mjs [--dry-run] [--memory-integration] [--plugin-root path] [--config-root path] [--scenarios file] [--output-dir path] [--scenario id] [--label name] [--repetitions positive-integer]\nWithout --dry-run this calls the configured model. It never connects to QQ or production stores. --memory-integration uses real memory modules with an isolated store. Repetitions default to 1; use 5 to examine stability. Each sample starts a fresh in-memory conversation. Structural checks do not score naturalness.';
 
 export function parseReplayOptions(args=[],env={},cwd=process.cwd()){
   const valueFlags=new Set(['--plugin-root','--config-root','--scenarios','--output-dir','--scenario','--label','--repetitions']);
-  const switches=new Set(['--dry-run','--help']);
+  const switches=new Set(['--dry-run','--help','--memory-integration']);
   const values=new Map();
   for(let i=0;i<args.length;i++){
     const flag=args[i];
@@ -25,7 +26,7 @@ export function parseReplayOptions(args=[],env={},cwd=process.cwd()){
   const pluginRoot=path.resolve(cwd,values.get('--plugin-root')||env.BL_SHADOW_PLUGIN_ROOT||cwd);
   const dryRun=values.has('--dry-run');
   return {
-    help:values.has('--help'),dryRun,repetitions,pluginRoot,
+    help:values.has('--help'),dryRun,repetitions,pluginRoot,memoryIntegration:values.has('--memory-integration'),
     configRoot:path.resolve(cwd,values.get('--config-root')||env.BL_SHADOW_CONFIG_ROOT||pluginRoot),
     outputDir:path.resolve(cwd,values.get('--output-dir')||env.BL_SHADOW_OUTPUT_DIR||`/tmp/bl-conversation-quality-${Date.now()}`),
     runLabel:values.get('--label')||(dryRun?'offline_stub':'candidate'),
@@ -122,6 +123,7 @@ export async function runReplaySamples({scenarios,repetitions=1,createFixture,ex
         await onResult(result,results);
         previousResult=result;
       }
+      await fixture?.dispose?.();
     }
   }
   return results;
@@ -134,7 +136,7 @@ export function writeReplayCheckpoint(file,document){
 }
 
 export async function main(argv=process.argv.slice(2),env=process.env){
-const {help,pluginRoot,configRoot,outputDir,dryRun,runLabel,scenariosFile,scenarioFilter,repetitions}=parseReplayOptions(argv,env);
+const {help,pluginRoot,configRoot,outputDir,dryRun,runLabel,scenariosFile,scenarioFilter,repetitions,memoryIntegration}=parseReplayOptions(argv,env);
 if(help){console.log(replayUsage);return {exitCode:0};}
 fs.mkdirSync(outputDir,{recursive:true,mode:0o700});
 const manifestFile=path.join(pluginRoot,'release-manifest.json');
@@ -167,6 +169,8 @@ const createSnapshot=fs.existsSync(snapshotModule)?(await import(pathToFileURL(s
 const {createPersonaFeedbackModule}=await load('modules/memory/infrastructure/personaFeedbackManager.js');
 const {isToneCorrectionMessage}=await load('modules/conversation/application/chatFailureReply.js');
 const {createMessageFormatting}=await load('modules/conversation/application/messageFormatting.js');
+const episodic=memoryIntegration?await load('modules/memory/infrastructure/episodicMemory.js'):null;
+const {createPromptContext}=memoryIntegration?await load('modules/conversation/infrastructure/promptContext.js'):{};
 const readConfig=file=>{const doc=YAML.parse(fs.readFileSync(file,'utf8'));return doc?.pluginSettings||doc||{}};
 const defaults=readConfig(path.join(pluginRoot,'config_default/message.yaml'));
 const supplied=dryRun?{}:readConfig(path.join(configRoot,'config/message.yaml'));
@@ -187,16 +191,16 @@ const compiledRoot=path.join(pluginRoot,'dist/backend');
 const compiledHashes={};
 const hashRuntime=directory=>{for(const item of fs.readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const file=path.join(directory,item.name);if(item.isDirectory())hashRuntime(file);else if(item.isFile()&&item.name.endsWith('.js'))compiledHashes[path.relative(compiledRoot,file).split(path.sep).join('/')]=fileHash(file);}};
 hashRuntime(compiledRoot);
-const metadata={schemaVersion:2,pluginRoot,configRoot,repetitions,runnerHash:fileHash(fileURLToPath(import.meta.url)),scenariosHash:fileHash(scenariosFile),selectedScenarioHashes:Object.fromEntries(scenarios.map(s=>[s.id,hashReplayValue(s)])),configHash:dryRun?null:fileHash(path.join(configRoot,'config/message.yaml')),effectiveConfigHash:hashReplayValue(config),personaHash:hashReplayValue(persona),personaLibraryHash:dryRun?null:fileHash(path.join(configRoot,'config/persona-library.yaml')),runtimeTreeHash:hashReplayValue(compiledHashes),runtimeFileCount:Object.keys(compiledHashes).length,runtimeHashes:Object.fromEntries(runtimePaths.map(file=>[file,fileHash(path.join(compiledRoot,file))])),historyClock:'synthetic_fixed_2026-01-01T04:00:00Z',runtimeClock:'real_wall_clock_not_frozen',taskFactsSource:'synthetic_fixture',outputPrivacy:'exact private config prompt and credential values are redacted; raw request bodies are never exported'};
+const metadata={schemaVersion:2,pluginRoot,configRoot,repetitions,runnerHash:fileHash(fileURLToPath(import.meta.url)),scenariosHash:fileHash(scenariosFile),selectedScenarioHashes:Object.fromEntries(scenarios.map(s=>[s.id,hashReplayValue(s)])),memoryIntegration,memoryHelperHash:fileHash(path.join(path.dirname(fileURLToPath(import.meta.url)),'conversationReplayMemory.mjs')),memoryPolicy:memoryIntegration?'real_extractor_store_retriever_and_episodic_isolated; vector_embedding_and_profile_learning_disabled':'disabled',configHash:dryRun?null:fileHash(path.join(configRoot,'config/message.yaml')),effectiveConfigHash:hashReplayValue(config),personaHash:hashReplayValue(persona),personaLibraryHash:dryRun?null:fileHash(path.join(configRoot,'config/persona-library.yaml')),runtimeTreeHash:hashReplayValue(compiledHashes),runtimeFileCount:Object.keys(compiledHashes).length,runtimeHashes:Object.fromEntries(runtimePaths.map(file=>[file,fileHash(path.join(compiledRoot,file))])),historyClock:'seed_context_fixed_2026-01-01T04:00:00Z; new_turns_use_wall_clock_or_explicit_scenario_at',runtimeClock:'real_wall_clock_not_frozen',taskFactsSource:'synthetic_fixture',outputPrivacy:'exact private config prompt and credential values are redacted; raw request bodies are never exported'};
 if(!scenarios.length)throw new Error('no matching scenarios');
-console.log(JSON.stringify({type:'start',dryRun,commit,label:runLabel,metadata,persona:persona.name,personaSource:identity.source,scenarios:scenarios.length,repetitions,totalSamples:scenarios.length*repetitions,adapters:'in_memory_send_and_store',tools:'disabled',enhancedLearning:'disabled'}));
+console.log(JSON.stringify({type:'start',dryRun,commit,label:runLabel,metadata,persona:persona.name,personaSource:identity.source,scenarios:scenarios.length,repetitions,totalSamples:scenarios.length*repetitions,adapters:'in_memory_send_and_store',tools:'disabled',enhancedLearning:memoryIntegration?'isolated_memory_enabled':'disabled'}));
 let fixtureId = 0
 
-function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) {
+async function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) {
   let scenario=initialScenario;
   let turnIndex=0;
   const fixtureConfig=structuredClone(config);
-  const currentPersona=structuredClone(initialScenario.personaOverride || persona);
+  let currentPersona=structuredClone(initialScenario.personaOverride || persona);
   const replayTime=at=>new Date(at).toLocaleString("zh-CN",{timeZone:"Asia/Shanghai",hour12:false});
   const initialTime=Date.parse('2026-01-01T04:00:00Z');
   const snapshotOptions={botId:99,personaId:identity.id||'default',persona:currentPersona,systemContent:fixtureConfig.systemContent||'',...(fixtureConfig.personaGuard?{personaGuard:fixtureConfig.personaGuard}:{})};
@@ -207,12 +211,12 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     sender:{user_id:Number(message.userId||(message.role==='assistant'?'99':'202')),nickname:message.role==='assistant'?currentPersona.name:(message.name||'测试群友'),role:'member'}
   }));
   const groupId = 900000 + ++fixtureId
-  const captures = {compose: [], guards: [], requests: [], generation: [], actionFacts: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0, warnings: [], network: [], modelOutput: ''}
+  const captures = {compose: [], guards: [], requests: [], generation: [], actionFacts: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0, warnings: [], network: [], memoryNetwork:[], memoryRecalls:[], memoryWrites:[], understanding:[], modelOutput: ''}
   const logger = {info() {}, warn(...args) {captures.warnings.push(scrub(args.join(' ')))}, debug() {}, error(message, error) { captures.errors.push({message:scrub(String(message)), error:scrub(error instanceof Error ? error.message : String(error ?? ''))}) }}
   const trace = {id: `replay-${groupId}`, setTrigger() {}, setIntent() {}, addModelCall() {}, addTool() {}, finish: () => ({modelCalls: [], tools: []})}
   const members = new Map([[99, {user_id: 99, nickname: '测试机器人', role: 'member'}], [202, {user_id: 202, nickname: '测试群友', role: 'member'}], [303, {user_id: 303, nickname: '另一只机器人', role: 'member'}]])
   for(const message of initialScenario.recentContext||[])if(message.userId&&message.name)members.set(Number(message.userId),{user_id:Number(message.userId),nickname:message.name,role:'member'});
-  const group = {group_name: '脱敏回放群', getMemberMap: async () => members, pickMember: id => ({info: members.get(Number(id)) || {}})}
+  const group = {group_name: '脱敏回放群', getMemberMap: async () => members, pickMember: id => ({info: members.get(Number(id)) || {}}),getForwardMsg:async()=>({messages:scenario.forwardNodes||Array.from({length:scenario.forwardCount||0},(_,i)=>({sender:{user_id:500+i,nickname:`群友${i+1}`},message:[{type:'text',text:i===84?'第85条最终决定：周六下午三点见。':`第${i+1}条：讨论聚会时间。`}]}))})}
   const event = {message_type: 'group', group_id: groupId, user_id: 202, self_id: 99, message_id: `input-${groupId}`, msg: scenario.rawUserText,
     message: [{type: 'text', text: scenario.rawUserText}], sender: members.get(202), group,
     bot: {uin: 99, nickname: '测试机器人', pickGroup: () => group}}
@@ -227,7 +231,10 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
   }
   const session = {tools: [], groupUserMessages: []}
   const storage = new Map()
-  const redis = {get: async key => storage.get(key) ?? null, set: async (key, value) => { storage.set(key, value) }}
+  const redis = {get: async key => storage.get(key) ?? null, set: async (key, value) => { storage.set(key, value) },del:async key=>storage.delete(key)}
+  const isolatedMemory=memoryIntegration?await createReplayMemory({load,config:fixtureConfig,redis,fetchImpl:fetchWithTimeout,scrub,dryRun,captures}):null;
+  const episodeDir=path.join(outputDir,`isolated-episodes-${groupId}`);
+  const enhancedJobs=[];
   const composer = createTurnPromptComposer(logger)
   const {PersonaFeedbackManager}=createPersonaFeedbackModule({isToneCorrectionMessage,logger});
   const guardManager=new PersonaFeedbackManager({cwd:outputDir,logger});
@@ -237,7 +244,7 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     buildGenericChatFailureReply: () => '未取得结果。', extractModrinthForwardItems: () => [], stripModrinthForwardMarkers: text => text,
     applyOutputPersonaGuards: (text, options) => { captures.guards.push(options); return guards.applyOutputPersonaGuards(text, options) },
     findRecentBotImage: async () => null,
-    recordEpisode: options => captures.episodes.push(options),
+    recordEpisode: options => {captures.episodes.push(options);return episodic?.recordEpisode({...options,baseDir:episodeDir})},
     recordTurnContinuity: async options => { captures.writes.push(options); return recordTurnContinuity({...options, redis}) },
     getActiveConversation: () => undefined, trackingKey: e => `${e.self_id}:${e.group_id}:${e.user_id}`,
     rememberPersonaReply() {}, rememberStyleReply() {}
@@ -254,7 +261,10 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     ...(createSnapshot?{getPersonaSnapshotFor:currentSnapshot}:{}),
     getCurrentGroupContext: async () => ({groupId, groupName: '脱敏回放群'}), getBasicGroupContext: () => ({groupId, groupName: '脱敏回放群'}),
     buildMergedDirectTriggerPrompt: () => '',
-    messageManager: {getMessages: async () => history.slice().reverse(), recordMessage: async record => captures.archived.push(record)},
+    messageManager: {getMessages: async () => history.slice().reverse(), recordMessage: async record => {
+      captures.archived.push(record);
+      history.push({...record,at:record.time*1000,time:replayTime(record.time*1000),content:(record.message||[]).filter(s=>s.type==='text').map(s=>s.text).join('')});
+    }},
     getTaskStatus: async () => null, formatTaskStatusForPrompt: () => '', resolveUnderstandingPrompt: async () => '',
     getTurnActionFacts:async(e,query={})=>{const declared=scenario.taskFacts??initialScenario.taskFacts;const facts=rebindReplayTaskFacts(declared,e,Date.now(),query);captures.actionFacts.push({query:structuredClone(query),facts});return facts;},
     trimMessageHistory: messages => messages, filterChatByQQ: messages => messages, formatMessages: messages => messages,
@@ -275,9 +285,13 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     processToolCalls:async ()=>{throw new Error('tools disabled in shadow replay')},
     getFriendlyFailureMessage:()=> '影子回放模型调用失败',
     resolveForwardPromptFromSegments:async ()=>'',
-    saveGroupUserMessages: async (...args) => captures.saved.push(args), updateEnhancedSystems: async (...args) => captures.enhanced.push(args),
+    saveGroupUserMessages: async (...args) => captures.saved.push(args), updateEnhancedSystems: async (...args) => {
+      captures.enhanced.push(args);
+      if(isolatedMemory){const job=final.updateEnhancedSystems(host,...args);enhancedJobs.push(job);return job;}
+    },
     finishConversationTask: async () => {}, recordReplyLatency() {}, formatTime: () => '12:00', setTrackingWithTimer() {}
   }
+  if(isolatedMemory){host.config.memorySystem={...host.config.memorySystem,enabled:true};host.memoryManager=isolatedMemory.manager;}
   const ports = {
     logger, botIdentity: e => e.bot, isAiConversationEnabled: () => true, evaluatePrivateChatGate: () => ({allowed: true}),
     resolveConversationContext: e => ({kind: 'group', botId: String(e.self_id), userId: String(e.user_id), conversationId: `group:${e.group_id}`, groupId: String(e.group_id)}),
@@ -288,14 +302,15 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     prepareImageEditAssets: () => null, resolveAvatarEditBase: () => null, resolveAvatarInspectionTargets: () => null, resolveAvatarDrawReference: () => null,
     shouldAskForMissingImageForVisualRequest: () => false, selectToolIntentCandidates: () => [], shouldSkipIntentModel: () => true,
     resolveDeterministicToolIntent: () => null, hasExcelWorkbookContext: () => false, hasRecentPixivSearch: () => false,
-    loadTurnContinuity: async options => { captures.loads.push(options); return loadTurnContinuity({...options, redis}) },
+    loadTurnContinuity: async options => { captures.loads.push(options); return scenario.memoryOnly?null:loadTurnContinuity({...options, redis}) },
     computeAddresseeSignal: () => ({targetKind: directToBot ? 'bot' : scenario.quote && scenario.quote.userId !== '99' ? 'other' : 'bot'}), buildAddresseePrompt: () => '',
     resolvePromptLayerProfile, buildTurnContinuityPrompt, delay: async () => {},
     formatGroupWorkflowTeachingPrompt: () => '', formatGroupKnowledgeTeachingPrompt: () => '', formatIdentityBindingsPrompt: () => '',
     mcpManager: {getMCPSystemPrompts: () => ''}, rollPersonaMood: () => null, getMidtermMemoryManager: () => null,
     composeTurnPromptLayers: async options => { captures.compose.push(options); return composer.composeTurnPromptLayers(options) },
-    getGroupTopicPrompt: () => '', getGroupSocialPrompt: () => '', getSemanticMemoryRuntime: () => null, hasTemporalDeixis: () => false,
-    recallUserEpisodes: () => [], buildUserCallbackPrompt: () => '', buildMainSystemPrompt, containsInternalStatusLeak: () => false,
+    getGroupTopicPrompt: () => '', getGroupSocialPrompt: () => '', getSemanticMemoryRuntime: () => null, hasTemporalDeixis: text => episodic?.hasTemporalDeixis(text)??false,
+    recallEpisodes:options=>scenario.memoryOnly?[]:episodic?.recallEpisodes({...options,baseDir:episodeDir})||[],buildEpisodicPrompt:(...args)=>episodic?.buildEpisodicPrompt(...args)||'',
+    recallUserEpisodes: options => episodic?.recallUserEpisodes({...options,baseDir:episodeDir})||[], buildUserCallbackPrompt: (...args) => episodic?.buildUserCallbackPrompt(...args)||'', buildMainSystemPrompt, containsInternalStatusLeak: () => false,
     resolveHistorySelectionBudget: () => ({mode: 'compact', recentCount: 3, relevantCount: 0, maxMessages: 3}), selectRelevantGroupHistory: messages => messages,
     shouldUseExcelWorkbookTool: () => false, buildExcelToolParams: () => null,
     resolveToolRoute: async () => ({toolChoice: 'none', forcedToolCall: null, toolScopeLocked: true, applied: []}),
@@ -306,7 +321,16 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     collectThinking() {}, extractEmbeddedToolCalls: () => ({calls: [], remainder: ''}), sendThinkingForward: async () => {},
     recordTurnDiagnostics() {}, buildCommittedActionReply: () => '', buildDrawFailureNoteMessage: () => '', takeDrawFailureNote: () => null
   }
-  const formatting=createMessageFormatting({botId:()=>99,error:()=>{}});
+  if(memoryIntegration){
+    const context=createPromptContext({formatAvatarDrawReferencePrompt:()=>'',info(){},fetchBrief:async (url,options,timeoutMs)=>{
+      if(dryRun) return {ok:false,status:503};
+      const started=Date.now();
+      try{const response=await fetchWithTimeout(url,options,timeoutMs);captures.understanding.push({status:response.status,elapsedMs:Date.now()-started});return response;}
+      catch(error){captures.understanding.push({status:null,elapsedMs:Date.now()-started,error:scrub(String(error?.message||error))});throw error;}
+    }});
+    for(const [name,method] of Object.entries(context))host[name]=(...args)=>method(host,...args);
+  }
+  const formatting=createMessageFormatting({botId:()=>event.self_id,error:()=>{}});
   host.formatTime=()=>formatting.formatTime(host);
   host.buildMessageContent=(...args)=>formatting.buildMessageContent(host,...args);
   host.formatMessages=(messages,e,current)=>formatting.formatMessages(host,messages,e,current);
@@ -324,24 +348,38 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     removeToolPromptsFromMessages,resolveChatCompletionUrl,resolveAgentBackend,shouldAcceptPlannerTextResponse,summarizeToolResultForAgent
   });
   const api = createChatTurn(ports)
-  return {api, host, event, session, captures,
+  return {api, host, event, session, captures,isolatedMemory,dispose:()=>isolatedMemory?.dispose(),
     run: async (turn=initialScenario) => {
       scenario=turn;
+      if(turn.personaOverride){currentPersona=structuredClone(turn.personaOverride);snapshotOptions.persona=currentPersona;host.config.persona=currentPersona;}
+      if(turn.personaId)snapshotOptions.personaId=turn.personaId;
+      if(turn.botId){snapshotOptions.botId=Number(turn.botId);event.self_id=Number(turn.botId);event.bot={...event.bot,uin:Number(turn.botId)};}
+      event.bot.nickname=currentPersona.name||'测试机器人';
+      members.set(event.self_id,{user_id:event.self_id,nickname:event.bot.nickname,role:'member'});
+      event.time=Math.floor((turn.at?Date.parse(turn.at):Date.now())/1000);
+      event._receivedAt=Date.now();
       event.msg=turn.rawUserText;
       event.user_id=Number(turn.userId||initialScenario.userId||202);
       const nickname=turn.userName||initialScenario.userName||members.get(event.user_id)?.nickname||'测试群友';
       members.set(event.user_id,{user_id:event.user_id,nickname,role:'member'});
       event.sender=members.get(event.user_id);
       event.message_id=`input-${groupId}-${turnIndex++}`;
-      event.message=[...(directToBot?[{type:'at',qq:99}]:[]),{type:'text',text:turn.rawUserText}];
+      event.message=[...(directToBot?[{type:'at',qq:event.self_id}]:[]),{type:'text',text:turn.rawUserText}];
       if(turn.imageSource)event.message.push({type:'image',url:turn.imageSource});
       if(turn.videoSource)event.message.push({type:'video',url:turn.videoSource});
+      if(turn.forwardNodes||turn.forwardCount)event.message.push({type:'forward',id:`forward-${groupId}-${turnIndex}`});
       delete event.reply_id;delete event.getReply;delete event._quotedPromptContext;
       if(turn.quote){const q=turn.quote;event.reply_id=q.messageId;event.getReply=async()=>({message_id:q.messageId,user_id:q.userId,sender:{user_id:q.userId,nickname:q.name},message:[{type:'text',text:q.text}]});event._quotedPromptContext={text:q.text,messageId:q.messageId,userId:q.userId,senderUserId:q.userId,senderName:q.name}}
       const sentStart=captures.sent.length;
+      if(turn.memoryOnly)history.length=0;
+      history.push({self_id:event.self_id,source:'receive',message_id:event.message_id,at:event.time*1000,time:replayTime(event.time*1000),content:turn.rawUserText,sender:{user_id:event.user_id,nickname:event.sender.nickname,role:'member'}});
       const handled=await api.handleToolInner(host,event);
-      history.push({message_id:event.message_id,time:replayTime(initialTime+turnIndex*30000),content:turn.rawUserText,sender:{user_id:event.user_id,nickname:event.sender.nickname,role:'member'}});
-      if(confirmed&&captures.sent.length>sentStart)history.push({message_id:`reply-${groupId}-${turnIndex}`,time:replayTime(initialTime+turnIndex*30000),content:captures.sent.slice(sentStart).join('\n'),source:'send',...(session.personaSnapshot?{personaSource:session.personaSnapshot}:{}),sender:{user_id:99,nickname:currentPersona.name,role:'member'}});
+      captures.lastReplyElapsedMs=Date.now()-captures.turnStartedAt;
+      const memoryStarted=Date.now();
+      await Promise.all(enhancedJobs.splice(0));
+      await isolatedMemory?.drain();
+      captures.lastMemoryElapsedMs=Date.now()-memoryStarted;
+      if(isolatedMemory)captures.lastMemorySnapshot=await isolatedMemory.snapshot(groupId);
       return handled;
     },
     seedContinuity: (record = scenario.continuity) => record ? recordTurnContinuity({...record, groupId, userId: 202, redis,...(currentSnapshot()?{persona:currentSnapshot()}:{})}) : Promise.resolve(),
@@ -351,12 +389,12 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
 
 const attempts=new WeakMap();
 const describeTurn=({fixture:f,scenario,turn,turnIndex,previousResult},handled)=>{
-      const {startedAt,offsets,intentCalls}=attempts.get(f)||{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','errors','warnings','network'].map(key=>[key,0])),intentCalls:0};
+      const {startedAt,offsets,intentCalls}=attempts.get(f)||{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','errors','warnings','network','memoryNetwork','memoryRecalls','memoryWrites','understanding'].map(key=>[key,0])),intentCalls:0};
       const failures=[];
       const c=f.session.interactionContext;
       const request=f.captures.requests[offsets.requests]||[];
       const system=request.find(m=>m.role==='system')?.content||'';
-      const checks={handled:handled===true,kind:c?.kind===turn.expectedKind,rawBody:c?.rawUserText===turn.rawUserText,interactionLayer:system.includes('【本轮互动】'),target:c?.target?.kind==='bot',noExtraIntent:f.captures.intentCalls===intentCalls,modelResponded:Boolean(f.captures.modelOutput),finalOutput:f.captures.sent.slice(offsets.sent).some(t=>t!=='影子回放模型调用失败'),noRuntimeError:f.captures.errors.length===offsets.errors};
+      const checks={handled:handled===true,kind:c?.kind===turn.expectedKind,rawBody:c?.rawUserText===turn.rawUserText,interactionLayer:system.includes('【本轮互动】'),target:c?.target?.kind===(turn.expectedTarget||'bot'),noExtraIntent:f.captures.intentCalls===intentCalls,modelResponded:Boolean(f.captures.modelOutput),finalOutput:f.captures.sent.slice(offsets.sent).some(t=>t!=='影子回放模型调用失败'),noRuntimeError:f.captures.errors.length===offsets.errors};
       if(turn.imageSource)checks.imageReferenceOnly=c?.evidence?.some(e=>e.kind==='image'&&e.state==='reference_only'&&!e.text);
       if(turn.videoSource){checks.videoReferenceOnly=c?.evidence?.some(e=>e.kind==='video'&&e.state==='reference_only'&&!e.text);if(turn.quote&&String(turn.quote.userId)!=='99')checks.otherBotNotMe=!c?.previousBotReply;if(turn.quote)checks.quoteRetained=system.includes(turn.quote.text)}
       if(turn.expectedKind==='serious_answer'){
@@ -364,9 +402,19 @@ const describeTurn=({fixture:f,scenario,turn,turnIndex,previousResult},handled)=
         checks.seriousPlan=f.session.turnPlan?.execution?.modelProfile==='reasoning';
       }
       if(turnIndex===0&&scenario.continuity)checks.continuityRetained=c?.previousBotReply?.source==='verified_continuity';
-      if(scenario.personaOverride){const p=scenario.personaOverride;checks.personaProjection=system.includes(p.name)&&system.includes(p.tone)&&p.speechStyle.every(style=>system.includes(style));}
-      if(turnIndex>0&&previousResult){
-        if(previousResult.output)checks.ownActualHistory=request.some(m=>historyText(m.content).includes(historyText(previousResult.output))&&String(m.content).includes('QQ号:99'));
+      if(scenario.personaOverride){const p=turn.personaOverride||f.host.config.persona;checks.personaProjection=system.includes(p.name)&&system.includes(p.tone)&&p.speechStyle.every(style=>system.includes(style));}
+      if(memoryIntegration&&!dryRun&&turn.expectedRecall){checks.longTermRecall=f.captures.memoryRecalls.slice(offsets.memoryRecalls).some(r=>r.prompt.includes(turn.expectedRecall));}
+      if(memoryIntegration&&!dryRun&&turn.expectedNewFact){
+        const facts=Object.values(f.captures.lastMemorySnapshot?.entities||{}).flatMap(entity=>entity.facts||[]).concat(f.captures.lastMemorySnapshot?.facts||[]);
+        checks.memoryCommitted=facts.some(fact=>fact.text?.includes(turn.expectedNewFact));
+        checks.extractionCommitted=f.captures.memoryWrites.slice(offsets.memoryWrites).some(write=>write.result?.status==='success'||write.result?.written>0);
+      }
+      if(memoryIntegration&&!dryRun&&turn.expectedEventDate){
+        const facts=Object.values(f.captures.lastMemorySnapshot?.entities||{}).flatMap(entity=>entity.facts||[]).concat(f.captures.lastMemorySnapshot?.facts||[]);
+        checks.memoryEventDate=facts.some(fact=>fact.eventAt&&new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(fact.eventAt)===turn.expectedEventDate);
+      }
+      if(turnIndex>0&&previousResult&&!turn.memoryOnly){
+        if(previousResult.output)checks.ownActualHistory=request.some(m=>historyText(m.content).includes(historyText(previousResult.output))&&String(m.content).includes(`QQ号:${previousResult.botId||99}`));
         checks.previousUserHistory=request.some(m=>m.role==='user'&&historyText(m.content).includes(historyText(previousResult.input)));
       }
       // Baseline runtimes may predate this port. Report capability separately;
@@ -375,18 +423,19 @@ const describeTurn=({fixture:f,scenario,turn,turnIndex,previousResult},handled)=
       if(c?.actionFacts){checks.actionFactsScoped=c.actionFacts.scope?.botId===String(f.event.self_id)&&c.actionFacts.scope?.conversationId===`group:${f.event.group_id}`&&c.actionFacts.scope?.userId===String(f.event.user_id);}
       for(const [key,ok]of Object.entries(checks))if(!ok)failures.push(key);
       const finalOutput=f.captures.sent.slice(offsets.sent).join('\n');
-      return {expected:turn.expect||scenario.expect,semanticChecks:turn.semanticChecks||scenario.semanticChecks||[],manualReview:turn.manualReview||scenario.manualReview||[],personaName:f.host.config.persona.name,personaHash:hashReplayValue(f.host.config.persona),scenarioHash:hashReplayValue(scenario),requestHash:hashReplayValue(request),generation:f.captures.generation.slice(offsets.generation),output:scrub(finalOutput),rawModelOutput:scrub(f.captures.modelOutput),guardChanged:finalOutput!==f.captures.modelOutput,elapsedMs:Date.now()-startedAt,network:f.captures.network.slice(offsets.network),plan:f.session.turnPlan?.execution,actionFacts:{source:'synthetic_fixture',providerUsed:actionFactsCalls.length>0,calls:actionFactsCalls,context:c?.actionFacts||null},diagnosticContext:c?.diagnosticContext||null,interaction:{kind:c?.kind,allowPlayfulness:c?.allowPlayfulness,target:c?.target,evidence:c?.evidence?.map(e=>({origin:e.origin,kind:e.kind,state:e.state})),previousReplySource:c?.previousBotReply?.source},checks,failures,errors:f.captures.errors.slice(offsets.errors),warnings:f.captures.warnings.slice(offsets.warnings)};
+      return {expected:turn.expect||scenario.expect,semanticChecks:turn.semanticChecks||scenario.semanticChecks||[],manualReview:turn.manualReview||scenario.manualReview||[],botId:String(f.event.self_id),personaName:f.host.config.persona.name,personaHash:hashReplayValue(f.host.config.persona),scenarioHash:hashReplayValue(scenario),requestHash:hashReplayValue(request),generation:f.captures.generation.slice(offsets.generation),output:scrub(finalOutput),rawModelOutput:scrub(f.captures.modelOutput),guardChanged:finalOutput!==f.captures.modelOutput,elapsedMs:Date.now()-startedAt,network:f.captures.network.slice(offsets.network),replyElapsedMs:f.captures.lastReplyElapsedMs,memoryDrainElapsedMs:f.captures.lastMemoryElapsedMs,understanding:f.captures.understanding.slice(offsets.understanding),memory:memoryIntegration?{network:f.captures.memoryNetwork.slice(offsets.memoryNetwork),extractions:f.captures.memoryWrites.slice(offsets.memoryWrites),recalls:f.captures.memoryRecalls.slice(offsets.memoryRecalls),snapshot:f.captures.lastMemorySnapshot}:null,plan:f.session.turnPlan?.execution,actionFacts:{source:'synthetic_fixture',providerUsed:actionFactsCalls.length>0,calls:actionFactsCalls,context:c?.actionFacts||null},diagnosticContext:c?.diagnosticContext||null,interaction:{kind:c?.kind,allowPlayfulness:c?.allowPlayfulness,target:c?.target,evidence:c?.evidence?.map(e=>({origin:e.origin,kind:e.kind,state:e.state})),social:c?.social,previousReplySource:c?.previousBotReply?.source},checks,failures,errors:f.captures.errors.slice(offsets.errors),warnings:f.captures.warnings.slice(offsets.warnings)};
 };
 const resultFile=path.join(outputDir,dryRun?'dry-results.json':'results.json');
 const replayDocument=(results,complete=false)=>({commit,label:runLabel,metadata,complete,structuralChecksOnly:true,semanticEvaluation:'manual_required',platformMessagesSent:0,productionStoreWrites:0,results});
 writeReplayCheckpoint(resultFile,replayDocument([]));
 const results=await runReplaySamples({
   scenarios,repetitions,scrub,
-  createFixture:scenario=>fixture(scenario,{directToBot:true}),
+  createFixture:scenario=>fixture(scenario,{directToBot:scenario.directToBot!==false}),
   executeTurn:async context=>{
     const f=context.fixture;
     f.captures.modelOutput='';
-    attempts.set(f,{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','errors','warnings','network'].map(key=>[key,f.captures[key].length])),intentCalls:f.captures.intentCalls});
+    f.captures.turnStartedAt=Date.now();
+    attempts.set(f,{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','errors','warnings','network','memoryNetwork','memoryRecalls','memoryWrites','understanding'].map(key=>[key,f.captures[key].length])),intentCalls:f.captures.intentCalls});
     const handled=await f.run(context.turn);
     return describeTurn(context,handled);
   },

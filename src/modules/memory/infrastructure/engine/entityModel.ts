@@ -1,5 +1,6 @@
 import { memoryRecord } from '../../../../contracts/memoryEngine.js'
 import type { MemoryEntity,MemoryFact,MemoryAlias } from '../../../../contracts/memoryEngine.js'
+import type { PersonaScope } from '../../../../contracts/persona.js'
 // utils/memory/entityModel.js
 import { createHash } from 'node:crypto'
 import { clamp, compactText } from './constants.js'
@@ -24,8 +25,20 @@ function normalizeEmbedding(value: unknown) {
 }
 
 function normalizeEventAt(value: unknown) {
+  if (value === null || value === undefined || (typeof value === 'string' && !value.trim()) || typeof value === 'boolean') return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
+}
+
+export function normalizePersonaSource(value: unknown): PersonaScope | undefined {
+  const source = memoryRecord(value)
+  if (!['botId','personaId','personaVersion','personaName'].every(key => typeof source[key] === 'string' && String(source[key]).trim())) return undefined
+  return {botId:String(source.botId).trim(),personaId:String(source.personaId).trim(),personaVersion:String(source.personaVersion).trim(),personaName:String(source.personaName).trim()}
+}
+
+export function personaSourceKey(value:unknown) {
+  const source = normalizePersonaSource(value)
+  return source ? JSON.stringify([source.botId,source.personaId,source.personaVersion]) : 'legacy'
 }
 
 function normalizeOrigin(value: unknown) {
@@ -46,6 +59,7 @@ export function makeAlias(raw: unknown = {}): MemoryAlias {
 
 export function makeFact(raw: unknown = {}): MemoryFact {
   const input = memoryRecord(raw)
+  const personaSource = normalizePersonaSource(input.personaSource)
   return {
     text: compactText(input.text, 240),
     tags: uniqStrings(input.tags),
@@ -59,7 +73,8 @@ export function makeFact(raw: unknown = {}): MemoryFact {
     origin: normalizeOrigin(input.origin),
     // 多账号共享记忆的来源标注:这条事实是哪个 bot 在场时听来的(人设名);
     // 注入给其他 bot 时可自然引用为"听XX说过"
-    ...(compactText(input.heardFrom, 24) ? { heardFrom: compactText(input.heardFrom, 24) } : {})
+    ...(compactText(input.heardFrom, 24) ? { heardFrom: compactText(input.heardFrom, 24) } : {}),
+    ...(personaSource ? {personaSource} : {})
   }
 }
 

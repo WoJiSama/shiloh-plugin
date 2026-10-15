@@ -1,8 +1,27 @@
 import type {PersonaIdentity} from '../../../contracts/persona.js'
+import type {SocialContinuity, SocialStance} from '../../../contracts/turnInteraction.js'
+import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 
 interface Store {get(key:string):Promise<unknown>;set(key:string,value:string,options:{EX:number}):Promise<unknown>}
-export interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number;botId?:string;persona?:PersonaIdentity}
+export interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number;botId?:string;persona?:PersonaIdentity;social?:SocialContinuity}
 interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number;botId?:string|number;persona?:PersonaIdentity}
+
+const SOCIAL_STANCES: readonly SocialStance[] = ['playful', 'supportive', 'matter_of_fact', 'repairing', 'boundary', 'neutral']
+function parseSocialContinuity(value: unknown, lastReply: string): SocialContinuity | undefined {
+  if (!lastReply.trim() || !value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  const reply = lastReply.replace(/\s+/g, ' ').trim()
+  const readExcerpt = (field: string) => {
+    const text = typeof raw[field] === 'string' ? raw[field].replace(/\s+/g, ' ').trim() : ''
+    return text && Array.from(text).length <= 180 && reply.includes(text) ? text : undefined
+  }
+  const activeBit = readExcerpt('activeBit')
+  const pendingInteraction = readExcerpt('pendingInteraction')
+  const stance = typeof raw.stance === 'string' && SOCIAL_STANCES.includes(raw.stance as SocialStance) ? raw.stance as SocialStance : undefined
+  return activeBit || pendingInteraction || stance ? {
+    ...(activeBit ? {activeBit} : {}), ...(pendingInteraction ? {pendingInteraction} : {}), ...(stance ? {stance} : {})
+  } : undefined
+}
 
 function parsePersona(value: unknown): PersonaIdentity | null {
   if (!value || typeof value !== 'object') return null
@@ -19,7 +38,9 @@ function parseRecord(value:unknown):Continuity|null {
  if(typeof r.at!=='number'||!Number.isFinite(r.at))return null
  const persona = r.persona === undefined ? undefined : parsePersona(r.persona)
  if(persona === null)return null
- return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply:typeof r.lastReply==='string'?r.lastReply:'',at:r.at,...(typeof r.botId==='string'?{botId:r.botId}:{}),...(persona ? {persona} : {})}
+ const lastReply = typeof r.lastReply === 'string' ? safeTruncateUnicode(r.lastReply, 240) : ''
+ const social = parseSocialContinuity(r.social, lastReply)
+ return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply,at:r.at,...(typeof r.botId==='string'?{botId:r.botId}:{}),...(persona ? {persona} : {}),...(social ? {social} : {})}
 }
 const TURN_CONTINUITY_TTL_MS = 10 * 60 * 1000
 const KEY_PREFIX = "blchat:turn_continuity:"
@@ -52,18 +73,22 @@ export async function recordTurnContinuity({
   route = "",
   tools = [],
   lastReply = "",
+  social,
   at = Date.now()
-}:Scope & {intent?:string;route?:string;tools?:unknown[];lastReply?:string;at?:number} = {}) {
+}:Scope & {intent?:string;route?:string;tools?:unknown[];lastReply?:string;social?:SocialContinuity;at?:number} = {}) {
   const identity = persona === undefined ? undefined : parsePersona(persona)
   if (identity === null) throw new TypeError('Turn continuity requires a valid persona identity and version')
-  const record = {
+  const reply = safeTruncateUnicode(String(lastReply || ''), 240)
+  const socialState = parseSocialContinuity(social, reply)
+  const record: Continuity = {
     intent: String(intent || "").slice(0, 40),
     route: String(route || "").slice(0, 20),
     tools: (Array.isArray(tools) ? tools : []).map(item => String(item || "").slice(0, 60)).slice(0, 6),
-    lastReply: String(lastReply || "").slice(0, 240),
+    lastReply: reply,
     at,
     ...(botId === undefined ? {} : { botId: String(botId) }),
-    ...(identity ? {persona: identity} : {})
+    ...(identity ? {persona: identity} : {}),
+    ...(socialState ? {social: socialState} : {})
   }
   const key = scopeKey(groupId, userId, botId, identity)
   memoryFallback.set(key, record)
@@ -91,7 +116,7 @@ export async function loadTurnContinuity({ redis:client = null, groupId = "", us
       record = null
     }
   }
-  if (!record) record = memoryFallback.get(key) || null
+  if (!record) record = parseRecord(memoryFallback.get(key))
   // A persona-scoped turn never borrows legacy speech or another revision's stance.
   // Legacy callers likewise cannot interpret scoped records as their own history.
   if (record?.botId !== (botId === undefined ? undefined : String(botId))) return null

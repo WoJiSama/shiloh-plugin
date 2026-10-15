@@ -1,9 +1,10 @@
 import type {createAvatarReference} from './avatarReference.js'
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
 export interface PromptEvent {msg?:string;raw_message?:string;group_id?:unknown;bot?:{nickname?:string};_quotedPromptContext?:{text?:string;senderName?:string;mediaSummary?:string};_directTriggerMerged?:boolean;_mergedMessageCount?:number;_mergedOriginalTexts?:string[];_groupContextImagePrompt?:string}
 export interface History {role?:string;content?:unknown}
 export interface UnderstandingConfig {enabled:boolean;maxChars:number;includeRecentContext:boolean;briefEnabled:boolean;briefTimeoutMs:number}
 type Avatar=Parameters<ReturnType<typeof createAvatarReference>['formatAvatarDrawReferencePrompt']>[0]
-export interface PromptContext {e?:PromptEvent|undefined;args?:string|undefined;msg?:string|undefined;prompt?:string|undefined;userContent?:string|undefined;currentIntentText?:string|undefined;images?:string[]|undefined;videos?:unknown[]|undefined;groupUserMessages?:History[]|undefined;messages?:History[];modelCommittedToDraw?:boolean;avatarDrawReference?:Avatar;groupContextImagePrompt?:string;session?:{turnTrace?:{addModelCall(stage:string,ms:number):void}}}
+export interface PromptContext {e?:PromptEvent|undefined;args?:string|undefined;msg?:string|undefined;prompt?:string|undefined;userContent?:string|undefined;currentIntentText?:string|undefined;images?:string[]|undefined;videos?:unknown[]|undefined;groupUserMessages?:History[]|undefined;messages?:History[];modelCommittedToDraw?:boolean;avatarDrawReference?:Avatar;groupContextImagePrompt?:string;session?:{interactionContext?:TurnInteractionContext;turnTrace?:{addModelCall(stage:string,ms:number):void}}}
 export type PromptContextInput = Omit<PromptContext, 'prompt' | 'groupUserMessages' | 'messages' | 'images'> & {
   prompt?: unknown
   images?: unknown
@@ -29,7 +30,7 @@ export function decodeImagePromptContext(input: PromptContextInput = {}): Prompt
     ...(messages !== undefined ? {messages: decodePromptHistory(messages)} : {})
   }
 }
-interface Materials {cfg:UnderstandingConfig;intentText:string;quotedContext:string;forwardContext:string;recentContext:string;signals:string[]}
+interface Materials {cfg:UnderstandingConfig;intentText:string;quotedContext:string;forwardContext:string;recentContext:string;signals:string[];socialContext?:string}
 export interface PromptContextHost {config:{understandingEnhancement?:Partial<UnderstandingConfig>;intentAiConfig?:{intentAiUrl?:string;intentAiApikey?:string;intentAiModel?:string};toolsAiConfig?:{toolsAiUrl?:string;toolsAiApikey?:string;toolsAiModel?:string};persona?:{name?:string};triggerPrefixes?:string[]};getPersonaFor?(e:PromptEvent|undefined):{name?:string};getQuotedPromptContextText(e:PromptEvent|undefined,content?:string):string;getRecentDrawContextText(messages:History[],content:string,max:number):string;getRecentPromptContextText(messages:History[],content:string,max:number):string;buildImageGenerationPrompt(context:PromptContext):string;getUnderstandingEnhancementConfig():UnderstandingConfig;shouldInjectUnderstandingContext(context:PromptContext):boolean;extractForwardContextFromUserContent(content:string,max?:number):string;gatherUnderstandingMaterials(context:PromptContext):Materials|null;buildUnderstandingContextPrompt(context:PromptContext):string}
 // 提示上下文构建:引用/近景/生图连续性/理解增强/生图修图 prompt。
 // 从 apps/test.js 原样迁出(P2),行为不变;this 依赖以 host(插件实例)注入。
@@ -40,11 +41,12 @@ import { compactDrawPromptText } from "../domain/textPolicy.js"
 import { compileImagePrompt, resolveImageContextMode, selectLatestDrawContextLines, selectMergedImagePromptTexts } from "../domain/promptCompiler.js"
 import { composeModelBriefCard, requestUnderstandingBrief } from "./understandingBrief.js"
 import { fetchWithTimeout } from "../../../adapters/modelFetch.js"
+import {buildSocialTurnPrompt, withTurnSocialInterpretation} from '../domain/turnInteractionContext.js'
 
 import { normalizeForContainment } from "../domain/messageSegments.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
 
-export function createPromptContext(ports:{formatAvatarDrawReferencePrompt:ReturnType<typeof createAvatarReference>["formatAvatarDrawReferencePrompt"];info(message:string):void}) {
+export function createPromptContext(ports:{formatAvatarDrawReferencePrompt:ReturnType<typeof createAvatarReference>["formatAvatarDrawReferencePrompt"];info(message:string):void;fetchBrief?:typeof fetchWithTimeout}) {
 const {formatAvatarDrawReferencePrompt}=ports
 function getQuotedPromptContextText(host:PromptContextHost, e:PromptEvent = {}, userContent = "") {
     const context = e?._quotedPromptContext
@@ -191,9 +193,10 @@ function getUnderstandingEnhancementConfig(host:PromptContextHost) {
     }
   }
 
-function shouldInjectUnderstandingContext(host:PromptContextHost, { e = {}, userContent = "", images = [], videos = [], currentIntentText = "" }:PromptContext = {}) {
+function shouldInjectUnderstandingContext(host:PromptContextHost, { e = {}, userContent = "", images = [], videos = [], currentIntentText = "", session }:PromptContext = {}) {
     const cfg = host.getUnderstandingEnhancementConfig()
     if (!cfg.enabled) return false
+    if (session?.interactionContext?.social?.needsDisambiguation) return true
 
     const content = `${currentIntentText || ""}\n${userContent || ""}`
     if (content.length > 260) return true
@@ -230,12 +233,13 @@ function gatherUnderstandingMaterials(host:PromptContextHost, context:PromptCont
       groupUserMessages = [],
       currentIntentText = ""
     } = context
-    if (!host.shouldInjectUnderstandingContext({ e, userContent, images, videos, currentIntentText })) return null
+    if (!host.shouldInjectUnderstandingContext(context)) return null
 
     const cfg = host.getUnderstandingEnhancementConfig()
     return {
       cfg,
-      intentText: compactDrawPromptText(currentIntentText || args || msg || "", 360),
+      intentText: compactDrawPromptText(context.session?.interactionContext?.rawUserText || currentIntentText || args || msg || "", 360),
+      socialContext: buildSocialTurnPrompt(context.session?.interactionContext?.social),
       quotedContext: host.getQuotedPromptContextText(e, userContent),
       forwardContext: host.extractForwardContextFromUserContent(userContent),
       recentContext: cfg.includeRecentContext
@@ -248,6 +252,7 @@ function gatherUnderstandingMaterials(host:PromptContextHost, context:PromptCont
         if (host.extractForwardContextFromUserContent(userContent) || /转发了合并聊天记录|转发记录内容|嵌套转发记录/.test(userContent)) signals.push("当前上下文包含合并转发/嵌套转发记录")
         if (images?.length) signals.push(`当前可见图片 ${images.length} 张`)
         if (videos?.length) signals.push(`当前引用/消息含视频 ${videos.length} 条`)
+        if (context.session?.interactionContext?.social?.needsDisambiguation) signals.push('当前共享互动状态尚有语用或对象歧义，只补充能由原文支持的判读')
         if (/(这个|这个人|那个人|上面|里面|前面|刚才|刚刚|上一条|他说|她说|它|这张|这段|这句|哪句|哪个)/.test(normalizeIntentText(currentIntentText || msg))) signals.push("用户用了指代词，需要结合引用、转发和近期对话消解")
         return signals
       })()
@@ -273,11 +278,14 @@ async function resolveUnderstandingPrompt(host:PromptContextHost, context:Prompt
         apiKey: briefCfg.key || "",
         model: briefCfg.model || "",
         materials,
-        fetchImpl: (url, options, timeoutMs) => fetchWithTimeout(url, options, timeoutMs),
+        fetchImpl: (url, options, timeoutMs) => (ports.fetchBrief ?? fetchWithTimeout)(url, options, timeoutMs),
         timeoutMs: cfg.briefTimeoutMs
       })
       context.session?.turnTrace?.addModelCall("brief", Date.now() - startedAt)
       if (result.ok) {
+        if (result.social && context.session?.interactionContext) {
+          context.session.interactionContext = withTurnSocialInterpretation(context.session.interactionContext, result.social, 'understanding_model')
+        }
         ports.info(`[理解简报] group=${context.e?.group_id || ""} 模型判读成功 elapsed=${Date.now() - startedAt}ms brief=${result.brief!.length}c`)
         return composeModelBriefCard({ brief: result.brief!, materials, maxChars: cfg.maxChars })
       }
@@ -297,7 +305,7 @@ function buildUnderstandingContextPrompt(host:PromptContextHost, context:PromptC
       groupUserMessages = [],
       currentIntentText = ""
     } = context
-    if (!host.shouldInjectUnderstandingContext({ e, userContent, images, videos, currentIntentText })) return ""
+    if (!host.shouldInjectUnderstandingContext(context)) return ""
 
     const cfg = host.getUnderstandingEnhancementConfig()
     const intentText = compactDrawPromptText(currentIntentText || args || msg || "", 360)

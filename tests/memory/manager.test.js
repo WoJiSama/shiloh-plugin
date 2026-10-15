@@ -70,11 +70,11 @@ test('extractAndSaveMemories buffers until batch full, then extracts the whole b
   let seenBatch = 0
   m.extractor.extract = async ({ messages }) => { seenBatch = messages.length; return [] }
 
-  const r1 = m.extractAndSaveMemories('g', '111', '消息一')
+  const r1 = await m.extractAndSaveMemories('g', '111', '消息一')
   assert.equal(r1.queued, true)
   assert.equal(r1.buffered, 1)
   assert.equal(seenBatch, 0) // 还没抽取
-  m.extractAndSaveMemories('g', '111', '消息二')
+  await m.extractAndSaveMemories('g', '111', '消息二')
   const r3 = await m.extractAndSaveMemories('g', '111', '消息三') // 第3条达上限 → flush
   assert.equal(seenBatch, 3) // 三条一起抽取
   assert.ok(r3) // flush 返回 applyOps 结果
@@ -228,7 +228,7 @@ test('extractAndSaveMemories returns opted-out and writes nothing for opted-out 
   const set = await m.adminSetUserMemoryEnabled({ groupId: 'g', userId: '111', enabled: false })
   assert.equal(set.enabled, false)
 
-  const r = m.extractAndSaveMemories('g', '111', '我在上海工作')
+  const r = await m.extractAndSaveMemories('g', '111', '我在上海工作')
   assert.equal(r.queued, false)
   assert.equal(r.reason, 'opted-out')
   assert.equal(extractCalls, 0) // 完全不抽取
@@ -244,7 +244,7 @@ test('adminSetUserMemoryEnabled toggles opt-out and re-enables extraction', { ti
   ])
 
   await m.adminSetUserMemoryEnabled({ groupId: 'g', userId: '111', enabled: false })
-  assert.equal(m.extractAndSaveMemories('g', '111', 'x').reason, 'opted-out')
+  assert.equal((await m.extractAndSaveMemories('g', '111', 'x')).reason, 'opted-out')
 
   const on = await m.adminSetUserMemoryEnabled({ groupId: 'g', userId: '111', enabled: true })
   assert.equal(on.enabled, true)

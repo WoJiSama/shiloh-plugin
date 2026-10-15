@@ -344,8 +344,8 @@ test('anonymous multi-user outcomes promote and later demote an autonomous style
   const reply = '先说结论：这个问题能排查，下一步看报错内容。'
   try {
     for (const userId of [11, 12, 11, 12]) {
-      manager.rememberBotReply({ group_id: 1, user_id: userId, msg: request }, reply, config)
-      manager.observeMessage({ group_id: 1, user_id: userId, message_id: userId, msg: '懂了' }, config, embeddingConfig)
+      manager.rememberBotReply({ group_id: 1, user_id: userId, msg: request, _personaSnapshot:personaA }, reply, config)
+      manager.observeMessage({ group_id: 1, user_id: userId, message_id: userId, msg: '懂了', _personaSnapshot:personaA }, config, embeddingConfig)
     }
     await waitForSemanticIdle(manager)
     let state = manager.readMemory(config).autoEvolution
@@ -358,8 +358,8 @@ test('anonymous multi-user outcomes promote and later demote an autonomous style
     assert.doesNotMatch(JSON.stringify(state), /这个接口报错了怎么办|懂了/)
 
     for (const userId of [11, 12, 11, 12, 11]) {
-      manager.rememberBotReply({ group_id: 1, user_id: userId, msg: request }, reply, config)
-      manager.observeMessage({ group_id: 1, user_id: userId, message_id: userId + 100, msg: '还是不行' }, config, embeddingConfig)
+      manager.rememberBotReply({ group_id: 1, user_id: userId, msg: request, _personaSnapshot:personaA }, reply, config)
+      manager.observeMessage({ group_id: 1, user_id: userId, message_id: userId + 100, msg: '还是不行', _personaSnapshot:personaA }, config, embeddingConfig)
     }
     state = manager.readMemory(config).autoEvolution
     assert.equal(candidate?.status, 'demoted')
@@ -368,5 +368,47 @@ test('anonymous multi-user outcomes promote and later demote an autonomous style
   } finally {
     manager.flushTimer && clearTimeout(manager.flushTimer)
     fs.rmSync(cwd, { recursive: true, force: true })
+  }
+})
+
+test('automatic feedback keeps persona ownership across switching, version changes and reload', async () => {
+  const {cwd,manager,config}=createManager(async () => response([1,0]))
+  const request='这个接口报错了怎么办？'
+  const reply='先说结论：这个问题能排查，下一步看报错内容。'
+  const event={group_id:1,user_id:11,msg:request,_personaSnapshot:personaA}
+  try {
+    assert.equal(manager.rememberBotReply({...event,_personaSnapshot:undefined},reply,config),false)
+    assert.equal(manager.rememberBotReply(event,reply,config),true)
+    manager.writeMemory(config)
+    const reloaded=new GlobalStyleLearnerManager({cwd,fetchFn:async()=>response([1,0]),logger:{warn(){},info(){}}})
+    try {
+      for(const source of [personaB,{...personaA,personaVersion:'v2'},undefined]) {
+        reloaded.observeMessage({...event,_personaSnapshot:source,msg:'懂了'},config,embeddingConfig)
+        assert.equal(reloaded.readMemory(config).autoEvolution.candidates.length,0)
+      }
+      assert.equal(reloaded.readMemory(config).autoEvolution.recentReplies.length,1)
+      reloaded.observeMessage({...event,msg:'懂了'},config,embeddingConfig)
+      const candidate=reloaded.readMemory(config).autoEvolution.candidates[0]
+      assert.deepEqual(candidate.personaSource,personaA)
+      assert.equal(candidate.positive,1)
+      await waitForSemanticIdle(reloaded)
+      reloaded.readMemory(config).semanticSamples=[{
+        hash:'owned-auto',embedding:[1,0],patterns:['只属于A的自动策略'],sceneKey:'排障求助',scene:'排障求助',
+        source:'auto_evolution',personaSource:personaA,weight:2,feedbackTags:[],sequence:false,at:new Date().toISOString()
+      },{
+        hash:'owned-auto-second',embedding:[1,0],patterns:['只属于A的第二条策略'],sceneKey:'排障求助',scene:'排障求助',
+        source:'auto_evolution',personaSource:personaA,weight:1,feedbackTags:[],sequence:false,at:new Date().toISOString()
+      },{
+        hash:'legacy-auto',embedding:[1,0],patterns:['无归属的旧策略'],sceneKey:'排障求助',scene:'排障求助',
+        source:'auto_evolution',weight:2,feedbackTags:[],sequence:false,at:new Date().toISOString()
+      }]
+      const recallConfig={...config,semanticMinSamples:1,semanticMinMargin:0,semanticSampleLimit:10}
+      assert.match(await reloaded.buildRelevantPrompt(recallConfig,{query:request,embeddingConfig,source:personaA}),/只属于A/)
+      assert.doesNotMatch(await reloaded.buildRelevantPrompt(recallConfig,{query:request,embeddingConfig,source:personaB}),/只属于A|无归属的旧策略/)
+      assert.doesNotMatch(await reloaded.buildRelevantPrompt(recallConfig,{query:request,embeddingConfig,source:{...personaA,personaVersion:'v2'}}),/只属于A|无归属的旧策略/)
+    } finally {reloaded.flushTimer && clearTimeout(reloaded.flushTimer)}
+  } finally {
+    manager.flushTimer && clearTimeout(manager.flushTimer)
+    fs.rmSync(cwd,{recursive:true,force:true})
   }
 })

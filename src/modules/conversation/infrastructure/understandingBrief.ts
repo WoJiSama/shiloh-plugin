@@ -1,4 +1,4 @@
-interface Materials {intentText?:string;signals?:string[];quotedContext?:string;forwardContext?:string;recentContext?:string}
+interface Materials {intentText?:string;signals?:string[];quotedContext?:string;forwardContext?:string;recentContext?:string;socialContext?:string}
 interface BriefResponse {ok:boolean;status?:number;json():Promise<unknown>}
 type BriefFetch=(url:string,init:RequestInit,timeoutMs?:number)=>Promise<BriefResponse>
 function object(value:unknown):Record<string,unknown> {return value && typeof value==='object'?value as Record<string,unknown>: {}}
@@ -8,14 +8,20 @@ function object(value:unknown):Record<string,unknown> {return value && typeof va
 // 任何失败(超时/接口缺失/输出不合法)都回退规则卡,零新增风险。
 // 本模块不 import 任何运行时全局,fetch 与配置全部注入,可单测。
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
+import {parseSocialInterpretation, socialInterpretationInstruction} from '../domain/turnInteractionContext.js'
+import type {SocialInterpretation} from '../domain/turnInteractionContext.js'
+
+export type UnderstandingBriefResult = {ok: true; brief: string; social?: SocialInterpretation} | {ok: false; reason: string}
 
 const BRIEF_SYSTEM_PROMPT = `你是群聊语境理解器。根据给到的材料,输出一张帮助回复者准确理解用户的简报。
-严格只输出以下四个小节,每节一行,材料里没有依据就写"无":
+先输出以下四个小节,每节一行,材料里没有依据就写"无":
 【用户意图】用户真正想要什么(一句话,包含没明说的隐含目标)
 【指代消解】消息里的"这个/刚才/他/上面/里面"等具体指什么
 【需要上下文】回复时必须参考的上文要点(最多3条)
-【语气关系】用户当前情绪,以及和机器人关系的熟悉程度
-不要输出其他内容,不要复述材料原文。`
+【语气关系】有依据的当前语气与互动目的；关系熟悉程度没有证据就写无，不推定亲密关系
+四节后可追加一行【社交判读】严格JSON。
+${socialInterpretationInstruction()}
+【社交判读】后只放 social 字段内部对象，不加代码块。不输出其他内容，不复述材料原文。`
 
 export function buildBriefMessages(materials:Materials = {}) {
   const parts = []
@@ -24,6 +30,7 @@ export function buildBriefMessages(materials:Materials = {}) {
   if (materials.quotedContext) parts.push(`【引用内容摘录】\n${materials.quotedContext}`)
   if (materials.forwardContext) parts.push(`【合并转发/嵌套转发摘录】\n${materials.forwardContext}`)
   if (materials.recentContext) parts.push(`【近期可参考上下文】\n${materials.recentContext}`)
+  if (materials.socialContext) parts.push(materials.socialContext)
   return [
     { role: "system", content: BRIEF_SYSTEM_PROMPT },
     { role: "user", content: parts.join("\n\n") || "(无材料)" }
@@ -33,8 +40,17 @@ export function buildBriefMessages(materials:Materials = {}) {
 function isValidBrief(text = "") {
   const content = String(text || "").trim()
   if (content.length < 10 || content.length > 2000) return false
-  if (!content.includes("【用户意图】")) return false
-  return true
+  return ['【用户意图】', '【指代消解】', '【需要上下文】', '【语气关系】'].every(section => content.includes(section))
+}
+
+export function parseUnderstandingSocial(text: string) {
+  const match = text.match(/(?:^|\n)\s*【社交判读】\s*(\{[^\n]*\})\s*$/u)
+  if (!match) return undefined
+  try {
+    return parseSocialInterpretation(JSON.parse(match[1]!))
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -48,7 +64,7 @@ export async function requestUnderstandingBrief({
   materials = {},
   fetchImpl = fetch,
   timeoutMs = 2500
-}: {apiUrl?:string;apiKey?:string;model?:string;materials?:Materials;fetchImpl?:BriefFetch;timeoutMs?:number} = {}) {
+}: {apiUrl?:string;apiKey?:string;model?:string;materials?:Materials;fetchImpl?:BriefFetch;timeoutMs?:number} = {}): Promise<UnderstandingBriefResult> {
   if (!apiUrl || !apiKey || !model || String(apiKey).includes("sk-xxx")) {
     return { ok: false, reason: "api-not-configured" }
   }
@@ -103,8 +119,12 @@ export async function requestUnderstandingBrief({
   }
   const choices=object(data).choices
   const content = String(object(object(Array.isArray(choices)?choices[0]:null).message).content || "").trim()
-  if (!isValidBrief(content)) return { ok: false, reason: "invalid-brief" }
-  return { ok: true, brief: content }
+  const social = parseUnderstandingSocial(content)
+  const socialStart = content.search(/(?:^|\n)\s*【社交判读】/u)
+  // Invalid or multi-line social JSON is not prose for the generator either.
+  const brief = (socialStart < 0 ? content : content.slice(0, socialStart)).trim()
+  if (!isValidBrief(brief)) return { ok: false, reason: "invalid-brief" }
+  return { ok: true, brief, ...(social ? {social} : {}) }
 }
 
 /**

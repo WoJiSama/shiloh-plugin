@@ -78,6 +78,40 @@ test('repetitions default to one and accept only positive safe integer CLI value
   assert.throws(()=>parseReplayOptions(['--unknown']),/Unknown/);
 });
 
+test('memory integration dry replay runs the real isolated memory path without private config or network',t=>{
+  const directory=scratch(t),outputDir=path.join(directory,'output'),privateRoot=path.join(directory,'must-not-read');
+  const code=`
+    import fs from 'node:fs';
+    const originalRead=fs.readFileSync;
+    fs.readFileSync=(file,...args)=>{if(String(file).startsWith(${JSON.stringify(privateRoot)}))throw new Error('private config was read');return originalRead(file,...args);};
+    globalThis.fetch=()=>{throw new Error('network must stay disabled');};
+    const originalLog=console.log;console.log=()=>{};
+    const {main}=await import(${JSON.stringify(new URL('../scripts/conversationQualityReplay.mjs',import.meta.url).href)});
+    const replay=await main(['--dry-run','--memory-integration','--plugin-root',${JSON.stringify(root)},'--config-root',${JSON.stringify(privateRoot)},'--scenarios',${JSON.stringify(path.join(root,'tests/fixtures/memorySocialReplayScenarios.json'))},'--scenario','dated-memory-next-turn','--output-dir',${JSON.stringify(outputDir)}],{});
+    originalLog(JSON.stringify({metadata:replay.metadata,results:replay.results}));
+  `;
+  const child=spawnSync(process.execPath,['--input-type=module','-e',code],{cwd:directory,encoding:'utf8',timeout:30000});
+  assert.equal(child.status,0,child.stderr);
+  const replay=JSON.parse(child.stdout);
+  assert.equal(replay.metadata.memoryIntegration,true);
+  assert.equal(replay.metadata.configHash,null);
+  assert.equal(replay.results.length,2);
+  for(const result of replay.results){
+    assert.equal(result.checks.noRuntimeError,true,JSON.stringify(result.errors));
+    assert.equal(result.checks.rawBody,true);
+    assert.ok(result.memory.snapshot);
+    assert.ok(result.memory.extractions.some(item=>item.method==='extractAndSaveMemories'));
+    assert.ok(result.memory.network.every(item=>item.stub===true&&item.status===null));
+    assert.deepEqual(result.network,[]);
+  }
+  assert.ok(replay.results[1].memory.recalls.some(item=>item.query==='我之前说的数学考试是哪天？'));
+  const saved=JSON.parse(fs.readFileSync(path.join(outputDir,'dry-results.json'),'utf8'));
+  assert.equal(saved.complete,true);
+  assert.equal(saved.platformMessagesSent,0);
+  assert.equal(saved.productionStoreWrites,0);
+  assert.equal(fs.existsSync(privateRoot),false);
+});
+
 test('each repeated sample owns fresh state and only its own previous output',async()=>{
   const fixtures=[];
   const scenarios=[structuredClone(simpleScenario),{id:'case-b',rawUserText:'独立场景',expectedKind:'conversation'}];

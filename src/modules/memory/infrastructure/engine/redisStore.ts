@@ -1,5 +1,5 @@
 import {memoryRecord} from '../../../../contracts/memoryEngine.js'
-import type {MemoryId,MemoryRedisClient,AliasEntry,KnowledgeEntry,WorkflowRule} from '../../../../contracts/memoryEngine.js'
+import type {MemoryId,MemoryRedisClient,AliasEntry,KnowledgeEntry,WorkflowRule,PendingMemoryExtraction} from '../../../../contracts/memoryEngine.js'
 // utils/memory/redisStore.js
 import { KEY } from './constants.js'
 import { slimEntityDoc, slimGroupFacts } from './entityModel.js'
@@ -21,7 +21,7 @@ function parseTeachingEntry(value:unknown):KnowledgeEntry & WorkflowRule {
  if(typeof resource.fileName==='string')output.resource={fileName:resource.fileName,folderPath:String(resource.folderPath||''),fileId:String(resource.fileId||''),origin:String(resource.origin||'')}
  return output
 }
-const DEFAULT_META = { disabled: false, optedOut: [], lastExtractAt: 0, nextRetryAt: 0, failureCount: 0 }
+const DEFAULT_META = { disabled: false, optedOut: [], lastExtractAt: 0, nextRetryAt: 0, failureCount: 0, lastExtractAttemptAt:0, lastExtractStatus:'', lastExtractFailure:'' }
 
 export class RedisStore {
  redis:MemoryRedisClient
@@ -84,14 +84,24 @@ export class RedisStore {
 
   async getMeta(groupId:MemoryId) {
     const meta=memoryRecord(await this._getJson(KEY.meta(groupId), {}))
-    return { ...DEFAULT_META, ...meta, disabled:meta.disabled===true, optedOut:Array.isArray(meta.optedOut)?meta.optedOut.map(String):[],lastExtractAt:Number(meta.lastExtractAt)||0,nextRetryAt:Number(meta.nextRetryAt)||0,failureCount:Number(meta.failureCount)||0 }
+    const finiteNumber = (value:unknown) => typeof value === 'number' && Number.isFinite(value) ? Math.max(0,value) : 0
+    return { ...DEFAULT_META, ...meta, disabled:meta.disabled===true, optedOut:Array.isArray(meta.optedOut)?meta.optedOut.map(String):[],lastExtractAt:finiteNumber(meta.lastExtractAt),nextRetryAt:finiteNumber(meta.nextRetryAt),failureCount:finiteNumber(meta.failureCount),lastExtractAttemptAt:finiteNumber(meta.lastExtractAttemptAt),lastExtractStatus:typeof meta.lastExtractStatus === 'string' ? meta.lastExtractStatus : '',lastExtractFailure:typeof meta.lastExtractFailure === 'string' ? meta.lastExtractFailure : '' }
   }
   async saveMeta(groupId:MemoryId, meta:unknown) {
     await this._setRaw(KEY.meta(groupId), JSON.stringify({ ...DEFAULT_META, ...memoryRecord(meta) }))
   }
 
+  async getPendingExtractions(groupId:MemoryId):Promise<unknown[]> {
+    const value = await this._getJson(KEY.pending(groupId), [])
+    return Array.isArray(value) ? value : []
+  }
+  async savePendingExtractions(groupId:MemoryId, pending:PendingMemoryExtraction[]) {
+    if (!pending.length) return this.redis.del(KEY.pending(groupId))
+    return this._setRaw(KEY.pending(groupId), JSON.stringify(pending))
+  }
+
   async clearGroup(groupId:MemoryId) {
-    const keys = [KEY.entities(groupId), KEY.alias(groupId), KEY.facts(groupId), KEY.workflows(groupId), KEY.knowledge(groupId), KEY.meta(groupId)]
+    const keys = [KEY.entities(groupId), KEY.alias(groupId), KEY.facts(groupId), KEY.workflows(groupId), KEY.knowledge(groupId), KEY.meta(groupId), KEY.pending(groupId)]
     for (const k of keys) await this.redis.del(k)
     return keys.length
   }

@@ -35,6 +35,19 @@ test('makeFact normalizes eventAt: finite number kept, otherwise → null', () =
   assert.equal(makeFact({ text: 't', eventAt: NaN }).eventAt, null)
   assert.equal(makeFact({ text: 't', eventAt: Infinity }).eventAt, null)
   assert.equal(makeFact({ text: 't' }).eventAt, null) // default
+  for (const eventAt of [null,undefined,'',false,true]) {
+    assert.equal(makeFact({text:'t',eventAt}).eventAt,null)
+    assert.equal(makeFact(JSON.parse(JSON.stringify(makeFact({text:'t',eventAt})))).eventAt,null)
+  }
+})
+
+test('fact provenance preserves reliable persona scope and rejects partial legacy scope', () => {
+  const personaSource={botId:'b1',personaId:'p1',personaVersion:'v1',personaName:'希洛'}
+  const fact=makeFact({text:'考试在周五',personaSource,heardFrom:'希洛',eventAt:1718000000000})
+  assert.deepEqual(fact.personaSource,personaSource)
+  assert.deepEqual(makeFact(JSON.parse(JSON.stringify(fact))).personaSource,personaSource)
+  assert.equal(makeFact({text:'旧事实',personaSource:{personaName:'希洛'}}).personaSource,undefined)
+  assert.equal(makeFact({text:'旧事实',heardFrom:'希洛'}).heardFrom,'希洛')
 })
 
 test('makeFact normalizes origin: whitelist kept, otherwise → extract', () => {

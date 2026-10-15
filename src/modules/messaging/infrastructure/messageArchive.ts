@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import YAML from 'yaml'
+import {parseSentPersonaSource} from '../../conversation/domain/personaProvenance.js'
+import {findForwardCompleteness, parseForwardCompleteness} from '../../conversation/domain/forwardCompleteness.js'
 interface Segment extends Record<string, unknown> { type?: string; data?: Record<string, unknown>; text?: string; id?: unknown }
 interface Sender extends Record<string, unknown> { user_id?: unknown; card?: string; nickname?: string; role?: string; title?: string; level?: unknown }
 interface Event extends Record<string, unknown> { time?: number | string; timestamp?: number; message_type?: string; group_id?: unknown; user_id?: unknown; message_id?: unknown; raw_message?: string; msg?: string; message?: Segment[]; sender?: Sender; group?: { name?: string }; group_name?: string; notice_type?: string; sub_type?: string }
@@ -25,13 +27,23 @@ export interface ArchivePorts {
 }
 function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error) }
 function object(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
+function verifiedForwardSegment(segment: Segment): Segment {
+ if (segment.type !== 'forward_context') return segment
+ const {completeness: _unverifiedCompleteness, ...record} = segment
+ const completeness = parseForwardCompleteness(segment.completeness)
+ return {...record, ...(completeness ? {completeness} : {})}
+}
 function parseArchiveRecord(text: string): ArchiveRecord {
  const value: unknown = JSON.parse(text)
  const row = object(value)
  if (!Number.isFinite(row.timestamp) || typeof row.message_type !== 'string' || typeof row.time !== 'string') throw new Error('Invalid archive record')
  if (row.message !== undefined && (!Array.isArray(row.message) || row.message.some(item => item === null || typeof item !== 'object'))) throw new Error('Invalid archive segments')
  if (row.sender !== undefined && (row.sender === null || typeof row.sender !== 'object')) throw new Error('Invalid archive sender')
- return row as ArchiveRecord
+ const personaSource = parseSentPersonaSource(row.personaSource, row.source, object(row.sender).user_id ?? row.user_id)
+ const forwardCompleteness = parseForwardCompleteness(row.forwardCompleteness) || findForwardCompleteness(row.message, row.forward_context)
+ const {personaSource: _unverifiedSource, forwardCompleteness: _unverifiedCompleteness, forward_context: _runtimeContext, ...record} = row
+ const message = Array.isArray(row.message) ? row.message.map(segment => verifiedForwardSegment(segment as Segment)) : undefined
+ return {...record, ...(message ? {message} : {}), ...(personaSource ? {personaSource} : {}), ...(forwardCompleteness ? {forwardCompleteness} : {})} as ArchiveRecord
 }
 export function createArchiveManagerClass(ports: ArchivePorts) {
 const { getMentionTargetId, safeTruncateUnicode, enrichBilibiliMessageSegments, enrichDouyinMessageSegments, enrichYoutubeMessageSegments, enrichPixivMessageSegments, formatBilibiliHistoryLinks, formatBilibiliHistoryText, formatDouyinHistoryLinks, formatDouyinHistoryText, formatYoutubeHistoryLinks, formatYoutubeHistoryText, formatPixivHistoryLinks, formatPixivHistoryText, qqFaceText } = ports
@@ -92,12 +104,14 @@ function normalizeMessageSegments(message: Segment[] = [], storeMediaUrl = true)
   if (!Array.isArray(message)) return []
   return message.map(seg => {
     if (seg?.type === "forward_context") {
+      const completeness = parseForwardCompleteness(seg.completeness)
       return {
         type: "forward_context",
         text: String(seg.text || ""),
         forward_ids: Array.isArray(seg.forward_ids) ? seg.forward_ids.map(String) : [],
         media: Array.isArray(seg.media) ? seg.media : [],
-        forward_nodes: Array.isArray(seg.forward_nodes) ? seg.forward_nodes : []
+        forward_nodes: Array.isArray(seg.forward_nodes) ? seg.forward_nodes : [],
+        ...(completeness ? {completeness} : {})
       }
     }
     if (seg?.type === "bilibili") {
@@ -489,6 +503,8 @@ class MessageArchiveManager {
     const timestamp = Number(e.time ? Number(e.time) * 1000 : Date.now())
     const raw = String(e.raw_message || e.msg || "")
     const maxLen = Math.max(100, Number(cfg.maxMessageLength) || DEFAULT_CONFIG.maxMessageLength)
+    const personaSource = parseSentPersonaSource(e.personaSource, e.source, e.sender?.user_id ?? e.user_id)
+    const forwardCompleteness = parseForwardCompleteness(e.forwardCompleteness) || findForwardCompleteness(e.message, e.forward_context)
     return {
       version: 1,
       event_id: e.event_id || null,
@@ -510,7 +526,9 @@ class MessageArchiveManager {
       raw_message: raw.length > maxLen ? safeTruncateUnicode(raw, maxLen, "...") : raw,
       raw_truncated: raw.length > maxLen,
       message: normalizeMessageSegments(e.message, cfg.storeMediaUrl),
-      source: e.source || null
+      source: e.source || null,
+      ...(personaSource ? {personaSource} : {}),
+      ...(forwardCompleteness ? {forwardCompleteness} : {})
     }
   }
 

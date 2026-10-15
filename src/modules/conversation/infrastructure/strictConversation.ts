@@ -3,10 +3,12 @@ import { extractChatKeywords } from '../domain/messageIntent.js'
 import { isAiConversationEnabled } from '../domain/aiConversationGate.js'
 import { ROLE_MAP as roleMap, summarizeForLog } from '../domain/messageContext.js'
 import type { ConversationTool } from '../infrastructure/conversationUtils.js'
+import type {PersonaSnapshot, PersonaScope} from '../../../contracts/persona.js'
 export interface HistoryItem {role:string;content:string}
 export interface Tracking {lastActiveTime:number;chatHistory:HistoryItem[];timer:ReturnType<typeof setTimeout>}
 export interface Judgment {conversationKey:string;userMessage:string;chatHistory:HistoryItem[];e:ConversationEvent;resolve(value:boolean):void}
 export interface StrictConversationHost {
+ getPersonaSnapshotFor?(e:ConversationEvent):PersonaSnapshot;
  config:{enabled?:unknown;conversationTrackingTimeout?:number;batchJudgmentDelay?:number;conversationTrackingThrottle?:number;conversationTrackingEnabled?:boolean;
  chatTriggerMode?:string;trackAiConfig:{trackAiUrl:string;trackAiApikey:string;trackAiModel:string};
  smartTrigger?:{maxRepliesPer10Min?:number;continuationKeywordMaxCount?:number;repeatJoinEnabled?:boolean;repeatMaxTextLength?:number;repeatDetectionWindow?:number;repeatMinCount?:number;repeatJoinCooldownMs?:number;repeatJoinProbability?:number};
@@ -27,7 +29,7 @@ export interface StrictConversationPorts {
  logger:{info(message:string):void;warn(message:string):void;error(message:string,error?:unknown):void};bot():{uin?:string|number;nickname?:string};now?():number;
  fetch?:typeof fetch;random?():number;
  diceManager:{isLogActive(groupId:string|number,config:unknown):boolean};
- globalStyleLearnerManager:{observeMessage(e:ConversationEvent,config:unknown,embedding:unknown):unknown;maybeAutoSummarize(config:unknown,memory:unknown):Promise<unknown>};
+ globalStyleLearnerManager:{observeMessage(e:ConversationEvent,config:unknown,embedding:unknown,source?:PersonaScope):unknown;maybeAutoSummarize(config:unknown,memory:unknown):Promise<unknown>};
  anchorEventConversation(e:ConversationEvent):unknown;getRedBagType(wallet:unknown):{type:string;name:string};isExclusiveForUser(wallet:unknown,botId:string|number|undefined):boolean;
  toolConfigHasName(config:ConversationTool[]|undefined,name:string):boolean;
 }
@@ -411,7 +413,7 @@ async function handleRandomReply(host:StrictConversationHost, e:ConversationEven
 
     if (host.config.globalStyleLearning?.enabled !== false) {
       try {
-        globalStyleLearnerManager.observeMessage(e, host.config.globalStyleLearning, host.config.embeddingAiConfig)
+        globalStyleLearnerManager.observeMessage(e, host.config.globalStyleLearning, host.config.embeddingAiConfig, host.getPersonaSnapshotFor?.(e))
         globalStyleLearnerManager.maybeAutoSummarize(
           host.config.globalStyleLearning,
           host.config.memoryAiConfig

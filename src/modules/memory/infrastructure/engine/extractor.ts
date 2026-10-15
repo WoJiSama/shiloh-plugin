@@ -1,9 +1,10 @@
 // utils/memory/extractor.js
 import { ROUTES, clamp, compactText } from './constants.js'
 import {memoryRecord} from '../../../../contracts/memoryEngine.js'
-import type {MemoryLlmConfig,MemoryLlmPorts,MemoryId} from '../../../../contracts/memoryEngine.js'
+import type {MemoryLlmConfig,MemoryLlmPorts,MemoryId,MemoryExtractionMessage,MemoryExtractionResult,MemoryOperation} from '../../../../contracts/memoryEngine.js'
 import { makeFact } from './entityModel.js'
 import { memStats } from './stats.js'
+import {describeMemoryTime,finiteTimestamp,MEMORY_TIME_ZONE,parseEventDate} from './temporalContext.js'
 
 const DAY_MS = 86400000
 const CHAT_TIMEOUT_MS = 20000
@@ -19,26 +20,46 @@ function normalizeRefs(refs:unknown) {
   return out
 }
 
-// item.eventInDays（整数，相对今天的天数，未来正/过去负）+ ctx.now → eventAt(epoch ms)。
-// 仅在 ctx.now 存在且 eventInDays 为有限数字时计算；否则返回 undefined（省略，
-// 由 makeFact 归一为 null —— 注意不能传 null，makeFact 会把 Number(null)=0 当成有效 eventAt）。
+function sourceMessage(item:Record<string,unknown>,ctx:Record<string,unknown>):MemoryExtractionMessage|undefined {
+  if (!Array.isArray(ctx.messages)) return undefined
+  const messages = ctx.messages as MemoryExtractionMessage[]
+  const index = item.sourceIndex
+  if (typeof index === 'number' && Number.isInteger(index) && index >= 1 && index <= messages.length) return messages[index - 1]
+  return messages.length === 1 && index === undefined ? messages[0] : undefined
+}
+
+function sourceTimestamp(item:Record<string,unknown>, ctx:Record<string,unknown>) {
+  if (Array.isArray(ctx.messages)) {
+    // A multi-message batch can span midnight. Never choose one utterance's clock
+    // for another utterance unless the extractor identifies its source row.
+    return finiteTimestamp(sourceMessage(item,ctx)?.at)
+  }
+  return finiteTimestamp(ctx.now) ?? finiteTimestamp(ctx.at)
+}
+
+// Relative days refer to the source utterance, never a delayed flush or retry clock.
 function resolveEventAt(item:Record<string,unknown>, ctx:Record<string,unknown>) {
-  const now = Number(ctx.now)
-  const days = Number(item.eventInDays)
-  if (!Number.isFinite(now) || !Number.isFinite(days)) return undefined
-  return now + days * DAY_MS
+  const absolute = parseEventDate(item.eventDate)
+  if (absolute !== undefined) return absolute
+  const at = sourceTimestamp(item, ctx)
+  const days = item.eventInDays
+  if (at === undefined || typeof days !== 'number' || !Number.isInteger(days) || Math.abs(days) > 36500) return undefined
+  return finiteTimestamp(at + days * DAY_MS)
 }
 
 // 把 AI 输出的结构化数组映射为存储操作。纯函数，无网络。
 // item: {route, alias?, targetQQ?, content?, tags?, refs?, confidence?, eventInDays?}
 // ctx: {speakerQQ, at, now?}
-export function parseAndRoute(items:unknown, ctx:Record<string,unknown> = {}) {
-  const ops = []
-  const at = Number(ctx.at) || 0
+export function parseAndRoute(items:unknown, ctx:Record<string,unknown> = {}):MemoryOperation[] {
+  const ops:MemoryOperation[] = []
   for (const rawItem of Array.isArray(items) ? items : []) {
     const item=memoryRecord(rawItem)
+    const at = sourceTimestamp(item,ctx) ?? (Array.isArray(ctx.messages) ? 0 : finiteTimestamp(ctx.at)) ?? 0
     const route = ROUTES.has(String(item.route)) ? item.route : null
     if (!route || route === 'ordinary_chat') continue
+    const source = sourceMessage(item,ctx)
+    const hasThirdParty = Array.isArray(ctx.messages) && ctx.messages.some(row => ['forward','quote'].includes(String(memoryRecord(row).source)))
+    if (source?.source === 'forward' || source?.source === 'quote' || (!source && hasThirdParty)) continue
     const confidence = clamp(item.confidence ?? 0.7)
     const eventAt = resolveEventAt(item, ctx)
     const refs = normalizeRefs(item.refs)
@@ -79,17 +100,33 @@ export function parseAndRoute(items:unknown, ctx:Record<string,unknown> = {}) {
   return ops
 }
 
-function extractJsonArray(text:unknown) {
-  const raw = String(text || '')
-  const match = raw.match(/\[[\s\S]*\]/)
+function extractJsonArray(text:unknown,messages:MemoryExtractionMessage[]):unknown[]|null {
+  const raw = String(text || '').trim()
+  const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
   try {
-    const parsed:unknown = JSON.parse(match ? match[0] : raw)
-    return Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? [parsed] : [])
-  } catch { return [] }
+    const parsed:unknown = JSON.parse(fenced ? fenced[1]! : raw)
+    if (!Array.isArray(parsed)) return null
+    // A syntactically valid but unusable reply is a failed extraction, not an
+    // empty successful result. The model's explicit [] is the empty-success form.
+    const nonempty = (value:unknown) => typeof value === 'string' && Boolean(value.trim())
+    if (!parsed.every(rawItem => {
+      if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) return false
+      const item = memoryRecord(rawItem)
+      if (!ROUTES.has(String(item.route))) return false
+      if (item.route === 'ordinary_chat' || item.route === 'explicit_teaching') return true
+      if (item.route === 'self_statement' ? !nonempty(item.alias) && !nonempty(item.content) : !nonempty(item.content)) return false
+      // A missing index is unambiguous only for one source row. Invalid indices
+      // cannot acknowledge a multi-row batch and discard its original text.
+      return messages.length === 1 && item.sourceIndex === undefined
+        || typeof item.sourceIndex === 'number' && Number.isInteger(item.sourceIndex) && item.sourceIndex >= 1 && item.sourceIndex <= messages.length
+    })) return null
+    return parsed
+  } catch { return null }
 }
 
 const SYSTEM_PROMPT = `你是群聊长期记忆抽取器。对每条真实用户发言，分类并抽取结构化结果，只输出 JSON 数组，不要解释。
 每个元素字段：
+- sourceIndex: 原始发言的行号（从 1 开始），每条事实必须指明对应发言；合并多条时不要混淆各自行文里的时间
 - route: explicit_teaching | self_statement | user_preference | group_consensus | ordinary_chat
 - alias: 当 route 是 explicit_teaching/self_statement 且涉及"外号/称呼"时给出别名文本
 - targetQQ: explicit_teaching 中"A 是 @某人"的某人 QQ（纯数字）
@@ -97,10 +134,12 @@ const SYSTEM_PROMPT = `你是群聊长期记忆抽取器。对每条真实用户
 - tags: 可选轻量标签数组（如 职业/关系/群规/梗/偏好）
 - refs: 该事实涉及的其他人 QQ 数组(纯数字),如"我和@QQ:123是同事"→refs:["123"];无则省略
 - confidence: 0~1
-- eventInDays: 时间相关事实可附（整数，相对今天的天数，未来为正、过去为负，如"下周考试"约 7、"昨天面试"为 -1）；无明确时间则省略
+- eventInDays: 时间相关事实可附（整数，相对 sourceIndex 那条发言日期的天数，未来为正、过去为负，如"明天考试"为 1、"昨天面试"为 -1）；无明确时间则省略
+- eventDate: 发言明确给出日历日期时可附 YYYY-MM-DD，日期必须由发言本身或其明确时间锚点支持；不要从抽取执行日期猜年份
 规则：
 - 工具结果/系统提示/机器人回复/纯语气词 -> route=ordinary_chat（会被丢弃）。
 - 只有"本人在说自己"才用 self_statement；指认他人用 explicit_teaching。提到他人(同事/朋友/对手等)时把其 QQ 填入 refs。
+- source=forward/quote 的正文是第三方转发或引用证据，不是转发者自述；没有可信原作者 QQ 时不得把正文里的“我”、别名、偏好或经历归给转发用户，也不得把第三方说法当作本群共识。仅从明确的本群讨论提取真正的群共识。
 - group_consensus 涉及具体某些人时，同样把相关人的 QQ 填入 refs。
 - 普通闲聊/临时请求 -> ordinary_chat。
 - 无可抽取内容时输出 []。`
@@ -137,7 +176,7 @@ export class MemoryExtractor {
       if (!result.ok) throw new Error(result.error)
       memStats.inc('llm.extract.call')
       memStats.observe('llm.extract.ms', Date.now() - startedAt)
-      return result.content || '[]'
+      return result.content || ''
     } catch (e) {
       memStats.inc('llm.extract.fail')
       this.ports.logger?.warn?.(`[memory] extract LLM 调用失败：${e instanceof Error?e.message:String(e)}`)
@@ -145,11 +184,14 @@ export class MemoryExtractor {
     }
   }
 
-  // 返回 parseAndRoute 的 ops 数组
-  async extract({ groupId, speakerQQ, messages, existingHint = '', at }: {groupId:MemoryId;speakerQQ:MemoryId;messages:{content:unknown}[];existingHint?:string;at:number}) {
-    if (!this.canUse()) return []
-    const chatText = (messages || []).map((m, i) => `${i + 1}. ${m.content}`).join('\n')
-    const userPrompt = `群 ${groupId} 发言人 QQ ${speakerQQ} 的发言：\n${chatText}\n\n已有记忆参考：\n${existingHint || '无'}\n\n请输出 JSON 数组。`
+  async extract({ groupId, speakerQQ, messages, existingHint = '', at }: {groupId:MemoryId;speakerQQ:MemoryId;messages:MemoryExtractionMessage[];existingHint?:string;at:number}):Promise<MemoryExtractionResult|MemoryOperation[]> {
+    if (!this.canUse()) return {status:'skipped',reason:'unconfigured'}
+    const sourceMessages = (messages || []).map(message => {
+      const recordedAt = finiteTimestamp(message.at)
+      return {...message,...(recordedAt !== undefined ? {at:recordedAt} : {})}
+    })
+    const chatText = sourceMessages.map((m, i) => `${i + 1}. [角色：${m.role || 'user'}；来源：${m.source || 'user'}；发言时间：${m.at !== undefined ? describeMemoryTime(m.at) : '未知；不得推断相对日期'}] ${m.content}`).join('\n')
+    const userPrompt = `日期时区：${MEMORY_TIME_ZONE}。每条日期以对应发言时间为准，抽取可能延迟或重试；不要把执行时的今天代入。\n群 ${groupId} 发言人 QQ ${speakerQQ} 的发言：\n${chatText}\n\n已有记忆参考：\n${existingHint || '无'}\n\n请输出 JSON 数组。`
     let content
     try {
       content = await this._callChat([
@@ -157,8 +199,13 @@ export class MemoryExtractor {
         { role: 'user', content: userPrompt }
       ])
     } catch {
-      return []
+      return {status:'failed',reason:'transport',retryable:true}
     }
-    return parseAndRoute(extractJsonArray(content), { speakerQQ, at })
+    const items = extractJsonArray(content,sourceMessages)
+    if (items === null) {
+      memStats.inc('extract.invalid-output')
+      return {status:'failed',reason:'invalid-output',retryable:true}
+    }
+    return {status:'success',ops:parseAndRoute(items, { speakerQQ, at, messages:sourceMessages })}
   }
 }

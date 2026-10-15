@@ -1483,3 +1483,21 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 已部署代码89650bd。发布脚本重跑完整门禁1926项后端/1924通过/0失败/2宿主音乐跳过，前端34通过；暂存校验、依赖安装、重启健康全部成功，快照20261015-015205。
 - 已显式应用实例配置四处修订，原值CAS、完整私有备份、无关字段保留检查通过；备份conversation-config-2026-10-14T17-54-46-631Z/message.yaml。重启后载入错误0、管线启动、两服务active/两页面200。
 - 部署后1907个托管文件及11个回放模块hash零差异，runner一致；persona/systemContent和已审副本一致，人设库未变。线上产物再跑重点4轮HTTP200/结构全过，配置hash无变化，未知交付这次未承诺后台重跑；发布前失败仍保留为稳定性限制。
+
+## 2026-10-15 episodic/persona ownership 子任务
+- 完成事件原时钟/日历日期、完整 PersonaScope 来源保留与跨人格公开事实注入；反思/去重不混异源异日事实。
+- 实现 success-empty/failed/skipped 抽取结果；Redis 每群持久 pending 保存完整原文/时间/来源/有限重试，已知群读写恢复、同批 running 防重复、ack失败可去重重放；关闭/忘记清队列并取消进行中请求。
+- 新增 tests/memory/extractionQueue.test.js 和时间/来源/反思回归。临时 /tmp TS import hook 跑测试（不写dist），全 memory 189/189 通过；tsc -p tsconfig.backend.json --noEmit 和 git diff --check 通过。
+- 初始7个旧断言因新 outcome 与 async 入队契约失败，已更新兼容测试；首轮并行typecheck的 promptContext union 报错已告知父代理并由主链修复，最终typecheck通过。
+- 不运行 build、commit、deploy、真实模型或生产存储；由父代理统一构建/交付。
+
+- 接续：6668bd3基线48轮完成；保留全部超时和结构差异。独立复核补修作者级退出过滤、无效schema误作成功和群反思时间/来源；finalReply已传作者QQ并剥离转发时间伪原话时间。
+
+## 2026-10-15 记忆独立复核修复闭环
+- 独立审阅补出群pending作者opt-out、有效route缺正文被当空成功、群级反思丢日期来源三处断点，均已修复。
+- 新增authorQQ；group入队/冷启动恢复/请求前按持久optedOut过滤，未知作者和转发/引用在存在opt-out时保守排除；覆盖meta已保存但pending未删即崩溃的恢复用例。
+- 提取输出校验各route必要正文/别名及multi-row sourceIndex；群反思必须引用有效sources，同源同事件才能派生并保留eventAt/refs/heardFrom/PersonaScope。
+- 群抽取失败backoff期间对重叠history去重追加，超限显式pending-full，不重置重试期限。
+- 更新后src直接加载全memory202/202通过、tsc --noEmit与diffcheck通过；feedback代理独立只读复核未发现新增阻断。父已收到“可统一构建”信号；本子任务未build/commit/访问生产。
+
+- 统一源码稳定后严格类型检查、backend构建、typed tests编译通过；memory、转发、主链社交/continuity、自动风格隔离、进度人格及runner共288/288通过，无跳过。冻结runner/helper与基线字节一致，准备候选实模48轮。

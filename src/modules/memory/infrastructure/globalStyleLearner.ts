@@ -12,7 +12,7 @@ function parseSummaryValue(value:unknown):Summary {
  return {absorb:Array.isArray(row.absorb)?row.absorb.map(parseRule):[],avoid:Array.isArray(row.avoid)?row.avoid.map(parseRule):[]}
 }
 interface Logger {warn?(message:string):void;info?(message:string):void}
-interface StyleEvent {msg?:string;raw_message?:string;user_id?:unknown;group_id?:unknown;message_id?:unknown;message?:unknown}
+interface StyleEvent {msg?:string;raw_message?:string;user_id?:unknown;group_id?:unknown;message_id?:unknown;message?:unknown;_personaSnapshot?:PersonaScope}
 interface EmbeddingConfig {embeddingApiUrl?:string;embeddingApiKey?:string;embeddingApiModel?:string}
 interface MemoryAiConfig {memoryAiUrl?:string;memoryAiApikey?:string;memoryAiModel?:string}
 interface Scene {key:string;descriptor:string;patterns:string[]}
@@ -21,8 +21,8 @@ interface Sample extends Signal {text:string}
 interface SemanticSample {hash:string;embedding:number[];patterns:string[];sceneKey:string;scene:string;source:string;personaSource?:PersonaScope;weight:number;feedbackTags:string[];sequence:boolean;at:string;usedCount?:number;lastUsedAt?:string}
 interface RawSample {hash?:string;scene?:Scene|null;text?:string;patterns?:string[];source?:string;personaSource?:PersonaScope;weight?:number;feedbackTags?:string[];sequence?:boolean;backfill?:boolean}
 interface NormalSample {hash:string;scene:Scene;patterns:string[];source:string;personaSource?:PersonaScope;weight:number;feedbackTags:string[];sequence:boolean;backfill:boolean}
-interface RecentReply {at:number;groupHash:string;speakerHash:string;sceneKey:string;scene:string;replyStyle:string}
-interface Candidate {key:string;sceneKey:string;scene:string;replyStyle:string;strategy:string;positive:number;negative:number;speakers:string[];status:string;createdAt:string;lastSeenAt:string;shadowAt?:string;promotedAt?:string;demotedAt?:string}
+interface RecentReply {at:number;groupHash:string;speakerHash:string;sceneKey:string;scene:string;replyStyle:string;personaSource?:PersonaScope}
+interface Candidate {key:string;sceneKey:string;scene:string;replyStyle:string;strategy:string;positive:number;negative:number;speakers:string[];status:string;createdAt:string;lastSeenAt:string;shadowAt?:string;promotedAt?:string;demotedAt?:string;personaSource?:PersonaScope}
 interface Rule {key:string;label:string;rule:string;confidence:number;reason:string;weight:number;createdAt:string;lastSeen:string}
 interface RuleInput {label?:string;rule?:string;confidence?:number;reason?:string}
 interface Summary {absorb?:RuleInput[];avoid?:RuleInput[]}
@@ -52,9 +52,13 @@ function personaSourceKey(source?:PersonaScope) {
   const scope = normalizePersonaSource(source)
   return scope ? JSON.stringify([scope.botId, scope.personaId, scope.personaVersion]) : "unattributed"
 }
+function semanticSourceHash(source:string, personaSource:PersonaScope|undefined, sampleHash:string, hash:(text:string)=>string):string {
+  return personaSource || source === 'master_feedback' || source === 'auto_evolution'
+    ? hash(JSON.stringify([source, personaSourceKey(personaSource), sampleHash])) : sampleHash
+}
 
 function canRecallStyleSample(sample:SemanticSample, source?:PersonaScope) {
-  if (sample.source !== "master_feedback") return true
+  if (sample.source !== "master_feedback" && sample.source !== "auto_evolution") return true
   // 人格反馈不是跨群公共观察。旧记录没有可靠归属时保留存档，不猜测它属于谁。
   const origin = normalizePersonaSource(sample.personaSource)
   const viewer = normalizePersonaSource(source)
@@ -483,8 +487,8 @@ function parsePersistedMemory(value: unknown): Memory {
   result.semanticBackfill={cursor:num(backfill.cursor),completed:backfill.completed===true,retries:num(backfill.retries),lastErrorAt:str(backfill.lastErrorAt)}
   const evolution=object(row.autoEvolution)
   for(const key of ['promoted','demoted','shadowed','observedOutcomes','policyVersion'] as const) result.autoEvolution[key]=num(evolution[key],result.autoEvolution[key])
-  result.autoEvolution.recentReplies=rows(evolution.recentReplies).map(r=>({at:num(r.at),groupHash:str(r.groupHash),speakerHash:str(r.speakerHash),sceneKey:str(r.sceneKey),scene:str(r.scene),replyStyle:str(r.replyStyle)}))
-  result.autoEvolution.candidates=rows(evolution.candidates).map(r=>({key:str(r.key),sceneKey:str(r.sceneKey),scene:str(r.scene),replyStyle:str(r.replyStyle),strategy:str(r.strategy),positive:num(r.positive),negative:num(r.negative),speakers:strings(r.speakers),status:str(r.status),createdAt:str(r.createdAt),lastSeenAt:str(r.lastSeenAt),shadowAt:str(r.shadowAt),promotedAt:str(r.promotedAt),demotedAt:str(r.demotedAt)}))
+  result.autoEvolution.recentReplies=rows(evolution.recentReplies).map(r=>({at:num(r.at),groupHash:str(r.groupHash),speakerHash:str(r.speakerHash),sceneKey:str(r.sceneKey),scene:str(r.scene),replyStyle:str(r.replyStyle),...(normalizePersonaSource(r.personaSource)?{personaSource:normalizePersonaSource(r.personaSource)!}:{})}))
+  result.autoEvolution.candidates=rows(evolution.candidates).map(r=>({key:str(r.key),sceneKey:str(r.sceneKey),scene:str(r.scene),replyStyle:str(r.replyStyle),strategy:str(r.strategy),positive:num(r.positive),negative:num(r.negative),speakers:strings(r.speakers),status:str(r.status),createdAt:str(r.createdAt),lastSeenAt:str(r.lastSeenAt),shadowAt:str(r.shadowAt),promotedAt:str(r.promotedAt),demotedAt:str(r.demotedAt),...(normalizePersonaSource(r.personaSource)?{personaSource:normalizePersonaSource(r.personaSource)!}:{})}))
   result.autoEvolution.history=rows(evolution.history).map(r=>({at:str(r.at),action:str(r.action),scene:str(r.scene),style:str(r.style),version:num(r.version)}))
   const rules=object(row.aiRules)
   for(const key of ['absorb','avoid'] as const) result.aiRules[key]=rows(rules[key]).map(r=>({key:str(r.key),label:str(r.label),rule:str(r.rule),confidence:num(r.confidence,0.6),reason:str(r.reason),weight:num(r.weight),createdAt:str(r.createdAt),lastSeen:str(r.lastSeen)}))
@@ -819,7 +823,7 @@ return class GlobalStyleLearnerManager {
     this.flushTimer.unref?.()
   }
 
-  observeMessage(e:StyleEvent, config: ConfigInput = {}, embeddingConfig: EmbeddingConfig = {}) {
+  observeMessage(e:StyleEvent, config: ConfigInput = {}, embeddingConfig: EmbeddingConfig = {}, source?:PersonaScope) {
     const cfg = normalizeConfig(config)
     if (!cfg.enabled) return
     const text = cleanText(e?.msg || e?.raw_message || "")
@@ -834,7 +838,7 @@ return class GlobalStyleLearnerManager {
 
     const memory = this.readMemory(cfg)
     this.prepareSemanticMemory(memory, cfg)
-    this.observeReplyOutcome(e, text, cfg, embeddingConfig)
+    this.observeReplyOutcome(e, text, cfg, embeddingConfig, source)
     this.scheduleSemanticBackfill(memory, cfg, embeddingConfig)
     const groupId = String(e?.group_id || "private")
     const sequenceRecorded = this.observeSpeakerSequence(e, sequenceText, cfg, memory, embeddingConfig)
@@ -1059,9 +1063,7 @@ return class GlobalStyleLearnerManager {
     const source = sample.source || "observation"
     const personaSource = normalizePersonaSource(sample.personaSource)
     const sampleHash = sample.hash || this.hashText(`scene:${scene.key}|${patterns.join("|")}|${source}`)
-    const hash = personaSource || source === "master_feedback"
-      ? this.hashText(JSON.stringify([source, personaSourceKey(personaSource), sampleHash]))
-      : sampleHash
+    const hash = semanticSourceHash(source,personaSource,sampleHash,text=>this.hashText(text))
     return {
       hash,
       scene,
@@ -1169,6 +1171,10 @@ return class GlobalStyleLearnerManager {
     const embedding = await this.embedSemanticText(sample.scene.descriptor, cfg, embeddingConfig)
     if (!embedding) return
     const memory = this.readMemory(cfg)
+    if (sample.source === 'auto_evolution' && !memory.autoEvolution.candidates.some(candidate =>
+      candidate.status === 'active' && normalizePersonaSource(candidate.personaSource)
+      && semanticSourceHash('auto_evolution',candidate.personaSource,this.hashText(`auto:${candidate.key}`),text=>this.hashText(text)) === sample.hash
+    )) return
     if (memory.semanticSamples.some(item => item.hash === sample.hash)) return
     // 只落盘向量和抽象句式，原始/脱敏文本均不作为可召回 prompt 内容保存。
     memory.semanticSamples = [
@@ -1216,6 +1222,8 @@ return class GlobalStyleLearnerManager {
   rememberBotReply(e:StyleEvent, output = "", config: ConfigInput = {}) {
     const cfg = normalizeConfig(config)
     if (!cfg.autoEvolutionEnabled) return false
+    const personaSource = normalizePersonaSource(e._personaSnapshot)
+    if (!personaSource) return false
     const scene = deriveStyleScene(e?.msg || "")
     const replyStyle = deriveReplyStyle(output)
     const userId = String(e?.user_id || "")
@@ -1232,7 +1240,8 @@ return class GlobalStyleLearnerManager {
         speakerHash,
         sceneKey: scene.key,
         scene: scene.descriptor,
-        replyStyle: replyStyle.key
+        replyStyle: replyStyle.key,
+        personaSource
       },
       ...state.recentReplies.filter(item => now - Number(item?.at || 0) <= cfg.autoEvolutionOutcomeWindowMinutes * 60 * 1000)
     ].slice(0, 160)
@@ -1241,8 +1250,10 @@ return class GlobalStyleLearnerManager {
     return true
   }
 
-  observeReplyOutcome(e:StyleEvent, text = "", cfg = normalizeConfig(), embeddingConfig: EmbeddingConfig = {}) {
+  observeReplyOutcome(e:StyleEvent, text = "", cfg = normalizeConfig(), embeddingConfig: EmbeddingConfig = {}, source?:PersonaScope) {
     if (!cfg.autoEvolutionEnabled) return false
+    const personaSource = normalizePersonaSource(source ?? e._personaSnapshot)
+    if (!personaSource) return false
     const outcome = classifyReplyOutcome(text)
     if (!outcome) return false
     const memory = this.readMemory(cfg)
@@ -1251,7 +1262,7 @@ return class GlobalStyleLearnerManager {
     const groupHash = this.hashText(String(e?.group_id || "private"))
     const speakerHash = this.hashText(`${String(e?.group_id || "private")}:${String(e?.user_id || "")}`)
     const cutoff = now - cfg.autoEvolutionOutcomeWindowMinutes * 60 * 1000
-    const index = state.recentReplies.findIndex(item => item.groupHash === groupHash && item.speakerHash === speakerHash && Number(item.at || 0) >= cutoff)
+    const index = state.recentReplies.findIndex(item => item.groupHash === groupHash && item.speakerHash === speakerHash && Number(item.at || 0) >= cutoff && personaSourceKey(item.personaSource) === personaSourceKey(personaSource))
     if (index < 0) return false
     const [reply] = state.recentReplies.splice(index, 1)
     state.recentReplies = state.recentReplies.filter(item => Number(item?.at || 0) >= cutoff)
@@ -1263,14 +1274,17 @@ return class GlobalStyleLearnerManager {
   }
 
   updateAutoEvolutionCandidate(memory:Memory, reply:RecentReply, outcome:"positive"|"negative", speakerHash:string, cfg:Config, embeddingConfig: EmbeddingConfig = {}) {
+    const personaSource = normalizePersonaSource(reply.personaSource)
+    if (!personaSource) return
     const style = AUTO_REPLY_STYLE_RULES.find(item => item.key === reply.replyStyle)
     if (!style || !reply.sceneKey || !reply.scene) return
     const state = memory.autoEvolution
-    const key = `${reply.sceneKey}|${style.key}`
+    const key = JSON.stringify([personaSourceKey(personaSource), reply.sceneKey, style.key])
     let candidate = state.candidates.find(item => item.key === key)
     if (!candidate) {
       candidate = {
         key,
+        personaSource,
         sceneKey: reply.sceneKey,
         scene: reply.scene,
         replyStyle: style.key,
@@ -1305,6 +1319,7 @@ return class GlobalStyleLearnerManager {
         scene: { key: reply.sceneKey, descriptor: reply.scene, patterns: [style.rule] },
         patterns: [style.rule],
         source: "auto_evolution",
+        personaSource,
         weight: cfg.autoEvolutionActiveWeight
       }, cfg, embeddingConfig)
       this.logger?.info?.(`[全局表达学习] 自主策略晋升 scene=${reply.sceneKey} style=${style.key} evidence=${evidence} ratio=${ratio.toFixed(2)}`)
@@ -1314,7 +1329,10 @@ return class GlobalStyleLearnerManager {
       state.demoted = (Number(state.demoted) || 0) + 1
       state.policyVersion = (Number(state.policyVersion) || 1) + 1
       state.history = [{ at: nowIso(), action: "demote", scene: reply.sceneKey, style: style.key, version: state.policyVersion }, ...state.history].slice(0, 60)
-      memory.semanticSamples = memory.semanticSamples.filter(item => item.hash !== autoHash)
+      const normalizedAutoHash=semanticSourceHash('auto_evolution',personaSource,autoHash,text=>this.hashText(text))
+      memory.semanticSamples = memory.semanticSamples.filter(item => item.hash !== normalizedAutoHash)
+      this.semanticQueue=this.semanticQueue.filter(task=>task.sample.hash!==normalizedAutoHash)
+      this.semanticPendingHashes.delete(normalizedAutoHash)
       this.logger?.info?.(`[全局表达学习] 自主策略撤销 scene=${reply.sceneKey} style=${style.key} evidence=${evidence} ratio=${ratio.toFixed(2)}`)
     }
     state.candidates = state.candidates
@@ -1407,7 +1425,7 @@ return class GlobalStyleLearnerManager {
         const patterns = [...new Set(best.item.patterns || [])].slice(0, cfg.semanticPromptExamples)
         if (!patterns.length) return ""
         const prompt = [
-          "【希洛当前话题的表达提示】",
+          "【当前话题的表达提示】",
           "这是由语义相近样本提炼出的匿名句式和节奏，不含任何群友原话；只在自然契合时采用，不要解释来源。",
           ...patterns.map(pattern => `- ${pattern}`)
         ].join("\n")

@@ -3,7 +3,7 @@ import type {ExecutionMessage} from "../../../contracts/toolExecution.js"
 import type {TurnEvidence} from "../../../contracts/turnInteraction.js"
 import { extractChatKeywords, isImageGenerationRequest, shouldInjectGroupContext, shouldUseCompactHistory } from "../../conversation/domain/messageIntent.js"
 import { collectMentionTargetIds } from "../../conversation/domain/mentionTargets.js"
-import { buildTurnInteractionContext } from "../../conversation/domain/turnInteractionContext.js"
+import { buildTurnInteractionContext,withTurnSocialInterpretation } from "../../conversation/domain/turnInteractionContext.js"
 import {unknownTurnActionFacts, validateTurnActionFacts} from "../../conversation/domain/turnActionFacts.js"
 import {buildDiagnosticContext} from "../../conversation/domain/diagnosticContext.js"
 import { ROLE_MAP as roleMap, extractMemberLookupTerms, formatMemberLookupPrompt, hasBotTextAnchor, joinIntentParts, matchGroupMembersByTerms, messageQuotesUser, uniqText } from "../../conversation/domain/messageContext.js"
@@ -27,6 +27,7 @@ function quotedMessageText(reply: QuotedMessage | null): string {
 export function createChatTurn(ports:ChatTurnPorts) {
 const {resolveConversationContext,collectThinking,sendThinkingForward,globalStyleLearnerManager,personProfileInjector,personaFeedbackManager,formatGroupKnowledgeTeachingPrompt,formatGroupWorkflowTeachingPrompt,getMidtermMemoryManager,getSemanticMemoryRuntime,mcpManager,recordActionOutcomes,buildAddresseePrompt,computeAddresseeSignal,resolveHistorySelectionBudget,selectRelevantGroupHistory,isAiConversationEnabled,evaluatePrivateChatGate,buildDrawFailureNoteMessage,recordDrawTextFallback,takeDrawFailureNote,prepareImageEditAssets,resolveAvatarEditBase,classifyEmojiToolExposure,buildEpisodicPrompt,buildUserCallbackPrompt,hasTemporalDeixis,recallEpisodes,recallUserEpisodes,buildExcelToolParams,hasExcelWorkbookContext,shouldUseExcelWorkbookTool,TakeImages,formatGroupContextImagePrompt,resolveGroupContextAssets,getGroupSocialPrompt,getGroupTopicPrompt,buildImageFailureReply,buildMissingImageAnalysisReply,shouldAskForMissingImageForVisualRequest,shouldRequireImageEditBase,shouldSkipIntentModel,containsInternalStatusLeak,noteInjectedChunks,resolveSingularOwnerMention,createOutboundArbiter,buildChatRequestData,rollPersonaMood,hasRecentPixivSearch,resolvePromptLayerProfile,resolveRecentBotImage,resolveRecentUserImage,resolveToolRoute,buildMainSystemPrompt,buildToolIntentDisclosure,resolveDeterministicToolIntent,selectToolIntentCandidates,extractEmbeddedToolCalls,buildCommittedActionReply,buildTurnContinuityPrompt,loadTurnContinuity,recordTurnDiagnostics,createTurnPlan,deriveTurnPlanRequest,formatTurnPlanLog,isEducationalExplanationRequest,resolveCardPresentation,composeTurnPromptLayers,createTurnTrace,resolveTurnTraceArchiveDir,resolveAvatarDrawReference,resolveAvatarInspectionTargets,formatIdentityBindingsPrompt,cardAcknowledgement,delay,getOrCreateGroupLimiter,filterToolsForMessageIntent,logger,botIdentity,cacheGroupName}=ports
 async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
+    e._receivedAt ||= Date.now()
     if (!isAiConversationEnabled(host.config)) return false
     // 私聊:经私聊门禁(开关/白名单=留空仅主人/节流)后与群聊共用主回合
     const isPrivateChat = e.message_type === "private" && !e.group_id
@@ -57,7 +58,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     // later turn still captures its newly selected persona rather than its old snapshot.
     const Bot = botIdentity(e)
     const gateSnapshot = e._pendingPersonaSnapshot
+    const socialHandoff = e._pendingSocialState
     delete e._pendingPersonaSnapshot
+    delete e._pendingSocialState
     delete e._personaSnapshot
     const personaSnapshot = (gateSnapshot?.botId === String(Bot.uin) ? gateSnapshot : undefined) ?? host.getPersonaSnapshotFor?.(e) ?? createPersonaSnapshot({
       botId: Bot.uin,
@@ -66,6 +69,14 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
       ...(host.config.personaGuard ? {personaGuard: host.config.personaGuard} : {})
     })
     e._personaSnapshot = personaSnapshot
+    const gateSocial = socialHandoff && gateSnapshot
+      && socialHandoff.rawUserText === String(e.msg || '')
+      && socialHandoff.groupId === String(e.group_id)
+      && socialHandoff.userId === String(e.user_id || '')
+      && socialHandoff.persona.botId === personaSnapshot.botId
+      && socialHandoff.persona.personaId === personaSnapshot.personaId
+      && socialHandoff.persona.personaVersion === personaSnapshot.personaVersion
+      ? socialHandoff.state : undefined
     const {personaGuard: _livePersonaGuard, ...baseTurnConfig} = host.config
     const turnConfig = {...baseTurnConfig, persona: personaSnapshot.persona, systemContent: personaSnapshot.systemContent, ...(personaSnapshot.personaGuard ? {personaGuard: personaSnapshot.personaGuard} : {})}
 
@@ -382,8 +393,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           const source = typeof video === 'string' ? video : video.source
           if (!interactionEvidence.some(item => item.kind === 'video' && item.source === source)) interactionEvidence.push({origin: 'current', kind: 'video', state: 'reference_only', ...(source ? {source} : {})})
         }
-        for (const text of [groupContextAssets.currentForwardText, groupContextAssets.quotedForwardText]) {
-          if (text) interactionEvidence.push({origin: 'forward', kind: 'text', state: 'readable', text})
+        for (const [text,completeness] of [[groupContextAssets.currentForwardText,groupContextAssets.currentForwardCompleteness],[groupContextAssets.quotedForwardText,groupContextAssets.quotedForwardCompleteness]] as const) {
+          if (text || completeness) interactionEvidence.push({origin: 'forward', kind: 'text', state: text ? 'readable' : 'unavailable', ...(text ? {text} : {}), ...(completeness ? {forwardCompleteness:completeness} : {})})
         }
         const signal = session.addresseeSignal
         session.interactionContext = buildTurnInteractionContext({
@@ -400,8 +411,10 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           mentionUserIds: atQq,
           addressee: signal && typeof signal === 'object' && 'targetKind' in signal && typeof signal.targetKind === 'string' ? {targetKind: signal.targetKind} : {},
           evidence: interactionEvidence,
+          social:gateSocial,
           continuity: lastTurnContinuity
         })
+        if (modelIntentDecision && 'social' in modelIntentDecision) session.interactionContext = withTurnSocialInterpretation(session.interactionContext, modelIntentDecision.social, 'intent_model')
         // Read the same conversation history once. Only the requester's own
         // user messages can establish diagnostic observations or candidate tasks.
         const chatHistory = host.config.groupHistory
@@ -409,6 +422,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           : []
         const ownRecentMessages = (chatHistory || []).filter(item =>
           item.source !== 'tool' && String(item.sender?.user_id) === String(userId)
+          && item.source !== 'forward' && !item.forwardCompleteness
+          && !/转发了合并聊天记录|转发记录内容|嵌套转发记录|【转发读取范围】/.test(String(item.content || ''))
           && String(item.message_id) !== String(e.message_id)
         ).slice(0, 12)
         const diagnostic = buildDiagnosticContext({
@@ -530,6 +545,18 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const groupContext = includeGroupContext
           ? await host.getCurrentGroupContext(e)
           : host.getBasicGroupContext(e)
+        // Reuse the existing brief only when the shared interpretation is
+        // ambiguous or this turn already needs task understanding. Tone and
+        // generation see the resulting state together.
+        const understandingPrompt = session.promptLayerProfile?.profile === 'chat' && !session.interactionContext.social?.needsDisambiguation
+          ? ''
+          : await runStage('brief', () => host.resolveUnderstandingPrompt({
+            e,args,msg,userContent,images,videos,session,
+            currentIntentText:joinIntentParts(args,msg),
+            groupUserMessages: (chatHistory || []).slice(0,12).reverse().map(item => ({
+              role:'user', content:`${item.sender?.nickname || '群友'}(QQ:${item.sender?.user_id}): ${item.content || ''}`
+            }))
+          }))
         const cardRequestText = [args, msg, userContent].filter(Boolean).join("\n")
         // 调皮情绪时刻:同人格内偶发情绪着色,命中只影响本回合(掷骰+群级冷却)
         const moodHit = session.interactionContext.allowPlayfulness ? rollPersonaMood(personaSnapshot.persona, isPrivateChat ? `private:${userId}` : groupId) : null
@@ -732,20 +759,6 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             logger.info(`[语义记忆] group=${groupId} 无命中(${memoryResult?.reason || "低于阈值"}) ${memoryResult?.elapsedMs ?? 0}ms`)
           }
         }
-
-        const understandingPrompt = session.promptLayerProfile?.profile === "chat"
-          ? ""
-          : await runStage("brief", () => host.resolveUnderstandingPrompt({
-          e,
-          args,
-          msg,
-          userContent,
-          images,
-          videos,
-          session,
-          currentIntentText: joinIntentParts(args, msg),
-          groupUserMessages
-        }))
 
         groupUserMessages = groupUserMessages.filter(m => m.role !== "system")
         groupUserMessages.unshift({ role: "system", content: systemContent })

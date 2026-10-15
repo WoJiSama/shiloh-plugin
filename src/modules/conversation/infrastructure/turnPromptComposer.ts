@@ -9,7 +9,7 @@ type Style=InstanceType<ReturnType<typeof createGlobalStyleLearnerClass>>
 type Profile=InstanceType<ReturnType<typeof createPersonProfileClass>>
 interface ComposerConfig {emotionSystem?:{enabled?:boolean};memorySystem?:{enabled?:boolean};expressionLearning?:{enabled?:boolean};personProfileInjection?:{enabled?:boolean};midtermMemory?:{enabled?:boolean};globalStyleLearning?:Parameters<Style['buildPrompt']>[0] & {semanticPromptWaitMs?:number};embeddingAiConfig?:{embeddingApiUrl?:string;embeddingApiKey?:string;embeddingApiModel?:string};persona?:PersonaText;personaGuard?:Record<string,unknown>;promptLayerCache?:{enabled?:boolean}}
 interface ComposerTurn {groupId?:string|number;userId?:string|number;event?:Parameters<Profile['build']>[2];viewerSelfId?:unknown;viewerBotName?:string;messageText?:string;memoryText?:string;rawMessageText?:string;toneText?:string;cardText?:string;cardResponseKind?:string;moodHint?:Parameters<typeof formatMoodPrompt>[0];interactionContext?:TurnInteractionContext}
-interface ComposerDeps {emotionManager?:{getEmotionPromptForGroup(groupId:unknown,botId:string):Promise<string>};memoryManager?:{getContextualMemoryPrompt(groupId:unknown,userId:unknown,text:string,now:number,options:{viewerBotName:string}):Promise<string>;getGroupWorkflowPrompt(groupId:unknown,text:string):Promise<string>;getGroupKnowledgePrompt(groupId:unknown,options:{speakerQQ:unknown;message:string}):Promise<string>};expressionLearner?:{getExpressionPromptForGroup(groupId:unknown):Promise<string>};knowledgeSearcher?:{search(text:string):Promise<{knowledgeContext?:string}|null>};personaFeedbackManager?:{buildFeedbackPrompt(config:Record<string,unknown>|undefined,options:{personaName?:string;source?:PersonaScope}):string;getFeedbackRevision?(source?:PersonaScope):string|number};globalStyleLearnerManager?:Pick<Style,'buildRelevantPrompt'|'buildPrompt'>;personProfileInjector?:Pick<Profile,'build'>;midtermSummaryManager?:{getSummaryPrompt(groupId:unknown):string}}
+interface ComposerDeps {emotionManager?:{getEmotionPromptForGroup(groupId:unknown,botId:string):Promise<string>};memoryManager?:{getContextualMemoryPrompt(groupId:unknown,userId:unknown,text:string,now:number,options:{viewerBotName:string;viewer?:PersonaScope|undefined}):Promise<string>;getGroupWorkflowPrompt(groupId:unknown,text:string):Promise<string>;getGroupKnowledgePrompt(groupId:unknown,options:{speakerQQ:unknown;message:string}):Promise<string>};expressionLearner?:{getExpressionPromptForGroup(groupId:unknown):Promise<string>};knowledgeSearcher?:{search(text:string):Promise<{knowledgeContext?:string}|null>};personaFeedbackManager?:{buildFeedbackPrompt(config:Record<string,unknown>|undefined,options:{personaName?:string;source?:PersonaScope}):string;getFeedbackRevision?(source?:PersonaScope):string|number};globalStyleLearnerManager?:Pick<Style,'buildRelevantPrompt'|'buildPrompt'>;personProfileInjector?:Pick<Profile,'build'>;midtermSummaryManager?:{getSummaryPrompt(groupId:unknown):string}}
 interface ComposerOptions {config?:ComposerConfig;personaSnapshot?:PersonaSnapshot;profile?:{profile?:string;reason?:string;layers?:string[]};turn?:ComposerTurn;precomputed?:Partial<Record<'identityBindings'|'workflowTeaching'|'knowledgeTeaching'|'memberLookup'|'mergedTrigger',string>>;deps?:ComposerDeps}
 interface ComposerLogger {warn?(message:string):void;error?(message:string):void;info?(message:string):void}
 function message(error:unknown){return error instanceof Error?error.message:String(error)}
@@ -169,7 +169,7 @@ async function composeTurnPromptLayers({
         })
       : '',
     config.memorySystem?.enabled && memoryManager
-      ? withContextualMemoryTimeout(memoryManager.getContextualMemoryPrompt(groupId, userId, memoryText, Date.now(), { viewerBotName }))
+      ? withContextualMemoryTimeout(memoryManager.getContextualMemoryPrompt(groupId, userId, memoryText, Date.now(), { viewerBotName, viewer:personaSource }))
       : '',
     config.memorySystem?.enabled && memoryManager
       ? memoryManager.getGroupWorkflowPrompt(groupId, messageText).catch(error => {
@@ -259,7 +259,12 @@ async function composeTurnPromptLayers({
         "这次会先单独发送一条确认消息，随后把你的全部输出渲染为卡面。卡面必须直接从完整内容开始：故事从标题开始；解释、整理或文档从结论、标题或第一段实质内容开始。不要重复确认、不要说正在写/整理、不要提及卡面或输出过程。"
       ].join("\n")
     : ""
-  const solutionExplanationPrompt = buildSolutionExplanationStylePrompt(toneText)
+  // Technical nouns inside a quote or a joke are not a new technical task.
+  // Let the shared speech-act state decide whether this template applies.
+  const solutionExplanationPrompt = turn.interactionContext
+    && (turn.interactionContext.kind !== 'serious_answer' || turn.interactionContext.social?.act === 'criticism')
+    ? ''
+    : buildSolutionExplanationStylePrompt(toneText)
   const feedbackCacheKey = personaSource ? `personaFeedback:${stableFingerprint({
     botId: personaSource.botId,
     personaId: personaSource.personaId,

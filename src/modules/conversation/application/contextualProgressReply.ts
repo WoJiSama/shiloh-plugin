@@ -1,11 +1,13 @@
 import type {PersonaText} from '../domain/personaSource.js'
 interface ProgressTask {apiUrl?:string;model?:string;apiKey?:unknown;maxTokensField?:string;maxOutputTokens?:number;reasoningEffort?:string;timeoutMs?:number}
-interface ProgressConfig {persona?:PersonaText;taskAiConfig?:{progress?:ProgressTask};trackAiConfig?:{trackAiUrl?:string;trackAiModel?:string;trackAiApikey?:unknown};chatAiConfig?:{chatApiUrl?:string;chatApiModel?:string;chatApiKey?:unknown}}
+interface ProgressConfig {persona?:PersonaText;systemContent?:string;taskAiConfig?:{progress?:ProgressTask};trackAiConfig?:{trackAiUrl?:string;trackAiModel?:string;trackAiApikey?:unknown};chatAiConfig?:{chatApiUrl?:string;chatApiModel?:string;chatApiKey?:unknown}}
 interface ProgressInput {config?:ProgressConfig;taskType?:string;taskMode?:string;userText?:string;stage?:string;agentContext?:string;suggestedText?:string;fetchImpl?:typeof fetch;signal?:AbortSignal;debug?:(message:string)=>void}
 function record(value:unknown):Record<string,unknown>{return value && typeof value==='object' && !Array.isArray(value)?value as Record<string,unknown>:{}}
 import { resolveChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
 import { buildPersonaTonePrompt } from "../domain/personaTonePolicy.js"
+import {buildPersonaStyleOverride, renderPersonaTemplate} from '../domain/personaSource.js'
+import {resolveSystemContentSource} from '../domain/systemContentSource.js'
 
 const DEFAULT_PROGRESS_TIMEOUT_MS = 6000
 const ROBOTIC_PROGRESS_PATTERN = /(?:我还在查[，,]?结果出来就发|(?:正在|还在)(?:查|查询|检索|处理|核对|确认|辨认|看|对)|稍等|等一下|请稍候|请耐心等待|正在为你(?:查询|处理)|任务正在执行|处理完成后|别急|别催)/i
@@ -95,20 +97,14 @@ export function inventsImageProgressDetail({ taskType = "", taskMode = "", userT
 
 export function buildContextualProgressMessages({ config = {}, taskType = "当前任务", taskMode = "", userText = "", stage = "等待可靠结果", agentContext = "" }: ProgressInput = {}) {
   const persona = config?.persona || {}
-  const name = safeTruncateUnicode(String(persona.name || "希洛").trim() || "希洛", 20)
-  const tone = safeTruncateUnicode(String(persona.tone || "熟人、随意、不客服").trim(), 80)
-  const speechStyle = (Array.isArray(persona.speechStyle) ? persona.speechStyle : [])
-    .map(item => safeTruncateUnicode(String(item || "").trim(), 30))
-    .filter(Boolean)
-    .slice(0, 4)
-    .join("、")
+  const customPersona = renderPersonaTemplate(resolveSystemContentSource(config.systemContent).text, persona)
   return [
     {
       role: "system",
       content: [
-        `你是 QQ 群里的群友${name}，语气是${tone}。`,
-        speechStyle ? `平时说话特点：${speechStyle}。` : "",
-        buildPersonaTonePrompt({ userText }),
+        customPersona,
+        buildPersonaStyleOverride(persona),
+        buildPersonaTonePrompt({ userText, persona }),
         "现在任务还没有返回最终结果。请根据当前用户具体在问什么，写一句可以先发出去的自然接话。",
         "只输出这一句话，12到45个汉字；像被朋友点到时接住话题，不要像客服、状态机或工作汇报。语气要有温度但不撒娇、不调情、不装熟。",
         "这句话必须包含用户明确提到的话题或动作，例如“Steam 安装这块，我仔细看看问题在哪儿”“这个构图我先理一下”。不要只把动作播报出来。",

@@ -1,7 +1,8 @@
 import {smartConversationKey} from '../domain/conversationIdentity.js'
 import type { MessageSegment, ChatMember } from '../../../contracts/chatEvent.js'
 import type { SmartRuntimeState } from '../../../contracts/runtime.js'
-import type {PersonaSnapshot} from '../../../contracts/persona.js'
+import type {PersonaSnapshot,PersonaScope} from '../../../contracts/persona.js'
+import type {SocialTurnState} from '../../../contracts/turnInteraction.js'
 import { lastIncomingMsgAt } from '../domain/splitState.js'
 import { getReplySender, summarizeForLog } from '../domain/messageContext.js'
 import { collectMentionTargetIds } from '../domain/mentionTargets.js'
@@ -9,6 +10,7 @@ import { isAiConversationEnabled } from '../domain/aiConversationGate.js'
 import { markProactiveReply } from '../domain/proactiveReplyFreshness.js'
 export interface ConversationEvent {
  _personaSnapshot?:PersonaSnapshot; _pendingPersonaSnapshot?:PersonaSnapshot;
+ _pendingSocialState?:{state:SocialTurnState;rawUserText:string;groupId:string;userId:string;persona:PersonaScope};
  group_id: string|number; user_id?:string|number; self_id?:string|number; bot?:{uin?:string|number;nickname?:string}; sender?:ChatMember;
  msg?:string; raw_message?:string; message_id?:unknown; time?:number; message_type?:string;
  message?:MessageSegment[]; source?:MessageSegment; reply?:MessageSegment|((...args:unknown[])=>unknown);
@@ -22,7 +24,7 @@ export interface ConversationSmartConfig {
  focusDurationMs?:number; focusMaxReplies?:number; fadingDurationMs?:number; focusMaxNoAction?:number;
  attentionDrift?:{enabled?:boolean;level?:string;windowMinutes?:number};
 }
-export interface GateResult {personaSnapshot?:PersonaSnapshot;decision:'continue'|'no_action'|'wait';reason:string;wait_seconds?:number;__forceContinue?:boolean}
+export interface GateResult {personaSnapshot?:PersonaSnapshot;social?:SocialTurnState;decision:'continue'|'no_action'|'wait';reason:string;wait_seconds?:number;__forceContinue?:boolean}
 export interface Prefilter {kind:string;reason:string}
 export interface SmartConversationHost {
  config:{enabled?:unknown;smartTrigger?:ConversationSmartConfig;groupContextState?:{topicEnabled?:boolean;socialEnabled?:boolean}};
@@ -51,6 +53,8 @@ const {logger,updateGroupTopic,updateGroupSocial,detectAttentionHook,anchorEvent
 const now=ports.now ?? Date.now
 let smartLockTokenCounter = 0
 async function handleRandomReplySmart(host:SmartConversationHost, e:ConversationEvent) {
+    delete e._pendingSocialState
+    delete e._pendingPersonaSnapshot
     if (!isAiConversationEnabled(host.config)) return false
     const groupId = e.group_id
     if (host.isUserBlacklisted(e)) {
@@ -235,6 +239,7 @@ async function handleRandomReplySmart(host:SmartConversationHost, e:Conversation
       }
 
       let gateResult:GateResult
+      const gateInput={rawUserText:String(e.msg || ''),groupId:String(e.group_id),userId:String(e.user_id || '')}
       try {
         // 强制继续路径直接放行，跳过 Gate；强制 Gate 路径仍交给 Gate 判断是否补一句
         if (state.forceContinue) {
@@ -316,6 +321,9 @@ async function handleRandomReplySmart(host:SmartConversationHost, e:Conversation
         }
         e._triggerContext = { mode: "smart_gate", gateDecision: "continue", gateReason: gateResult?.reason || "", phase }
         if (gateResult.personaSnapshot) e._pendingPersonaSnapshot = gateResult.personaSnapshot
+        if (gateResult.social && gateResult.personaSnapshot) e._pendingSocialState = {
+          state:gateResult.social, ...gateInput, persona:gateResult.personaSnapshot
+        }
         return await host.handleTool(e)
       }
       if (decision === 'wait') {

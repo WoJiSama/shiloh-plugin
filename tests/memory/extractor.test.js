@@ -75,11 +75,53 @@ test('teaching facts are reserved for the synchronous group decision', () => {
   assert.deepEqual(ops, [])
 })
 
-test('eventAt stays null when ctx.now missing', () => {
+test('eventInDays uses provided source at when ctx.now is absent', () => {
   const ops = parseAndRoute([
     { route: 'self_statement', content: '下周有考试', eventInDays: 7, confidence: 0.9 }
   ], ctx) // no now
-  assert.equal(ops[0].fact.eventAt, null)
+  assert.equal(ops[0].fact.eventAt, ctx.at + 7 * DAY_MS)
+})
+
+test('event dates survive a midnight flush and use the selected utterance clock', () => {
+  const first=Date.parse('2026-10-15T23:59:00+08:00')
+  const second=Date.parse('2026-10-16T00:01:00+08:00')
+  const ops=parseAndRoute([
+    {route:'self_statement',content:'明天考试',eventInDays:1,sourceIndex:1},
+    {route:'self_statement',content:'明天面试',eventInDays:1,sourceIndex:2},
+    {route:'self_statement',content:'来源不明',eventInDays:1},
+    {route:'self_statement',content:'行号不合法',eventInDays:1,sourceIndex:3}
+  ],{speakerQQ:'1',at:second+DAY_MS,messages:[{content:'明天考试',at:first},{content:'明天面试',at:second}]})
+  assert.equal(ops[0].fact.eventAt,first+DAY_MS)
+  assert.equal(ops[0].fact.at,first)
+  assert.equal(ops[1].fact.eventAt,second+DAY_MS)
+  assert.equal(ops[2].fact.eventAt,null)
+  assert.equal(ops[3].fact.eventAt,null)
+})
+
+test('absolute calendar dates are validated and invalid relative values cannot become day zero', () => {
+  const items=[null,'',false,true,Infinity,0.5,'1'].map(eventInDays=>({route:'self_statement',content:'日期未知',eventInDays}))
+  const invalid=parseAndRoute(items,ctxNow)
+  assert.ok(invalid.every(op=>op.fact.eventAt===null))
+  const dated=parseAndRoute([
+    {route:'self_statement',content:'十月十七日考试',eventDate:'2026-10-17'},
+    {route:'self_statement',content:'坏日期',eventDate:'2026-02-30'},
+    {route:'self_statement',content:'未知日期',eventInDays:1}
+  ],{speakerQQ:'1',at:NOW,messages:[{content:'unknown'}]})
+  assert.equal(dated[0].fact.eventAt,Date.parse('2026-10-17T12:00:00+08:00'))
+  assert.equal(dated[1].fact.eventAt,null)
+  assert.equal(dated[2].fact.eventAt,null)
+})
+
+test('third-party forward and quote never become sender self-memory or group consensus', () => {
+  const messages=[{content:'我叫小馒头',source:'forward',at:1000},{content:'群里周三开会',source:'user',at:2000}]
+  const ops=parseAndRoute([
+    {route:'self_statement',alias:'小馒头',sourceIndex:1},
+    {route:'group_consensus',content:'小馒头是本人',sourceIndex:1},
+    {route:'group_consensus',content:'来源缺失'},
+    {route:'group_consensus',content:'群里周三开会',sourceIndex:2}
+  ],{speakerQQ:'1',at:3000,messages})
+  assert.equal(ops.length,1)
+  assert.equal(ops[0].fact.text,'群里周三开会')
 })
 
 test('eventAt stays null when eventInDays absent or non-finite', () => {

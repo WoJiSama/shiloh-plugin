@@ -28,6 +28,14 @@ const CONFIG = {
   }
 }
 
+test('progress prompts project all active persona fields and custom content', () => {
+  const persona={name:'岚',identity:'寡言的档案员',tone:'冷静简洁',speechStyle:['习惯一','习惯二','习惯三','习惯四','第五条也生效'],preferences:['重视准确'],boundaries:['不虚构亲密关系'],notes:'用词直白'}
+  const messages=buildContextualProgressMessages({config:{persona,systemContent:'{personaName}的自定义补充'},userText:'核对版本号'})
+  const system=messages[0].content
+  for(const field of [persona.identity,persona.tone,...persona.speechStyle,...persona.preferences,...persona.boundaries,persona.notes,'岚的自定义补充']) assert.ok(system.includes(field),field)
+  assert.match(system,/不能编造已经查到/)
+})
+
 test("generates a contextual progress reply through the configured compact model", async () => {
   let request
   const reply = await generateContextualProgressReply({

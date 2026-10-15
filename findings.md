@@ -1180,3 +1180,12 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - TurnInteractionContext 已判 serious_answer，但 TurnPlan 未接收该语义，部分故障询问被选 casual，实际 outgoing reasoning_effort 仍 low；先闭合此断点再评估最终配置。
 - 最终第一轮20回放结构全过、均glm-5.3/HTTP200/无重试，但人工发现未知交付仍承诺再跑一次，原始散热场景仍在断电后查风扇运行并建议未查清就通电。已在TurnPlan派生现有请求中传递实际仅文字执行边界，公共排障协议要求状态可执行/真实电气损坏排除前不再通电；不是改写模型输出。
 - 最终配置修订严格只改变systemContent和speechStyle[2]/preferences[1]/preferences[5]；保留身份、备注、全部边界及实时信息规则，原值比对生产仍相等，未修改生产。
+
+## 2026-10-15 episodic/persona ownership 本轮补齐
+- 抽取 outcome 区分 success（包括显式空数组）、failed transport/invalid-output、skipped unconfigured；反思不改抽取状态。
+- Pending 原文、原发言时间、完整 PersonaScope、attempt/backoff/exhausted 写既有 Redis 每群 pending-extractions 文档；已知群在读取或入队时恢复，未新增全 Redis 扫描。单进程同批 running 防并发；持久 ack 失败可至少一次重放，事实按来源和事件时间去重。
+- 用户输入不再在 pending 截到500字；用户 buffer 按 bot+人格+版本+中国日期隔离。sourceIndex 选原发言时间，未知/多条无来源不猜相对日期；eventDate 校验真实日历日期。
+- 来源不同/版本不同/同名bot/legacy来源均不当作自身亲历；公开事实仍共享。反思与去重保留来源和事件时间，不混跨来源/跨事件事实。
+- forward/quote 有提示来源声明与解析边界，不把第三方“我”归为转发人的自述或本群共识。
+- 禁用/opt-out/清空会清持久pending并失效正在执行的抽取，避免延后写回。
+- 定向初轮92/92、全memory186/186（临时TS import hook，无build、真实模型或线上访问）；后续新增ack失败回归仍待最终重跑。
