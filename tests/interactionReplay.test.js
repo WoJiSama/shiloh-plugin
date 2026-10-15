@@ -398,6 +398,20 @@ test('text-only turn respects a separately verified existing completion registra
  assert.doesNotMatch(messages.at(-1).content,/回复发出后不会自动查询、重试、生成或稍后投递/)
 })
 
+test('legacy unscoped task status cannot leak into actual conversation history',async()=>{
+ const f=fixture({rawUserText:'刚才的图出来了吗？',modelReply:'还没有可确认的结果。'},{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+ f.host.messageManager.getMessages=async()=>[
+  {message_id:'original',content:'把背景改成傍晚。',sender:{user_id:202,nickname:'测试群友',role:'member'}},
+  {message_id:'other-request',content:'另一位群友的请求。',sender:{user_id:303,nickname:'其他人',role:'member'}}
+ ]
+ let legacyReads=0
+ f.host.getTaskStatus=async()=>{legacyReads++;return {status:'success',toolName:'imageEdit'}}
+ f.host.formatTaskStatusForPrompt=()=> '旧的无作用域状态声称图片已经送达'
+ assert.equal(await f.run(),true);assert.equal(legacyReads,0)
+ assert.equal(f.session.interactionContext.actionFacts.lookup,'unavailable')
+ assert.ok(f.captures.gatewayRequests[0].body.messages.every(message=>!String(message.content).includes('旧的无作用域状态声称图片已经送达')))
+})
+
 test('burnt-smell followup keeps prerequisites from the requester instead of the bot\'s old advice',async()=>{
  const scenario={rawUserText:'没看到烧痕，味也散了，现在能开机吗？',modelReply:'先保持断电，外观正常还不能排除损坏。'}
  const f=fixture(scenario,{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})

@@ -644,11 +644,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
                 content: `[${msg.time}] ${formatMemberDisplayName(historyMemberMap?.get(Number(msg.sender.user_id)), msg.sender.nickname)}(QQ号:${msg.sender.user_id})[群身份: ${roleMap[msg.sender.role || ""] || "member"}]${msg.message_id ? `[消息ID:${msg.message_id}]` : ''}: ${msg.content}`
               }))
             )
-            groupUserMessages = await Promise.all(groupUserMessages.map(async msg => {
-              const taskStatus = msg.messageId ? await host.getTaskStatus(groupId, msg.messageId) : null
-              const statusText = host.formatTaskStatusForPrompt(taskStatus)
-              return statusText ? { ...msg, content: `${msg.content}\n${statusText}` } : msg
-            }))
+            // Task authority comes from the scoped, fresh actionFacts above.
+            // Legacy history status keys have no bot/requester identity and
+            // must not reintroduce stale or another bot's task claims here.
             const intelligence = host.config.agentIntelligence || {}
             const historyBudget = resolveHistorySelectionBudget(intelligence, {
               compact: shouldUseCompactHistory({
