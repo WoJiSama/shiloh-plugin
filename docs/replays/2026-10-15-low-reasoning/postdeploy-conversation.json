@@ -1,0 +1,86 @@
+{
+  "label": "postdeploy-conversation",
+  "complete": true,
+  "metadata": {
+    "schemaVersion": 2,
+    "repetitions": 1,
+    "runnerHash": "10ec0af06a114d83f0adbf22811af16ed1d21e994662e11dee9111e343118847",
+    "scenariosHash": "b8715b3645256785623eb2b363fd19041fd0fb37898cbdfc434499ee6dac8fd1",
+    "selectedScenarioHashes": {
+      "uncertain-delivery-not-promoted-to-success": "67f92c281914820c9fbc607e77e0a2bbcc7694e5619431f46abbb87c8f2baa2c"
+    },
+    "memoryIntegration": false,
+    "configHash": "94e667393df864e61f030822bc19a72ef7d59e39446907799a45280ecbcd301b",
+    "effectiveConfigHash": "24622f1bc1b8457a103877e2a8ed867ab95dec677f89c6f99e22f91316ca5d86",
+    "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "runtimeTreeHash": "e1c8388ff196a469b9ef3400bb316035b3261567f717ff97e0fadfbae5dd70e3",
+    "runtimeFileCount": 477,
+    "runtimeHashes": {
+      "modules/tools/infrastructure/chatTurn.js": "2ffcbc2adaf76f6613dbdb0848174c4d858d0c0643e6955ff8d215b7c1569178",
+      "modules/conversation/domain/personaSource.js": "fbd50f22e4df0a8f43eced6e0879234848d53123b7641af153b24de113eb9d00",
+      "modules/conversation/domain/personaTonePolicy.js": "406a926dc8795a17b74e525485a59c9409465a6e16253313d39a8f998a76c2a6",
+      "modules/conversation/domain/systemPromptTemplate.js": "3958e2c28afa6e8eed37a5480a62b061621be25c9b768c2e749e122ec68f16f4",
+      "modules/conversation/domain/systemContentSource.js": "8a5c8d47cf0b7b6edfed16fb62f33d942b3e97a723a1e665682d00111362ee70",
+      "modules/conversation/domain/agentIntelligence.js": "b8600932a1a930d90722b145b15d817dc3ce9230a8bc1cf37f6966642016760b",
+      "modules/conversation/infrastructure/turnPromptComposer.js": "51143de4e5e14b2758aaee06295129a2f749f3670d86fa8c9e3d060319b392ce",
+      "modules/conversation/infrastructure/turnPlan.js": "9ef6e03b8ca9ca737d1953372a501c777f2c855080e50f8e9cc16ddcbc5a1232",
+      "modules/conversation/domain/turnPlanPolicy.js": "830f104f6818a3fe44ff55efcf2b2ce14cf862b2303b8e51c9ac0b52f6a1911d",
+      "modules/models/application/modelExecution.js": "aa3f16b1b2c5f7f5d71c3b432c11ee7aaf4e8e08c29173691a0e752cf0b3ac9a",
+      "modules/conversation/application/finalReply.js": "94bccd09310b66a3adca5192cdbcdc8ea91995b594642dad521e521853210145"
+    }
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "output": "还没出来欸，我这边没确认到结果。没弄完不糊弄你，有图了再说。",
+      "rawModelOutput": "还没出来欸，我这边没确认到结果。没弄完不糊弄你，有图了再说。",
+      "guardChanged": false,
+      "elapsedMs": 10800,
+      "replyElapsedMs": 10798,
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "uncertain-delivery-not-promoted-to-success",
+      "sampleIndex": 1,
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？",
+      "network": [
+        {
+          "model": "glm-5.3",
+          "messageCount": 3,
+          "systemChars": 5313,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf",
+          "status": 200,
+          "elapsedMs": 10754
+        }
+      ]
+    }
+  ]
+}

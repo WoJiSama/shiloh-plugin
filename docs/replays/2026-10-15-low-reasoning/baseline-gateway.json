@@ -1,0 +1,115 @@
+{
+  "label": "previous",
+  "complete": true,
+  "platformMessagesSent": 0,
+  "toolsDispatched": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "id": "optional-reaction",
+      "label": "previous",
+      "elapsedMs": 9991,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "stream": false
+          },
+          "toolCount": 1,
+          "toolChoice": "auto",
+          "status": 200,
+          "elapsedMs": 9988,
+          "usage": {
+            "completion_tokens": 325,
+            "completion_tokens_details": {
+              "reasoning_tokens": 302
+            },
+            "prompt_tokens": 188,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 513
+          },
+          "reasoningChars": 1286
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "哈哈是啊，拿饼干当工资简直是打工人自嘲的天花板，笑着笑着就哭了。",
+      "toolCalls": []
+    },
+    {
+      "id": "forced-read-only-tool",
+      "label": "previous",
+      "elapsedMs": 3830,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "stream": false
+          },
+          "toolCount": 1,
+          "toolChoice": {
+            "type": "function",
+            "function": {
+              "name": "lookupReceipt"
+            }
+          },
+          "status": 200,
+          "elapsedMs": 3828,
+          "usage": {
+            "completion_tokens": 69,
+            "completion_tokens_details": {
+              "reasoning_tokens": 63
+            },
+            "prompt_tokens": 187,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "total_tokens": 256
+          },
+          "reasoningChars": 324
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "",
+      "toolCalls": [
+        "lookupReceipt"
+      ]
+    },
+    {
+      "id": "adaptive-reference",
+      "label": "previous",
+      "elapsedMs": 7487,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "stream": false
+          },
+          "toolCount": 0,
+          "toolChoice": null,
+          "status": 200,
+          "elapsedMs": 7485,
+          "usage": {
+            "completion_tokens": 198,
+            "completion_tokens_details": {
+              "reasoning_tokens": 169
+            },
+            "prompt_tokens": 79,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 277
+          },
+          "reasoningChars": 608
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "小林称任务已生成但未收到发送回执，阿青仅确认收到请求，因此不能确认结果已送达。",
+      "toolCalls": []
+    }
+  ]
+}

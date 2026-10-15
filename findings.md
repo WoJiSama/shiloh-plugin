@@ -1204,3 +1204,7 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - complexReasoningEffort 默认 high，serious_answer/delivery 均自动应用；关闭此覆盖只继承全局，不等于发送 none 或关闭模型思考。
 - 工具初始请求、工具回复转文字、自适应长上下文切工具后端有漏 effort 路径；生产 useTools=true，不能只修改复杂档配置或仅测试 useTools=false。
 - 本轮将复杂默认改 low，独立工具预算留空继承当轮/全局，保留管理员显式 high；不随机分配思考档，不声称 GLM 已支持 none。
+
+- 实模确认：旧版工具/自适应三条均provider_default；候选及部署后26条全部显式low。两个低档网关样本reasoning_tokens为0，另有少量推理token，低档不等于关闭思考。
+- 低档有27.415秒长尾，不能保证每条提速。未知交付的条件式未来承诺在补提示后仍会复现；结构kind与HTTP成功不评价该语义正确性。预算目标完成，剩余承诺判断应另行低档验收。
+- 配置load会补写新增默认字段，因此发布后配置CAS需先核对真实语义差异再基于新哈希施加单字段改动。首轮CAS正确拒绝，不能绕开CAS覆盖私有现场配置。

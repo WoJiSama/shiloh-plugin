@@ -2419,8 +2419,10 @@ Modrinth 工具查询完成后，使用不带群历史、人设和工具定义�
 - [x] 复核当前线上档位与请求漏参路径，备份原工作区 HEAD/index/305 个 dirty 文件
 - [x] 默认复杂回合 low，保留认真回复/交付证据约束和显式高档配置
 - [x] 贯通工具、自适应、转文字及后备模型请求，验证兼容重试和强制动作契约
-- [ ] 构建与定向回归，隔离真实请求对照与预算/延迟记录
-- [ ] 完整发布门禁、commit/push/deploy、线上配置 CAS 和健康核验、安全写回
+- [x] 构建与定向回归，隔离真实请求对照与预算/延迟记录
+- [x] 完整发布门禁、commit/push/deploy、线上配置 CAS 和健康核验、安全写回
+
+结果：运行 5a8a630，所有新版实模26请求显式low；完整门禁后端2228pass/0fail/2Chromium skip、前端34pass。线上1942受管文件零漂移、配置复杂high→low、人格库不变、服务与页面健康。保留低档长尾及未登记条件式发送承诺的质量限制，详见 docs/ai-low-reasoning-2026-10-15.md。
 
 证据目录：/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-low-effort-start-20261015-uekxuqcj。
 本轮错误：首次只读备份脚本括号缺失 SyntaxError，未复制文件；改为独立 changed 变量后成功。不扩展未确认的 GLM none/thinking 参数映射。

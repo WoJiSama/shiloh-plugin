@@ -1,0 +1,120 @@
+{
+  "label": "low-default",
+  "complete": true,
+  "platformMessagesSent": 0,
+  "toolsDispatched": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "id": "optional-reaction",
+      "label": "low-default",
+      "elapsedMs": 4699,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "toolCount": 1,
+          "toolChoice": "auto",
+          "status": 200,
+          "elapsedMs": 4696,
+          "usage": {
+            "completion_tokens": 24,
+            "completion_tokens_details": {
+              "reasoning_tokens": 16
+            },
+            "prompt_tokens": 188,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 212
+          },
+          "reasoningChars": 74
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "",
+      "toolCalls": [
+        "sendLocalEmojiTool"
+      ]
+    },
+    {
+      "id": "forced-read-only-tool",
+      "label": "low-default",
+      "elapsedMs": 3008,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "toolCount": 1,
+          "toolChoice": {
+            "type": "function",
+            "function": {
+              "name": "lookupReceipt"
+            }
+          },
+          "status": 200,
+          "elapsedMs": 3006,
+          "usage": {
+            "completion_tokens": 6,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 187,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "total_tokens": 193
+          },
+          "reasoningChars": 0
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "",
+      "toolCalls": [
+        "lookupReceipt"
+      ]
+    },
+    {
+      "id": "adaptive-reference",
+      "label": "low-default",
+      "elapsedMs": 2017,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "toolCount": 0,
+          "toolChoice": null,
+          "status": 200,
+          "elapsedMs": 2014,
+          "usage": {
+            "completion_tokens": 45,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 79,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 124
+          },
+          "reasoningChars": 0
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "小林称任务已生成但尚未收到发送回执，阿青仅确认收到请求。据此无法确认结果已送达，只能确认请求已接收、任务在处理中，回执状态未知。",
+      "toolCalls": []
+    }
+  ]
+}

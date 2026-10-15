@@ -1,0 +1,113 @@
+{
+  "baseline-conversation": {
+    "turns": 7,
+    "requestEffortCounts": {
+      "low": 3,
+      "high": 4
+    },
+    "httpStatusCounts": {
+      "200": 7
+    },
+    "replyMedianMs": 9612,
+    "replyMaxMs": 19080,
+    "structuralFailureCounts": {
+      "kind": 2
+    },
+    "guardChangedCount": 0
+  },
+  "candidate-conversation": {
+    "turns": 7,
+    "requestEffortCounts": {
+      "low": 7
+    },
+    "httpStatusCounts": {
+      "200": 7
+    },
+    "replyMedianMs": 2058,
+    "replyMaxMs": 6642,
+    "structuralFailureCounts": {
+      "kind": 2
+    },
+    "guardChangedCount": 0
+  },
+  "final-candidate-conversation": {
+    "turns": 7,
+    "requestEffortCounts": {
+      "low": 7
+    },
+    "httpStatusCounts": {
+      "200": 7
+    },
+    "replyMedianMs": 2674,
+    "replyMaxMs": 27415,
+    "structuralFailureCounts": {
+      "kind": 2
+    },
+    "guardChangedCount": 0
+  },
+  "delivery-stability": {
+    "turns": 5,
+    "requestEffortCounts": {
+      "low": 5
+    },
+    "httpStatusCounts": {
+      "200": 5
+    },
+    "replyMedianMs": 2739,
+    "replyMaxMs": 3573,
+    "structuralFailureCounts": {},
+    "guardChangedCount": 0
+  },
+  "qualityLimits": [
+    "All main arms retain two kind mismatches for the biscuit followups.",
+    "Unregistered conditional delivery promises remain in initial and final low outputs.",
+    "Two of five extra low delivery samples explicitly promise later sending without a verified registration.",
+    "Low effort had a 27415ms main reply; request effort does not guarantee latency."
+  ],
+  "baseline-gateway": {
+    "requests": 3,
+    "requestEffortCounts": {
+      "provider_default": 3
+    },
+    "httpStatusCounts": {
+      "200": 3
+    },
+    "complete": true
+  },
+  "candidate-gateway": {
+    "requests": 3,
+    "requestEffortCounts": {
+      "low": 3
+    },
+    "httpStatusCounts": {
+      "200": 3
+    },
+    "complete": true
+  },
+  "postdeploy-gateway": {
+    "requests": 3,
+    "requestEffortCounts": {
+      "low": 3
+    },
+    "httpStatusCounts": {
+      "200": 3
+    },
+    "complete": true
+  },
+  "postdeploy-conversation": {
+    "requests": 1,
+    "requestEffortCounts": {
+      "low": 1
+    },
+    "httpStatusCounts": {
+      "200": 1
+    },
+    "complete": true
+  },
+  "totalHttpRequests": 36,
+  "candidateHttpRequests": 26,
+  "candidateExplicitLowRequests": 26,
+  "platformMessagesSent": 0,
+  "toolsDispatched": 0,
+  "productionMemoryWrites": 0
+}
