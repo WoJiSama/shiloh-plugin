@@ -2,6 +2,8 @@ import { test } from "node:test"
 import { readPluginSources, readSource } from "./helpers/pluginSources.js"
 import assert from "node:assert/strict"
 import fs from "node:fs"
+import { createTurnPlan, deriveTurnPlanRequest } from "../dist/backend/modules/conversation/infrastructure/turnPlan.js"
+import { buildChatRequestData } from "../dist/backend/modules/models/domain/modelGateway.js"
 
 const source = readPluginSources()
 const routeSource = readSource("utils/routeDecision.js")
@@ -30,21 +32,25 @@ test("high-confidence emoji reactions bypass model tool selection", () => {
 })
 
 test("ordinary casual emoji replies retain the optional tool for model selection", () => {
-  assert.match(source, /const initialToolNames = turnPlan\.capabilities\.required\.length/)
-  assert.match(source, /: turnPlan\.capabilities\.optional/)
-  assert.match(source, /(?:this|host)\.getToolsByName\(initialToolNames\)/)
+  const emoji = { type: "function", function: { name: "sendLocalEmojiTool", parameters: { type: "object", properties: {} } } }
+  const plan = createTurnPlan({ intentText: "哈哈", availableCapabilities: [emoji.function.name] })
+  assert.deepEqual(plan.capabilities.required, [])
+  assert.deepEqual(plan.capabilities.optional, [emoji.function.name])
+  assert.equal(plan.execution.mode, "tool")
+  const request = buildChatRequestData({ useTools: true }, [{ role: "user", content: "哈哈" }], [emoji], deriveTurnPlanRequest(plan).toolChoice)
+  assert.deepEqual(request.tools, [emoji])
+  assert.equal(request.tool_choice, "auto", "the model can choose either the admitted reaction or ordinary text")
 })
 
 test("knowledge replies use TurnPlan instead of optional emoji capability routing", () => {
-  assert.match(source, /createTurnPlan/)
-  assert.match(source, /requestedActionCapabilities = selectToolIntentCandidates/)
-  assert.match(source, /responseKind: isEducationalExplanationRequest\(currentIntentText\) \? "knowledge" : "chat"/)
-  assert.match(source, /formatTurnPlanLog\(turnPlan\)/)
-  const genericEmojiExposure = source.indexOf("轻松闲聊仅启用 sendLocalEmojiTool")
-  const executionRoute = source.indexOf("const turnPlan = createTurnPlan")
-  // buildRequestData 已迁至 utils/modelGateway.js(buildChatRequestData),主链路改为直接调用
-  const modelRequest = source.indexOf("const requestData = buildChatRequestData(host.config,")
-  assert.ok(genericEmojiExposure > 0 && executionRoute > genericEmojiExposure && modelRequest > executionRoute)
+  const emoji = { type: "function", function: { name: "sendLocalEmojiTool", parameters: { type: "object", properties: {} } } }
+  const plan = createTurnPlan({ responseKind: "knowledge", intentText: "解释什么是比热容", availableCapabilities: [emoji.function.name], requiredCapabilities: [emoji.function.name] })
+  assert.deepEqual(plan.capabilities.required, [], "an optional emoji candidate cannot turn a knowledge answer into a required action")
+  assert.equal(plan.execution.mode, "chat")
+  assert.equal(plan.presentation.kind, "knowledge")
+  const request = buildChatRequestData({ useTools: true }, [{ role: "user", content: "解释什么是比热容" }], [emoji], deriveTurnPlanRequest(plan).toolChoice)
+  assert.equal(request.tools, undefined)
+  assert.equal(request.tool_choice, undefined)
 })
 
 test("card replies acknowledge before generation and keep the card body free of process text", () => {
