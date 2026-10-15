@@ -1,15 +1,30 @@
 import fs from "fs"
 import path from "path"
+import { createHash } from "node:crypto"
+import type { PersonaScope } from '../../../contracts/persona.js'
 
 import { safeTruncateUnicode } from '../../models/domain/unicodeText.js'
 
-interface FeedbackEvent { group_id?: unknown; user_id?: unknown; message_id?: unknown; self_id?: unknown; bot?: { uin?: unknown }; isMaster?: boolean }
+interface FeedbackEvent { group_id?: unknown; user_id?: unknown; message_id?: unknown; self_id?: unknown; bot?: { uin?: unknown }; isMaster?: boolean; _personaSnapshot?: unknown }
 interface Context { userText?: string; botNames?: string[]; onPatternHit?(pattern: string): void }
 interface Tag { key: string; label: string; count?: number }
-interface Reply { groupId: string; userId: string; messageId: string; text: string; at: number }
-interface Feedback { at: string; groupId: string; userId: string; feedback: string; tags: string[]; tagLabels: string[]; botReply: string; botMessageId: string; sourceMessageId: string }
-interface Summary { tags: Record<string, Tag>; recent: { at: string; feedback: string; tags: string[] }[] }
+interface Reply { groupId: string; userId: string; messageId: string; text: string; at: number; source?: PersonaScope }
+interface Feedback { at: string; groupId: string; userId: string; feedback: string; tags: string[]; tagLabels: string[]; botReply: string; botMessageId: string; sourceMessageId: string; source?: PersonaScope }
+interface Summary { tags: Record<string, Tag>; recent: { at: string; feedback: string; tags: string[] }[]; source?: PersonaScope }
 interface Logger { warn?(message: string): void }
+
+function feedbackSource(value: unknown): PersonaScope | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const fields = ['botId', 'personaId', 'personaVersion', 'personaName'] as const
+  if (fields.some(field => typeof record[field] !== 'string' || !record[field].trim())) return undefined
+  return { botId: String(record.botId).trim(), personaId: String(record.personaId).trim(), personaVersion: String(record.personaVersion).trim(), personaName: String(record.personaName).trim() }
+}
+
+function feedbackSourceKey(source: PersonaScope): string {
+  return JSON.stringify([source.botId, source.personaId, source.personaVersion])
+}
+
 export function createPersonaFeedbackModule(ports: { isToneCorrectionMessage(text: string | undefined): boolean; logger?: Logger }) {
 const { isToneCorrectionMessage } = ports
 // 代码侧兜底坏模式表;config_default/message.yaml 的 personaGuard.badPatterns
@@ -189,55 +204,71 @@ function normalizeConfig(config: Record<string, unknown> = {}) {
 }
 
 class PersonaFeedbackManager {
- cwd: string; logger: Logger | undefined; lastReplies: Map<string, Reply>; lastFeedback: Map<string, Feedback>;
+ cwd: string; logger: Logger | undefined; lastReplies: Map<string, Reply>; lastFeedback: Map<string, Feedback>; feedbackRevisions: Map<string, number>;
   constructor({ cwd = process.cwd(), logger = ports.logger }: { cwd?: string; logger?: Logger } = {}) {
     this.cwd = cwd
     this.logger = logger
     this.lastReplies = new Map()
     this.lastFeedback = new Map()
+    this.feedbackRevisions = new Map()
   }
 
-  getDataDir() {
-    return path.join(this.cwd, "plugins/shiloh-plugin/data/persona_feedback")
+  getDataDir(source?: PersonaScope) {
+    const root = path.join(this.cwd, "plugins/shiloh-plugin/data/persona_feedback")
+    const scope = feedbackSource(source)
+    return scope ? path.join(root, 'scoped', createHash('sha256').update(feedbackSourceKey(scope)).digest('hex')) : root
   }
 
-  getFeedbackPath() {
-    return path.join(this.getDataDir(), "feedback.jsonl")
+  getFeedbackPath(source?: PersonaScope) {
+    return path.join(this.getDataDir(source), "feedback.jsonl")
   }
 
-  getSummaryPath() {
-    return path.join(this.getDataDir(), "summary.json")
+  getSummaryPath(source?: PersonaScope) {
+    return path.join(this.getDataDir(source), "summary.json")
   }
 
-  rememberBotReply(e: FeedbackEvent, output = "") {
+  resolveSource(e: FeedbackEvent, source?: PersonaScope) {
+    const scope = feedbackSource(source ?? e?._personaSnapshot)
+    const botId = String(e?.self_id || e?.bot?.uin || '').trim()
+    return scope && (!botId || scope.botId === botId) ? scope : undefined
+  }
+
+  rememberBotReply(e: FeedbackEvent, output = "", source?: PersonaScope) {
+    const scope = this.resolveSource(e, source)
+    const aliasEvent: FeedbackEvent = scope ? Object.assign(Object.create(e), {self_id: scope.botId}) : e
     const groupId = String(e?.group_id || "private")
-    const key = this.getConversationKey(e)
+    const key = this.getConversationKey(e, scope)
     const record = {
       groupId,
       userId: String(e?.user_id || ""),
       messageId: e?.message_id ? String(e.message_id) : "",
       text: compactText(output, 1600),
-      at: Date.now()
+      at: Date.now(),
+      ...(scope ? { source: scope } : {})
     }
     this.lastReplies.set(key, record)
-    // 多账号:群级"最近回复"按 bot 分键,星彩的上一句不能被当成希洛的
-    if (groupId !== "private") this.lastReplies.set(this.getGroupKey(e), record)
+    // 无 scope 的命令仅能追溯最新已投递回复的真实来源，不能把旧记录升级成当前人格。
+    this.lastReplies.set(this.getConversationKey(aliasEvent), record)
+    if (groupId !== "private") {
+      this.lastReplies.set(this.getGroupKey(e, scope), record)
+      this.lastReplies.set(this.getGroupKey(aliasEvent), record)
+    }
   }
 
-  getConversationKey(e: FeedbackEvent) {
-    return `${String(e?.self_id || e?.bot?.uin || "")}:${String(e?.group_id || "private")}:${String(e?.user_id || "")}`
+  getConversationKey(e: FeedbackEvent, source?: PersonaScope) {
+    return JSON.stringify([String(e?.self_id || e?.bot?.uin || source?.botId || ''), source ? feedbackSourceKey(source) : 'latest', String(e?.group_id || 'private'), String(e?.user_id || '')])
   }
 
-  // bot 维度的群键:同群多 bot 各记各的
-  getGroupKey(e: FeedbackEvent) {
-    const selfId = String(e?.self_id || e?.bot?.uin || "")
-    return `group:${selfId}:${String(e?.group_id || "private")}`
+  getGroupKey(e: FeedbackEvent, source?: PersonaScope) {
+    return JSON.stringify(['group', String(e?.self_id || e?.bot?.uin || source?.botId || ''), source ? feedbackSourceKey(source) : 'latest', String(e?.group_id || 'private')])
   }
 
-  getRecentBotReply(e: FeedbackEvent) {
-    const direct = this.lastReplies.get(this.getConversationKey(e))
+  getRecentBotReply(e: FeedbackEvent, source?: PersonaScope): Reply | null {
+    const scope = this.resolveSource(e, source)
+    if ((source || e?._personaSnapshot) && !scope) return null
+    const direct = this.lastReplies.get(this.getConversationKey(e, scope))
     if (direct) return direct
-    return this.lastReplies.get(this.getGroupKey(e)) || null
+    return this.lastReplies.get(this.getGroupKey(e, scope)) || null
   }
 
   classifyFeedback(text = "") {
@@ -254,12 +285,14 @@ class PersonaFeedbackManager {
       .trim()
   }
 
-  async recordFeedback(e: FeedbackEvent, msg = "") {
+  async recordFeedback(e: FeedbackEvent, msg = "", source?: PersonaScope) {
     if (!e?.isMaster) return "只有主人可以记录希洛反馈。"
     const feedback = this.parseFeedbackText(msg)
     if (!feedback) return "格式：.希洛反馈 太硬了 / 太啰嗦 / 这个语气好"
 
-    const reply = this.getRecentBotReply(e)
+    const reply = this.getRecentBotReply(e, source)
+    const scope = this.resolveSource(e, source) ?? feedbackSource(reply?.source)
+    const aliasEvent: FeedbackEvent = scope ? Object.assign(Object.create(e), {self_id: scope.botId}) : e
     const tags = this.classifyFeedback(feedback)
     const record = {
       at: nowIso(),
@@ -270,28 +303,35 @@ class PersonaFeedbackManager {
       tagLabels: tags.map(tag => tag.label),
       botReply: reply?.text || "",
       botMessageId: reply?.messageId || "",
-      sourceMessageId: e?.message_id ? String(e.message_id) : ""
+      sourceMessageId: e?.message_id ? String(e.message_id) : "",
+      ...(scope ? { source: scope } : {})
     }
 
-    ensureDir(this.getDataDir())
-    fs.appendFileSync(this.getFeedbackPath(), `${JSON.stringify(record)}\n`, "utf8")
-    this.updateSummary(tags, feedback)
-    this.lastFeedback.set(this.getConversationKey(e), record)
+    ensureDir(this.getDataDir(scope))
+    fs.appendFileSync(this.getFeedbackPath(scope), `${JSON.stringify(record)}\n`, "utf8")
+    this.updateSummary(tags, feedback, scope)
+    this.lastFeedback.set(this.getConversationKey(e, scope), record)
+    this.lastFeedback.set(this.getConversationKey(aliasEvent), record)
     return `记下来了：${tags.map(tag => tag.label).join("、")}`
   }
 
-  getLatestFeedback(e: FeedbackEvent) {
-    return this.lastFeedback.get(this.getConversationKey(e)) || null
+  getLatestFeedback(e: FeedbackEvent, source?: PersonaScope) {
+    const scope = this.resolveSource(e, source)
+    if ((source || e?._personaSnapshot) && !scope) return null
+    return this.lastFeedback.get(this.getConversationKey(e, scope)) || null
   }
 
-  readSummary(): Summary {
+  readSummary(source?: PersonaScope): Summary {
     try {
-      const file = this.getSummaryPath()
+      const scope = feedbackSource(source)
+      const file = this.getSummaryPath(scope)
       if (!fs.existsSync(file)) return { tags: {}, recent: [] }
       const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"))
       const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
       const data = record(parsed)
-      const summary: Summary = { tags: {}, recent: [] }
+      const storedSource = feedbackSource(data.source)
+      if (scope && (!storedSource || feedbackSourceKey(scope) !== feedbackSourceKey(storedSource))) return { tags: {}, recent: [] }
+      const summary: Summary = { tags: {}, recent: [], ...(storedSource ? { source: storedSource } : {}) }
       for (const [key, value] of Object.entries(record(data.tags))) {
         const tag = record(value)
         if (typeof tag.key !== 'string' || typeof tag.label !== 'string') continue
@@ -309,8 +349,10 @@ class PersonaFeedbackManager {
     }
   }
 
-  updateSummary(tags: Tag[] = [], feedback = "") {
-    const summary = this.readSummary()
+  updateSummary(tags: Tag[] = [], feedback = "", source?: PersonaScope) {
+    const scope = feedbackSource(source)
+    const summary = this.readSummary(scope)
+    if (scope) summary.source = scope
     for (const tag of tags) {
       const item = summary.tags[tag.key] || { key: tag.key, label: tag.label, count: 0 }
       item.label = tag.label
@@ -321,20 +363,35 @@ class PersonaFeedbackManager {
       { at: nowIso(), feedback: compactText(feedback, 160), tags: tags.map(tag => tag.key) },
       ...(summary.recent || [])
     ].slice(0, 30)
-    ensureDir(this.getDataDir())
-    fs.writeFileSync(this.getSummaryPath(), JSON.stringify(summary, null, 2), "utf8")
+    ensureDir(this.getDataDir(scope))
+    fs.writeFileSync(this.getSummaryPath(scope), JSON.stringify(summary, null, 2), "utf8")
+    const revisionKey = scope ? feedbackSourceKey(scope) : 'legacy'
+    this.feedbackRevisions.set(revisionKey, (this.feedbackRevisions.get(revisionKey) || 0) + 1)
   }
 
-  buildFeedbackPrompt(config: Record<string, unknown> = {}, { personaName }: { personaName?: string } = {}) {
+  getFeedbackRevision(source?: PersonaScope) {
+    const scope = feedbackSource(source)
+    if (!scope) return 'unscoped'
+    const localRevision = this.feedbackRevisions.get(feedbackSourceKey(scope)) || 0
+    try {
+      const stat = fs.statSync(this.getSummaryPath(scope))
+      return `${localRevision}:${stat.mtimeMs}:${stat.size}`
+    } catch { return `${localRevision}:missing` }
+  }
+
+  buildFeedbackPrompt(config: Record<string, unknown> = {}, { personaName, source }: { personaName?: string; source?: PersonaScope } = {}) {
     const guard = normalizeConfig(config)
     if (!guard.enabled || guard.maxPromptItems <= 0) return ""
-    const summary = this.readSummary()
+    // 旧全局摘要没有来源，保留供诊断，但不能冒充某个具体人格的长期修正。
+    const scope = feedbackSource(source)
+    if (!scope) return ''
+    const summary = this.readSummary(scope)
     const sorted = Object.values(summary.tags || {})
       .sort((a, b) => (Number(b.count) || 0) - (Number(a.count) || 0))
       .slice(0, guard.maxPromptItems)
     if (!sorted.length) return ""
 
-    const name = String(personaName || "希洛").trim() || "希洛"
+    const name = String(personaName || scope.personaName).trim() || scope.personaName
     const lines = [
       `【${name}近期微雕反馈】`,
       `这些是主人对${name}回复风格的长期修正，回复时自然遵守，不要提到这些规则本身。`

@@ -7,6 +7,10 @@ import { composeTurnPromptLayers } from "../utils/turnPromptComposer.js"
 import { FULL_PROMPT_LAYERS, CHAT_PROMPT_LAYERS, resolvePromptLayerProfile } from "../utils/promptLayers.js"
 import { clearPromptLayerCache } from "../utils/promptLayerCache.js"
 import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
+import {PersonaFeedbackManager} from '../domains/memory/PersonaFeedbackManager.js'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 // 层缓存是模块级全局状态,测试间必须隔离
 beforeEach(() => clearPromptLayerCache())
@@ -70,6 +74,7 @@ const CONFIG = {
 const TURN = {
   groupId: "g1",
   userId: "u1",
+  viewerSelfId: '99',
   event: { id: "evt" },
   messageText: "查一下这个",
   memoryText: "查一下这个",
@@ -283,4 +288,127 @@ test("promptLayerCache.enabled=false 时全部层直读", async () => {
   assert.equal(deps.counts.emotion, 2)
   assert.equal(deps.counts.globalStyle, 2)
   assert.equal(deps.counts.personProfile, 2)
+})
+
+const snapshot = (overrides = {}) => ({
+  botId: '99', personaId: 'persona-a', personaVersion: 'v1', personaName: '同名人格',
+  persona: {name: '同名人格', identity: '当前人格', speechStyle: ['快照里的说话习惯']},
+  systemContent: '', personaGuard: {enabled: true}, ...overrides
+})
+
+test('feedback cache isolates same-name personas, revisions and bots throughout A to B to A', async () => {
+  const calls = []
+  const deps = {personaFeedbackManager: {buildFeedbackPrompt: (config, {source}) => {
+    calls.push(source)
+    return `反馈:${source.botId}/${source.personaId}/${source.personaVersion}`
+  }}}
+  const profile = resolvePromptLayerProfile({responseKind: 'chat'})
+  const compose = personaSnapshot => composeTurnPromptLayers({config: CONFIG, personaSnapshot, profile, turn: TURN, deps})
+  const a = snapshot()
+  const b = snapshot({personaId: 'persona-b'})
+  const aV2 = snapshot({personaVersion: 'v2'})
+  const otherBot = snapshot({botId: '100'})
+  for (const source of [a, b, aV2, otherBot, a, b]) {
+    const result = await compose(source)
+    assert.equal(result.layerValues.personaFeedback, `反馈:${source.botId}/${source.personaId}/${source.personaVersion}`)
+    assert.match(result.layerValues.personaTone, /同名人格场景口吻/)
+  }
+  assert.equal(calls.length, 4)
+})
+
+test('snapshot persona and guard remain authoritative and changed guard config invalidates feedback cache', async () => {
+  const guards = []
+  const deps = {personaFeedbackManager: {buildFeedbackPrompt: (guard, {personaName}) => {
+    guards.push(guard)
+    return `${personaName}:${guard.maxPromptItems}`
+  }}}
+  const base = snapshot({personaGuard: {maxPromptItems: 1}})
+  const options = {config: CONFIG, personaSnapshot: base, turn: TURN, deps}
+  const a = await composeTurnPromptLayers(options)
+  const b = await composeTurnPromptLayers({...options, config: {...CONFIG, persona: {name: '热切换后的人格'}, personaGuard: {maxPromptItems: 8}}})
+  const c = await composeTurnPromptLayers({...options, personaSnapshot: {...base, personaGuard: {maxPromptItems: 2}}})
+  assert.equal(a.layerValues.personaFeedback, '同名人格:1')
+  assert.equal(b.layerValues.personaFeedback, '同名人格:1')
+  assert.match(b.layerValues.personaTone, /同名人格场景口吻/)
+  assert.equal(c.layerValues.personaFeedback, '同名人格:2')
+  assert.deepEqual(guards, [{maxPromptItems: 1}, {maxPromptItems: 2}])
+})
+
+test('legacy composer calls use stable persona content plus bot and guard instead of a global key', async () => {
+  const calls = []
+  const deps = {personaFeedbackManager: {buildFeedbackPrompt: (guard, {source, personaName}) => {
+    calls.push({guard, source})
+    return `${source?.botId}:${personaName}:${guard.enabled}`
+  }}}
+  const options = {config: {...CONFIG, persona: {name: 'A', tone: '直率'}}, turn: TURN, deps}
+  const a = await composeTurnPromptLayers(options)
+  const same = await composeTurnPromptLayers({...options, config: {...options.config, persona: {tone: '直率', name: 'A'}}})
+  const b = await composeTurnPromptLayers({...options, config: {...options.config, persona: {name: 'B', tone: '平静'}}})
+  const otherBot = await composeTurnPromptLayers({...options, turn: {...TURN, viewerSelfId: '100'}})
+  const guard = await composeTurnPromptLayers({...options, config: {...options.config, personaGuard: {enabled: false}}})
+  assert.equal(a.layerValues.personaFeedback, same.layerValues.personaFeedback)
+  assert.equal(b.layerValues.personaFeedback, '99:B:true')
+  assert.equal(otherBot.layerValues.personaFeedback, '100:A:true')
+  assert.equal(guard.layerValues.personaFeedback, '99:A:false')
+  assert.equal(calls.length, 4)
+  assert.notEqual(calls[0].source.personaId, calls[1].source.personaId)
+  assert.equal(calls[0].source.personaName, 'A')
+})
+
+test('concurrent persona feedback loads cannot overwrite each other in the shared cache', async () => {
+  const pending = new Map()
+  const deps = {personaFeedbackManager: {buildFeedbackPrompt: (_config, {source}) => new Promise(resolve => pending.set(source.personaId, resolve))}}
+  const a = snapshot()
+  const b = snapshot({personaId: 'persona-b'})
+  const compose = personaSnapshot => composeTurnPromptLayers({config: {}, personaSnapshot, turn: TURN, deps})
+  const first = compose(a)
+  const second = compose(b)
+  for (let attempt = 0; pending.size < 2 && attempt < 100; attempt += 1) await new Promise(resolve => setImmediate(resolve))
+  assert.equal(pending.size, 2, 'both persona-specific loaders should start independently')
+  pending.get(b.personaId)('B 独有反馈')
+  assert.equal((await second).layerValues.personaFeedback, 'B 独有反馈')
+  pending.get(a.personaId)('A 独有反馈')
+  assert.equal((await first).layerValues.personaFeedback, 'A 独有反馈')
+  assert.equal((await compose(a)).layerValues.personaFeedback, 'A 独有反馈')
+  assert.equal((await compose(b)).layerValues.personaFeedback, 'B 独有反馈')
+})
+
+test('recorded scoped feedback invalidates its cached prompt immediately and persists across manager restart', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'composer-feedback-'))
+  const manager = new PersonaFeedbackManager({cwd, logger: null})
+  const source = snapshot()
+  const event = {group_id: TURN.groupId, user_id: TURN.userId, self_id: source.botId, isMaster: true}
+  const options = {config: CONFIG, personaSnapshot: source, turn: TURN, deps: {personaFeedbackManager: manager}}
+  try {
+    assert.equal((await composeTurnPromptLayers(options)).layerValues.personaFeedback, '')
+    manager.rememberBotReply(event, '这是一条已确认投递的回复', source)
+    await manager.recordFeedback(event, '.希洛反馈 太客服了')
+    const result = await composeTurnPromptLayers(options)
+    assert.match(result.layerValues.personaFeedback, /同名人格近期微雕反馈/)
+    assert.match(result.layerValues.personaFeedback, /客服腔/)
+    const other = await composeTurnPromptLayers({...options, personaSnapshot: snapshot({personaId: 'persona-b'})})
+    assert.equal(other.layerValues.personaFeedback, '')
+    clearPromptLayerCache()
+    const restarted = new PersonaFeedbackManager({cwd, logger: null})
+    assert.match((await composeTurnPromptLayers({...options, deps: {personaFeedbackManager: restarted}})).layerValues.personaFeedback, /客服腔/)
+  } finally { fs.rmSync(cwd, {recursive: true, force: true}) }
+})
+
+test('semantic style recall receives the captured persona source for feedback filtering', async () => {
+  const sources = []
+  const deps = {globalStyleLearnerManager: {
+    buildPrompt: () => '',
+    buildRelevantPrompt: async (_config, options) => {
+      sources.push(options.source)
+      return `语义:${options.source.personaId}`
+    }
+  }}
+  const profile = resolvePromptLayerProfile({responseKind: 'chat', modelIntent: 'search'})
+  const a = snapshot()
+  const b = snapshot({personaId: 'persona-b'})
+  for (const source of [a, b]) {
+    const result = await composeTurnPromptLayers({config: CONFIG, personaSnapshot: source, profile, turn: TURN, deps})
+    assert.equal(result.layerValues.semanticStyle, `语义:${source.personaId}`)
+  }
+  assert.deepEqual(sources, [a, b])
 })

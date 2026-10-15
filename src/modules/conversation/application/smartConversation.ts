@@ -1,12 +1,14 @@
 import {smartConversationKey} from '../domain/conversationIdentity.js'
 import type { MessageSegment, ChatMember } from '../../../contracts/chatEvent.js'
 import type { SmartRuntimeState } from '../../../contracts/runtime.js'
+import type {PersonaSnapshot} from '../../../contracts/persona.js'
 import { lastIncomingMsgAt } from '../domain/splitState.js'
 import { getReplySender, summarizeForLog } from '../domain/messageContext.js'
 import { collectMentionTargetIds } from '../domain/mentionTargets.js'
 import { isAiConversationEnabled } from '../domain/aiConversationGate.js'
 import { markProactiveReply } from '../domain/proactiveReplyFreshness.js'
 export interface ConversationEvent {
+ _personaSnapshot?:PersonaSnapshot; _pendingPersonaSnapshot?:PersonaSnapshot;
  group_id: string|number; user_id?:string|number; self_id?:string|number; bot?:{uin?:string|number;nickname?:string}; sender?:ChatMember;
  msg?:string; raw_message?:string; message_id?:unknown; time?:number; message_type?:string;
  message?:MessageSegment[]; source?:MessageSegment; reply?:MessageSegment|((...args:unknown[])=>unknown);
@@ -20,7 +22,7 @@ export interface ConversationSmartConfig {
  focusDurationMs?:number; focusMaxReplies?:number; fadingDurationMs?:number; focusMaxNoAction?:number;
  attentionDrift?:{enabled?:boolean;level?:string;windowMinutes?:number};
 }
-export interface GateResult {decision:'continue'|'no_action'|'wait';reason:string;wait_seconds?:number;__forceContinue?:boolean}
+export interface GateResult {personaSnapshot?:PersonaSnapshot;decision:'continue'|'no_action'|'wait';reason:string;wait_seconds?:number;__forceContinue?:boolean}
 export interface Prefilter {kind:string;reason:string}
 export interface SmartConversationHost {
  config:{enabled?:unknown;smartTrigger?:ConversationSmartConfig;groupContextState?:{topicEnabled?:boolean;socialEnabled?:boolean}};
@@ -313,6 +315,7 @@ async function handleRandomReplySmart(host:SmartConversationHost, e:Conversation
           host.releaseSmartInFlight(state, e, smartLockToken)
         }
         e._triggerContext = { mode: "smart_gate", gateDecision: "continue", gateReason: gateResult?.reason || "", phase }
+        if (gateResult.personaSnapshot) e._pendingPersonaSnapshot = gateResult.personaSnapshot
         return await host.handleTool(e)
       }
       if (decision === 'wait') {

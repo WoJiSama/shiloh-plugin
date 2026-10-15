@@ -4,6 +4,7 @@ import {getVoiceStyleConfig,sanitizeVoiceText,scheduleVoiceFileCleanup,selectVoi
 import {parseDrawEvent} from '../../toolSupport/infrastructure/bananaDecoders.js'
 import type {DrawEvent} from '../../../contracts/bananaTool.js'
 import {extractDeliveryMessageId} from '../../messaging/domain/deliveryObservability.js'
+import {withPersonaSnapshot} from '../../conversation/domain/personaSnapshotConfig.js'
 function record(value: unknown): Record<string, unknown> {return value && typeof value==='object'?value as Record<string,unknown>:{}}
 function parseVoiceStyle(value: unknown): VoiceStyle {
  const raw=record(value),result:VoiceStyle={}
@@ -27,7 +28,7 @@ class VoiceTool extends AbstractTool {
       properties: {
         text: {
           type: "string",
-          description: "要用希洛声音说出来的短句，必须是纯口播文字，不要包含 Markdown、代码、表情符号或舞台动作。"
+          description: "要说出来的短句，必须是纯口播文字，不要包含 Markdown、代码、表情符号或舞台动作。"
         },
         style: {
           type: "string",
@@ -58,9 +59,12 @@ class VoiceTool extends AbstractTool {
     }
 
     const rawText = String(opts.text || "")
-    const guardedText = ports.guardReply(rawText, ports.getBridge()?.config?.personaGuard, {
+    const bridge = ports.getBridge()
+    const personaConfig = withPersonaSnapshot(bridge?.config || {}, e)
+    const persona = e._personaSnapshot ? personaConfig.persona : bridge?.getPersonaFor?.(e) ?? personaConfig.persona
+    const guardedText = ports.guardReply(rawText, personaConfig.personaGuard, {
       userText: e?.msg || "",
-      botNames: [e?.bot?.nickname, ports.getBridge()?.getPersonaFor?.(e)?.name ?? ports.getBridge()?.config?.persona?.name]
+      botNames: [persona?.name, e?.bot?.nickname]
     })
     const text = sanitizeVoiceText(guardedText, config.maxTextLength || 80)
     if (!text) return "语音内容为空，先不发语音。"

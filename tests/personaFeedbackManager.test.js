@@ -6,6 +6,9 @@ import { buildTurnInteractionContext } from '../dist/backend/modules/conversatio
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import {createOutboundArbiter} from '../dist/backend/modules/messaging/application/outboundArbiter.js'
+
+const personaSource = (overrides = {}) => ({botId: 'bot-a', personaId: 'persona-a', personaVersion: 'v1', personaName: '同名人格', ...overrides})
 
 test('softens hard robot or human identity denial', () => {
   const manager = new PersonaFeedbackManager({ logger: null })
@@ -128,7 +131,7 @@ test('actual reply pipeline preserves both model outputs corrupted in the baseli
 test('hard-tone feedback permits honest brief refusals without demanding alternatives', () => {
   const manager = new PersonaFeedbackManager({ logger: null })
   manager.readSummary = () => ({tags: {too_hard: {key: 'too_hard', label: '拒绝太硬', count: 1}}, recent: []})
-  const prompt = manager.buildFeedbackPrompt({enabled: true}, {personaName: '夜巡'})
+  const prompt = manager.buildFeedbackPrompt({enabled: true}, {personaName: '夜巡', source: personaSource({personaName: '夜巡'})})
   assert.match(prompt, /夜巡近期微雕反馈/)
   assert.match(prompt, /具体能力边界.*可以简短拒绝/)
   assert.match(prompt, /替代建议仅在有助于当前目标时给/)
@@ -255,4 +258,115 @@ test('direct reply feedback is isolated by bot within the same group and user', 
   manager.rememberBotReply({ ...common, self_id: 'bot-b' }, 'reply from b')
   assert.equal(manager.getRecentBotReply({ ...common, self_id: 'bot-a' }).text, 'reply from a')
   assert.equal(manager.getRecentBotReply({ ...common, self_id: 'bot-b' }).text, 'reply from b')
+})
+
+test('confirmed replies and latest feedback retain bot, persona id and version ownership', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-feedback-scope-'))
+  const manager = new PersonaFeedbackManager({cwd, logger: null})
+  const event = {group_id: 'g', user_id: 'u', self_id: 'bot-a', isMaster: true}
+  const a = personaSource()
+  const b = personaSource({personaId: 'persona-b'})
+  const aV2 = personaSource({personaVersion: 'v2'})
+  try {
+    manager.rememberBotReply(event, 'A 的已投递回复', a)
+    await manager.recordFeedback(event, '.希洛反馈 太客服了')
+    manager.rememberBotReply(event, 'B 的已投递回复', b)
+    await manager.recordFeedback(event, '.希洛反馈 太啰嗦')
+    assert.equal(manager.getRecentBotReply(event, a)?.text, 'A 的已投递回复')
+    assert.equal(manager.getRecentBotReply(event, b)?.text, 'B 的已投递回复')
+    assert.equal(manager.getRecentBotReply(event, aV2), null)
+    assert.equal(manager.getRecentBotReply({...event, user_id: 'another-user'}, a)?.text, 'A 的已投递回复')
+    assert.equal(manager.getRecentBotReply({...event, user_id: 'another-user'}, aV2), null)
+    assert.equal(manager.getLatestFeedback(event, a)?.botReply, 'A 的已投递回复')
+    assert.deepEqual(manager.getLatestFeedback(event, a)?.source, a)
+    assert.equal(manager.getLatestFeedback(event, b)?.botReply, 'B 的已投递回复')
+    assert.equal(manager.getLatestFeedback(event, aV2), null)
+    assert.equal(manager.getRecentBotReply({...event, self_id: 'bot-b'}, a), null)
+    assert.equal(manager.getLatestFeedback({...event, self_id: 'bot-b'}, a), null)
+    const noBotEvent = {group_id: 'same-group', user_id: 'same-user'}
+    manager.rememberBotReply(noBotEvent, '只有 source 提供 bot 身份', a)
+    assert.equal(manager.getRecentBotReply(noBotEvent), null)
+    assert.equal(manager.getRecentBotReply(noBotEvent, a)?.text, '只有 source 提供 bot 身份')
+    assert.equal(manager.getRecentBotReply({...noBotEvent, self_id: a.botId})?.text, '只有 source 提供 bot 身份')
+    assert.match(manager.buildFeedbackPrompt({}, {source: a}), /客服腔/)
+    assert.doesNotMatch(manager.buildFeedbackPrompt({}, {source: a}), /太啰嗦/)
+    assert.match(manager.buildFeedbackPrompt({}, {source: b}), /太啰嗦/)
+    assert.doesNotMatch(manager.buildFeedbackPrompt({}, {source: b}), /客服腔/)
+    assert.equal(manager.buildFeedbackPrompt({}, {source: aV2}), '')
+
+    const restarted = new PersonaFeedbackManager({cwd, logger: null})
+    assert.match(restarted.buildFeedbackPrompt({}, {source: a}), /客服腔/)
+    assert.match(restarted.buildFeedbackPrompt({}, {source: b}), /太啰嗦/)
+    assert.notEqual(manager.getSummaryPath(a), manager.getSummaryPath(b))
+    assert.notEqual(manager.getSummaryPath(a), manager.getSummaryPath(aV2))
+  } finally { fs.rmSync(cwd, {recursive: true, force: true}) }
+})
+
+test('legacy unowned feedback is preserved without being promoted to any current persona', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-feedback-legacy-'))
+  const manager = new PersonaFeedbackManager({cwd, logger: null})
+  const event = {group_id: 'g', user_id: 'u', self_id: 'bot-a', isMaster: true}
+  const source = personaSource()
+  try {
+    manager.rememberBotReply(event, '旧记录没有人格来源')
+    await manager.recordFeedback(event, '.希洛反馈 太客服了')
+    assert.equal(manager.getLatestFeedback(event).source, undefined)
+    assert.equal(manager.getRecentBotReply(event, source), null)
+    assert.equal(manager.getLatestFeedback(event, source), null)
+    assert.ok(fs.existsSync(manager.getFeedbackPath()))
+    assert.equal(manager.readSummary().tags.too_customer.count, 1)
+    assert.equal(manager.buildFeedbackPrompt({}, {personaName: '当前人格'}), '')
+    assert.equal(manager.buildFeedbackPrompt({}, {source}), '')
+
+    await manager.recordFeedback(event, '.希洛反馈 太啰嗦', source)
+    assert.equal(manager.getLatestFeedback(event, source)?.botReply, '')
+    assert.match(manager.buildFeedbackPrompt({}, {source}), /太啰嗦/)
+    assert.doesNotMatch(manager.buildFeedbackPrompt({}, {source}), /客服腔/)
+  } finally { fs.rmSync(cwd, {recursive: true, force: true}) }
+})
+
+test('source fallback is validated and summary provenance cannot be relabelled', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-feedback-provenance-'))
+  const manager = new PersonaFeedbackManager({cwd, logger: null})
+  const source = personaSource()
+  const event = {group_id: 'g', user_id: 'u', self_id: source.botId, isMaster: true, _personaSnapshot: source}
+  try {
+    manager.rememberBotReply(event, '带已确认来源的回复')
+    await manager.recordFeedback(event, '.希洛反馈 太客服了')
+    assert.deepEqual(manager.getLatestFeedback(event)?.source, source)
+    const file = manager.getSummaryPath(source)
+    const summary = JSON.parse(fs.readFileSync(file, 'utf8'))
+    summary.source.personaId = 'another-persona'
+    fs.writeFileSync(file, JSON.stringify(summary))
+    assert.equal(manager.buildFeedbackPrompt({}, {source}), '')
+    for (const invalid of [{...source, personaVersion: ''}, {...source, botId: 123}, {...source, personaName: undefined}]) {
+      assert.equal(manager.buildFeedbackPrompt({}, {source: invalid}), '')
+      assert.equal(manager.getRecentBotReply({...event, _personaSnapshot: invalid}), null)
+    }
+  } finally { fs.rmSync(cwd, {recursive: true, force: true}) }
+})
+
+test('real outbound event wrappers retain conversation identity when inferring feedback provenance', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'persona-feedback-wrapper-'))
+  const manager = new PersonaFeedbackManager({cwd, logger: null})
+  const source = personaSource()
+  const original = {group_id: 'wrapped-group', user_id: 'wrapped-user', self_id: source.botId, isMaster: true, reply: async () => ({message_id: 'out'})}
+  const wrapped = createOutboundArbiter({logger: {}}).wrapEvent(original)
+  try {
+    assert.equal(Object.hasOwn(wrapped, 'group_id'), false, 'the real arbiter inherits transport fields')
+    manager.rememberBotReply(wrapped, '原型继承事件上的已投递回复', source)
+    assert.equal(manager.getRecentBotReply(original)?.text, '原型继承事件上的已投递回复')
+    assert.deepEqual(manager.getRecentBotReply(original)?.source, source)
+    assert.equal(manager.getRecentBotReply({self_id: source.botId}, source), null)
+    await manager.recordFeedback(wrapped, '.希洛反馈 太客服了', source)
+    const feedback = manager.getLatestFeedback(original)
+    assert.equal(feedback?.groupId, original.group_id)
+    assert.equal(feedback?.userId, original.user_id)
+    assert.equal(feedback?.botReply, '原型继承事件上的已投递回复')
+    assert.deepEqual(feedback?.source, source)
+    assert.equal(manager.getLatestFeedback({self_id: source.botId}), null)
+    await manager.recordFeedback(wrapped, '.希洛反馈 太啰嗦')
+    assert.equal(manager.getLatestFeedback(original, source)?.botReply, '原型继承事件上的已投递回复')
+    assert.deepEqual(manager.getLatestFeedback(original)?.source, source)
+  } finally { fs.rmSync(cwd, {recursive: true, force: true}) }
 })

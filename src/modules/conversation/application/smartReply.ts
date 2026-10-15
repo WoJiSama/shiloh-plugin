@@ -1,5 +1,6 @@
+import type {PersonaSnapshot} from '../../../contracts/persona.js'
 interface SmartOptions {kind?:string;thresholds?:Partial<{maxTextChars:number;maxLines:number;structuredRows:number;documentChars:number;documentLines:number}>;force?:boolean;quote?:boolean;forceText?:boolean;template?:string;nickname?:string;avatarUrl?:string}
-interface SmartEvent {reply(output:unknown,quote?:boolean):Promise<unknown>}
+interface SmartEvent {_personaSnapshot?:PersonaSnapshot;reply(output:unknown,quote?:boolean):Promise<unknown>}
 interface CardPayload {text:string;template:string;nickname?:string;avatarUrl?:string}
 export function createSmartReply(ports:{getTextImageTool():Promise<{execute(payload:CardPayload,event:SmartEvent):Promise<unknown>}>;warn(message:string):void}) {
 const DEFAULT_THRESHOLDS = {
@@ -67,6 +68,7 @@ async function sendSmartReply(e:SmartEvent, output:unknown, options:SmartOptions
   if (!analysis.shouldRender) return await e.reply(text, options.quote)
 
   let deliveryAttempted = false
+  const personaSnapshot = e._personaSnapshot
   try {
     const tool = await ports.getTextImageTool()
     const template = options.template || analysis.template
@@ -76,7 +78,8 @@ async function sendSmartReply(e:SmartEvent, output:unknown, options:SmartOptions
     }
     if (template === "chat" && typeof options.nickname === "string" && options.nickname.trim()) payload.nickname = options.nickname
     if (template === "chat" && typeof options.avatarUrl === "string" && options.avatarUrl.trim()) payload.avatarUrl = options.avatarUrl
-    const result = await tool.execute(payload, { ...e, reply: async (output, quote) => { deliveryAttempted = true; return e.reply(output, quote) } })
+    const cardEvent:SmartEvent = Object.assign(Object.create(e), {_personaSnapshot:personaSnapshot,reply:async (output:unknown,quote?:boolean) => { deliveryAttempted = true; return e.reply(output, quote) }})
+    const result = await tool.execute(payload, cardEvent)
     if (typeof result === "string" && result.trim().startsWith("error:")) {
       throw new Error(result)
     }

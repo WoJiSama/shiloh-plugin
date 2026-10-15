@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createFinalReply} from '../dist/backend/modules/conversation/application/finalReply.js'
 import {createMemoryReplies} from '../dist/backend/modules/conversation/application/memoryReplies.js'
+import {createPersonaSnapshot} from '../dist/backend/modules/conversation/infrastructure/personaSnapshot.js'
 function fixture(){
  const archived=[],saved=[],enhanced=[],tracking=[],events=[]
  const api=createFinalReply({randomUUID:()=>"tool-id",logger:{warn(){},info(){},error(){}},bot:()=>({uin:99,nickname:'bot'}),buildGenericChatFailureReply:()=> 'failed',extractModrinthForwardItems:()=>[],stripModrinthForwardMarkers:text=>text,applyOutputPersonaGuards:text=>text,findRecentBotImage:async()=>null,recordEpisode(){},recordTurnContinuity:async()=>{},getActiveConversation:()=>({chatHistory:[]}),trackingKey:e=>`${e.self_id}:${e.group_id}_${e.user_id}`,rememberPersonaReply(){},rememberStyleReply(){}})
@@ -31,6 +32,26 @@ test('final card returns actual receipt and never falls back after a transport a
  assert.equal(await api.sendFinalReplyAsTextImage(host,event,'text'),null);assert.equal(fallbacks,0)
  host.toolInstances.textImageTool.execute=async()=>{throw Error('render failed')}
  assert.equal(await api.sendFinalReplyAsTextImage(host,event,'text'),'fallback');assert.equal(fallbacks,1)
+})
+
+test('final card preserves inherited event identity and pins the session persona across preparation',async()=>{
+ const {api,event,host,archived}=fixture()
+ const captured=createPersonaSnapshot({botId:99,persona:{name:'甲'}})
+ const replacement=createPersonaSnapshot({botId:99,persona:{name:'乙'}})
+ const wrapped=Object.assign(Object.create(event),{_personaSnapshot:captured})
+ host.processToolSpecificMessage=async text=>{await Promise.resolve();wrapped._personaSnapshot=replacement;return text}
+ host.getTextImageTemplateForFinalReply=()=> 'document'
+ host.sendObservedReply=async(e,payload,quote)=>e.reply(payload,quote)
+ let rendered=0
+ host.toolInstances={textImageTool:{execute:async(_payload,e)=>{
+  rendered++;assert.equal(e.self_id,99);assert.equal(e.group_id,1);assert.equal(e.user_id,2)
+  assert.equal(e._personaSnapshot,captured)
+  await e.reply('image')
+ }}}
+ await api.handleTextResponse(host,'正文',wrapped,{personaSnapshot:captured},[])
+ assert.equal(rendered,1)
+ assert.equal(archived[0].sender.nickname,'甲')
+ assert.equal(archived[0].personaSource,captured)
 })
 test('memory forwarding falls back only when preparation failed',async()=>{
  for(const prepareFailure of [true,false]){

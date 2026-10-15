@@ -2,11 +2,12 @@ import type {KnowledgeEntry,WorkflowRule} from './memoryEngine.js'
 import type {ExecutionEvent,ExecutionSession,ExecutionMessage,ToolDefinition,ToolCall,SemanticDecision,ToolSemanticContext,SemanticMember,ExecutionAvatar,ExecutionConfig} from './toolExecution.js'
 import type {TurnPlan,ToolChoice} from './turnPlan.js'
 import type {ActionFactsQuery, TurnActionFacts} from './turnActionFacts.js'
+import type {PersonaGuardConfig, PersonaIdentity, PersonaScope, PersonaSnapshot} from './persona.js'
 export type ChatId=string|number
 export interface IdentityBinding {qq?:string|number|null|undefined;name?:string;aliases?:string[];notes?:string}
 export interface ChatTurnMember extends SemanticMember {group_name?:string}
 export interface ChatGroup {group_name?:string;getMemberMap():Promise<Map<number,ChatTurnMember>>;pickMember(id:ChatId|null|undefined):{info:ChatTurnMember|Promise<ChatTurnMember>}}
-export interface ChatTurnEvent extends ExecutionEvent {message_type?:string;self_id?:ChatId;group?:ChatGroup;group_name?:string;sender:ChatTurnMember;bot:{uin?:ChatId;nickname?:string;pickGroup(id:ChatId|undefined):ChatGroup};message?:import('./chatEvent.js').MessageSegment[];isMaster?:boolean;sessionId?:string;_turnId?:string;_triggerContext?:{mode?:string;[key:string]:unknown};_progressReplyState?:{sent:boolean;reserved:boolean};_receivedAt?:number;_groupContextAssets?:GroupAssets;reply_id?:unknown;getReply?():Promise<QuotedMessage|null>;_prefilterKind?:string;forceGrabRedBag?:boolean;_mergedMessageCount?:number;_quotedPromptContext?:{text?:string;messageId?:unknown}}
+export interface ChatTurnEvent extends ExecutionEvent {_personaSnapshot?:PersonaSnapshot;_pendingPersonaSnapshot?:PersonaSnapshot;message_type?:string;self_id?:ChatId;group?:ChatGroup;group_name?:string;sender:ChatTurnMember;bot:{uin?:ChatId;nickname?:string;pickGroup(id:ChatId|undefined):ChatGroup};message?:import('./chatEvent.js').MessageSegment[];isMaster?:boolean;sessionId?:string;_turnId?:string;_triggerContext?:{mode?:string;[key:string]:unknown};_progressReplyState?:{sent:boolean;reserved:boolean};_receivedAt?:number;_groupContextAssets?:GroupAssets;reply_id?:unknown;getReply?():Promise<QuotedMessage|null>;_prefilterKind?:string;forceGrabRedBag?:boolean;_mergedMessageCount?:number;_quotedPromptContext?:{text?:string;messageId?:unknown}}
 export interface QuotedMessage {message?:unknown;[key:string]:unknown}
 export interface GroupMediaReference {source?:string;type?:string;origin?:string}
 export interface GroupAssets {images:{source:string;origin?:string}[];currentImages:unknown[];quotedImages:unknown[];forwardImages:unknown[];videos:(string|GroupMediaReference)[];media?:GroupMediaReference[];files?:unknown[];replyTargetUserId?:ChatId;replyTargetLabel?:string;currentForwardText?:string;quotedForwardText?:string}
@@ -16,11 +17,11 @@ export interface ChatTrace {id:string;setTrigger(mode:string|undefined,context:u
 export interface ChatArbiter {wrapEvent(e:ChatTurnEvent):ChatTurnEvent;beginToolOutcomes():void;enqueue(kind:string,send:()=>Promise<unknown>):unknown;settle(outcomes:{toolName:string;success:boolean}[]):void;resolveToolOutcomes():void}
 export interface ChatTurnMessage extends ExecutionMessage {messageId?:unknown;userId?:unknown;contextSection?:string}
 export interface ChatTurnSession extends Omit<ExecutionSession,'groupContextAssets'|'memberMap'|'turnTrace'|'outboundArbiter'|'groupUserMessages'> {
- __createdAt?:number;__lastActiveAt?:number;actionOutcomes?:unknown[];context?:unknown;taskContext?:{messageId?:unknown};groupContextAssets?:GroupAssets;recentUserImage?:{image:string};recentImageContinuation?:{image:string};memberMap?:Map<number,ChatTurnMember>|null;
+ __createdAt?:number;__lastActiveAt?:number;personaSnapshot?:PersonaSnapshot;actionOutcomes?:unknown[];context?:unknown;taskContext?:{messageId?:unknown};groupContextAssets?:GroupAssets;recentUserImage?:{image:string};recentImageContinuation?:{image:string};memberMap?:Map<number,ChatTurnMember>|null;
  avatarInspection?:AvatarAssets;turnDrawRequested?:boolean;modelIntentDecision?:{intent:string;confidence?:number}|null;addresseeSignal?:unknown;promptLayerProfile?:{profile:string};promptLayerReport?:unknown;
  historySelectionMode?:string;selectedGroupHistoryCount?:number;groupUserMessages:ChatTurnMessage[];cardPresentation?:string;initialExecutionRoute?:{mode:string;reason:string};cardAcknowledged?:boolean;responseAttempted?:boolean;turnTrace?:ChatTrace;outboundArbiter?:ChatArbiter;
 }
-export interface ChatTurnConfig extends ExecutionConfig {enabled?:boolean;concurrentLimit?:number;triggerPrefixes?:string[];turnTrace?:{archiveEnabled?:boolean;archiveDir?:string;retentionDays?:number};memorySystem?:{enabled?:boolean;knowledgeDecisionInlineWaitMs?:number};persona?:{name?:string};identityBindings?:IdentityBinding[];episodicMemory?:{enabled?:boolean;recallDays?:number;proactiveEnabled?:boolean};systemContent?:string;groupHistory?:boolean;agentIntelligence?:{enabled?:boolean;[key:string]:unknown}}
+export interface ChatTurnConfig extends ExecutionConfig {personaGuard?:PersonaGuardConfig;enabled?:boolean;concurrentLimit?:number;triggerPrefixes?:string[];turnTrace?:{archiveEnabled?:boolean;archiveDir?:string;retentionDays?:number};memorySystem?:{enabled?:boolean;knowledgeDecisionInlineWaitMs?:number};persona?:{name?:string};identityBindings?:IdentityBinding[];episodicMemory?:{enabled?:boolean;recallDays?:number;proactiveEnabled?:boolean};systemContent?:string;groupHistory?:boolean;agentIntelligence?:{enabled?:boolean;[key:string]:unknown}}
 export interface GroupMemoryCommit {status:string;knowledgeEntries?:KnowledgeEntry[];workflowRules?:WorkflowRule[];aliasMappings?:Record<string,unknown>[]}
 export interface ChatModelResponse {choices?:{message?:ExecutionMessage}[];error?:unknown;usage?:{total_tokens?:number}}
 export interface ChatToolDecision {tools:ToolDefinition[];toolCall:ToolCall;toolName:string;reason?:string}
@@ -34,12 +35,12 @@ export interface ChatTurnHost {
  handleActiveDrawStatusQuestion(e:ChatTurnEvent,text:string):Promise<boolean>;buildMessageContent(sender:ChatTurnMember,args:string,images:string[],atQq:ChatId[],group?:ChatGroup,event?:ChatTurnEvent):Promise<string>;
  resolvePrimaryModelIntent(text:string,options:{hasImages:boolean}):Promise<{intent:string;confidence?:number}|null>;
  getSmartState(groupId:ChatId|undefined,event:ChatTurnEvent):{lastBotReplyToUserId?:ChatId|null}|null;
- getPersonaFor(e:ChatTurnEvent):{name?:string;[key:string]:unknown};getChatConfig(e:ChatTurnEvent):ChatTurnConfig;
+ getPersonaFor(e:ChatTurnEvent):{name?:string;[key:string]:unknown};getPersonaSnapshotFor?(e:ChatTurnEvent):PersonaSnapshot;getChatConfig(e:ChatTurnEvent):ChatTurnConfig;
  memoryManager:{interpretGroupKnowledgeInstruction(context:unknown):Promise<GroupMemoryCommit>;commitGroupMemoryDecision(groupId:ChatId,decision:GroupMemoryCommit,context:Record<string,unknown>):Promise<GroupMemoryCommit>;seedFromConfig(groupId:ChatId,bindings:IdentityBinding[]):Promise<unknown>};
  emotionManager:unknown;expressionLearner:unknown;knowledgeSearcher:unknown;
  getCurrentGroupContext(e:ChatTurnEvent):Promise<{groupId?:ChatId;groupName?:string;groupNotice?:unknown}>;getBasicGroupContext(e:ChatTurnEvent):{groupId?:ChatId;groupName?:string;groupNotice?:unknown};
  buildMergedDirectTriggerPrompt(e:ChatTurnEvent):string;
- messageManager:{getMessages(type:string|undefined,id:ChatId|undefined):Promise<{message_id?:unknown;source?:string;content?:string;at?:unknown;time?:unknown;sender:{user_id?:ChatId|undefined;nickname?:string|undefined;role?:string|undefined}}[]>};
+ messageManager:{getMessages(type:string|undefined,id:ChatId|undefined):Promise<{message_id?:unknown;source?:string;personaSource?:PersonaScope;content?:string;at?:unknown;time?:unknown;sender:{user_id?:ChatId|undefined;nickname?:string|undefined;role?:string|undefined}}[]>};
  getTaskStatus(groupId:ChatId|undefined,messageId:unknown):Promise<unknown>;formatTaskStatusForPrompt(status:unknown):string;
  getTurnActionFacts?(event:ChatTurnEvent,query:ActionFactsQuery):Promise<TurnActionFacts>;
  resolveUnderstandingPrompt(context:unknown):Promise<string>;trimMessageHistory(messages:ChatTurnMessage[]):ChatTurnMessage[];filterChatByQQ(messages:ChatTurnMessage[],userId:ChatId|undefined):ChatTurnMessage[];
@@ -54,7 +55,7 @@ export interface ChatTurnHost {
 export interface ChatTurnRoute {warn?:string;aborted?:string;toolChoice:ToolChoice;forcedToolCall:ToolCall|null;toolScopeLocked:boolean;toolDecision?:SemanticDecision|null;applied:string[]}
 export interface ChatTurnPorts {
  logger:{info(message:string,meta?:unknown):void;warn(message:string):void;error(message:string,error?:unknown):void;debug(message:string):void};
- botIdentity(e:ChatTurnEvent):{uin:ChatId;nickname:string};cacheGroupName(groupId:ChatId,name:string):Promise<void>;loadTurnContinuity(context:{groupId:ChatId|undefined;userId:ChatId|undefined;botId:ChatId}):Promise<{botId?:string;lastReply?:string;intent?:string;tools?:unknown[]}|null>;
+ botIdentity(e:ChatTurnEvent):{uin:ChatId;nickname:string};cacheGroupName(groupId:ChatId,name:string):Promise<void>;loadTurnContinuity(context:{groupId:ChatId|undefined;userId:ChatId|undefined;botId:ChatId;persona?:PersonaIdentity}):Promise<{botId?:string;persona?:PersonaIdentity;lastReply?:string;intent?:string;tools?:unknown[]}|null>;
  resolveConversationContext(e:ChatTurnEvent):unknown;collectThinking(session:ChatTurnSession,message:ExecutionMessage,e:ChatTurnEvent):void;sendThinkingForward(host:ChatTurnHost,e:ChatTurnEvent,session:ChatTurnSession):Promise<unknown>;
  globalStyleLearnerManager:unknown;personProfileInjector:unknown;personaFeedbackManager:unknown;getMidtermMemoryManager():unknown;
  formatGroupKnowledgeTeachingPrompt(entries:unknown[]):string;formatGroupWorkflowTeachingPrompt(entries:unknown[]):string;
@@ -65,7 +66,7 @@ export interface ChatTurnPorts {
  isAiConversationEnabled(config:ChatTurnConfig):boolean;evaluatePrivateChatGate(options:unknown):{allowed:boolean;reason:string};
  buildDrawFailureNoteMessage(note:unknown):string;recordDrawTextFallback(groupId:ChatId|undefined,text:string):void;takeDrawFailureNote(groupId:ChatId|undefined):unknown;
  prepareImageEditAssets(options:unknown):AvatarAssets|null;resolveAvatarEditBase(options:unknown):AvatarAssets|null;
- classifyEmojiToolExposure(text:string):string;buildEpisodicPrompt(episodes:unknown):string;buildUserCallbackPrompt(episodes:unknown,options:unknown):string;hasTemporalDeixis(text:string):boolean;recallEpisodes(options:unknown):unknown;recallUserEpisodes(options:unknown):unknown;
+ classifyEmojiToolExposure(text:string):string;buildEpisodicPrompt(episodes:unknown,options?:{viewer?:PersonaSnapshot}):string;buildUserCallbackPrompt(episodes:unknown,options:unknown):string;hasTemporalDeixis(text:string):boolean;recallEpisodes(options:unknown):unknown;recallUserEpisodes(options:unknown):unknown;
  buildExcelToolParams(text:string,options:unknown):unknown;hasExcelWorkbookContext(options:unknown):boolean;shouldUseExcelWorkbookTool(text:string,options:unknown):boolean;TakeImages(e:ChatTurnEvent):Promise<string[]>;
  formatGroupContextImagePrompt(images:GroupAssets['images']):string;resolveGroupContextAssets(options:unknown):Promise<GroupAssets>;
  getGroupSocialPrompt(groupId:ChatId|undefined):string;getGroupTopicPrompt(groupId:ChatId|undefined):string;buildImageFailureReply(error:string):string;

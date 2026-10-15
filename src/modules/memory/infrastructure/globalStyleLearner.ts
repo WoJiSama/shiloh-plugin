@@ -18,9 +18,9 @@ interface MemoryAiConfig {memoryAiUrl?:string;memoryAiApikey?:string;memoryAiMod
 interface Scene {key:string;descriptor:string;patterns:string[]}
 interface Signal {at:string;groupId:string;essence:string[];dross:string[];hash?:string;sequence?:boolean}
 interface Sample extends Signal {text:string}
-interface SemanticSample {hash:string;embedding:number[];patterns:string[];sceneKey:string;scene:string;source:string;weight:number;feedbackTags:string[];sequence:boolean;at:string;usedCount?:number;lastUsedAt?:string}
-interface RawSample {hash?:string;scene?:Scene|null;text?:string;patterns?:string[];source?:string;weight?:number;feedbackTags?:string[];sequence?:boolean;backfill?:boolean}
-interface NormalSample {hash:string;scene:Scene;patterns:string[];source:string;weight:number;feedbackTags:string[];sequence:boolean;backfill:boolean}
+interface SemanticSample {hash:string;embedding:number[];patterns:string[];sceneKey:string;scene:string;source:string;personaSource?:PersonaScope;weight:number;feedbackTags:string[];sequence:boolean;at:string;usedCount?:number;lastUsedAt?:string}
+interface RawSample {hash?:string;scene?:Scene|null;text?:string;patterns?:string[];source?:string;personaSource?:PersonaScope;weight?:number;feedbackTags?:string[];sequence?:boolean;backfill?:boolean}
+interface NormalSample {hash:string;scene:Scene;patterns:string[];source:string;personaSource?:PersonaScope;weight:number;feedbackTags:string[];sequence:boolean;backfill:boolean}
 interface RecentReply {at:number;groupHash:string;speakerHash:string;sceneKey:string;scene:string;replyStyle:string}
 interface Candidate {key:string;sceneKey:string;scene:string;replyStyle:string;strategy:string;positive:number;negative:number;speakers:string[];status:string;createdAt:string;lastSeenAt:string;shadowAt?:string;promotedAt?:string;demotedAt?:string}
 interface Rule {key:string;label:string;rule:string;confidence:number;reason:string;weight:number;createdAt:string;lastSeen:string}
@@ -39,7 +39,27 @@ function object(value:unknown):Record<string,unknown> { return value && typeof v
 
 import fs from "fs"
 import path from "path"
+import type { PersonaScope } from "../../../contracts/persona.js"
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
+
+function normalizePersonaSource(value:unknown):PersonaScope|undefined {
+  const row = object(value)
+  if (!["botId", "personaId", "personaVersion", "personaName"].every(key => typeof row[key] === "string" && String(row[key]).trim())) return undefined
+  return { botId:String(row.botId).trim(), personaId:String(row.personaId).trim(), personaVersion:String(row.personaVersion).trim(), personaName:String(row.personaName).trim() }
+}
+
+function personaSourceKey(source?:PersonaScope) {
+  const scope = normalizePersonaSource(source)
+  return scope ? JSON.stringify([scope.botId, scope.personaId, scope.personaVersion]) : "unattributed"
+}
+
+function canRecallStyleSample(sample:SemanticSample, source?:PersonaScope) {
+  if (sample.source !== "master_feedback") return true
+  // 人格反馈不是跨群公共观察。旧记录没有可靠归属时保留存档，不猜测它属于谁。
+  const origin = normalizePersonaSource(sample.personaSource)
+  const viewer = normalizePersonaSource(source)
+  return Boolean(origin && viewer && personaSourceKey(origin) === personaSourceKey(viewer))
+}
 
 
 const DEFAULT_CONFIG = {
@@ -453,7 +473,8 @@ function parsePersistedMemory(value: unknown): Memory {
   result.semanticSamples = rows(row.semanticSamples).flatMap(r=>{
     if (!Array.isArray(r.embedding) || !r.embedding.length || !r.embedding.every(x=>typeof x==='number' && Number.isFinite(x))) return []
     const embedding:number[] = r.embedding.filter((x):x is number=>typeof x==='number')
-    return [{hash:str(r.hash),embedding,patterns:strings(r.patterns),sceneKey:str(r.sceneKey),scene:str(r.scene),source:str(r.source),weight:num(r.weight,1),feedbackTags:strings(r.feedbackTags),sequence:r.sequence===true,at:str(r.at),usedCount:num(r.usedCount),lastUsedAt:str(r.lastUsedAt)}]
+    const personaSource = normalizePersonaSource(r.personaSource)
+    return [{hash:str(r.hash),embedding,patterns:strings(r.patterns),sceneKey:str(r.sceneKey),scene:str(r.scene),source:str(r.source),...(personaSource ? {personaSource} : {}),weight:num(r.weight,1),feedbackTags:strings(r.feedbackTags),sequence:r.sequence===true,at:str(r.at),usedCount:num(r.usedCount),lastUsedAt:str(r.lastUsedAt)}]
   })
   const stats=object(row.semanticStats)
   for(const key of ['queries','cacheHits','hits','misses','failures','timeouts','totalElapsedMs'] as const) result.semanticStats[key]=num(stats[key])
@@ -1035,11 +1056,18 @@ return class GlobalStyleLearnerManager {
     if (!scene?.key || !scene?.descriptor) return null
     const patterns = Array.isArray(sample.patterns) && sample.patterns.length ? sample.patterns : scene.patterns
     if (!patterns?.length) return null
+    const source = sample.source || "observation"
+    const personaSource = normalizePersonaSource(sample.personaSource)
+    const sampleHash = sample.hash || this.hashText(`scene:${scene.key}|${patterns.join("|")}|${source}`)
+    const hash = personaSource || source === "master_feedback"
+      ? this.hashText(JSON.stringify([source, personaSourceKey(personaSource), sampleHash]))
+      : sampleHash
     return {
-      hash: sample.hash || this.hashText(`scene:${scene.key}|${patterns.join("|")}|${sample.source || "observation"}`),
+      hash,
       scene,
       patterns: [...new Set(patterns.map(item => cleanText(item)).filter(Boolean))].slice(0, 4),
-      source: sample.source || "observation",
+      source,
+      ...(personaSource ? {personaSource} : {}),
       weight: Math.max(1, Number(sample.weight) || 1),
       feedbackTags: Array.isArray(sample.feedbackTags) ? sample.feedbackTags.slice(0, 6) : [],
       sequence: Boolean(sample.sequence),
@@ -1151,6 +1179,7 @@ return class GlobalStyleLearnerManager {
         sceneKey: sample.scene.key,
         scene: sample.scene.descriptor,
         source: sample.source,
+        ...(sample.personaSource ? {personaSource:sample.personaSource} : {}),
         weight: sample.weight,
         feedbackTags: sample.feedbackTags,
         sequence: Boolean(sample.sequence),
@@ -1162,7 +1191,7 @@ return class GlobalStyleLearnerManager {
     this.scheduleFlush(cfg)
   }
 
-  observePersonaFeedback(record:{tags?:string[];botReply?:string} = {}, config: ConfigInput = {}, embeddingConfig: EmbeddingConfig = {}) {
+  observePersonaFeedback(record:{tags?:string[];botReply?:string;source?:PersonaScope} = {}, config: ConfigInput = {}, embeddingConfig: EmbeddingConfig = {}) {
     const cfg = normalizeConfig(config)
     const tags = [...new Set((record.tags || []).filter(tag => FEEDBACK_STYLE_RULES[tag]))]
     if (!tags.length || !record.botReply) return false
@@ -1178,6 +1207,7 @@ return class GlobalStyleLearnerManager {
       },
       patterns,
       source: "master_feedback",
+      ...(record.source ? { personaSource:record.source } : {}),
       weight: cfg.semanticFeedbackWeight,
       feedbackTags: tags
     }, cfg, embeddingConfig)
@@ -1328,20 +1358,22 @@ return class GlobalStyleLearnerManager {
     }
   }
 
-  async buildRelevantPrompt(config: ConfigInput = {}, { query = "", embeddingConfig = {} }: {query?:string;embeddingConfig?:EmbeddingConfig} = {}):Promise<string> {
+  async buildRelevantPrompt(config: ConfigInput = {}, { query = "", embeddingConfig = {}, source }: {query?:string;embeddingConfig?:EmbeddingConfig;source?:PersonaScope} = {}):Promise<string> {
     const cfg = normalizeConfig(config)
     const memory = this.readMemory(cfg)
     const startedAt = Date.now()
     if (!cfg.enabled || !cfg.promptInjectionEnabled || !this.canUseSemanticRecall(cfg, embeddingConfig)) return ""
     this.prepareSemanticMemory(memory, cfg)
-    const candidates = (memory.semanticSamples || []).filter(item => Array.isArray(item.embedding) && Array.isArray(item.patterns) && item.patterns.length && item.sceneKey)
+    const viewer = normalizePersonaSource(source)
+    const candidates = (memory.semanticSamples || []).filter(item => Array.isArray(item.embedding) && Array.isArray(item.patterns) && item.patterns.length && item.sceneKey && canRecallStyleSample(item, viewer))
     if (candidates.length < cfg.semanticMinSamples) {
       this.recordSemanticRecall(memory, cfg, { outcome: "warming", elapsedMs: Date.now() - startedAt })
       return ""
     }
     const queryScene = deriveStyleScene(query)
     if (!queryScene) return ""
-    const cacheKey = `${embeddingConfig.embeddingApiModel || "text-embedding-3-small"}:${queryScene.key}`
+    const candidateRevision = this.hashText(JSON.stringify(candidates.map(item => [item.hash, item.weight, item.patterns]).sort((left, right) => String(left[0]).localeCompare(String(right[0])))))
+    const cacheKey = JSON.stringify([this.getSemanticProviderKey(embeddingConfig), personaSourceKey(viewer), queryScene.key, candidateRevision, cfg.semanticPromptExamples, cfg.semanticSimilarityThreshold, cfg.semanticMinMargin])
     const cached = this.semanticQueryCache.get(cacheKey)
     if (cached && cached.expiresAt > Date.now()) {
       this.recordSemanticRecall(memory, cfg, { ...cached.metrics, outcome: cached.prompt ? "hit" : "miss", cacheHit: true, elapsedMs: Date.now() - startedAt, scene: queryScene.key })

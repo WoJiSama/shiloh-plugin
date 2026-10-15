@@ -162,6 +162,8 @@ const {createTurnPlan,deriveTurnPlanRequest,formatTurnPlanLog}=await load('modul
 const {mergeDeepConfig}=await load('modules/config/infrastructure/configStore.js');
 const {decodeHostConfig}=await load('modules/host/infrastructure/hostConfig.js');
 const {createPersonaLibrary}=await load('modules/conversation/infrastructure/personaLibrary.js');
+const snapshotModule=path.join(pluginRoot,'dist/backend/modules/conversation/infrastructure/personaSnapshot.js');
+const createSnapshot=fs.existsSync(snapshotModule)?(await import(pathToFileURL(snapshotModule))).createPersonaSnapshot:null;
 const {createPersonaFeedbackModule}=await load('modules/memory/infrastructure/personaFeedbackManager.js');
 const {isToneCorrectionMessage}=await load('modules/conversation/application/chatFailureReply.js');
 const {createMessageFormatting}=await load('modules/conversation/application/messageFormatting.js');
@@ -197,8 +199,11 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
   const currentPersona=structuredClone(initialScenario.personaOverride || persona);
   const replayTime=at=>new Date(at).toLocaleString("zh-CN",{timeZone:"Asia/Shanghai",hour12:false});
   const initialTime=Date.parse('2026-01-01T04:00:00Z');
+  const snapshotOptions={botId:99,personaId:identity.id||'default',persona:currentPersona,systemContent:fixtureConfig.systemContent||'',...(fixtureConfig.personaGuard?{personaGuard:fixtureConfig.personaGuard}:{})};
+  const currentSnapshot=()=>createSnapshot?.(snapshotOptions);
   const history=(initialScenario.recentContext||[]).map((message,index)=>({
     message_id:message.messageId||`history-${fixtureId}-${index}`,time:replayTime(initialTime-((initialScenario.recentContext||[]).length-index)*30000),content:message.content,
+    ...(message.role==='assistant'&&currentSnapshot()?{source:'send',personaSource:currentSnapshot()}:{}),
     sender:{user_id:Number(message.userId||(message.role==='assistant'?'99':'202')),nickname:message.role==='assistant'?currentPersona.name:(message.name||'测试群友'),role:'member'}
   }));
   const groupId = 900000 + ++fixtureId
@@ -245,7 +250,8 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
     handleActiveDrawStatusQuestion: async () => false,
     buildMessageContent: async (_sender, args, images) => `[2026-01-01 12:00:00] 测试群友(qq号:202)[群身份:member]: 在群里说: ${args}${images.length ? '\n[图片素材引用]' : ''}${scenario.quote ? `\n[回复 ${scenario.quote.name} 的消息: ${scenario.quote.text}]` : ''}`,
     resolvePrimaryModelIntent: async () => { captures.intentCalls++; return null },
-    getSmartState: () => ({}), getPersonaFor: () => currentPersona, getChatConfig() { return this.config },
+    getSmartState: () => ({}), getPersonaFor: e => e?._personaSnapshot?.persona || currentPersona, getChatConfig() { return this.config },
+    ...(createSnapshot?{getPersonaSnapshotFor:currentSnapshot}:{}),
     getCurrentGroupContext: async () => ({groupId, groupName: '脱敏回放群'}), getBasicGroupContext: () => ({groupId, groupName: '脱敏回放群'}),
     buildMergedDirectTriggerPrompt: () => '',
     messageManager: {getMessages: async () => history.slice().reverse(), recordMessage: async record => captures.archived.push(record)},
@@ -335,11 +341,11 @@ function fixture(initialScenario, {confirmed = true, directToBot = false} = {}) 
       const sentStart=captures.sent.length;
       const handled=await api.handleToolInner(host,event);
       history.push({message_id:event.message_id,time:replayTime(initialTime+turnIndex*30000),content:turn.rawUserText,sender:{user_id:event.user_id,nickname:event.sender.nickname,role:'member'}});
-      if(confirmed&&captures.sent.length>sentStart)history.push({message_id:`reply-${groupId}-${turnIndex}`,time:replayTime(initialTime+turnIndex*30000),content:captures.sent.slice(sentStart).join('\n'),sender:{user_id:99,nickname:currentPersona.name,role:'member'}});
+      if(confirmed&&captures.sent.length>sentStart)history.push({message_id:`reply-${groupId}-${turnIndex}`,time:replayTime(initialTime+turnIndex*30000),content:captures.sent.slice(sentStart).join('\n'),source:'send',...(session.personaSnapshot?{personaSource:session.personaSnapshot}:{}),sender:{user_id:99,nickname:currentPersona.name,role:'member'}});
       return handled;
     },
-    seedContinuity: (record = scenario.continuity) => record ? recordTurnContinuity({...record, groupId, userId: 202, redis}) : Promise.resolve(),
-    readContinuity: (botId = '99') => loadTurnContinuity({groupId, userId: 202, botId, redis})}
+    seedContinuity: (record = scenario.continuity) => record ? recordTurnContinuity({...record, groupId, userId: 202, redis,...(currentSnapshot()?{persona:currentSnapshot()}:{})}) : Promise.resolve(),
+    readContinuity: (botId = '99') => loadTurnContinuity({groupId, userId: 202, botId, redis,...(session.personaSnapshot?{persona:session.personaSnapshot}:{})})}
 }
 
 

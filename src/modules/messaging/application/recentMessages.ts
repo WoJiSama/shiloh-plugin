@@ -1,6 +1,19 @@
 import { resolveMessageCacheTtlSeconds } from '../domain/messageCacheTtl.js'
 import { safeTruncateUnicode } from '../../models/domain/unicodeText.js'
 import type { RecentMessagePorts, RecentOptions, Segment, Sender, MessageEvent, StoredMessage } from '../../../contracts/recentMessages.js'
+import type { PersonaScope } from '../../../contracts/persona.js'
+
+function parsePersonaSource(value: unknown, source: unknown, senderId: unknown): PersonaScope | null {
+ if (source !== 'send' || !value || typeof value !== 'object' || Array.isArray(value)) return null
+ const item = value as Record<string, unknown>
+ const fields = ['botId', 'personaId', 'personaVersion', 'personaName'] as const
+ if (!fields.every(field => typeof item[field] === 'string' && item[field].trim())) return null
+ if (typeof senderId !== 'string' && typeof senderId !== 'number') return null
+ if (item.botId !== String(senderId)) return null
+ // Persist provenance only, never the snapshot's prompts or raw configuration.
+ return {botId: item.botId as string, personaId: item.personaId as string, personaVersion: item.personaVersion as string, personaName: item.personaName as string}
+}
+
 function parseStoredMessages(value: unknown): StoredMessage[] {
  if (!Array.isArray(value)) throw new Error('消息历史格式无效')
  const object = (item: unknown): Record<string, unknown> | null => item !== null && typeof item === 'object' && !Array.isArray(item) ? item as Record<string,unknown> : null
@@ -10,7 +23,9 @@ function parseStoredMessages(value: unknown): StoredMessage[] {
   for (const field of ['nickname','card','role','title','identity']) if (sender[field] !== undefined && typeof sender[field] !== 'string') throw new Error('消息历史发送者格式无效')
   if (sender.user_id !== undefined && typeof sender.user_id !== 'number' && typeof sender.user_id !== 'string') throw new Error('消息历史发送者格式无效')
   if (item.group_name !== undefined && item.group_name !== null && typeof item.group_name !== 'string') throw new Error('消息历史群名称格式无效')
-  return item as StoredMessage
+  const personaSource = parsePersonaSource(item.personaSource, item.source, sender.user_id)
+  const {personaSource: _unverifiedSource, ...record} = item
+  return {...record, ...(personaSource ? {personaSource} : {})} as StoredMessage
  })
 }
 
@@ -372,6 +387,7 @@ return class MessageManager {
   async formatMessage(message: MessageEvent & {sender: Sender}, options: RecentOptions = {}) {
     const isGroup = message.message_type === 'group';
     const isBot = message.sender.user_id === botIdentity.uin;
+    const personaSource = parsePersonaSource(message.personaSource, message.source, message.sender.user_id);
     const enrichedMessage = Array.isArray(options.preEnrichedMessage)
       ? options.preEnrichedMessage
       : await enrichDouyinMessageSegments(
@@ -399,6 +415,7 @@ return class MessageManager {
       ...(message.self_id !== undefined ? { self_id: message.self_id } : {}),
       message_type: message.message_type,
       source: message.source || null,
+      ...(personaSource ? {personaSource} : {}),
       group_id: isGroup ? message.group_id : null,
       group_name: isGroup ? message.group_name : null,
       message: enrichedMessage,

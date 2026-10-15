@@ -36,6 +36,8 @@ import {createConfigStore} from '../../config/infrastructure/configStore.js'
 import {mergeDeepConfig} from '../../config/infrastructure/configStore.js'
 import {classifyIntentWithModel} from '../../conversation/application/modelIntentClassifier.js'
 import {resolvePersonaName} from '../../conversation/domain/personaSource.js'
+import {createPersonaSnapshot} from '../../conversation/infrastructure/personaSnapshot.js'
+import type {PersonaSnapshot} from '../../../contracts/persona.js'
 import {createPersonaLibrary} from '../../conversation/infrastructure/personaLibrary.js'
 import {isCodeOrMarkdownRequest} from '../../conversation/domain/turnPresentation.js'
 import {isEducationalExplanationRequest} from '../../conversation/domain/turnPresentation.js'
@@ -969,6 +971,8 @@ class ExamplePlugin extends ports.Plugin {
   // 其次按 bot 账号默认(accountBindings),否则 message.yaml 默认
   getPersonaFor(e:unknown) {
     const event=modrinthRecord(e)
+    const snapshot = event._personaSnapshot as PersonaSnapshot | undefined
+    if (snapshot?.persona && snapshot.botId === String(event.self_id || modrinthRecord(event.bot).uin || '')) return snapshot.persona
     try {
       return this.personaLibrary?.resolve({
         messageType: String(event.message_type || ""),
@@ -981,10 +985,28 @@ class ExamplePlugin extends ports.Plugin {
   }
 
   // 按会话人设生成的配置视图:未绑定群直接复用全局配置对象(零开销),绑定群浅拷贝替换 persona
-  getChatConfig(e:unknown) {
+  getChatConfig(e:unknown): import('./hostConfig.js').HostConfig {
+    const snapshot = modrinthRecord(e)._personaSnapshot as PersonaSnapshot | undefined
+    if (snapshot) {
+      const {personaGuard: _liveGuard, ...config} = this.config
+      return {...config, persona: snapshot.persona, systemContent: snapshot.systemContent, ...(snapshot.personaGuard ? {personaGuard: snapshot.personaGuard} : {})}
+    }
     const persona = this.getPersonaFor(e)
     if (!persona || persona === this.config?.persona) return this.config
     return { ...this.config, persona }
+  }
+
+  getPersonaSnapshotFor(e:unknown): PersonaSnapshot {
+    const event = modrinthRecord(e)
+    const botId = String(event.self_id || modrinthRecord(event.bot).uin || '')
+    const resolved = this.personaLibrary?.resolve({messageType: String(event.message_type || ''), groupId: String(event.group_id || ''), selfId: botId})
+    return createPersonaSnapshot({
+      botId,
+      personaId: resolved?.id || 'default',
+      persona: resolved?.persona || this.config.persona || {},
+      systemContent: this.config.systemContent || '',
+      ...(this.config.personaGuard ? {personaGuard: this.config.personaGuard} : {})
+    })
   }
 
   mergeConfig(defaults:Record<string,unknown>, user:unknown) {

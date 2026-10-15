@@ -11,6 +11,7 @@ import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } 
 import { resolveSystemContentSource } from "../../conversation/domain/systemContentSource.js"
 import { summarizeForLog, formatMemberDisplayName } from "../../conversation/domain/messageContext.js"
 import { randomUUID } from "crypto"
+import {createPersonaSnapshot} from "../../conversation/infrastructure/personaSnapshot.js"
 
 // Only the quoted message's own text is eligible as a previous bot reply, not nested forwards.
 function quotedMessageText(reply: QuotedMessage | null): string {
@@ -52,6 +53,22 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     })
     if (scheduledToolRequest === false) return false
 
+    // Resolve once before the first asynchronous stage. Reusing an event for a
+    // later turn still captures its newly selected persona rather than its old snapshot.
+    const Bot = botIdentity(e)
+    const gateSnapshot = e._pendingPersonaSnapshot
+    delete e._pendingPersonaSnapshot
+    delete e._personaSnapshot
+    const personaSnapshot = (gateSnapshot?.botId === String(Bot.uin) ? gateSnapshot : undefined) ?? host.getPersonaSnapshotFor?.(e) ?? createPersonaSnapshot({
+      botId: Bot.uin,
+      persona: host.getPersonaFor(e),
+      systemContent: host.config.systemContent || '',
+      ...(host.config.personaGuard ? {personaGuard: host.config.personaGuard} : {})
+    })
+    e._personaSnapshot = personaSnapshot
+    const {personaGuard: _livePersonaGuard, ...baseTurnConfig} = host.config
+    const turnConfig = {...baseTurnConfig, persona: personaSnapshot.persona, systemContent: personaSnapshot.systemContent, ...(personaSnapshot.personaGuard ? {personaGuard: personaSnapshot.personaGuard} : {})}
+
     if (host.localToolsReadyPromise) await host.localToolsReadyPromise
     await host.refreshLocalToolRegistry({ silent: true })
     await host.waitForMCPReady()
@@ -60,7 +77,6 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     const handleToolStartAt = Date.now()
 
     const { group_id: groupId, user_id: userId, msg } = e
-    const Bot=botIdentity(e)
     const sessionId = randomUUID()
     e.sessionId = sessionId
     const session = host.getOrCreateSession(sessionId, isPrivateChat ? [] : host.tools)
@@ -70,6 +86,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     delete session.executionTools
     const conversationContext = resolveConversationContext(e)
     if (conversationContext) session.context = conversationContext
+    session.personaSnapshot = personaSnapshot
     session.taskContext = taskContext
     // 一个回合一条 trace + 一个出站仲裁：回合内所有出站消息过同一个有序队列
     const turnTrace = createTurnTrace({ groupId, userId, sessionId, logger, archive: { enabled: host.config?.turnTrace?.archiveEnabled !== false, dir: String(host.config?.turnTrace?.archiveDir || "") || resolveTurnTraceArchiveDir(), retentionDays: Number(host.config?.turnTrace?.retentionDays) || 7 } })
@@ -81,6 +98,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     session.outboundArbiter = outboundArbiter
     session.turnTrace = turnTrace
     e = outboundArbiter.wrapEvent(e)
+    e._personaSnapshot = personaSnapshot
     // Tool stages share one optional progress message for the whole turn.
     e._progressReplyState = { sent: false, reserved: false }
     const groupLimiter = getOrCreateGroupLimiter(host._groupLimiters, groupId, host.config.concurrentLimit || 5)
@@ -304,7 +322,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         // 上下文构建(连续性redis+消息体)不依赖意图模型结果:并行发起,
         // 意图模型慢时(最长6s超时)这段时间不再是纯串行等待
         const contextBuildPromise = (async () => {
-          const lastTurnContinuity = await loadTurnContinuity({ groupId, userId, botId: Bot.uin }).catch(() => null)
+          const lastTurnContinuity = await loadTurnContinuity({ groupId, userId, botId: Bot.uin, persona: personaSnapshot }).catch(() => null)
           const builtUserContent = await host.buildMessageContent(e.sender, args, images, atQq, e.group, e)
           return { lastTurnContinuity, builtUserContent }
         })()
@@ -328,7 +346,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         session.addresseeSignal = computeAddresseeSignal({
           e,
           botId: Bot.uin,
-          mentionsBotName: hasBotTextAnchor(String(e?.msg || ""), resolvePersonaName(host.getPersonaFor(e)) || Bot.nickname || "机器人", host.config.triggerPrefixes),
+          mentionsBotName: hasBotTextAnchor(String(e?.msg || ""), personaSnapshot.personaName || Bot.nickname || "机器人", host.config.triggerPrefixes),
           quotesBot: mainQuotesBot,
           sameUserAsLastReply: Boolean(smartStateForSignal?.lastBotReplyToUserId && String(userId) === String(smartStateForSignal.lastBotReplyToUserId)),
           prefilterKind: e?._prefilterKind || "regular"
@@ -370,6 +388,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const signal = session.addresseeSignal
         session.interactionContext = buildTurnInteractionContext({
           rawUserText: session.rawUserText,
+          persona: personaSnapshot,
           botId: Bot.uin,
           speaker: {userId, name: e.sender?.card || e.sender?.nickname},
           quote: {
@@ -470,7 +489,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const workflowTeachingPrompt = formatGroupWorkflowTeachingPrompt(savedWorkflowRules)
         const knowledgeTeachingPrompt = formatGroupKnowledgeTeachingPrompt(savedKnowledgeEntries)
         const selfBotId = String(Bot?.uin || e?.self_id || "")
-        const personaName = (typeof host.getPersonaFor === "function" ? host.getPersonaFor(e)?.name : "") || host.config?.persona?.name || ""
+        const personaName = personaSnapshot.personaName
         const memberLookupPrompt = formatMemberLookupPrompt(
           matchGroupMembersByTerms(memberMap, extractMemberLookupTerms(e.msg || args), userId, { selfBotId }),
           {
@@ -513,10 +532,11 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           : host.getBasicGroupContext(e)
         const cardRequestText = [args, msg, userContent].filter(Boolean).join("\n")
         // 调皮情绪时刻:同人格内偶发情绪着色,命中只影响本回合(掷骰+群级冷却)
-        const moodHit = session.interactionContext.allowPlayfulness ? rollPersonaMood(host.getPersonaFor(e), isPrivateChat ? `private:${userId}` : groupId) : null
+        const moodHit = session.interactionContext.allowPlayfulness ? rollPersonaMood(personaSnapshot.persona, isPrivateChat ? `private:${userId}` : groupId) : null
         if (moodHit) logger.info(`[心情时刻] group=${groupId} 命中「${moodHit.name}」(本回合生效)`)
         const promptLayers = await composeTurnPromptLayers({
-          config: host.getChatConfig(e),
+          personaSnapshot,
+          config: turnConfig,
           profile: session.promptLayerProfile,
           turn: {
             groupId,
@@ -524,7 +544,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             event: e,
             // 当前注入对象的 bot 身份:共享记忆"听X说的"标注与分账号情绪缓存键都依赖它
             viewerSelfId: String(e?.self_id || e?.bot?.uin || Bot.uin || ""),
-            viewerBotName: resolvePersonaName(host.getPersonaFor(e)),
+            viewerBotName: personaSnapshot.personaName,
             moodHint: moodHit,
             interactionContext: session.interactionContext,
             messageText: e.msg || args,
@@ -572,10 +592,11 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const episodicPrompt = host.config?.episodicMemory?.enabled !== false && hasTemporalDeixis(currentIntentText)
           ? buildEpisodicPrompt(recallEpisodes({
               groupId,
+              viewer: personaSnapshot,
               terms: extractChatKeywords(currentIntentText, 6),
               days: Number(host.config?.episodicMemory?.recallDays) || 7,
               limit: 5
-            }))
+            }), {viewer: personaSnapshot})
           : ""
         if (episodicPrompt) logger.info(`[情节回忆] group=${groupId} 命中时间指代，注入近期情节`)
         // 记忆回勾：闲聊档注入这位群友自己的旧情节（跨天），让她能自然想起旧账
@@ -585,10 +606,11 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           ? buildUserCallbackPrompt(recallUserEpisodes({
               groupId,
               userId: e.user_id,
+              viewer: personaSnapshot,
               days: Number(host.config?.episodicMemory?.recallDays) || 7,
               limit: 2,
               minAgeMs: 30 * 60 * 1000
-            }), { userName: e?.sender?.card || e?.sender?.nickname || "" })
+            }), { userName: e?.sender?.card || e?.sender?.nickname || "", viewer: personaSnapshot })
           : ""
         if (callbackPrompt) logger.info(`[记忆回勾] group=${groupId} user=${e?.user_id} 注入旧话题 ${callbackPrompt.length}c`)
         const enhancedPrompts = [promptLayers.prompt, addresseePrompt, turnContinuityPrompt, groupTopicPrompt, groupSocialPrompt, episodicPrompt, callbackPrompt].filter(Boolean).join('\n')
@@ -606,9 +628,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         }
 
         // 本回合生效人设:群绑定切换后,主提示词/风格覆盖/名字全部随之变化
-        const chatPersona = host.getPersonaFor(e)
+        const chatPersona = personaSnapshot.persona
         const systemContent = buildMainSystemPrompt({
-          baseIdentity: renderPersonaTemplate(resolveSystemContentSource(host.config.systemContent).text, chatPersona),
+          baseIdentity: renderPersonaTemplate(resolveSystemContentSource(personaSnapshot.systemContent).text, chatPersona),
           personaOverride: buildPersonaStyleOverride(chatPersona),
           runtimeData,
           enhancedPrompts,
@@ -641,12 +663,21 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
                 }
                 return true
               })
-              .map(msg => ({
-                role: msg.sender.user_id === Bot.uin ? "assistant" : "user",
-                messageId: msg.message_id,
-                userId: msg.sender.user_id,
-                content: `[${msg.time}] ${formatMemberDisplayName(historyMemberMap?.get(Number(msg.sender.user_id)), msg.sender.nickname)}(QQ号:${msg.sender.user_id})[群身份: ${roleMap[msg.sender.role || ""] || "member"}]${msg.message_id ? `[消息ID:${msg.message_id}]` : ''}: ${msg.content}`
-              }))
+              .map(msg => {
+                const sameBot = String(msg.sender.user_id) === personaSnapshot.botId
+                const source = msg.personaSource
+                const samePersona = sameBot && source?.botId === personaSnapshot.botId && source.personaId === personaSnapshot.personaId && source.personaVersion === personaSnapshot.personaVersion
+                const attribution = sameBot && !samePersona
+                  ? source ? `[历史人格:${source.personaName}；与当前人格或版本不同，仅作群公开发言]` : '[历史机器人发言：人格来源未记录，不作为当前人格的自身经历]'
+                  : ''
+                const speakerName = source?.personaName || formatMemberDisplayName(historyMemberMap?.get(Number(msg.sender.user_id)), msg.sender.nickname)
+                return {
+                  role: samePersona ? "assistant" : "user",
+                  messageId: msg.message_id,
+                  userId: msg.sender.user_id,
+                  content: `[${msg.time}] ${speakerName}(QQ号:${msg.sender.user_id})[群身份: ${roleMap[msg.sender.role || ""] || "member"}]${msg.message_id ? `[消息ID:${msg.message_id}]` : ''}${attribution}: ${msg.content}`
+                }
+              })
             )
             // Task authority comes from the scoped, fresh actionFacts above.
             // Legacy history status keys have no bot/requester identity and
@@ -769,7 +800,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           modelIntent: modelIntentDecision?.intent,
           images, videos, groupId, userId,
           botName: Bot?.nickname || "",
-          config: host.getChatConfig(e),
+          config: turnConfig,
           memberMap,
           hasExcelContext, excelToolIntent, excelToolParams, hasPixivSearchSession,
           groupWorkflowPrompt: workflowPrompt,

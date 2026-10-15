@@ -1,17 +1,35 @@
+import type {PersonaIdentity} from '../../../contracts/persona.js'
+
 interface Store {get(key:string):Promise<unknown>;set(key:string,value:string,options:{EX:number}):Promise<unknown>}
-export interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number;botId?:string}
-interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number;botId?:string|number}
+export interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number;botId?:string;persona?:PersonaIdentity}
+interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number;botId?:string|number;persona?:PersonaIdentity}
+
+function parsePersona(value: unknown): PersonaIdentity | null {
+  if (!value || typeof value !== 'object') return null
+  const identity = value as Record<string, unknown>
+  if (typeof identity.personaId !== 'string' || !identity.personaId.trim()
+    || typeof identity.personaVersion !== 'string' || !identity.personaVersion.trim()
+    || typeof identity.personaName !== 'string') return null
+  return {personaId: identity.personaId, personaVersion: identity.personaVersion, personaName: identity.personaName}
+}
+
 function parseRecord(value:unknown):Continuity|null {
  if(!value||typeof value!=='object')return null
  const r=value as Record<string,unknown>
  if(typeof r.at!=='number'||!Number.isFinite(r.at))return null
- return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply:typeof r.lastReply==='string'?r.lastReply:'',at:r.at,...(typeof r.botId==='string'?{botId:r.botId}:{})}
+ const persona = r.persona === undefined ? undefined : parsePersona(r.persona)
+ if(persona === null)return null
+ return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply:typeof r.lastReply==='string'?r.lastReply:'',at:r.at,...(typeof r.botId==='string'?{botId:r.botId}:{}),...(persona ? {persona} : {})}
 }
 const TURN_CONTINUITY_TTL_MS = 10 * 60 * 1000
 const KEY_PREFIX = "blchat:turn_continuity:"
+const PERSONA_KEY_PREFIX = "blchat:turn_continuity_v2:"
 const memoryFallback = new Map<string,Continuity>()
 
-function scopeKey(groupId:string|number = "", userId:string|number = "", botId?:string|number) {
+function scopeKey(groupId:string|number = "", userId:string|number = "", botId?:string|number, persona?:PersonaIdentity) {
+  // A separate namespace prevents legacy writers from overwriting scoped records.
+  // Tuple encoding keeps separators in group/user/persona identifiers unambiguous.
+  if (persona) return `${PERSONA_KEY_PREFIX}${JSON.stringify([String(groupId), String(userId), botId === undefined ? null : String(botId), persona.personaId, persona.personaVersion])}`
   return `${KEY_PREFIX}${groupId}:${userId}${botId === undefined ? "" : `:${String(botId)}`}`
 }
 
@@ -29,21 +47,25 @@ export async function recordTurnContinuity({
   groupId = "",
   userId = "",
   botId,
+  persona,
   intent = "",
   route = "",
   tools = [],
   lastReply = "",
   at = Date.now()
 }:Scope & {intent?:string;route?:string;tools?:unknown[];lastReply?:string;at?:number} = {}) {
+  const identity = persona === undefined ? undefined : parsePersona(persona)
+  if (identity === null) throw new TypeError('Turn continuity requires a valid persona identity and version')
   const record = {
     intent: String(intent || "").slice(0, 40),
     route: String(route || "").slice(0, 20),
     tools: (Array.isArray(tools) ? tools : []).map(item => String(item || "").slice(0, 60)).slice(0, 6),
     lastReply: String(lastReply || "").slice(0, 240),
     at,
-    ...(botId === undefined ? {} : { botId: String(botId) })
+    ...(botId === undefined ? {} : { botId: String(botId) }),
+    ...(identity ? {persona: identity} : {})
   }
-  const key = scopeKey(groupId, userId, botId)
+  const key = scopeKey(groupId, userId, botId, identity)
   memoryFallback.set(key, record)
   const store = isRedisLike(client) ? client : null
   if (!store) return record
@@ -55,8 +77,10 @@ export async function recordTurnContinuity({
   return record
 }
 
-export async function loadTurnContinuity({ redis:client = null, groupId = "", userId = "", botId }:Scope = {}) {
-  const key = scopeKey(groupId, userId, botId)
+export async function loadTurnContinuity({ redis:client = null, groupId = "", userId = "", botId, persona }:Scope = {}) {
+  const identity = persona === undefined ? undefined : parsePersona(persona)
+  if (identity === null) return null
+  const key = scopeKey(groupId, userId, botId, identity)
   let record:Continuity|null = null
   const store = isRedisLike(client) ? client : null
   if (store) {
@@ -68,8 +92,12 @@ export async function loadTurnContinuity({ redis:client = null, groupId = "", us
     }
   }
   if (!record) record = memoryFallback.get(key) || null
-  // 带 bot 身份的调用只读取该 bot 自己的记录，不借用旧的无来源摘要。
-  if (botId !== undefined && record?.botId !== String(botId)) return null
+  // A persona-scoped turn never borrows legacy speech or another revision's stance.
+  // Legacy callers likewise cannot interpret scoped records as their own history.
+  if (record?.botId !== (botId === undefined ? undefined : String(botId))) return null
+  if (identity
+    ? record?.persona?.personaId !== identity.personaId || record.persona.personaVersion !== identity.personaVersion
+    : record?.persona !== undefined) return null
   if (!record || Number.isFinite(record.at) !== true || Date.now() - Number(record.at) > TURN_CONTINUITY_TTL_MS) return null
   return record
 }

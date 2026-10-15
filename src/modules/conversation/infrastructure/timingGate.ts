@@ -4,11 +4,13 @@ import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from '../../mo
 import { hasBotTextAnchor, getReplySender, messageQuotesUser } from '../domain/messageContext.js'
 import { getMentionTargetId, messageMentionsUser } from '../domain/mentionTargets.js'
 import {buildPersonaParticipationPrompt, type PersonaText} from '../domain/personaSource.js'
+import {createPersonaSnapshot} from './personaSnapshot.js'
+import type {PersonaGuardConfig, PersonaSnapshot} from '../../../contracts/persona.js'
 interface AttentionHook {word:string;count:number}
 export interface TimingGateHost {
- config:{smartTrigger?:{gateContextSize?:number;promptHintBusyGroupRate?:number;promptHintRateLimitWarn?:number;attentionDrift?:{enabled?:boolean;windowMinutes?:number;level?:string}};triggerPrefixes?:unknown[];
+ config:{systemContent?:string;personaGuard?:PersonaGuardConfig;smartTrigger?:{gateContextSize?:number;promptHintBusyGroupRate?:number;promptHintRateLimitWarn?:number;attentionDrift?:{enabled?:boolean;windowMinutes?:number;level?:string}};triggerPrefixes?:unknown[];
  trackAiConfig?:{trackAiUrl?:string;trackAiModel?:string;trackAiApikey?:string}};
- getPersonaFor(e:ConversationEvent):PersonaText|null;messageManager:{formatMessageHistory(kind:'group',id:string|number,size:number):Promise<string>};computeGroupMsgRate5min(state:ConversationState):number
+ getPersonaSnapshotFor?(e:ConversationEvent):PersonaSnapshot;getPersonaFor(e:ConversationEvent):PersonaText|null;messageManager:{formatMessageHistory(kind:'group',id:string|number,size:number):Promise<string>};computeGroupMsgRate5min(state:ConversationState):number
 }
 export interface TimingGatePorts {
  logger:{warn(message:string):void};bot():{uin?:string|number;nickname?:string};now?():number;sideLLMCall?:typeof sideLLMCall;
@@ -39,7 +41,13 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
     const smartCfg = host.config.smartTrigger || {}
     const ctxSize = Math.max(5, Math.min(100, Number(smartCfg.gateContextSize) || 20))
     // 账号人设名优先:门控判定与提示词必须用本账号的名字,不能拿主号昵称串台
-    const botName = resolvePersonaName(host.getPersonaFor(e)) || ports.bot().nickname || '机器人'
+    const personaSnapshot = host.getPersonaSnapshotFor?.(e) ?? createPersonaSnapshot({
+      botId: e.self_id || e.bot?.uin || ports.bot().uin || '',
+      persona: host.getPersonaFor(e) as {name?:string;[key:string]:unknown} || {},
+      systemContent: host.config.systemContent || '',
+      ...(host.config.personaGuard ? {personaGuard:host.config.personaGuard} : {})
+    })
+    const botName = resolvePersonaName(personaSnapshot.persona) || ports.bot().nickname || '机器人'
 
     let history = ''
     try {
@@ -124,9 +132,9 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
 
     const gatePersonaTone = buildPersonaTonePrompt({
       userText: currentText,
-      persona: host.getPersonaFor(e)
+      persona: personaSnapshot.persona
     })
-    const participationPrompt = buildPersonaParticipationPrompt(host.getPersonaFor(e) || {})
+    const participationPrompt = buildPersonaParticipationPrompt(personaSnapshot.persona)
     const systemPrompt = `你是 QQ 群聊节奏判断助手。机器人名字叫"${botName}"。
 当前北京时间：${new Date(now()).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
 你需要判断 ${botName} 是否应该现在插话、保持沉默、或稍后再说。
@@ -221,6 +229,7 @@ ${specialSignalsBlock}
       }
       return {
         decision: dec,
+        ...(dec === 'continue' ? {personaSnapshot} : {}),
         wait_seconds: Number(parsed.wait_seconds) || 5,
         reason: String(parsed.reason || '').slice(0, 80)
       }

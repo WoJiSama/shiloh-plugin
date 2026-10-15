@@ -13,6 +13,7 @@ import {buildImageFailureReply} from '../../image/domain/imageFailurePolicy.js'
 import {applyImageAspectRatioToConfigs,describeImageAspectRatioIntent,resolveImageAspectRatioIntent,type ImageAspectRatioIntent} from '../../image/domain/imageAspectRatio.js'
 import {generateContextualProgressReply} from '../../conversation/application/contextualProgressReply.js'
 import {reserveProgressReply} from '../../conversation/domain/progressReplyBudget.js'
+import {withPersonaSnapshot} from '../../conversation/domain/personaSnapshotConfig.js'
 import {parseDrawOptions,parseDrawEvent,parseDrawRecord} from './bananaDecoders.js'
 import type {TurnTaskFact} from '../../../contracts/turnActionFacts.js'
 import {normalizeDeliveryReceipt} from '../../messaging/domain/deliveryReceipt.js'
@@ -787,6 +788,8 @@ export class BananaTool extends AbstractTool {
   }
 
   async sendProgress(e:DrawEvent, {config={},opts={},hasReferenceImages=false,signal}:{config?:Record<string,unknown>;opts?:DrawOptions;hasReferenceImages?:boolean;signal?:AbortSignal}={}) {
+    const progressConfig = withPersonaSnapshot(config, e);
+    const hasPersonaSnapshot = Boolean(e._personaSnapshot);
     const reservation = reserveProgressReply(e);
     if (!reservation) return false;
     try {
@@ -796,7 +799,7 @@ export class BananaTool extends AbstractTool {
       }
       const progress = this.resolveProgressContext(opts, hasReferenceImages);
       const message = await this.progressReplyFactory({
-        config,
+        config: progressConfig,
         ...progress,
         userText: e?.msg || e?.raw_message || opts?.prompt || "生成一张图片",
         ...(opts.progressText?{suggestedText:opts.progressText}:{}),
@@ -808,9 +811,9 @@ export class BananaTool extends AbstractTool {
         reservation.release();
         return false;
       }
-      const guardedMessage = this.ports.guardReply(message, this.ports.getBridge()?.config?.personaGuard, {
+      const guardedMessage = this.ports.guardReply(message, hasPersonaSnapshot ? progressConfig.personaGuard : this.ports.getBridge()?.config?.personaGuard, {
         userText: e?.msg || "",
-        botNames: [e?.bot?.nickname, this.ports.getBridge()?.getPersonaFor?.(e)?.name ?? this.ports.getBridge()?.config?.persona?.name]
+        botNames: hasPersonaSnapshot ? [progressConfig.persona?.name] : [e?.bot?.nickname, this.ports.getBridge()?.getPersonaFor?.(e)?.name ?? this.ports.getBridge()?.config?.persona?.name]
       });
       if (!guardedMessage) {
         reservation.release();

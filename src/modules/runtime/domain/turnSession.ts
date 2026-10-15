@@ -1,10 +1,12 @@
 import type { ConversationContext } from '../../../contracts/conversation.js'
+import type {PersonaSnapshot} from '../../../contracts/persona.js'
 import type { TurnInteractionContext } from '../../../contracts/turnInteraction.js'
 import type { SemanticDecision, ToolDefinition } from '../../../contracts/toolExecution.js'
 
 /** Legacy payloads remain opaque until their owning domain is migrated. No arbitrary fields. */
 export interface TurnSession {
   context?: ConversationContext
+  personaSnapshot?: PersonaSnapshot
   tools?: unknown[]
   groupUserMessages?: unknown[]
   actionOutcomes?: unknown[]
@@ -83,6 +85,7 @@ export const TURN_SESSION_MAX = 300
 // 字段注册表:登记 = 承认这个字段存在并注明归属。新字段先来这里加一行。
 export const TURN_SESSION_FIELDS = [
   { name: "context", owner: "已校验的机器人/群聊/私聊身份;不保存原始平台事件" },
+  { name: "personaSnapshot", owner: "回合开始时冻结的人设及版本;生成/出口/记忆共用,热切换只影响下一轮" },
   { name: "tools", owner: "回合可用工具集;创建时注入,updateToolsList 全量刷新" },
   { name: "groupUserMessages", owner: "本回合注入的群聊历史消息" },
   { name: "actionOutcomes", owner: "本轮已确认的动作产出(recordActionOutcomes)" },

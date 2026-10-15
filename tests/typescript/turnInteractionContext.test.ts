@@ -97,6 +97,47 @@ test('only verified continuity from this bot supplies a previous stance', () => 
   assert.equal(legacy.previousBotReply, undefined)
 })
 
+test('the previous stance belongs to this persona revision as well as this bot', () => {
+  const persona = {personaId: 'first', personaVersion: 'v2', personaName: '甲'}
+  const verified = buildTurnInteractionContext({rawUserText: '然后呢', botId: '99', speaker, persona,
+    continuity: {botId: '99', persona: {...persona}, lastReply: '当前人格的新立场。'}})
+  assert.deepEqual(verified.previousBotReply, {text: '当前人格的新立场。', source: 'verified_continuity'})
+  for (const previous of [undefined, {...persona, personaId: 'second'}, {...persona, personaVersion: 'v1'}]) {
+    const context = buildTurnInteractionContext({rawUserText: '然后呢', botId: '99', speaker, persona,
+      continuity: {botId: '99', persona: previous, lastReply: '不属于当前人格版本的旧立场。'}})
+    assert.equal(context.previousBotReply, undefined)
+  }
+  const unscoped = buildTurnInteractionContext({rawUserText: '然后呢', botId: '99', speaker,
+    continuity: {botId: '99', persona, lastReply: '有明确人格来源的回复。'}})
+  assert.equal(unscoped.previousBotReply, undefined, 'legacy callers cannot adopt a scoped stance without naming its persona')
+})
+
+test('a same-account quote with unknown or old persona provenance remains attributed evidence', () => {
+  const persona = {personaId: 'current', personaVersion: 'v2', personaName: '当前人格'}
+  for (const quotedPersona of [undefined, {...persona, personaId: 'old'}, {...persona, personaVersion: 'v1'}]) {
+    const context = buildTurnInteractionContext({rawUserText: '你这句什么意思', botId: '99', speaker, persona,
+      quote: {userId: '99', persona: quotedPersona, text: '我是原来那个人格。', messageId: 'same-bot-old-persona'}})
+    assert.equal(context.target.kind, 'bot', 'the account attribution remains known')
+    assert.equal(context.previousBotReply, undefined, 'the account alone does not prove the current persona said it')
+    assert.ok(context.evidence.some(item => item.origin === 'quote' && item.speaker?.userId === '99' && item.text === '我是原来那个人格。'))
+    const prompt = buildTurnInteractionPrompt(context)
+    assert.match(prompt, /引用只证明标注账号说过这些话/)
+    assert.doesNotMatch(prompt, /你确实说过的上句/)
+  }
+  const verified = buildTurnInteractionContext({rawUserText: '你这句什么意思', botId: '99', speaker, persona,
+    quote: {userId: '99', persona: {...persona}, text: '这是当前人格自己的原话。'}})
+  assert.deepEqual(verified.previousBotReply, {text: '这是当前人格自己的原话。', source: 'quote'})
+})
+
+test('a quote from a prior persona does not replace the current persona verified stance', () => {
+  const persona = {personaId: 'current', personaVersion: 'v2', personaName: '当前人格'}
+  const context = buildTurnInteractionContext({rawUserText: '那你现在怎么看', botId: '99', speaker, persona,
+    quote: {userId: '99', persona: {...persona, personaVersion: 'v1'}, text: '旧版本原话。'},
+    continuity: {botId: '99', persona, lastReply: '新版本已确认的上句。'}})
+  assert.deepEqual(context.previousBotReply, {text: '新版本已确认的上句。', source: 'verified_continuity'})
+  assert.ok(context.evidence.some(item => item.origin === 'quote' && item.text === '旧版本原话。'))
+})
+
 test('unavailable media only removes that evidence, leaving readable conversation and a specific gap', () => {
   const context = buildTurnInteractionContext({rawUserText: '我刚吃完，你们在说什么吃法？', botId: '99', speaker,
     quote: {userId: '202', text: '他们聊的是吃饭。'},

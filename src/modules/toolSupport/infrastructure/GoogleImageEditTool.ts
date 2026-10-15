@@ -6,6 +6,7 @@ import {extractImageResult} from '../../image/domain/imageResult.js';
 import {generateImageEditWithFallbacks} from '../../image/application/legacyImageGeneration.js';
 import {matchesImageProvider,normalizeImageProviderParameter,resolveRequestedImageProvider,resolveImageEditConfigs,selectImageConfigsByProvider,shouldRetryWithoutUrlResponseFormat,toImageEditUrl} from '../../image/domain/providerConfig.js';
 import {reserveProgressReply} from '../../conversation/domain/progressReplyBudget.js';
+import {withPersonaSnapshot} from '../../conversation/domain/personaSnapshotConfig.js';
 import type {DrawEvent,DrawOptions,DrawRedis,DrawBot,DrawId} from '../../../contracts/bananaTool.js';
 import type {DrawBridge} from '../../../contracts/bananaTool.js';
 import type {TurnTaskFact} from '../../../contracts/turnActionFacts.js';
@@ -532,13 +533,14 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
     logWarn(...args:unknown[]){ports.logger.warn(...args);}
     logError(...args:unknown[]){ports.logger.warn(...args);}
     async sendProgress(e:DrawEvent, { config = {}, opts = {}, signal }:{config?:Record<string,unknown>;opts?:DrawOptions;signal?:AbortSignal} = {}) {
+        const progressConfig = withPersonaSnapshot(config, e);
         if (!e?.reply || signal?.aborted) return false;
         const reservation = reserveProgressReply(e);
         if (!reservation) return false;
         let deliveryAttempted=false;
         try {
             const text = await this.progressReplyFactory({
-                config,
+                config: progressConfig,
                 taskType: "图片编辑",
                 taskMode: "image_edit",
                 
@@ -553,9 +555,9 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
                 reservation.release();
                 return false;
             }
-            const guardedText = ports.guardReply(text, config?.personaGuard, {
+            const guardedText = ports.guardReply(text, progressConfig.personaGuard, {
                 userText: e?.msg || e?.raw_message || opts?.prompt || "",
-                botNames: [record(config.persona).name]
+                botNames: [progressConfig.persona?.name]
             });
             if (!guardedText) {
                 reservation.release();

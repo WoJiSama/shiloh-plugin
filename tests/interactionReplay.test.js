@@ -3,6 +3,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import {createPersonaSnapshot} from '../dist/backend/modules/conversation/infrastructure/personaSnapshot.js'
+import {createPersonaLibrary} from '../dist/backend/modules/conversation/infrastructure/personaLibrary.js'
+import {createChatPlugin} from '../dist/backend/modules/host/infrastructure/chatPlugin.js'
+import {resolveConversationContext} from '../dist/backend/adapters/conversationContext.js'
+import * as episodic from '../dist/backend/modules/memory/infrastructure/episodicMemory.js'
 import {createChatTurn} from '../dist/backend/modules/tools/infrastructure/chatTurn.js'
 import {createTurnPromptComposer} from '../dist/backend/modules/conversation/infrastructure/turnPromptComposer.js'
 import {buildMainSystemPrompt} from '../dist/backend/modules/conversation/domain/systemPromptTemplate.js'
@@ -15,11 +22,12 @@ import {planTextReplyMessages} from '../dist/backend/modules/conversation/domain
 import {createTurnPlan, deriveTurnPlanRequest, formatTurnPlanLog} from '../dist/backend/modules/conversation/infrastructure/turnPlan.js'
 import {buildChatRequestData} from '../dist/backend/modules/models/domain/modelGateway.js'
 import {modelExecutor} from './helpers/modelExecutor.js'
+import {createOutboundArbiter} from '../dist/backend/modules/messaging/application/outboundArbiter.js'
 
 const scenarios = JSON.parse(fs.readFileSync(new URL('./fixtures/interactionReplayScenarios.json', import.meta.url), 'utf8'))
 let fixtureId = 0
 
-function fixture(scenario, {confirmed = true, directToBot = false, realPlanning = false, gatewayConfig, optionalEmoji = false} = {}) {
+function fixture(scenario, {confirmed = true, directToBot = false, realPlanning = false, gatewayConfig, optionalEmoji = false, episodeBaseDir} = {}) {
   const groupId = 900000 + ++fixtureId
   const captures = {compose: [], guards: [], requests: [], planInputs: [], gatewayRequests: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0}
   const logger = {info() {}, warn() {}, debug() {}, error(message, error) { captures.errors.push({message, error}) }}
@@ -49,7 +57,7 @@ function fixture(scenario, {confirmed = true, directToBot = false, realPlanning 
     buildGenericChatFailureReply: () => '未取得结果。', extractModrinthForwardItems: () => [], stripModrinthForwardMarkers: text => text,
     applyOutputPersonaGuards: (text, options) => { captures.guards.push(options); return guards.applyOutputPersonaGuards(text, options) },
     findRecentBotImage: async () => null,
-    recordEpisode: options => captures.episodes.push(options),
+    recordEpisode: options => { captures.episodes.push(options); if (episodeBaseDir) return episodic.recordEpisode({...options,baseDir:episodeBaseDir}) },
     recordTurnContinuity: async options => { captures.writes.push(options); return recordTurnContinuity({...options, redis}) },
     getActiveConversation: () => undefined, trackingKey: e => `${e.self_id}:${e.group_id}:${e.user_id}`,
     rememberPersonaReply() {}, rememberStyleReply() {}
@@ -127,8 +135,9 @@ function fixture(scenario, {confirmed = true, directToBot = false, realPlanning 
   const api = createChatTurn(ports)
   return {api, ports, host, event, session, captures,
     run: () => api.handleToolInner(host, event),
-    seedContinuity: (record = scenario.continuity) => record ? recordTurnContinuity({...record, groupId, userId: 202, redis}) : Promise.resolve(),
-    readContinuity: (botId = '99') => loadTurnContinuity({groupId, userId: 202, botId, redis})}
+    seedContinuity: (record = scenario.continuity) => record ? recordTurnContinuity({...record, groupId, userId: 202, redis,
+      persona: createPersonaSnapshot({botId: event.self_id, persona: host.getPersonaFor(event), systemContent: host.config.systemContent || '', ...(host.config.personaGuard ? {personaGuard:host.config.personaGuard} : {})})}) : Promise.resolve(),
+    readContinuity: (botId = '99') => loadTurnContinuity({groupId, userId: 202, botId, redis, ...(session.personaSnapshot ? {persona:session.personaSnapshot} : {})})}
 }
 
 test('an explicit chat decision survives an in-flight registry refresh and never executes native or embedded calls', async () => {
@@ -269,7 +278,8 @@ for (const scenario of scenarios) {
     }
     if (scenario.id === 'serious-cooling-fault') {
       assert.equal(context.allowPlayfulness, false)
-      assert.equal(context.previousBotReply.text, scenario.quote.text)
+      assert.equal(context.previousBotReply, undefined, 'a same-account quote without persona provenance remains evidence')
+      assert.ok(context.evidence.some(item => item.origin === 'quote' && item.text === scenario.quote.text))
       assert.match(system, /当前需要认真回答/)
     }
     if (scenario.id === 'delivery-second-beat') {
@@ -533,4 +543,197 @@ test('old or untimed physical observations do not authorize current power state 
   assert.equal(context.incident.status,'asserted');assert.equal(context.power,'unknown')
   assert.ok(context.unmetPrerequisites.includes('power_isolated'));assert.ok(context.unmetPrerequisites.includes('cooled'))
  }
+})
+
+function useRealPersonaLibrary(f, t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'persona-turn-replay-'))
+  t.after(() => fs.rmSync(dir,{recursive:true,force:true}))
+  const {ExamplePlugin} = createChatPlugin({Plugin:class {},shared:{},logger:{}})
+  const host = f.host
+  host.personaLibrary = createPersonaLibrary({libraryPath:path.join(dir,'personas.yaml'),getBasePersona:()=>host.config.persona})
+  for (const method of ['getPersonaFor','getPersonaSnapshotFor','getChatConfig']) host[method] = ExamplePlugin.prototype[method]
+  return {library:host.personaLibrary,dir}
+}
+
+test('in-flight persona switch keeps prompt, guard, archive and memory on one snapshot; next turn adopts the new persona', async t => {
+  const scenario = {rawUserText:'今天想聊点什么？',modelReply:'聊聊刚才那件事吧。'}
+  const f = fixture(scenario)
+  const {library} = useRealPersonaLibrary(f,t)
+  const first = library.upsert({name:'甲',identity:'冷静克制',tone:'简练',speechStyle:['短句'],notes:'甲的设定'})
+  const second = library.upsert({name:'乙',identity:'热情好奇',tone:'轻快',notes:'乙的设定'})
+  library.setGroupBinding(f.event.group_id,first.id)
+  f.host.config.systemContent = '原自定义 {personaName}'
+  f.host.config.personaGuard = {enabled:true,badPatterns:['甲的规则']}
+  let snapshot
+  f.host.refreshLocalToolRegistry = async () => {
+    snapshot = f.event._personaSnapshot
+    library.setGroupBinding(f.event.group_id,second.id)
+    f.host.config.systemContent = '新自定义 {personaName}'
+    f.host.config.personaGuard = {enabled:false,badPatterns:['乙的规则']}
+  }
+  let moods = []
+  const api = createChatTurn({...f.ports,resolveConversationContext,createOutboundArbiter,rollPersonaMood:persona => {moods.push(persona);return null}})
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.deepEqual(f.captures.errors,[])
+  assert.equal(f.session.personaSnapshot,snapshot)
+  assert.equal(f.session.context.persona.personaId,first.id)
+  assert.equal(f.captures.compose[0].personaSnapshot,snapshot)
+  assert.equal(moods[0],snapshot.persona)
+  const system = f.captures.requests[0].find(message => message.role === 'system').content
+  assert.match(system,/原自定义 甲/)
+  assert.match(system,/冷静克制/)
+  assert.doesNotMatch(system,/新自定义|乙的设定|热情好奇/)
+  assert.deepEqual(f.captures.guards[0].personaGuard,{enabled:true,badPatterns:['甲的规则']})
+  assert.equal(f.captures.archived[0].sender.nickname,'甲')
+  assert.equal(f.captures.archived[0].personaSource,snapshot)
+  assert.equal(f.captures.episodes[0].source,snapshot)
+  assert.equal(f.captures.writes[0].persona,snapshot)
+  assert.equal(f.captures.enhanced[0][3],snapshot)
+  f.host.refreshLocalToolRegistry = async () => {}
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.equal(f.session.personaSnapshot.personaId,second.id)
+  assert.equal(f.session.interactionContext.previousBotReply,undefined)
+  const nextSystem = f.captures.requests[1].find(message => message.role === 'system').content
+  assert.match(nextSystem,/新自定义 乙/)
+  assert.match(nextSystem,/热情好奇/)
+  assert.doesNotMatch(nextSystem,/甲的设定|原自定义/)
+  assert.equal(f.captures.archived[1].sender.nickname,'乙')
+})
+
+test('real episode writes feed later turns with bot and persona ownership while public words remain shared', async t => {
+  const baseDir = fs.mkdtempSync(path.join(os.tmpdir(),'persona-episode-replay-'))
+  t.after(() => fs.rmSync(baseDir,{recursive:true,force:true}))
+  const scenario = {rawUserText:'上次说的考试安排还记得吗？',modelReply:'记着你提过考试。'}
+  const f = fixture(scenario,{episodeBaseDir:baseDir})
+  const {library} = useRealPersonaLibrary(f,t)
+  const first = library.upsert({name:'甲',tone:'简练'})
+  const second = library.upsert({name:'乙',tone:'活泼'})
+  library.setGroupBinding(f.event.group_id,first.id)
+  const api = createChatTurn({...f.ports,resolveConversationContext,createOutboundArbiter,
+    hasTemporalDeixis:episodic.hasTemporalDeixis,
+    recallEpisodes:options => episodic.recallEpisodes({...options,baseDir}),
+    buildEpisodicPrompt:episodic.buildEpisodicPrompt,
+    recallUserEpisodes:options => episodic.recallUserEpisodes({...options,baseDir}),
+    buildUserCallbackPrompt:episodic.buildUserCallbackPrompt
+  })
+  f.host.messageManager.getMessages = async () => f.captures.archived.map((row,index) => ({
+    message_id:`prior-${index}`,source:'send',time:row.time,sender:row.sender,personaSource:row.personaSource,content:row.message[0].text
+  })).reverse()
+  const systems = () => f.captures.requests.map(messages => messages.find(item => item.role === 'system').content)
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  const original = f.session.personaSnapshot
+  assert.ok(fs.existsSync(path.join(baseDir,`${f.event.group_id}.ndjson`)))
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.match(systems()[1],/你回了/)
+  assert.equal(f.session.interactionContext.previousBotReply.text,scenario.modelReply)
+  assert.ok(f.captures.requests[1].some(item => item.role === 'assistant' && item.content.includes(scenario.modelReply)))
+
+  library.setGroupBinding(f.event.group_id,second.id)
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.equal(f.session.interactionContext.previousBotReply,undefined)
+  assert.ok(systems()[2].includes(scenario.rawUserText),'public user words remain available')
+  assert.ok(systems()[2].includes('甲'),'other persona is explicitly named')
+  assert.doesNotMatch(systems()[2],/你回了|你当时回/)
+  assert.ok(!f.captures.requests[2].some(item => item.role === 'assistant'))
+  assert.ok(f.captures.requests[2].some(item => item.role === 'user' && item.content.includes('[历史人格:甲')))
+
+  f.event.self_id = 303
+  f.event.bot = {...f.event.bot,uin:303,nickname:'另一只机器人'}
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.doesNotMatch(systems()[3],/你回了|你当时回/)
+  assert.equal(f.session.interactionContext.previousBotReply,undefined)
+
+  f.event.self_id = 99
+  f.event.bot = {...f.event.bot,uin:99,nickname:'测试机器人'}
+  library.setGroupBinding(f.event.group_id,first.id)
+  library.upsert({name:'甲',tone:'修改后的语气'})
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.equal(f.session.personaSnapshot.personaId,original.personaId)
+  assert.notEqual(f.session.personaSnapshot.personaVersion,original.personaVersion)
+  assert.equal(f.session.interactionContext.previousBotReply,undefined)
+  assert.doesNotMatch(systems()[4],/你回了|你当时回/)
+  assert.deepEqual(f.captures.errors,[])
+  assert.equal(f.captures.mainCalls,5,'source handling adds no model request')
+})
+
+test('legacy same-account history remains named public evidence rather than this persona assistant history', async () => {
+  const f = fixture({rawUserText:'上次说什么来着？',modelReply:'你在问之前那段聊天。'})
+  f.host.messageManager.getMessages = async () => [{message_id:'legacy',time:'昨日',source:'send',sender:{user_id:99,nickname:'旧称呼'},content:'旧人格说过的话'}]
+  assert.equal(await f.run(),true)
+  assert.deepEqual(f.captures.errors,[])
+  const history = f.captures.requests[0].find(item => item.content?.includes('旧人格说过的话'))
+  assert.equal(history.role,'user')
+  assert.match(history.content,/人格来源未记录/)
+  assert.equal(f.session.interactionContext.previousBotReply,undefined)
+})
+
+test('TimingGate captures one persona across its awaits and hands the same snapshot to the main turn', async t => {
+  const {createTimingGate} = await import('../dist/backend/modules/conversation/infrastructure/timingGate.js')
+  const f = fixture({rawUserText:'甲，你怎么看？',modelReply:'先把刚才那点说清楚。'})
+  const {library} = useRealPersonaLibrary(f,t)
+  const a = library.upsert({name:'甲',identity:'冷静',preferences:['甲的偏好']})
+  const b = library.upsert({name:'乙',identity:'活泼',preferences:['乙的偏好']})
+  library.setGroupBinding(f.event.group_id,a.id)
+  f.host.config.trackAiConfig = {trackAiUrl:'https://gate.invalid/v1',trackAiModel:'fixture',trackAiApikey:'fixture-key'}
+  let system
+  f.host.computeGroupMsgRate5min = () => 0
+  f.host.messageManager.formatMessageHistory = async () => {
+    library.setGroupBinding(f.event.group_id,b.id)
+    return '群友正在讨论。'
+  }
+  const gate = createTimingGate({logger:{warn(){}},bot:()=>f.event.bot,resolvePersonaName:p=>p.name,
+    computeAddresseeSignal:()=>({groupAddressed:false,targetKind:'bot',pronounWithoutBotAnchor:false}),
+    buildPersonaTonePrompt:({persona})=>`人格态度:${persona.identity}`,getGroupTopicPrompt:()=>'',getGroupSocialPrompt:()=>'',detectAttentionHook:()=>null,
+    sideLLMCall:async input => {system = input.messages[0].content;return {ok:true,content:'{"decision":"continue","reason":"direct"}'}}
+  })
+  const result = await gate.runTimingGate(f.host,f.event,{})
+  assert.equal(result.decision,'continue')
+  assert.match(system,/甲的偏好/)
+  assert.match(system,/人格态度:冷静/)
+  assert.doesNotMatch(system,/乙的偏好|人格态度:活泼/)
+  assert.equal(result.personaSnapshot.personaId,a.id)
+  f.event._pendingPersonaSnapshot = result.personaSnapshot
+  assert.equal(await f.run(),true)
+  assert.equal(f.session.personaSnapshot,result.personaSnapshot)
+  assert.equal(f.event._pendingPersonaSnapshot,undefined,'the gate handoff is consumed once')
+  assert.equal(await f.run(),true)
+  assert.equal(f.session.personaSnapshot.personaId,b.id,'a separate later turn captures current persona')
+  assert.deepEqual(f.captures.errors,[])
+})
+
+test('outbound wrapper owns its persona even when the original event is reused during a tool stage', async t => {
+  const f = fixture({rawUserText:'聊聊刚才那个梗。',modelReply:'我接着刚才说。'})
+  const {library} = useRealPersonaLibrary(f,t)
+  const a = library.upsert({name:'甲',tone:'简练'})
+  const b = library.upsert({name:'乙',tone:'活泼'})
+  library.setGroupBinding(f.event.group_id,a.id)
+  let understandingCalls = 0
+  f.host.resolveUnderstandingPrompt = async ({e}) => {
+    understandingCalls++
+    const original = e._personaSnapshot
+    library.setGroupBinding(f.event.group_id,b.id)
+    f.event._personaSnapshot = f.host.getPersonaSnapshotFor(f.event)
+    assert.equal(e._personaSnapshot,original)
+    assert.equal(f.host.getPersonaFor(e).name,'甲')
+    return ''
+  }
+  const api = createChatTurn({...f.ports,createOutboundArbiter,resolvePromptLayerProfile:()=>({profile:'task'})})
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.equal(understandingCalls,1,'the awaited tool-stage hook actually runs')
+  assert.deepEqual(f.captures.errors,[])
+  assert.equal(f.captures.archived[0].sender.nickname,'甲')
+})
+
+test('a guard enabled during Gate handoff cannot enter a turn whose snapshot has no guard', async t => {
+  const f = fixture({rawUserText:'接着聊聊。',modelReply:'接着刚才说。'})
+  useRealPersonaLibrary(f,t)
+  const snapshot = f.host.getPersonaSnapshotFor(f.event)
+  assert.equal(snapshot.personaGuard,undefined)
+  f.host.config.personaGuard = {enabled:true,badPatterns:['新规则']}
+  f.event._pendingPersonaSnapshot = snapshot
+  assert.equal(await f.run(),true)
+  assert.equal(f.captures.compose[0].config.personaGuard,undefined)
+  assert.equal(f.captures.guards[0].personaGuard,undefined)
+  assert.equal(f.session.personaSnapshot,snapshot)
+  assert.deepEqual(f.captures.errors,[])
 })

@@ -141,6 +141,97 @@ test("Redis failures retain only the matching bot's local continuity", async () 
   assert.equal(await loadTurnContinuity(scope), null)
 })
 
+test("persona continuity separates persona switches and revisions even when an old turn writes late", async () => {
+  const records = new Map()
+  let releaseOldWrite
+  const oldWritePending = new Promise(resolve => { releaseOldWrite = resolve })
+  const redisLike = {
+    get: async key => records.get(key) || null,
+    set: async (key, value) => {
+      if (JSON.parse(value).lastReply === "旧人格的在途回复") await oldWritePending
+      records.set(key, value)
+    }
+  }
+  const scope = {redis: redisLike, groupId: "persona-switch-group", userId: "persona-switch-user", botId: "99"}
+  const first = {personaId: "first", personaVersion: "v1", personaName: "甲"}
+  const second = {personaId: "second", personaVersion: "v1", personaName: "乙"}
+  const revised = {...first, personaVersion: "v2"}
+  const oldTurn = recordTurnContinuity({...scope, persona: first, lastReply: "旧人格的在途回复"})
+  await recordTurnContinuity({...scope, persona: second, lastReply: "乙自己的立场"})
+  await recordTurnContinuity({...scope, persona: revised, lastReply: "甲新版本的立场"})
+  releaseOldWrite()
+  await oldTurn
+
+  assert.equal((await loadTurnContinuity({...scope, persona: first})).lastReply, "旧人格的在途回复")
+  assert.equal((await loadTurnContinuity({...scope, persona: second})).lastReply, "乙自己的立场")
+  const current = await loadTurnContinuity({...scope, persona: revised})
+  assert.equal(current.lastReply, "甲新版本的立场")
+  assert.deepEqual(current.persona, revised)
+  assert.equal(current.botId, "99")
+  assert.equal(records.size, 3)
+  assert.equal(await loadTurnContinuity(scope), null, "旧API不借用新scope记录")
+})
+
+test("persona continuity has unambiguous group/private and identifier boundaries", async () => {
+  const records = new Map()
+  const redisLike = {get: async key => records.get(key) || null, set: async (key, value) => { records.set(key, value) }}
+  const persona = {personaId: "key-persona", personaVersion: "v1", personaName: "甲"}
+  const scopes = [
+    {groupId: "group:with", userId: "user", botId: "99", persona},
+    {groupId: "group", userId: "with:user", botId: "99", persona},
+    {userId: "group:with:user", botId: "99", persona},
+    {groupId: "group", userId: "user", botId: "99:with", persona},
+    {groupId: "group", userId: "user", botId: "99", persona: {...persona, personaId: "a:b", personaVersion: "c"}},
+    {groupId: "group", userId: "user", botId: "99", persona: {...persona, personaId: "a", personaVersion: "b:c"}}
+  ]
+  for (const [index, scope] of scopes.entries()) await recordTurnContinuity({...scope, redis: redisLike, lastReply: `独立回复 ${index}`})
+  assert.equal(records.size, scopes.length)
+  for (const [index, scope] of scopes.entries()) assert.equal((await loadTurnContinuity({...scope, redis: redisLike})).lastReply, `独立回复 ${index}`)
+  assert.ok([...records.keys()].every(key => key.startsWith("blchat:turn_continuity_v2:")))
+})
+
+test("persona continuity never adopts legacy or mismatched source identities", async () => {
+  const records = new Map()
+  const reads = []
+  const redisLike = {
+    get: async key => { reads.push(key); return records.get(key) || null },
+    set: async (key, value) => { records.set(key, value) }
+  }
+  const persona = {personaId: "verified-persona", personaVersion: "v1", personaName: "甲"}
+  const scope = {redis: redisLike, groupId: "persona-provenance-group", userId: "persona-provenance-user", botId: "99"}
+  await recordTurnContinuity({...scope, lastReply: "没有人格来源的旧回复"})
+  assert.equal(await loadTurnContinuity({...scope, persona}), null)
+  const scopedKey = reads.at(-1)
+  assert.ok(scopedKey.startsWith("blchat:turn_continuity_v2:"))
+  const base = {intent: "chat", route: "chat", tools: [], lastReply: "来源不匹配", at: Date.now(), botId: "99"}
+  for (const wrong of [
+    {...base},
+    {...base, persona, botId: "another-bot"},
+    {...base, persona: {...persona, personaId: "another-persona"}},
+    {...base, persona: {...persona, personaVersion: "v0"}}
+  ]) {
+    records.set(scopedKey, JSON.stringify(wrong))
+    assert.equal(await loadTurnContinuity({...scope, persona}), null)
+  }
+  const legacyKey = "blchat:turn_continuity:persona-provenance-group:persona-provenance-user:99"
+  records.set(legacyKey, JSON.stringify({...base, persona}))
+  assert.equal(await loadTurnContinuity(scope), null, "旧key中的新scope来源也不能被旧API读取")
+})
+
+test("persona-scoped local fallback preserves revisions and snapshots the supplied identity", async () => {
+  const redisLike = {get: async () => { throw new Error("offline") }, set: async () => { throw new Error("offline") }}
+  const scope = {redis: redisLike, userId: "persona-fallback-user", botId: "99"}
+  const mutable = {personaId: "fallback-persona", personaVersion: "v1", personaName: "甲"}
+  const original = {...mutable}
+  await recordTurnContinuity({...scope, persona: mutable, lastReply: "修改前的回复"})
+  mutable.personaVersion = "v2"
+  await recordTurnContinuity({...scope, persona: mutable, lastReply: "修改后的回复"})
+  assert.equal((await loadTurnContinuity({...scope, persona: original})).lastReply, "修改前的回复")
+  assert.equal((await loadTurnContinuity({...scope, persona: mutable})).lastReply, "修改后的回复")
+  assert.equal(await loadTurnContinuity({...scope, persona: {...mutable, personaId: "different"}}), null)
+  assert.equal(await loadTurnContinuity(scope), null)
+})
+
 test("gate and main path share the addressee signal module", () => {
   const src = readPluginSources()
   // gate 已拆到 apps/lib/timingGate.js(P 重构),两处必须 import 同一 addresseeSignals 模块
@@ -153,7 +244,9 @@ test("gate and main path share the addressee signal module", () => {
 
 test("turn continuity is injected next turn and recorded at turn end", () => {
   const src = readPluginSources()
-  assert.match(src, /loadTurnContinuity\(\{\s*groupId,\s*userId,\s*botId:\s*Bot\.uin\s*\}\)/, "下一轮只注入当前 bot 的上一轮摘要")
+  const load = src.match(/loadTurnContinuity\(\{([^}]+)\}\)/)?.[1] || ""
+  assert.match(load, /\bbotId:/, "下一轮只注入当前 bot 的上一轮摘要")
+  assert.match(load, /\bpersona:/, "下一轮按本轮人格版本加载上一轮摘要")
   assert.ok(src.includes("await recordTurnContinuity({"), "轮末记录延续摘要")
   assert.ok(src.includes("session.lastFinalReply = String(output || \"\").slice(0, 240)"), "最终回复节选入摘要")
 })
