@@ -4,6 +4,7 @@ import { createToolExecution } from '../dist/backend/modules/tools/infrastructur
 import { createSemanticToolIntent } from '../dist/backend/modules/tools/infrastructure/semanticToolIntent.js'
 import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
 import {buildDiagnosticContext} from '../dist/backend/modules/conversation/domain/diagnosticContext.js'
+import {createTurnSessionStore} from '../utils/turnSession.js'
 const logger={info(){},warn(){},error(){}}
 
 test('compiled executor dispatches MCP and retries local execution once',async()=>{
@@ -120,4 +121,83 @@ test('uncertain delivery errors are not retried by the shared tool executor',asy
  const api=createToolExecution({logger,mcpManager:{isMCPTool:()=>false}}),host={executeTool:(...args)=>api.executeTool(host,...args)}
  await assert.rejects(api.executeTool(host,{execute:async()=>{attempts++;throw Object.assign(Error('lost receipt'),{uncertain:true})}},{},{}),/lost receipt/)
  assert.equal(attempts,1)
+})
+
+function scopedExecutorFixture(tools) {
+  const executions = [], requests = [], sent = []
+  const controls = {afterExecute: async () => {}, responses: []}
+  const store = createTurnSessionStore()
+  const session = store.getOrCreate('in-flight', tools)
+  const executeNamed = async (name, params) => {
+    executions.push({name, params})
+    await controls.afterExecute(name, params)
+    return name === 'googleImageAnalysisTool' ? 'OCR：杭州地铁10月15日运行公告' : `${name}第${params.page || 1}页结果`
+  }
+  const api = createToolExecution({logger, resolveToolRoundLimit: () => 4, resolveEmojiTurnSkips: names => names.map(() => false),
+    mcpManager: {isMCPTool: name => name.startsWith('mcp_'), executeToolByAlias: executeNamed},
+    recordTurnPlanToolOutcome() {}, collectThinking() {}, formatTurnPlanLog: () => '', buildAgentProgressContext: () => '',
+    buildChatRequestData: (_config, messages, requestTools, choice) => {
+      const request = {messages, tools: requestTools, tool_choice: choice}
+      requests.push(structuredClone(request))
+      return request
+    }})
+  const host = {config: {}, toolInstances: Object.fromEntries(['googleImageAnalysisTool', 'searchInformationTool', 'unrelatedTool'].map(name => [name, {execute: params => executeNamed(name, params)}])),
+    getToolCallName: call => call.function.name, dedupeToolCalls: calls => calls, normalizeAssistantToolMessage: message => message,
+    shouldRunTerminalToolsInBackground: () => false, isDedupeTool: () => false,
+    serializeToolResult: value => String(value), isRawToolFailure: value => /^error:/i.test(value), isToolResultError: value => /^error:/i.test(value),
+    buildGroundedImageAnalysisPrompt: prompt => prompt || '读取图片', extractToolResultText: value => String(value),
+    buildForcedToolCall: (name, params) => ({id: `call-${executions.length}`, type: 'function', function: {name, arguments: JSON.stringify(params)}}),
+    retryRequest: async () => ({choices: [{message: controls.responses.shift() || {content: '已取得当前结果。'}}]}),
+    handleTextResponse: async text => sent.push(text), handleToolFailureResponse: async () => { throw Error('unexpected failure summary') }}
+  host.executeTool = (...args) => api.executeTool(host, ...args)
+  host.runToolCall = (...args) => api.runToolCall(host, ...args)
+  host.buildImageVerificationSearchToolCall = (...args) => api.buildImageVerificationSearchToolCall(host, ...args)
+  return {api, host, store, session, controls, executions, requests, sent}
+}
+const scopedDefinition = name => ({type: 'function', function: {name, parameters: {type: 'object', properties: {page: {type: 'integer'}}, required: ['page']}}})
+
+test('vision-to-search keeps its original authorized scope across a real registry refresh', async () => {
+  const initial = ['googleImageAnalysisTool', 'searchInformationTool'].map(scopedDefinition)
+  const f = scopedExecutorFixture(initial)
+  f.session.imageVerificationNeedsSearch = true
+  f.controls.afterExecute = async name => {
+    if (name === 'googleImageAnalysisTool') {
+      await Promise.resolve()
+      f.store.refreshTools([scopedDefinition('unrelatedTool')])
+    }
+  }
+  await f.api.processToolCalls(f.host, {tool_calls: [f.host.buildForcedToolCall('googleImageAnalysisTool', {images: ['fixture.png']})]}, {msg: '查一下这个消息是真的吗'}, f.session, [], [], undefined, {syntheticToolCall: true})
+  assert.deepEqual(f.executions.map(row => row.name), ['googleImageAnalysisTool', 'searchInformationTool'])
+  assert.match(f.executions[1].params.query, /OCR：杭州地铁10月15日运行公告/)
+  assert.equal(f.session.imageVerificationSearchDone, true)
+  assert.deepEqual(f.session.executionTools, initial)
+  assert.deepEqual(f.sent, ['已取得当前结果。'])
+  assert.deepEqual(f.requests[0].tools, [], 'synthetic calls summarize without another tool model round')
+})
+
+test('registry refresh cannot add auto-search to a vision-only execution', async () => {
+  const initial = [scopedDefinition('googleImageAnalysisTool')]
+  const f = scopedExecutorFixture(initial)
+  f.session.imageVerificationNeedsSearch = true
+  f.controls.afterExecute = async () => { await Promise.resolve(); f.store.refreshTools([...initial, scopedDefinition('searchInformationTool')]) }
+  await f.api.processToolCalls(f.host, {tool_calls: [f.host.buildForcedToolCall('googleImageAnalysisTool', {})]}, {msg: '这是什么'}, f.session, [], [], undefined, {syntheticToolCall: true})
+  assert.deepEqual(f.executions.map(row => row.name), ['googleImageAnalysisTool'])
+  assert.equal(f.session.imageVerificationSearchDone, undefined)
+  assert.deepEqual(f.session.executionTools, initial)
+  const denied = await f.api.runToolCall(f.host, f.host.buildForcedToolCall('searchInformationTool', {query: '新增动作'}), {}, f.session)
+  assert.match(denied.result, /not available in this session/)
+  assert.equal(f.executions.length, 1)
+})
+
+test('MCP native continuation keeps the original alias and schema while rejecting refreshed tools', async () => {
+  const mcp = scopedDefinition('mcp_fixture_pages')
+  mcp.function.parameters.properties.filter = {type: 'object', properties: {category: {type: 'string', enum: ['A', 'B']}}}
+  const f = scopedExecutorFixture([mcp])
+  f.controls.afterExecute = async () => { await Promise.resolve(); f.store.refreshTools([mcp, scopedDefinition('unrelatedTool')]) }
+  f.controls.responses = [{tool_calls: [f.host.buildForcedToolCall(mcp.function.name, {page: 2}), f.host.buildForcedToolCall('unrelatedTool', {})]}, {content: '两页结果已取得。'}]
+  await f.api.processToolCalls(f.host, {tool_calls: [f.host.buildForcedToolCall(mcp.function.name, {page: 1})]}, {}, f.session, [], [])
+  assert.deepEqual(f.executions.map(row => [row.name, row.params.page]), [[mcp.function.name, 1], [mcp.function.name, 2]])
+  assert.equal(f.requests.length, 2)
+  for (const request of f.requests) assert.deepEqual(request.tools, [mcp])
+  assert.deepEqual(f.sent, ['两页结果已取得。'])
 })

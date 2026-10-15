@@ -64,6 +64,10 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     const sessionId = randomUUID()
     e.sessionId = sessionId
     const session = host.getOrCreateSession(sessionId, isPrivateChat ? [] : host.tools)
+    const turnAvailableTools = [...(isPrivateChat ? [] : session.tools || [])]
+    session.tools = turnAvailableTools
+    session.toolDecision = null
+    delete session.executionTools
     const conversationContext = resolveConversationContext(e)
     if (conversationContext) session.context = conversationContext
     session.taskContext = taskContext
@@ -274,7 +278,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         // ── 意图判定前置（P4 主判定 + 闲聊快路）：必须在分层画像与 prompt 拼接之前 ──
         const currentIntentText = joinIntentParts(args, msg)
         session.turnDrawRequested = isImageGenerationRequest(currentIntentText)
-        const intentToolCandidates = selectToolIntentCandidates(currentIntentText, (session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name)))
+        const intentToolCandidates = selectToolIntentCandidates(currentIntentText, turnAvailableTools.map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name)))
         let skipIntentModel = shouldSkipIntentModel({
           text: currentIntentText,
           hasImages: Boolean(images?.length),
@@ -282,7 +286,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           toolCandidates: intentToolCandidates
         })
         let modelIntentDecision = null
-        const availableToolNamesNow = (host.toolInstances ? Object.keys(host.toolInstances) : [])
+        const availableToolNamesNow = turnAvailableTools.map(tool => tool.function?.name).filter((name):name is string => Boolean(name))
         const deterministicIntentReady = Boolean(resolveDeterministicToolIntent(currentIntentText, availableToolNamesNow, {
           // 意图快路先于 userContent 构建,这里用意图文本就地探测;
           // 不能引用后面 const hasExcelContext(路由段),否则 TDZ 必崩
@@ -739,7 +743,26 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const excelToolIntent = shouldUseExcelWorkbookTool(currentIntentText, { hasExcelContext })
         const excelToolParams = buildExcelToolParams(currentIntentText, { hasExcelContext })
         const emojiCooldownMs = Number(host.config?.emojiSystem?.emojiCooldownMs ?? 120000)
-        route = await resolveToolRoute({
+        // Keep the actual definitions admitted to this turn. Rebuilding from the
+        // global local registry can both expand scope and discard MCP aliases.
+        const toolsForThisTurn = (names:string[]) => names.flatMap(name => {
+          const tool = turnAvailableTools.find(item => item.function?.name === name)
+          return tool ? [tool] : []
+        })
+        // Route evaluation also awaits models; keep its mutable working set
+        // separate from the store entry refreshed by other incoming turns.
+        const routingSession = {...session, tools: [...turnAvailableTools]}
+        // The strict trigger has already checked the real wallet segment and
+        // its configured permission. Preserve that independently selected scope.
+        const authorizedRedBagTools = e.forceGrabRedBag ? toolsForThisTurn(["grabRedBagTool"]) : []
+        if (authorizedRedBagTools.length) routingSession.tools = authorizedRedBagTools
+        route = authorizedRedBagTools.length ? {
+          toolChoice: {type: "function", function: {name: "grabRedBagTool"}},
+          forcedToolCall: null,
+          toolScopeLocked: true,
+          toolDecision: {intent: "tool", toolName: "grabRedBagTool", params: {}},
+          applied: ["authorizedRedBag"]
+        } : await resolveToolRoute({
           intentText: currentIntentText,
           rawMsg: msg,
           args,
@@ -751,10 +774,10 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           hasExcelContext, excelToolIntent, excelToolParams, hasPixivSearchSession,
           groupWorkflowPrompt: workflowPrompt,
           emojiCooldownMs,
-          session,
-          promptContext: () => ({ e, args, msg, currentIntentText, userContent, groupUserMessages: session.groupUserMessages }),
+          session: routingSession,
+          promptContext: () => ({ e, args, msg, currentIntentText, userContent, groupUserMessages: session.groupUserMessages, interactionContext: session.interactionContext, modelIntent: modelIntentDecision?.intent, sessionTools: turnAvailableTools }),
           imageGenerationReferenceImages: () => host.getImageGenerationReferenceImages(images, session),
-          applyTools: (names:string[]) => { session.tools = host.getToolsByName(names); return session.tools },
+          applyTools: (names:string[]) => { routingSession.tools = toolsForThisTurn(names); return routingSession.tools },
           log: (text:string) => logger.info(text),
           helpers: {
             resolveSingularOwnerMention,
@@ -766,10 +789,13 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             resolveContextualDrawGeneration: (context:unknown) => host.resolveContextualDrawGeneration(context),
             classifySemanticToolIntent: (context:unknown) => host.classifySemanticToolIntent(context),
             semanticSessionTools: () => images?.length
-              ? session.tools
-              : (session.tools || []).filter(tool => !["googleImageEditTool", "googleImageAnalysisTool"].includes(tool?.function?.name || ""))
+              ? turnAvailableTools
+              : turnAvailableTools.filter(tool => !["googleImageEditTool", "googleImageAnalysisTool"].includes(tool?.function?.name || ""))
           }
         })
+        session.tools = routingSession.tools
+        if (routingSession.imageVerificationNeedsSearch !== undefined) session.imageVerificationNeedsSearch = routingSession.imageVerificationNeedsSearch
+        if (routingSession.imageVerificationMode !== undefined) session.imageVerificationMode = routingSession.imageVerificationMode
         if (route.warn) logger.warn(route.warn)
         if (route.aborted === "no-banana-channel") {
           await host.sendSegmentedMessage(e, buildImageFailureReply("图片生成失败: 当前没有可用的图片生成渠道"), 0)
@@ -780,11 +806,12 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         let toolChoice = route.toolChoice
         let forcedToolCall = route.forcedToolCall
         let toolScopeLocked = route.toolScopeLocked
-
-        // 强制抢红包模式
-        if (e.forceGrabRedBag) {
-          session.tools = host.getToolsByName(["grabRedBagTool"])
-          if (session.tools?.length) toolChoice = { type: "function", function: { name: "grabRedBagTool" } }
+        session.toolDecision = route.toolDecision || null
+        if (session.toolDecision?.intent === "chat") {
+          session.tools = []
+          toolChoice = "none"
+          forcedToolCall = null
+          toolScopeLocked = true
         }
 
         if (!toolScopeLocked && toolChoice === "auto") {
@@ -800,13 +827,16 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         }
 
         const availableToolNames = (session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name))
-        const requestedActionCapabilities = selectToolIntentCandidates(currentIntentText, availableToolNames)
+        const requestedActionCapabilities = session.toolDecision
+          ? session.toolDecision.toolName ? [session.toolDecision.toolName] : []
+          : selectToolIntentCandidates(currentIntentText, availableToolNames)
         const turnPlan = createTurnPlan({
           responseKind: isEducationalExplanationRequest(currentIntentText) ? "knowledge" : "chat",
           intentText: currentIntentText,
           interactionKind: session.interactionContext?.kind,
           availableCapabilities: availableToolNames,
           requiredCapabilities: requestedActionCapabilities,
+          toolDecision: session.toolDecision,
           toolChoice,
           toolScopeLocked,
           forcedToolCall,
@@ -825,19 +855,28 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           const initialToolNames = turnPlan.capabilities.required.length
             ? turnPlan.capabilities.required
             : turnPlan.capabilities.optional
-          session.tools = host.getToolsByName(initialToolNames)
+          session.tools = toolsForThisTurn(initialToolNames)
           logger.info(`[执行计划] group=${groupId} ${formatTurnPlanLog(turnPlan)} tools=${initialToolNames.join(",")}`)
         } else if (session.tools?.length) {
           logger.info(`[执行计划] group=${groupId} ${formatTurnPlanLog(turnPlan)} optional=${turnPlan.capabilities.optional.join(",")}`)
           session.tools = []
         }
         toolChoice = turnPlanRequest.toolChoice
+        // Registry refreshes may replace session.tools while the model is in
+        // flight. Only this plan's immutable membership authorizes dispatch.
+        const executionTools = [...(session.tools || [])]
+        session.executionTools = executionTools
+        const executionToolNames = new Set(executionTools.map(tool => tool.function?.name))
+        const selectedToolName = typeof toolChoice === "object" ? toolChoice.function?.name : session.toolDecision?.toolName
+        const authorizedToolNames = turnPlan.execution.mode === "tool" && selectedToolName && executionToolNames.has(selectedToolName)
+          ? [selectedToolName] : []
 
         const botMemberMap = isPrivateChat ? new Map<number,ChatTurnMember>() : await e.bot.pickGroup(groupId).getMemberMap()
         const botRole = roleMap[botMemberMap.get(Number(Bot.uin))?.role || ""] || "member"
         session.toolContent = await host.buildMessageContent({ nickname: Bot.nickname, user_id: Bot.uin, role: botRole }, "", [], [], e.group)
 
         if (forcedToolCall) {
+          session.tools = executionTools
           await host.processToolCalls({ role: "assistant", tool_calls: [forcedToolCall] }, e, session, session.groupUserMessages, atQq, senderRole, { syntheticToolCall: true })
           host.clearSession(sessionId)
           return true
@@ -854,12 +893,12 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
 	        // 语义规划器没强制调用时,主模型是唯一决策者——但它平时看不到任何工具
 	        // 抽取规则,不同群的上下文会让它摇摆(反问澄清/换错工具)。把候选工具的
 	        // 披露说明注入本轮请求,让主模型和规划器看到同一套规则。
-	        const toolNamesForRequest = (session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name))
+	        const toolNamesForRequest = executionTools.map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name))
 	        const disclosureForMainModel = [turnPlanRequest.executionPrompt, buildToolIntentDisclosure(toolNamesForRequest)].filter(Boolean).join("\n\n")
 	        const requestMessages = disclosureForMainModel
 	          ? [...session.groupUserMessages, { role: "system", content: disclosureForMainModel }]
 	          : session.groupUserMessages
-	        const requestData = buildChatRequestData(host.config, requestMessages, session.tools, toolChoice)
+	        const requestData = buildChatRequestData(host.config, requestMessages, executionTools, toolChoice)
             const initialModelStartedAt = Date.now()
 	        let response = await host.retryRequest(requestData, session.toolContent, 1, undefined, turnPlanRequest.requestOptions)
 	        const mainElapsedMs = Date.now() - initialModelStartedAt
@@ -873,7 +912,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
 			              ? response.error
 			              : JSON.stringify(response.error)
 			            logger.warn(`[回复失败] group=${groupId} user=${userId} stage=initial_api toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} merged=${e?._mergedMessageCount || 0} error=${errorText}`)
-			            const failedToolName = session.toolName || session.tools?.[0]?.function?.name || ""
+			            const failedToolName = session.toolName || executionTools[0]?.function?.name || ""
 			            await host.sendSegmentedMessage(e, host.getFriendlyFailureMessage(failedToolName, {
 			              e,
 			              session,
@@ -902,16 +941,28 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const dispatchAssistantMessage = async (target:ExecutionMessage) => {
           collectThinking(session, target, e)
           if (target.tool_calls?.length) {
+            const runnable = target.tool_calls.filter(call => executionToolNames.has(call.function?.name))
+            if (runnable.length !== target.tool_calls.length) {
+              logger.warn(`[工具范围] 拒绝主模型返回的本轮范围外调用 group=${groupId}`)
+              if (!runnable.length && !target.content) {
+                await host.sendSegmentedMessage(e, host.getFriendlyFailureMessage("", {e, session, stage: "unexpected_tool_call", error: "回答服务返回了本轮不可执行的动作"}), 0)
+                return true
+              }
+              target = {...target, tool_calls: runnable}
+            }
+          }
+          if (target.tool_calls?.length) {
+            session.tools = executionTools
             await host.processToolCalls(target, e, session, session.groupUserMessages, atQq, senderRole)
           } else if (target.content) {
             // 降级链路兜底:聊天模型把工具调用写成 ```json 文本块时,转成真正的
             // 工具调用执行(否则这段中间产物会被渲染成卡面,用户只看到黑块)
             const embedded = extractEmbeddedToolCalls(target.content)
             if (embedded.calls.length) {
-              const availableTools = new Set((session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name)))
-              const runnable = embedded.calls.find(call => availableTools.has(call.name))
+              const runnable = embedded.calls.find(call => executionToolNames.has(call.name))
               if (runnable) {
                 logger.warn(`[降级兜底] 模型以文本形式输出工具调用，转正执行 tool=${runnable.name}`)
+                session.tools = executionTools
                 await host.processToolCalls({ role: "assistant", tool_calls: [host.buildForcedToolCall(runnable.name, runnable.params)] }, e, session, session.groupUserMessages, atQq, senderRole, { syntheticToolCall: true })
                 return true
               }
@@ -921,17 +972,20 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
               }
               target = { ...target, content: embedded.remainder }
             }
-            const missingToolCall = host.buildMissingToolCommitmentCall(target.content || "", {
+            const missingToolCall = authorizedToolNames.length ? host.buildMissingToolCommitmentCall(target.content || "", {
               e,
               args,
               msg,
               images,
               currentIntentText,
               userContent,
-              groupUserMessages: session.groupUserMessages
-            })
-            if (missingToolCall) {
-              session.tools = missingToolCall.tools
+              groupUserMessages: session.groupUserMessages,
+              sessionTools: executionTools,
+              authorizedToolNames,
+              toolDecision: session.toolDecision
+            }) : null
+            if (missingToolCall && authorizedToolNames.includes(missingToolCall.toolName)) {
+              session.tools = executionTools.filter(tool => tool.function?.name === missingToolCall.toolName)
               logger.warn(`[工具漏调守卫] 模型承诺执行但未调用工具，强制使用 ${missingToolCall.toolName} reason=${missingToolCall.reason}`)
               await host.processToolCalls({ role: "assistant", tool_calls: [missingToolCall.toolCall] }, e, session, session.groupUserMessages, atQq, senderRole, { syntheticToolCall: true })
             } else {

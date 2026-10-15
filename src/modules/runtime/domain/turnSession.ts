@@ -1,5 +1,6 @@
 import type { ConversationContext } from '../../../contracts/conversation.js'
 import type { TurnInteractionContext } from '../../../contracts/turnInteraction.js'
+import type { SemanticDecision, ToolDefinition } from '../../../contracts/toolExecution.js'
 
 /** Legacy payloads remain opaque until their owning domain is migrated. No arbitrary fields. */
 export interface TurnSession {
@@ -13,6 +14,8 @@ export interface TurnSession {
   rawArgs?: string
   rawUserText?: string
   interactionContext?: TurnInteractionContext
+  toolDecision?: SemanticDecision | null
+  executionTools?: ToolDefinition[]
   userContent?: unknown
   turnPlan?: unknown
   turnTrace?: unknown
@@ -89,6 +92,8 @@ export const TURN_SESSION_FIELDS = [
   { name: "rawArgs", owner: "原始命令参数" },
   { name: "rawUserText", owner: "本轮当前正文;与时间/身份/引用前缀分开保留" },
   { name: "interactionContext", owner: "本轮互动线索、对象与证据;主提示/感知续轮/最终出口共用" },
+  { name: "toolDecision", owner: "本轮已选动作或明确无工具决策;只约束当前回合并在创建时重置" },
+  { name: "executionTools", owner: "本轮执行与工具续轮的固定能力定义;不随注册表刷新扩权,新回合清理" },
   { name: "userContent", owner: "构造后的用户消息内容(buildMessageContent)" },
   { name: "turnPlan", owner: "回合执行计划(turnPlan.js)" },
   { name: "turnTrace", owner: "回合观测 trace" },

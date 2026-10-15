@@ -85,13 +85,14 @@ const schema: ConfigSchemaItem[] = [
     field: "personaGuard.avoidUnpromptedIntimacy",
     label: "避免主动亲密称谓",
     component: "Switch",
-    bottomHelpMessage: "发送前移除机器人主动使用的宝宝、宝贝等亲密化接话"
+    bottomHelpMessage: "只处理机器人对当前用户的明确亲密呼语，保留亲属称谓、第三人转述和引用"
   },
   {
     field: "personaGuard.rewriteHardRefusal",
-    label: "软化强硬拒绝",
+    label: "旧版拒绝改写（已停用）",
     component: "Switch",
-    bottomHelpMessage: "把直接“不能/无法”改成更自然的边界表达"
+    componentProps: { disabled: true },
+    bottomHelpMessage: "兼容保留旧值；现在保留模型原句，不再替换或删除正常拒绝表达"
   },
   {
     field: "personaGuard.maxPromptItems",

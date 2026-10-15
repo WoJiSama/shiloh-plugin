@@ -115,8 +115,8 @@ function extractToolResultText(host: ToolExecutionHost, result = "") {
   }
 
 function buildImageVerificationSearchToolCall(host: ToolExecutionHost, validResults: ExecutionResult[] = [], session: ExecutionSession = {}, e: ExecutionEvent = {}) {
-    if (!session.imageVerificationNeedsSearch || session.imageVerificationSearchDone) return null
-    if (!session.tools?.some(tool => tool.function?.name === "searchInformationTool")) return null
+    if (session.toolDecision?.intent === "chat" || !session.imageVerificationNeedsSearch || session.imageVerificationSearchDone) return null
+    if (!(session.executionTools ?? session.tools)?.some(tool => tool.function?.name === "searchInformationTool")) return null
 
     const visionResult = validResults.find(result =>
       result?.toolName === "googleImageAnalysisTool" &&
@@ -217,7 +217,7 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
     const toolName = funcData.name
     const isMCPTool = mcpManager.isMCPTool(toolName)
     const isLocalTool = !isMCPTool && host.toolInstances[toolName]
-    const isValidTool = session.tools?.some(t => t.function?.name === toolName)
+    const isValidTool = session.toolDecision?.intent !== "chat" && (session.executionTools ?? session.tools)?.some(t => t.function?.name === toolName)
 
     if (!isValidTool || (!isMCPTool && !isLocalTool)) {
       return {
@@ -465,6 +465,10 @@ function dedupeToolCalls(host: ToolExecutionHost, toolCalls: ToolCall[] = []) {
   }
 
 async function processToolCalls(host: ToolExecutionHost, message: ExecutionMessage, e: ExecutionEvent, session: ExecutionSession, groupUserMessages: ExecutionMessage[], atQq: unknown, senderRole?: string, options: {syntheticToolCall?:boolean} = {}) {
+    // Standalone executor entries freeze before their first await as well.
+    // Registry updates may replace session.tools during execution or summary.
+    const executionTools = session.toolDecision?.intent === "chat" ? [] : session.executionTools ?? [...(session.tools || [])]
+    session.executionTools = executionTools
     const MAX_TOOL_ROUNDS = resolveToolRoundLimit(host.config, {
       messages: groupUserMessages,
       toolNames: (message?.tool_calls || []).map(toolCall => host.getToolCallName(toolCall))
@@ -735,7 +739,7 @@ async function processToolCalls(host: ToolExecutionHost, message: ExecutionMessa
         return
       }
 
-	      const nextRequest = buildChatRequestData(host.config, currentMessages, session.tools, "auto")
+	      const nextRequest = buildChatRequestData(host.config, currentMessages, executionTools, "auto")
 	      const nextResponse = await host.retryRequest(nextRequest, session.toolContent, 1, session.toolName)
 	      const nextMessage = nextResponse?.choices?.[0]?.message
         collectThinking(session, nextMessage, e)

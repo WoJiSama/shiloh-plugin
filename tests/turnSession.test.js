@@ -40,6 +40,16 @@ test("clear 与 refreshTools", () => {
   assert.equal(store.stats().sessions, 1)
 })
 
+test('a completed turn does not carry its no-tool decision into another turn', () => {
+  const store = createTurnSessionStore()
+  store.getOrCreate('first', []).toolDecision = {intent: 'chat'}
+  store.getOrCreate('first').executionTools = []
+  store.clear('first')
+  assert.equal(store.getOrCreate('second', ['searchInformationTool']).toolDecision, undefined)
+  assert.equal(store.getOrCreate('first', ['searchInformationTool']).toolDecision, undefined)
+  assert.equal(store.getOrCreate('first').executionTools, undefined)
+})
+
 test("sweep 按 TTL 淘汰,活跃会话保留", () => {
   const store = createTurnSessionStore({ ttlMs: 1000 })
   store.getOrCreate("s1", [])

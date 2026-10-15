@@ -409,6 +409,7 @@ pluginSettings:
     stripSelfDoubt: true
     stripCustomerTone: true
     avoidUnpromptedIntimacy: true
+    # 旧配置兼容字段，运行时已停用固定拒绝改写；保留值避免覆盖实例配置。
     rewriteHardRefusal: true
     maxPromptItems: 4
     badPatterns:

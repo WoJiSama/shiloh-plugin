@@ -6,7 +6,7 @@ interface RoutePorts {
  resolveNaturalDeltaForceToolCall(text:string,options:{botName:string}):{params:Record<string,unknown>}|null;
 }
 interface RoutedCall {tools:ToolDefinition[];toolName:string;toolCall:ToolCall;intent?:string|undefined}
-interface RouteDecision {toolNames?:string[];toolChoiceName?:string;forcedToolCallParams?:Record<string,unknown>;toolCall?:ToolCall;tools?:ToolDefinition[];lock?:boolean;appendAvatarLink?:string|number;log?:string;logParams?:unknown;abort?:string;warn?:string;intent?:string|undefined;silent?:boolean}
+interface RouteDecision {toolNames?:string[];toolChoiceName?:string;forcedToolCallParams?:Record<string,unknown>;toolCall?:ToolCall;tools?:ToolDefinition[];toolDecision?:SemanticDecision|undefined;noTools?:boolean;lock?:boolean;appendAvatarLink?:string|number;log?:string;logParams?:unknown;abort?:string;warn?:string;intent?:string|undefined;silent?:boolean}
 export interface RouteContext {
  intentText:string;groupId:string|number;userId:string|number;botName:string;emojiCooldownMs:number;rawMsg:string;args:string;modelIntent?:string;
  memberMap?:Map<number,SemanticMember>|undefined;config?:{forcedAvatarMode?:boolean};excelToolIntent?:boolean;excelToolParams?:Record<string,unknown>|null;images:string[];videos:string[];
@@ -295,6 +295,7 @@ const ROUTE_RULES: {name:string;guard:"auto"|"both"|"unlocked";evaluate(context:
         tools: toolCall.tools,
         toolChoiceName: toolCall.toolName,
         toolCall: toolCall.toolCall,
+        toolDecision: decision || undefined,
         lock: true,
         logParams: decision?.params,
         log: `[工具兜底] group=${ctx.groupId} 使用确定性参数解析 ${toolCall.toolName} params=${JSON.stringify(decision?.params)}`
@@ -317,6 +318,12 @@ const ROUTE_RULES: {name:string;guard:"auto"|"both"|"unlocked";evaluate(context:
         groupWorkflowPrompt: ctx.groupWorkflowPrompt || "",
         sessionTools: ctx.helpers.semanticSessionTools()
       })
+      if (decision?.intent === "chat") {
+        return {
+          tools: [], noTools: true, lock: true, toolDecision: decision,
+          log: `[工具选择] group=${ctx.groupId} 语义规划明确选择文字回复，不开启本轮工具`
+        }
+      }
       const toolCall = decision?.toolName
         ? ctx.helpers.buildToolCallFromDecision(decision, {
           ...ctx.promptContext(),
@@ -329,6 +336,7 @@ const ROUTE_RULES: {name:string;guard:"auto"|"both"|"unlocked";evaluate(context:
         tools: toolCall.tools,
         toolChoiceName: toolCall.toolName,
         toolCall: toolCall.toolCall,
+        toolDecision: decision || undefined,
         intent: toolCall.intent,
         log: `[工具选择] group=${ctx.groupId} 语义分类强制使用 ${toolCall.toolName} intent=${toolCall.intent}`
       }
@@ -376,8 +384,9 @@ const ROUTE_RULES: {name:string;guard:"auto"|"both"|"unlocked";evaluate(context:
 // - lock 后,后续 "both"/"unlocked" 守卫的规则跳过(与原 toolScopeLocked 用法一致)。
 // 返回 { toolChoice, forcedToolCall, toolScopeLocked, applied: [ruleName], aborted, warn }
 async function resolveToolRoute(ctx:RouteContext) {
-  let toolChoice: "auto"|{type:"function";function:{name:string}} = "auto"
+  let toolChoice: "auto"|"none"|{type:"function";function:{name:string}} = "auto"
   let forcedToolCall:ToolCall|null = null
+  let toolDecision:SemanticDecision|null = null
   let toolScopeLocked = false
   const applied = []
   let aborted:string|null = null
@@ -399,6 +408,12 @@ async function resolveToolRoute(ctx:RouteContext) {
       break
     }
     if (decision.tools) ctx.session.tools = decision.tools
+    if (decision.toolDecision) toolDecision = decision.toolDecision
+    if (decision.noTools) {
+      toolChoice = "none"
+      forcedToolCall = null
+      ctx.session.tools = []
+    }
     if (decision.toolChoiceName) {
       toolChoice = { type: "function", function: { name: decision.toolChoiceName } }
       if (decision.forcedToolCallParams) {
@@ -414,7 +429,7 @@ async function resolveToolRoute(ctx:RouteContext) {
     if (decision.log) ctx.log(decision.log)
   }
 
-  return { toolChoice, forcedToolCall, toolScopeLocked, applied, aborted, warn }
+  return { toolChoice, forcedToolCall, toolScopeLocked, toolDecision, applied, aborted, warn }
 }
 
 return {ROUTE_RULES,resolveToolRoute}

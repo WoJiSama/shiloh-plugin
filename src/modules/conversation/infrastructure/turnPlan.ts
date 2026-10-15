@@ -51,6 +51,7 @@ export function createTurnPlan({
   interactionKind,
   availableCapabilities = [],
   requiredCapabilities = [],
+  toolDecision,
   toolChoice = "auto",
   toolScopeLocked = false,
   forcedToolCall = null,
@@ -60,19 +61,20 @@ export function createTurnPlan({
 }:TurnPlanInput = {}):TurnPlan {
   const available = normalizeNames(availableCapabilities)
   const requested = normalizeNames(requiredCapabilities)
+  const noTools = toolDecision?.intent === "chat" || toolChoice === "none"
   const forcedName = forcedToolName(toolChoice, forcedToolCall)
-  const committedAction = Boolean(toolScopeLocked || forcedToolCall || forcedName)
-  const requestedRequired = requested.filter(name =>
+  const committedAction = !noTools && Boolean(toolScopeLocked || forcedToolCall || forcedName)
+  const requestedRequired = (toolDecision?.toolName ? [toolDecision.toolName] : requested).filter(name =>
     explicitEmojiRequest || !OPTIONAL_CAPABILITIES.has(name)
   )
-  const required = requestedRequired.length
+  const required = noTools ? [] : requestedRequired.length
     ? requestedRequired
     : committedAction
     ? normalizeNames(available.length ? available : [forcedName])
     : explicitEmojiRequest
       ? normalizeNames(["sendLocalEmojiTool"])
       : []
-  const optional = available.filter(name => !required.includes(name))
+  const optional = noTools ? [] : available.filter(name => !required.includes(name))
   const hasRequiredAction = required.length > 0
   const seriousAnswer = interactionKind === "serious_answer"
   const deliveryStatus = interactionKind === "delivery"
@@ -108,10 +110,11 @@ export function createTurnPlan({
       toolChoice: executionMode === "tool" ? toolChoice : "none"
     },
     capabilities: { required, optional, available },
+    ...(toolDecision ? {toolDecision} : {}),
     context: { historyMode, selectedHistoryCount },
     presentation: { kind: responseKind === "knowledge" ? "knowledge" : "text" },
     observability: {
-      routeReason: executionMode === "tool"
+      routeReason: toolDecision?.intent === "chat" ? "semantic_chat" : executionMode === "tool"
         ? committedAction ? "committed_action" : hasOptionalReaction ? "optional_reaction" : "requested_action"
         : seriousAnswer
           ? "serious_answer"

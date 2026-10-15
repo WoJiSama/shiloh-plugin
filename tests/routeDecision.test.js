@@ -208,3 +208,25 @@ test("确定性快路先于语义规划器:命中即锁定且不发起语义分�
   assert.equal(ctx.classifierCalls.length, 0, "确定性命中后语义规划器不应再发起 LLM 分类")
   assert.ok(route.applied.includes("deterministicManifest"))
 })
+
+test('明确 chat 关闭工具范围且跳过后续改图兜底', async () => {
+  const ctx = buildCtx({ctx: {modelIntent: 'image_edit', intentText: '先聊聊这种改法'}})
+  ctx.images = ['https://fixture.invalid/image.png']
+  ctx.helpers.classifySemanticToolIntent = async () => ({intent: 'chat', goal: '讨论图片改法'})
+  const route = await resolveToolRoute(ctx)
+  assert.equal(route.toolChoice, 'none')
+  assert.equal(route.toolScopeLocked, true)
+  assert.equal(route.forcedToolCall, null)
+  assert.deepEqual(route.toolDecision, {intent: 'chat', goal: '讨论图片改法'})
+  assert.deepEqual(ctx.session.tools, [])
+  assert.deepEqual(route.applied, ['semanticPlanner'])
+})
+
+test('规划器不可用保留既有改图兜底，区别于明确 chat', async () => {
+  const ctx = buildCtx({ctx: {modelIntent: 'image_edit', intentText: '修改这张图'}})
+  ctx.images = ['https://fixture.invalid/image.png']
+  const route = await resolveToolRoute(ctx)
+  assert.equal(route.toolChoice.function.name, 'googleImageEditTool')
+  assert.equal(route.toolDecision, null)
+  assert.ok(route.applied.includes('imageEdit'))
+})

@@ -51,7 +51,7 @@ export interface ChatTurnHost {
  getFriendlyFailureMessage(name:string,context:unknown):string;buildMissingToolCommitmentCall(content:string,context:unknown):ChatToolDecision|null;handleTextResponse(content:string,e:ChatTurnEvent,session:ChatTurnSession,messages:ChatTurnMessage[]):Promise<unknown>;
  finishConversationTask(task:unknown,session:ChatTurnSession):Promise<unknown>;recordReplyLatency(groupId:ChatId,elapsed:number,e:ChatTurnEvent):void
 }
-export interface ChatTurnRoute {warn?:string;aborted?:string;toolChoice:ToolChoice;forcedToolCall:ToolCall|null;toolScopeLocked:boolean;applied:string[]}
+export interface ChatTurnRoute {warn?:string;aborted?:string;toolChoice:ToolChoice;forcedToolCall:ToolCall|null;toolScopeLocked:boolean;toolDecision?:SemanticDecision|null;applied:string[]}
 export interface ChatTurnPorts {
  logger:{info(message:string,meta?:unknown):void;warn(message:string):void;error(message:string,error?:unknown):void;debug(message:string):void};
  botIdentity(e:ChatTurnEvent):{uin:ChatId;nickname:string};cacheGroupName(groupId:ChatId,name:string):Promise<void>;loadTurnContinuity(context:{groupId:ChatId|undefined;userId:ChatId|undefined;botId:ChatId}):Promise<{botId?:string;lastReply?:string;intent?:string;tools?:unknown[]}|null>;

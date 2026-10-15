@@ -30,6 +30,8 @@ const DEFAULT_BAD_PATTERNS = [
   "我不能帮你",
   "无法协助"
 ]
+// 旧配置仍可能带着这些条目；删除否定片段会把能力边界改成承诺。
+const LEGACY_REFUSAL_PATTERNS = new Set(["抱歉，我不能", "我无法满足", "我不能满足", "我不能帮你", "无法协助"])
 
 const FEEDBACK_TAG_RULES = [
   { key: "too_hard", label: "拒绝太硬", pattern: /太硬|强硬|拒绝|不该拒绝|别拒绝|不要这样拒绝/ },
@@ -144,21 +146,38 @@ function deescalateToneCorrection(text = "", context: Context = {}) {
   return "你说得对，刚才那几句有点顶着你说了，听着确实不舒服。我收一下。"
 }
 
-function removeUnpromptedIntimacy(text = "") {
-  return String(text || "")
-    // 只吞昵称后的行内空白，保留换行——\s 会把空行吞成空格，
-    // 连 markdown 表格/多段文本的行结构都会被压扁
-    .replace(/(?:宝宝|宝贝|亲爱的|老婆|老公|哥哥|妹妹)[，,、 \t]*/g, "你")
-    .replace(/(?:欸|嗯嗯?|诶)[，,、 \t]*别突然这么叫呀[，,、 \t]*/g, "叫我希洛就好。")
-    .replace(/(?:我)?有点不好意思(?:啦|欸)?[。！？!?…]*/g, "谢谢。")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim()
+function removeUnpromptedIntimacy(text = "", context: Context = {}) {
+  const output = String(text || "")
+  // 只收住明确回应亲昵称呼的整句，不改写普通羞赧、转述或引用。
+  if (/^(?:欸|嗯嗯?|诶)[，,、 \t]*别突然这么叫呀[，,、 \t]*(?:我)?有点不好意思(?:啦|欸)?[。！？!?…~～]*$/u.test(output)) {
+    const name = context.botNames?.find(value => value.trim())?.trim() || "希洛"
+    return `叫我${name}就好。`
+  }
+  // 代码、引用和被讨论的原话不是机器人对当前收件人的称呼。
+  const literalSpans = [...output.matchAll(/^[ \t]*(`{3,}|~{3,})[^\n]*(?:\n|$)[\s\S]*?(?:^[ \t]*\1[~`]*[ \t]*(?=\r?$)|(?![\s\S]))|(`+)[\s\S]*?\2|^[ \t]*>[^\n]*|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gm)]
+    .map(match => ({start: match.index, end: match.index + match[0].length}))
+  return output.replace(/([，,、][ \t]*)?(宝宝|宝贝|亲爱的|老婆|老公|哥哥|妹妹)([，,、 \t]*)/g,
+    (match, separator: string | undefined, _nickname: string, _trailing: string, offset: number) => {
+      const nameStart = offset + (separator?.length || 0)
+      if (literalSpans.some(span => nameStart >= span.start && nameStart < span.end)) return match
+      const before = output.slice(0, nameStart)
+      const after = output.slice(offset + match.length)
+      const startsAddress = /(?:^|[。.!！?？；;\n])[ \t]*(?:(?:欸|诶|嗯嗯?|哎|嘿|喂|好的?|好啦)[，,、 \t]*)?$/.test(before)
+      const addressesRecipient = /^(?:你|妳|您|别|先|快|请|听我|跟我|等我|记得|放心|注意|我(?:在|帮|给|陪|说|想|觉得|没|不|会))/.test(after)
+      if (startsAddress && addressesRecipient) return separator || ""
+
+      const previousSentence = output.slice(0, offset).split(/[。.!！?？；;\n]/).at(-1)?.trim() || ""
+      const endsAddress = /^(?:[。.!！?？~～…\n]|$)/.test(after)
+      if (separator && endsAddress && (/[你妳您]/.test(previousSentence) || /^(?:晚安|早安|早上好|晚上好|知道了|好的?|好啦|没事的|放心吧)$/.test(previousSentence))) return ""
+      // 无明确呼语证据时保留，例如“人家哥哥的钱包”或“哥哥，妹妹都来了”。
+      return match
+    })
 }
 
 function normalizeConfig(config: Record<string, unknown> = {}) {
   return {
     enabled: config.enabled !== false,
-    rewriteHardRefusal: config.rewriteHardRefusal !== false,
+    // rewriteHardRefusal 是兼容字段；能力和拒绝语义不再通过删词或固定话术改写。
     stripSelfDoubt: config.stripSelfDoubt !== false,
     stripCustomerTone: config.stripCustomerTone !== false,
     avoidUnpromptedIntimacy: config.avoidUnpromptedIntimacy !== false,
@@ -321,7 +340,7 @@ class PersonaFeedbackManager {
       `这些是主人对${name}回复风格的长期修正，回复时自然遵守，不要提到这些规则本身。`
     ]
     for (const item of sorted) {
-      if (item.key === "too_hard") lines.push(`- ${item.label}：拒绝时别冷冰冰，不要直接甩“不能/无法”；先接住意图，再给替代做法。`)
+      if (item.key === "too_hard") lines.push(`- ${item.label}：说明具体能力边界，语气自然，可以简短拒绝；替代建议仅在有助于当前目标时给。`)
       else if (item.key === "too_verbose") lines.push(`- ${item.label}：少铺垫，能短就短，别在结尾自我评价啰嗦。`)
       else if (item.key === "too_customer") lines.push(`- ${item.label}：不要客服腔、汇报腔、说明书腔，像熟人自然说。`)
       else if (item.key === "good_tone") lines.push(`- ${item.label}：保持最近被认可的自然、熟人感表达。`)
@@ -356,20 +375,11 @@ class PersonaFeedbackManager {
 
     output = softenIdentityDenial(output, context)
     output = deescalateToneCorrection(output, context)
-    if (guard.avoidUnpromptedIntimacy) output = removeUnpromptedIntimacy(output)
-
-    if (guard.rewriteHardRefusal) {
-      output = output
-        .replace(/我(?:不能|无法|不可以|没办法)(?:帮你|为你|替你)?(?:直接)?(?:完成|提供|满足|处理|执行|做)?(?:这个|这件事|该请求|你的请求)?[。.!！]?/g, "这个我不太适合直接这样做。")
-        .replace(/(?:无法|不能)协助(?:你)?(?:完成|处理)?(?:这个|这件事|该请求)?[。.!！]?/g, "这个我不太适合直接这样做。")
-        .replace(/我(?:必须|需要)拒绝(?:这个|该请求|你的请求)?[。.!！]?/g, "这个我不太适合直接这样做。")
-        .replace(/这个我不太适合直接这样做。\s*这个我不太适合直接这样做。/g, "这个我不太适合直接这样做。")
-        .trim()
-    }
+    if (guard.avoidUnpromptedIntimacy) output = removeUnpromptedIntimacy(output, context)
 
     for (const pattern of guard.badPatterns) {
       const needle = String(pattern || "").trim()
-      if (!needle) continue
+      if (!needle || LEGACY_REFUSAL_PATTERNS.has(needle)) continue
       if (output.includes(needle)) {
         output = output.split(needle).join("")
         // 可选命中回调:输出守卫管线用它做逐模式触发统计,作为规则退役依据;不传则零开销

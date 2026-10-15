@@ -125,11 +125,105 @@ function fixture(scenario, {confirmed = true, directToBot = false, realPlanning 
     recordTurnDiagnostics() {}, buildCommittedActionReply: () => '', buildDrawFailureNoteMessage: () => '', takeDrawFailureNote: () => null
   }
   const api = createChatTurn(ports)
-  return {api, host, event, session, captures,
+  return {api, ports, host, event, session, captures,
     run: () => api.handleToolInner(host, event),
     seedContinuity: (record = scenario.continuity) => record ? recordTurnContinuity({...record, groupId, userId: 202, redis}) : Promise.resolve(),
     readContinuity: (botId = '99') => loadTurnContinuity({groupId, userId: 202, botId, redis})}
 }
+
+test('an explicit chat decision survives an in-flight registry refresh and never executes native or embedded calls', async () => {
+  const tools = ['searchInformationTool', 'reminderTool', 'mcp_reserve_table'].map(name => ({type:'function', function:{name,parameters:{type:'object',properties:{}}}}))
+  for (const responseKind of ['native', 'embedded', 'text']) {
+    const scenario = {rawUserText:'不用搜索，只讨论这句预约餐厅的玩笑。',modelReply:'这次只聊这句话。'}
+    const f = fixture(scenario, {realPlanning:true})
+    f.host.config.useTools = true
+    f.session.tools = tools
+    f.host.tools = tools
+    const executed = []
+    let repairs = 0
+    f.host.getToolsByName = names => tools.filter(tool => names.includes(tool.function.name))
+    f.host.processToolCalls = async message => executed.push(...message.tool_calls)
+    f.host.buildMissingToolCommitmentCall = () => { repairs++; throw Error('No action was selected') }
+    f.host.retryRequest = async request => {
+      assert.equal(request.tool_choice, undefined, 'the real gateway omits tool fields for no-tool requests')
+      assert.equal(request.tools, undefined)
+      // Another message or registry update refreshes this in-flight session.
+      f.session.tools = [...tools]
+      return {choices:[{message:{content:scenario.modelReply,...(responseKind==='native'?{tool_calls:[{type:'function',function:{name:'searchInformationTool',arguments:'{}'}}]}:{})}}]}
+    }
+    const api = createChatTurn({...f.ports,
+      selectToolIntentCandidates: () => ['searchInformationTool','reminderTool'],
+      resolveToolRoute: async () => ({toolChoice:'none',forcedToolCall:null,toolScopeLocked:true,toolDecision:{intent:'chat',goal:'讨论玩笑'},applied:['semanticPlanner']}),
+      extractEmbeddedToolCalls: () => responseKind==='embedded'?{calls:[{name:'reminderTool',params:{action:'create'}}],remainder:scenario.modelReply}:{calls:[],remainder:''}
+    })
+    assert.equal(await api.handleToolInner(f.host,f.event),true)
+    assert.deepEqual(f.captures.errors,[])
+    assert.equal(f.session.turnPlan.observability.routeReason,'semantic_chat')
+    assert.deepEqual(f.session.turnPlan.capabilities.required,[])
+    assert.deepEqual(executed,[])
+    assert.equal(repairs,0)
+    assert.deepEqual(f.captures.sent,[scenario.modelReply])
+  }
+})
+
+test('a selected session-only MCP tool remains executable while a refresh cannot add unrelated tools', async () => {
+  const selected = {type:'function',function:{name:'mcp_reserve_table',description:'合成订位能力',parameters:{type:'object',properties:{restaurant:{type:'string'}}}}}
+  const unselected = {type:'function',function:{name:'searchInformationTool',parameters:{type:'object',properties:{}}}}
+  const f = fixture({rawUserText:'请用已接入的订位系统提交双人预约。',modelReply:''},{realPlanning:true})
+  f.host.config.useTools = true
+  f.session.tools = [selected,unselected]
+  f.host.tools = [selected,unselected]
+  f.host.getToolsByName = () => { throw Error('MCP definition must come from the admitted session') }
+  const executed = []
+  f.host.processToolCalls = async (message,_e,session) => {
+    executed.push(...message.tool_calls.map(call=>call.function.name))
+    assert.deepEqual(session.tools.map(tool=>tool.function.name),['mcp_reserve_table'])
+  }
+  f.host.retryRequest = async request => {
+    assert.deepEqual(request.tools.map(tool=>tool.function.name),['mcp_reserve_table'])
+    f.session.tools = [selected,unselected]
+    return {choices:[{message:{tool_calls:[
+      {type:'function',function:{name:'mcp_reserve_table',arguments:'{"restaurant":"合成餐厅"}'}},
+      {type:'function',function:{name:'searchInformationTool',arguments:'{}'}}
+    ]}}]}
+  }
+  const api = createChatTurn({...f.ports,
+    resolveToolRoute: async () => ({toolChoice:{type:'function',function:{name:'mcp_reserve_table'}},forcedToolCall:null,toolScopeLocked:true,toolDecision:{intent:'tool',toolName:'mcp_reserve_table',params:{restaurant:'合成餐厅'}},applied:['semanticPlanner']})
+  })
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.deepEqual(f.captures.errors,[])
+  assert.deepEqual(executed,['mcp_reserve_table'])
+})
+
+test('a previous chat decision cannot lock a later real search in a reused session', async () => {
+  const search = {type:'function',function:{name:'searchInformationTool',parameters:{type:'object',properties:{query:{type:'string'}}}}}
+  const f = fixture({rawUserText:'先别查，随便聊聊。',modelReply:'好，先聊。'},{realPlanning:true})
+  f.host.config.useTools = true
+  f.session.tools = [search]
+  f.host.tools = [search]
+  f.host.getToolsByName = () => [search]
+  let turn = 0
+  const executed = []
+  f.host.processToolCalls = async message => executed.push(...message.tool_calls.map(call=>call.function.name))
+  f.host.retryRequest = async () => turn===1?{choices:[{message:{content:'好，先聊。'}}]}:{choices:[{message:{tool_calls:[{type:'function',function:{name:'searchInformationTool',arguments:'{"query":"上海餐厅营业时间"}'}}]}}]}
+  const api = createChatTurn({...f.ports,
+    resolveToolRoute: async () => {
+      assert.equal(f.session.toolDecision,null,'every turn clears the previous action decision')
+      assert.equal(f.session.executionTools,undefined,'every turn clears the previous execution snapshot before routing')
+      turn++
+      return turn===1?{toolChoice:'none',forcedToolCall:null,toolScopeLocked:true,toolDecision:{intent:'chat'},applied:['semanticPlanner']}:
+        {toolChoice:{type:'function',function:{name:'searchInformationTool'}},forcedToolCall:null,toolScopeLocked:true,toolDecision:{intent:'search',toolName:'searchInformationTool',params:{query:'上海餐厅营业时间'}},applied:['semanticPlanner']}
+    }
+  })
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.deepEqual(f.session.executionTools,[], 'the completed chat turn deliberately has an empty execution scope')
+  f.event.msg='认真帮我查上海餐厅今天的营业时间。'
+  f.event.message=[{type:'text',text:f.event.msg}]
+  f.session.tools=[search]
+  assert.equal(await api.handleToolInner(f.host,f.event),true)
+  assert.deepEqual(f.captures.errors,[])
+  assert.deepEqual(executed,['searchInformationTool'])
+})
 
 for (const scenario of scenarios) {
   test(`offline interaction replay preserves boundaries through the real reply path: ${scenario.id}`, async () => {
