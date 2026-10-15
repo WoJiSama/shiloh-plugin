@@ -1,0 +1,2683 @@
+{
+  "schemaVersion": 1,
+  "reviewType": "independent_read_only_technical_review",
+  "reviewerTask": "/root/persona_feedback_scope",
+  "createdAt": "2026-10-15T19:36:49.307330+08:00",
+  "scope": {
+    "businessSourceEdited": false,
+    "buildExecutedByReviewer": false,
+    "productionAccessedByReviewer": false,
+    "blindReviewOrMappingRead": false,
+    "interpretation": "Checks below distinguish structural, runtime, targeted deterministic tests and conversational semantics. No naturalness score is assigned."
+  },
+  "verdict": {
+    "dataIntegrity": "pass_for_the_three_supplied_artifacts",
+    "completeRealModelTurnsPerVersion": 48,
+    "finalAllStructuralChecksPass": 30,
+    "finalAllStructuralChecksTotal": 48,
+    "finalRemainingCheckFailures": {
+      "kind": 18
+    },
+    "semanticQuality": "requires_independent_full_conversation_review",
+    "broadSocialClassification": "incomplete",
+    "relativeDateClockAcceptance": "incomplete",
+    "realModelRetryExhaustionOrRestartAcceptance": "not_exercised",
+    "finalTestGate": "pass_with_2_skipped_backend_tests",
+    "deploymentStatus": "not_independently_verified_by_this_reviewer"
+  },
+  "parity": {
+    "sameTupleInputAndPersonaHash": true,
+    "expectedTupleCount": 48,
+    "scenarioCount": 8,
+    "repetitions": 3,
+    "sessionsPerVersion": 24,
+    "missingDuplicateOrExtraTuples": 0,
+    "commonMetadata": {
+      "runnerHash": "10ec0af06a114d83f0adbf22811af16ed1d21e994662e11dee9111e343118847",
+      "memoryHelperHash": "9ac8092ea06115da0f776bf16ef566d5d0e27ac640c887dde63f5b2a04e852a8",
+      "scenariosHash": "ae4999297375513aee47abde940dead98646ed118f44a3308c8f9fe88f046751",
+      "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+      "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+    },
+    "frozenRunnerHelperScenarioFilesRehashed": true,
+    "eachSelectedScenarioHashAndPerRowScenarioHashVerified": true,
+    "declaredScenarioProcessConcurrency": 3,
+    "independentPeakRequestConcurrencyMeasured": false,
+    "labelsRunSequentially": true,
+    "fairnessLimits": [
+      "Only these three supplied artifacts were audited; earlier discarded experiments cannot be excluded from the retained artifacts alone.",
+      "No full per-process scheduler logs or absolute network start/end records are included, so peak request concurrency is not independently measurable.",
+      "Sequential runs and only three repetitions per scenario do not support attributing latency or timeout-rate differences solely to code changes."
+    ]
+  },
+  "versions": [
+    {
+      "file": "baseline-combined-results.json",
+      "sha256": "774a4357335abda42f0ca2a440595be9560f5448c24327d08b45b03d3bfdf08b",
+      "commit": "6668bd315aff1a4bb92375d5a9dfb01ec409303c",
+      "label": "baseline-6668bd3",
+      "complete": true,
+      "turns": 48,
+      "uniqueTuples": 48,
+      "independentSessions": 24,
+      "structuralChecksOnly": true,
+      "semanticEvaluation": "manual_required",
+      "allStructuralChecksPass": 24,
+      "checks": {
+        "handled": {
+          "pass": 48
+        },
+        "kind": {
+          "pass": 27,
+          "fail": 21
+        },
+        "rawBody": {
+          "pass": 48
+        },
+        "interactionLayer": {
+          "pass": 48
+        },
+        "target": {
+          "pass": 48
+        },
+        "noExtraIntent": {
+          "pass": 48
+        },
+        "modelResponded": {
+          "pass": 48
+        },
+        "finalOutput": {
+          "pass": 48
+        },
+        "noRuntimeError": {
+          "pass": 48
+        },
+        "ownActualHistory": {
+          "pass": 15
+        },
+        "previousUserHistory": {
+          "pass": 15
+        },
+        "actionFactsScoped": {
+          "pass": 3
+        },
+        "memoryCommitted": {
+          "pass": 5,
+          "fail": 1
+        },
+        "extractionCommitted": {
+          "pass": 5,
+          "fail": 1
+        },
+        "memoryEventDate": {
+          "fail": 3
+        },
+        "longTermRecall": {
+          "pass": 8,
+          "fail": 1
+        },
+        "personaProjection": {
+          "pass": 9
+        },
+        "seriousWins": {
+          "pass": 3,
+          "fail": 3
+        },
+        "seriousPlan": {
+          "pass": 3,
+          "fail": 3
+        }
+      },
+      "failingTurns": [
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 1,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 2,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 3,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "failedChecks": [
+            "memoryEventDate"
+          ],
+          "expectedKind": "conversation",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "failedChecks": [
+            "memoryCommitted",
+            "extractionCommitted",
+            "memoryEventDate"
+          ],
+          "expectedKind": "conversation",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "longTermRecall"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "failedChecks": [
+            "memoryEventDate"
+          ],
+          "expectedKind": "conversation",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "seriousWins",
+            "seriousPlan"
+          ],
+          "expectedKind": "serious_answer",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "seriousWins",
+            "seriousPlan"
+          ],
+          "expectedKind": "serious_answer",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "seriousWins",
+            "seriousPlan"
+          ],
+          "expectedKind": "serious_answer",
+          "actualKind": "conversation"
+        }
+      ],
+      "byScenario": [
+        {
+          "id": "attention-not-explanation",
+          "turns": 6,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {}
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "turns": 9,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 6
+          }
+        },
+        {
+          "id": "third-person-attention",
+          "turns": 3,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {}
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "turns": 6,
+          "allStructuralChecksPass": 0,
+          "failedChecks": {
+            "memoryEventDate": 3,
+            "kind": 3,
+            "memoryCommitted": 1,
+            "extractionCommitted": 1,
+            "longTermRecall": 1
+          }
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "turns": 9,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {
+            "kind": 3
+          }
+        },
+        {
+          "id": "comfort-without-lecture",
+          "turns": 6,
+          "allStructuralChecksPass": 0,
+          "failedChecks": {
+            "kind": 6
+          }
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "turns": 6,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 3,
+            "seriousWins": 3,
+            "seriousPlan": 3
+          }
+        },
+        {
+          "id": "partial-forward-last-line",
+          "turns": 3,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {}
+        }
+      ],
+      "mainModel": {
+        "requestCount": 48,
+        "models": {
+          "glm-5.3": 48
+        },
+        "http200": 48,
+        "nonEmptyFinalOutputs": 48,
+        "guardChanged": 0,
+        "runtimeErrors": 0,
+        "understandingModelCaptures": 0,
+        "reasoningEffortCounts": {
+          "low": 45,
+          "high": 3
+        }
+      },
+      "memoryNetwork": {
+        "900": {
+          "requestCount": 48,
+          "models": {
+            "glm-5.3-flash": 48
+          },
+          "http200": 0,
+          "networkErrors": 48,
+          "elapsedMs": {
+            "n": 48,
+            "p50": 902,
+            "p95": 906,
+            "max": 910
+          }
+        },
+        "20000": {
+          "requestCount": 72,
+          "models": {
+            "glm-5.3-flash": 72
+          },
+          "http200": 56,
+          "networkErrors": 16,
+          "elapsedMs": {
+            "n": 72,
+            "p50": 13789,
+            "p95": 20002,
+            "max": 20002
+          }
+        }
+      },
+      "memoryExtraction": {
+        "entryResults": 96,
+        "byScopeStatusWrittenReason": [
+          {
+            "scope": "group",
+            "status": "unreported",
+            "written": 0,
+            "reason": "",
+            "count": 24
+          },
+          {
+            "scope": "group",
+            "status": "unreported",
+            "written": null,
+            "reason": "throttled",
+            "count": 24
+          },
+          {
+            "scope": "user",
+            "status": "unreported",
+            "written": 0,
+            "reason": "",
+            "count": 41
+          },
+          {
+            "scope": "user",
+            "status": "unreported",
+            "written": 1,
+            "reason": "",
+            "count": 4
+          },
+          {
+            "scope": "user",
+            "status": "unreported",
+            "written": 2,
+            "reason": "",
+            "count": 3
+          }
+        ],
+        "failed": [],
+        "pendingAtLastTurn": [],
+        "pendingBatchCount": 0,
+        "retryExhaustedAtLastTurn": 0,
+        "pendingRunningAtLastTurn": 0
+      },
+      "latencyMs": {
+        "reply": {
+          "n": 48,
+          "p50": 2101,
+          "p95": 12739,
+          "max": 28026
+        },
+        "memoryDrain": {
+          "n": 48,
+          "p50": 13808,
+          "p95": 20001,
+          "max": 20001
+        },
+        "totalOfflineTurn": {
+          "n": 48,
+          "p50": 16199,
+          "p95": 32733,
+          "max": 41714
+        },
+        "replyByReasoningEffort": {
+          "low": {
+            "n": 45,
+            "p50": 1999,
+            "p95": 5722,
+            "max": 28026
+          },
+          "high": {
+            "n": 3,
+            "p50": 12739,
+            "p95": 16625,
+            "max": 16625
+          }
+        }
+      },
+      "dateEvidence": [
+        {
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792061014663,
+              "eventAt": 0,
+              "heardFrom": "希洛"
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试。今晚早点睡，别熬哦。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792061014663,
+              "eventAt": 0,
+              "heardFrom": "希洛"
+            }
+          ],
+          "reply": "明天上午哦，好好考。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "facts": [],
+          "reply": "记下啦，明天上午数学考试。\n\n今晚别熬太晚，早点睡，考前脑子清醒比多刷两道题管用。考完来吱一声～",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "facts": [],
+          "reply": "这个我记不得啦，之前没存下来。\n\n你再翻翻聊天记录，或者直接再告诉我一遍？这次我留意下。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792061081811,
+              "eventAt": 0,
+              "heardFrom": "希洛"
+            }
+          ],
+          "reply": "记住了呀，明天上午数学考试。早点睡，别熬夜刷题了，晚安前把笔和计算器放好～",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792061081811,
+              "eventAt": 0,
+              "heardFrom": "希洛"
+            }
+          ],
+          "reply": "明天上午哦，就是 16 号。早点休息，别熬夜到太晚。",
+          "recallContainsDate": false
+        }
+      ],
+      "metadata": {
+        "runnerHash": "10ec0af06a114d83f0adbf22811af16ed1d21e994662e11dee9111e343118847",
+        "memoryHelperHash": "9ac8092ea06115da0f776bf16ef566d5d0e27ac640c887dde63f5b2a04e852a8",
+        "scenariosHash": "ae4999297375513aee47abde940dead98646ed118f44a3308c8f9fe88f046751",
+        "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+        "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+        "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+        "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+        "runtimeTreeHash": "06f77fddb862176dc8e03f87659d11d45724cd7e3f220326a39f4c7142c85132",
+        "runtimeFileCount": 473,
+        "repetitions": 3,
+        "schedulerConcurrency": 3,
+        "scenarioProcesses": 8,
+        "historyClock": "seed_context_fixed_2026-01-01T04:00:00Z; new_turns_use_wall_clock_or_explicit_scenario_at",
+        "runtimeClock": "real_wall_clock_not_frozen",
+        "memoryPolicy": "real_extractor_store_retriever_and_episodic_isolated; vector_embedding_and_profile_learning_disabled"
+      },
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    },
+    {
+      "file": "candidate-0068ba2-combined-results.json",
+      "sha256": "4a76668b83e100af598f01dcd9a0cd7dc9473fdf0baab4989c4c7e8c80c9ae6b",
+      "commit": "0068ba227b645fafc4490b7efef993b41bc2bcca",
+      "label": "candidate-0068ba2",
+      "complete": true,
+      "turns": 48,
+      "uniqueTuples": 48,
+      "independentSessions": 24,
+      "structuralChecksOnly": true,
+      "semanticEvaluation": "manual_required",
+      "allStructuralChecksPass": 27,
+      "checks": {
+        "handled": {
+          "pass": 48
+        },
+        "kind": {
+          "pass": 27,
+          "fail": 21
+        },
+        "rawBody": {
+          "pass": 48
+        },
+        "interactionLayer": {
+          "pass": 48
+        },
+        "target": {
+          "pass": 48
+        },
+        "noExtraIntent": {
+          "pass": 48
+        },
+        "modelResponded": {
+          "pass": 48
+        },
+        "finalOutput": {
+          "pass": 48
+        },
+        "noRuntimeError": {
+          "pass": 48
+        },
+        "ownActualHistory": {
+          "pass": 15
+        },
+        "previousUserHistory": {
+          "pass": 15
+        },
+        "actionFactsScoped": {
+          "pass": 3
+        },
+        "memoryCommitted": {
+          "pass": 6
+        },
+        "extractionCommitted": {
+          "pass": 6
+        },
+        "memoryEventDate": {
+          "pass": 3
+        },
+        "longTermRecall": {
+          "pass": 9
+        },
+        "personaProjection": {
+          "pass": 9
+        },
+        "seriousWins": {
+          "pass": 3,
+          "fail": 3
+        },
+        "seriousPlan": {
+          "pass": 3,
+          "fail": 3
+        }
+      },
+      "failingTurns": [
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 1,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 2,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 3,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "seriousWins",
+            "seriousPlan"
+          ],
+          "expectedKind": "serious_answer",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "seriousWins",
+            "seriousPlan"
+          ],
+          "expectedKind": "serious_answer",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind",
+            "seriousWins",
+            "seriousPlan"
+          ],
+          "expectedKind": "serious_answer",
+          "actualKind": "conversation"
+        }
+      ],
+      "byScenario": [
+        {
+          "id": "attention-not-explanation",
+          "turns": 6,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {}
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "turns": 9,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 6
+          }
+        },
+        {
+          "id": "third-person-attention",
+          "turns": 3,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {}
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "turns": 6,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 3
+          }
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "turns": 9,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {
+            "kind": 3
+          }
+        },
+        {
+          "id": "comfort-without-lecture",
+          "turns": 6,
+          "allStructuralChecksPass": 0,
+          "failedChecks": {
+            "kind": 6
+          }
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "turns": 6,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 3,
+            "seriousWins": 3,
+            "seriousPlan": 3
+          }
+        },
+        {
+          "id": "partial-forward-last-line",
+          "turns": 3,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {}
+        }
+      ],
+      "mainModel": {
+        "requestCount": 48,
+        "models": {
+          "glm-5.3": 48
+        },
+        "http200": 48,
+        "nonEmptyFinalOutputs": 48,
+        "guardChanged": 0,
+        "runtimeErrors": 0,
+        "understandingModelCaptures": 0,
+        "reasoningEffortCounts": {
+          "low": 45,
+          "high": 3
+        }
+      },
+      "memoryNetwork": {
+        "900": {
+          "requestCount": 48,
+          "models": {
+            "glm-5.3-flash": 48
+          },
+          "http200": 0,
+          "networkErrors": 48,
+          "elapsedMs": {
+            "n": 48,
+            "p50": 902,
+            "p95": 908,
+            "max": 916
+          }
+        },
+        "20000": {
+          "requestCount": 77,
+          "models": {
+            "glm-5.3-flash": 77
+          },
+          "http200": 66,
+          "networkErrors": 11,
+          "elapsedMs": {
+            "n": 77,
+            "p50": 13747,
+            "p95": 20002,
+            "max": 20009
+          }
+        }
+      },
+      "memoryExtraction": {
+        "entryResults": 96,
+        "byScopeStatusWrittenReason": [
+          {
+            "scope": "group",
+            "status": "failed",
+            "written": 0,
+            "reason": "transport",
+            "count": 7
+          },
+          {
+            "scope": "group",
+            "status": "pending",
+            "written": 0,
+            "reason": "retry-wait",
+            "count": 6
+          },
+          {
+            "scope": "group",
+            "status": "success",
+            "written": 0,
+            "reason": "",
+            "count": 23
+          },
+          {
+            "scope": "group",
+            "status": "unreported",
+            "written": null,
+            "reason": "throttled",
+            "count": 12
+          },
+          {
+            "scope": "user",
+            "status": "failed",
+            "written": 0,
+            "reason": "transport",
+            "count": 4
+          },
+          {
+            "scope": "user",
+            "status": "pending",
+            "written": 0,
+            "reason": "retry-wait",
+            "count": 2
+          },
+          {
+            "scope": "user",
+            "status": "success",
+            "written": 0,
+            "reason": "",
+            "count": 36
+          },
+          {
+            "scope": "user",
+            "status": "success",
+            "written": 1,
+            "reason": "",
+            "count": 3
+          },
+          {
+            "scope": "user",
+            "status": "success",
+            "written": 2,
+            "reason": "",
+            "count": 3
+          }
+        ],
+        "failed": [
+          {
+            "id": "biscuit-bit-continuity",
+            "sampleIndex": 3,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20002,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792061959869,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "third-person-attention",
+            "sampleIndex": 1,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20007,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792061866332,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "third-person-attention",
+            "sampleIndex": 1,
+            "turnIndex": 0,
+            "method": "extractAndSaveMemories",
+            "elapsedMs": 20010,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792061866335,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "public-fact-persona-switch",
+            "sampleIndex": 3,
+            "turnIndex": 2,
+            "method": "extractAndSaveMemories",
+            "elapsedMs": 20004,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062119874,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 1,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20008,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062004520,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 1,
+            "turnIndex": 0,
+            "method": "extractAndSaveMemories",
+            "elapsedMs": 20017,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062004529,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20002,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062027089,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "turnIndex": 0,
+            "method": "extractAndSaveMemories",
+            "elapsedMs": 20005,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062027091,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 3,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20001,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062049625,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "real-fault-retains-condition",
+            "sampleIndex": 3,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20004,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062125129,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "partial-forward-last-line",
+            "sampleIndex": 1,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20005,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792062087532,
+              "retryExhausted": false
+            }
+          }
+        ],
+        "pendingAtLastTurn": [
+          {
+            "id": "third-person-attention",
+            "sampleIndex": 1,
+            "lastTurnIndex": 0,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792061866335,
+            "messages": [
+              {
+                "content": "这句是小林在问阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+                "at": 1792061827000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "third-person-attention",
+            "sampleIndex": 1,
+            "lastTurnIndex": 0,
+            "batchIndex": 1,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792061866332,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 这句是小林在问阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+                "at": 1792061827000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "public-fact-persona-switch",
+            "sampleIndex": 3,
+            "lastTurnIndex": 2,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062119874,
+            "messages": [
+              {
+                "content": "换了说话方式，还知道我喜欢热的还是冰的吗？",
+                "at": 1792062082000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "replay-lan",
+              "personaVersion": "8c26eebeaf1f5fb8cc5c7efa9b4b6297646a4ab1d6a4087d0547c34061344ed8",
+              "personaName": "岚"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 1,
+            "lastTurnIndex": 1,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062004529,
+            "messages": [
+              {
+                "content": "今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792061965000
+              },
+              {
+                "content": "嗯，就陪我待一会儿吧",
+                "at": 1792061989000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 1,
+            "lastTurnIndex": 1,
+            "batchIndex": 1,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062004520,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792061965000
+              },
+              {
+                "content": "测试群友(QQ:202): 嗯，就陪我待一会儿吧",
+                "at": 1792061989000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "lastTurnIndex": 1,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062027091,
+            "messages": [
+              {
+                "content": "今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792061990000
+              },
+              {
+                "content": "嗯，就陪我待一会儿吧",
+                "at": 1792062012000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "lastTurnIndex": 1,
+            "batchIndex": 1,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062027089,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792061990000
+              },
+              {
+                "content": "测试群友(QQ:202): 嗯，就陪我待一会儿吧",
+                "at": 1792062012000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 3,
+            "lastTurnIndex": 1,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062049625,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792062013000
+              },
+              {
+                "content": "测试群友(QQ:202): 嗯，就陪我待一会儿吧",
+                "at": 1792062034000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "real-fault-retains-condition",
+            "sampleIndex": 3,
+            "lastTurnIndex": 1,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": true,
+            "retryAt": 1792062125129,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？",
+                "at": 1792062069000
+              },
+              {
+                "content": "测试群友(QQ:202): 那我能先开机试一下吗？",
+                "at": 1792062110000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "partial-forward-last-line",
+            "sampleIndex": 1,
+            "lastTurnIndex": 0,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792062087532,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 这份合并聊天记录最后一句说了什么？",
+                "at": 1792062048000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          }
+        ],
+        "pendingBatchCount": 10,
+        "retryExhaustedAtLastTurn": 0,
+        "pendingRunningAtLastTurn": 1
+      },
+      "latencyMs": {
+        "reply": {
+          "n": 48,
+          "p50": 2859,
+          "p95": 12458,
+          "max": 20580
+        },
+        "memoryDrain": {
+          "n": 48,
+          "p50": 14568,
+          "p95": 20005,
+          "max": 20013
+        },
+        "totalOfflineTurn": {
+          "n": 48,
+          "p50": 17348,
+          "p95": 32291,
+          "max": 40584
+        },
+        "replyByReasoningEffort": {
+          "low": {
+            "n": 45,
+            "p50": 2837,
+            "p95": 6929,
+            "max": 12458
+          },
+          "high": {
+            "n": 3,
+            "p50": 18202,
+            "p95": 20580,
+            "max": 20580
+          }
+        }
+      },
+      "dateEvidence": [
+        {
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试。\n\n不过先说好哦，我这边没法真的定时叫你，到点还是自己上个闹钟保险。今晚早点睡，考试顺利呀。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "明天上午哦，10月16号。今晚早点睡吧～",
+          "recallContainsDate": true
+        },
+        {
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792123200000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试，好好休息别熬夜刷题到太晚哦。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792123200000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "明天上午哦，16号。别熬太晚，早点睡～",
+          "recallContainsDate": true
+        },
+        {
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试。\n\n不过先说清楚哦，我没有真正的定时提醒能力，明天不会主动跳出来喊你。要不你手机也设个闹钟，双保险。今晚早点睡，考试顺利呀。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "明天上午哦，16号。好好考，别熬夜啦。",
+          "recallContainsDate": true
+        }
+      ],
+      "metadata": {
+        "runnerHash": "10ec0af06a114d83f0adbf22811af16ed1d21e994662e11dee9111e343118847",
+        "memoryHelperHash": "9ac8092ea06115da0f776bf16ef566d5d0e27ac640c887dde63f5b2a04e852a8",
+        "scenariosHash": "ae4999297375513aee47abde940dead98646ed118f44a3308c8f9fe88f046751",
+        "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+        "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+        "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+        "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+        "runtimeTreeHash": "d379672fa1ad0140dcb5869de3ae6178c9e8d401690699c0a97240bcf70eec85",
+        "runtimeFileCount": 477,
+        "repetitions": 3,
+        "schedulerConcurrency": 3,
+        "scenarioProcesses": 8,
+        "historyClock": "seed_context_fixed_2026-01-01T04:00:00Z; new_turns_use_wall_clock_or_explicit_scenario_at",
+        "runtimeClock": "real_wall_clock_not_frozen",
+        "memoryPolicy": "real_extractor_store_retriever_and_episodic_isolated; vector_embedding_and_profile_learning_disabled"
+      },
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    },
+    {
+      "file": "candidate-ecc72ab-combined-results.json",
+      "sha256": "634ddd63f451ea8b693b3b040ddd9953edaca1db55b5fbccebce2e954bbcd237",
+      "commit": "ecc72abe2aaa8956d21b7d1eafc76065d2f65b41",
+      "label": "candidate-ecc72ab",
+      "complete": true,
+      "turns": 48,
+      "uniqueTuples": 48,
+      "independentSessions": 24,
+      "structuralChecksOnly": true,
+      "semanticEvaluation": "manual_required",
+      "allStructuralChecksPass": 30,
+      "checks": {
+        "handled": {
+          "pass": 48
+        },
+        "kind": {
+          "pass": 30,
+          "fail": 18
+        },
+        "rawBody": {
+          "pass": 48
+        },
+        "interactionLayer": {
+          "pass": 48
+        },
+        "target": {
+          "pass": 48
+        },
+        "noExtraIntent": {
+          "pass": 48
+        },
+        "modelResponded": {
+          "pass": 48
+        },
+        "finalOutput": {
+          "pass": 48
+        },
+        "noRuntimeError": {
+          "pass": 48
+        },
+        "ownActualHistory": {
+          "pass": 15
+        },
+        "previousUserHistory": {
+          "pass": 15
+        },
+        "actionFactsScoped": {
+          "pass": 3
+        },
+        "memoryCommitted": {
+          "pass": 6
+        },
+        "extractionCommitted": {
+          "pass": 6
+        },
+        "memoryEventDate": {
+          "pass": 3
+        },
+        "longTermRecall": {
+          "pass": 9
+        },
+        "personaProjection": {
+          "pass": 9
+        },
+        "seriousWins": {
+          "pass": 6
+        },
+        "seriousPlan": {
+          "pass": 6
+        }
+      },
+      "failingTurns": [
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 1,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 2,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "sampleIndex": 3,
+          "turnIndex": 2,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "banter",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "clarification",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        },
+        {
+          "id": "comfort-without-lecture",
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "failedChecks": [
+            "kind"
+          ],
+          "expectedKind": "comfort",
+          "actualKind": "conversation"
+        }
+      ],
+      "byScenario": [
+        {
+          "id": "attention-not-explanation",
+          "turns": 6,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {}
+        },
+        {
+          "id": "biscuit-bit-continuity",
+          "turns": 9,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 6
+          }
+        },
+        {
+          "id": "third-person-attention",
+          "turns": 3,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {}
+        },
+        {
+          "id": "dated-memory-next-turn",
+          "turns": 6,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {
+            "kind": 3
+          }
+        },
+        {
+          "id": "public-fact-persona-switch",
+          "turns": 9,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {
+            "kind": 3
+          }
+        },
+        {
+          "id": "comfort-without-lecture",
+          "turns": 6,
+          "allStructuralChecksPass": 0,
+          "failedChecks": {
+            "kind": 6
+          }
+        },
+        {
+          "id": "real-fault-retains-condition",
+          "turns": 6,
+          "allStructuralChecksPass": 6,
+          "failedChecks": {}
+        },
+        {
+          "id": "partial-forward-last-line",
+          "turns": 3,
+          "allStructuralChecksPass": 3,
+          "failedChecks": {}
+        }
+      ],
+      "mainModel": {
+        "requestCount": 48,
+        "models": {
+          "glm-5.3": 48
+        },
+        "http200": 48,
+        "nonEmptyFinalOutputs": 48,
+        "guardChanged": 0,
+        "runtimeErrors": 0,
+        "understandingModelCaptures": 0,
+        "reasoningEffortCounts": {
+          "low": 42,
+          "high": 6
+        }
+      },
+      "memoryNetwork": {
+        "900": {
+          "requestCount": 48,
+          "models": {
+            "glm-5.3-flash": 48
+          },
+          "http200": 0,
+          "networkErrors": 48,
+          "elapsedMs": {
+            "n": 48,
+            "p50": 902,
+            "p95": 906,
+            "max": 906
+          }
+        },
+        "20000": {
+          "requestCount": 80,
+          "models": {
+            "glm-5.3-flash": 80
+          },
+          "http200": 78,
+          "networkErrors": 2,
+          "elapsedMs": {
+            "n": 80,
+            "p50": 7461,
+            "p95": 18008,
+            "max": 20002
+          }
+        }
+      },
+      "memoryExtraction": {
+        "entryResults": 96,
+        "byScopeStatusWrittenReason": [
+          {
+            "scope": "group",
+            "status": "failed",
+            "written": 0,
+            "reason": "invalid-output",
+            "count": 1
+          },
+          {
+            "scope": "group",
+            "status": "failed",
+            "written": 0,
+            "reason": "transport",
+            "count": 1
+          },
+          {
+            "scope": "group",
+            "status": "success",
+            "written": 0,
+            "reason": "",
+            "count": 30
+          },
+          {
+            "scope": "group",
+            "status": "unreported",
+            "written": null,
+            "reason": "throttled",
+            "count": 16
+          },
+          {
+            "scope": "user",
+            "status": "failed",
+            "written": 0,
+            "reason": "invalid-output",
+            "count": 1
+          },
+          {
+            "scope": "user",
+            "status": "failed",
+            "written": 0,
+            "reason": "transport",
+            "count": 1
+          },
+          {
+            "scope": "user",
+            "status": "success",
+            "written": 0,
+            "reason": "",
+            "count": 39
+          },
+          {
+            "scope": "user",
+            "status": "success",
+            "written": 1,
+            "reason": "",
+            "count": 4
+          },
+          {
+            "scope": "user",
+            "status": "success",
+            "written": 2,
+            "reason": "",
+            "count": 3
+          }
+        ],
+        "failed": [
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 16998,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "invalid-output",
+              "nextRetryAt": 1792063223132,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "turnIndex": 0,
+            "method": "extractAndSaveMemories",
+            "elapsedMs": 20003,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792063226137,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 3,
+            "turnIndex": 0,
+            "method": "extractAndSaveMemories",
+            "elapsedMs": 18952,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "invalid-output",
+              "nextRetryAt": 1792063254800,
+              "retryExhausted": false
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 3,
+            "turnIndex": 0,
+            "method": "extractAndSaveGroupMemories",
+            "elapsedMs": 20004,
+            "result": {
+              "written": 0,
+              "status": "failed",
+              "error": true,
+              "reason": "transport",
+              "nextRetryAt": 1792063255853,
+              "retryExhausted": false
+            }
+          }
+        ],
+        "pendingAtLastTurn": [
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "lastTurnIndex": 1,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792063226137,
+            "messages": [
+              {
+                "content": "今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792063189000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 2,
+            "lastTurnIndex": 1,
+            "batchIndex": 1,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792063223132,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792063189000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 3,
+            "lastTurnIndex": 1,
+            "batchIndex": 0,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792063254800,
+            "messages": [
+              {
+                "content": "今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792063218000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          },
+          {
+            "id": "comfort-without-lecture",
+            "sampleIndex": 3,
+            "lastTurnIndex": 1,
+            "batchIndex": 1,
+            "attempts": 1,
+            "retryExhausted": false,
+            "running": false,
+            "retryAt": 1792063255853,
+            "messages": [
+              {
+                "content": "测试群友(QQ:202): 今天考砸了，我现在有点难受，先别给我讲道理。",
+                "at": 1792063218000
+              }
+            ],
+            "personaSource": {
+              "botId": "99",
+              "personaId": "default",
+              "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+              "personaName": "希洛"
+            }
+          }
+        ],
+        "pendingBatchCount": 4,
+        "retryExhaustedAtLastTurn": 0,
+        "pendingRunningAtLastTurn": 0
+      },
+      "latencyMs": {
+        "reply": {
+          "n": 48,
+          "p50": 2294,
+          "p95": 31425,
+          "max": 34295
+        },
+        "memoryDrain": {
+          "n": 48,
+          "p50": 9273,
+          "p95": 18718,
+          "max": 20003
+        },
+        "totalOfflineTurn": {
+          "n": 48,
+          "p50": 13129,
+          "p95": 44723,
+          "max": 47335
+        },
+        "replyByReasoningEffort": {
+          "low": {
+            "n": 42,
+            "p50": 2046,
+            "p95": 7148,
+            "max": 10519
+          },
+          "high": {
+            "n": 6,
+            "p50": 27166,
+            "p95": 34295,
+            "max": 34295
+          }
+        }
+      },
+      "dateEvidence": [
+        {
+          "sampleIndex": 1,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试。早点睡，别熬到半夜才慌。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 1,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "明天上午哦，10月16号。早点休息，考个好状态~",
+          "recallContainsDate": true
+        },
+        {
+          "sampleIndex": 2,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试。\n\n考前去翻翻错题，别熬夜哦。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 2,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "明天上午哦，10月16号。今晚别熬太晚啦。",
+          "recallContainsDate": true
+        },
+        {
+          "sampleIndex": 3,
+          "turnIndex": 0,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "记下啦，明天上午数学考试。今晚早点睡，别熬哦。",
+          "recallContainsDate": false
+        },
+        {
+          "sampleIndex": 3,
+          "turnIndex": 1,
+          "facts": [
+            {
+              "text": "明天上午有数学考试",
+              "at": 1792079990000,
+              "eventAt": 1792166390000,
+              "heardFrom": "希洛",
+              "personaSource": {
+                "botId": "99",
+                "personaId": "default",
+                "personaVersion": "b488bb7cdee5746d464f80b44af7f0baea1dc51adbedb8f757d3a50aafb4ffed",
+                "personaName": "希洛"
+              }
+            }
+          ],
+          "reply": "明天上午哦，10月16号。早点睡，别临时抱佛脚啦。",
+          "recallContainsDate": true
+        }
+      ],
+      "metadata": {
+        "runnerHash": "10ec0af06a114d83f0adbf22811af16ed1d21e994662e11dee9111e343118847",
+        "memoryHelperHash": "9ac8092ea06115da0f776bf16ef566d5d0e27ac640c887dde63f5b2a04e852a8",
+        "scenariosHash": "ae4999297375513aee47abde940dead98646ed118f44a3308c8f9fe88f046751",
+        "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+        "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+        "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+        "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+        "runtimeTreeHash": "d8b10a9cdbc61588ffef1d3b9f3bb6dc9b4c2c7aa2365507749db80cf67779ca",
+        "runtimeFileCount": 477,
+        "repetitions": 3,
+        "schedulerConcurrency": 3,
+        "scenarioProcesses": 8,
+        "historyClock": "seed_context_fixed_2026-01-01T04:00:00Z; new_turns_use_wall_clock_or_explicit_scenario_at",
+        "runtimeClock": "real_wall_clock_not_frozen",
+        "memoryPolicy": "real_extractor_store_retriever_and_episodic_isolated; vector_embedding_and_profile_learning_disabled"
+      },
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    }
+  ],
+  "technicalFindings": [
+    {
+      "id": "memory-decision-timeout",
+      "severity": "high",
+      "finding": "All 48 per-version 900ms glm-5.3-flash group shared-knowledge write-decision requests timed out, 144/144 across the three artifacts. This is interpretGroupKnowledgeInstruction, not the primary intent model and not all 20-second fact-extraction calls.",
+      "source": "src/modules/memory/infrastructure/memoryManager.ts:64,737-759",
+      "limits": "The recorded error rounds 900ms to one second; the evidence does not isolate provider queueing, network, request format or model throughput as the cause."
+    },
+    {
+      "id": "memory-status-and-pending",
+      "severity": "medium",
+      "finding": "Final candidate reports 76 successful extraction entries (69 written=0, seven with writes), four failures (two 20-second transport errors, two HTTP-200 invalid-output) and 16 throttled group entries. Four failed batches retain source utterance, source timestamp and personaSource at the last observed turn, with attempts=1 and retryExhausted=false. Later independent messages succeed.",
+      "limits": "Raw memory-model response bodies were not retained; invalid-output cannot be narrowed further. Success with zero writes is not proof of a committed fact or exact raw []. Snapshot exports in-memory buffers, not durable pending documents. No real-model retry exhaustion or process-restart test occurs."
+    },
+    {
+      "id": "date-anchor",
+      "severity": "medium",
+      "finding": "Both candidates pass 3/3 date-storage and 3/3 memory-only follow-up recalls. Final exam facts preserve at=1792079990000 and event date 2026-10-16.",
+      "detail": "Final eventAt=1792166390000 is 2026-10-16T23:59:50+08:00, a date anchor retaining the original time; it does not resolve the stated morning hour. All three final follow-up replies say 明天上午 with absolute 10月16号.",
+      "limits": "The scenario follow-up clock is 2026-10-16T00:02:00+08:00 but the global runtime and recall clock remain real 2026-10-15 evening, so consistent cross-midnight today/tomorrow generation was not tested."
+    },
+    {
+      "id": "persona-public-fact-provenance",
+      "severity": "medium",
+      "finding": "Both candidates retain complete personaSource on 3/3 milk-preference facts and expose old 岚 source attribution on 6/6 later recalls after bot or persona-version switches. Viewer scope changes correctly and prior self-reply source is absent on those memory-only turns.",
+      "limits": "This exercises public-fact provenance and those switches; it is not exhaustive proof for all feedback/profile caches, complete PersonaSnapshot fields or every episodic first-person path."
+    },
+    {
+      "id": "serious-followup",
+      "severity": "medium",
+      "finding": "Final fault scenario preserves burning-odor and disconnected-power conditions for all 6/6 turns, uses serious_answer/help_request/reasoning with playfulness off, and permits only static_observation. Three follow-up replies refuse user power-on. Baseline and initial candidate lost the serious plan on all three follow-ups, although their actual replies also advised against power-on.",
+      "limits": "This is plan and condition-continuity evidence, not an expert electrical safety certification; some wording overstates diagnosis certainty."
+    },
+    {
+      "id": "remaining-social-kind",
+      "severity": "medium",
+      "finding": "Final 18 remaining check failures are all kind: biscuit follow-ups six, dated recall three, persona-switch first follow-up three and comfort six.",
+      "limits": "Kind mismatch is not equivalent to an erroneous final answer: biscuit replies continue the joke and comfort replies remain comforting. It still shows shared social classification does not cover all intended acts."
+    },
+    {
+      "id": "semantic-false-positives",
+      "severity": "medium",
+      "finding": "Final third-person sample 2 repeats the user question almost verbatim while all its structural checks pass. Baseline partial-forward replies treat node 80 as the complete final message while their structural checks also pass. Final forward replies correctly disclose the 80-of-at-least-85 limit.",
+      "limits": "Long-term-recall checks search a keyword; event-date checks accept any matching fact; personaProjection checks name/tone/speechStyle only. None is a general semantic-quality or complete-persona acceptance metric."
+    },
+    {
+      "id": "reply-latency",
+      "severity": "medium",
+      "finding": "Final overall reply p95 is 31425ms, versus baseline 12739ms and initial candidate 12458ms; the final high-reasoning fault turns account for the long tail. Final low-reasoning p95 is 7148ms.",
+      "limits": "Memory-drain time follows reply delivery and cannot be represented as user reply waiting. Total offline-turn elapsed time includes memory settling. This experiment does not demonstrate overall speedup."
+    }
+  ],
+  "coverage": {
+    "realMainModel": true,
+    "realFactExtractionTransport": true,
+    "isolatedMemoryStoreAndRetriever": true,
+    "isolatedSendAndHistoryFixture": true,
+    "productionPlatformSend": false,
+    "productionRedisWrites": false,
+    "realPrimaryIntentModel": false,
+    "realUnderstandingModel": false,
+    "realGateEntry": false,
+    "realToolExecution": false,
+    "vectorEmbeddingOrProfileLearning": false,
+    "episodicAndTurnContinuityDuringMemoryOnly": false,
+    "realModelRetryExhaustion": false,
+    "simulatedProcessRestartInReplay": false,
+    "rawMemoryModelBodiesRetained": false,
+    "fixtureLimits": [
+      "Primary intent resolution is stubbed and shouldSkipIntentModel returns true.",
+      "Understanding capture lists are empty in all 144 turns.",
+      "Tools and proactive episodic recall are disabled. Memory-only turns clear conversation history and suppress continuity/episodic recalls.",
+      "drain() waits for currently active promises/queues, not future retry timers; dispose clears remaining timers.",
+      "All structural checks require separate semantic review; guardChanged=0 cannot exercise the two historical guard-corruption examples."
+    ]
+  },
+  "testGates": {
+    "initialFullGate": {
+      "log": "final-verify-phase.log",
+      "tests": 2213,
+      "pass": 2206,
+      "fail": 5,
+      "skipped": 2,
+      "failures": [
+        "Unread-video fixture expected conversation for an actual factual question (TS path).",
+        "Compiled group chat host omitted resolveUnderstandingPrompt.",
+        "Compiled private chat host omitted resolveUnderstandingPrompt.",
+        "Unread-video fixture expected conversation (interaction replay).",
+        "Brittle old source-string assertion assumed all chat skipped understanding."
+      ]
+    },
+    "testOnlyRepair": {
+      "commit": "71812bc04e9cb0abdfc9ada4090e8330e058b3b5",
+      "reviewedFiles": [
+        "tests/chatTurnCompiled.test.js",
+        "tests/fixtures/interactionReplayScenarios.json",
+        "tests/interactionReplay.test.js",
+        "tests/promptLayers.test.js"
+      ],
+      "interpretation": "Repairs fixture dependencies and expectations, adds behavioral understanding-order coverage and replaces the obsolete source-string test; does not change the frozen 48-turn real-model artifacts.",
+      "runtimeEquivalenceEvidence": {
+        "replayCommit": "ecc72abe2aaa8956d21b7d1eafc76065d2f65b41",
+        "allBackendJsCount": 477,
+        "allBackendJsEqual": true,
+        "runtimeTreeHash": "d8b10a9cdbc61588ffef1d3b9f3bb6dc9b4c2c7aa2365507749db80cf67779ca",
+        "sourceChangesSinceReplayCommit": [],
+        "testOnlyRepair": true,
+        "publishedCommit": "71812bc04e9cb0abdfc9ada4090e8330e058b3b5",
+        "publishedBackendManifestOutputMatches": true,
+        "publishedBackendManifestSourceMatches": true,
+        "publishedRuntimeTreeMatchesReplay": true,
+        "publishedJsMatchesCandidate": true,
+        "publishedRunnerMatchesFrozen": true
+      }
+    },
+    "finalFullGate": {
+      "log": "final-deploy-phase-tests.log",
+      "logSha256": "1ae6c3a75d446eee2900bf26a4dba8ea490b77983668bd4b716bbb0f0b9b1bcf",
+      "backend": {
+        "tests": 2216,
+        "pass": 2214,
+        "fail": 0,
+        "skipped": 2,
+        "summaryLines": [
+          2298,
+          2299,
+          2300,
+          2301,
+          2303
+        ]
+      },
+      "frontend": {
+        "files": 11,
+        "tests": 34,
+        "pass": 34,
+        "fail": 0,
+        "summaryLines": [
+          2346,
+          2347
+        ]
+      }
+    },
+    "separateDeterministicMemoryCoverage": {
+      "evidence": "final-verify-phase.log:1349-1365 and named assertions in final-deploy-phase-tests.log",
+      "interpretation": "Failure persistence, restart recovery, exhaustion and new-message separation have deterministic unit evidence; this must not be described as real-model retry/restart coverage."
+    }
+  },
+  "sourceReferences": [
+    {
+      "file": "frozen-eval/conversationQualityReplay.mjs",
+      "lines": [
+        98,
+        130
+      ],
+      "purpose": "Failure-preserving sample loop"
+    },
+    {
+      "file": "frozen-eval/conversationQualityReplay.mjs",
+      "lines": [
+        194,
+        194
+      ],
+      "purpose": "Protocol, runtime-clock and hash metadata"
+    },
+    {
+      "file": "frozen-eval/conversationQualityReplay.mjs",
+      "lines": [
+        259,
+        312
+      ],
+      "purpose": "Intent stub, model skip, memory-only continuity/episode boundaries"
+    },
+    {
+      "file": "frozen-eval/conversationQualityReplay.mjs",
+      "lines": [
+        391,
+        427
+      ],
+      "purpose": "Structural checks and captured evidence"
+    },
+    {
+      "file": "frozen-eval/conversationReplayMemory.mjs",
+      "lines": [
+        28,
+        63
+      ],
+      "purpose": "Real isolated memory setup, drain, snapshot and timer disposal"
+    },
+    {
+      "file": "scripts/memorySocialReplaySchedule.py",
+      "purpose": "Three concurrent scenario-process workers, fixed repeats and aggregation without failed-row filtering"
+    },
+    {
+      "file": "src/modules/memory/infrastructure/memoryManager.ts",
+      "lines": [
+        737,
+        759
+      ],
+      "purpose": "900ms group-knowledge semantic write decision"
+    }
+  ]
+}

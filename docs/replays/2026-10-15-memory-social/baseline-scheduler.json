@@ -1,0 +1,51 @@
+{
+  "label": "baseline-6668bd3",
+  "repetitions": 3,
+  "concurrency": 3,
+  "scenarioOrder": [
+    "attention-not-explanation",
+    "biscuit-bit-continuity",
+    "third-person-attention",
+    "dated-memory-next-turn",
+    "public-fact-persona-switch",
+    "comfort-without-lecture",
+    "real-fault-retains-condition",
+    "partial-forward-last-line"
+  ],
+  "sampling": "three independent conversations per scenario; no resampling or discarded failures",
+  "runs": {
+    "third-person-attention": {
+      "exitCode": 0,
+      "elapsedSeconds": 64.453
+    },
+    "attention-not-explanation": {
+      "exitCode": 0,
+      "elapsedSeconds": 111.674
+    },
+    "biscuit-bit-continuity": {
+      "exitCode": 1,
+      "elapsedSeconds": 143.758
+    },
+    "dated-memory-next-turn": {
+      "exitCode": 1,
+      "elapsedSeconds": 103.307
+    },
+    "comfort-without-lecture": {
+      "exitCode": 1,
+      "elapsedSeconds": 101.27
+    },
+    "public-fact-persona-switch": {
+      "exitCode": 1,
+      "elapsedSeconds": 158.861
+    },
+    "real-fault-retains-condition": {
+      "exitCode": 1,
+      "elapsedSeconds": 126.751
+    },
+    "partial-forward-last-line": {
+      "exitCode": 0,
+      "elapsedSeconds": 54.612
+    }
+  },
+  "complete": true
+}

@@ -1,0 +1,14 @@
+{
+  "replayCommit": "ecc72abe2aaa8956d21b7d1eafc76065d2f65b41",
+  "allBackendJsCount": 477,
+  "allBackendJsEqual": true,
+  "runtimeTreeHash": "d8b10a9cdbc61588ffef1d3b9f3bb6dc9b4c2c7aa2365507749db80cf67779ca",
+  "sourceChangesSinceReplayCommit": [],
+  "testOnlyRepair": true,
+  "publishedCommit": "71812bc04e9cb0abdfc9ada4090e8330e058b3b5",
+  "publishedBackendManifestOutputMatches": true,
+  "publishedBackendManifestSourceMatches": true,
+  "publishedRuntimeTreeMatchesReplay": true,
+  "publishedJsMatchesCandidate": true,
+  "publishedRunnerMatchesFrozen": true
+}

@@ -1,0 +1,35 @@
+{
+  "arms": [
+    "baseline-6668bd3",
+    "candidate-0068ba2",
+    "candidate-ecc72ab"
+  ],
+  "commits": [
+    "6668bd315aff1a4bb92375d5a9dfb01ec409303c",
+    "0068ba227b645fafc4490b7efef993b41bc2bcca",
+    "ecc72abe2aaa8956d21b7d1eafc76065d2f65b41"
+  ],
+  "turnCounts": [
+    48,
+    48,
+    48
+  ],
+  "comparisonKeys": {
+    "runnerHash": true,
+    "memoryHelperHash": true,
+    "scenariosHash": true,
+    "configHash": true,
+    "effectiveConfigHash": true,
+    "personaHash": true,
+    "personaLibraryHash": true,
+    "selectedScenarioHashes": true,
+    "schedulerConcurrency": true,
+    "scenarioProcesses": true,
+    "repetitions": true,
+    "memoryPolicy": true
+  },
+  "sameCaseKeys": true,
+  "uniqueAndComplete": true,
+  "platformAndStoreIsolated": true,
+  "noResampling": "scheduler preserves each unique case once, including failed checks; temporal provider variation remains"
+}

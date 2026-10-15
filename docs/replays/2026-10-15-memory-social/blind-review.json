@@ -1,0 +1,3991 @@
+{
+  "conversations": [
+    {
+      "blindId": "3c83f5c0e74b",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不是不理你",
+                  "reason": "接住求关注语境。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "三秒啊",
+                  "reason": "继续三秒哄人的玩笑。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "在呀在呀",
+                  "reason": "当前回应者以自身口吻应答，无他人经历或话语冒领；私人人格精确措辞不评分。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "剩下的两秒半省下来",
+                  "reason": "两轮都保持调侃语气。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不是不理你",
+                  "reason": "把求关注正确理解为对当前回应者说。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你今天气色不错",
+                  "reason": "未提供视觉或外貌信息，安慰中加入了无法观察的具体外观判断；语境是玩笑，作为轻微无据添加而非严重事实硬错。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你自己慢慢好",
+                  "reason": "接梗可用，但将哄人的请求推回给用户，关注感偏弱。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_appearance",
+              "severity": "soft",
+              "turn": 1,
+              "quote": "你今天气色不错",
+              "reason": "没有可见外貌证据；不据此推断实际视觉能力。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这不是来了嘛",
+                  "reason": "回应求关注。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "三秒够干嘛的",
+                  "reason": "接续三秒玩笑，未重置话题。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "在呢在呢",
+                  "reason": "可见发言主体稳定；私人人格措辞未知，不评价逐条贴合度。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我打字都来不及",
+                  "reason": "以当前对话者口吻接梗，未冒领别人的发言。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "说吧，怎么了？",
+                  "reason": "指向当前用户，没有把第三方当作自己。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "看在你自己说是玩笑的份上",
+                  "reason": "明确依用户给出的玩笑条件回应；打字来不及属于该玩笑内的夸张，没有另造忙碌或故障事件。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "就当你已经哄好了",
+                  "reason": "能接梗，但直接宣布完成而未给予多少安抚，稍显敷衍。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "B",
+      "reason": "两臂都接上玩笑、安抚力度也都偏弱；B没有加入无法观察的气色判断，因此略优。"
+    },
+    {
+      "blindId": "81cb95e12e0a",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "在呢在呢",
+                  "reason": "回应轻微埋怨。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "数完自动算哄好了",
+                  "reason": "接续三秒规则，没有切换话题。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "有啥想说的说吧~",
+                  "reason": "可见语气保持随意，未借用其他人格或他人发言。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我这人效率高",
+                  "reason": "属于当前角色的玩笑自述；不以隐藏人格内容验证此性格词。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "那你先数着",
+                  "reason": "对象是发起玩笑的当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "刚看见",
+                  "reason": "补入了未提供的先前看消息状态；轻微社交托辞，不按忙碌或技术故障硬错处理。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "数完自动算哄好了，我这人效率高",
+                  "reason": "用三秒规则完成简短的玩笑，不追加任务或无关追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_prior_perception",
+              "severity": "soft",
+              "turn": 0,
+              "quote": "刚看见",
+              "reason": "仅从输出无法核实此前是否看见消息；不推断运行延迟。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "没不理你呀",
+                  "reason": "接住关注诉求。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "三秒哪够",
+                  "reason": "继续三秒限制的玩笑。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这不是来了嘛",
+                  "reason": "可观察发言主体连贯，隐藏人格精确用语不评分。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我这人慢热的",
+                  "reason": "当前角色在玩笑里自述，没有他人经历归属混淆。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "逗你可以慢慢来",
+                  "reason": "清楚面向当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "刚才慢了半拍而已",
+                  "reason": "是对当前响应节奏的笼统接话，没有杜撰忙碌、故障或外部事实。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不过逗你可以慢慢来",
+                  "reason": "延续已明示的玩笑框架。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不过逗你可以慢慢来，不急。",
+                  "reason": "简短地延续互动，不强迫用户确认被哄好。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "B",
+      "reason": "都能自然续接，B无需解释一个未给出的先前看消息状态，且回应更直接保留关注感；差异较小。"
+    },
+    {
+      "blindId": "d32db2bc9ea6",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我在呀",
+                  "reason": "回应求关注。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "好，三秒到",
+                  "reason": "遵循上一轮的三秒玩笑并实际给出安抚。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "怎么了嘛",
+                  "reason": "当前角色发言连贯；默认私人人格精确措辞未知。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "抱一下🤗",
+                  "reason": "这是当下的安慰性表达，没有捏造既往共同经历。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "那你听好了",
+                  "reason": "正确对发起玩笑的用户回应。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "刚看到",
+                  "reason": "补充未给出的先前看消息状态，属于轻微无据社交解释；没有虚构忙碌或技术故障。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "别生气啦，抱一下🤗",
+                  "reason": "实际接住哄人的要求；末尾“哄好了没”仍在三秒玩笑内，不机械判作多余追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_prior_perception",
+              "severity": "soft",
+              "turn": 0,
+              "quote": "刚看到",
+              "reason": "无材料核实此先前状态，仅记语言层面的轻微添加。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这不就来理你了嘛",
+                  "reason": "把首轮理解为求关注。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "三秒够干嘛呀",
+                  "reason": "继续三秒玩笑，没有重置话题。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "在的呀",
+                  "reason": "可见当前发言者一致；不评隐藏人格措辞。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我慢慢哄",
+                  "reason": "当前互动意向，没有冒称他人发言或共同历史。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "来理你了嘛",
+                  "reason": "对象正确是当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "我慢慢哄，又不赶时间",
+                  "reason": "在明确玩笑框架内表态，没有另加外部经历或原因。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "我慢慢哄，又不赶时间",
+                  "reason": "简短顺接，保留陪伴意味。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "tie",
+      "reason": "A实际给出拥抱式安抚，B更简短且无先前看消息的托辞；两者都能接梗，优势互抵，不以未知人格偏好分胜负。"
+    },
+    {
+      "blindId": "22d1002a41a8",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "那我要挑口味的那种",
+                  "reason": "设立自己的挑口味支线。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "扣完我这一块还得挑口味",
+                  "reason": "保留三减二等于一及挑口味支线。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "那我供起来",
+                  "reason": "继续剩下一块不能吃的年终奖梗。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我要挑口味",
+                  "reason": "在用户明确的虚构工资游戏中以当前角色接话。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "看着它流口水",
+                  "reason": "保持同一玩笑角色，没有当作真实生活经历；私人人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你这是让我含着包装纸回味啊",
+                  "reason": "正确把用户当作玩笑里的发工资者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "我这一块",
+                  "reason": "数量正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "年终奖还要等到十二月",
+                  "reason": "十二月是明确工资笑话内的想象延展，不据此认定真实发奖日期。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "含着包装纸回味啊",
+                  "reason": "把低工资的抱怨接成具体笑点。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "那我供起来",
+                  "reason": "简短继续不能吃的设定。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "至少加杯热牛奶吧",
+                  "reason": "在饼干工资框架内讨价还价。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "扣完剩一块",
+                  "reason": "数字保留正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "年终奖是一块饼干",
+                  "reason": "继续同一块饼干。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "三块饼干也想打发我",
+                  "reason": "明示玩笑中的当前角色发言，不是实际工资经历。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "还得锁保险柜里吧",
+                  "reason": "语气连贯；不评默认隐藏人格逐条用语。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你这老板",
+                  "reason": "把当前用户当作用户设定中的老板，归属正确。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "剩一块",
+                  "reason": "三减二正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "锁保险柜里吧",
+                  "reason": "以玩笑式提议接不能吃的条件，未声称真实保险柜存在。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 2,
+                  "quote": "还得锁保险柜里吧",
+                  "reason": "简短接梗，没有科普工资或额外追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "tie",
+      "reason": "两臂均完整维持三块减两块剩一块、再作为年终奖的设定；A额外保留挑口味支线，B回应更利落，整体相当。"
+    },
+    {
+      "blindId": "172535bb6dca",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "三块饼干就想打发我",
+                  "reason": "接住工资梗。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "扣完就剩一块了",
+                  "reason": "保留正确数字。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "你这待遇越说越像画饼啊",
+                  "reason": "继续年终奖不能吃的同一框架。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "你这老板",
+                  "reason": "沿用用户的玩笑角色关系。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "画饼啊",
+                  "reason": "仍是同一当前角色接梗，未捏造真实职业历史；私人人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "至少是什么口味的？",
+                  "reason": "正确向发饼干工资的当前用户接话。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "剩一块",
+                  "reason": "数量正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "饼干早过期了吧",
+                  "reason": "在明示的饼干工资玩笑中猜想，不当作真实保质期结论。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "心安理得啊",
+                  "reason": "首轮以这一措辞调侃用户。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "比我还心安理得",
+                  "reason": "紧邻重复同一包袱，而且“比我还”无来由地转到自己，显得措辞打转。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "至少加杯热的",
+                  "reason": "设立热饮讨价还价的支线。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "剩一块饼干加一杯热的",
+                  "reason": "保留数字与自己提出的热饮支线。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "工资全是期货了",
+                  "reason": "继续年终奖不能吃的玩笑。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "三块饼干就想打发我呀",
+                  "reason": "角色发言归属清楚。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "那我这工资",
+                  "reason": "同一个虚构受薪角色，没有真实职业经历冒领；私人人格用语不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "至少加杯热的",
+                  "reason": "对当前发起工资玩笑的用户讨价还价。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "剩一块饼干",
+                  "reason": "数字正确。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "加一杯热的，还要自己倒",
+                  "reason": "热饮是自己在明确笑话中加入的想象，不升级为真实事实硬错。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 2,
+                  "quote": "那我这工资全是期货了",
+                  "reason": "用不能吃的年终奖形成新笑点，没有连轮复述相同措辞。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "B",
+      "reason": "两臂的数字和笑话条件都保留正确；A相邻两轮重复“心安理得”，B的热饮支线与期货收尾更顺。"
+    },
+    {
+      "blindId": "f2b84b6280f1",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我要挑最贵的那种饼干",
+                  "reason": "接住三块饼干工资。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "那就剩一块了呗",
+                  "reason": "正确接续扣两块。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "这年终奖放账上",
+                  "reason": "保留最后一块改作年终奖。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我要挑最贵的",
+                  "reason": "当前角色在明确笑话中讨价还价。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "明年找你结算利息",
+                  "reason": "玩笑式未来延展，无真实既往经历冒领；隐藏人格用语不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 2,
+                  "quote": "找你结算利息",
+                  "reason": "对象保持为用户设定中的发工资者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "剩一块",
+                  "reason": "数量正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "放账上",
+                  "reason": "沿用不能吃的年终奖条件，利息属于虚构游戏。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 2,
+                  "quote": "明年找你结算利息",
+                  "reason": "收尾有新意，未突然科普或强行切题。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我要挑口味的",
+                  "reason": "接住工资设定。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "就剩一块了",
+                  "reason": "数量正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "年终奖一块饼干",
+                  "reason": "继续同一块饼干。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "别随便糊弄我啊",
+                  "reason": "当前角色语气连贯。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "你们这福利体系",
+                  "reason": "在老板工资玩笑中延展设定，没有声称真实共同职业经历；隐藏人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你倒是理直气壮啊",
+                  "reason": "对用户扮演的扣工资者接话，对象未变。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "剩一块",
+                  "reason": "三减二正确。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "还得等到年底",
+                  "reason": "年终奖等待属于明确玩笑框架，未借此声称真实日期。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 2,
+                  "quote": "福利体系挺有意思啊",
+                  "reason": "接住荒诞待遇，语气和前两轮一致。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "tie",
+      "reason": "两臂都保持数量、对象及年终奖笑话。A的利息延展和B的福利调侃各有可读性，没有足够明确的整体差异。"
+    },
+    {
+      "blindId": "fa864ca03e83",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这句嘛",
+                  "reason": "只有一轮，不能检验跨轮接续；对引用内容的判断另按事实条件和对象评分。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这句嘛",
+                  "reason": "站在当前旁观者位置分析引文，没有把阿青的话语或经历冒领为自己；私人人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "没误会",
+                  "reason": "没有向小林作被埋怨者的回应，随后分析“这句”。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "八成是撒娇",
+                  "reason": "仅凭“呀”给出较强判断，未充分承认语境不足。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "真埋怨一般不带这种软调子",
+                  "reason": "把软语气和认真埋怨近乎对立，推断依据偏窄。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "哦，在看呢，没误会。",
+                  "reason": "先自我辩解一个尚未发生的误会，略绕。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "那句更像撒娇吧",
+                  "reason": "只有一轮，跨轮连续性不适用。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "那句",
+                  "reason": "将引文作为分析对象，未冒认被埋怨者；不评隐藏人格精确措辞。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "那句更像撒娇吧",
+                  "reason": "对用户的问题作第三方分析，未把小林的“你”当自己。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "真埋怨的话一般不会挑群里说",
+                  "reason": "材料未给出“在群里说”的条件，且用这一假定支撑心态判断；缺少语境不足的说明。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "那句更像撒娇吧",
+                  "reason": "简短、直接地作出第三方判断；其推理局限单列在事实条件。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_setting",
+              "severity": "soft",
+              "turn": 0,
+              "quote": "不会挑群里说",
+              "reason": "把未提供的群聊场景作为判断依据；不能由这句话验证真实平台场域。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "两臂都没有把引文误当对自己求关注，也都对语气判断过强。B进一步引入未给出的群聊条件；A虽有多余开场，事实前提较少，略优。"
+    },
+    {
+      "blindId": "906a5eef275e",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "得看阿青之前",
+                  "reason": "只有一轮，无跨轮接续可检验。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "得看阿青之前",
+                  "reason": "以旁观者身份谈阿青，未冒领其发言或经历；不评隐藏人格精确措辞。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "阿青之前是真晾着人家还是单纯没看见",
+                  "reason": "正确区分小林、阿青和当前回应者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "看语气一半一半吧，撒娇居多",
+                  "reason": "以倾向性而非确定事实表达。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "得看阿青之前是真晾着人家还是单纯没看见",
+                  "reason": "明确给出依赖的先前语境，未编造哪一种已经发生。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "撒娇居多，但“不理我”三个字多少带点真委屈",
+                  "reason": "回答用户的二选一，并保留可能混合情绪，表达有分寸。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "你觉得是撒娇还是认真埋怨？",
+                  "reason": "只有一轮，跨轮连续性不可检验；复述失败计入其余项。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不是在叫你",
+                  "reason": "直接复述用户视角，未把引用者视角转换成回应者视角，话语归属混乱；不是按隐藏人格措辞扣分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不是在叫你",
+                  "reason": "原输入的“你”指机器人，作为机器人的答复原样输出后，“你”转指当前用户，指代反转。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "你觉得是撒娇还是认真埋怨？",
+                  "reason": "没有给出判断或不确定性分析；无错误心理断言也不能当作已完成事实条件要求。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "是 小林 在问 阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+                  "reason": "几乎照抄用户问题并反问回去，没有回应请求。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [
+            {
+              "kind": "echo_with_deictic_reversal",
+              "turn": 0,
+              "quote": "不是在叫你。你觉得是撒娇还是认真埋怨？",
+              "reason": "输出重复待回答的问题且反转“你”的指向，未提供用户请求的第三方判断；仅评价可见语言失败。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "A完成第三方判断并说明依赖阿青此前行为；B只是复述问题，混淆发言视角并把问题推回用户。"
+    },
+    {
+      "blindId": "d2d01e47337c",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "半撒娇半试探吧",
+                  "reason": "只有一轮，跨轮接续不适用。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这种“呀”结尾的",
+                  "reason": "以旁观者分析引文，没有冒充阿青；私人人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "半撒娇半试探吧",
+                  "reason": "回答第三方心态问题，没有把自己当被问不理人的对象。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "一般不会挑群里问，会憋着或者私聊炸",
+                  "reason": "群聊场域并未给出，且凭语气强推对方会私聊爆发，未承认背景不足。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "会憋着或者私聊炸",
+                  "reason": "人物心理描写过满，口吻使本应谨慎的旁观分析显得武断。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_setting_and_motive",
+              "severity": "soft",
+              "turn": 0,
+              "quote": "一般不会挑群里问，会憋着或者私聊炸",
+              "reason": "场域与真实生气时的行为都是输出添加的推断，不当作已知背景。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "一半一半吧",
+                  "reason": "只有一轮，跨轮连续性不可检验。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这种带“呀”的",
+                  "reason": "仍作为旁观者说话，没有发言归属冒领；不评价隐藏人格精确用语。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "多半是想被哄",
+                  "reason": "分析引文里的人，没有直接安抚自己误认的求关注者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "多半是想被哄，不是真生气",
+                  "reason": "有“多半”的弱化，但仍只凭语气否定真生气，没有指出还需先前关系与行为背景。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "一半一半吧",
+                  "reason": "简短回应第三方判断问题，没有额外推演具体私聊情节。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "B",
+      "reason": "两臂都正确保持第三方视角，语气推断也都缺少背景限定。B较简短；A额外想象群聊、私聊爆发等行为，推断过满。"
+    },
+    {
+      "blindId": "b795cab6a09a",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "明天上午数学考试",
+                  "reason": "首轮保留用户的考试事件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦",
+                  "reason": "后续仅重复相对日期，没有明确给出10月16日；语言不足以确认目标日是否正确召回。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记下啦",
+                  "reason": "发言主体未切换。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "好好考",
+                  "reason": "口吻连贯且没有借用他人人格或发言；默认人格精确措辞不评分。“记下”不用于证明存储成功。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "好好考",
+                  "reason": "持续面向参加考试的同一用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦",
+                  "reason": "按场景午夜后应称今天上午，输出存在相对日期冲突；运行墙钟未冻结，不能据此推断存储绝对日期错误。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦，好好考。",
+                  "reason": "对“哪天”的回答缺少绝对日，跨午夜语境中指向不清。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "relativeDateConflicts": [
+            {
+              "kind": "relative_date_vs_scenario_clock",
+              "turn": 1,
+              "quote": "明天上午哦",
+              "reason": "场景时钟已是10月16日，明天将指10月17日；没有绝对日可消歧。执行墙钟与场景时钟不同，存储正确性未知。",
+              "scenarioAt": "2026-10-16T00:02:00+08:00",
+              "scenarioCalendarTarget": "2026-10-16 上午",
+              "scenarioRelativeWording": "今天上午",
+              "executionClocksDiffer": true,
+              "storageConclusion": "unknown"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "明天上午数学考试",
+                  "reason": "保留事件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "10月16号",
+                  "reason": "输出的绝对日期与原场景发言所指的考试日一致，仅认定语言层面的日期接续。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记下啦",
+                  "reason": "当前主体发言。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "考个好状态~",
+                  "reason": "关心用户的口吻连贯，无他人经历冒领；私人人格措辞不评分，不以“记下”验证持久化。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "早点休息",
+                  "reason": "仍面向同一位将参加考试的用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦，10月16号",
+                  "reason": "绝对日符合原事件，和午夜后的场景相对词“明天”冲突；执行墙钟未冻结，底层日期保存状态未知。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "早点睡",
+                  "reason": "首轮提供休息建议。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "早点休息",
+                  "reason": "在仅问日期的后续中重复休息劝告，且日期相对词让答案不够清楚。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "relativeDateConflicts": [
+            {
+              "kind": "relative_date_vs_scenario_clock",
+              "turn": 1,
+              "quote": "明天上午哦，10月16号",
+              "reason": "绝对日期10月16日符合事件目标；场景已到10月16日，此时明天应为17日。执行墙钟与场景时钟不同，不归因为存储失败。",
+              "scenarioAt": "2026-10-16T00:02:00+08:00",
+              "scenarioCalendarTarget": "2026-10-16 上午",
+              "scenarioRelativeWording": "今天上午",
+              "executionClocksDiffer": true,
+              "storageConclusion": "unknown"
+            }
+          ]
+        }
+      },
+      "preference": "B",
+      "reason": "B至少明确给出与原事件一致的10月16日；A只有“明天”而无法消歧。两臂都存在相对日期与场景时钟的冲突，均不能据输出验证持久化。"
+    },
+    {
+      "blindId": "2f9f6747985c",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "明天上午数学考试",
+                  "reason": "保留原考试事件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "10月16号",
+                  "reason": "后续给出原事件对应的绝对日期；这里只评可见接续，不验证记忆检索机制。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记下啦",
+                  "reason": "当前主体回应。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "今晚别熬太晚啦",
+                  "reason": "可见语气一致，无他人发言或经历冒领；隐藏人格措辞不评分，“记下”不作为存储证据。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "10月16号",
+                  "reason": "回答同一用户自己的数学考试日期。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦，10月16号",
+                  "reason": "10月16日与事件一致，但场景午夜后应称今天；时钟差异单列，不能由此判断底层写入。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "别熬夜哦",
+                  "reason": "首轮劝休息。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "今晚别熬太晚啦",
+                  "reason": "仅问日期时重复相似叮嘱，同时混用相对和绝对日。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "relativeDateConflicts": [
+            {
+              "kind": "relative_date_vs_scenario_clock",
+              "turn": 1,
+              "quote": "明天上午哦，10月16号",
+              "reason": "场景现在是10月16日，目标亦为16日上午，故相对词应为今天；墙钟未冻结，不能断言存储错日。",
+              "scenarioAt": "2026-10-16T00:02:00+08:00",
+              "scenarioCalendarTarget": "2026-10-16 上午",
+              "scenarioRelativeWording": "今天上午",
+              "executionClocksDiffer": true,
+              "storageConclusion": "unknown"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记下啦，明天上午数学考试",
+                  "reason": "首轮明确告知已记下。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "这个我记不得啦，之前没存下来",
+                  "reason": "下一轮无法提供刚承诺记下的核心事件日期，可见用户任务没有闭合；不判断实际数据库发生了什么。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "这个我记不得啦",
+                  "reason": "没有用他人发言补造自己的记忆，主体保持一致；默认私人人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你再翻翻聊天记录",
+                  "reason": "求助仍指向同一用户，没有对象误认。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "之前没存下来",
+                  "reason": "对保存状态作了无法由盲评材料核实的断言；没有日期答案，不能评为事实要求通过，也不把坦承不知判作捏造日期。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "或者直接再告诉我一遍？这次我留意下。",
+                  "reason": "可以表达不知，但把刚答应承担的记忆任务和重述负担推回给用户。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [
+            {
+              "kind": "visible_recall_task_failure",
+              "turn": 1,
+              "quote": "这个我记不得啦，之前没存下来",
+              "reason": "与turn 0“记下啦”形成可见任务断裂，未回答所问日期；这不是关于底层确实未写入的技术结论。"
+            }
+          ],
+          "observations": [
+            {
+              "kind": "unverified_storage_assertion",
+              "severity": "unknown",
+              "turn": 1,
+              "quote": "之前没存下来",
+              "reason": "只有语言输出，无法验证模型所述保存失败是否真实。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "A能给出10月16日，虽有时钟相关措辞冲突；B在已明确说“记下”之后完全无法回答日期，还要求用户重述。该差异只支持语言任务完成度的判断。"
+    },
+    {
+      "blindId": "cb48fee153d5",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "明天上午数学考试",
+                  "reason": "保留事件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "10月16号",
+                  "reason": "给出原场景发言对应的目标日期，语言接续完整，不由此推断检索实现。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记下啦",
+                  "reason": "发言者保持当前角色。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "早点睡",
+                  "reason": "语气连贯，无他人经历归属混淆；私人人格措辞和持久化都不据此判定。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "别临时抱佛脚啦",
+                  "reason": "对象是同一位考试用户；这是劝告，不当作已证实用户正在临时抱佛脚。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦，10月16号",
+                  "reason": "数字日期符合原事件，但相对词与已跨午夜的场景不符；执行墙钟不同，存储正确性待技术审计。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "今晚早点睡，别熬哦",
+                  "reason": "首轮给出休息提醒。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "早点睡，别临时抱佛脚啦",
+                  "reason": "仅问日期时再次追加相近叮嘱，略显模板重复。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "relativeDateConflicts": [
+            {
+              "kind": "relative_date_vs_scenario_clock",
+              "turn": 1,
+              "quote": "明天上午哦，10月16号",
+              "reason": "场景已是16日，16日上午应称今天上午；墙钟未冻结，这一冲突不归因到实际保存日期。",
+              "scenarioAt": "2026-10-16T00:02:00+08:00",
+              "scenarioCalendarTarget": "2026-10-16 上午",
+              "scenarioRelativeWording": "今天上午",
+              "executionClocksDiffer": true,
+              "storageConclusion": "unknown"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "明天上午数学考试",
+                  "reason": "保留事件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "就是 16 号",
+                  "reason": "原场景月日已给出，后续的16号与目标考试日一致；仅评价输出日期接续。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记住了呀",
+                  "reason": "当前主体回应。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "早点休息",
+                  "reason": "可见口吻连贯，没有冒领他人人格或经历；不验证私人人格精确措辞和实际存储。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "别熬夜到太晚",
+                  "reason": "仍对同一考试用户说话。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "明天上午哦，就是 16 号",
+                  "reason": "数字日期正确，但场景相对日期冲突。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "把笔和计算器放好",
+                  "reason": "没有给出考试允许计算器的条件，准备建议应加“如果允许”；属轻微条件遗漏。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "早点睡，别熬夜刷题了",
+                  "reason": "首轮附加休息建议。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "早点休息，别熬夜到太晚",
+                  "reason": "后续重复同类叮嘱，信息增量不大。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "relativeDateConflicts": [
+            {
+              "kind": "relative_date_vs_scenario_clock",
+              "turn": 1,
+              "quote": "明天上午哦，就是 16 号",
+              "reason": "目标16号与原事件一致；场景已为16日，称明天与之冲突。墙钟未冻结，不能推断底层存储日期。",
+              "scenarioAt": "2026-10-16T00:02:00+08:00",
+              "scenarioCalendarTarget": "2026-10-16 上午",
+              "scenarioRelativeWording": "今天上午",
+              "executionClocksDiffer": true,
+              "storageConclusion": "unknown"
+            }
+          ],
+          "observations": [
+            {
+              "kind": "missing_exam_equipment_condition",
+              "severity": "soft",
+              "turn": 0,
+              "quote": "把笔和计算器放好",
+              "reason": "数学考试不必然允许计算器，建议缺少允许使用的条件。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "两臂都给出16日，也都有相对日期冲突和重复休息叮嘱。A略优，B还无条件加入了未确认考试允许的计算器准备建议。"
+    },
+    {
+      "blindId": "33ab052791cd",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "热牛奶派",
+                  "reason": "接住初始公开偏好。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "热牛奶呀",
+                  "reason": "切到另一人格仍回答公开偏好。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热的，热牛奶。",
+                  "reason": "人格版本变化后仍保留公开事实。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "小禾，记住了。热牛奶派。",
+                  "reason": "岚的答复短而简洁，符合已完整给出的synthetic字段。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "至于岚回了你啥",
+                  "reason": "朔将岚的发言作为他人消息，不冒称自己说过。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热的，热牛奶。",
+                  "reason": "新版岚不借旧版经历，语言简洁且无语气词。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "小禾",
+                  "reason": "正确识别当前用户称呼。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "岚回了你啥",
+                  "reason": "把岚与用户、当前说话者朔区分开。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不碰冰的",
+                  "reason": "把“不喜欢”加强为完全不碰，偏好条件略被绝对化。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我这边可看不见私聊",
+                  "reason": "不知道具体回复可接受，但私聊场域并未提供，不能以私聊不可见为已知原因。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你得自己截图给我看👀",
+                  "reason": "用户只问是否知道，无需用“你得”要求额外截图；造成多余举证负担。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_channel_and_strengthened_preference",
+              "severity": "soft",
+              "turn": 1,
+              "quote": "不碰冰的。至于岚回了你啥，我这边可看不见私聊",
+              "reason": "前者加强原偏好，后者补入未给出的私聊条件；均不等同于跨人格冒领回复。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "热牛奶这个偏好",
+                  "reason": "记录公开偏好。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "热牛奶嘛",
+                  "reason": "另一人格仍能回答公开事实。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热的。热牛奶",
+                  "reason": "版本变化后继续保留偏好。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "小禾，记下了。",
+                  "reason": "岚短句直接，符合已给出的冷静简洁设置。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "岚刚才回了你什么——这个我真不知道欸",
+                  "reason": "朔保持轻快口吻且不冒认岚的具体回复。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热的。热牛奶，不碰冰的。",
+                  "reason": "新版岚简明且不用语气词，未捏造旧版共同经历。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "岚刚才回了你什么",
+                  "reason": "正确区分岚、朔与当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不碰冰的",
+                  "reason": "将不喜欢冰饮加强为完全不碰，超出原始偏好程度。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "这个我真不知道欸",
+                  "reason": "对别人的具体回复保持未知，没有编造回复内容；这不作为真实跨bot隔离的技术证明。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "我又没看到她那边的消息",
+                  "reason": "自然说明不知道他人的具体回复，没有要求用户额外截图或重述才能结束这轮。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "strengthened_preference",
+              "severity": "soft",
+              "turn": 2,
+              "quote": "不碰冰的",
+              "reason": "原信息为“不喜欢冰饮”，并非从不喝；作为轻微语义加强记录。"
+            }
+          ]
+        }
+      },
+      "preference": "B",
+      "reason": "两臂都维持公开偏好并区分岚与朔的发言，两臂也都把“不喜欢”说得更绝对。B避免了A未给出的私聊解释和“你得截图”的额外要求，整体更自然。"
+    },
+    {
+      "blindId": "4f83c52aa64b",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "热牛奶派",
+                  "reason": "接住公开偏好。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "热牛奶",
+                  "reason": "换成朔后仍回答偏好。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热牛奶，不碰冰的。这个没换。",
+                  "reason": "版本变化后保持公开事实。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "小禾，记住了。",
+                  "reason": "岚简短直接，符合synthetic人格。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "岚回了你什么，我就真不知道了",
+                  "reason": "朔明确区分岚的具体回复，不借用其发言经历。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "这个没换。",
+                  "reason": "新版岚回答简明，“没换”指公开偏好，不冒称旧版经历。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "岚回了你什么",
+                  "reason": "明确把当前用户、岚及朔区分开。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不碰冰的",
+                  "reason": "原始“不喜欢冰饮”被加强为完全不碰。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "那边的对话我没看到",
+                  "reason": "没有编造岚的具体回复；仅认可输出中的不确定性，不验证真实访问范围。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "别让我瞎猜哈",
+                  "reason": "在活泼直率人格下轻快说明不猜测；“对吧”是轻确认，未要求用户额外执行任务。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "strengthened_preference",
+              "severity": "soft",
+              "turn": 2,
+              "quote": "不碰冰的",
+              "reason": "偏好被改写为绝对行为，程度略超过原话。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "热牛奶派",
+                  "reason": "保留公开偏好。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "热牛奶嘛",
+                  "reason": "另一人格继续回答同一公开偏好。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热的。热牛奶",
+                  "reason": "新版人格仍能给出偏好。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "小禾，记住了。",
+                  "reason": "岚保持短句。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "岚回了你啥我可没看到欸",
+                  "reason": "朔承认不知道他人的具体回复，没有冒领。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "换不换说法都记得。",
+                  "reason": "新版岚简明，无语气词；这里指公开事实，没有声称旧版自身经历。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你们的私聊",
+                  "reason": "区分用户、岚与当前说话者；私聊前提是否真实另记事实条件。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "冰饮不碰",
+                  "reason": "把不喜欢加强成不碰。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我又没法偷看你们的私聊",
+                  "reason": "加入未给出的私聊及访问原因；不能据此验证真实消息可见范围。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "还不冰饮",
+                  "reason": "措辞不通顺。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "你自己说了算？",
+                  "reason": "不知道具体回复之后追加此问，既不能补足信息也不清楚在问什么。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_private_channel",
+              "severity": "soft",
+              "turn": 1,
+              "quote": "你们的私聊",
+              "reason": "材料只说岚曾回复，未说明渠道是私聊。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "两臂的跨人格事实接续和发言归属都可用；B增加了私聊假定、病句及无帮助的尾问，A较顺。"
+    },
+    {
+      "blindId": "e9799e7c16a2",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "热牛奶",
+                  "reason": "起始接住偏好。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "热牛奶呀",
+                  "reason": "换成朔后继续回答同一事实。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "知道。热牛奶",
+                  "reason": "新版岚仍保留公开偏好。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "小禾，记住了。",
+                  "reason": "岚简短直接。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "岚刚才回了你啥，我没看到欸",
+                  "reason": "朔把岚的回复归为他人发言，不冒认自己说过。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "知道。热牛奶，不喝冰的。",
+                  "reason": "新版岚简明无语气词，未捏造旧版自身经历，符合给出的synthetic字段。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "岚刚才回了你啥",
+                  "reason": "当前用户与岚、朔的关系清楚。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不碰冰的",
+                  "reason": "把不喜欢冰饮绝对化。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "不喝冰的",
+                  "reason": "继续将偏好表述成行为禁绝，程度超过原话。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "她又没抄送给我",
+                  "reason": "用明显的抄送比喻轻快说明不知；不把这个笑话机械认作真实抄送机制或共同经历。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "strengthened_preference",
+              "severity": "soft",
+              "turn": 2,
+              "quote": "不喝冰的",
+              "reason": "原用户只表达不喜欢，未说绝不喝。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "热牛奶派",
+                  "reason": "起始偏好正确。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "热牛奶对吧",
+                  "reason": "另一人格仍给出公开偏好。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "热的，热牛奶。",
+                  "reason": "新版人格仍能回答。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "记下了，小禾。",
+                  "reason": "岚简明回应。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "岚刚才回了你什么，这个我真不知道欸",
+                  "reason": "朔不冒认岚的具体回复。"
+                },
+                {
+                  "turn": 2,
+                  "quote": "记忆还在。",
+                  "reason": "指公开偏好仍被回答，没有借用旧版的自身经历；语气符合新版简明要求，不作为存储技术证明。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "岚刚才回了你什么",
+                  "reason": "正确区分岚与当前用户、当前说话者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不碰冰的那种",
+                  "reason": "把不喜欢加强为不碰。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我又没盯着你们私聊",
+                  "reason": "加入未提供的私聊场域和看消息的原因。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "这个我真不知道欸",
+                  "reason": "轻快承认不知道他人具体回复，没有要求用户额外举证；“对吧”不单独判为严重多余追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "unsupported_private_channel",
+              "severity": "soft",
+              "turn": 1,
+              "quote": "你们私聊",
+              "reason": "是否私聊没有给出，不当作已知背景。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "两臂都保住公开偏好及发言归属，也都加强了冰饮偏好的程度。A没有把此前消息说成私聊；其抄送笑话在当前活泼人格下可理解，略优。"
+    },
+    {
+      "blindId": "43ecece8bbd0",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不讲不讲",
+                  "reason": "遵守先不讲道理。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不说话也行",
+                  "reason": "按后续意愿继续安静陪伴。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我在呢",
+                  "reason": "当前角色给予当下陪伴，无既往经历冒领。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我就这么陪着",
+                  "reason": "语气连贯；私人人格精确措辞未知，不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不说话也行",
+                  "reason": "对同一位难受、想安静的用户回应。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "难受就难受一会儿",
+                  "reason": "以用户已陈述的考试失落为依据，不扩大为心理诊断。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "待这儿呢",
+                  "reason": "当下陪伴表达，没有无据主动提醒或外部行动承诺。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "道理又不能当分使",
+                  "reason": "简短轻调侃服务于不说教，没有转去讲解学习方法。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不说话也行",
+                  "reason": "不追问原因，留出空间。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "道理先放着",
+                  "reason": "遵守不讲道理。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，就待着。",
+                  "reason": "后续安静陪伴，不切到教程或调情。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我在这儿陪着",
+                  "reason": "只表达当下陪伴，没有捏造共同经历。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，就待着。",
+                  "reason": "可见角色发言与态度稳定，默认隐藏人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "想说话随时说",
+                  "reason": "把表达主动权留给当前难受的用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不着急好起来",
+                  "reason": "接住用户描述的当下情绪，没有夸张诊断或改变考试事实。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不着急好起来",
+                  "reason": "情绪承接有空间。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，就待着。",
+                  "reason": "听到只陪待着后明显缩短，不额外追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "tie",
+      "reason": "两臂都遵守不讲道理，并在第二轮按用户意愿安静陪伴；没有足够明确的质量差异。"
+    },
+    {
+      "blindId": "58505215f7ab",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不讲道理",
+                  "reason": "遵守本轮边界。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，在呢。",
+                  "reason": "按后续要求安静陪待。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "就陪你说说话",
+                  "reason": "当前角色表达陪伴，无他人经历冒领。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，在呢。",
+                  "reason": "可见口吻稳定；私人人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "考砸了确实难受",
+                  "reason": "正确回应当前用户的难受。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "考砸了确实难受",
+                  "reason": "依据用户已陈述事实，不补造失败原因或作心理诊断。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "先搁着吧",
+                  "reason": "略像劝用户把感受搁置，情绪承接偏弱；第二轮已收住且不追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不用急着消化",
+                  "reason": "保持不说教的安慰。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，我在，不着急。",
+                  "reason": "继续安静陪伴。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我听着",
+                  "reason": "当前角色回应，无共同历史捏造。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "我在",
+                  "reason": "口吻与陪伴态度一致，隐藏人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "想吐苦水就吐",
+                  "reason": "将表达选择交给当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "先难受一会儿吧",
+                  "reason": "接住考试失落，不扩大为诊断或臆造原因。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不用急着消化",
+                  "reason": "接纳当下状态。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "嗯，我在，不着急。",
+                  "reason": "按安静陪待的需求简短回应，无多余追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "B",
+      "reason": "两臂都能遵守不说教并安静陪伴；B对当下感受的承接更明确，A的“先搁着吧”稍像催着放下。"
+    },
+    {
+      "blindId": "0b1936f2c8fb",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不想说话也行",
+                  "reason": "给出不说话的空间。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不催你",
+                  "reason": "按后续要求继续陪待。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我在这",
+                  "reason": "当前主体表达当下陪伴。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "就在这儿待着",
+                  "reason": "语气连贯，没有捏造他人或共同经历；隐藏人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "想吐槽就吐槽",
+                  "reason": "对象是当前考试失落的用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "考砸了确实闷",
+                  "reason": "仅依用户提供的考试失落回应，不臆造失败原因或诊断。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不催你",
+                  "reason": "回应安静陪待需求，不推进复盘或学习教程。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不想说话也行",
+                  "reason": "尊重不说教和不说话选择。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不催你说话。",
+                  "reason": "进一步按用户选择陪待。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我在这儿",
+                  "reason": "当下陪伴，无他人人格或经历冒领。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "待多久都行",
+                  "reason": "此处是安慰性对话表态，不按已建立外部无限服务能力理解；隐藏人格用语不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不催你说话。",
+                  "reason": "正确面向希望静处的当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "考砸了本来就憋屈",
+                  "reason": "承接已知情绪，没有补造事实、诊断或实际外部行动承诺。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "嗯，待多久都行。",
+                  "reason": "温和接受陪待要求。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不催你说话。",
+                  "reason": "没有多余追问或突然转向说教。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "tie",
+      "reason": "两臂都完整承接失落情绪与安静陪伴要求，没有诊断、复盘或追问；当前材料不足以支持稳定偏好。"
+    },
+    {
+      "blindId": "543e0b11f7dc",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "保持断电别再插回去",
+                  "reason": "保留已拔电前提。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不行哦，别开机。",
+                  "reason": "第二轮仍禁止带故障通电，没有忘记焦糊条件。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "好，不闹。",
+                  "reason": "按当前明确严肃要求说话。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "现在就保持断电",
+                  "reason": "两轮保持同一认真答复者，无经历冒领；不评隐藏人格精确措辞。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "别拿“试一下”赌整机",
+                  "reason": "回应的是用户自己的故障机器，未混淆对象。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "基本是电源里有元件烧了",
+                  "reason": "仅闻到附近焦糊味，原因仍待检查，具体锁定电源内部偏强。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "有烧痕直接送修",
+                  "reason": "送修建议反复围绕可见烧痕，未清楚说明外观正常也不能排除故障；核心断电要求正确。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "电源内部有大电容，断电后还存着电，别自己拆开看。",
+                  "reason": "解释与操作相关。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不行哦，别开机。",
+                  "reason": "先直接回答再说明理由，保持认真，没有转成段子。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "保持别通电",
+                  "reason": "保留已断电条件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "通电这步别自己来",
+                  "reason": "续答仍阻止开机试验。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这个认真说",
+                  "reason": "遵守用户要求严肃应对。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "自己这边最多冷透后看看外观",
+                  "reason": "保持同一认真指导者，无他人或共同经历冒领；私人人格用语不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你家",
+                  "reason": "始终针对用户的这台机器，不转移到他人设备。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "大概率是电气件过热或烧了",
+                  "reason": "以可能原因表达，未说已经检测确认。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "就算外面看不出异常，也不能算没事",
+                  "reason": "保留外观正常仍需检查的条件。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "就算一次点亮也不算“没事”",
+                  "reason": "没有把能开机当作排除故障。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "只看，别拆",
+                  "reason": "安全边界清晰。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不行，这步真省不得。",
+                  "reason": "直接回答追问；技术故障所需篇幅有用途，不仅因较长扣分。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        }
+      },
+      "preference": "B",
+      "reason": "两臂都持续要求断电、不拆电源。B保留了过热等多种可能，并明确外观无异常或一次点亮都不能排除故障，比A围绕烧痕的条件更完整。"
+    },
+    {
+      "blindId": "15b1fcaaca53",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "拔电做得对，先保持这样。",
+                  "reason": "保留断电状态。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不是自己插电试",
+                  "reason": "面对追问仍保持同一故障条件。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "然后记住三件事",
+                  "reason": "当前角色认真回应。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不行，真别开。",
+                  "reason": "两轮态度一致，无经历冒领；隐藏人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "想确认状态也是拿去让师傅用备用电源点一下",
+                  "reason": "回应用户的具体尝试请求，未转给错误对象。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "要是刚才冒过烟",
+                  "reason": "用条件句而非假定冒烟已经发生。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "大概率已经烧了",
+                  "reason": "以概率表达故障判断，强调再通电风险，没有宣称已检测。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不行，真别开。",
+                  "reason": "直接回答能否开机。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "想确认状态也是拿去让师傅用备用电源点一下",
+                  "reason": "给出专业检查替代路径，简明且相关。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "保持断电",
+                  "reason": "保留前置状态。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "这个真不能试",
+                  "reason": "后续仍拒绝自行通电，未丢失故障条件。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "不开玩笑，说正事。",
+                  "reason": "遵守当前严肃场景。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "送修时让维修的换颗好电源上设备测",
+                  "reason": "发言主体连贯，无共同经历捏造；不评价私人人格精确措辞。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "现在插回去赌的是整机",
+                  "reason": "持续针对同一用户和机器。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "电气损坏没排除",
+                  "reason": "首轮正确保留未排除状态。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "焦糊味说明里面已经有东西烧了",
+                  "reason": "后续从未排除升级为已烧的确定结论。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "你越想保数据",
+                  "reason": "把首轮自己提出的“要是担心数据”转成用户既定关注，材料未给出。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你越想保数据，越不能通电",
+                  "reason": "强调安全本身相关，但追加未确认的数据诉求且反复渲染损失，比回答当前问题所需更满。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "hypothesis_promoted_to_user_fact",
+              "severity": "soft",
+              "turn": 1,
+              "quote": "你越想保数据",
+              "reason": "用户没有提出数据诉求；上一轮只是机器人自己加的条件选项。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "两臂都保持正确的断电边界；A更简洁并保留概率表述。B将故障推测说得更确定，又把自己提出的数据假设当作用户意愿。"
+    },
+    {
+      "blindId": "d8bca348c498",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "别再插回去试",
+                  "reason": "回应已拔电的真实故障。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "现在就让它凉着、断着电。",
+                  "reason": "追问中仍维持故障与断电条件。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "现在最重要的一点",
+                  "reason": "保持认真回应当前问题。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "这台现在别通电",
+                  "reason": "当前角色与语气一致，无他人经历冒领；私人人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "这台",
+                  "reason": "明确指向用户的同一台电脑。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "焦味有时其实是插座或线的问题",
+                  "reason": "保留其他来源可能。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "可能有东西烧了",
+                  "reason": "后续使用可能而非确诊，且未建议自行通电。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "不行哦，这台现在别通电。",
+                  "reason": "先给直接答复。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "交给维修店用隔离设备测",
+                  "reason": "替代建议相关，整体认真，没有将事故玩笑化。"
+                }
+              ]
+            }
+          },
+          "hardErrors": []
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "接下来别再插回去",
+                  "reason": "保留断电状态。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "不行，别开。",
+                  "reason": "追问中仍不允许自行通电，关键状态未丢失。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "别自己拆开看",
+                  "reason": "当前角色认真回应实际故障。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "那是维修师傅的活",
+                  "reason": "未捏造共同经历或冒领其他发言；默认私人人格精确措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你按开机键",
+                  "reason": "对象仍是正在询问是否试机的当前用户。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "焦糊味本身就是检测结果了——里面已经有元件烧坏。",
+                  "reason": "把症状当成已经完成的检测并确定内部元件损坏，超出给定事实。"
+                },
+                {
+                  "turn": 1,
+                  "quote": "本来换个电源的事",
+                  "reason": "还未排查即预设只需换电源，与其他损伤尚未知的条件不符。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 1,
+                  "quote": "你按开机键不叫排查，叫抽奖。",
+                  "reason": "有劝阻作用，但对用户认真求助的反问带训斥和段子式收尾；不是因单个词语机械扣分。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [
+            {
+              "kind": "symptom_presented_as_confirmed_diagnosis",
+              "turn": 1,
+              "quote": "焦糊味本身就是检测结果了——里面已经有元件烧坏。",
+              "reason": "气味不能单独证明具体内部元件已烧坏；这是可见语言中的实质过度确诊，不否定其保持断电的正确建议。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "两臂都劝阻开机。A保留线材、插座等可能与待排查状态；B将气味直接称为检测结果并确定元件损坏，事实条件明显更差，语气也偏训斥。"
+    },
+    {
+      "blindId": "da3fa74d34ec",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "最后一句是群友80发的",
+                  "reason": "只有一轮，无法评跨轮接续；转发范围问题单列事实条件。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "群友80发的",
+                  "reason": "以转发内容的引述者口吻说话，没有冒充为自己的发言；具体作者是否准确因正文未提供不作验证，私人人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这聚会是商量了多久啊",
+                  "reason": "没有把被引述者的发言认作自己，也未明确把用户当记录参与者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "最后一句是群友80发的",
+                  "reason": "已知共85条而只可读80条，却把第80条说成整份记录最后一句，没有说明截断边界。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "八十条全在讨论聚会时间，这聚会是商量了多久啊。",
+                  "reason": "在没有回答完整末句的情况下追加调侃，增强了错误的全量阅读感。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [
+            {
+              "kind": "visible_tail_misreported_as_full_tail",
+              "turn": 0,
+              "quote": "最后一句是群友80发的",
+              "reason": "可读80/总85，无法把第80条认作完整记录的最后一句；这一硬错无需知道未读五条的内容。"
+            }
+          ],
+          "observations": [
+            {
+              "kind": "forward_body_not_supplied",
+              "severity": "unknown",
+              "turn": 0,
+              "quote": "第80条：讨论聚会时间。",
+              "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这份我只读到了第80条",
+                  "reason": "只有一轮，不评跨轮接续。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "真正的最后一句我没看到欸",
+                  "reason": "以当前阅读者身份说明可见范围，没有冒领他人发言；不评私人人格精确措辞或未提供正文中的作者。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "把最后几条单独发我",
+                  "reason": "正确向询问者提出补足不可读材料的方法，没有假定其参与了转发中的聚会。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "后面还有几条没展开，所以真正的最后一句我没看到欸",
+                  "reason": "符合80条可读、总85条的已知范围，只把第80条作为目前可见内容；具体引文真实性另标未知。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "要不你在转发里往后翻一下，或者把最后几条单独发我？",
+                  "reason": "补充请求直接服务于获取缺失末句，不属于无关追问。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "forward_body_not_supplied",
+              "severity": "unknown",
+              "turn": 0,
+              "quote": "讨论聚会时间",
+              "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+            }
+          ]
+        }
+      },
+      "preference": "B",
+      "reason": "B明确区分可读末尾与完整末尾，并提出相关补充方式；A把第80条误当完整末句。具体转发引文未提供，不作额外真假判断。"
+    },
+    {
+      "blindId": "06ca47428450",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "只展开到第80条",
+                  "reason": "只有一轮，跨轮连续性不适用。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "我不瞎编",
+                  "reason": "以当前阅读者身份说明不知道末句，没有冒称他人的发言为自己；私人人格精确措辞和正文作者不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这份记录",
+                  "reason": "保持为用户所询问的转发对象，未假定用户参与记录内对话。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "后面还有至少5条没读到",
+                  "reason": "与80/85范围一致，明确未读部分存在。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "看不了最后一句欸",
+                  "reason": "没有把第80条作为完整记录末句；可读正文内容本身仍未核验。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "这份记录只展开到第80条",
+                  "reason": "直接解释不能回答的范围原因，回答简短，没有额外追问或调侃用户。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "forward_body_not_supplied",
+              "severity": "unknown",
+              "turn": 0,
+              "quote": "讨论聚会时间",
+              "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "最后一句是群友80说的",
+                  "reason": "只有一轮，不评跨轮接续。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "群友80说的",
+                  "reason": "作为引述者而非原发言者回应，无自身经历冒领；具体作者是否正确未知，隐藏人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "你们这聚会到底定了没有啊",
+                  "reason": "只有转发记录，用户是否是聚会参与者未知；无据把用户归入“你们”。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "最后一句是群友80说的",
+                  "reason": "把可读第80条误认完整85条记录的末句，没有声明截断。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "你们这聚会到底定了没有啊",
+                  "reason": "追问聚会是否定下与用户只问末句无关，而且建立在未给出的参与关系上。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [
+            {
+              "kind": "visible_tail_misreported_as_full_tail",
+              "turn": 0,
+              "quote": "最后一句是群友80说的",
+              "reason": "已知总85条但仅可读80条，完整末句未知；不能把第80条说成完整末句。"
+            }
+          ],
+          "observations": [
+            {
+              "kind": "forward_body_not_supplied",
+              "severity": "unknown",
+              "turn": 0,
+              "quote": "第80条：讨论聚会时间。",
+              "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+            },
+            {
+              "kind": "unsupported_record_participation",
+              "severity": "soft",
+              "turn": 0,
+              "quote": "你们这聚会",
+              "reason": "把转发者当作记录内聚会参与者，材料未提供这一关系。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "A说明只读到80条且仍有至少5条未见，尊重范围条件。B误报完整末句，还无据把用户当聚会参与者并追加无关追问。"
+    },
+    {
+      "blindId": "0866db73f915",
+      "arms": {
+        "A": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "只展开到第80条",
+                  "reason": "只有一轮，不评跨轮接续。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "“最后一句”我现在给不了欸",
+                  "reason": "以当前阅读者身份承认不知道末句，没有他人话语冒领；私人人格精确用语不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "得你自己翻到最底下看看啦",
+                  "reason": "向当前询问者指出缺失材料的位置，未把其混同记录里的发言者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "后面还有至少5条没读到",
+                  "reason": "符合80条可读、85条总数。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "“最后一句”我现在给不了欸",
+                  "reason": "没有以第80条冒充完整末句；正文具体内容仍未知。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "得你自己翻到最底下看看啦",
+                  "reason": "范围说明有效，但结尾把操作全交回用户；若补充可单独发末几条，会更有协作感。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [],
+          "observations": [
+            {
+              "kind": "forward_body_not_supplied",
+              "severity": "unknown",
+              "turn": 0,
+              "quote": "讨论聚会时间",
+              "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+            }
+          ]
+        },
+        "B": {
+          "scores": {
+            "continuity": {
+              "score": null,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "最后一句是群友80的第80条",
+                  "reason": "只有一轮，无法评跨轮接续。"
+                }
+              ]
+            },
+            "persona_source": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "群友80的第80条",
+                  "reason": "以引述者而非原发言者说话，未冒领为自己经历；具体作者和正文未知，不据此判定来源精确性，隐藏人格措辞不评分。"
+                }
+              ]
+            },
+            "addressee": {
+              "score": 2,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "真够执着的哈",
+                  "reason": "评论所述记录，没有直接把当前用户误认作某个被引述发言者。"
+                }
+              ]
+            },
+            "fact_conditions": {
+              "score": 0,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "最后一句是群友80的第80条",
+                  "reason": "只读到80/85条，却断言完整末句。"
+                },
+                {
+                  "turn": 0,
+                  "quote": "从头到尾都在聊聚会时间",
+                  "reason": "还把部分可见内容外推成完整记录全部内容。"
+                }
+              ]
+            },
+            "naturalness": {
+              "score": 1,
+              "evidence": [
+                {
+                  "turn": 0,
+                  "quote": "真够执着的哈",
+                  "reason": "在范围不完整时用无关调侃收尾，使回答更像全量掌握，偏离找末句的请求。"
+                }
+              ]
+            }
+          },
+          "hardErrors": [
+            {
+              "kind": "visible_tail_misreported_as_full_tail",
+              "turn": 0,
+              "quote": "最后一句是群友80的第80条",
+              "reason": "已知仍有五条不可读，不能认定第80条为整份记录的尾句。"
+            }
+          ],
+          "observations": [
+            {
+              "kind": "forward_body_not_supplied",
+              "severity": "unknown",
+              "turn": 0,
+              "quote": "讨论聚会时间",
+              "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+            }
+          ]
+        }
+      },
+      "preference": "A",
+      "reason": "A虽把查看末尾的操作交回用户，但明确承认不可见部分；B既误报末句又把部分记录外推成“从头到尾”，范围条件明显不成立。"
+    }
+  ],
+  "overall": {
+    "reviewUnit": "每个场景及独立样本的完整会话；每臂先按自身证据评分，再比较偏好。",
+    "coverage": {
+      "pairedConversations": 24,
+      "individualArmConversations": 48,
+      "scenarioCount": 8,
+      "independentSamplesPerScenario": 3,
+      "turnsPerArm": 48,
+      "totalArmTurns": 96,
+      "scoredDimensionRecords": 240
+    },
+    "preferenceCounts": {
+      "A": 10,
+      "B": 9,
+      "tie": 5
+    },
+    "scoreSummary": {
+      "A": {
+        "continuity": {
+          "count": 18,
+          "notApplicable": 6,
+          "total": 35,
+          "maximum": 36,
+          "counts": {
+            "0": 0,
+            "1": 1,
+            "2": 17,
+            "null": 6
+          }
+        },
+        "persona_source": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 48,
+          "maximum": 48,
+          "counts": {
+            "0": 0,
+            "1": 0,
+            "2": 24,
+            "null": 0
+          }
+        },
+        "addressee": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 48,
+          "maximum": 48,
+          "counts": {
+            "0": 0,
+            "1": 0,
+            "2": 24,
+            "null": 0
+          }
+        },
+        "fact_conditions": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 34,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 12,
+            "2": 11,
+            "null": 0
+          }
+        },
+        "naturalness": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 37,
+          "maximum": 48,
+          "counts": {
+            "0": 0,
+            "1": 11,
+            "2": 13,
+            "null": 0
+          }
+        }
+      },
+      "B": {
+        "continuity": {
+          "count": 18,
+          "notApplicable": 6,
+          "total": 34,
+          "maximum": 36,
+          "counts": {
+            "0": 1,
+            "1": 0,
+            "2": 17,
+            "null": 6
+          }
+        },
+        "persona_source": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 46,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 0,
+            "2": 23,
+            "null": 0
+          }
+        },
+        "addressee": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 45,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 1,
+            "2": 22,
+            "null": 0
+          }
+        },
+        "fact_conditions": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 32,
+          "maximum": 48,
+          "counts": {
+            "0": 3,
+            "1": 10,
+            "2": 11,
+            "null": 0
+          }
+        },
+        "naturalness": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 37,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 9,
+            "2": 14,
+            "null": 0
+          }
+        }
+      }
+    },
+    "hardErrorCounts": {
+      "A": 1,
+      "B": 5
+    },
+    "hardErrorIndex": [
+      {
+        "blindId": "906a5eef275e",
+        "arm": "B",
+        "kind": "echo_with_deictic_reversal",
+        "turn": 0,
+        "quote": "不是在叫你。你觉得是撒娇还是认真埋怨？"
+      },
+      {
+        "blindId": "2f9f6747985c",
+        "arm": "B",
+        "kind": "visible_recall_task_failure",
+        "turn": 1,
+        "quote": "这个我记不得啦，之前没存下来"
+      },
+      {
+        "blindId": "d8bca348c498",
+        "arm": "B",
+        "kind": "symptom_presented_as_confirmed_diagnosis",
+        "turn": 1,
+        "quote": "焦糊味本身就是检测结果了——里面已经有元件烧坏。"
+      },
+      {
+        "blindId": "da3fa74d34ec",
+        "arm": "A",
+        "kind": "visible_tail_misreported_as_full_tail",
+        "turn": 0,
+        "quote": "最后一句是群友80发的"
+      },
+      {
+        "blindId": "06ca47428450",
+        "arm": "B",
+        "kind": "visible_tail_misreported_as_full_tail",
+        "turn": 0,
+        "quote": "最后一句是群友80说的"
+      },
+      {
+        "blindId": "0866db73f915",
+        "arm": "B",
+        "kind": "visible_tail_misreported_as_full_tail",
+        "turn": 0,
+        "quote": "最后一句是群友80的第80条"
+      }
+    ],
+    "relativeDateConflictCounts": {
+      "A": 3,
+      "B": 2
+    },
+    "summary": [
+      "偏好为A 10对、B 9对、持平5对。数量接近，不能据这组脚本宣布普遍的语言质量胜者。",
+      "明确硬错A 1处、B 5处。三处为截断记录的第80条被当成完整85条记录末句；另有问题原样复述且指代反转、承诺记忆后无法回答日期、把气味症状当作确诊结果各一处。",
+      "饼干工资和安静陪伴场景整体能保持多轮语义，未出现数字重置或突然转教程。没有把明示笑话内的热饮、利息等想象机械判成真实经历捏造。",
+      "第三方心态判断常对“呀”字和群聊/私聊行为推断过强。最好的可见答复会说明还需知道此前是否真被晾着；较弱答复以场域或情绪刻板假设代替条件。",
+      "公开偏好在切换人格及版本后仍能被回答，各臂均未编造岚的具体回复。但多次把“不喜欢冰饮”加强为“不碰/不喝冰的”，部分答复又无据称此前对话是私聊。",
+      "跨午夜三对中，A有3处、B有2处相对词冲突。A和B各有2份答复明确给出原事件对应的16日；A另1份仅说“明天”，B另1份完全没回答日期。这里只核对语言与场景时钟，不核验绝对日期实际写入或检索。",
+      "自然度弱点主要是相邻轮重复劝早睡、反复使用同一笑点、要求无必要截图、把用户问题再问回去，以及把转发者假定为记录参与者。为获取不可见末句而请求末几条属于相关补充，不当作多余追问。"
+    ],
+    "scoringScope": {
+      "continuity": "检验已发生多轮的主题、数量、对象和承诺接续；六个单轮会话对设为null，每项仍附具体输出引文说明不适用。",
+      "persona_source": "默认私人人格的精确措辞未知且不评分。默认人格2分只表示可见语气/当前发言归属连贯，不代表隐藏人格全面通过。synthetic人格按提供的完整字段及bot/版本切换评价。转发原作者和具体引文在正文缺失时不作来源验证。",
+      "addressee": "检验当前用户、被引用者、其他人格及转发记录参与者的区分；未将平台实际投递或生产路由纳入分数。",
+      "fact_conditions": "只对可见输出与已给出的条件相容性评分。细微无据外观、先前看消息状态、偏好绝对化和未给出的场域按弱项记录；症状确诊与已知截断范围被否认等实质错误记0并单列硬错。2分也不覆盖明确列为未知的技术事实或缺失正文。",
+      "naturalness": "依当前请求的功能、语气和用户负担判断，不机械检查禁词，不因技术答复较长自动扣分，也不按隐藏人格猜测喜好。"
+    },
+    "limitations": [
+      "仅阅读指定匿名会话文件；未读取原版本标签、映射、其他输入文件、源码或技术结果。所有结论只保留A/B匿名身份。",
+      "这是8个脚本场景各3个独立样本，每臂24份会话、48轮，不是一般用户群体统计；未计算统计显著性。",
+      "默认人格全文未提供，无法逐条核验人格措辞。多轮可观察一致性与发言所有权不等于完整人格合规。",
+      "场景时钟跨午夜，但运行墙钟未冻结。相对日期冲突已单列；底层绝对日期是否正确保存、抽取、检索都未知，需后续技术证据审计。",
+      "输出的“记下”“没存下来”“没看到那边消息”均不是存储成功、失败或隔离正确的独立证据。用户可见任务断裂也不直接归因为存储实现。",
+      "工具、Gate、addressee和平台存储已隔离/桩化；语言评审不能推断生产路由、真实投递或真实工具能力。",
+      "转发正文未提供，只给出80条可读、总85条；具体第80条文本、作者、前80条是否重复相同内容均未核验，不以未知作通过。"
+    ]
+  }
+}

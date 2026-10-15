@@ -1,0 +1,51 @@
+{
+  "label": "candidate-ecc72ab",
+  "repetitions": 3,
+  "concurrency": 3,
+  "scenarioOrder": [
+    "attention-not-explanation",
+    "biscuit-bit-continuity",
+    "third-person-attention",
+    "dated-memory-next-turn",
+    "public-fact-persona-switch",
+    "comfort-without-lecture",
+    "real-fault-retains-condition",
+    "partial-forward-last-line"
+  ],
+  "sampling": "three independent conversations per scenario; no resampling or discarded failures",
+  "runs": {
+    "third-person-attention": {
+      "exitCode": 0,
+      "elapsedSeconds": 50.825
+    },
+    "attention-not-explanation": {
+      "exitCode": 0,
+      "elapsedSeconds": 60.483
+    },
+    "biscuit-bit-continuity": {
+      "exitCode": 1,
+      "elapsedSeconds": 92.068
+    },
+    "dated-memory-next-turn": {
+      "exitCode": 1,
+      "elapsedSeconds": 78.918
+    },
+    "comfort-without-lecture": {
+      "exitCode": 1,
+      "elapsedSeconds": 75.118
+    },
+    "public-fact-persona-switch": {
+      "exitCode": 1,
+      "elapsedSeconds": 115.741
+    },
+    "partial-forward-last-line": {
+      "exitCode": 0,
+      "elapsedSeconds": 42.002
+    },
+    "real-fault-retains-condition": {
+      "exitCode": 0,
+      "elapsedSeconds": 211.739
+    }
+  },
+  "complete": true
+}

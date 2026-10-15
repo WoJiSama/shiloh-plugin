@@ -1,0 +1,338 @@
+[
+  {
+    "blindId": "3c83f5c0e74b",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "attention-not-explanation",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "3c83f5c0e74b",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "attention-not-explanation",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "81cb95e12e0a",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "attention-not-explanation",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "81cb95e12e0a",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "attention-not-explanation",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "d32db2bc9ea6",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "attention-not-explanation",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "d32db2bc9ea6",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "attention-not-explanation",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "22d1002a41a8",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "biscuit-bit-continuity",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "22d1002a41a8",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "biscuit-bit-continuity",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "172535bb6dca",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "biscuit-bit-continuity",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "172535bb6dca",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "biscuit-bit-continuity",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "f2b84b6280f1",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "biscuit-bit-continuity",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "f2b84b6280f1",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "biscuit-bit-continuity",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "fa864ca03e83",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "third-person-attention",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "fa864ca03e83",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "third-person-attention",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "906a5eef275e",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "third-person-attention",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "906a5eef275e",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "third-person-attention",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "d2d01e47337c",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "third-person-attention",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "d2d01e47337c",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "third-person-attention",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "b795cab6a09a",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "dated-memory-next-turn",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "b795cab6a09a",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "dated-memory-next-turn",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "2f9f6747985c",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "dated-memory-next-turn",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "2f9f6747985c",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "dated-memory-next-turn",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "cb48fee153d5",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "dated-memory-next-turn",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "cb48fee153d5",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "dated-memory-next-turn",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "33ab052791cd",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "public-fact-persona-switch",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "33ab052791cd",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "public-fact-persona-switch",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "4f83c52aa64b",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "public-fact-persona-switch",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "4f83c52aa64b",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "public-fact-persona-switch",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "e9799e7c16a2",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "public-fact-persona-switch",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "e9799e7c16a2",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "public-fact-persona-switch",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "43ecece8bbd0",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "comfort-without-lecture",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "43ecece8bbd0",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "comfort-without-lecture",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "58505215f7ab",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "comfort-without-lecture",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "58505215f7ab",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "comfort-without-lecture",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "0b1936f2c8fb",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "comfort-without-lecture",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "0b1936f2c8fb",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "comfort-without-lecture",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "543e0b11f7dc",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "real-fault-retains-condition",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "543e0b11f7dc",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "real-fault-retains-condition",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "15b1fcaaca53",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "real-fault-retains-condition",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "15b1fcaaca53",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "real-fault-retains-condition",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "d8bca348c498",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "real-fault-retains-condition",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "d8bca348c498",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "real-fault-retains-condition",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "da3fa74d34ec",
+    "anonymousArm": "A",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "partial-forward-last-line",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "da3fa74d34ec",
+    "anonymousArm": "B",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "partial-forward-last-line",
+    "sampleIndex": 1
+  },
+  {
+    "blindId": "06ca47428450",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "partial-forward-last-line",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "06ca47428450",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "partial-forward-last-line",
+    "sampleIndex": 2
+  },
+  {
+    "blindId": "0866db73f915",
+    "anonymousArm": "A",
+    "realLabel": "candidate-ecc72ab",
+    "scenario": "partial-forward-last-line",
+    "sampleIndex": 3
+  },
+  {
+    "blindId": "0866db73f915",
+    "anonymousArm": "B",
+    "realLabel": "baseline-6668bd3",
+    "scenario": "partial-forward-last-line",
+    "sampleIndex": 3
+  }
+]

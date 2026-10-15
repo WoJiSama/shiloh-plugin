@@ -1,0 +1,20 @@
+{
+  "backendBuild": {
+    "files": 1431,
+    "compiler": "5.9.3",
+    "sourceManifestMatches": true,
+    "outputManifestMatches": true,
+    "originalHead": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+    "note": "Source checkout HEAD intentionally stays de03521; source/file hashes describe the built dirty tree, not a published revision."
+  },
+  "typedTestCompilation": {
+    "exitCode": 0
+  },
+  "targetedTests": {
+    "tests": 350,
+    "pass": 350,
+    "fail": 0,
+    "skipped": 0,
+    "log": "original-writeback-targeted.log"
+  }
+}

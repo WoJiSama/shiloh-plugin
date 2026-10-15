@@ -1,0 +1,11 @@
+{
+  "understandingEnhancement": {
+    "enabled": true,
+    "maxChars": 1400,
+    "includeRecentContext": true,
+    "briefEnabled": true,
+    "briefTimeoutMs": 2500
+  },
+  "memorySystemEnabled": true,
+  "globalStyleLearningEnabled": true
+}

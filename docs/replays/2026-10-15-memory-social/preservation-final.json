@@ -1,0 +1,19 @@
+{
+  "originalHead": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+  "headUnchanged": true,
+  "indexUnchanged": true,
+  "businessTargets": 62,
+  "businessMismatches": [],
+  "protectedDirtyCount": 196,
+  "protectedDirtyChanged": [],
+  "sourceTsCount": 477,
+  "sourceTsMismatches": [],
+  "planning": "Only appended final outcome; prior text preserved",
+  "publicDocuments": "Hash-checked new report/evidence; final sync independently verifies identity",
+  "ignoredBuildArtifacts": "Regenerated; source and output manifests equal isolated candidate",
+  "tests": {
+    "pass": 350,
+    "fail": 0,
+    "skip": 0
+  }
+}

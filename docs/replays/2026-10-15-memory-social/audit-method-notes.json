@@ -1,0 +1,5 @@
+{
+  "preFinalAudit": "All 1928 managed files/config/backend JS/service/HTTP checks passed. Only native runner hash assertion failed: baseline was intentionally tested with the common external frozen eval harness, whose newer script differs from its native old runner. Original audit retained. Corrected auditor verifies external frozen runner/helper in both arms, and requires live runner equality for the final published candidate.",
+  "runtimeComparison": "477 compiled backend JavaScript files are byte equal between ecc72ab replay and test-only 71812bc release; source equality is checked after deploy.",
+  "privateEvidenceExport": "Configuration entity IDs and aliases are deterministically replaced in public evidence. Exact private originals remain in restricted temporary storage; raw and sanitized hashes are recorded."
+}

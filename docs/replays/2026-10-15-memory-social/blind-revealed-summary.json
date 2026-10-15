@@ -1,0 +1,619 @@
+{
+  "reviewSha256": "214d493c517b576a93cda79906034de2c472a55828f55707870e9db7ecfd8625",
+  "completePairedConversations": 24,
+  "wins": {
+    "candidate-ecc72ab": 14,
+    "baseline-6668bd3": 5,
+    "tie": 5
+  },
+  "perScenario": {
+    "attention-not-explanation": {
+      "candidate-ecc72ab": 1,
+      "baseline-6668bd3": 1,
+      "tie": 1
+    },
+    "biscuit-bit-continuity": {
+      "tie": 2,
+      "candidate-ecc72ab": 1
+    },
+    "third-person-attention": {
+      "baseline-6668bd3": 2,
+      "candidate-ecc72ab": 1
+    },
+    "dated-memory-next-turn": {
+      "candidate-ecc72ab": 3
+    },
+    "public-fact-persona-switch": {
+      "candidate-ecc72ab": 3
+    },
+    "comfort-without-lecture": {
+      "tie": 2,
+      "candidate-ecc72ab": 1
+    },
+    "real-fault-retains-condition": {
+      "candidate-ecc72ab": 1,
+      "baseline-6668bd3": 2
+    },
+    "partial-forward-last-line": {
+      "candidate-ecc72ab": 3
+    }
+  },
+  "dimensions": {
+    "baseline-6668bd3": {
+      "continuity": {
+        "counts": {
+          "2": 16,
+          "None": 6,
+          "1": 1,
+          "0": 1
+        },
+        "meanOrdinalScore": 1.8333
+      },
+      "persona_source": {
+        "counts": {
+          "2": 24
+        },
+        "meanOrdinalScore": 2.0
+      },
+      "addressee": {
+        "counts": {
+          "2": 23,
+          "1": 1
+        },
+        "meanOrdinalScore": 1.9583
+      },
+      "fact_conditions": {
+        "counts": {
+          "1": 11,
+          "2": 10,
+          "0": 3
+        },
+        "meanOrdinalScore": 1.2917
+      },
+      "naturalness": {
+        "counts": {
+          "1": 13,
+          "2": 11
+        },
+        "meanOrdinalScore": 1.4583
+      }
+    },
+    "candidate-ecc72ab": {
+      "continuity": {
+        "counts": {
+          "2": 18,
+          "None": 6
+        },
+        "meanOrdinalScore": 2.0
+      },
+      "persona_source": {
+        "counts": {
+          "2": 23,
+          "0": 1
+        },
+        "meanOrdinalScore": 1.9167
+      },
+      "addressee": {
+        "counts": {
+          "2": 23,
+          "0": 1
+        },
+        "meanOrdinalScore": 1.9167
+      },
+      "fact_conditions": {
+        "counts": {
+          "2": 12,
+          "1": 11,
+          "0": 1
+        },
+        "meanOrdinalScore": 1.4583
+      },
+      "naturalness": {
+        "counts": {
+          "1": 7,
+          "2": 16,
+          "0": 1
+        },
+        "meanOrdinalScore": 1.625
+      }
+    }
+  },
+  "hardErrors": [
+    {
+      "scenario": "third-person-attention",
+      "sample": 2,
+      "label": "candidate-ecc72ab",
+      "kind": "echo_with_deictic_reversal",
+      "turn": 0,
+      "quote": "不是在叫你。你觉得是撒娇还是认真埋怨？",
+      "reason": "输出重复待回答的问题且反转“你”的指向，未提供用户请求的第三方判断；仅评价可见语言失败。"
+    },
+    {
+      "scenario": "dated-memory-next-turn",
+      "sample": 2,
+      "label": "baseline-6668bd3",
+      "kind": "visible_recall_task_failure",
+      "turn": 1,
+      "quote": "这个我记不得啦，之前没存下来",
+      "reason": "与turn 0“记下啦”形成可见任务断裂，未回答所问日期；这不是关于底层确实未写入的技术结论。"
+    },
+    {
+      "scenario": "real-fault-retains-condition",
+      "sample": 3,
+      "label": "candidate-ecc72ab",
+      "kind": "symptom_presented_as_confirmed_diagnosis",
+      "turn": 1,
+      "quote": "焦糊味本身就是检测结果了——里面已经有元件烧坏。",
+      "reason": "气味不能单独证明具体内部元件已烧坏；这是可见语言中的实质过度确诊，不否定其保持断电的正确建议。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 1,
+      "label": "baseline-6668bd3",
+      "kind": "visible_tail_misreported_as_full_tail",
+      "turn": 0,
+      "quote": "最后一句是群友80发的",
+      "reason": "可读80/总85，无法把第80条认作完整记录的最后一句；这一硬错无需知道未读五条的内容。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 2,
+      "label": "baseline-6668bd3",
+      "kind": "visible_tail_misreported_as_full_tail",
+      "turn": 0,
+      "quote": "最后一句是群友80说的",
+      "reason": "已知总85条但仅可读80条，完整末句未知；不能把第80条说成完整末句。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 3,
+      "label": "baseline-6668bd3",
+      "kind": "visible_tail_misreported_as_full_tail",
+      "turn": 0,
+      "quote": "最后一句是群友80的第80条",
+      "reason": "已知仍有五条不可读，不能认定第80条为整份记录的尾句。"
+    }
+  ],
+  "observations": [
+    {
+      "scenario": "attention-not-explanation",
+      "sample": 1,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_appearance",
+      "severity": "soft",
+      "turn": 1,
+      "quote": "你今天气色不错",
+      "reason": "没有可见外貌证据；不据此推断实际视觉能力。"
+    },
+    {
+      "scenario": "attention-not-explanation",
+      "sample": 2,
+      "label": "candidate-ecc72ab",
+      "kind": "unsupported_prior_perception",
+      "severity": "soft",
+      "turn": 0,
+      "quote": "刚看见",
+      "reason": "仅从输出无法核实此前是否看见消息；不推断运行延迟。"
+    },
+    {
+      "scenario": "attention-not-explanation",
+      "sample": 3,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_prior_perception",
+      "severity": "soft",
+      "turn": 0,
+      "quote": "刚看到",
+      "reason": "无材料核实此先前状态，仅记语言层面的轻微添加。"
+    },
+    {
+      "scenario": "third-person-attention",
+      "sample": 1,
+      "label": "candidate-ecc72ab",
+      "kind": "unsupported_setting",
+      "severity": "soft",
+      "turn": 0,
+      "quote": "不会挑群里说",
+      "reason": "把未提供的群聊场景作为判断依据；不能由这句话验证真实平台场域。"
+    },
+    {
+      "scenario": "third-person-attention",
+      "sample": 3,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_setting_and_motive",
+      "severity": "soft",
+      "turn": 0,
+      "quote": "一般不会挑群里问，会憋着或者私聊炸",
+      "reason": "场域与真实生气时的行为都是输出添加的推断，不当作已知背景。"
+    },
+    {
+      "scenario": "dated-memory-next-turn",
+      "sample": 2,
+      "label": "baseline-6668bd3",
+      "kind": "unverified_storage_assertion",
+      "severity": "unknown",
+      "turn": 1,
+      "quote": "之前没存下来",
+      "reason": "只有语言输出，无法验证模型所述保存失败是否真实。"
+    },
+    {
+      "scenario": "dated-memory-next-turn",
+      "sample": 3,
+      "label": "baseline-6668bd3",
+      "kind": "missing_exam_equipment_condition",
+      "severity": "soft",
+      "turn": 0,
+      "quote": "把笔和计算器放好",
+      "reason": "数学考试不必然允许计算器，建议缺少允许使用的条件。"
+    },
+    {
+      "scenario": "public-fact-persona-switch",
+      "sample": 1,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_channel_and_strengthened_preference",
+      "severity": "soft",
+      "turn": 1,
+      "quote": "不碰冰的。至于岚回了你啥，我这边可看不见私聊",
+      "reason": "前者加强原偏好，后者补入未给出的私聊条件；均不等同于跨人格冒领回复。"
+    },
+    {
+      "scenario": "public-fact-persona-switch",
+      "sample": 1,
+      "label": "candidate-ecc72ab",
+      "kind": "strengthened_preference",
+      "severity": "soft",
+      "turn": 2,
+      "quote": "不碰冰的",
+      "reason": "原信息为“不喜欢冰饮”，并非从不喝；作为轻微语义加强记录。"
+    },
+    {
+      "scenario": "public-fact-persona-switch",
+      "sample": 2,
+      "label": "candidate-ecc72ab",
+      "kind": "strengthened_preference",
+      "severity": "soft",
+      "turn": 2,
+      "quote": "不碰冰的",
+      "reason": "偏好被改写为绝对行为，程度略超过原话。"
+    },
+    {
+      "scenario": "public-fact-persona-switch",
+      "sample": 2,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_private_channel",
+      "severity": "soft",
+      "turn": 1,
+      "quote": "你们的私聊",
+      "reason": "材料只说岚曾回复，未说明渠道是私聊。"
+    },
+    {
+      "scenario": "public-fact-persona-switch",
+      "sample": 3,
+      "label": "candidate-ecc72ab",
+      "kind": "strengthened_preference",
+      "severity": "soft",
+      "turn": 2,
+      "quote": "不喝冰的",
+      "reason": "原用户只表达不喜欢，未说绝不喝。"
+    },
+    {
+      "scenario": "public-fact-persona-switch",
+      "sample": 3,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_private_channel",
+      "severity": "soft",
+      "turn": 1,
+      "quote": "你们私聊",
+      "reason": "是否私聊没有给出，不当作已知背景。"
+    },
+    {
+      "scenario": "real-fault-retains-condition",
+      "sample": 2,
+      "label": "candidate-ecc72ab",
+      "kind": "hypothesis_promoted_to_user_fact",
+      "severity": "soft",
+      "turn": 1,
+      "quote": "你越想保数据",
+      "reason": "用户没有提出数据诉求；上一轮只是机器人自己加的条件选项。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 1,
+      "label": "baseline-6668bd3",
+      "kind": "forward_body_not_supplied",
+      "severity": "unknown",
+      "turn": 0,
+      "quote": "第80条：讨论聚会时间。",
+      "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 1,
+      "label": "candidate-ecc72ab",
+      "kind": "forward_body_not_supplied",
+      "severity": "unknown",
+      "turn": 0,
+      "quote": "讨论聚会时间",
+      "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 2,
+      "label": "candidate-ecc72ab",
+      "kind": "forward_body_not_supplied",
+      "severity": "unknown",
+      "turn": 0,
+      "quote": "讨论聚会时间",
+      "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 2,
+      "label": "baseline-6668bd3",
+      "kind": "forward_body_not_supplied",
+      "severity": "unknown",
+      "turn": 0,
+      "quote": "第80条：讨论聚会时间。",
+      "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 2,
+      "label": "baseline-6668bd3",
+      "kind": "unsupported_record_participation",
+      "severity": "soft",
+      "turn": 0,
+      "quote": "你们这聚会",
+      "reason": "把转发者当作记录内聚会参与者，材料未提供这一关系。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 3,
+      "label": "candidate-ecc72ab",
+      "kind": "forward_body_not_supplied",
+      "severity": "unknown",
+      "turn": 0,
+      "quote": "讨论聚会时间",
+      "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+    },
+    {
+      "scenario": "partial-forward-last-line",
+      "sample": 3,
+      "label": "baseline-6668bd3",
+      "kind": "forward_body_not_supplied",
+      "severity": "unknown",
+      "turn": 0,
+      "quote": "讨论聚会时间",
+      "reason": "材料未提供转发正文，不能核实具体引文、作者或前80条是否全同；只评80/85可见范围条件。"
+    }
+  ],
+  "limitations": [
+    "One independent model evaluator, uncalibrated ordinal scores, 24 paired scripted conversations; not human or population preference statistics",
+    "Default private persona exact wording withheld",
+    "Different execution/scenario clocks limit relative-date conclusions",
+    "Technical results were hidden throughout blind scoring"
+  ],
+  "hardErrorCounts": {
+    "candidate-ecc72ab": 2,
+    "baseline-6668bd3": 4
+  },
+  "overallAnonymousReview": {
+    "reviewUnit": "每个场景及独立样本的完整会话；每臂先按自身证据评分，再比较偏好。",
+    "coverage": {
+      "pairedConversations": 24,
+      "individualArmConversations": 48,
+      "scenarioCount": 8,
+      "independentSamplesPerScenario": 3,
+      "turnsPerArm": 48,
+      "totalArmTurns": 96,
+      "scoredDimensionRecords": 240
+    },
+    "preferenceCounts": {
+      "A": 10,
+      "B": 9,
+      "tie": 5
+    },
+    "scoreSummary": {
+      "A": {
+        "continuity": {
+          "count": 18,
+          "notApplicable": 6,
+          "total": 35,
+          "maximum": 36,
+          "counts": {
+            "0": 0,
+            "1": 1,
+            "2": 17,
+            "null": 6
+          }
+        },
+        "persona_source": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 48,
+          "maximum": 48,
+          "counts": {
+            "0": 0,
+            "1": 0,
+            "2": 24,
+            "null": 0
+          }
+        },
+        "addressee": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 48,
+          "maximum": 48,
+          "counts": {
+            "0": 0,
+            "1": 0,
+            "2": 24,
+            "null": 0
+          }
+        },
+        "fact_conditions": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 34,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 12,
+            "2": 11,
+            "null": 0
+          }
+        },
+        "naturalness": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 37,
+          "maximum": 48,
+          "counts": {
+            "0": 0,
+            "1": 11,
+            "2": 13,
+            "null": 0
+          }
+        }
+      },
+      "B": {
+        "continuity": {
+          "count": 18,
+          "notApplicable": 6,
+          "total": 34,
+          "maximum": 36,
+          "counts": {
+            "0": 1,
+            "1": 0,
+            "2": 17,
+            "null": 6
+          }
+        },
+        "persona_source": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 46,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 0,
+            "2": 23,
+            "null": 0
+          }
+        },
+        "addressee": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 45,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 1,
+            "2": 22,
+            "null": 0
+          }
+        },
+        "fact_conditions": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 32,
+          "maximum": 48,
+          "counts": {
+            "0": 3,
+            "1": 10,
+            "2": 11,
+            "null": 0
+          }
+        },
+        "naturalness": {
+          "count": 24,
+          "notApplicable": 0,
+          "total": 37,
+          "maximum": 48,
+          "counts": {
+            "0": 1,
+            "1": 9,
+            "2": 14,
+            "null": 0
+          }
+        }
+      }
+    },
+    "hardErrorCounts": {
+      "A": 1,
+      "B": 5
+    },
+    "hardErrorIndex": [
+      {
+        "blindId": "906a5eef275e",
+        "arm": "B",
+        "kind": "echo_with_deictic_reversal",
+        "turn": 0,
+        "quote": "不是在叫你。你觉得是撒娇还是认真埋怨？"
+      },
+      {
+        "blindId": "2f9f6747985c",
+        "arm": "B",
+        "kind": "visible_recall_task_failure",
+        "turn": 1,
+        "quote": "这个我记不得啦，之前没存下来"
+      },
+      {
+        "blindId": "d8bca348c498",
+        "arm": "B",
+        "kind": "symptom_presented_as_confirmed_diagnosis",
+        "turn": 1,
+        "quote": "焦糊味本身就是检测结果了——里面已经有元件烧坏。"
+      },
+      {
+        "blindId": "da3fa74d34ec",
+        "arm": "A",
+        "kind": "visible_tail_misreported_as_full_tail",
+        "turn": 0,
+        "quote": "最后一句是群友80发的"
+      },
+      {
+        "blindId": "06ca47428450",
+        "arm": "B",
+        "kind": "visible_tail_misreported_as_full_tail",
+        "turn": 0,
+        "quote": "最后一句是群友80说的"
+      },
+      {
+        "blindId": "0866db73f915",
+        "arm": "B",
+        "kind": "visible_tail_misreported_as_full_tail",
+        "turn": 0,
+        "quote": "最后一句是群友80的第80条"
+      }
+    ],
+    "relativeDateConflictCounts": {
+      "A": 3,
+      "B": 2
+    },
+    "summary": [
+      "偏好为A 10对、B 9对、持平5对。数量接近，不能据这组脚本宣布普遍的语言质量胜者。",
+      "明确硬错A 1处、B 5处。三处为截断记录的第80条被当成完整85条记录末句；另有问题原样复述且指代反转、承诺记忆后无法回答日期、把气味症状当作确诊结果各一处。",
+      "饼干工资和安静陪伴场景整体能保持多轮语义，未出现数字重置或突然转教程。没有把明示笑话内的热饮、利息等想象机械判成真实经历捏造。",
+      "第三方心态判断常对“呀”字和群聊/私聊行为推断过强。最好的可见答复会说明还需知道此前是否真被晾着；较弱答复以场域或情绪刻板假设代替条件。",
+      "公开偏好在切换人格及版本后仍能被回答，各臂均未编造岚的具体回复。但多次把“不喜欢冰饮”加强为“不碰/不喝冰的”，部分答复又无据称此前对话是私聊。",
+      "跨午夜三对中，A有3处、B有2处相对词冲突。A和B各有2份答复明确给出原事件对应的16日；A另1份仅说“明天”，B另1份完全没回答日期。这里只核对语言与场景时钟，不核验绝对日期实际写入或检索。",
+      "自然度弱点主要是相邻轮重复劝早睡、反复使用同一笑点、要求无必要截图、把用户问题再问回去，以及把转发者假定为记录参与者。为获取不可见末句而请求末几条属于相关补充，不当作多余追问。"
+    ],
+    "scoringScope": {
+      "continuity": "检验已发生多轮的主题、数量、对象和承诺接续；六个单轮会话对设为null，每项仍附具体输出引文说明不适用。",
+      "persona_source": "默认私人人格的精确措辞未知且不评分。默认人格2分只表示可见语气/当前发言归属连贯，不代表隐藏人格全面通过。synthetic人格按提供的完整字段及bot/版本切换评价。转发原作者和具体引文在正文缺失时不作来源验证。",
+      "addressee": "检验当前用户、被引用者、其他人格及转发记录参与者的区分；未将平台实际投递或生产路由纳入分数。",
+      "fact_conditions": "只对可见输出与已给出的条件相容性评分。细微无据外观、先前看消息状态、偏好绝对化和未给出的场域按弱项记录；症状确诊与已知截断范围被否认等实质错误记0并单列硬错。2分也不覆盖明确列为未知的技术事实或缺失正文。",
+      "naturalness": "依当前请求的功能、语气和用户负担判断，不机械检查禁词，不因技术答复较长自动扣分，也不按隐藏人格猜测喜好。"
+    },
+    "limitations": [
+      "仅阅读指定匿名会话文件；未读取原版本标签、映射、其他输入文件、源码或技术结果。所有结论只保留A/B匿名身份。",
+      "这是8个脚本场景各3个独立样本，每臂24份会话、48轮，不是一般用户群体统计；未计算统计显著性。",
+      "默认人格全文未提供，无法逐条核验人格措辞。多轮可观察一致性与发言所有权不等于完整人格合规。",
+      "场景时钟跨午夜，但运行墙钟未冻结。相对日期冲突已单列；底层绝对日期是否正确保存、抽取、检索都未知，需后续技术证据审计。",
+      "输出的“记下”“没存下来”“没看到那边消息”均不是存储成功、失败或隔离正确的独立证据。用户可见任务断裂也不直接归因为存储实现。",
+      "工具、Gate、addressee和平台存储已隔离/桩化；语言评审不能推断生产路由、真实投递或真实工具能力。",
+      "转发正文未提供，只给出80条可读、总85条；具体第80条文本、作者、前80条是否重复相同内容均未核验，不以未知作通过。"
+    ]
+  }
+}
