@@ -1189,3 +1189,9 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - forward/quote 有提示来源声明与解析边界，不把第三方“我”归为转发人的自述或本群共识。
 - 禁用/opt-out/清空会清持久pending并失效正在执行的抽取，避免延后写回。
 - 定向初轮92/92、全memory186/186（临时TS import hook，无build、真实模型或线上访问）；后续新增ack失败回归仍待最终重跑。
+
+## 2026-10-15 耗尽批次可靠性补修
+- 原scope唯一buffer让exhausted批次挡住同日用户消息及后续群事实；现拆成独立持久batch身份和同人格scope，耗尽记录保留，不进入自动重试，新消息从独立预算开始。同scope已有请求时新批先持久化后等待，避免并发新增原文未经尝试继承耗尽次数。
+- 群history对该scope全部pending原文去重，耗尽行不会作为新输入重置预算；pending总上限统计user/group/live/exhausted所有批次，独立拆批不绕过cap。耗尽记录仍需显式清理，达到总cap后明确拒绝新批。
+- 冷恢复尊重每份持久key与attempts；重复legacy key稳定派生身份，恢复cleanup失败后重入不复制。文档occurrence在隐私过滤前计数，后续opt-out不能改变保留batch身份；timer在隐私cleanup持久完成后才启动。
+- 最终源码hook全memory219/219、0跳过，tsc --noEmit退出0，diffcheck通过；独立只读feedback复核无新增阻断。这是本地契约证据，统一构建与真实模型/线上验收由父代理继续。

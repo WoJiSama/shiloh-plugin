@@ -93,6 +93,89 @@ test('laughter does not cancel an actual smoke report and double negation is not
   }
 })
 
+test('asking for seriousness does not turn an electrical incident into a joke', () => {
+  for (const seriousness of ['别开玩笑', '不要开玩笑了', '别再跟我开玩笑', '我没有在开玩笑', '这不是个玩笑', '这不是梗']) {
+    const rawUserText = `电脑电源那里有焦糊味，已经拔电了。${seriousness}，能怎么办？`
+    const context = buildDiagnosticContext({rawUserText, speakerId})!
+    assert.equal(context.purpose, 'troubleshooting', rawUserText)
+    assert.equal(context.incident.status, 'asserted', rawUserText)
+    assert.equal(context.power, 'off', rawUserText)
+    assert.deepEqual(context.allowedChecks, ['static_observation'], rawUserText)
+    assert.ok(context.unmetPrerequisites.includes('electrical_damage_excluded'), rawUserText)
+  }
+})
+
+test('an explicitly genuine joke stays figurative even beside a request not to joke about something else', () => {
+  for (const rawUserText of [
+    '这真的是个梗：电脑都冒烟了，接一下。',
+    '电脑冒烟只是个玩笑，没有现实故障。',
+    '别开玩笑是台词，图里的电脑笑得冒烟只是梗图。'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId})!
+    assert.equal(context.purpose, 'figurative', rawUserText)
+    assert.equal(context.incident.status, 'figurative', rawUserText)
+    assert.deepEqual(context.allowedChecks, [], rawUserText)
+  }
+})
+
+test('quoted joke wording does not override the speakers separate real incident', () => {
+  const context = buildDiagnosticContext({rawUserText: '[回复 朋友：这只是个玩笑，电脑笑得冒烟] 我的电脑电源有焦糊味，已经拔了电，怎么办？', speakerId})!
+  assert.equal(context.incident.status, 'asserted')
+  assert.equal(context.purpose, 'troubleshooting')
+  assert.equal(context.power, 'off')
+})
+
+test('ordinary completed colloquial disconnection reports retain isolation in the immediate next turn', () => {
+  const now = Date.parse('2026-10-15T06:00:00+08:00')
+  for (const disconnected of ['已拔电', '已经拔电', '已经拔电了', '拔了电', '我已经拔了电', '拔电了', '刚刚拔掉了电']) {
+    const rawUserText = `电脑电源有焦糊味，${disconnected}。别开玩笑，能怎么办？`
+    const initial = buildDiagnosticContext({rawUserText, speakerId, now})!
+    assert.equal(initial.power, 'off', disconnected)
+    const next = buildDiagnosticContext({rawUserText: '那我能先开机试一下吗？', speakerId, now: now + 1000, history: [{role: 'user', userId: speakerId, text: rawUserText, at: now}]})!
+    assert.equal(next.incident.status, 'asserted', disconnected)
+    assert.equal(next.power, 'off', disconnected)
+    assert.deepEqual(next.allowedChecks, ['static_observation'], disconnected)
+    assert.ok(!next.unmetPrerequisites.includes('power_isolated'), disconnected)
+    assert.ok(next.unmetPrerequisites.includes('electrical_damage_excluded'), disconnected)
+  }
+})
+
+test('negating colloquial disconnection retracts isolation rather than matching its completed suffix', () => {
+  const now = Date.parse('2026-10-15T06:00:00+08:00')
+  const isolated: DiagnosticHistoryMessage = {role: 'user', userId: speakerId, text: '电脑有焦糊味，我已经拔电了。', at: now - 1000}
+  for (const rawUserText of ['我没有拔电，怎么检查？', '其实我还没拔电，怎么办？', '电没拔，怎么排查？', '我并没有拔了电，只关机了。怎么检查？', '我不是已经拔了电，只关机了。怎么检查？']) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, now, history: [isolated]})!
+    assert.equal(context.incident.status, 'asserted', rawUserText)
+    assert.equal(context.power, 'unknown', rawUserText)
+    assert.ok(context.unmetPrerequisites.includes('power_isolated'), rawUserText)
+  }
+})
+
+test('uncompleted, hypothetical, uncertain or partial component disconnections do not prove isolation', () => {
+  for (const report of ['拔电', '我已经拔电了吗？', '如果我已经拔电了', '我打算拔了电', '稍后我已经拔电了再检查', '可能已经拔电了', '我已经拔电池了', '已经拔了电容']) {
+    const context = buildDiagnosticContext({rawUserText: `电脑有焦糊味。${report}。`, speakerId})!
+    assert.equal(context.power, 'unknown', report)
+    if (context.purpose === 'troubleshooting') assert.ok(context.unmetPrerequisites.includes('power_isolated'), report)
+  }
+})
+
+test('a third partys colloquial disconnection does not establish the current users isolation', () => {
+  const now = Date.parse('2026-10-15T06:00:00+08:00')
+  for (const rawUserText of [
+    '[回复 朋友：我已经拔电了] 我的电脑有焦糊味，怎么办？',
+    '朋友说他已经拔电了，我的电脑有焦糊味，怎么办？',
+    '朋友的电脑已经拔了电。我的电脑有焦糊味，怎么办？'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, now})!
+    assert.equal(context.subject.kind, 'speaker_device', rawUserText)
+    assert.equal(context.incident.status, 'asserted', rawUserText)
+    assert.equal(context.power, 'unknown', rawUserText)
+  }
+  const otherSpeaker = buildDiagnosticContext({rawUserText: '我的电脑有焦糊味，现在怎么检查？', speakerId, now, history: [{role: 'user', userId: '303', text: '我的电脑有焦糊味，已经拔电了。', at: now - 1000}]})!
+  assert.equal(otherSpeaker.power, 'unknown')
+  assert.equal(otherSpeaker.sources.length, 1)
+})
+
 test('a literal question about isolation or a future conditional is not a completed isolation report', () => {
   for (const rawUserText of ['我已经拔掉电源线了吗？', '拔掉电源线之后检查风扇，是这么做吗？']) {
     const context = buildDiagnosticContext({rawUserText, speakerId, history})!

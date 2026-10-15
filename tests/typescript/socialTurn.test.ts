@@ -1,7 +1,8 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import type {InteractionTarget, SocialAct, TurnInteractionContext} from '../../src/contracts/turnInteraction.js'
-import {buildSocialContinuity, buildSocialTurnPrompt, buildTurnInteractionContext, buildTurnInteractionPrompt, parseSocialInterpretation, withTurnInteractionEvidence, withTurnSocialInterpretation} from '../../src/modules/conversation/domain/turnInteractionContext.js'
+import {buildSocialContinuity, buildSocialTurnPrompt, buildTurnInteractionContext, buildTurnInteractionPrompt, parseSocialInterpretation, withTurnInteractionEvidence, withTurnSocialInterpretation, withTurnDiagnosticContext} from '../../src/modules/conversation/domain/turnInteractionContext.js'
+import {buildDiagnosticContext} from '../../src/modules/conversation/domain/diagnosticContext.js'
 import {buildPersonaTonePrompt, resolvePersonaReplyMode} from '../../src/modules/conversation/domain/personaTonePolicy.js'
 import {createTimingGate, type TimingGateHost} from '../../src/modules/conversation/infrastructure/timingGate.js'
 import {createGroupRuntime} from '../../src/modules/runtime/application/groupRuntime.js'
@@ -13,6 +14,47 @@ import {buildBriefMessages, parseUnderstandingSocial, requestUnderstandingBrief}
 import {createPromptContext, type PromptContextHost} from '../../src/modules/conversation/infrastructure/promptContext.js'
 
 const persona = {personaId: 'first', personaVersion: 'v2', personaName: '安序'}
+
+test('a model social hint cannot downgrade source-checked troubleshooting from prior user observations',()=>{
+ const rawUserText='那我能先开机试一下吗？'
+ const diagnostic=buildDiagnosticContext({rawUserText,speakerId:'202',history:[{role:'user',userId:'202',text:'电脑电源有焦糊味，已经拔电了。',at:Date.now()-10000}]})
+ assert.ok(diagnostic)
+ const context=withTurnDiagnosticContext(buildTurnInteractionContext({rawUserText,botId:'99',speaker:{userId:'202'},persona,addressee:{targetKind:'bot'}}),diagnostic)
+ const refined=withTurnSocialInterpretation(context,{act:'teasing',confidence:0.99,activeBit:'开机'},'understanding_model')
+ assert.equal(refined.kind,'serious_answer')
+ assert.equal(refined.social?.act,'help_request')
+ assert.equal(refined.social?.source,'local')
+ assert.equal(refined.social?.activeBit,undefined)
+ assert.equal(refined.allowPlayfulness,false)
+ assert.deepEqual(refined.target,context.target)
+ assert.equal(resolvePersonaReplyMode({interactionContext:refined}),'precise')
+})
+
+test('source-checked fictional device danger can remain a joke without overriding a new factual request',()=>{
+ for(const rawUserText of ['这真的是个梗：电脑都冒烟了，接一下。','这张梗图是CPU满载92℃冒烟，吐槽一下。','朋友的电脑冒烟只是个玩笑，接个梗。']) {
+  const diagnostic=buildDiagnosticContext({rawUserText,speakerId:'202'})
+  assert.equal(diagnostic?.purpose,'figurative',rawUserText)
+  const context=withTurnDiagnosticContext(buildTurnInteractionContext({rawUserText,botId:'99',persona,addressee:{targetKind:'bot'}}),diagnostic!)
+  assert.equal(context.kind,'banter',rawUserText)
+  assert.equal(context.allowPlayfulness,true)
+  assert.equal(withTurnSocialInterpretation(context,{act:'teasing',confidence:0.99},'understanding_model').kind,'banter')
+ }
+ const rawUserText='这张电脑冒烟的梗图，认真解释一下散热原理。'
+ const diagnostic=buildDiagnosticContext({rawUserText,speakerId:'202'})
+ assert.ok(diagnostic)
+ const context=withTurnDiagnosticContext(buildTurnInteractionContext({rawUserText,botId:'99',persona}),diagnostic)
+ assert.equal(context.kind,'serious_answer')
+ assert.equal(context.allowPlayfulness,false)
+ for(const [rawUserText,kind] of [
+  ['这张电脑冒烟的梗图，另一个问题：Redis是什么？','serious_answer'],
+  ['这张电脑冒烟的梗图，另一个问题：Redis报错ECONNRESET是什么？','serious_answer'],
+  ['这张电脑冒烟的梗图，给我画一张同款。','delivery']
+ ] as const) {
+  const diagnostic=buildDiagnosticContext({rawUserText,speakerId:'202'})
+  assert.equal(diagnostic?.purpose,'figurative')
+  assert.equal(withTurnDiagnosticContext(buildTurnInteractionContext({rawUserText,botId:'99',persona}),diagnostic!).kind,kind,rawUserText)
+ }
+})
 const snapshot = createPersonaSnapshot({botId: '99', personaId: 'first', persona: {name: '安序', tone: '冷静简洁'}, systemContent: '独立判断'})
 const contextFor = (rawUserText: string) => buildTurnInteractionContext({rawUserText, botId: '99', persona, addressee: {targetKind: 'bot'}})
 

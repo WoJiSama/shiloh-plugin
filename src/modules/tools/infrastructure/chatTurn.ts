@@ -3,7 +3,7 @@ import type {ExecutionMessage} from "../../../contracts/toolExecution.js"
 import type {TurnEvidence} from "../../../contracts/turnInteraction.js"
 import { extractChatKeywords, isImageGenerationRequest, shouldInjectGroupContext, shouldUseCompactHistory } from "../../conversation/domain/messageIntent.js"
 import { collectMentionTargetIds } from "../../conversation/domain/mentionTargets.js"
-import { buildTurnInteractionContext,withTurnSocialInterpretation } from "../../conversation/domain/turnInteractionContext.js"
+import { buildTurnInteractionContext,withTurnSocialInterpretation,withTurnDiagnosticContext } from "../../conversation/domain/turnInteractionContext.js"
 import {unknownTurnActionFacts, validateTurnActionFacts} from "../../conversation/domain/turnActionFacts.js"
 import {buildDiagnosticContext} from "../../conversation/domain/diagnosticContext.js"
 import { ROLE_MAP as roleMap, extractMemberLookupTerms, formatMemberLookupPrompt, hasBotTextAnchor, joinIntentParts, matchGroupMembersByTerms, messageQuotesUser, uniqText } from "../../conversation/domain/messageContext.js"
@@ -394,7 +394,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           if (!interactionEvidence.some(item => item.kind === 'video' && item.source === source)) interactionEvidence.push({origin: 'current', kind: 'video', state: 'reference_only', ...(source ? {source} : {})})
         }
         for (const [text,completeness] of [[groupContextAssets.currentForwardText,groupContextAssets.currentForwardCompleteness],[groupContextAssets.quotedForwardText,groupContextAssets.quotedForwardCompleteness]] as const) {
-          if (text || completeness) interactionEvidence.push({origin: 'forward', kind: 'text', state: text ? 'readable' : 'unavailable', ...(text ? {text} : {}), ...(completeness ? {forwardCompleteness:completeness} : {})})
+          if (text || completeness?.entries.length) interactionEvidence.push({origin: 'forward', kind: 'text', state: text ? 'readable' : 'unavailable', ...(text ? {text} : {}), ...(completeness ? {forwardCompleteness:completeness} : {})})
         }
         const signal = session.addresseeSignal
         session.interactionContext = buildTurnInteractionContext({
@@ -437,7 +437,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             ...(item.message_id !== undefined ? {messageId: String(item.message_id)} : {})
           }))
         })
-        if (diagnostic) session.interactionContext.diagnosticContext = diagnostic
+        if (diagnostic) session.interactionContext = withTurnDiagnosticContext(session.interactionContext, diagnostic)
         const reference = e._quotedPromptContext?.messageId || e.reply_id
         const needsActionFacts = session.interactionContext.kind === 'delivery'
           || typeof reference === 'string' || typeof reference === 'number'

@@ -1501,3 +1501,12 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 更新后src直接加载全memory202/202通过、tsc --noEmit与diffcheck通过；feedback代理独立只读复核未发现新增阻断。父已收到“可统一构建”信号；本子任务未build/commit/访问生产。
 
 - 统一源码稳定后严格类型检查、backend构建、typed tests编译通过；memory、转发、主链社交/continuity、自动风格隔离、进度人格及runner共288/288通过，无跳过。冻结runner/helper与基线字节一致，准备候选实模48轮。
+
+- 0068ba2源码已commit/push；同冻结配置完成首轮候选48轮，所有输出保留。记忆日期3/3、长期召回3/3结构通过；21项kind差异及3组故障续问seriousWins/seriousPlan失败未隐藏。真实回放定位到否定玩笑/口语拔电识别、故障上下文未共享至续轮social，以及空forward collection伪未读证据，继续修复，不以首轮候选冒充最终验收。
+- 独立可靠性复核发现耗尽batch阻塞后续scope，正改为多份持久独立批次；特别验证并发新增原话不得未经尝试就耗尽、group排队先持久化、冷恢复幂等及重叠history不变相重试旧失败。原工作区预检56个业务目标无冲突、200个非目标起始dirty哈希不变，HEAD/index保持。
+
+- 记忆耗尽批次修复收敛：每批UUID独立持久身份，scope维持同人格请求串行；已开始请求的批次不再接新原文，新消息另开预算，旧耗尽原文继续保留且不调度。group跨全部pending去重，避免重叠history让旧耗尽行进入新批次；所有新旧批次共同计入pending总上限，满额明确拒绝。
+- group等待同scope前序请求前先持久化；恢复重复legacy key使用稳定派生身份，cleanup失败重入复用现存batch且不重置attempts。duplicate位置在隐私过滤前计数，新增opt-out不挪动其他batch身份；隐私清理持久成功后才启动恢复timer。
+- 最终直接加载src的全memory219/219通过、0跳过；日志/tmp/episodic-memory-batch-final-stable-20261015.log。tsc --noEmit最终进程77068退出0、git diff --check通过；feedback独立只读复核无新增阻断。可由父统一构建/提交/实模回放；本子任务未build、commit、访问生产或真实模型。
+
+- 最后补修统一类型检查、backend构建与357项定向测试全过，无跳过；诊断/社交/main源码组合独立77/77，全memory219/219。准备冻结最终候选；保留0068ba2全部48轮，最终版继续相同48轮协议。

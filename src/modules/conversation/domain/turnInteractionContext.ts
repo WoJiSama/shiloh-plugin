@@ -3,6 +3,7 @@ import type {PersonaIdentity} from '../../../contracts/persona.js'
 import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 import {buildTurnActionFactsPrompt} from './turnActionFacts.js'
 import {buildDiagnosticContextPrompt} from './diagnosticContext.js'
+import type {DiagnosticContext} from '../../../contracts/diagnosticContext.js'
 
 type Id = string | number | null | undefined
 interface InteractionInput {
@@ -18,9 +19,10 @@ interface InteractionInput {
   continuity?: {botId?: string | undefined; lastReply?: string | undefined; persona?: PersonaIdentity | undefined; social?: SocialContinuity | undefined} | null | undefined
 }
 
-const SERIOUS_CUE = /(?:认真(?:问|说|点|回答)|正经|不开玩笑|不是开玩笑|急救|救命|冒烟|烧焦|焦糊|起火|漏电|烫手|人身安全)/u
+const SERIOUS_CUE = /(?:认真(?:问|说|点|回答)|正经|不开玩笑|不是开玩笑|别开玩笑|不要开玩笑)/u
 const DANGER_CUE = /(?:急救|救命|冒烟|烧焦|焦糊|起火|漏电|烫手|人身安全)/u
-const SERIOUS_REQUEST = /(?:排查|故障|报错|异常|修复|报警|原理|推导|证明|公式|诊断|如何|(?:解释|讲解)(?:一下|下)|请.{0,4}(?:解释|分析)|怎么.{0,12}(?:配置|部署|连接|散热|降温|解决|处理)|(?:CPU|GPU|处理器|显卡|服务器).{0,20}\d+\s*[℃°])/iu
+const SERIOUS_REQUEST = /(?:排查|故障|报错|异常|修复|报警|原理|推导|证明|公式|诊断|如何|(?:解释|讲解)(?:一下|下)|请.{0,4}(?:解释|分析)|怎么.{0,12}(?:配置|部署|连接|散热|降温|解决|处理))/iu
+const THERMAL_REPORT = /(?:CPU|GPU|处理器|显卡|服务器).{0,20}\d+\s*[℃°]/iu
 const EXPLICIT_FACT_REQUEST = /(?:帮我|请|麻烦|替我|需要你|能不能|能否|可不可以).{0,12}(?:计算|算|核算|估算|检查|核对|分析|解释|评估|审查|审核|判断|比较|对比|查|搜|翻译|总结|整理|写.{0,4}(?:代码|程序|合同|方案|报告))|(?:计算|估算|核算|审查|翻译)(?:一下|下|这|此)/u
 const DIRECT_EXPLANATION_REQUEST = /^(?:请你?|麻烦你?|帮我|给我|能不能|能否|可不可以)?\s*(?:解释|讲解|讲讲|介绍|说明|分析|总结|整理|梳理)(?!得|真|很|太|挺)/u
 // Only positive cues of figurative play. Laughter alone does not override a real task.
@@ -66,14 +68,14 @@ function samePersona(expected: PersonaIdentity | undefined, actual: PersonaIdent
     && actual?.personaId === expected.personaId && actual.personaVersion === expected.personaVersion)
 }
 
-function localAct(rawUserText: string, evidence: TurnEvidence[]): {act: SocialAct; confidence: number; protected: boolean} {
+function localAct(rawUserText: string, evidence: TurnEvidence[], fictionalDevice = false): {act: SocialAct; confidence: number; protected: boolean} {
   const text = rawUserText.trim()
   // Direct danger, explicit work and correction cannot be downgraded by an
   // interpretation of an old joke. A question word alone proves none of them.
-  if (DANGER_CUE.test(text)) return {act: 'help_request', confidence: 0.98, protected: true}
+  if (DANGER_CUE.test(text) && (!fictionalDevice || /急救|救命|人身安全/u.test(text))) return {act: 'help_request', confidence: 0.98, protected: true}
   if (CRITICISM_CUE.test(text)) return {act: 'criticism', confidence: 0.94, protected: true}
   if (SERIOUS_CUE.test(text)) return {act: 'help_request', confidence: 0.98, protected: true}
-  if (SERIOUS_REQUEST.test(text) || EXPLICIT_FACT_REQUEST.test(text) || DIRECT_EXPLANATION_REQUEST.test(text)) return {act: 'help_request', confidence: 0.94, protected: true}
+  if (SERIOUS_REQUEST.test(text) || (!fictionalDevice && THERMAL_REPORT.test(text)) || EXPLICIT_FACT_REQUEST.test(text) || DIRECT_EXPLANATION_REQUEST.test(text)) return {act: 'help_request', confidence: 0.94, protected: true}
   if (DELIVERY_REQUEST.test(text)) return {act: 'delivery', confidence: 0.94, protected: true}
   if (ATTENTION_BID.test(text)) return {act: 'attention_bid', confidence: 0.86, protected: false}
   if (SOCIAL_APPRAISAL.test(text)) return {act: 'conversation', confidence: 0.84, protected: false}
@@ -85,6 +87,32 @@ function localAct(rawUserText: string, evidence: TurnEvidence[]): {act: SocialAc
   if (HELP_REQUEST.test(text)) return {act: 'help_request', confidence: 0.85, protected: true}
   if (FACT_QUESTION.test(text)) return {act: 'factual_question', confidence: 0.8, protected: false}
   return {act: 'conversation', confidence: 0.55, protected: false}
+}
+
+function contextAct(context: TurnInteractionContext) {
+  // Diagnostic observations already resolve source, subject, time and negation.
+  // A short follow-up must retain that established request for help.
+  if (context.diagnosticContext?.purpose === 'troubleshooting' && context.diagnosticContext.incident.status === 'asserted') {
+    return {act: 'help_request' as const, confidence: 0.98, protected: true}
+  }
+  const text = context.rawUserText
+  if (context.diagnosticContext?.purpose === 'figurative') {
+    // Remove only the fictional incident's danger/temperature escalation; all
+    // actual question, task and delivery rules still interpret the new request.
+    const inferred = localAct(text, context.evidence, true)
+    return inferred.act === 'conversation' && inferred.confidence < 0.72
+      ? {act: 'teasing' as const, confidence: 0.9, protected: false} : inferred
+  }
+  return localAct(context.rawUserText, context.evidence)
+}
+
+export function withTurnDiagnosticContext(context: TurnInteractionContext, diagnosticContext: DiagnosticContext): TurnInteractionContext {
+  const updated = {...context, diagnosticContext}
+  const act = contextAct(updated)
+  if (act.act !== 'help_request' && diagnosticContext.purpose !== 'figurative') return updated
+  const social = {...(context.social ?? localSocial(updated)), act: act.act, source: 'local' as const, confidence: act.confidence}
+  if (act.act !== 'teasing') delete social.activeBit
+  return {...updated, social, kind: kindForAct(act.act), allowPlayfulness: allowsPlayfulness(act.act)}
 }
 
 function kindForAct(act: SocialAct): InteractionKind {
@@ -120,7 +148,7 @@ function inferredStance(text: string, act?: SocialAct): SocialStance {
 }
 
 function localSocial(context: TurnInteractionContext, continuity?: SocialContinuity): SocialTurnState {
-  const inferred = localAct(context.rawUserText, context.evidence)
+  const inferred = contextAct(context)
   const previous = context.previousBotReply
   const previousText = excerpt(previous?.text, 600)
   // A persisted hint is useful only when its excerpt remains in the verified
@@ -176,7 +204,7 @@ export function withTurnSocialInterpretation(context: TurnInteractionContext, va
   const raw = parseSocialInterpretation(value)
   if (!MODEL_SOURCES.includes(source) || !raw) return context
   const existing = context.social ?? localSocial(context)
-  const local = localAct(context.rawUserText, context.evidence)
+  const local = contextAct(context)
   const act = local.protected ? local.act : raw.act
   const targetValue = raw.target
   let target: InteractionTarget = {...context.target}

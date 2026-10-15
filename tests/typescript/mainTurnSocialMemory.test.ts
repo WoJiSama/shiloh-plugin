@@ -21,6 +21,7 @@ function turnFixture(text='这个呢') {
  const event:ChatTurnEvent={message_type:'group',group_id:42,user_id:202,self_id:99,message_id:'current',msg:text,
   message:[{type:'text',text}],sender:{user_id:202,nickname:'群友'},group,bot:{uin:99,nickname:'账号昵称',pickGroup:()=>group}}
  const session:ChatTurnSession={tools:[],groupUserMessages:[]}
+ const assets:Awaited<ReturnType<ChatTurnPorts['resolveGroupContextAssets']>>={images:[],currentImages:[],quotedImages:[],forwardImages:[],videos:[]}
  const composer=createTurnPromptComposer()
  let current=replacement, briefCalls=0, intentCalls=0
  const ports:Partial<ChatTurnPorts>={
@@ -28,7 +29,7 @@ function turnFixture(text='这个呢') {
   resolveConversationContext:()=>({kind:'group',botId:'99',conversationId:'group:42',userId:'202'}),
   createTurnTrace:()=>({id:'trace',setTrigger(){},setIntent(){},addModelCall(){},addTool(){},finish:()=>({modelCalls:[],tools:[]})}),resolveTurnTraceArchiveDir:()=>'/tmp',
   createOutboundArbiter:()=>({wrapEvent:e=>e,beginToolOutcomes(){},enqueue(){},settle(){},resolveToolOutcomes(){}}),
-  getOrCreateGroupLimiter:()=>work=>work(),cacheGroupName:async()=>{},resolveGroupContextAssets:async()=>({images:[],currentImages:[],quotedImages:[],forwardImages:[],videos:[]}),formatGroupContextImagePrompt:()=>'',
+  getOrCreateGroupLimiter:()=>work=>work(),cacheGroupName:async()=>{},resolveGroupContextAssets:async()=>assets,formatGroupContextImagePrompt:()=>'',
   TakeImages:async()=>[],shouldRequireImageEditBase:()=>false,resolveRecentBotImage:async()=>null,resolveRecentUserImage:async()=>null,
   prepareImageEditAssets:()=>null,resolveAvatarEditBase:()=>null,resolveAvatarInspectionTargets:()=>null,resolveAvatarDrawReference:()=>null,
   shouldAskForMissingImageForVisualRequest:()=>false,selectToolIntentCandidates:()=>[],shouldSkipIntentModel:()=>true,resolveDeterministicToolIntent:()=>null,
@@ -53,7 +54,7 @@ function turnFixture(text='这个呢') {
   getToolsByName:()=>[],getImageGenerationReferenceImages:images=>images,retryRequest:async()=>({choices:[{message:{content:'接住这句'}}]}),buildMissingToolCommitmentCall:()=>null,handleTextResponse:async()=>{},finishConversationTask:async()=>{},recordReplyLatency(){}
  }
  const api=createChatTurn(ports as ChatTurnPorts)
- return {event,session,host:host as ChatTurnHost,composed,order,errors,api,setSnapshot:(snapshot:typeof captured)=>{current=snapshot},counts:()=>({briefCalls,intentCalls})}
+ return {event,session,assets,host:host as ChatTurnHost,composed,order,errors,api,setSnapshot:(snapshot:typeof captured)=>{current=snapshot},counts:()=>({briefCalls,intentCalls})}
 }
 
 function gateHandoff(event:ChatTurnEvent):PendingSocialState {
@@ -112,6 +113,51 @@ test('main turn awaits the understanding update before composing tone from the s
  assert.equal(f.session.interactionContext?.kind,'serious_answer')
  assert.equal(f.session.interactionContext?.allowPlayfulness,false)
  assert.match(f.composed[0]?.tone||'',/事实|精确|明确/)
+})
+
+test('empty forward collection does not invent an unread forward in ordinary chat',async()=>{
+ const f=turnFixture('你好呀')
+ const empty=(await collectForwardContext(null,[])).completeness
+ f.assets.currentForwardCompleteness=empty
+ f.assets.quotedForwardCompleteness=empty
+ assert.equal(await f.api.handleToolInner(f.host,f.event),true)
+ assert.deepEqual(f.errors,[])
+ assert.equal(f.session.interactionContext?.evidence.some(item=>item.origin==='forward'),false)
+})
+
+test('source-checked diagnostic history keeps a short follow-up serious before tone composition',async()=>{
+ const f=turnFixture('那我能先开机试一下吗？')
+ f.host.messageManager.getMessages=async()=>[{self_id:99,source:'receive',sender:{user_id:202,nickname:'群友'},content:'电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？',at:Date.now()-10000,message_id:'previous'}]
+ assert.equal(await f.api.handleToolInner(f.host,f.event),true)
+ assert.deepEqual(f.errors,[])
+ assert.equal(f.session.interactionContext?.diagnosticContext?.incident.status,'asserted')
+ assert.equal(f.session.interactionContext?.kind,'serious_answer')
+ assert.equal(f.session.interactionContext?.social?.act,'help_request')
+ assert.equal(f.session.interactionContext?.allowPlayfulness,false)
+ assert.equal(f.composed[0]?.options.turn?.interactionContext,f.session.interactionContext)
+ assert.match(f.composed[0]?.tone||'',/事实|精确|明确/)
+})
+
+test('another member diagnostic report does not become the current speaker device state',async()=>{
+ const f=turnFixture('那我能先开机试一下吗？')
+ f.host.messageManager.getMessages=async()=>[{self_id:99,source:'receive',sender:{user_id:303,nickname:'另一位群友'},content:'电脑电源有焦糊味，已经拔电了。',at:Date.now()-10000,message_id:'other'}]
+ assert.equal(await f.api.handleToolInner(f.host,f.event),true)
+ assert.deepEqual(f.errors,[])
+ assert.equal(f.session.interactionContext?.diagnosticContext?.incident.status,'unknown')
+ assert.deepEqual(f.session.interactionContext?.diagnosticContext?.incident.signals,[])
+ assert.equal(f.session.interactionContext?.diagnosticContext?.power,'unknown')
+ assert.ok(f.session.interactionContext?.diagnosticContext?.sources.every(item=>item.origin==='current'))
+ assert.equal(f.session.interactionContext?.kind,'conversation')
+})
+
+test('a positively framed device meme stays playful after diagnostic source resolution',async()=>{
+ const f=turnFixture('这张梗图是CPU满载92℃冒烟，吐槽一下。')
+ assert.equal(await f.api.handleToolInner(f.host,f.event),true)
+ assert.deepEqual(f.errors,[])
+ assert.equal(f.session.interactionContext?.diagnosticContext?.purpose,'figurative')
+ assert.equal(f.session.interactionContext?.kind,'banter')
+ assert.equal(f.session.interactionContext?.social?.act,'teasing')
+ assert.equal(f.session.interactionContext?.allowPlayfulness,true)
 })
 
 function memoryFixture(history:unknown[]=[]) {

@@ -18,10 +18,11 @@ import type { MemoryId, MemoryRedisClient, MemoryLlmConfig, MemoryLlmPorts, Memo
 import type { PersonaScope } from '../../../contracts/persona.js'
 import { memoryRecord } from '../../../contracts/memoryEngine.js'
 import {finiteTimestamp,memoryDate} from './engine/temporalContext.js'
+import {randomUUID} from 'node:crypto'
 type Fact = MemoryFact
 type EntityMap = Record<string, MemoryEntity>
 type Operation = MemoryOperation
-interface ExtractionBuffer {groupId:MemoryId;userId:MemoryId;messages:MemoryExtractionMessage[];timer:ReturnType<typeof setTimeout>|null;heardFrom:string;personaSource?:PersonaScope;attempts:number;retryAt:number;retryExhausted:boolean;running:boolean;lastFailure?:string}
+interface ExtractionBuffer {scopeKey:string;groupId:MemoryId;userId:MemoryId;messages:MemoryExtractionMessage[];timer:ReturnType<typeof setTimeout>|null;heardFrom:string;personaSource?:PersonaScope;attempts:number;retryAt:number;retryExhausted:boolean;running:boolean;waitingForScope?:boolean;lastFailure?:string}
 
 interface ReflectTargets { entityQQs: string[]; groupOverThreshold: boolean }
 interface AdminOptions { groupId?: MemoryId; userId?: MemoryId; scope?: string | null; query?: string; limit?: number; id?: string; requesterQQ?: MemoryId; requesterIsGroupManager?: boolean; enabled?: boolean }
@@ -946,13 +947,15 @@ class MemoryManager {
     }
 
     const at = finiteTimestamp(meta.at) ?? nowMs()
-    const key = JSON.stringify([String(groupId),String(userId),personaSourceKey(meta.personaSource),memoryDate(at)])
-    if (!this.userBuffers.has(key) && this._pendingBatchCount(groupId) >= this._pendingBatchLimit()) return {queued:false,reason:'pending-batches-full'}
-    const buf = this.userBuffers.get(key) || this._createExtractionBuffer(groupId,userId,meta)
+    const scopeKey = JSON.stringify([String(groupId),String(userId),personaSourceKey(meta.personaSource),memoryDate(at)])
+    const open = this._acceptingExtractionBuffer(this.userBuffers,scopeKey)
+    if (!open && this._pendingBatchCount(groupId) >= this._pendingBatchLimit()) return {queued:false,reason:'pending-batches-full'}
+    const key = open?.[0] || this._newExtractionBatchKey(scopeKey)
+    const buf = open?.[1] || this._createExtractionBuffer(groupId,userId,meta,scopeKey)
     const pendingLimit = Math.max(1,Math.min(500,Number(this.config.extractPendingMaxMessages) || 60))
-    if (buf.messages.length >= pendingLimit || buf.retryExhausted) {
+    if (buf.messages.length >= pendingLimit) {
       memStats.inc('extract.user.pending-rejected')
-      return {queued:false,reason:buf.retryExhausted ? 'retry-exhausted' : 'pending-full',buffered:buf.messages.length}
+      return {queued:false,reason:'pending-full',buffered:buf.messages.length}
     }
     // Keep the actual utterance, including long quoted text and its source clock.
     // Pending input must survive a restart without a second lossy summary.
@@ -979,9 +982,19 @@ class MemoryManager {
     return { queued: true, buffered: buf.messages.length }
   }
 
-  _createExtractionBuffer(groupId:MemoryId,userId:MemoryId,meta:MemoryExtractionMeta):ExtractionBuffer {
+  _createExtractionBuffer(groupId:MemoryId,userId:MemoryId,meta:MemoryExtractionMeta,scopeKey:string):ExtractionBuffer {
     const personaSource = normalizePersonaSource(meta.personaSource)
-    return {groupId,userId,messages:[],timer:null,heardFrom:compactText(personaSource?.personaName || meta.heardFrom,24),...(personaSource ? {personaSource} : {}),attempts:0,retryAt:0,retryExhausted:false,running:false}
+    return {scopeKey,groupId,userId,messages:[],timer:null,heardFrom:compactText(personaSource?.personaName || meta.heardFrom,24),...(personaSource ? {personaSource} : {}),attempts:0,retryAt:0,retryExhausted:false,running:false}
+  }
+
+  _newExtractionBatchKey(scopeKey:string) {
+    return JSON.stringify([scopeKey,randomUUID()])
+  }
+
+  _acceptingExtractionBuffer(buffers:Map<string,ExtractionBuffer>,scopeKey:string) {
+    // Once a request starts, its input and attempt budget are fixed. Fresh input
+    // cannot inherit an older batch's failed attempts, including its final one.
+    return [...buffers].find(([_key,buf]) => buf.scopeKey === scopeKey && !buf.running && !buf.retryExhausted && buf.attempts === 0)
   }
 
   _pendingBatchCount(groupId:MemoryId) {
@@ -1010,6 +1023,21 @@ class MemoryManager {
     const task = this.enqueueGroup(groupId,async () => {
       const [pending,meta] = await Promise.all([this.store.getPendingExtractions(groupId),this.store.getMeta(groupId)])
       this.optedOutCache.set(groupKey,new Set(meta.optedOut))
+      // A previous restore may have loaded records before its cleanup write
+      // failed. Reconcile those same identities without duplicating batches or
+      // resetting their attempt budgets when this restore is retried.
+      for (const [kind,buffers] of [['user',this.userBuffers],['group',this.groupBuffers]] as const) {
+        for (const [key,buf] of buffers) {
+          if (String(buf.groupId) !== groupKey) continue
+          if (kind === 'group') buf.messages = this._privacySafeGroupMessages(buf.messages,meta.optedOut)
+          if (meta.disabled || !buf.messages.length || kind === 'user' && meta.optedOut.includes(String(buf.userId))) {
+            if (buf.timer) clearTimeout(buf.timer)
+            buffers.delete(key)
+          }
+        }
+      }
+      const occurrences = new Map<string,number>()
+      const restored:Array<{kind:'user'|'group';key:string;buf:ExtractionBuffer}> = []
       for (const raw of pending) {
         const entry = memoryRecord(raw)
         if ((entry.kind !== 'user' && entry.kind !== 'group') || typeof entry.key !== 'string' || String(entry.groupId) !== groupKey || !Array.isArray(entry.messages)) {
@@ -1017,6 +1045,12 @@ class MemoryManager {
           continue
         }
         const kind = entry.kind
+        // Count document positions before privacy filtering so a newly opted-out
+        // earlier record cannot change a later duplicate legacy key's identity.
+        const identity = JSON.stringify([kind,entry.key])
+        const occurrence = occurrences.get(identity) || 0
+        occurrences.set(identity,occurrence + 1)
+        const key = occurrence ? JSON.stringify([entry.key,'recovered-duplicate',occurrence]) : entry.key
         const userId = String(entry.userId || '')
         if (meta.disabled || (kind === 'user' && meta.optedOut.includes(userId))) continue
         const restoredMessages = entry.messages.flatMap(rawMessage => {
@@ -1028,25 +1062,36 @@ class MemoryManager {
         const messages = kind === 'group' ? this._privacySafeGroupMessages(restoredMessages,meta.optedOut) : restoredMessages
         if (!messages.length) continue
         const personaSource = normalizePersonaSource(entry.personaSource)
-        const key = kind === 'user'
+        const scopeKey = kind === 'user'
           ? JSON.stringify([groupKey,userId,personaSourceKey(personaSource),memoryDate(finiteTimestamp(messages[0]?.at) ?? 0)])
           : JSON.stringify([groupKey,personaSourceKey(personaSource)])
         const buffers = kind === 'user' ? this.userBuffers : this.groupBuffers
-        const buf = this._createExtractionBuffer(groupId,userId,{heardFrom:typeof entry.heardFrom === 'string' ? entry.heardFrom : '',...(personaSource ? {personaSource} : {})})
+        // Preserve batch identity rather than collapsing every record of a
+        // persona into one scope key. Legacy scope-only keys remain readable.
+        // If an old document really contains repeated keys, derive stable
+        // separate identities so retrying a failed restore stays idempotent.
+        const existing = buffers.get(key)
+        if (existing) {
+          restored.push({kind,key,buf:existing})
+          continue
+        }
+        const buf = this._createExtractionBuffer(groupId,userId,{heardFrom:typeof entry.heardFrom === 'string' ? entry.heardFrom : '',...(personaSource ? {personaSource} : {})},scopeKey)
         buf.messages = messages
         buf.attempts = typeof entry.attempts === 'number' && Number.isInteger(entry.attempts) ? Math.max(0,entry.attempts) : 0
         buf.retryAt = finiteTimestamp(entry.retryAt) ?? 0
         buf.retryExhausted = entry.retryExhausted === true || buf.attempts >= Math.max(1,Math.min(6,Number(this.config.extractRetryMaxAttempts) || 3))
         if (typeof entry.lastFailure === 'string') buf.lastFailure = entry.lastFailure
-        const live = buffers.get(key)
-        if (live) buf.messages.push(...live.messages)
         buffers.set(key,buf)
+        restored.push({kind,key,buf})
+      }
+      if (meta.disabled || meta.optedOut.length) await this._savePendingExtractions(groupId)
+      // No restored timer starts before privacy cleanup has been durably saved.
+      for (const {kind,key,buf} of restored) {
         if (!buf.retryExhausted && buf.lastFailure !== 'unconfigured') {
           const delay = buf.retryAt > 0 ? Math.max(1,buf.retryAt - nowMs()) : Math.max(1,Number(this.config.userExtractDebounceSeconds) || 0)*1000
           this._scheduleExtractionBuffer(kind,key,buf,delay)
         }
       }
-      if (meta.disabled || meta.optedOut.length) await this._savePendingExtractions(groupId)
     })
     this.pendingRestoreTasks.set(groupKey,task)
     task.catch(() => { if (this.pendingRestoreTasks.get(groupKey) === task) this.pendingRestoreTasks.delete(groupKey) })
@@ -1059,7 +1104,7 @@ class MemoryManager {
     for (const [kind,buffers] of [['user',this.userBuffers],['group',this.groupBuffers]] as const) {
       for (const [key,buf] of buffers) {
         if (String(buf.groupId) !== String(groupId) || !buf.messages.length) continue
-        pending.push({key,kind,groupId:String(groupId),userId:String(buf.userId || ''),messages:buf.messages.map(message => ({...message})),heardFrom:buf.heardFrom,...(buf.personaSource ? {personaSource:buf.personaSource} : {}),attempts:buf.attempts,retryAt:buf.retryAt,retryExhausted:buf.retryExhausted,...(buf.lastFailure ? {lastFailure:buf.lastFailure} : {})})
+        pending.push({key,scopeKey:buf.scopeKey,kind,groupId:String(groupId),userId:String(buf.userId || ''),messages:buf.messages.map(message => ({...message})),heardFrom:buf.heardFrom,...(buf.personaSource ? {personaSource:buf.personaSource} : {}),attempts:buf.attempts,retryAt:buf.retryAt,retryExhausted:buf.retryExhausted,...(buf.lastFailure ? {lastFailure:buf.lastFailure} : {})})
       }
     }
     return this.store.savePendingExtractions(groupId,pending)
@@ -1131,6 +1176,10 @@ class MemoryManager {
     if (buf.running) return {written:0,status:'pending',reason:'in-flight'}
     if (buf.retryExhausted) return {written:0,status:'failed',reason:'retry-exhausted',retryExhausted:true}
     if (buf.retryAt > retryClock) return {written:0,status:'pending',reason:'retry-wait',nextRetryAt:buf.retryAt}
+    if ([...buffers.values()].some(other => other !== buf && other.scopeKey === buf.scopeKey && other.running)) {
+      buf.waitingForScope = true
+      return {written:0,status:'pending',reason:'scope-in-flight'}
+    }
     if (buf.timer) clearTimeout(buf.timer)
     buf.timer = null
     buf.running = true
@@ -1201,13 +1250,18 @@ class MemoryManager {
         }
         if (!buf.messages.length) buffers.delete(key)
         else this._scheduleExtractionBuffer(kind,key,buf,Math.max(1,Number(this.config.userExtractDebounceSeconds) || 0)*1000)
-        if (kind === 'group') this.lastGroupExtractAt.set(key,nowMs())
+        if (kind === 'group') this.lastGroupExtractAt.set(buf.scopeKey,nowMs())
         return {...result,status:'success'}
       })
     } catch {
       return await this._retainFailedExtraction(kind,key,buf,'transport-or-store')
     } finally {
       buf.running = false
+      for (const [nextKey,next] of buffers) {
+        if (next.scopeKey !== buf.scopeKey || next.running || next.retryExhausted || !next.waitingForScope) continue
+        delete next.waitingForScope
+        this._scheduleExtractionBuffer(kind,nextKey,next,Math.max(1,next.retryAt - nowMs()))
+      }
     }
   }
 
@@ -1261,23 +1315,24 @@ class MemoryManager {
     if (storedMeta.disabled) return {queued:false,reason:'disabled'}
 
     const intervalMs = Math.max(0, Number(this.config.groupExtractMinIntervalMinutes) || 0) * 60000
-    const key = JSON.stringify([String(groupId),personaSourceKey(meta.personaSource)])
+    const scopeKey = JSON.stringify([String(groupId),personaSourceKey(meta.personaSource)])
     const messages = this._privacySafeGroupMessages(chatHistory,storedMeta.optedOut)
       .filter(m => m.role !== 'assistant' && m.source !== 'send' && m.source !== 'tool' && classifyBoundary(m.content).verdict === 'candidate')
       .slice(-this.config.groupExtractMaxBatchMessages)
-    const pending = this.groupBuffers.get(key)
-    if (pending) {
-      if (pending.retryExhausted) return {queued:false,reason:'retry-exhausted'}
-      // Histories overlap between turns. Append only genuinely new rows while
-      // keeping old failed input and its retry deadline intact.
-      const rowKey = (message:MemoryExtractionMessage) => JSON.stringify([message.authorQQ || '',message.at ?? null,message.role || 'user',message.source || 'user',message.content])
-      const seen = new Set(pending.messages.map(rowKey))
-      const added = messages.filter(message => {
-        const id = rowKey(message)
-        if (seen.has(id)) return false
-        seen.add(id)
-        return true
-      })
+    const scopeBatches = [...this.groupBuffers].filter(([_key,buf]) => buf.scopeKey === scopeKey)
+    // Histories overlap between turns. In particular, do not put the rows of an
+    // exhausted batch into a fresh batch and silently restart their retry budget.
+    const rowKey = (message:MemoryExtractionMessage) => JSON.stringify([message.authorQQ || '',message.at ?? null,message.role || 'user',message.source || 'user',message.content])
+    const seen = new Set(scopeBatches.flatMap(([_key,buf]) => buf.messages.map(rowKey)))
+    const added = messages.filter(message => {
+      const id = rowKey(message)
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+    const open = this._acceptingExtractionBuffer(this.groupBuffers,scopeKey)
+    if (open) {
+      const [key,pending] = open
       const limit = Math.max(1,Math.min(500,Number(this.config.extractPendingMaxMessages) || 60))
       if (pending.messages.length + added.length > limit) return {queued:false,reason:'pending-full',buffered:pending.messages.length,rejectedMessages:added.length}
       if (added.length) {
@@ -1286,19 +1341,24 @@ class MemoryManager {
       }
       return this._flushExtractionBuffer('group',key)
     }
+    if (!added.length) {
+      const retryable = scopeBatches.find(([_key,buf]) => !buf.retryExhausted)
+      return retryable ? this._flushExtractionBuffer('group',retryable[0]) : {queued:false,reason:scopeBatches.length ? 'no-new-candidate' : 'no-candidate'}
+    }
     if (this._pendingBatchCount(groupId) >= this._pendingBatchLimit()) return {queued:false,reason:'pending-batches-full'}
-    const last = this.lastGroupExtractAt.get(key) || 0
+    const last = this.lastGroupExtractAt.get(scopeKey) || 0
     if (intervalMs > 0 && nowMs() - last < intervalMs) {
       memStats.inc('extract.group.throttled')
       return { queued: false, reason: 'throttled' }
     }
 
-    if (!messages.length) return { queued: false, reason: 'no-candidate' }
-
     memStats.inc('extract.group.run')
-    const buf = this._createExtractionBuffer(groupId,'',meta)
-    buf.messages = messages.map(message => ({...message,content:String(message.content || ''),...(finiteTimestamp(message.at) !== undefined ? {at:message.at!} : {})}))
+    const key = this._newExtractionBatchKey(scopeKey)
+    const buf = this._createExtractionBuffer(groupId,'',meta,scopeKey)
+    buf.messages = added.map(message => ({...message,content:String(message.content || ''),...(finiteTimestamp(message.at) !== undefined ? {at:message.at!} : {})}))
     this.groupBuffers.set(key,buf)
+    try { await this._persistPendingExtractions(groupId) }
+    catch { return this._retainFailedExtraction('group',key,buf,'pending-store') }
     return this._flushExtractionBuffer('group',key)
   }
 

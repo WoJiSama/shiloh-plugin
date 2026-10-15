@@ -35,7 +35,7 @@ function historyTimestamp(message: DiagnosticHistoryMessage): number | undefined
 
 const DEVICE = /电脑|台式机|主机|机箱|电源|插排|插座|主板|显卡|CPU|GPU|服务器|笔记本|风扇|水泵|散热器|机器|设备/iu
 const DIAGNOSIS = /排查|故障|维修|检修|修好|散热|降温|温度|满载|℃|°C|开机|通电|断电|电源线|拔.{0,3}插头|怎么办|怎么处理|怎么检查|能继续用|能用了吗|能开吗|风扇|水泵/iu
-const FIGURATIVE = /梗图|接.{0,2}梗|玩笑|比喻|吐槽|虚构|小说|台词|表情包|电子体香|赛博香水|笑得.{0,5}冒烟/u
+const FIGURATIVE = /梗图|接.{0,2}梗|(?:只是|(?:真的?|其实|就)?是)(?:个|一个)?梗|玩笑|比喻|吐槽|虚构|小说|台词|表情包|电子体香|赛博香水|笑得.{0,5}冒烟/u
 const HYPOTHETICAL = /如果|假如|假设|要是|倘若|万一|假想|假定|若是/u
 const REPORT_CORRECTION = /刚才.{0,5}(?:说错|误报|不是事实|只是(?:个)?(?:玩笑|梗|比喻))|(?:其实|原来).{0,5}(?:是(?:个)?(?:玩笑|梗|比喻)|并没有|根本没)|并没有真的/u
 const SIGNAL_PATTERNS: [DiagnosticSignal, RegExp][] = [
@@ -71,7 +71,7 @@ function separateQuotedText(text: string): {text: string; unresolvedAttribution:
   const beforeQuotes = ownText
   ownText = ownText.replace(/“[^”]*”|「[^」]*」|『[^』]*』|"[^"\n]*"|`[^`\n]*`/gu, '，')
   if (ownText !== beforeQuotes) unresolvedAttribution = true
-  if (/[“”「」『』"`]|(?:你(?:刚才)?说|机器人(?:说|回复)|引用|转发|原文|原话|这句.{0,3}(?:说|是))/u.test(ownText)) unresolvedAttribution = true
+  if (/[“”「」『』"`]|(?:你(?:刚才)?说|机器人(?:说|回复)|(?:朋友|同事|室友|群友|别人|他|她|小张|小王)(?:刚才)?(?:说|表示|回复|提到)|引用|转发|原文|原话|这句.{0,3}(?:说|是))/u.test(ownText)) unresolvedAttribution = true
   return {text: ownText.trim(), unresolvedAttribution}
 }
 
@@ -85,7 +85,12 @@ function isDiagnosticContinuation(text: string): boolean {
 }
 
 function hasFigurativeFrame(text: string): boolean {
-  return FIGURATIVE.test(text.replace(/不是(?:在)?开玩笑|不开玩笑|没开玩笑|不是玩笑/gu, ''))
+  // A request to stop joking asserts seriousness; its word "玩笑" is not a
+  // fictional frame. Remove only the denied frame so a separate real joke or
+  // meme marker in the same message can still be recognized.
+  const withoutDeniedFrames = text
+    .replace(/(?:不是(?:在)?|并非(?:在)?|没(?:有)?(?:在)?|不|(?:请)?(?:别|不要)(?:再)?)(?:(?:跟|和)我)?开玩笑|(?:不是|并非)(?:个|一个)?(?:玩笑|梗|比喻|虚构)/gu, '')
+  return FIGURATIVE.test(withoutDeniedFrames)
 }
 
 function ownSubject(speakerId?: string, another = false): DiagnosticSubject {
@@ -139,7 +144,14 @@ function observations(text: string): Observation[] {
 }
 
 function isReportedPowerOff(text: string): boolean {
-  return /(?:已经|已|刚刚|我刚|我已).{0,8}(?:拔(?:掉|下)?(?:了)?(?:电源(?:线)?|插头)|切断(?:了)?电源|断电)|(?:电源线|插头).{0,5}(?:已经)?拔(?:掉|下)?了|(?:我)?拔(?:掉|下)?了(?:电源(?:线)?|插头)|拔(?:掉|下)?(?:了)?(?:电源(?:线)?|插头)了|(?:已经断电|已断电|断电了)/u.test(text)
+  if (/(?:已经|已|刚刚|我刚|我已).{0,8}(?:拔(?:掉|下)?(?:了)?(?:电源(?:线)?|插头)|切断(?:了)?电源|断电)|(?:电源线|插头).{0,5}(?:已经)?拔(?:掉|下)?了|(?:我)?拔(?:掉|下)?了(?:电源(?:线)?|插头)|拔(?:掉|下)?(?:了)?(?:电源(?:线)?|插头)了|(?:已经断电|已断电|断电了)/u.test(text)) return true
+  // Colloquial "拔电" still needs a completed-report marker. In particular,
+  // "拔电池/电容" and a bare imperative "拔电" do not establish isolation.
+  return /(?:(?:已经|已|刚刚|我刚|我已)拔(?:掉|下)?(?:了)?电(?:了)?|拔(?:掉|下)?了电(?:了)?|拔(?:掉|下)?电了)(?=$|[，。！？!?；;\s]|但|不过|然后)/u.test(text)
+}
+
+function deniesPowerOff(text: string): boolean {
+  return /(?:没有|没|尚未|还没|未|并未|并没有|不是|并非)(?:有)?(?:已经|已|真的|实际)?(?:拔(?:掉|下)?(?:了)?(?:电源(?:线)?|插头|电(?=$|[，。！？!?；;\s]|了|但|不过))|断电|隔离电源)|(?:电源线|插头).{0,4}(?:没|没有|未|尚未)拔|电(?:还没|没|没有|未|尚未)拔/u.test(text)
 }
 
 function isReportedPowerOn(text: string): boolean {
@@ -171,10 +183,10 @@ function parseSource(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'
   const statuses = obs.map(item => item.status)
   const incidentStatus = statuses.includes('asserted') ? 'asserted' : statuses.includes('unknown') ? 'unknown' : statuses.includes('denied') ? 'denied' : statuses.includes('figurative') ? 'figurative' : 'unknown'
   // Advice, questions and hypothetical steps are not reports that those steps happened.
-  const reportClauses = diagnosticClauses(scopedText).filter(clause => !HYPOTHETICAL.test(clause) && !/[？?]|(?:建议|应该|应当|先去|请你|需要先|是不是|是否|要不要|能不能|该不该|吗|么|的话|之后|以后)|(?:等(?:到)?|待)(?:它|机器)?(?:完全)?(?:冷却|凉透|放凉)|(?:冷却|凉透|放凉)后/u.test(clause))
+  const reportClauses = diagnosticClauses(scopedText).filter(clause => !HYPOTHETICAL.test(clause) && !/[？?]|(?:建议|应该|应当|先去|请你|需要先|是不是|是否|要不要|能不能|该不该|吗|么|的话|之后|以后|准备|打算|计划|将要|明天|稍后|一会儿|等会儿|待会儿|可能|大概|也许|好像|似乎|听说|据说)|(?:等(?:到)?|待)(?:它|机器)?(?:完全)?(?:冷却|凉透|放凉)|(?:冷却|凉透|放凉)后/u.test(clause))
   let power: DiagnosticContext['power'] | undefined
   for (const clause of reportClauses) {
-    if (/(?:没有|没|尚未|还没|未)(?:有)?(?:拔(?:掉|下)?(?:电源(?:线)?|插头)|断电|隔离电源)|(?:电源线|插头).{0,4}(?:没|没有|未|尚未)拔/u.test(clause)) power = 'unknown'
+    if (deniesPowerOff(clause)) power = 'unknown'
     else if (isReportedPowerOn(clause) || /(?:又|重新).{0,6}插(?:回|上).{0,5}(?:电源|插头)|(?:电源线|插头).{0,5}(?:又|重新)插(?:回|上)/u.test(clause)) power = 'on'
     else if (!separated.unresolvedAttribution && isReportedPowerOff(clause)) power = 'off'
   }
@@ -228,7 +240,7 @@ export function buildDiagnosticContext(input: DiagnosticContextInput): Diagnosti
   const subject = currentExplicitSubject || quoteSubject || inherited
   const current = parseSource({origin: 'current', text: safeTruncateUnicode(raw, 1600), subject, at: now, transientFactsFresh: true, ...(input.speakerId ? {userId: input.speakerId} : {})})
   // An explicitly fictional frame covers quoted words as well, unless the user reports a new real incident.
-  if (hasFigurativeFrame(raw) && !/(?:真的?|确实|实际|现在|这次).{0,8}(?:冒烟|焦糊|焦味|起火|漏电)|(?:但|不过).{0,20}(?:冒烟|焦糊|焦味|起火|漏电)/u.test(raw)) {
+  if (hasFigurativeFrame(current.source.text) && !/(?:真的?|确实|实际|现在|这次).{0,8}(?:冒烟|焦糊|焦味|起火|漏电)|(?:但|不过).{0,20}(?:冒烟|焦糊|焦味|起火|漏电)/u.test(current.source.text)) {
     current.observations = current.observations.map(item => ({...item, status: 'figurative'}))
     current.source.incidentStatus = 'figurative'
   }
