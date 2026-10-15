@@ -68,12 +68,15 @@ test("schema rejects unknown fields, credentials on normal fields, and inverted 
 test("reasoning selections preserve inheritance, validate supported choices, and declare hot application", async () => {
   const { default: schema } = await import("../models/Guoba/schemas/reasoning.js")
   const entry = { schema }
-  const current = { chatAiConfig: { chatReasoningEffort: "low", complexReasoningEffort: "high" }, taskAiConfig: { casual: { reasoningEffort: "none" } } }
+  const current = { chatAiConfig: { chatReasoningEffort: "low", complexReasoningEffort: "high" }, toolsAiConfig: { toolsReasoningEffort: "medium" }, taskAiConfig: { casual: { reasoningEffort: "none" } } }
   const view = buildSchemaConfigView("reasoning", entry, current)
-  assert.equal(view.groups[0].fields.length, 3)
-  const result = prepareSchemaUpdates("reasoning", entry, current, { revision: view.revision, values: { "taskAiConfig.casual.reasoningEffort": "low", "chatAiConfig.complexReasoningEffort": "max" } })
+  assert.deepEqual(view.groups[0].fields.map(item => item.field), ["chatAiConfig.chatReasoningEffort", "taskAiConfig.casual.reasoningEffort", "toolsAiConfig.toolsReasoningEffort", "chatAiConfig.complexReasoningEffort"])
+  const result = prepareSchemaUpdates("reasoning", entry, current, { revision: view.revision, values: { "taskAiConfig.casual.reasoningEffort": "low", "toolsAiConfig.toolsReasoningEffort": "low", "chatAiConfig.complexReasoningEffort": "max" } })
   assert.equal(result.updates["taskAiConfig.casual.reasoningEffort"], "low")
+  assert.equal(result.updates["toolsAiConfig.toolsReasoningEffort"], "low")
   assert.ok(result.apply.every(item => item.applyMode === "hot"))
   assert.equal(prepareSchemaUpdates("reasoning", entry, current, { values: { "taskAiConfig.casual.reasoningEffort": "" } }).updates["taskAiConfig.casual.reasoningEffort"], "")
+  assert.equal(prepareSchemaUpdates("reasoning", entry, current, { values: { "toolsAiConfig.toolsReasoningEffort": "" } }).updates["toolsAiConfig.toolsReasoningEffort"], "")
   assert.throws(() => prepareSchemaUpdates("reasoning", entry, current, { values: { "taskAiConfig.casual.reasoningEffort": "invalid" } }), { status: 400 })
+  assert.throws(() => prepareSchemaUpdates("reasoning", entry, current, { values: { "toolsAiConfig.toolsReasoningEffort": "invalid" } }), { status: 400 })
 })

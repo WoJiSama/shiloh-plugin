@@ -151,7 +151,7 @@ export function deriveTurnPlanRequest(plan:Partial<TurnPlan> = {}, config:{chatA
   return {
     toolChoice: plan?.execution?.toolChoice || "none",
     ...(plan.execution?.mode === "chat" ? {
-      executionPrompt: "【本轮执行范围】\n本次只生成并发出当前回复，没有可调用的工具；这次回复不会新登记自动查询、重试、生成或稍后投递。已经核验且仍有效的后续登记可以按其实际范围说明，不能因为本轮只有文字就否认既有登记；没有核验到登记则不能承诺稍后行动。基于已有结果回答，缺少当前结果就保持未确认。不要用将来会做某件事代替实际调用，也不要替用户重新发起旧任务。"
+      executionPrompt: "【本轮执行范围】\n本次只生成并发出当前回复，没有可调用的工具；这次回复不会新登记自动查询、重试、生成或稍后投递。已经核验且仍有效的后续登记可以按其实际范围说明，不能因为本轮只有文字就否认既有登记；没有核验到登记则不能承诺稍后行动。即使加上条件，‘好了我第一时间发你’‘有结果就通知你’也属于后续承诺，必须有已核验的有效登记才能说。没有登记时只回答当前状态，不能暗示会继续查看或主动补发。基于已有结果回答，缺少当前结果就保持未确认。不要用将来会做某件事代替实际调用，也不要替用户重新发起旧任务。"
     } : {}),
     requestOptions: profile === "fast"
       ? { forceChatBackend: true, routeLabel: "快速知识回复" }

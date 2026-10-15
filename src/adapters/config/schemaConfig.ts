@@ -130,7 +130,7 @@ export function fieldApplyInfo(field: string) {
   if (["groupMaxMessages", "groupChatMemoryMinutes"].includes(field)) return { applyMode: "restart", applyHint: "已保存；聊天模块会热更新，消息管道的历史写入参数需重启机器人服务后完全生效。已有历史按后续消息逐步更新" }
   if (field === "concurrentLimit") return { applyMode: "hot", applyHint: "已保存；配置热更新后，新回合使用新的每群并发额度，已在处理的请求继续完成" }
   if (["enabled", "chatTriggerMode", "groupHistory", "triggerPrefixes", "excludeMessageTypes", "enableGroupWhitelist", "allowedGroups", "useTools", "maxToolRounds"].includes(field) || ["privateChat.", "userBlacklist.", "forbiddenWords.", "agentIntelligence.", "taskAiConfig.", "replyRhythm.", "understandingEnhancement."].some(prefix => field.startsWith(prefix))) return { applyMode: "hot", applyHint: "已保存；配置热更新后，后续相关请求使用新配置，已开始的回合继续完成" }
-  if (["chatAiConfig.chatReasoningEffort", "chatAiConfig.complexReasoningEffort", "taskAiConfig.casual.reasoningEffort"].includes(field)) return { applyMode: "hot", applyHint: "已保存；配置热更新后，后续请求使用新档位" }
+  if (["chatAiConfig.chatReasoningEffort", "chatAiConfig.complexReasoningEffort", "toolsAiConfig.toolsReasoningEffort", "taskAiConfig.casual.reasoningEffort"].includes(field)) return { applyMode: "hot", applyHint: "已保存；配置热更新后，后续请求使用新档位" }
   if (field.startsWith("mediaRelayAdminReport.")) return { applyMode: "next-cycle", applyHint: "已保存；管理群报告在下一调度周期读取配置" }
   if (field.startsWith("messagePipeline.") || field.startsWith("youtubeRelay.") || field === "bilibiliQualityRelay.autoUseAuthorizedForMemberOnly") return { applyMode: "restart", applyHint: "已保存；消息管道初始化参数需重启机器人服务后生效" }
   if (field.startsWith("riskControl.")) return { applyMode: "hot", applyHint: "已保存；出站风控约 10 秒内读取更新" }
