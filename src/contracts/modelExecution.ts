@@ -7,7 +7,7 @@ export interface Backend {
 export interface ChatBackendConfig { chatApiUrl?: string | undefined; chatApiModel?: string | undefined; chatApiKey?: string | string[] | undefined; chatReasoningEffort?: string; label?: string | undefined }
 export interface ExecutionConfig {
  providers?: string; useTools?: boolean; chatAiConfig?: ChatBackendConfig
- toolsAiConfig?: { toolsAiUrl?: string; toolsAiModel?: string; toolsAiApikey?: string }
+ toolsAiConfig?: { toolsAiUrl?: string; toolsAiModel?: string; toolsAiApikey?: string; toolsReasoningEffort?: string }
  trackAiConfig?: { trackAiUrl?: string; trackAiModel?: string; trackAiApikey?: string | string[] }
  searchAiConfig?: { searchApiUrl?: string; searchApiModel?: string; searchApiKey?: string | string[] }
  memoryAiConfig?: { memoryAiUrl?: string; memoryAiModel?: string; memoryAiApikey?: string | string[] }

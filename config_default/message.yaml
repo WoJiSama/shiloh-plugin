@@ -581,13 +581,15 @@ pluginSettings:
     toolsAiUrl: https://api.openai.com/v1/chat/completions
     toolsAiModel: gemini-2.5-flash
     toolsAiApikey: sk-xxxxx
+    # 留空继承本轮任务或全局聊天档位；配置独立工具档时以此为准。
+    toolsReasoningEffort: ""
 
   chatAiConfig:
-    # 主模型默认思考档（minimal/low/medium/high）：实测 low 比默认省一半思考 token、快一倍多；置 "" 恢复模型默认
+    # 主模型默认思考档 low；各模型支持的档位不同，置 "" 恢复模型默认。
     chatReasoningEffort: low
-    # 复杂回合(多约束对比/故障排查/连环追问/推导证明)自动升到的思考档；
-    # 默认 high。置 false 或 none 可关闭按回合升档，回到全局 chatReasoningEffort。
-    complexReasoningEffort: high
+    # 认真回答、进度确认及复杂回合的思考预算，默认 low；需要时可显式配置 medium/high/max。
+    # false 或 none 只停止本轮覆盖，继承全局 chatReasoningEffort，不表示关闭模型思考。
+    complexReasoningEffort: low
     chatApiUrl: https://api.openai.com/v1/chat/completions
     chatApiModel: gemini-2.5-pro
     chatApiKey: sk-xxxxx

@@ -372,7 +372,7 @@ test('an explicit bot mention keeps the response directed to the bot while an ot
   assert.ok(system.includes(scenario.quote.text))
 })
 
-function reasoningGatewayConfig(complexReasoningEffort = 'high') {
+function reasoningGatewayConfig(complexReasoningEffort) {
   return {
     providers: 'oneapi', useTools: false,
     chatAiConfig: {chatApiUrl: 'https://base.invalid/v1', chatApiModel: 'base-reply', chatApiKey: 'fixture-base-key', chatReasoningEffort: 'low', complexReasoningEffort},
@@ -380,7 +380,7 @@ function reasoningGatewayConfig(complexReasoningEffort = 'high') {
   }
 }
 
-test('short serious cooling questions reach high reasoning at the real model request despite an optional reaction', async () => {
+test('short serious cooling questions default to low at the real model request and retain their execution contract', async () => {
   const scenario = {rawUserText: 'CPU已经92℃了，怎么散热？', modelReply: '先停止满载，让机器冷却，再检查散热。'}
   const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig(), optionalEmoji: true})
   assert.equal(await f.run(), true)
@@ -394,11 +394,22 @@ test('short serious cooling questions reach high reasoning at the real model req
   const {url, body} = f.captures.gatewayRequests[0]
   assert.equal(url, 'https://base.invalid/v1/chat/completions')
   assert.equal(body.model, 'base-reply')
-  assert.equal(body.reasoning_effort, 'high', 'serious short requests must override both base and casual low effort')
+  assert.equal(body.reasoning_effort, 'low', 'serious interaction must not automatically increase the thinking budget')
   assert.equal(body.tools, undefined)
   assert.match(body.messages.at(-1).content, /【本轮执行范围】/)
   assert.match(body.messages.at(-1).content, /这次回复不会新登记自动查询、重试、生成或稍后投递/)
   assert.match(body.messages.at(-1).content, /没有核验到登记则不能承诺稍后行动/)
+  assert.deepEqual(f.captures.sent, [scenario.modelReply])
+})
+
+test('an explicitly configured high budget still reaches the actual model request', async () => {
+  const scenario = {rawUserText: 'CPU已经92℃了，怎么散热？', modelReply: '先停止满载，让机器冷却，再检查散热。'}
+  const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig('high'), optionalEmoji: true})
+  assert.equal(await f.run(), true)
+  assert.deepEqual(f.captures.errors, [])
+  assert.equal(f.session.interactionContext.kind, 'serious_answer')
+  assert.equal(f.captures.gatewayRequests.length, 1)
+  assert.equal(f.captures.gatewayRequests[0].body.reasoning_effort, 'high')
   assert.deepEqual(f.captures.sent, [scenario.modelReply])
 })
 
@@ -445,7 +456,7 @@ test('unknown delivery status uses evidence reasoning and an explicit execution 
   assert.equal(f.captures.planInputs[0].interactionKind, 'delivery')
   assert.equal(f.captures.gatewayRequests.length, 1)
   const {body} = f.captures.gatewayRequests[0]
-  assert.equal(body.reasoning_effort, 'high')
+  assert.equal(body.reasoning_effort, 'low')
   assert.equal(body.tools, undefined)
   assert.match(body.messages.at(-1).content, /不要替用户重新发起旧任务/)
   assert.ok(body.messages.some(message => String(message.content).includes('缺少结果时只说明尚未确认')))

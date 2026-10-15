@@ -79,7 +79,7 @@ test("serious interaction excludes optional emoji before choosing the reasoning 
   assert.equal(plan.presentation.kind, "text")
   assert.equal(plan.observability.routeReason, "serious_answer")
   assert.deepEqual(plan.capabilities.required, [])
-  assert.deepEqual(deriveTurnPlanRequest(plan).requestOptions.generation, {reasoningEffort: "high"})
+  assert.deepEqual(deriveTurnPlanRequest(plan).requestOptions.generation, {reasoningEffort: "low"})
   assert.match(deriveTurnPlanRequest(plan).executionPrompt, /没有可调用的工具/)
   assert.equal(deriveTurnPlanRequest(plan, {chatAiConfig: {complexReasoningEffort: false}}).requestOptions.generation, undefined)
 })
@@ -102,7 +102,7 @@ test("delivery status checks preserve evidence reasoning instead of selecting a 
   assert.equal(plan.execution.mode, "chat")
   assert.equal(plan.execution.modelProfile, "reasoning")
   assert.equal(plan.observability.routeReason, "delivery_status")
-  assert.equal(deriveTurnPlanRequest(plan).requestOptions.generation.reasoningEffort, "high")
+  assert.equal(deriveTurnPlanRequest(plan).requestOptions.generation.reasoningEffort, "low")
   assert.match(deriveTurnPlanRequest(plan).executionPrompt, /不要替用户重新发起旧任务/)
 })
 

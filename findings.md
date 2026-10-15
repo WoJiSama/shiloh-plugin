@@ -1199,3 +1199,8 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - 完整门禁失败定位：未读视频正文实际请求“视频里的吃法是什么”，应保留factual_question/serious_answer且局部承认不可见；两个compiled测试的host不完整，生产host已有resolveUnderstandingPrompt。歧义闲聊复用理解简报，原无条件跳过字符串断言已过时。后续仅修验收并核对运行产物等价。
 
 - 最终实模改善边界：来源与绝对日期、部分转发处理改善；盲评14:5:5但仍有两处语言硬错，不能以48/48主生成HTTP200或30/48结构通过冒充自然度通过。900ms群共享知识裁决全超时，与20秒正文抽取/主意图模型是不同调用；最终pending只证明失败可见和原文保留，timer未来恢复由单测覆盖。跨午夜场景存在真实与模拟双时钟，eventAt仅日期锚而非上午精确时段。
+
+## 2026-10-15 默认推理预算审计
+- complexReasoningEffort 默认 high，serious_answer/delivery 均自动应用；关闭此覆盖只继承全局，不等于发送 none 或关闭模型思考。
+- 工具初始请求、工具回复转文字、自适应长上下文切工具后端有漏 effort 路径；生产 useTools=true，不能只修改复杂档配置或仅测试 useTools=false。
+- 本轮将复杂默认改 low，独立工具预算留空继承当轮/全局，保留管理员显式 high；不随机分配思考档，不声称 GLM 已支持 none。

@@ -32,7 +32,7 @@ function inferIntent(responseKind:string, requiredCapabilities:string[]) {
   return responseKind === "knowledge" ? "knowledge" : "chat"
 }
 
-// 复杂度判定:命中即升 reasoning 档(换档位而非换人)。除学术推导类原有关键词外,
+// 复杂度判定:命中即选 reasoning 路由，具体思考预算由配置决定。除学术推导类原有关键词外,
 // 覆盖群里真实发生的复杂问法——多约束对比、故障排查、方案规划;
 // 连环追问(疑问信号 ≥3)也算。注意门槛靠 isCasualChatTurn 反向兜底:
 // 命中这些模式的回合不可能是 casual,不会误伤短闲聊的提速路径。
@@ -85,8 +85,8 @@ export function createTurnPlan({
   // the emoji tool is silently stripped before the request is made.
   const hasOptionalReaction = casual && optional.some(name => OPTIONAL_CAPABILITIES.has(name))
   const executionMode = hasRequiredAction || hasOptionalReaction ? "tool" : "chat"
-  // 升档不再要求 knowledge 档:技术性追问常被 responseKind 判成 chat(排障类被显式排除在
-  // 教育讲解之外),它们同样值得高思考档;casual 已被 isCasualChatTurn 排除,不受影响
+  // 认真处理问题与思考预算分开：技术追问即使被判为 chat，也保留 reasoning 路由和
+  // 证据约束，但不会因此自动提高到 high；casual 仍由 isCasualChatTurn 排除。
   const reasoning = executionMode === "chat" && (groundedReply || needsDeliberateReasoning(intentText))
   const modelProfile = hasOptionalReaction
     ? "casual"
@@ -143,10 +143,10 @@ export function recordTurnPlanToolOutcome(plan:TurnPlan|null|undefined, { toolNa
 
 export function deriveTurnPlanRequest(plan:Partial<TurnPlan> = {}, config:{chatAiConfig?:{complexReasoningEffort?:unknown}} = {}) {
   const profile = plan?.execution?.modelProfile || "adaptive"
-  // reasoning 档真正升 thinking 档位:effort 经 options.generation 直达请求体
+  // reasoning 路由的预算经 options.generation 直达请求体，默认 low。
   // (apiClient: generation.reasoningEffort 优先于 backend.reasoningEffort)。
-  // 配置 complexReasoningEffort 可改档(minimal/low/medium/high/max);置 false/none 关闭升档。
-  const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "high").trim().toLowerCase()
+  // complexReasoningEffort 可显式改档；false/none 仅停止覆盖并继承后端，不是关闭思考。
+  const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "low").trim().toLowerCase()
   const escalateEffort = ["minimal", "low", "medium", "high", "max"].includes(configuredEffort) ? configuredEffort : ""
   return {
     toolChoice: plan?.execution?.toolChoice || "none",

@@ -1517,3 +1517,13 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 最终71812bc已push并用完整deploy.sh发布：后端2216项/2214pass/0fail/2本地Chromium跳过，前端34/34；1942托管文件零漂移，477后端JS和source/output manifest与ecc72ab实模候选一致。配置两哈希不变，两服务active/NRestarts0、载入错误0、管线1、两页面200；回滚20261015-192650。
 - 三版各48轮均完整保留：最终30/48全结构通过，18kind差异；900ms群知识裁决每版48/48超时，最终20秒抽取80次中2超时2无效输出，4批attempt1保留，无实模耗尽/重启证明。主回复P50 2.294s/P95 31.425s，高推理续问增加长尾。独立24配对盲评已封存后揭盲：新版14胜/5负/5平，仍有第三方问句复述和过度确诊两处硬错。
 - 原工作区62个业务/测试目标已备份写回，196非目标原dirty哈希、原HEAD与index不变，所有src TS一致；重新构建/typed编译及350/350定向通过、0跳过，source/output manifest一致。证据进一步脱敏配置QQ和别名；最终报告docs/ai-memory-social-2026-10-15.md，文档提交独立于生产runtime。
+
+## 2026-10-15 降低默认思考预算
+- 已重新只读核验生产 glm-5.3：全局 low、闲聊 low、复杂 high、useTools=true；认真问题和交付进度即使短续问也触发 high。
+- 原工作区新 baseline 已保存，HEAD de03521、index d3376d9f、305 个 dirty 文件；隔离分支 HEAD 3087194。
+- reasoning_effort_audit 独占 modelExecution/contracts/agentIntelligence 和模型请求回归；主代理负责 turnPlan/default YAML/schema 帮助与主链计划回归。保留低预算之外的既有语义和强制动作约束。
+
+- New validation issues retained: first remote audit guessed `.release-manifest.json`; corrected to repository-defined `release-manifest.json`. A guessed shell glob had no match; switched to rg --files. Strict typecheck found normalized flat tool_choice union incompatibility; source-test success alone was insufficient. Delegated precise transport contract fix before rebuilding.
+
+- 精确厂商 tool_choice HTTP 类型边界修复后，严格源/测试类型、backend 构建及90项 compiled 定向回归全过；独立只读审查无新增阻断。400明确拒绝生成参数时会保留工具契约、恢复provider_default，不能统计为low生效。
+- 真实对照使用生产受管文件的两个私有运行副本，配置/人格只在服务器快照；候选只把complex high改low。七轮/臂覆盖三轮闲聊接梗、故障续问、未知交付和计算，另加三条工具/自适应网关请求，不实际调度工具。离线baseline七轮完整保存，两项kind差异属于既有识别限制，未以此抹掉真实对照或重采样。

@@ -1,7 +1,7 @@
 export interface HistoryMessage {content?:unknown;role?:string;userId?:unknown;messageId?:unknown;contextSection?:string}
 interface HistoryOptions {currentUserId?:unknown;botId?:unknown;recentCount?:number;relevantCount?:number;maxMessages?:number;query?:string;replyMessageId?:unknown}
 interface IntelligenceConfig {enabled?:boolean;complexModelRouting?:boolean;complexUserChars?:number;complexContextChars?:number;complexSpeakerCount?:number;complexScoreThreshold?:number;complexMaxToolRounds?:number}
-interface AgentConfig {useTools?:boolean;agentIntelligence?:IntelligenceConfig;toolsAiConfig?:{toolsAiUrl?:string;toolsAiModel?:string;toolsAiApikey?:string};chatAiConfig?:{chatApiUrl?:string;chatApiKey?:string;chatApiModel?:string;chatReasoningEffort?:string};maxToolRounds?:number}
+interface AgentConfig {useTools?:boolean;agentIntelligence?:IntelligenceConfig;toolsAiConfig?:{toolsAiUrl?:string;toolsAiModel?:string;toolsAiApikey?:string;toolsReasoningEffort?:string};chatAiConfig?:{chatApiUrl?:string;chatApiKey?:string;chatApiModel?:string;chatReasoningEffort?:string};maxToolRounds?:number}
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
 
 const DEFAULT_RECENT_HISTORY = 10
@@ -219,6 +219,7 @@ export function resolveAgentBackend(config:AgentConfig = {}, requestData:{messag
       apiKey: config.toolsAiConfig!.toolsAiApikey,
       model: config.toolsAiConfig!.toolsAiModel,
       label: "reasoning",
+      reasoningEffort: config.toolsAiConfig!.toolsReasoningEffort?.trim() || config.chatAiConfig?.chatReasoningEffort || "",
       complexity
     }
   }

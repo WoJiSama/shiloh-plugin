@@ -3,6 +3,12 @@ import { sanitizeJsonValue } from '../domain/unicodeText.js'
 import { parseChatResponse } from '../domain/chatResponse.js'
 import type { ChatMessage, ChatRequestData, ChatResponse } from '../../../contracts/modelGateway.js'
 import type { Backend, ChatBackendConfig, ExecutionConfig, ExecutionOptions, ModelExecutionPorts } from '../../../contracts/modelExecution.js'
+// A provider may require a flat named choice on the wire. Keep that shape at
+// this boundary instead of weakening the application's nested tool contract.
+interface ProviderChatRequestData {
+    [field: string]: unknown
+    tool_choice?: ChatRequestData['tool_choice'] | { type: string; name: string }
+}
 function errorMessage(value: unknown): string {
   if (value instanceof Error) return value.message
   if (value && typeof value === 'object' && 'message' in value) return String(value.message)
@@ -15,6 +21,40 @@ function sourceFailure(url: string, model: unknown, detail: string): string {
 }
 export function createModelExecutor(ports: ModelExecutionPorts) {
  const { fetch, logger, removeToolPromptsFromMessages, resolveChatCompletionUrl, resolveAgentBackend, shouldAcceptPlannerTextResponse, summarizeToolResultForAgent } = ports
+
+async function fetchWithGenerationCompatibility(url: string, headers: Record<string, string>, requestData: ProviderChatRequestData, options: ExecutionOptions) {
+    const sendRequest = () => {
+        options.signal?.throwIfAborted()
+        return fetch(url, {
+            method: 'POST', headers,
+            body: JSON.stringify(sanitizeJsonValue(requestData)),
+            ...(options.signal ? { signal: options.signal } : {})
+        })
+    }
+    let response = await sendRequest()
+    if (response.ok) return { response, errorText: "" }
+
+    let errorText = await response.text().catch(() => '无法读取错误内容')
+    const optionalFields = ["temperature", "top_p", "max_tokens", "max_completion_tokens", "reasoning_effort", "response_format"]
+        .filter(field => Object.hasOwn(requestData, field))
+    // Tool-choice recovery has its own contract and must retain the effort.
+    const mayRetryWithoutOptions = response.status === 400 && optionalFields.length > 0 &&
+        !/thinking mode does not support this tool_choice/i.test(errorText) &&
+        /(?:unsupported|unknown|unrecognized|not support|invalid parameter|max_tokens|max_completion_tokens|reasoning_effort|temperature|response_format)/i.test(errorText)
+    if (mayRetryWithoutOptions) {
+        logger.warn(`[API兼容] 可选生成参数不受支持，移除后在同一后端重试 fields=${optionalFields.join(',')}${optionalFields.includes("reasoning_effort") ? " effort=provider_default" : ""}`)
+        for (const field of optionalFields) delete requestData[field]
+        response = await sendRequest()
+        errorText = response.ok ? "" : await response.text().catch(() => '无法读取错误内容')
+    }
+    return { response, errorText }
+}
+
+function preserveReasoningEffort(options: ExecutionOptions, effort: unknown): ExecutionOptions {
+    return typeof effort === "string" && effort.trim()
+        ? { ...options, generation: { ...options.generation, reasoningEffort: effort } }
+        : options
+}
 /**
  * 发送请求到 OpenAI API 或其他提供者并处理响应
  * @param {Object} requestData - 请求体数据
@@ -34,7 +74,8 @@ async function YTapi(requestData: ChatRequestData, config: ExecutionConfig, tool
 
         if (config.useTools && requestHasTools) {
             // useTools 开启，先调用 OpenAI API
-            const openaiUrl = resolveChatCompletionUrl(config.toolsAiConfig?.toolsAiUrl);
+            const toolsBackend = resolveConfiguredToolsBackend(config, options.taskBackend);
+            const openaiUrl = resolveChatCompletionUrl(toolsBackend.apiUrl);
             // 确保使用OpenAiModel的模型
             if (!config.toolsAiConfig?.toolsAiApikey) return { error: "OpenAI Token 未配置" };
 
@@ -46,22 +87,20 @@ async function YTapi(requestData: ChatRequestData, config: ExecutionConfig, tool
             let openaiResponse;
             try {
                 // 使用config.OpenAiModel替换请求中的模型
-                const openaiRequestData = sanitizeJsonValue(normalizeToolChoiceForToolsProvider({
+                const openaiRequestData = normalizeToolChoiceForToolsProvider({
                     ...requestData,
-                    model: config.toolsAiConfig?.toolsAiModel,
-                    stream: false
-                }, openaiUrl));
+                    model: toolsBackend.model,
+                    stream: false,
+                    ...buildGenerationOptions(requestData, options, toolsBackend)
+                }, openaiUrl);
+                options = preserveReasoningEffort(options, openaiRequestData.reasoning_effort)
                 // logger.error(config.toolsAiConfig?.toolsAiApikey, config.toolsAiConfig?.toolsAiModel, JSON.stringify(openaiRequestData))
                 // logger.error('已触发全局AI对话', config.toolsAiConfig?.toolsAiApikey, config.toolsAiConfig?.toolsAiModel)
-                openaiResponse = await fetch(openaiUrl, {
-                    method: 'POST',
-                    headers: openaiHeaders,
-                    body: JSON.stringify(openaiRequestData), ...(options.signal ? { signal: options.signal } : {})
-                });
+                const sent = await fetchWithGenerationCompatibility(openaiUrl, openaiHeaders, openaiRequestData, options)
+                openaiResponse = sent.response
 
                 if (!openaiResponse.ok) {
-                    const errorText = await openaiResponse.text().catch(() => '无法读取错误内容');
-                    const failure = sourceFailure(openaiUrl, config.toolsAiConfig?.toolsAiModel, `OpenAI API 请求失败：${openaiResponse.status} ${openaiResponse.statusText} - ${errorText}`);
+                    const failure = sourceFailure(openaiUrl, config.toolsAiConfig?.toolsAiModel, `OpenAI API 请求失败：${openaiResponse.status} ${openaiResponse.statusText} - ${sent.errorText}`);
                     logger.error(failure);
                     return await fallbackFromToolsBackend(requestData, config, toolContent, toolName, options, failure);
                 }
@@ -107,7 +146,8 @@ async function YTapi(requestData: ChatRequestData, config: ExecutionConfig, tool
             finalRequestData = {
                 model: selectedTextBackend.model,
                 messages: convertToolMessagesForChat(requestData.messages, toolName),
-                stream: false
+                stream: false,
+                ...buildGenerationOptions(requestData, options, selectedTextBackend)
             };
         } else {
             const backend = options.taskBackend
@@ -153,28 +193,13 @@ async function YTapi(requestData: ChatRequestData, config: ExecutionConfig, tool
             removeToolPromptsFromMessages(finalRequestData.messages || requestData.messages || [])
         )
         logger.info('最终请求体:', finalRequestData);
+        options = preserveReasoningEffort(options, finalRequestData.reasoning_effort)
         try {
-            const sendRequest = () => fetch(url, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(sanitizeJsonValue(finalRequestData)), ...(options.signal ? { signal: options.signal } : {})
-            });
-            response = await sendRequest();
+            const sent = await fetchWithGenerationCompatibility(url, headers, finalRequestData, options)
+            response = sent.response
 
             if (!response.ok) {
-                let errorText = await response.text().catch(() => '无法读取错误内容');
-                const optionalFields = ["temperature", "top_p", "max_tokens", "max_completion_tokens", "reasoning_effort", "response_format"]
-                    .filter(field => Object.hasOwn(finalRequestData, field))
-                const mayRetryWithoutOptions = response.status === 400 && optionalFields.length > 0 &&
-                    /(?:unsupported|unknown|unrecognized|not support|invalid parameter|max_tokens|max_completion_tokens|reasoning_effort|temperature|response_format)/i.test(errorText)
-                if (mayRetryWithoutOptions) {
-                    logger.warn(`[API兼容] 可选生成参数不受支持，移除后在同一后端重试 fields=${optionalFields.join(',')}`)
-                    for (const field of optionalFields) delete finalRequestData[field]
-                    response = await sendRequest()
-                    if (response.ok) return processResponse(await response.json())
-                    errorText = await response.text().catch(() => '无法读取错误内容')
-                }
-                const failure = sourceFailure(selectedTextBackend?.apiUrl || url, selectedTextBackend?.model || finalRequestData.model, `API 请求失败：${response.status} ${response.statusText} - ${errorText}`);
+                const failure = sourceFailure(selectedTextBackend?.apiUrl || url, selectedTextBackend?.model || finalRequestData.model, `API 请求失败：${response.status} ${response.statusText} - ${sent.errorText}`);
                 logger.error(failure);
                 const fallback = await fallbackFromTextBackend(
                     requestData,
@@ -232,6 +257,9 @@ async function fallbackFromToolsBackend(requestData: ChatRequestData, config: Ex
     if (!canFallbackFromToolsBackend(requestData)) return { error: failure };
 
     const candidates = resolveToolsBackendFallbacks(config);
+    // A casual task may lend its effort to a tool request, but cannot replace
+    // the explicitly selected text fallback's address, model or credentials.
+    const { taskBackend: _taskBackend, ...fallbackOptions } = options
     let lastFailure: ChatResponse = { error: failure };
     for (const candidate of candidates) {
         logger.warn(`[Agent路由] 工具模型不可用，当前请求不强制工具调用，降级到 ${candidate.label}: ${failure}`);
@@ -240,7 +268,7 @@ async function fallbackFromToolsBackend(requestData: ChatRequestData, config: Ex
             useTools: false,
             chatAiConfig: candidate
         }, toolContent, toolName, {
-            ...options,
+            ...fallbackOptions,
             forceChatBackend: true,
             toolsBackendFallback: true,
             textBackendFallback: true
@@ -286,6 +314,18 @@ function resolveConfiguredChatBackend(config: ExecutionConfig = {}): Backend {
         apiKey: chat.chatApiKey,
         label: "chat",
         reasoningEffort: chat.chatReasoningEffort || ""
+    }
+}
+
+function resolveConfiguredToolsBackend(config: ExecutionConfig = {}, taskName = ""): Backend {
+    const tools = config.toolsAiConfig || {}
+    const task = config.taskAiConfig?.[taskName]
+    return {
+        apiUrl: tools.toolsAiUrl,
+        model: tools.toolsAiModel,
+        apiKey: tools.toolsAiApikey,
+        label: "tools",
+        reasoningEffort: tools.toolsReasoningEffort?.trim() || task?.reasoningEffort?.trim() || config.chatAiConfig?.chatReasoningEffort || ""
     }
 }
 
@@ -346,7 +386,7 @@ function resolveConfiguredTaskBackend(config: ExecutionConfig = {}, taskName = "
     }
     const chatBackend = resolveConfiguredChatBackend(config)
     // 只配置思考档、不另配地址时：沿用 chat 后端但覆盖 effort
-    // （闲聊档用 none 关思考、全局 chat 保持 low、复杂升档走 generation 覆盖，三者互不干扰）
+    // none 仅在后端支持时按原值透传；全局 chat 保持 low，复杂档由 generation 覆盖。
     if (task.reasoningEffort !== undefined && String(task.reasoningEffort).trim() !== "") {
         return { ...chatBackend, label: `task:${taskName}:chat-effort`, reasoningEffort: String(task.reasoningEffort).trim() }
     }
@@ -379,7 +419,7 @@ function getChatApiKey(chatApiKey: string | string[] | undefined) {
     return chatApiKey
 }
 
-function normalizeToolChoiceForToolsProvider(requestData: ChatRequestData, apiUrl: string) {
+function normalizeToolChoiceForToolsProvider(requestData: ChatRequestData, apiUrl: string): ProviderChatRequestData {
     const toolChoice = requestData?.tool_choice;
     const functionName = (typeof toolChoice === "object" ? toolChoice.function?.name : undefined);
 
