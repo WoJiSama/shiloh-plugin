@@ -1,0 +1,25 @@
+{
+  "codeCommit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+  "scope": "final_diagnostic_supplement_not_a_replacement_for_original_135_turns",
+  "turns": 30,
+  "independentConversations": 10,
+  "structuralPassed": 30,
+  "successfulModels": {
+    "glm-5.3": 30
+  },
+  "networkRequestCount": 30,
+  "guardChangedCount": 0,
+  "matchedOriginalCandidateHashes": {
+    "runnerHash": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+    "scenariosHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+    "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+  },
+  "runtimeTreeHash": "71ee946c6c85e59207e52b596bbb804c945e7f36317cbc90add8654b08641f52",
+  "sourceSha256": "3e1f5d13c0bd601e1f82c808e0e2cd4c638f5b492732aadff7c03f62c8ffec1a",
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "interpretation": "structure does not establish semantics; final reviews list residual failures independently"
+}

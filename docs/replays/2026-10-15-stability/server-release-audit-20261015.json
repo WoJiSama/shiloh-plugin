@@ -1,0 +1,56 @@
+{
+  "manifest": {
+    "commit": "9a739f5696b4790e636cb0f2de265078335d8bff",
+    "count": 1907,
+    "matched": 1907,
+    "missing": [],
+    "changed": [],
+    "unsafe": [],
+    "generatedExtra": []
+  },
+  "resolved": {
+    "HEAD": {
+      "code": 0,
+      "stdout": "69d5b3a0d0b1c141bdfa5e2b8213f0b6350c90ed",
+      "stderr": ""
+    },
+    "89650bd": {
+      "code": 128,
+      "stdout": "",
+      "stderr": "fatal: Needed a single revision"
+    },
+    "ed53117": {
+      "code": 128,
+      "stdout": "",
+      "stderr": "fatal: Needed a single revision"
+    },
+    "69d5b3a": {
+      "code": 0,
+      "stdout": "69d5b3a0d0b1c141bdfa5e2b8213f0b6350c90ed",
+      "stderr": ""
+    }
+  },
+  "git": {
+    "log": {
+      "code": 0,
+      "stdout": "69d5b3a (HEAD -> main, origin/main, origin/HEAD) (adapter): 为OneBotv11适配器加入群待办接口适配\n6957ae2 回退 body-parser\n2a6173c 回退 sqlite3\n656f30e 修复 pnpm 12\nab364a1 修复 pnpm 12\n4a9a922 修复 pnpm 12\n2d1652a 添加 shotium\ncec2cae add Secluded-Adapter\nd41c783 fix(core): 修复事件调用与异常清理边界\n339f1c5 fix(renderer): 修复并发初始化与截图资源清理\n90d522a fix(adapter): 修复接口状态、缓存与连接重建\n8f969c9 fix(core): 修复插件、文件与连接资源生命周期",
+      "stderr": ""
+    },
+    "status": {
+      "code": 0,
+      "stdout": "D \"plugins/example/\\350\\277\\233\\347\\276\\244\\351\\200\\200\\347\\276\\244\\351\\200\\232\\347\\237\\245.js\"\n D plugins/system/quit.js\n?? backups/",
+      "stderr": ""
+    },
+    "commit69": {
+      "code": 0,
+      "stdout": "commit 69d5b3a0d0b1c141bdfa5e2b8213f0b6350c90ed\nAuthor:     Temmie0125 <1179755948@qq.com>\nAuthorDate: Wed Sep 9 11:12:01 2026 +0800\nCommit:     时雨◎星空 <Time.Rain.Star.Sky@Gmail.com>\nCommitDate: Tue Sep 15 13:15:57 2026 +0800\n\n    (adapter): 为OneBotv11适配器加入群待办接口适配\n\n plugins/adapter/OneBotv11.js | 36 ++++++++++++++++++++++++++++++++++++\n 1 file changed, 36 insertions(+)",
+      "stderr": ""
+    },
+    "commit69Paths": {
+      "code": 0,
+      "stdout": "M\tplugins/adapter/OneBotv11.js",
+      "stderr": ""
+    }
+  },
+  "comparisons": {}
+}

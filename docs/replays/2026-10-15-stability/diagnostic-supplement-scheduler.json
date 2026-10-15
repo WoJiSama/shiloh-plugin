@@ -1,0 +1,22 @@
+{
+  "commit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+  "scope": "supplement_after_original_135_turn_candidate_not_a_replacement",
+  "concurrency": 2,
+  "repetitions": 5,
+  "scenarioOrder": [
+    "fictional-meme-updated-duration-and-negative-fault",
+    "real-burning-fault-no-visible-mark-then-inspection"
+  ],
+  "sampling": "each scenario run once; no resampling or discarded errors",
+  "runs": {
+    "fictional-meme-updated-duration-and-negative-fault": {
+      "exitCode": 0,
+      "elapsedSeconds": 148.721
+    },
+    "real-burning-fault-no-visible-mark-then-inspection": {
+      "exitCode": 0,
+      "elapsedSeconds": 350.884
+    }
+  },
+  "complete": true
+}

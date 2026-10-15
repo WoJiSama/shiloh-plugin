@@ -1,0 +1,55 @@
+{
+  "path": "/tmp/bl-task-grounding-20261015/baseline/results.json",
+  "commit": "89650bde93c20c71e38242180da61c8ce12d39fe",
+  "complete": false,
+  "label": "baseline-89650bd",
+  "resultCount": 71,
+  "mtime": "2026-10-15T02:50:42.805979+00:00",
+  "runnerActualHash": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+  "metadata": {
+    "runnerHash": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+    "runtimeTreeHash": "f90083c1f006555ebf8dca2cd0eefd14cdaeedaf083d083f5587e834573fbd71",
+    "runtimeFileCount": 466,
+    "runtimeHashes": {
+      "modules/tools/infrastructure/chatTurn.js": "8359116aec81d59495fa9ffb497da856ab3746b8e06db47f6bee9a941a4306d1",
+      "modules/conversation/domain/personaSource.js": "fbd50f22e4df0a8f43eced6e0879234848d53123b7641af153b24de113eb9d00",
+      "modules/conversation/domain/personaTonePolicy.js": "5ab79eadbb1269f2659210a6791955ae5b760d6faf758315d929c254ca804779",
+      "modules/conversation/domain/systemPromptTemplate.js": "6cb1e5a737d7e1314791a6cd841c612b7ca7b4ad2ce54100876156947307f900",
+      "modules/conversation/domain/systemContentSource.js": "8a5c8d47cf0b7b6edfed16fb62f33d942b3e97a723a1e665682d00111362ee70",
+      "modules/conversation/domain/agentIntelligence.js": "204df4471562e7b242ffb76116a5ab4494997932de2992f75c2704f0edc97f8f",
+      "modules/conversation/infrastructure/turnPromptComposer.js": "dcbed966ccc8781b025f41b82fe77f923e9ecaa7867348cb1f612ff2944942aa",
+      "modules/conversation/infrastructure/turnPlan.js": "ae6743d29774327bd63e35170b63eade05d07278d810d90424a962c802fadf04",
+      "modules/conversation/domain/turnPlanPolicy.js": "830f104f6818a3fe44ff55efcf2b2ce14cf862b2303b8e51c9ac0b52f6a1911d",
+      "modules/models/application/modelExecution.js": "631ce928fc1a004884f65e8f419f6eea0137d5fed58ac571ca2ebded2374ebc7",
+      "modules/conversation/application/finalReply.js": "f941e3e6af743f3268704ec0281250d77a799455681622d75c8e88c0258a6651"
+    },
+    "scenariosHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+    "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+  },
+  "loadedEntryCount": 23,
+  "staticClosureCount": 53,
+  "hostEventLoaded": false,
+  "dynamicOrRequireModules": [],
+  "missingDependencies": [],
+  "resultSummary": [
+    {
+      "id": "unknown-task-no-registered-followup",
+      "sampleId": "unknown-task-no-registered-followup:sample-1",
+      "elapsedMs": 29205,
+      "networkElapsedMs": [
+        29170
+      ]
+    },
+    {
+      "id": "unknown-task-no-registered-followup",
+      "sampleId": "unknown-task-no-registered-followup:sample-1",
+      "elapsedMs": 2156,
+      "networkElapsedMs": [
+        2145
+      ]
+    }
+  ]
+}

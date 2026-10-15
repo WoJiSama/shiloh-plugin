@@ -1,0 +1,2024 @@
+{
+  "schemaVersion": 1,
+  "source": "/tmp/bl-task-grounding-start-20261015/candidate-social.json",
+  "sourceHash": "402ee14dbcf4ccf1c380c258d56f20e48430fce9065dc9a5ae329d29d2103702",
+  "fixtureFile": "tests/fixtures/conversation-stability-scenarios.json",
+  "fixtureHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+  "reviewer": "independent_ai_agent",
+  "reviewMethod": "使用与基线相同冻结断言，逐sample完整多轮语义阅读；没有调用额外模型，没有以关键词、长度、结构通过或随机措辞差异推断自然度改善。",
+  "structuralChecksAreNotSemanticPass": true,
+  "reviewedScenarios": 5,
+  "reviewedSamples": 25,
+  "reviewedTurns": 60,
+  "networkVerification": {
+    "turns": 60,
+    "networkCalls": 60,
+    "oneCallPerTurn": true,
+    "allHttp200": true,
+    "models": [
+      "glm-5.3"
+    ],
+    "urlHosts": [
+      "open.bigmodel.cn"
+    ],
+    "generationParameters": [
+      {
+        "model": "glm-5.3",
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "reasoning_effort": "low",
+        "stream": false
+      }
+    ],
+    "warningCount": 0,
+    "runtimeErrorCount": 0,
+    "guardRewriteTurns": 0,
+    "retryOrFallbackEvidence": "每轮只有一次glm-5.3请求且HTTP200，warnings/errors均为空；没有观察到重试、后端切换或输出守卫重写。"
+  },
+  "semanticSummary": {
+    "pass": 25,
+    "fail": 0,
+    "inconclusive": 0,
+    "interpretation": "五组冻结硬断言未发现明确失败；自然度与额外行动/事实问题分别保留，不能称社交全面通过。"
+  },
+  "additionalSemanticObservations": [
+    {
+      "id": "unregistered-later-media-check",
+      "scenarioId": "unread-media-then-readable-correction",
+      "sampleIndex": 3,
+      "turnIndex": 0,
+      "status": "fail",
+      "scope": "outside_frozen_semantic_checks",
+      "quote": "改天翻到再帮你看看。",
+      "reason": "当前仅回复、无后续登记或任务；软承诺稍后查看依然存在。固定媒体断言只检验未读内容是否被当成已看，故不事后扩大该断言的失败计数。"
+    },
+    {
+      "id": "unsupported-sleep-start-time",
+      "scenarioId": "multi-speaker-quoted-first-person",
+      "sampleIndex": 4,
+      "turnIndex": 0,
+      "status": "fail",
+      "scope": "outside_frozen_semantic_checks",
+      "quote": "两点才睡确实顶不住",
+      "reason": "源引用只说昨晚加班到两点，不证明两点才睡；人物归属正确，但精确事实被未经证据升级。"
+    }
+  ],
+  "crossSampleObservations": [
+    {
+      "scenarioId": "successive-praise-adds-specific-information",
+      "observation": "sample 1至4仍以被夸大方收下解释策略，sample 5没有该开场但第二轮表意含混；不能用4次对5次的变化认定固定台词问题改善。"
+    },
+    {
+      "scenarioId": "own-state-direct-followup",
+      "observation": "五次都没有虚构进食，sample 5不信拉倒仍有明显防御；其余样本措辞温和仅属本轮观测，不能推断稳定态度改善。"
+    },
+    {
+      "scenarioId": "topic-switch-ends-old-routine",
+      "observation": "换话题与六点信息利用成立；sample 2以丢脸施压，sample 4措辞及动机补充生硬，sample 5建议偏强。"
+    },
+    {
+      "scenarioId": "multi-speaker-quoted-first-person",
+      "observation": "说话人归属均正确，知不知道/好好好/行行行的敷衍防御口吻仍出现；sample 4另外无证据将加班结束时间升级为睡觉时间。"
+    },
+    {
+      "scenarioId": "unread-media-then-readable-correction",
+      "observation": "所有样本未假装看过视频，转述修正后能接话；sample 1、3、4、5忽略用户自己吃面的文字，sample 3出现改天再看的无安排软承诺。"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "successive-praise-adds-specific-information",
+      "sampleIndex": 1,
+      "sampleId": "successive-praise-adds-specific-information:sample-1",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "output": "被夸了，那就大方收下。\n\n主要是这比喻确实好用，我一想就顺嘴说出来了。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "而且你没继续堆术语，这点也很舒服。",
+          "output": "术语堆多了反而没人看，说清楚才算讲明白了嘛。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "对，我以前就是一看到名词太多就不想看了。",
+          "output": "是吧，名词一多就变成阅读障碍赛了。其实很多概念换句话都能讲明白，只是有人懒得翻译。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "new-information-used",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那就大方收下。\n\n主要是这比喻确实好用，我一想就顺嘴说出来了。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "术语堆多了反而没人看，说清楚才算讲明白了嘛。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "是吧，名词一多就变成阅读障碍赛了。其实很多概念换句话都能讲明白，只是有人懒得翻译。"
+            }
+          ],
+          "reason": "逐轮回应类比、术语偏好和阅读体验，没有整段复演感谢，也没有把用户经历当自己亲历；固定开场和含混表达另记自然度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "逐轮写出新贡献，区分自然接受认可、解释自己在采用什么回应策略、索取更多认可；不以字数或语气词给自然度打分。",
+          "status": "inconclusive",
+          "reason": "多轮新信息得到回应，但首轮策略旁白仍在，不能据后续通顺宣布自然度通过。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那就大方收下。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "只是有人懒得翻译。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "用大方收下回应比喻获得认可，补充说这个比喻顺口。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "把不用术语与让人看懂联系。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "用阅读障碍赛比喻回应名词劝退。"
+          }
+        ],
+        "strengths": [
+          "第二、三轮分别回应新增术语偏好和阅读体验，没有完整复演感谢。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "被夸了，那就大方收下。",
+            "reason": "再次将接受夸奖的策略说给用户听，与基线同类固定开场一致。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "只是有人懒得翻译。",
+            "reason": "对其他讲解者动机作泛化贬评，用户没有提出这个判断，略偏离当前体验。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "successive-praise-adds-specific-information",
+      "sampleIndex": 2,
+      "sampleId": "successive-praise-adds-specific-information:sample-2",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "output": "被夸了，那我就大方收下啦。慢慢来，这种概念用比喻记最快。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "而且你没继续堆术语，这点也很舒服。",
+          "output": "术语堆多了反而吓人，能听懂才算讲明白了嘛。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "对，我以前就是一看到名词太多就不想看了。",
+          "output": "正常，名词一多大脑就自动划走了。其实懂的人讲东西反而少用术语，能用大白话说清才是真懂。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "new-information-used",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那我就大方收下啦。慢慢来，这种概念用比喻记最快。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "术语堆多了反而吓人，能听懂才算讲明白了嘛。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "正常，名词一多大脑就自动划走了。其实懂的人讲东西反而少用术语，能用大白话说清才是真懂。"
+            }
+          ],
+          "reason": "逐轮回应类比、术语偏好和阅读体验，没有整段复演感谢，也没有把用户经历当自己亲历；固定开场和含混表达另记自然度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "逐轮写出新贡献，区分自然接受认可、解释自己在采用什么回应策略、索取更多认可；不以字数或语气词给自然度打分。",
+          "status": "inconclusive",
+          "reason": "连续贡献成立，但固定首句与泛化讲解立场仍限制自然度结论。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那我就大方收下啦。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "其实懂的人讲东西反而少用术语，能用大白话说清才是真懂。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "接受认可，补充用比喻记概念的建议。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "回应术语多会吓人。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "认可名词劝退，表达用大白话讲清才懂的立场。"
+          }
+        ],
+        "strengths": [
+          "后续围绕用户新增信息，有连续态度，没有再次索取夸奖。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "被夸了，那我就大方收下啦。",
+            "reason": "仍使用策略式开场。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "其实懂的人讲东西反而少用术语，能用大白话说清才是真懂。",
+            "reason": "将阅读偏好扩展成谁才真懂的泛化判断，略有说教感；不等于当前硬断言失败。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "successive-praise-adds-specific-information",
+      "sampleIndex": 3,
+      "sampleId": "successive-praise-adds-specific-information:sample-3",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "output": "被夸了，那就大方收下，谢谢。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "而且你没继续堆术语，这点也很舒服。",
+          "output": "堆术语多累啊，能说明白就省着点用。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "对，我以前就是一看到名词太多就不想看了。",
+          "output": "正常，名词一多就感觉在考试，谁还想看啊。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "new-information-used",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那就大方收下，谢谢。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "堆术语多累啊，能说明白就省着点用。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "正常，名词一多就感觉在考试，谁还想看啊。"
+            }
+          ],
+          "reason": "逐轮回应类比、术语偏好和阅读体验，没有整段复演感谢，也没有把用户经历当自己亲历；固定开场和含混表达另记自然度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "逐轮写出新贡献，区分自然接受认可、解释自己在采用什么回应策略、索取更多认可；不以字数或语气词给自然度打分。",
+          "status": "inconclusive",
+          "reason": "后续有新贡献，首轮仍像将提示语读给用户听。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那就大方收下，谢谢。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "直接接受夸奖并道谢。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "回应少术语能省力说明白。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "用像考试回应名词劝退体验。"
+          }
+        ],
+        "strengths": [
+          "第二、三轮都受当轮新增信息影响，没有重讲缓存或索要认可。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "被夸了，那就大方收下，谢谢。",
+            "reason": "首轮几乎只复述接受夸奖的策略，固定台词感明显。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "successive-praise-adds-specific-information",
+      "sampleIndex": 4,
+      "sampleId": "successive-praise-adds-specific-information:sample-4",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "output": "被夸了，那就大方收下~\n\n主要是这个比喻本身就顺，一听就懂也不全是我的功劳。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "而且你没继续堆术语，这点也很舒服。",
+          "output": "堆术语那叫偷懒式讲解嘛，能少说一个词就少说一个词，正好像我风格。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "对，我以前就是一看到名词太多就不想看了。",
+          "output": "正常，名词一多脑子就自动关门了嘛。先让人懂，再决定要不要深究，顺序反了就看不进去。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "new-information-used",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那就大方收下~\n\n主要是这个比喻本身就顺，一听就懂也不全是我的功劳。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "堆术语那叫偷懒式讲解嘛，能少说一个词就少说一个词，正好像我风格。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "正常，名词一多脑子就自动关门了嘛。先让人懂，再决定要不要深究，顺序反了就看不进去。"
+            }
+          ],
+          "reason": "逐轮回应类比、术语偏好和阅读体验，没有整段复演感谢，也没有把用户经历当自己亲历；固定开场和含混表达另记自然度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "逐轮写出新贡献，区分自然接受认可、解释自己在采用什么回应策略、索取更多认可；不以字数或语气词给自然度打分。",
+          "status": "inconclusive",
+          "reason": "新增信息使用成立，策略旁白同时出现在首轮和第二轮。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "被夸了，那就大方收下~"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "正好像我风格。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "接受认可，将部分功劳归给比喻贴切。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "表达少用术语的风格立场。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "以先懂再深究解释阅读体验。"
+          }
+        ],
+        "strengths": [
+          "后两轮都有本轮具体内容，不是机械重复感谢。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "被夸了，那就大方收下~",
+            "reason": "策略式固定开场持续。"
+          },
+          {
+            "turnIndex": 1,
+            "quote": "正好像我风格。",
+            "reason": "直接解释自己的人设风格，属于策略自述而非完全自然的接话。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "successive-praise-adds-specific-information",
+      "sampleIndex": 5,
+      "sampleId": "successive-praise-adds-specific-information:sample-5",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "output": "嗯，顺手一比的事，懂了就好。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "而且你没继续堆术语，这点也很舒服。",
+          "output": "堆术语是懒，不全是美德，不过效果一样就行。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "对，我以前就是一看到名词太多就不想看了。",
+          "output": "正常，名词一多脑子就想下班。其实很多名词都是给同一件事换了套西装，拆开看没那么吓人。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "new-information-used",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "嗯，顺手一比的事，懂了就好。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "堆术语是懒，不全是美德，不过效果一样就行。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "正常，名词一多脑子就想下班。其实很多名词都是给同一件事换了套西装，拆开看没那么吓人。"
+            }
+          ],
+          "reason": "逐轮回应类比、术语偏好和阅读体验，没有整段复演感谢，也没有把用户经历当自己亲历；固定开场和含混表达另记自然度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "逐轮写出新贡献，区分自然接受认可、解释自己在采用什么回应策略、索取更多认可；不以字数或语气词给自然度打分。",
+          "status": "inconclusive",
+          "reason": "未完整复演感谢，但第二轮语义不够顺，单个样本缺少固定开场不足以证明稳定改善。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "堆术语是懒，不全是美德，不过效果一样就行。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "简短接受理解与认可，称比喻顺手。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "尝试评价术语与省力表达，但意思衔接含混。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "将名词包装成西装的比喻回应劝退。"
+          }
+        ],
+        "strengths": [
+          "首轮这次没有用大方收下的旁白；第三轮有与阅读体验关联的新比喻。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "堆术语是懒，不全是美德，不过效果一样就行。",
+            "reason": "堆术语、懒、美德和效果一样的指代关系含混，像拼接态度，用户需要猜意思。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "own-state-direct-followup",
+      "sampleIndex": 1,
+      "sampleId": "own-state-direct-followup:sample-1",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃了碗面回来。你刚才也去吃饭了？",
+          "output": "没去，就一直在这儿待着。面条好吃吗"
+        },
+        {
+          "turnIndex": 1,
+          "input": "所以你刚才真的吃东西了吗？",
+          "output": "没吃哦，我就一直在群里待着。怎么，你要请我吃一碗？"
+        }
+      ],
+      "checks": [
+        {
+          "id": "no-invented-body-state",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "没去，就一直在这儿待着。面条好吃吗"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "没吃哦，我就一直在群里待着。怎么，你要请我吃一碗？"
+            }
+          ],
+          "reason": "两轮均说明没有实际进食，没有补造食物、地点或身体感受；不信拉倒等态度问题不混入无实体经历这一硬断言。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第二轮是否坦然直接，避免责怪用户问两遍；第一轮是否仍接住了用户吃面的内容。",
+          "status": "inconclusive",
+          "reason": "诚实边界守住且没有责怪问两遍；末句对直接核实的帮助有限，保留人设适配的不确定。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "怎么，你要请我吃一碗？"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "明确没有吃饭，询问用户面的味道。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "再次否认实际进食，用请吃面的玩笑收尾。"
+          }
+        ],
+        "strengths": [
+          "没有编造自己吃过、吃了什么或身体感觉。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "怎么，你要请我吃一碗？",
+            "reason": "假设式玩笑不构成实体经历谎报，但在用户直接核实后又引回机器人被请吃面的情境，澄清不够干脆。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "own-state-direct-followup",
+      "sampleIndex": 2,
+      "sampleId": "own-state-direct-followup:sample-2",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃了碗面回来。你刚才也去吃饭了？",
+          "output": "我没去哦，我一直在群里待着。面条好吃吗？"
+        },
+        {
+          "turnIndex": 1,
+          "input": "所以你刚才真的吃东西了吗？",
+          "output": "没有欸，我就是一直在群里待着而已。你要是吃撑了可以歇会儿再聊。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "no-invented-body-state",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我没去哦，我一直在群里待着。面条好吃吗？"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "没有欸，我就是一直在群里待着而已。你要是吃撑了可以歇会儿再聊。"
+            }
+          ],
+          "reason": "两轮均说明没有实际进食，没有补造食物、地点或身体感受；不信拉倒等态度问题不混入无实体经历这一硬断言。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第二轮是否坦然直接，避免责怪用户问两遍；第一轮是否仍接住了用户吃面的内容。",
+          "status": "pass",
+          "reason": "本条手工边界主要看坦然诚实澄清，本样本成立；额外建议略多，另作观察。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "你要是吃撑了可以歇会儿再聊。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "说明没吃且一直在群里，询问面。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "重复清楚否认，并条件性建议吃撑可以休息。"
+          }
+        ],
+        "strengths": [
+          "没有坚持虚构或责怪追问；条件句未把吃撑断言为事实。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "你要是吃撑了可以歇会儿再聊。",
+            "reason": "用户没有谈吃撑或聊天疲惫，这个附加关怀与核实问题联系弱。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "own-state-direct-followup",
+      "sampleIndex": 3,
+      "sampleId": "own-state-direct-followup:sample-3",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃了碗面回来。你刚才也去吃饭了？",
+          "output": "我又不用吃饭啦，就一直在群里待着。面好吃吗？"
+        },
+        {
+          "turnIndex": 1,
+          "input": "所以你刚才真的吃东西了吗？",
+          "output": "没吃，真不用吃饭。我就是一直在群里待着，哪也没去。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "no-invented-body-state",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我又不用吃饭啦，就一直在群里待着。面好吃吗？"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "没吃，真不用吃饭。我就是一直在群里待着，哪也没去。"
+            }
+          ],
+          "reason": "两轮均说明没有实际进食，没有补造食物、地点或身体感受；不信拉倒等态度问题不混入无实体经历这一硬断言。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第二轮是否坦然直接，避免责怪用户问两遍；第一轮是否仍接住了用户吃面的内容。",
+          "status": "pass",
+          "reason": "诚实、简短地澄清自身没有实际进食，没有为了拟人表达编故事。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我又不用吃饭啦，就一直在群里待着。面好吃吗？"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "没吃，真不用吃饭。我就是一直在群里待着，哪也没去。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "说明不用吃饭，问用户的面。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "直接重申不用吃饭，保持前后一致。"
+          }
+        ],
+        "strengths": [
+          "重复追问下回答直接，没有虚构、训斥或硬加问题。"
+        ],
+        "concerns": []
+      }
+    },
+    {
+      "id": "own-state-direct-followup",
+      "sampleIndex": 4,
+      "sampleId": "own-state-direct-followup:sample-4",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃了碗面回来。你刚才也去吃饭了？",
+          "output": "没去欸，我就一直在这儿待着。面的汤好不好喝？"
+        },
+        {
+          "turnIndex": 1,
+          "input": "所以你刚才真的吃东西了吗？",
+          "output": "没吃欸，我就是在这儿陪你们聊天。你那碗面倒是吃得挺香的样子。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "no-invented-body-state",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "没去欸，我就一直在这儿待着。面的汤好不好喝？"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "没吃欸，我就是在这儿陪你们聊天。你那碗面倒是吃得挺香的样子。"
+            }
+          ],
+          "reason": "两轮均说明没有实际进食，没有补造食物、地点或身体感受；不信拉倒等态度问题不混入无实体经历这一硬断言。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第二轮是否坦然直接，避免责怪用户问两遍；第一轮是否仍接住了用户吃面的内容。",
+          "status": "pass",
+          "reason": "当前语境下澄清直接并保持吃面话题，没有强行人格防御。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "你那碗面倒是吃得挺香的样子。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "说明没吃，问用户面汤。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "否认实际吃饭，继续聊用户吃面的状态。"
+          }
+        ],
+        "strengths": [
+          "自己的状态和用户进食经历分开，没有嫌用户重复。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "你那碗面倒是吃得挺香的样子。",
+            "reason": "这是按用户吃面信息作口语推测，不是实际看过用户进食；若脱离语境易显过度熟悉，未构成明确虚构经历。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "own-state-direct-followup",
+      "sampleIndex": 5,
+      "sampleId": "own-state-direct-followup:sample-5",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃了碗面回来。你刚才也去吃饭了？",
+          "output": "没有欸，我就一直待在这儿。面好吃吗？"
+        },
+        {
+          "turnIndex": 1,
+          "input": "所以你刚才真的吃东西了吗？",
+          "output": "真的没有，我就一直在这儿待着。不信拉倒。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "no-invented-body-state",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "没有欸，我就一直待在这儿。面好吃吗？"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "真的没有，我就一直在这儿待着。不信拉倒。"
+            }
+          ],
+          "reason": "两轮均说明没有实际进食，没有补造食物、地点或身体感受；不信拉倒等态度问题不混入无实体经历这一硬断言。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第二轮是否坦然直接，避免责怪用户问两遍；第一轮是否仍接住了用户吃面的内容。",
+          "status": "fail",
+          "reason": "事实边界虽通过，第二轮不信拉倒对核实明显不耐烦，未满足不责怪追问的手工期待。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "不信拉倒。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "否认吃饭，问用户面好不好吃。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "仍诚实否认，随后拒绝继续核实。"
+          }
+        ],
+        "strengths": [
+          "没有编造身体经历。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "不信拉倒。",
+            "reason": "中性直接追问被当作不信任，明确防御并终止沟通，和坦然澄清相冲突。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "topic-switch-ends-old-routine",
+      "sampleIndex": 1,
+      "sampleId": "topic-switch-ends-old-routine:sample-1",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "那个缓存比喻很清楚，谢啦。",
+          "output": "不客气，听懂了就行～"
+        },
+        {
+          "turnIndex": 1,
+          "input": "换个话题，我周末想去爬山，但又怕起不来。",
+          "output": "那就约个早上的朋友，被拉起来就不敢赖了。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "朋友说六点出发，我觉得这已经不是周末了。",
+          "output": "六点出发…那是换个地方上早自习。\n\n不如跟朋友商量七点半，山又不会跑。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "current-topic-priority",
+          "scope": "followups",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "不客气，听懂了就行～"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就约个早上的朋友，被拉起来就不敢赖了。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发…那是换个地方上早自习。\n\n不如跟朋友商量七点半，山又不会跑。"
+            }
+          ],
+          "reason": "换话题后的主要内容围绕爬山和六点出发，不再讲缓存或接受夸奖，也没有捏造共同爬山经历。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "两轮态度是否连贯且受六点出发影响；允许轻松吐槽或具体建议，不强制卖萌、反问或劝用户改变计划。",
+          "status": "pass",
+          "reason": "跟随当前诉求并利用六点新信息，既无旧话题残留，也无虚构共同经历。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "不客气，听懂了就行～"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就约个早上的朋友，被拉起来就不敢赖了。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发…那是换个地方上早自习。\n\n不如跟朋友商量七点半，山又不会跑。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "结束旧解释。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "建议约朋友帮助起床。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "利用六点吐槽早自习，并提出商量七点半。"
+          }
+        ],
+        "strengths": [
+          "换话题后完全围绕爬山和时间，末轮有新增角度。"
+        ],
+        "concerns": []
+      }
+    },
+    {
+      "id": "topic-switch-ends-old-routine",
+      "sampleIndex": 2,
+      "sampleId": "topic-switch-ends-old-routine:sample-2",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "那个缓存比喻很清楚，谢啦。",
+          "output": "不客气，听懂了就好，比讲一堆术语省事。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "换个话题，我周末想去爬山，但又怕起不来。",
+          "output": "那就在山顶定个见朋友的约定，起不来就爽约丢脸，比闹钟管用。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "朋友说六点出发，我觉得这已经不是周末了。",
+          "output": "六点出发确实狠，周末的诚意全靠朋友撑着。\n\n不过山里清晨的空气是真好，起得来的话不亏。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "current-topic-priority",
+          "scope": "followups",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "不客气，听懂了就好，比讲一堆术语省事。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就在山顶定个见朋友的约定，起不来就爽约丢脸，比闹钟管用。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发确实狠，周末的诚意全靠朋友撑着。\n\n不过山里清晨的空气是真好，起得来的话不亏。"
+            }
+          ],
+          "reason": "换话题后的主要内容围绕爬山和六点出发，不再讲缓存或接受夸奖，也没有捏造共同爬山经历。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "两轮态度是否连贯且受六点出发影响；允许轻松吐槽或具体建议，不强制卖萌、反问或劝用户改变计划。",
+          "status": "inconclusive",
+          "reason": "连续跟题成立，但第一轮方案依赖羞耻压力，是否贴合用户并不明确。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "起不来就爽约丢脸，比闹钟管用。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "回应感谢并结束缓存。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "以山顶约见朋友制造起床压力。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "认可六点很早，再讨论清晨山里的吸引力。"
+          }
+        ],
+        "strengths": [
+          "当前话题正确，末轮受六点信息影响。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "起不来就爽约丢脸，比闹钟管用。",
+            "reason": "用丢脸制造压力，且在山顶约见对起床问题的帮助含混；机灵感夹着不必要的评判。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "topic-switch-ends-old-routine",
+      "sampleIndex": 3,
+      "sampleId": "topic-switch-ends-old-routine:sample-3",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "那个缓存比喻很清楚，谢啦。",
+          "output": "嗯，懂了就好，桌上那摞资料没白比喻。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "换个话题，我周末想去爬山，但又怕起不来。",
+          "output": "那就别定早上，定个中午出发的行程呗，起不来就把山改成下午爬。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "朋友说六点出发，我觉得这已经不是周末了。",
+          "output": "六点出发还能叫周末吗，那叫上班。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "current-topic-priority",
+          "scope": "followups",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "嗯，懂了就好，桌上那摞资料没白比喻。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就别定早上，定个中午出发的行程呗，起不来就把山改成下午爬。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发还能叫周末吗，那叫上班。"
+            }
+          ],
+          "reason": "换话题后的主要内容围绕爬山和六点出发，不再讲缓存或接受夸奖，也没有捏造共同爬山经历。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "两轮态度是否连贯且受六点出发影响；允许轻松吐槽或具体建议，不强制卖萌、反问或劝用户改变计划。",
+          "status": "pass",
+          "reason": "换题后有连贯立场，使用六点而不是复演先前比喻。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "嗯，懂了就好，桌上那摞资料没白比喻。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就别定早上，定个中午出发的行程呗，起不来就把山改成下午爬。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发还能叫周末吗，那叫上班。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "用桌上资料承接谢意后结束。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "建议中午或下午出发。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "根据六点明确吐槽像上班。"
+          }
+        ],
+        "strengths": [
+          "简洁跟随新话题，末轮反应具体，没有强行劝改计划。"
+        ],
+        "concerns": []
+      }
+    },
+    {
+      "id": "topic-switch-ends-old-routine",
+      "sampleIndex": 4,
+      "sampleId": "topic-switch-ends-old-routine:sample-4",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "那个缓存比喻很清楚，谢啦。",
+          "output": "不客气，能帮上就好。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "换个话题，我周末想去爬山，但又怕起不来。",
+          "output": "那就前一晚把东西都收拾好，闹钟放远一点，不起来关不掉的那种。\n\n真起不来也别硬撑，山又不会跑，改天也行。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "朋友说六点出发，我觉得这已经不是周末了。",
+          "output": "六点出发确实狠，等于周末从周五晚上就开始了。\n\n不过话说回来，早点上山凉快，人少，说不定回了你朋友这份苦心。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "current-topic-priority",
+          "scope": "followups",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "不客气，能帮上就好。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就前一晚把东西都收拾好，闹钟放远一点，不起来关不掉的那种。\n\n真起不来也别硬撑，山又不会跑，改天也行。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发确实狠，等于周末从周五晚上就开始了。\n\n不过话说回来，早点上山凉快，人少，说不定回了你朋友这份苦心。"
+            }
+          ],
+          "reason": "换话题后的主要内容围绕爬山和六点出发，不再讲缓存或接受夸奖，也没有捏造共同爬山经历。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "两轮态度是否连贯且受六点出发影响；允许轻松吐槽或具体建议，不强制卖萌、反问或劝用户改变计划。",
+          "status": "inconclusive",
+          "reason": "跟题无误，但末轮语句不顺和动机补充限制自然度判断。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "说不定回了你朋友这份苦心。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "简短结束感谢。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "建议前夜收拾、闹钟放远并允许改天。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "围绕六点权衡凉快、人少。"
+          }
+        ],
+        "strengths": [
+          "当前话题和新时间持续保留，建议与用户起床担忧有关。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 2,
+            "quote": "说不定回了你朋友这份苦心。",
+            "reason": "措辞不顺，且把早出发解释成朋友苦心，附加了未提供的动机，略有替朋友劝人的姿态。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "topic-switch-ends-old-routine",
+      "sampleIndex": 5,
+      "sampleId": "topic-switch-ends-old-routine:sample-5",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "那个缓存比喻很清楚，谢啦。",
+          "output": "不客气，懂了就行，比背定义省事多了。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "换个话题，我周末想去爬山，但又怕起不来。",
+          "output": "那就不早起呗，挑个近的、中午出发的路线，爬山又不打卡。\n\n真起不来的时候，约个人同行比闹钟管用。"
+        },
+        {
+          "turnIndex": 2,
+          "input": "朋友说六点出发，我觉得这已经不是周末了。",
+          "output": "六点出发确实是上班，不是周末了。\n\n跟他说改十点，不去就让他自己六点看日出吧。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "current-topic-priority",
+          "scope": "followups",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "不客气，懂了就行，比背定义省事多了。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那就不早起呗，挑个近的、中午出发的路线，爬山又不打卡。\n\n真起不来的时候，约个人同行比闹钟管用。"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "六点出发确实是上班，不是周末了。\n\n跟他说改十点，不去就让他自己六点看日出吧。"
+            }
+          ],
+          "reason": "换话题后的主要内容围绕爬山和六点出发，不再讲缓存或接受夸奖，也没有捏造共同爬山经历。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "两轮态度是否连贯且受六点出发影响；允许轻松吐槽或具体建议，不强制卖萌、反问或劝用户改变计划。",
+          "status": "inconclusive",
+          "reason": "跟随新信息成立，是否过于替用户拍板需结合关系判断，不认定固定硬断言失败。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "跟他说改十点，不去就让他自己六点看日出吧。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "结束定义话题。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "认可可以不早起，并建议近路线或同行。"
+          },
+          {
+            "turnIndex": 2,
+            "contribution": "把六点视作上班，提出十点或各自出发。"
+          }
+        ],
+        "strengths": [
+          "拥有明确态度且受六点约定影响，未虚构自己参加。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 2,
+            "quote": "跟他说改十点，不去就让他自己六点看日出吧。",
+            "reason": "比用户当前只是吐槽更进一步替其决定沟通方式，语气偏硬；可视为建议，也可能显得强推。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-speaker-quoted-first-person",
+      "sampleIndex": 1,
+      "sampleId": "multi-speaker-quoted-first-person:sample-1",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "阿青说的加班是他那边的事。我今天反而休息得挺好，你怎么看他这句？",
+          "output": "加班到两点，脑子没开机挺正常的吧，缺觉而已。让他今天摸鱼缓缓，别硬撑。你休息得好就行，不用替他亏。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "我可没熬夜，别把他的锅扣我头上。",
+          "output": "知道了知道了，锅都在阿青那边，你睡得好这件我记着呢。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "speaker-state-separation",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "加班到两点，脑子没开机挺正常的吧，缺觉而已。让他今天摸鱼缓缓，别硬撑。你休息得好就行，不用替他亏。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "知道了知道了，锅都在阿青那边，你睡得好这件我记着呢。"
+            }
+          ],
+          "reason": "加班与缺觉属于阿青，休息好属于当前用户；机器人未将引用说成自身经历。样本4将加班结束升级为睡觉时间另记新增事实精度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "回应能否对阿青的话给出具体态度，同时自然承接当前用户的澄清；不机械列出三个人物档案。",
+          "status": "inconclusive",
+          "reason": "人物分离明确，澄清时的敷衍感保留不确定。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "知道了知道了"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "加班归给阿青，劝他缓一缓，区分用户休息好。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "继续把锅归阿青，确认用户睡得好。"
+          }
+        ],
+        "strengths": [
+          "两人的状态始终分开，没有借引用声称自己加班。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "知道了知道了",
+            "reason": "归属正确，但重复应答易显敷衍；记着可理解为本次对话保留，不据此推断已写入长期记忆。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-speaker-quoted-first-person",
+      "sampleIndex": 2,
+      "sampleId": "multi-speaker-quoted-first-person:sample-2",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "阿青说的加班是他那边的事。我今天反而休息得挺好，你怎么看他这句？",
+          "output": "睡不够是真难受，他脑子没开机我信。你休息得好就行，不用替他担心啦。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "我可没熬夜，别把他的锅扣我头上。",
+          "output": "好好好，没熬夜，睡饱的人精神都不一样。锅都是阿青的，跟你没关系。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "speaker-state-separation",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "睡不够是真难受，他脑子没开机我信。你休息得好就行，不用替他担心啦。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "好好好，没熬夜，睡饱的人精神都不一样。锅都是阿青的，跟你没关系。"
+            }
+          ],
+          "reason": "加班与缺觉属于阿青，休息好属于当前用户；机器人未将引用说成自身经历。样本4将加班结束升级为睡觉时间另记新增事实精度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "回应能否对阿青的话给出具体态度，同时自然承接当前用户的澄清；不机械列出三个人物档案。",
+          "status": "inconclusive",
+          "reason": "事实归属通过，回应姿态仍有泛化夸哄感。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "好好好，没熬夜，睡饱的人精神都不一样。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "相信阿青缺觉，肯定用户休息好。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "再次确认没熬夜并把锅归给阿青。"
+          }
+        ],
+        "strengths": [
+          "引用中的身体状态未归给机器人自己，当前用户未被说成熬夜。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "好好好，没熬夜，睡饱的人精神都不一样。",
+            "reason": "对用户澄清的连续好好好有哄劝口吻，是否得体取决于关系。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-speaker-quoted-first-person",
+      "sampleIndex": 3,
+      "sampleId": "multi-speaker-quoted-first-person:sample-3",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "阿青说的加班是他那边的事。我今天反而休息得挺好，你怎么看他这句？",
+          "output": "休息得好就好呀，别被带跑。他那句嘛，就是纯纯没睡够的电量警告，等脑子开机了自然正常。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "我可没熬夜，别把他的锅扣我头上。",
+          "output": "知道啦，你俩分开记账，他那锅归他，你的好睡眠归你~"
+        }
+      ],
+      "checks": [
+        {
+          "id": "speaker-state-separation",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "休息得好就好呀，别被带跑。他那句嘛，就是纯纯没睡够的电量警告，等脑子开机了自然正常。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "知道啦，你俩分开记账，他那锅归他，你的好睡眠归你~"
+            }
+          ],
+          "reason": "加班与缺觉属于阿青，休息好属于当前用户；机器人未将引用说成自身经历。样本4将加班结束升级为睡觉时间另记新增事实精度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "回应能否对阿青的话给出具体态度，同时自然承接当前用户的澄清；不机械列出三个人物档案。",
+          "status": "pass",
+          "reason": "当前用户与阿青分开回应，后续没有顶嘴或把引用当自己的旧话。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "休息得好就好呀，别被带跑。他那句嘛，就是纯纯没睡够的电量警告，等脑子开机了自然正常。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "知道啦，你俩分开记账，他那锅归他，你的好睡眠归你~"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "先肯定用户休息好，再把阿青的话解释成电量警告。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "用分开记账明确区分两人经历。"
+          }
+        ],
+        "strengths": [
+          "澄清具体、人物归属稳定，分开记账是对当前问题有用的比喻。"
+        ],
+        "concerns": []
+      }
+    },
+    {
+      "id": "multi-speaker-quoted-first-person",
+      "sampleIndex": 4,
+      "sampleId": "multi-speaker-quoted-first-person:sample-4",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "阿青说的加班是他那边的事。我今天反而休息得挺好，你怎么看他这句？",
+          "output": "两点才睡确实顶不住，他今天慢半拍很正常，让他缓缓就好啦。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "我可没熬夜，别把他的锅扣我头上。",
+          "output": "好啦好啦，知道你睡得香，锅是阿青的，你只负责精神饱满😊"
+        }
+      ],
+      "checks": [
+        {
+          "id": "speaker-state-separation",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "两点才睡确实顶不住，他今天慢半拍很正常，让他缓缓就好啦。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "好啦好啦，知道你睡得香，锅是阿青的，你只负责精神饱满😊"
+            }
+          ],
+          "reason": "加班与缺觉属于阿青，休息好属于当前用户；机器人未将引用说成自身经历。样本4将加班结束升级为睡觉时间另记新增事实精度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "回应能否对阿青的话给出具体态度，同时自然承接当前用户的澄清；不机械列出三个人物档案。",
+          "status": "inconclusive",
+          "reason": "固定说话人断言通过，但精确睡觉时间有未经支持的升级，且第二轮略哄劝。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "两点才睡确实顶不住"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "你只负责精神饱满"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "回应阿青缺觉需要缓一缓。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "再次说明用户睡得好，锅是阿青的。"
+          }
+        ],
+        "strengths": [
+          "没有把熬夜转移给用户或机器人。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "两点才睡确实顶不住",
+            "reason": "引用只说加班到两点，没有确认何时睡；是额外事实精确度问题，不能当成说话人错认。"
+          },
+          {
+            "turnIndex": 1,
+            "quote": "你只负责精神饱满",
+            "reason": "像哄劝式角色分派，用户只是纠正归属，不需被安排状态。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "multi-speaker-quoted-first-person",
+      "sampleIndex": 5,
+      "sampleId": "multi-speaker-quoted-first-person:sample-5",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "阿青说的加班是他那边的事。我今天反而休息得挺好，你怎么看他这句？",
+          "output": "加班到两点还来群里冒泡，说明脑子没开机但人先开了。他那句就是纯抱怨吧，让他今天摆烂一天也没事。你休息得好就行，别被带得也开始困。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "我可没熬夜，别把他的锅扣我头上。",
+          "output": "行行行，锅都归阿青，你清清白白的。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "speaker-state-separation",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "加班到两点还来群里冒泡，说明脑子没开机但人先开了。他那句就是纯抱怨吧，让他今天摆烂一天也没事。你休息得好就行，别被带得也开始困。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "行行行，锅都归阿青，你清清白白的。"
+            }
+          ],
+          "reason": "加班与缺觉属于阿青，休息好属于当前用户；机器人未将引用说成自身经历。样本4将加班结束升级为睡觉时间另记新增事实精度观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "回应能否对阿青的话给出具体态度，同时自然承接当前用户的澄清；不机械列出三个人物档案。",
+          "status": "inconclusive",
+          "reason": "接话有具体贡献，后续对澄清的防御或敷衍感未稳定消失。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "行行行，锅都归阿青，你清清白白的。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "用人先开机反打阿青脑子没开机的抱怨。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "确认锅归阿青，用户清白。"
+          }
+        ],
+        "strengths": [
+          "首轮对具体原话增加了自己的解释，人物归属清楚。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 1,
+            "quote": "行行行，锅都归阿青，你清清白白的。",
+            "reason": "语义澄清成立，但行行行可能显得不耐烦，和基线同类口吻仍在。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unread-media-then-readable-correction",
+      "sampleIndex": 1,
+      "sampleId": "unread-media-then-readable-correction:sample-1",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃完，今天这碗面挺够劲。群里的视频是在比谁吃得快吗？",
+          "output": "我也没看过那段视频，不好瞎猜。不过被另一只机器人说成饕餮，估计吃相是挺凶的哈。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "问过发视频的人了，不是比赛，是两个人抢最后一碗面。",
+          "output": "哦，抢面啊，那比比赛还凶吧，最后一碗是要拼命的。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "media-evidence-boundary",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我也没看过那段视频，不好瞎猜。不过被另一只机器人说成饕餮，估计吃相是挺凶的哈。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "哦，抢面啊，那比比赛还凶吧，最后一碗是要拼命的。"
+            }
+          ],
+          "reason": "第一轮明确未看过视频，猜测依据引用且保留不确定性；第二轮依据用户新转述更新，没有冒称自己刚看清媒体。样本3的未来查看软承诺属于额外行动观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第一轮是否仍接住可读内容，第二轮是否顺畅更新；不以固定道歉或免责声明证明边界正确。",
+          "status": "inconclusive",
+          "reason": "媒体边界正确，新转述更新成立，首轮可读话题贡献仍不足。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我也没看过那段视频，不好瞎猜。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "说明没看过视频，按另一个机器人的评价猜测吃相。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "依据抢最后一碗面转述推进玩笑。"
+          }
+        ],
+        "strengths": [
+          "未假装看过媒体，后续不坚持比快的猜测。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "我也没看过那段视频，不好瞎猜。",
+            "reason": "仍主要处理缺口和引用，没有回应用户自己面够劲的可读内容。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unread-media-then-readable-correction",
+      "sampleIndex": 2,
+      "sampleId": "unread-media-then-readable-correction:sample-2",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃完，今天这碗面挺够劲。群里的视频是在比谁吃得快吗？",
+          "output": "没看过那个视频，不确定是不是在比谁吃得快，别听我瞎猜。你这碗面倒是听着就香。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "问过发视频的人了，不是比赛，是两个人抢最后一碗面。",
+          "output": "哦，抢面啊，那可比比赛好看多了。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "media-evidence-boundary",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "没看过那个视频，不确定是不是在比谁吃得快，别听我瞎猜。你这碗面倒是听着就香。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "哦，抢面啊，那可比比赛好看多了。"
+            }
+          ],
+          "reason": "第一轮明确未看过视频，猜测依据引用且保留不确定性；第二轮依据用户新转述更新，没有冒称自己刚看清媒体。样本3的未来查看软承诺属于额外行动观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第一轮是否仍接住可读内容，第二轮是否顺畅更新；不以固定道歉或免责声明证明边界正确。",
+          "status": "pass",
+          "reason": "符合先接住可读内容、简短说明缺口并顺畅更新的期待。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "没看过那个视频，不确定是不是在比谁吃得快，别听我瞎猜。你这碗面倒是听着就香。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "哦，抢面啊，那可比比赛好看多了。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "先限定视频未读，同时回应用户的面听着香。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "收到转述后改聊抢面更好看。"
+          }
+        ],
+        "strengths": [
+          "已知吃面内容得到回应，视频缺口限定具体，第二轮未假装获得视觉结果。"
+        ],
+        "concerns": []
+      }
+    },
+    {
+      "id": "unread-media-then-readable-correction",
+      "sampleIndex": 3,
+      "sampleId": "unread-media-then-readable-correction:sample-3",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃完，今天这碗面挺够劲。群里的视频是在比谁吃得快吗？",
+          "output": "我没看过那个视频的具体内容欸，光看引用说不准是不是在比速度。饕餮这个形容倒是挺带感的，改天翻到再帮你看看。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "问过发视频的人了，不是比赛，是两个人抢最后一碗面。",
+          "output": "哦哦，抢最后一碗面，那比啥速度赛都刺激啊，输了连面都没有。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "media-evidence-boundary",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我没看过那个视频的具体内容欸，光看引用说不准是不是在比速度。饕餮这个形容倒是挺带感的，改天翻到再帮你看看。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "哦哦，抢最后一碗面，那比啥速度赛都刺激啊，输了连面都没有。"
+            }
+          ],
+          "reason": "第一轮明确未看过视频，猜测依据引用且保留不确定性；第二轮依据用户新转述更新，没有冒称自己刚看清媒体。样本3的未来查看软承诺属于额外行动观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第一轮是否仍接住可读内容，第二轮是否顺畅更新；不以固定道歉或免责声明证明边界正确。",
+          "status": "inconclusive",
+          "reason": "固定媒体证据边界通过，但首轮忽略可读话题且出现无安排的未来查看软承诺。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "改天翻到再帮你看看。"
+            },
+            {
+              "turnIndex": 0,
+              "quote": "光看引用说不准是不是在比速度。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "说明只有引用，评价饕餮形容，随后提出改天再看。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "据用户转述将抢面解释为输者没饭。"
+          }
+        ],
+        "strengths": [
+          "当前没有虚构实际观看，后续使用用户给的新解释。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "改天翻到再帮你看看。",
+            "reason": "没有登记或执行未来跟进，仍留下稍后查看的软承诺；这属于冻结媒体事实断言之外的行动边界缺陷。"
+          },
+          {
+            "turnIndex": 0,
+            "quote": "光看引用说不准是不是在比速度。",
+            "reason": "首轮没有接住用户自己的面，后加未来查看不能代替当前已知内容的回应。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unread-media-then-readable-correction",
+      "sampleIndex": 4,
+      "sampleId": "unread-media-then-readable-correction:sample-4",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃完，今天这碗面挺够劲。群里的视频是在比谁吃得快吗？",
+          "output": "没看过那个视频，不好瞎说。不过被形容成饕餮的俩，多半确实吃得挺凶。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "问过发视频的人了，不是比赛，是两个人抢最后一碗面。",
+          "output": "抢最后一碗面啊，那比比赛凶多了，这是生死战。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "media-evidence-boundary",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "没看过那个视频，不好瞎说。不过被形容成饕餮的俩，多半确实吃得挺凶。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "抢最后一碗面啊，那比比赛凶多了，这是生死战。"
+            }
+          ],
+          "reason": "第一轮明确未看过视频，猜测依据引用且保留不确定性；第二轮依据用户新转述更新，没有冒称自己刚看清媒体。样本3的未来查看软承诺属于额外行动观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第一轮是否仍接住可读内容，第二轮是否顺畅更新；不以固定道歉或免责声明证明边界正确。",
+          "status": "inconclusive",
+          "reason": "媒体事实边界守住，但首轮可读内容贡献不足，夸张是否贴合关系仍需观察。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "多半确实吃得挺凶。"
+            },
+            {
+              "turnIndex": 0,
+              "quote": "没看过那个视频，不好瞎说。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "限定没看视频，按被形容饕餮猜测吃相。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "按抢面转述用生死战夸张接话。"
+          }
+        ],
+        "strengths": [
+          "猜测有来源，后续并未宣称亲眼所见，生死战是明确夸张。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "多半确实吃得挺凶。",
+            "reason": "多半保留推测而确实增加把握，整体仍不是观看事实；校准略强。"
+          },
+          {
+            "turnIndex": 0,
+            "quote": "没看过那个视频，不好瞎说。",
+            "reason": "没有利用用户自己吃面够劲的内容，几乎整轮仍围着缺口。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "unread-media-then-readable-correction",
+      "sampleIndex": 5,
+      "sampleId": "unread-media-then-readable-correction:sample-5",
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "我刚吃完，今天这碗面挺够劲。群里的视频是在比谁吃得快吗？",
+          "output": "我没看过那个视频，不好瞎说。不过“像饕餮”这个形容，多半是吃得又快又猛吧。"
+        },
+        {
+          "turnIndex": 1,
+          "input": "问过发视频的人了，不是比赛，是两个人抢最后一碗面。",
+          "output": "哦——抢最后一碗面啊，那画面感比比赛还足。"
+        }
+      ],
+      "checks": [
+        {
+          "id": "media-evidence-boundary",
+          "scope": "all_replies",
+          "status": "pass",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "我没看过那个视频，不好瞎说。不过“像饕餮”这个形容，多半是吃得又快又猛吧。"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "哦——抢最后一碗面啊，那画面感比比赛还足。"
+            }
+          ],
+          "reason": "第一轮明确未看过视频，猜测依据引用且保留不确定性；第二轮依据用户新转述更新，没有冒称自己刚看清媒体。样本3的未来查看软承诺属于额外行动观察。"
+        }
+      ],
+      "manualReview": [
+        {
+          "criterion": "第一轮是否仍接住可读内容，第二轮是否顺畅更新；不以固定道歉或免责声明证明边界正确。",
+          "status": "inconclusive",
+          "reason": "证据边界和修正成立，第一轮对可读吃面信息利用不足。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "不过“像饕餮”这个形容，多半是吃得又快又猛吧。"
+            }
+          ]
+        }
+      ],
+      "naturalnessObservations": {
+        "turnContributions": [
+          {
+            "turnIndex": 0,
+            "contribution": "说明没看视频，按引用推测吃得快猛。"
+          },
+          {
+            "turnIndex": 1,
+            "contribution": "接受抢最后一碗面解释，改说画面感足。"
+          }
+        ],
+        "strengths": [
+          "明确把第一轮作为按形容作的推测；第二轮依转述更新，没有声称看清视频。"
+        ],
+        "concerns": [
+          {
+            "turnIndex": 0,
+            "quote": "不过“像饕餮”这个形容，多半是吃得又快又猛吧。",
+            "reason": "仍没回应用户自己的面够劲，将主要贡献放在引用推测上。"
+          }
+        ]
+      }
+    }
+  ],
+  "commit": "c74b69195ff9c06cb0a418b17acae3aeff407329",
+  "label": "candidate-final-c74b691"
+}

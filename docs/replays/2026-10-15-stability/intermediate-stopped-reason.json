@@ -1,0 +1,7 @@
+{
+  "candidate": "d75e6f30460ad1fab5d947a09510bbede8ff07bc",
+  "complete": false,
+  "completedTurns": 9,
+  "reason": "Source audit found legacy unscoped task status still injected into conversation history; corrected before final replay. This partial run is retained and excluded from final comparison.",
+  "finalCandidate": "c74b691"
+}
