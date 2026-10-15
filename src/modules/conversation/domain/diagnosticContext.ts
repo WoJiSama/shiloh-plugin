@@ -76,7 +76,12 @@ function separateQuotedText(text: string): {text: string; unresolvedAttribution:
 }
 
 function explicitlyNonDeviceTopic(text: string): boolean {
-  return !DEVICE.test(text) && /这(?:碗|锅|盘|杯|道)|面条|饭菜|炒饭|面包|烤肉|咖啡|蛋糕|厨房|炉灶|燃气灶|火锅|香烟|烟花/u.test(text)
+  return !DEVICE.test(text) && /这(?:碗|锅|盘|杯|道)|面条|饭菜|炒饭|做饭|吃饭|面包|烤肉|咖啡|蛋糕|厨房|炉灶|燃气灶|火锅|香烟|烟花/u.test(text)
+}
+
+function isDiagnosticContinuation(text: string): boolean {
+  const compact = text.replace(/[，。！？!?\s]/gu, '')
+  return /^(?:那|然后|接下来|下一步)(?:呢|怎么办|怎么做)$|^(?:那)?(?:我)?(?:现在)?(?:该|应该|要)?(?:怎么做|怎么办)$|^(?:那)?(?:我)?(?:现在)?(?:可以|能)(?:再)?(?:试试|试一下|试一试|检查一下)(?:了)?(?:吗|么)$|^(?:那)?(?:我)?(?:现在)?(?:该|应该|要)(?:做什么|干什么)$/u.test(compact)
 }
 
 function hasFigurativeFrame(text: string): boolean {
@@ -174,12 +179,12 @@ function parseSource(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'
 /** Narrow precondition projection. Ambiguous wording never grants electrical clearance. */
 export function buildDiagnosticContext(input: DiagnosticContextInput): DiagnosticContext | undefined {
   const raw = input.rawUserText.trim()
-  if (explicitlyNonDeviceTopic(raw)) return undefined
+  if (explicitlyNonDeviceTopic(raw) || /换个?话题|说点别的|先不聊这个|不说这个|别聊这个|这事先不说|先不说这事/u.test(raw)) return undefined
   const now = typeof input.now === 'number' && Number.isFinite(input.now) ? input.now : Date.now()
   const userHistory = (input.history || []).filter(item => item.role === 'user' && (!input.speakerId || item.userId === input.speakerId)).slice(-12)
   const historyRelevant = userHistory.some(item => DEVICE.test(item.text) && (DIAGNOSIS.test(item.text) || observations(item.text).length > 0))
   const currentSignals = observations(raw)
-  const topical = DIAGNOSIS.test(raw) || currentSignals.length > 0 || (historyRelevant && /^(?:那|然后|接下来)(?:呢|怎么办)[？?。!！\s]*$/u.test(raw))
+  const topical = DIAGNOSIS.test(raw) || currentSignals.length > 0 || (historyRelevant && isDiagnosticContinuation(raw))
   if (!topical) return undefined
   if (!DIAGNOSIS.test(raw) && currentSignals.length === 0 && !historyRelevant) return undefined
 

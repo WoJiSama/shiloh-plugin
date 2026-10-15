@@ -400,10 +400,11 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           }))
         })
         if (diagnostic) session.interactionContext.diagnosticContext = diagnostic
+        const reference = e._quotedPromptContext?.messageId || e.reply_id
         const needsActionFacts = session.interactionContext.kind === 'delivery'
-          || /(?:进度|结果|任务|成图|图片|那张图|这张|发我|发给我|发过|已发|重发|好了.{0,4}发|重试|重跑|提醒|预约|收到|送达|取消)/u.test(session.rawUserText)
+          || typeof reference === 'string' || typeof reference === 'number'
+          || /(?:进度|结果|任务|成图|图片|那张图|这张|发我|发给我|发过|已发|重发|好了.{0,4}发|好(?:了(?:没|吗)|没)|还在.{0,4}(?:做|跑|画|生成)|自动.{0,4}(?:发|给|送)|(?:完成|做好).{0,4}(?:没|吗)|怎么样了|重试|重跑|提醒|预约|收到|送达|取消)/u.test(session.rawUserText)
         if (needsActionFacts) {
-          const reference = e._quotedPromptContext?.messageId || e.reply_id
           const query = {
             ...(typeof reference === 'string' || typeof reference === 'number' ? {referenceMessageId: String(reference)} : {}),
             recentRequestMessageIds: ownRecentMessages.flatMap(item => typeof item.message_id === 'string' || typeof item.message_id === 'number' ? [String(item.message_id)] : [])

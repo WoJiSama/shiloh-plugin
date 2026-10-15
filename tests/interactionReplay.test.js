@@ -287,7 +287,8 @@ test('short serious cooling questions reach high reasoning at the real model req
   assert.equal(body.reasoning_effort, 'high', 'serious short requests must override both base and casual low effort')
   assert.equal(body.tools, undefined)
   assert.match(body.messages.at(-1).content, /【本轮执行范围】/)
-  assert.match(body.messages.at(-1).content, /回复发出后不会自动查询、重试、生成或稍后投递/)
+  assert.match(body.messages.at(-1).content, /这次回复不会新登记自动查询、重试、生成或稍后投递/)
+  assert.match(body.messages.at(-1).content, /没有核验到登记则不能承诺稍后行动/)
   assert.deepEqual(f.captures.sent, [scenario.modelReply])
 })
 
@@ -368,6 +369,33 @@ test('task lookup failure cannot borrow another account and becomes an explicit 
   assert.equal(f.session.interactionContext.actionFacts.lookup,'unavailable')
   assert.ok(f.captures.gatewayRequests[0].body.messages.some(message=>String(message.content).includes('本次未能核验相关任务记录')))
  }
+})
+
+test('terse status followups and quoted requests refresh task facts rather than old assistant promises',async()=>{
+ for(const scenario of [
+  {rawUserText:'好了吗？'}, {rawUserText:'还在做吗？'}, {rawUserText:'那还会自动给我吗？'},
+  {rawUserText:'怎么样？',quote:{userId:'202',messageId:'original',name:'测试群友',text:'把背景改成傍晚。'}}
+ ]){
+  const f=fixture({...scenario,modelReply:'图片已生成，发送尚未确认。'},{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+  let calls=0
+  f.host.getTurnActionFacts=async e=>{
+   calls++
+   return {scope:{botId:'99',conversationId:`group:${e.group_id}`,userId:'202'},observedAt:Date.now(),lookup:'ok',tasks:[{taskId:'actual-task',requestMessageId:'original',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'completed',result:'available',delivery:{state:'unknown'},followUp:{state:'none'}}]}
+  }
+  assert.equal(await f.run(),true);assert.equal(calls,1)
+  assert.equal(f.session.interactionContext.actionFacts.tasks[0].execution,'completed')
+  assert.ok(f.captures.gatewayRequests[0].body.messages.some(message=>String(message.content).includes('已有产物；投递结果未确认')))
+ }
+})
+
+test('text-only turn respects a separately verified existing completion registration',async()=>{
+ const f=fixture({rawUserText:'刚才的图出来了吗？',modelReply:'还在生成，完成后发送的安排仍有效。'},{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+ f.host.getTurnActionFacts=async e=>({scope:{botId:'99',conversationId:`group:${e.group_id}`,userId:'202'},observedAt:Date.now(),lookup:'ok',tasks:[{taskId:'actual-task',requestMessageId:'original',toolName:'imageEdit',source:'live_job',observedAt:Date.now(),execution:'running',result:'unavailable',delivery:{state:'not_attempted'},followUp:{state:'registered',kind:'job_completion',id:'followup'}}]})
+ assert.equal(await f.run(),true)
+ const messages=f.captures.gatewayRequests[0].body.messages
+ assert.ok(messages.some(message=>String(message.content).includes('已核验仍有效的完成后投递任务')))
+ assert.match(messages.at(-1).content,/不能因为本轮只有文字就否认既有登记/)
+ assert.doesNotMatch(messages.at(-1).content,/回复发出后不会自动查询、重试、生成或稍后投递/)
 })
 
 test('burnt-smell followup keeps prerequisites from the requester instead of the bot\'s old advice',async()=>{

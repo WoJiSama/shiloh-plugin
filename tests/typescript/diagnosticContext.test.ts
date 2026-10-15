@@ -272,8 +272,27 @@ test('explicit correction of a false report updates only the corrected signal', 
 })
 
 test('unrelated chat does not keep injecting an old incident', () => {
-  for (const rawUserText of ['今天这碗面挺辣的。', '别聊电脑了，今天晚饭吃啥？', '电脑边上这碗面真好吃。', '谢谢你，讲得很清楚。', '这碗面有焦糊味，不过很好吃。', '厨房那锅菜烧焦了。']) {
+  for (const rawUserText of ['今天这碗面挺辣的。', '别聊电脑了，今天晚饭吃啥？', '电脑边上这碗面真好吃。', '谢谢你，讲得很清楚。', '这碗面有焦糊味，不过很好吃。', '厨房那锅菜烧焦了。', '换个话题，那我现在该怎么做？', '先不聊这个，下一步呢？', '那我明天做饭该怎么办？']) {
     assert.equal(buildDiagnosticContext({rawUserText, speakerId, history}), undefined, rawUserText)
+  }
+})
+
+test('short follow-ups keep unresolved diagnostic prerequisites without inventing execution', () => {
+  for (const rawUserText of ['下一步呢？', '那我现在该怎么做？', '能试试了吗？', '然后呢？', '那现在怎么办？', '我现在应该做什么？']) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.ok(context, rawUserText)
+    assert.equal(context.incident.status, 'asserted', rawUserText)
+    assert.equal(context.power, 'unknown', rawUserText)
+    assert.equal(context.damageExclusion, 'unknown', rawUserText)
+    assert.deepEqual(context.allowedChecks, ['static_observation'], rawUserText)
+    assert.ok(context.unmetPrerequisites.includes('electrical_damage_excluded'), rawUserText)
+  }
+})
+
+test('short follow-ups alone do not create device context after unrelated history', () => {
+  for (const rawUserText of ['下一步呢？', '那我现在该怎么做？', '能试试了吗？']) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history: [{role: 'user', userId: speakerId, text: '今天这碗面真好吃。'}]})
+    assert.equal(context, undefined, rawUserText)
   }
 })
 
