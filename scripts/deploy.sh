@@ -75,9 +75,11 @@ HEALTH=$(SSH 'bash -s' <<'REMOTE_CHECK'
 systemctl restart trss-yunzai
 systemctl restart bl-console
 sleep 18
+# 只统计本次重启之后的日志：-45s 时间窗会把旧进程停止前的报错误算成新版本失败(2026-10-15 误杀过一次)。
+SINCE=$(systemctl show -p ActiveEnterTimestamp --value trss-yunzai)
 ACTIVE=$(systemctl is-active trss-yunzai || true)
-ERRORS=$(journalctl -u trss-yunzai --since "-45 seconds" --no-pager 2>/dev/null | grep -caE "载入插件错误|ReferenceError|SyntaxError|is not defined|unhandled" || true)
-PIPE=$(journalctl -u trss-yunzai --since "-45 seconds" --no-pager 2>/dev/null | grep -ca "MessagePipeline.*已启动" || true)
+ERRORS=$(journalctl -u trss-yunzai --since "$SINCE" --no-pager 2>/dev/null | grep -caE "载入插件错误|ReferenceError|SyntaxError|is not defined|unhandled" || true)
+PIPE=$(journalctl -u trss-yunzai --since "$SINCE" --no-pager 2>/dev/null | grep -ca "MessagePipeline.*已启动" || true)
 PAGE=$(curl -s -o /dev/null -m 5 -w "%{http_code}" http://127.0.0.1:2536/bl-chat/commands 2>/dev/null || echo 000)
 CONSOLE=$(systemctl is-active bl-console || true)
 CONSOLE_PAGE=$(curl -s -o /dev/null -m 5 -w "%{http_code}" http://127.0.0.1:8787/ 2>/dev/null || echo 000)
