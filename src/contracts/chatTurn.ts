@@ -1,6 +1,7 @@
 import type {KnowledgeEntry,WorkflowRule} from './memoryEngine.js'
 import type {ExecutionEvent,ExecutionSession,ExecutionMessage,ToolDefinition,ToolCall,SemanticDecision,ToolSemanticContext,SemanticMember,ExecutionAvatar,ExecutionConfig} from './toolExecution.js'
 import type {TurnPlan,ToolChoice} from './turnPlan.js'
+import type {ActionFactsQuery, TurnActionFacts} from './turnActionFacts.js'
 export type ChatId=string|number
 export interface IdentityBinding {qq?:string|number|null|undefined;name?:string;aliases?:string[];notes?:string}
 export interface ChatTurnMember extends SemanticMember {group_name?:string}
@@ -38,8 +39,9 @@ export interface ChatTurnHost {
  emotionManager:unknown;expressionLearner:unknown;knowledgeSearcher:unknown;
  getCurrentGroupContext(e:ChatTurnEvent):Promise<{groupId?:ChatId;groupName?:string;groupNotice?:unknown}>;getBasicGroupContext(e:ChatTurnEvent):{groupId?:ChatId;groupName?:string;groupNotice?:unknown};
  buildMergedDirectTriggerPrompt(e:ChatTurnEvent):string;
- messageManager:{getMessages(type:string|undefined,id:ChatId|undefined):Promise<{message_id?:unknown;source?:string;content?:string;time?:unknown;sender:{user_id?:ChatId|undefined;nickname?:string|undefined;role?:string|undefined}}[]>};
+ messageManager:{getMessages(type:string|undefined,id:ChatId|undefined):Promise<{message_id?:unknown;source?:string;content?:string;at?:unknown;time?:unknown;sender:{user_id?:ChatId|undefined;nickname?:string|undefined;role?:string|undefined}}[]>};
  getTaskStatus(groupId:ChatId|undefined,messageId:unknown):Promise<unknown>;formatTaskStatusForPrompt(status:unknown):string;
+ getTurnActionFacts?(event:ChatTurnEvent,query:ActionFactsQuery):Promise<TurnActionFacts>;
  resolveUnderstandingPrompt(context:unknown):Promise<string>;trimMessageHistory(messages:ChatTurnMessage[]):ChatTurnMessage[];filterChatByQQ(messages:ChatTurnMessage[],userId:ChatId|undefined):ChatTurnMessage[];
  formatMessages(messages:ChatTurnMessage[],event:ChatTurnEvent,content:string):ChatTurnMessage[];
  getImageGenerationReferenceImages(images:string[],session:ChatTurnSession):string[];getToolsByName(names:string[]):ToolDefinition[];resolveForcedReplyTextRate(groupId:ChatId|undefined):Promise<number>;

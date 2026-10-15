@@ -6,7 +6,7 @@ export interface MessageEvent {
  event_id?: unknown; message_id?: unknown; source?: unknown; group_id?: string | number; group_name?: string
  group?: {getFileUrl(fid: string): Promise<string>}; friend?: {getFileUrl(fid: string): Promise<string>}
 }
-export interface StoredMessage { time: string; sender: Sender; content: string; event_id?: unknown; message_id?: unknown; group_name?: string | null | undefined; [field:string]:unknown }
+export interface StoredMessage { time: string; at?: number; sender: Sender; content: string; event_id?: unknown; message_id?: unknown; group_name?: string | null | undefined; [field:string]:unknown }
 export interface RecentOptions extends MessageCacheOptions { privateMaxMessages?: number; groupMaxMessages?: number; messageMaxLength?: number; preEnrichedMessage?: Segment[]; throwOnError?: boolean }
 export interface RecentMessagePorts {
  redis: {get(key: string): Promise<string | null>; set(key: string, value: string, options: {EX: number}): Promise<unknown>; del(...keys: string[]): Promise<unknown>; keys(pattern: string): Promise<string[]>; scanIterator?(options: {MATCH:string;COUNT:number}): AsyncIterable<string | string[]>; scan?(cursor: string, ...args: (string|number)[]): Promise<[string|number,string[]]>}

@@ -85,11 +85,23 @@ test("a failing send does not break the queue", async () => {
   const e = recorder()
   e.reply = async () => { throw new Error("adapter down") }
   const arbiter = createOutboundArbiter()
-  await arbiter.enqueue("default", () => e.reply("boom"))
+  await assert.rejects(arbiter.enqueue("default", () => e.reply("boom")),/adapter down/)
   const after = recorder()
   const ok = after
   await arbiter.enqueue("default", () => ok.reply("fine"))
   assert.deepEqual(after.sent, ["fine"])
+})
+
+test('wrapped replies preserve the receipt for each queued send',async()=>{
+ const arbiter=createOutboundArbiter(),wrapped=arbiter.wrapEvent({reply:async text=>({message_id:text})})
+ assert.deepEqual(await Promise.all([wrapped.reply('one'),wrapped.reply('two')]),[{message_id:'one'},{message_id:'two'}])
+})
+
+test('wrapped send failures reach the caller while subsequent queued sends complete',async()=>{
+ const arbiter=createOutboundArbiter(),wrapped=arbiter.wrapEvent({reply:async text=>{if(text==='fail')throw Error('lost receipt');return {message_id:text}}})
+ const rejected=wrapped.reply('fail'),next=wrapped.reply('next')
+ await assert.rejects(rejected,/lost receipt/)
+ assert.deepEqual(await next,{message_id:'next'})
 })
 
 test("turn trace assembles one structured record", () => {

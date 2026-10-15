@@ -4,6 +4,8 @@ import type {TurnEvidence} from "../../../contracts/turnInteraction.js"
 import { extractChatKeywords, isImageGenerationRequest, shouldInjectGroupContext, shouldUseCompactHistory } from "../../conversation/domain/messageIntent.js"
 import { collectMentionTargetIds } from "../../conversation/domain/mentionTargets.js"
 import { buildTurnInteractionContext } from "../../conversation/domain/turnInteractionContext.js"
+import {unknownTurnActionFacts, validateTurnActionFacts} from "../../conversation/domain/turnActionFacts.js"
+import {buildDiagnosticContext} from "../../conversation/domain/diagnosticContext.js"
 import { ROLE_MAP as roleMap, extractMemberLookupTerms, formatMemberLookupPrompt, hasBotTextAnchor, joinIntentParts, matchGroupMembersByTerms, messageQuotesUser, uniqText } from "../../conversation/domain/messageContext.js"
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName } from "../../conversation/domain/personaSource.js"
 import { resolveSystemContentSource } from "../../conversation/domain/systemContentSource.js"
@@ -377,6 +379,42 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           evidence: interactionEvidence,
           continuity: lastTurnContinuity
         })
+        // Read the same conversation history once. Only the requester's own
+        // user messages can establish diagnostic observations or candidate tasks.
+        const chatHistory = host.config.groupHistory
+          ? await host.messageManager.getMessages(e.message_type, isPrivateChat ? userId : groupId)
+          : []
+        const ownRecentMessages = (chatHistory || []).filter(item =>
+          item.source !== 'tool' && String(item.sender?.user_id) === String(userId)
+          && String(item.message_id) !== String(e.message_id)
+        ).slice(0, 12)
+        const diagnostic = buildDiagnosticContext({
+          rawUserText: session.rawUserText,
+          speakerId: String(userId),
+          evidence: session.interactionContext.evidence,
+          history: [...ownRecentMessages].reverse().map(item => ({
+            role: 'user' as const, userId: String(item.sender.user_id), text: String(item.content || ''),
+            ...(typeof item.at === 'number' ? {at: item.at} : {}),
+            ...(typeof item.time === 'string' || typeof item.time === 'number' ? {time: item.time} : {}),
+            ...(item.message_id !== undefined ? {messageId: String(item.message_id)} : {})
+          }))
+        })
+        if (diagnostic) session.interactionContext.diagnosticContext = diagnostic
+        const needsActionFacts = session.interactionContext.kind === 'delivery'
+          || /(?:进度|结果|任务|成图|图片|那张图|这张|发我|发给我|发过|已发|重发|好了.{0,4}发|重试|重跑|提醒|预约|收到|送达|取消)/u.test(session.rawUserText)
+        if (needsActionFacts) {
+          const reference = e._quotedPromptContext?.messageId || e.reply_id
+          const query = {
+            ...(typeof reference === 'string' || typeof reference === 'number' ? {referenceMessageId: String(reference)} : {}),
+            recentRequestMessageIds: ownRecentMessages.flatMap(item => typeof item.message_id === 'string' || typeof item.message_id === 'number' ? [String(item.message_id)] : [])
+          }
+          try {
+            session.interactionContext.actionFacts = validateTurnActionFacts(await host.getTurnActionFacts?.(e, query), e)
+          } catch (error) {
+            logger.warn(`[任务事实] 查询不可用 group=${groupId} user=${userId}`)
+            session.interactionContext.actionFacts = unknownTurnActionFacts(e)
+          }
+        }
         const knowledgeContext = {
           text: e.msg || args,
           messageSegments: e.message || [],
@@ -574,15 +612,13 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         })
         // 获取历史记录
         if (host.config.groupHistory) {
-          const chatHistory = await host.messageManager.getMessages(e.message_type, e.message_type === "group" ? e.group_id : e.user_id)
-
           if (chatHistory?.length) {
             const historyMemberMap = isPrivateChat ? null : (memberMap || await e.bot.pickGroup(groupId).getMemberMap())
 
             // 使用 message_id 过滤当前消息
             const currentMessageId = e.message_id
 
-            groupUserMessages = await Promise.all(chatHistory
+            groupUserMessages = await Promise.all([...chatHistory]
               .reverse()
               .filter(msg => {
                 // 直接用 message_id 判断，过滤掉当前消息

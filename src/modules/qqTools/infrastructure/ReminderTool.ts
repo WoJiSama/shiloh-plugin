@@ -2,6 +2,8 @@ import {randomUUID} from 'node:crypto'
 import {AbstractTool} from '../../toolSupport/infrastructure/AbstractTool.js'
 import {normalizeDeliveryReceipt} from '../../messaging/domain/deliveryReceipt.js'
 import type {ReminderPorts,ReminderData,ReminderEvent,ReminderPending,ReminderTools,ReminderAction} from '../../../contracts/reminder.js'
+import type {ActionFactsEvent,ActionFactsQuery,TurnActionFacts,TurnTaskFact} from '../../../contracts/turnActionFacts.js'
+import {actionFactScope,unknownTurnActionFacts} from '../../conversation/domain/turnActionFacts.js'
 function record(value:unknown):Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
 function errorText(error:unknown){return error instanceof Error?error.message:String(error)}
 function decodeAction(value:unknown):ReminderAction|null {const r=record(value);return typeof r.tool==='string'?{tool:r.tool,params:record(r.params)}:null}
@@ -9,7 +11,9 @@ function decodeEvent(value:unknown):ReminderEvent {const r=record(value);if(type
 function decodeReminder(data:string):ReminderData {
  const r=record(JSON.parse(data));if(typeof r.id!=='string'||typeof r.user_id!=='string'||typeof r.content!=='string'||typeof r.trigger_time!=='number'||!Number.isFinite(r.trigger_time))throw new Error('提醒详情损坏')
  const status=r.status;if(status!=='pending'&&status!=='sending'&&status!=='unknown'&&status!=='failed'&&status!=='completed')throw new Error('提醒状态无效')
- return {id:r.id,user_id:r.user_id,group_id:r.group_id?String(r.group_id):null,bot_id:String(r.bot_id||''),message_id:typeof r.message_id==='string'||typeof r.message_id==='number'?r.message_id:null,content:r.content,reminder_message:typeof r.reminder_message==='string'?r.reminder_message:null,trigger_time:r.trigger_time,created_at:Number(r.created_at)||0,status,extra_action:decodeAction(r.extra_action),extra_attempted:r.extra_attempted===true,retry_count:Number(r.retry_count)||0}
+ const receipt=record(r.delivery)
+ const delivery:ReminderData['delivery']=receipt.state==='sent'&&typeof receipt.messageId==='string'&&receipt.messageId?{state:'sent',messageId:receipt.messageId}:receipt.state==='failed'?{state:'failed',code:typeof receipt.code==='string'?receipt.code:null}:{state:'unknown'}
+ return {id:r.id,user_id:r.user_id,group_id:r.group_id?String(r.group_id):null,bot_id:String(r.bot_id||''),message_id:typeof r.message_id==='string'||typeof r.message_id==='number'?r.message_id:null,content:r.content,reminder_message:typeof r.reminder_message==='string'?r.reminder_message:null,trigger_time:r.trigger_time,created_at:Number(r.created_at)||0,status,extra_action:decodeAction(r.extra_action),extra_attempted:r.extra_attempted===true,retry_count:Number(r.retry_count)||0,delivery,updated_at:Number(r.updated_at)||Number(r.created_at)||0}
 }
 export function createReminderRuntime(ports:ReminderPorts){
 const {redis,logger,mcpManager}=ports
@@ -19,6 +23,16 @@ const eventCache = new Map<string,ReminderEvent>()
 const REDIS_KEY_PREFIX = 'bl-chat:reminder:'
 const PENDING_LIST_KEY = `${REDIS_KEY_PREFIX}pending:list`
 const LOCK_KEY = `${REDIS_KEY_PREFIX}lock`
+const scopeIndexKey=(e:ActionFactsEvent)=>`${REDIS_KEY_PREFIX}facts:${encodeURIComponent(JSON.stringify(actionFactScope(e)))}`
+
+async function indexReminder(e:ActionFactsEvent,id:string) {
+  try {
+    const key=scopeIndexKey(e),raw=await redis.get(key)
+    const parsed:unknown=raw?JSON.parse(raw):[]
+    const ids=Array.isArray(parsed)?parsed.filter((value):value is string=>typeof value==='string'):[]
+    await redis.set(key,JSON.stringify([id,...ids.filter(value=>value!==id)].slice(0,12)),{EX:86400})
+  } catch { logger.warn('[ReminderTool] 提醒事实索引不可用，后续查询将保持未确认') }
+}
 
 const LOCK_TIMEOUT=15000
 const LOCK_ACQUIRE_TIMEOUT=1500
@@ -191,7 +205,7 @@ class ReminderTool extends AbstractTool {
     const reminderId = this.generateId(e.user_id)
     eventCache.set(reminderId, e)
     const reminderData:ReminderData = {
-      bot_id:String(e.bot?.uin || ports.getBot()?.uin || ""),
+      bot_id:String(e.self_id || e.bot?.uin || ports.getBot()?.uin || ""),
       id: reminderId,
       user_id: String(e.user_id),
       group_id: e.group_id ? String(e.group_id) : null,
@@ -222,6 +236,7 @@ class ReminderTool extends AbstractTool {
         // 按时间排序
         pendingList.sort((a, b) => a.trigger_time - b.trigger_time)
         await savePendingList(pendingList)
+        await indexReminder({...e,self_id:reminderData.bot_id||''},reminderId)
       })
 
       const formattedTime = this.formatTime(triggerTime)
@@ -247,6 +262,51 @@ class ReminderTool extends AbstractTool {
   /**
    * 查看提醒列表
    */
+  async getActionFacts(e:ActionFactsEvent,query:ActionFactsQuery={}):Promise<TurnActionFacts> {
+    const now=Date.now(),scope=actionFactScope(e)
+    if(!scope.botId||!scope.userId)return unknownTurnActionFacts(e,now)
+    try {
+      // A slow or corrupt unrelated reminder must not block chat or erase a
+      // separately verified receipt. All reads share one bounded query budget.
+      const deadline=now+2000
+      async function read<T>(operation:()=>Promise<T>):Promise<T> {
+        let timer:ReturnType<typeof setTimeout>|undefined
+        try {
+          return await Promise.race([Promise.resolve().then(operation),new Promise<never>((_,reject)=>{
+            timer=setTimeout(()=>reject(new Error('提醒事实查询超时')),Math.max(0,deadline-Date.now()))
+          })])
+        } finally {if(timer!==undefined)clearTimeout(timer)}
+      }
+      let incomplete=false
+      const [pendingRead,indexRead]=await Promise.allSettled([read(getPendingList),read(async()=>{
+        const raw=await redis.get(scopeIndexKey(e)),parsed:unknown=raw?JSON.parse(raw):[]
+        if(!Array.isArray(parsed)||parsed.some(value=>typeof value!=='string'))throw new Error('提醒事实索引损坏')
+        return parsed as string[]
+      })])
+      const pending=pendingRead.status==='fulfilled'?pendingRead.value:[]
+      const index=indexRead.status==='fulfilled'?indexRead.value:[]
+      incomplete=pendingRead.status==='rejected'||indexRead.status==='rejected'
+      const ids=[...new Set([...index,...pending.slice(0,128).map(item=>item.id)])].slice(0,140)
+      const records=await Promise.allSettled(ids.map(id=>read(async()=>{
+        const raw=await redis.get(`${REDIS_KEY_PREFIX}detail:${id}`)
+        return raw?decodeReminder(raw):null
+      })))
+      const tasks:TurnTaskFact[]=[]
+      for(const result of records) {
+        if(result.status==='rejected'){incomplete=true;continue}
+        const reminder=result.value
+        if(!reminder||reminder.bot_id!==scope.botId||reminder.user_id!==scope.userId
+          || (reminder.group_id?`group:${reminder.group_id}`:`private:${reminder.user_id}`)!==scope.conversationId)continue
+        if(query.referenceMessageId&&String(reminder.message_id)!==query.referenceMessageId&&reminder.id!==query.referenceMessageId
+          &&!(reminder.delivery?.state==='sent'&&reminder.delivery.messageId===query.referenceMessageId))continue
+        const registered=reminder.status==='pending'&&reminder.trigger_time>now&&pending.some(item=>item.id===reminder.id&&item.trigger_time===reminder.trigger_time)
+        const delivery=reminder.delivery?.state==='sent'?{state:'sent' as const,messageId:reminder.delivery.messageId}:reminder.delivery?.state==='failed'?{state:'failed' as const}:reminder.status==='pending'?{state:'not_attempted' as const}:{state:'unknown' as const}
+        tasks.push({taskId:reminder.id,requestMessageId:String(reminder.message_id||reminder.id),toolName:'reminderTool',source:'reminder',observedAt:registered?now:(reminder.updated_at||reminder.created_at),execution:registered?'queued':reminder.status==='completed'?'completed':reminder.status==='failed'?'failed':'unknown',result:'unknown',delivery,followUp:registered?{state:'registered',kind:'reminder',id:reminder.id,dueAt:reminder.trigger_time}:{state:'none'}})
+      }
+      return {scope,observedAt:now,lookup:incomplete?'unavailable':'ok',tasks:tasks.slice(0,8)}
+    } catch {return unknownTurnActionFacts(e,now)}
+  }
+
   async listReminders(e:ReminderEvent) {
     try {
       const pendingList = await getPendingList()
@@ -256,7 +316,7 @@ class ReminderTool extends AbstractTool {
         const data = await redis.get(this.getRedisKey('detail', item.id))
         if (data) {
           const reminder = decodeReminder(data)
-          if (reminder.user_id === String(e.user_id) && ['pending','unknown','sending'].includes(reminder.status)) {
+          if (reminder.user_id === String(e.user_id) && reminder.bot_id===String(e.self_id||e.bot?.uin||ports.getBot()?.uin||'') && reminder.group_id===(e.group_id?String(e.group_id):null) && ['pending','unknown','sending'].includes(reminder.status)) {
             userReminders.push(reminder)
           }
         }
@@ -496,7 +556,7 @@ async function triggerReminder(reminderId:string, toolInstances:ReminderTools) {
             nickname: '定时提醒用户'
           },
           message_type: reminder.group_id ? 'group' : 'private',
-          self_id: Bot?.uin,
+          ...(Bot?.uin!==undefined?{self_id:Bot.uin}:{}),
           bot: Bot,
           group: reminder.group_id ? Bot?.pickGroup?.(Number(reminder.group_id)) : null,
           isGroup: !!reminder.group_id,
@@ -567,6 +627,8 @@ async function triggerReminder(reminderId:string, toolInstances:ReminderTools) {
     }
 
     const outcome=normalizeDeliveryReceipt(receipt)
+    reminder.delivery=outcome
+    reminder.updated_at=Date.now()
     if(outcome.state!=="sent"){
       reminder.status=outcome.state==="failed"?"pending":"unknown"
       await redis.set(`${REDIS_KEY_PREFIX}detail:${reminderId}`,JSON.stringify(reminder))
@@ -582,14 +644,8 @@ async function triggerReminder(reminderId:string, toolInstances:ReminderTools) {
       JSON.stringify(reminder)
     )
 
-    // 延迟删除 detail 数据（保留 1 分钟用于调试）
-    setTimeout(async () => {
-      try {
-        await redis.del(`${REDIS_KEY_PREFIX}detail:${reminderId}`)
-      } catch (e) {
-        // 忽略删除失败
-      }
-    }, 60000).unref()
+    // Keep the confirmed receipt for bounded follow-up queries; no pending index remains.
+    await redis.set(`${REDIS_KEY_PREFIX}detail:${reminderId}`,JSON.stringify(reminder),{EX:86400})
 
     eventCache.delete(reminderId)
 
@@ -597,7 +653,7 @@ async function triggerReminder(reminderId:string, toolInstances:ReminderTools) {
 
   } catch (error) {
     logger.error(`[ReminderTool] 发送提醒消息失败:`, error)
-    if(attempted){reminder.status='unknown';await redis.set(`${REDIS_KEY_PREFIX}detail:${reminderId}`,JSON.stringify(reminder));eventCache.delete(reminderId);return true}
+    if(attempted){reminder.status='unknown';reminder.delivery={state:'unknown'};reminder.updated_at=Date.now();await redis.set(`${REDIS_KEY_PREFIX}detail:${reminderId}`,JSON.stringify(reminder));eventCache.delete(reminderId);return true}
     return false
   }
 }

@@ -1,8 +1,10 @@
 import type {ToolExecutionHost,ToolExecutionPorts,ExecutionMessage,ExecutionSession,ExecutionEvent,ExecutionResult,ToolCall,LocalExecutableTool,ToolExecutorPort} from "../../../contracts/toolExecution.js"
 import {toolRecord} from "../../../contracts/toolExecution.js"
 import type {TurnEvidence} from '../../../contracts/turnInteraction.js'
+import type {TurnTaskFact} from '../../../contracts/turnActionFacts.js'
 import {buildTurnInteractionPrompt,withTurnInteractionEvidence} from '../../conversation/domain/turnInteractionContext.js'
 import {buildPersonaReplyModePrompt} from '../../conversation/domain/personaTonePolicy.js'
+import {validateTurnActionFacts,unknownTurnActionFacts} from '../../conversation/domain/turnActionFacts.js'
 import {TERMINAL_TOOL_NAMES,BACKGROUND_TERMINAL_TOOL_NAMES,getImageVerificationMode,isExplicitSearchRequest,isRealtimeInfoRequest} from "../../conversation/domain/messageIntent.js"
 import {safeTruncateUnicode} from "../../models/domain/unicodeText.js"
 import {joinIntentParts} from "../../conversation/domain/messageContext.js"
@@ -359,7 +361,7 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
 
     const dedupeEnabled = host.isDedupeTool(toolName)
     const task = session.taskContext || {}
-    const toolRunKey = dedupeEnabled ? host.getToolRunKey(e.group_id, e.user_id, toolName) : ""
+    const toolRunKey = dedupeEnabled ? host.getToolRunKey(e.group_id, e.user_id, toolName,e) : ""
     const toolRunValue = {
       ...(e.group_id !== undefined ? {groupId:e.group_id}:{}),
       ...(e.user_id !== undefined ? {userId:e.user_id}:{}),
@@ -379,16 +381,10 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
 
       activeDedupeToolRuns.set(toolRunKey, toolRunValue)
       session.taskDedupeToolTouched = true
-      if (toolRunValue.messageId) {
-        await host.saveTaskStatus({
-          groupId: e.group_id,
-          userId: e.user_id,
-          messageId: toolRunValue.messageId,
-          status: "tool_running",
-          toolName
-        })
-      }
     }
+    const requestMessageId=String(toolRunValue.messageId||'')
+    const actionFact:TurnTaskFact={taskId:String(toolCall.id||`${toolName}:${requestMessageId}:${toolRunValue.startedAt}`),requestMessageId,toolName,source:'task_record',observedAt:Date.now(),execution:'running',result:'unknown',delivery:{state:'unknown'},followUp:{state:'unknown'}}
+    if(requestMessageId)await host.saveTaskStatus({groupId:e.group_id,userId:e.user_id,messageId:requestMessageId,status:dedupeEnabled?'tool_running':'',toolName,event:e,actionFacts:actionFact})
 
     const toolStartedAt = Date.now()
     try {
@@ -411,15 +407,17 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
         toolName,
         success: !host.isToolResultError(result)
       })
-      if (dedupeEnabled && toolRunValue.messageId) {
+      if (requestMessageId) {
         const failed = host.isToolResultError(result)
         await host.saveTaskStatus({
           groupId: e.group_id,
           userId: e.user_id,
           messageId: toolRunValue.messageId,
-          status: failed ? "tool_failed" : "tool_success",
+          status: dedupeEnabled ? failed ? "tool_failed" : "tool_success" : "",
           toolName,
-          error: failed ? result : ""
+          error: failed ? result : "",
+          event:e,
+          actionFacts:{...actionFact,observedAt:Date.now(),execution:failed?'failed':'completed',followUp:{state:'none'}}
         })
       }
       return {
@@ -429,14 +427,16 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
         result: result?.trim() ? result : `工具 ${toolName} 执行成功`
       }
     } catch (error) {
-      if (dedupeEnabled && toolRunValue.messageId) {
+      if (requestMessageId) {
         await host.saveTaskStatus({
           groupId: e.group_id,
           userId: e.user_id,
           messageId: toolRunValue.messageId,
-          status: "tool_failed",
+          status: dedupeEnabled ? "tool_failed" : "",
           toolName,
-          error: buildVisibleFailureDetail(error)
+          error: buildVisibleFailureDetail(error),
+          event:e,
+          actionFacts:{...actionFact,observedAt:Date.now(),execution:'failed',followUp:{state:'none'}}
         })
       }
       logger.error(`[工具调用] ${toolName} 执行失败:`, error)
@@ -532,6 +532,12 @@ async function processToolCalls(host: ToolExecutionHost, message: ExecutionMessa
       })))
 
       if (session.interactionContext) {
+        if(host.getTurnActionFacts){
+          let actionFacts=unknownTurnActionFacts(e)
+          try{actionFacts=validateTurnActionFacts(await host.getTurnActionFacts(e,{recentRequestMessageIds:[String(e.message_id||session.taskContext?.messageId||'')].filter(Boolean)}),e)}catch{}
+          session.interactionContext={...session.interactionContext,actionFacts}
+          currentMessages.push({role:'system',content:['【任务事实已更新】以下当前记录替代本轮此前的任务事实；工具返回文字和进度消息不能覆盖这些记录。',buildTurnInteractionPrompt(session.interactionContext)].join('\n')})
+        }
         const mediaEvidence: TurnEvidence[] = validResults.flatMap(({toolName, toolCall, result}) => {
           const kind = toolName === 'googleImageAnalysisTool' ? 'image' : toolName === 'videoAnalysisTool' ? 'video' : null
           if (!kind) return []
@@ -795,6 +801,7 @@ async function executeTool(host: ToolExecutionHost, tool: string|LocalExecutable
 
       return null
     } catch (error) {
+      if(toolRecord(error).uncertain===true)throw error
       if (!isRetry) {
         return host.executeTool(tool, params, e, true)
       }

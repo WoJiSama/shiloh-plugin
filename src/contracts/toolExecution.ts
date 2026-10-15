@@ -1,3 +1,4 @@
+import type {ActionFactsEvent,ActionFactsQuery,TurnActionFacts,TurnTaskFact} from './turnActionFacts.js'
 import type {TurnInteractionContext} from './turnInteraction.js'
 export interface ToolCall {id?:string;type?:string;function?:{name?:string;arguments?:string};[key:string]:unknown}
 export interface ToolResult {toolName:string;result:unknown;toolCallId?:string}
@@ -60,7 +61,7 @@ export interface SemanticToolPorts {
 }
 
 export interface ExecutionEvent extends SemanticEvent {
- group_id?:string|number;user_id?:string|number;message_id?:unknown;
+ group_id?:string|number;user_id?:string|number;message_id?:unknown;self_id?:string|number;bot?:{uin?:string|number};
  _groupContextImagePrompt?:string;_longRunningToolTask?:boolean;_quotedPromptContext?:{text?:string}
 }
 export interface ExecutionMessage {role?:string;content?:string;tool_calls?:ToolCall[];reasoning_content?:string;tool_call_id?:string|undefined;name?:string}
@@ -90,8 +91,9 @@ export interface ToolExecutionHost {
  buildImageEditPrompt(context:Omit<ToolSemanticContext,'prompt'> & {prompt?:unknown}):string;
  buildImageGenerationPrompt(context:Omit<ToolSemanticContext,'prompt'|'images'> & {prompt?:unknown;images?:unknown;avatarDrawReference?:ExecutionAvatar|undefined}):string;
  getImageGenerationReferenceImages(images:unknown,session:ExecutionSession):string[];
- isDedupeTool(name:string):boolean;getToolRunKey(groupId:string|number|undefined,userId:string|number|undefined,name:string):string;
- saveTaskStatus(status:{groupId?:string|number|undefined;userId?:string|number|undefined;messageId:unknown;status:string;toolName:string;error?:string}):Promise<unknown>;
+ isDedupeTool(name:string):boolean;getToolRunKey(groupId:string|number|undefined,userId:string|number|undefined,name:string,event?:ActionFactsEvent):string;
+ saveTaskStatus(status:{groupId?:string|number|undefined;userId?:string|number|undefined;messageId:unknown;status:string;toolName:string;error?:string;event?:ActionFactsEvent;actionFacts?:TurnTaskFact}):Promise<unknown>;
+ getTurnActionFacts?(event:ActionFactsEvent,query?:ActionFactsQuery):Promise<TurnActionFacts>;
  executeTool(tool:string|LocalExecutableTool|undefined,params:Record<string,unknown>,event:ExecutionEvent,retry?:boolean):Promise<unknown>;
  serializeToolResult(result:unknown):string;isRawToolFailure(result:string):boolean;
  dedupeToolCalls(calls:ToolCall[]):ToolCall[];normalizeAssistantToolMessage(message:ExecutionMessage):ExecutionMessage;

@@ -382,6 +382,9 @@ return class MessageManager {
 
     return {
       time: ports.formatTime(message.time * 1000),
+      // Keep an unambiguous clock for short-lived physical observations. The
+      // display timestamp can be local and must not authorize current state.
+      at: message.time * 1000,
       sender: {
         user_id: message.sender.user_id,
         nickname: isBot ? botIdentity.nickname : (message.sender.card || message.sender.nickname),

@@ -339,3 +339,62 @@ test('unknown delivery status uses evidence reasoning and an explicit execution 
   assert.match(body.messages.at(-1).content, /不要替用户重新发起旧任务/)
   assert.ok(body.messages.some(message => String(message.content).includes('缺少结果时只说明尚未确认')))
 })
+
+test('runtime task facts reach the actual model request separately from historical commitments', async () => {
+  const scenario={rawUserText:'刚才改背景的图出来了吗？',modelReply:'图已经生成了，发送结果还没确认。'}
+  const f=fixture(scenario,{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+  f.host.messageManager.getMessages=async()=>[{message_id:'original',content:'把背景改成傍晚。',sender:{user_id:202,nickname:'测试群友',role:'member'}}]
+  const queries=[]
+  f.host.getTurnActionFacts=async(e,query)=>{
+    queries.push(query)
+    return {scope:{botId:'99',conversationId:`group:${e.group_id}`,userId:'202'},observedAt:Date.now(),lookup:'ok',tasks:[{taskId:'actual-task',requestMessageId:'original',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'completed',result:'available',delivery:{state:'unknown'},followUp:{state:'none'}}]}
+  }
+  assert.equal(await f.run(),true)
+  assert.deepEqual(queries[0].recentRequestMessageIds,['original'])
+  const body=f.captures.gatewayRequests[0].body
+  assert.ok(body.messages.some(message=>String(message.content).includes('已有产物；投递结果未确认')))
+  assert.equal(f.session.interactionContext.actionFacts.tasks[0].delivery.state,'unknown')
+})
+
+test('task lookup failure cannot borrow another account and becomes an explicit evidence gap',async()=>{
+ const scenario={rawUserText:'刚才改背景的图出来了吗？',modelReply:'现在还没有可确认的结果。'}
+ for(const mode of ['throw','other_bot']){
+  const f=fixture(scenario,{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+  f.host.getTurnActionFacts=async e=>{
+   if(mode==='throw')throw Error('store unavailable')
+   return {scope:{botId:'another-bot',conversationId:`group:${e.group_id}`,userId:'202'},observedAt:Date.now(),lookup:'ok',tasks:[]}
+  }
+  assert.equal(await f.run(),true)
+  assert.equal(f.session.interactionContext.actionFacts.lookup,'unavailable')
+  assert.ok(f.captures.gatewayRequests[0].body.messages.some(message=>String(message.content).includes('本次未能核验相关任务记录')))
+ }
+})
+
+test('burnt-smell followup keeps prerequisites from the requester instead of the bot\'s old advice',async()=>{
+ const scenario={rawUserText:'没看到烧痕，味也散了，现在能开机吗？',modelReply:'先保持断电，外观正常还不能排除损坏。'}
+ const f=fixture(scenario,{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+ f.host.messageManager.getMessages=async()=>[
+  {message_id:'advice',content:'先拔电源，等它凉下来。',sender:{user_id:99,nickname:'测试机器人',role:'member'}},
+  {message_id:'incident',at:Date.now()-1000,content:'我电脑刚闻到焦糊味，已经拔掉电源线。',sender:{user_id:202,nickname:'测试群友',role:'member'}}
+ ]
+ assert.equal(await f.run(),true)
+ const context=f.session.interactionContext.diagnosticContext
+ assert.equal(context.incident.status,'asserted');assert.equal(context.power,'off')
+ assert.equal(context.damageExclusion,'unknown')
+ assert.ok(!context.allowedChecks.includes('operational_monitoring'))
+ const messages=f.captures.gatewayRequests[0].body.messages
+ assert.ok(messages.some(message=>String(message.content).includes('运行检测的前提尚不成立')))
+})
+
+test('old or untimed physical observations do not authorize current power state in the main turn',async()=>{
+ for(const timestamp of [{at:Date.now()-86400000},{time:'2026-10-15 10:00:00'},{}]){
+  const f=fixture({rawUserText:'那现在怎么检查风扇？',modelReply:'先确认已经断电并且凉透。'},{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+  f.host.messageManager.getMessages=async()=>[
+   {message_id:'old-incident',...timestamp,content:'我电脑闻到焦糊味，已经拔掉电源线，机器已经完全凉透。',sender:{user_id:202,nickname:'测试群友',role:'member'}}
+  ]
+  assert.equal(await f.run(),true)
+  const context=f.session.interactionContext.diagnosticContext
+  assert.equal(context.incident.status,'asserted');assert.equal(context.power,'unknown')
+  assert.ok(context.unmetPrerequisites.includes('power_isolated'));assert.ok(context.unmetPrerequisites.includes('cooled'))
+ }
+})

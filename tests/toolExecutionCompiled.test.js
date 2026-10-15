@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { createToolExecution } from '../dist/backend/modules/tools/infrastructure/toolExecution.js'
 import { createSemanticToolIntent } from '../dist/backend/modules/tools/infrastructure/semanticToolIntent.js'
 import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
+import {buildDiagnosticContext} from '../dist/backend/modules/conversation/domain/diagnosticContext.js'
 const logger={info(){},warn(){},error(){}}
 
 test('compiled executor dispatches MCP and retries local execution once',async()=>{
@@ -80,4 +81,43 @@ test('media evidence uses shared success/empty classification, preserving readab
       assert.doesNotMatch(update,/【希洛场景口吻】/)
     } else assert.equal(requests.length,0,'unusable tool results retain the existing factual failure path')
   }
+})
+
+test('tool continuation refreshes actual action facts while preserving diagnostic context',async()=>{
+ const requests=[],queries=[]
+ const api=createToolExecution({logger,resolveToolRoundLimit:()=>2,resolveEmojiTurnSkips:()=>[false],recordTurnPlanToolOutcome(){},buildChatRequestData:(_config,messages)=>{requests.push(structuredClone(messages));return{}},collectThinking(){}})
+ const call={id:'schedule',type:'function',function:{name:'reminderTool',arguments:'{}'}}
+ const diagnosticContext=buildDiagnosticContext({rawUserText:'我的电脑有焦味，已经拔掉电源了',speakerId:'20'})
+ assert.ok(diagnosticContext)
+ const session={rawUserText:'好了发我',interactionContext:{...buildTurnInteractionContext({rawUserText:'好了发我',botId:99}),diagnosticContext}}
+ const facts={scope:{botId:'99',conversationId:'group:10',userId:'20'},observedAt:Date.now(),lookup:'ok',tasks:[{taskId:'reminder-1',requestMessageId:'30',toolName:'reminderTool',source:'reminder',observedAt:Date.now(),execution:'queued',result:'unknown',delivery:{state:'not_attempted'},followUp:{state:'registered',kind:'reminder',id:'reminder-1',dueAt:Date.now()+600000}}]}
+ const host={config:{},dedupeToolCalls:c=>c,getToolCallName:c=>c.function.name,normalizeAssistantToolMessage:m=>m,shouldRunTerminalToolsInBackground:()=>false,runToolCall:async c=>({toolCall:c,toolName:'reminderTool',result:'提醒已创建'}),isToolResultError:()=>false,buildImageVerificationSearchToolCall:()=>null,getTurnActionFacts:async(e,q)=>{queries.push([e,q]);return facts},retryRequest:async()=>({choices:[{message:{content:'已登记提醒。'}}]}),handleTextResponse:async()=>{}}
+ const e={self_id:99,group_id:10,user_id:20,message_id:30,msg:'好了发我'}
+ await api.processToolCalls(host,{tool_calls:[call]},e,session,[],[])
+ assert.equal(queries.length,1)
+ assert.deepEqual(queries[0][1].recentRequestMessageIds,['30'])
+ assert.equal(session.interactionContext.actionFacts.tasks[0].followUp.id,'reminder-1')
+ assert.equal(session.interactionContext.diagnosticContext,diagnosticContext)
+ const prompt=requests[0].filter(row=>row.role==='system').map(row=>row.content).join('\n')
+ assert.match(prompt,/【任务事实已更新】/);assert.match(prompt,/已核验提醒登记 reminder-1/)
+})
+
+test('actual tool executor passes bot identity into dedupe and never infers result or delivery from success text',async()=>{
+ const statuses=[],seen=[];let release
+ const gate=new Promise(resolve=>{release=resolve})
+ const api=createToolExecution({logger,mcpManager:{isMCPTool:()=>false},formatTurnPlanLog:()=>'',recordTurnPlanToolOutcome(){}})
+ const host={config:{},toolInstances:{fixtureTool:{execute:async()=>''}},getToolCallName:c=>c.function.name,isDedupeTool:()=>true,getToolRunKey:(g,u,name,e)=>{seen.push(e.self_id);return `${e.self_id}:${g}:${u}:${name}`},saveTaskStatus:async value=>statuses.push(value),serializeToolResult:value=>value,isRawToolFailure:()=>false,isToolResultError:()=>false,executeTool:async()=>{await gate;return '执行成功'}}
+ const call={id:'fixture',type:'function',function:{name:'fixtureTool',arguments:'{}'}},session=()=>({tools:[{function:{name:'fixtureTool'}}]})
+ const first=api.runToolCall(host,call,{self_id:99,group_id:10,user_id:20,message_id:30},session())
+ const second=api.runToolCall(host,{...call,id:'second'},{self_id:98,group_id:10,user_id:20,message_id:30},session())
+ release();const results=await Promise.all([first,second])
+ assert.deepEqual(seen,[99,98]);assert.equal(results.filter(result=>result.result==='执行成功').length,2)
+ for(const status of statuses.filter(value=>value.status==='tool_success')){assert.equal(status.actionFacts.result,'unknown');assert.equal(status.actionFacts.delivery.state,'unknown');assert.equal(status.actionFacts.execution,'completed')}
+})
+
+test('uncertain delivery errors are not retried by the shared tool executor',async()=>{
+ let attempts=0
+ const api=createToolExecution({logger,mcpManager:{isMCPTool:()=>false}}),host={executeTool:(...args)=>api.executeTool(host,...args)}
+ await assert.rejects(api.executeTool(host,{execute:async()=>{attempts++;throw Object.assign(Error('lost receipt'),{uncertain:true})}},{},{}),/lost receipt/)
+ assert.equal(attempts,1)
 })

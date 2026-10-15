@@ -36,6 +36,9 @@ test('compiled task status rejects malformed persistence and answers active draw
  rows.set('status:1:3','{"status":{},"toolName":"x"}')
  assert.equal(await host.getTaskStatus(1,3),null)
  await host.updateUserToolTaskStatus({groupId:1,userId:2,messageId:4,toolName:'bananaTool',status:'running'})
- assert.equal(await host.handleActiveDrawStatusQuestion({group_id:1,user_id:2},'图呢'),true)
+ assert.equal(await host.handleActiveDrawStatusQuestion({group_id:1,user_id:2},'图呢'),false)
+ const event={group_id:1,user_id:2,self_id:99,message_id:4}
+ await host.saveTaskStatus({groupId:1,userId:2,messageId:4,status:'',toolName:'bananaTool',event,actionFacts:{taskId:'draw',requestMessageId:'4',toolName:'bananaTool',source:'live_job',observedAt:Date.now(),execution:'running',result:'unknown',delivery:{state:'not_attempted'},followUp:{state:'unknown'}}})
+ assert.equal(await host.handleActiveDrawStatusQuestion({...event,reply_id:4},'图呢'),true)
  assert.equal(sent.length,1)
 })

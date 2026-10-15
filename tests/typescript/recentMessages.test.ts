@@ -17,6 +17,7 @@ test('compiled recent-message manager serializes concurrent writes and deduplica
  const event = {message_type:'group',group_id:42,time:100,sender:{user_id:2,nickname:'user'},message:[{type:'text',text:'hello'}]}
  await Promise.all(Array.from({length:10},(_,i)=>manager.recordMessage({...event,event_id:String(i),time:100+i})))
  assert.equal((await manager.getMessages('group',42)).length,10)
+ assert.equal((await manager.getMessages('group',42)).find(item=>item.event_id==='9')?.at,109000)
  await manager.recordMessage({...event,event_id:'0'})
  assert.equal((await manager.getMessages('group',42)).length,10)
  assert.equal((await manager.getMessages('group',43)).length,0)

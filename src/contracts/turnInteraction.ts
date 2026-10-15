@@ -1,3 +1,6 @@
+import type {TurnActionFacts} from './turnActionFacts.js'
+import type {DiagnosticContext} from './diagnosticContext.js'
+
 export type InteractionKind = 'conversation' | 'banter' | 'clarification' | 'delivery' | 'comfort' | 'serious_answer'
 
 export interface TurnEvidence {
@@ -26,5 +29,7 @@ export interface TurnInteractionContext {
   }
   evidence: TurnEvidence[]
   previousBotReply?: { text: string; source: 'quote' | 'verified_continuity' }
+  actionFacts?: TurnActionFacts
+  diagnosticContext?: DiagnosticContext
   allowPlayfulness: boolean
 }

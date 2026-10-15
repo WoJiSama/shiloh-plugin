@@ -42,10 +42,9 @@ test("sends a downloaded Buffer and rejects failed replies", async () => {
   }
 })
 
-test('unknown send receipt is returned without retry', async () => {
+test('unknown send receipt is rejected without retry', async () => {
  let sends = 0
- const result = await sendImageReliably({reply:async()=>{sends++;return undefined}},Buffer.from('image'),{buildMessage:buffer=>buffer})
- assert.equal(result,undefined)
+ await assert.rejects(sendImageReliably({reply:async()=>{sends++;return undefined}},Buffer.from('image'),{buildMessage:buffer=>buffer}),/发送结果未确认/)
  assert.equal(sends,1)
 })
 test('image download rejects oversized response and preserves metadata decoding', async()=>{

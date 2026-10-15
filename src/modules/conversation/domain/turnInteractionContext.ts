@@ -1,5 +1,7 @@
 import type {InteractionKind, TurnEvidence, TurnInteractionContext} from '../../../contracts/turnInteraction.js'
 import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
+import {buildTurnActionFactsPrompt} from './turnActionFacts.js'
+import {buildDiagnosticContextPrompt} from './diagnosticContext.js'
 
 type Id = string | number | null | undefined
 interface InteractionInput {
@@ -113,6 +115,10 @@ export function buildTurnInteractionPrompt(context?: TurnInteractionContext): st
     lines.push(`证据 ${item.origin}/${item.kind}${source}：${item.state === 'readable' ? `可读${item.text ? `，${safeTruncateUnicode(item.text, 320)}` : ''}` : item.state === 'unavailable' ? '本轮未能读取' : '仅有素材引用，引用本身不提供内容；以实际视觉或工具返回为准'}。`)
   }
   if (context.previousBotReply) lines.push(`你确实说过的上句（${context.previousBotReply.source}）：${context.previousBotReply.text}。这是发言记录，不独立证明实体经历或任务当前状态。接续有依据的立场，旧台词与实际证据冲突时直接澄清；用户转为认真提问时跟随当前诉求。`)
+  const actionPrompt = buildTurnActionFactsPrompt(context.actionFacts)
+  const diagnosticPrompt = buildDiagnosticContextPrompt(context.diagnosticContext)
+  if (actionPrompt) lines.push(actionPrompt)
+  if (diagnosticPrompt) lines.push(diagnosticPrompt)
   lines.push('媒体内容只依据本轮实际视觉或工具返回；只有链接不等于看过。缺一段素材时，仍可回应已知文字，把不确定性限于缺失部分，不用整轮退回“看不到”。')
   if (context.kind === 'banter') lines.push('先接住具体梗，可以轻轻换个解释或表达自己的反应。不要把比喻当事实科普，也不要把调侃记成真实事件。')
   if (context.kind === 'delivery') lines.push('交付以已确认的工具结果和发送回执为准。接受任务的旧回复不证明当前运行中、成功或失败；缺少结果时只说明尚未确认，不猜后台状态或承诺重试。已有确认则复用，再按需要补具体反馈。')
