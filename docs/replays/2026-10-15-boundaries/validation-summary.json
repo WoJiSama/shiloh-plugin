@@ -1,0 +1,46 @@
+{
+  "releaseCommit": "900a5cb0d945c594da4d4e7b3b54fc4d3252a97b",
+  "codeReplayCommit": "c62ad84f81c589aeef7533deaa619aaefcaefe69",
+  "deploymentEntry": "scripts/deploy.sh; full gate, no skips",
+  "backendPhaseGate": {
+    "tests": 2041,
+    "pass": 2039,
+    "fail": 0,
+    "skipped": 2,
+    "skipReason": "host music integration environment"
+  },
+  "frontendPhaseGate": {
+    "tests": 34,
+    "pass": 34,
+    "fail": 0
+  },
+  "backendStrictTypes": "pass",
+  "moduleBoundaries": "pass",
+  "frontendTypesAndBuild": "pass",
+  "preliminaryFocused": {
+    "tests": 113,
+    "pass": 113
+  },
+  "gateRepairFocused": {
+    "tests": 44,
+    "pass": 44
+  },
+  "originalWritebackValidation": {
+    "backendBuild": "pass",
+    "tests": 122,
+    "pass": 122,
+    "fail": 0,
+    "skipped": 0,
+    "runtimeJsFiles": 470,
+    "candidateRuntimeJsMismatches": []
+  },
+  "originalIndexEntries": [],
+  "firstGateAttempt": {
+    "tests": 2041,
+    "pass": 2037,
+    "fail": 2,
+    "skipped": 2,
+    "phase": "local tests, before server install",
+    "resolution": "replace two obsolete source-shape assertions with compiled plan and gateway behavior checks; test-only commit"
+  }
+}

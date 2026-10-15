@@ -1,0 +1,226 @@
+{
+  "privacy": "Original group records, exact private persona/config and raw model requests are excluded. Full synthetic output samples including errors are retained; private nickname and model endpoint host are replaced with role labels. Original source hashes identify restricted originals.",
+  "noResampling": true,
+  "redactions": {
+    "privatePersonaNickname": 16,
+    "modelEndpointHost": 184
+  },
+  "files": [
+    {
+      "sourcePrivateBasename": "baseline-results.json",
+      "sourceSha256": "64a8b7899d06353f7f1f308dc691b7e90428085ea9e9e1b1855039d21ef76927",
+      "exportedFile": "baseline.json",
+      "exportedSha256": "a968fb3a330789becccbafa76352eaeef960337f367056a306126152f86ee167"
+    },
+    {
+      "sourcePrivateBasename": "candidate-results.json",
+      "sourceSha256": "6737217a49ada0355399fafbcb2209c14870f62f5579c39298edee403a0cb739",
+      "exportedFile": "candidate.json",
+      "exportedSha256": "082fdece0d20a58820e684da6fdbcdc212475a928c0e2b27a1b3d5b380096986"
+    },
+    {
+      "sourcePrivateBasename": "baseline-review.json",
+      "sourceSha256": "36e058a127736440001ec1b3d5522b2cfb625653518647f5996aa61194708b39",
+      "exportedFile": "baseline-review.json",
+      "exportedSha256": "b33d34543d2794de329886af04340bcac7cddcb7dc7efc4970153a5de4c6827f"
+    },
+    {
+      "sourcePrivateBasename": "candidate-review.json",
+      "sourceSha256": "e755bc3ac86416d85ec1466dac9c97d7af0157a523508a546ef5f0ae11dc2164",
+      "exportedFile": "candidate-review.json",
+      "exportedSha256": "68873411a543df23f66d2d0a2520cb2ebccde1d47b92dcd9a55fa12778533d72"
+    },
+    {
+      "sourcePrivateBasename": "boundary-comparison-review.json",
+      "sourceSha256": "622479abce295ba209e8cdf4ccacdb2af3bbf5d91ffbe458f68b0404bfc7e7ed",
+      "exportedFile": "comparison-review.json",
+      "exportedSha256": "92d9ee57a31a806c5465574d50fd0ae411c730f4fcdd213faa4ebb42c1fa43d1"
+    },
+    {
+      "sourcePrivateBasename": "parent-observations.json",
+      "sourceSha256": "8957fb91893d8054ce3da2b8d4eb5bb8785de8f51effcfcc1b3465f17e99660d",
+      "exportedFile": "parent-observations.json",
+      "exportedSha256": "54788afe58230de97e5266ff14641f37388ca03d12807fdc722d67d436928ccd"
+    },
+    {
+      "sourcePrivateBasename": "comparison-integrity.json",
+      "sourceSha256": "e400b246c8e634a17003ca190fd97db7c2175bb5a161048d3a8946d1d4da3085",
+      "exportedFile": "comparison-integrity.json",
+      "exportedSha256": "0806ccae53d08e505e85a6dcf1a195861b26de29a9fe46119dc63049f545516e"
+    },
+    {
+      "sourcePrivateBasename": "baseline-a00fdd3-tool-decisions.json",
+      "sourceSha256": "061e04ed2b59ab03cff35fbc43b385458b13ce942199e125fd5c75c9210eeb3f",
+      "exportedFile": "baseline-tool-decisions.json",
+      "exportedSha256": "0acc97cda464a66300f3f12f40910ef70c46ae47f40eccfd08dd37e93a35ef8e"
+    },
+    {
+      "sourcePrivateBasename": "candidate-c62ad84-tool-decisions.json",
+      "sourceSha256": "56d382c7025503f73b247893bde73b388293ea94410e00c045a5922ce26610cd",
+      "exportedFile": "candidate-tool-decisions.json",
+      "exportedSha256": "e6b1be119a8b1f34f1f09f1128f72a7ba02057dee1da94172cc0fb363331832e"
+    },
+    {
+      "sourcePrivateBasename": "classifier-comparison-integrity.json",
+      "sourceSha256": "eff4d2a1f84676fe51ddc480026c3732b805dd09efabea8b50e0feefc3e01a53",
+      "exportedFile": "classifier-comparison-integrity.json",
+      "exportedSha256": "89e0a4d41816bfe276d031b2cf87bccfcb29acf45bbde1af7b59ae977ff79946"
+    },
+    {
+      "sourcePrivateBasename": "frozen-review-rubric.json",
+      "sourceSha256": "d55b1548e2f3aa30889f3c60f815d1e4b2048d5fb6e9a93690dd8726742bbec7",
+      "exportedFile": "frozen-review-rubric.json",
+      "exportedSha256": "b56467a116a5f33e209e723c6253ed4840f5e09ef4bd684c73475060377c4281"
+    },
+    {
+      "sourcePrivateBasename": "intent-provider-diagnostic.json",
+      "sourceSha256": "ed88070498dd887c3e148a8652fd8888bc0bb9bf5b97cd13f8ce8f1465f2ea32",
+      "exportedFile": "intent-provider-diagnostic.json",
+      "exportedSha256": "e9557729ebf5cb7ef8256ef2599d433c1769f321fd6fbdd68df0372db3766c44"
+    },
+    {
+      "sourcePrivateBasename": "baseline-freeze-audit.json",
+      "sourceSha256": "4f49e5dea2472808d3280a1e3c0b8289ed151456d800e75de5b52b9da2a28fe3",
+      "exportedFile": "baseline-freeze-audit.json",
+      "exportedSha256": "2bd93cf222677d43979c1a08d13bb6b49327a62916d163be75c38b4272d363f7"
+    },
+    {
+      "sourcePrivateBasename": "candidate-freeze-audit.json",
+      "sourceSha256": "8b97a45b6562797e3338520ae7e4922aa9529150e224e4ec3c77ad54b752a6a3",
+      "exportedFile": "candidate-freeze-audit.json",
+      "exportedSha256": "4d3e79d3383bc278af3f8c52c099f17a74e48f7fad097ef91a1575f71a2f0b85"
+    },
+    {
+      "sourcePrivateBasename": "baseline-scheduler.json",
+      "sourceSha256": "b2a2fb75f656af642b18d5af01346f41313275cce039c0ca822bf8174bb3ae3b",
+      "exportedFile": "baseline-scheduler.json",
+      "exportedSha256": "737e29d5bfee6fc506cd9dcaeb3d7a4174b5a5d3bd04bb79801fbaac5716583e"
+    },
+    {
+      "sourcePrivateBasename": "candidate-scheduler.json",
+      "sourceSha256": "07276fe41c89106611a7e645d017d54f5195f4690d167e01655a35fe95cc920b",
+      "exportedFile": "candidate-scheduler.json",
+      "exportedSha256": "0b02289099bd12829913ee658c090be3ef873c96b62d658a814a7f55e5f60485"
+    },
+    {
+      "sourcePrivateBasename": "pre-deploy-audit.json",
+      "sourceSha256": "7f081078564f7d603f7ccaed19deee76f40d8ec2d6eb561d9bd98d7a8dcf9db8",
+      "exportedFile": "pre-deploy-audit.json",
+      "exportedSha256": "7f081078564f7d603f7ccaed19deee76f40d8ec2d6eb561d9bd98d7a8dcf9db8"
+    },
+    {
+      "sourcePrivateBasename": "deploy-start-audit.json",
+      "sourceSha256": "33df705555ff07861c5628a51e0a3c5c3760da884a851de0b71b497adf49d3f9",
+      "exportedFile": "deploy-start-audit.json",
+      "exportedSha256": "33df705555ff07861c5628a51e0a3c5c3760da884a851de0b71b497adf49d3f9"
+    },
+    {
+      "sourcePrivateBasename": "post-deploy-audit.json",
+      "sourceSha256": "fb085dd6230f945d6324aed5a3af5061f2689bc94b050604cab04ee436ead98e",
+      "exportedFile": "post-deploy-audit.json",
+      "exportedSha256": "b55ff7c2b355bdb7320e001572fffd03893450430ebae1536600e3f1eab6c1d3"
+    },
+    {
+      "sourcePrivateBasename": "writeback-preflight.json",
+      "sourceSha256": "7592efc9f5c26fda28b8424beafddeb0d07457b4f44e3cb8436aa8ebce479b98",
+      "exportedFile": "writeback-preflight.json",
+      "exportedSha256": "89768e579e909267d023577e2d5750d9c66a788a797a30982783475426e6f582"
+    },
+    {
+      "sourcePrivateBasename": "preservation-audit.json",
+      "sourceSha256": "904a10f8ecbeced0108b7dda0549ea7a371b1ae4480e5dcf4a849c6c3e34a3fc",
+      "exportedFile": "preservation-audit.json",
+      "exportedSha256": "173c996bcd31a038546116d2eb038399f150383d73b76d4c3d9cae8f8bf37be7"
+    },
+    {
+      "sourcePrivateBasename": "validation-summary.json",
+      "sourceSha256": "891792cb5016bca1e3f38f6da7128717ec7dc8e9bf6d712474fa2a18be2b067a",
+      "exportedFile": "validation-summary.json",
+      "exportedSha256": "ee068cfb7cf69440a5f3010d9d6224cd8bed3b0d02b3de49e0ba6fac7c1108ad"
+    },
+    {
+      "sourcePrivateBasename": "release-code-equivalence.json",
+      "sourceSha256": "399a82bb96544c9988e7716e6863579c4c85956845cc288249c6b7968d1c54ae",
+      "exportedFile": "release-code-equivalence.json",
+      "exportedSha256": "b20fe926f0dc29c3cfda5eda361705cacded8118cfa9e254862cfb192478ee34"
+    },
+    {
+      "sourcePrivateBasename": "initialization-failure-summary.json",
+      "sourceSha256": "c7f55f8621aa4454dc0682c5d7c867a42a1355bbbbfa4f7aa4bcf6576039b81a",
+      "exportedFile": "initialization-failure-summary.json",
+      "exportedSha256": "50eb65ac6b231792051823df94c92d8e07458cdcfdaf551a23140d71325dd1ac"
+    },
+    {
+      "sourcePrivateBasename": "tool-boundary-scenarios.json",
+      "sourceSha256": "49df89f6e07dd6fc98c077b8166fc01d0baaaa31cdecf41075b317a89bd68587",
+      "exportedFile": "tool-boundary-scenarios.json",
+      "exportedSha256": "42ee06384618bd0e202e620fe2510cb5b129250247fdb17af4d38fc743982f9c"
+    },
+    {
+      "sourcePrivateBasename": "tool-boundary-shadow.mjs",
+      "sourceSha256": "126d104755c7de2a499cd39c469f74f5c5983fb598ee3dea382458dca2ef146f",
+      "exportedFile": "tool-boundary-shadow.mjs",
+      "exportedSha256": "126d104755c7de2a499cd39c469f74f5c5983fb598ee3dea382458dca2ef146f"
+    },
+    {
+      "sourcePrivateBasename": "run_boundary_replay.py",
+      "sourceSha256": "aff76fb6eac2d723e0e468baab9f221a172a48db78e9ce9fef1c3bba5ab636bb",
+      "exportedFile": "run_boundary_replay.py",
+      "exportedSha256": "aff76fb6eac2d723e0e468baab9f221a172a48db78e9ce9fef1c3bba5ab636bb"
+    },
+    {
+      "sourcePrivateBasename": "audit_runtime.py",
+      "sourceSha256": "be7349b44af36a37556d08ecda7bffeb03345b268c9b7db504fdc862099bddb8",
+      "exportedFile": "audit_runtime.py",
+      "exportedSha256": "be7349b44af36a37556d08ecda7bffeb03345b268c9b7db504fdc862099bddb8"
+    },
+    {
+      "sourcePrivateBasename": "focused-final.log",
+      "sourceSha256": "88351fb4dd5dc07bc9e9703b6fac89cdb0f79c96b775a8cba9c8130a20504b45",
+      "exportedFile": "focused-final.log.gz",
+      "exportedSha256": "e6aab2977903c985e1fd1f1a0a8297f6f363d4ff59e96dd3688d92ff8d090083"
+    },
+    {
+      "sourcePrivateBasename": "gate-repair-focused.log",
+      "sourceSha256": "48376c1059c6d5d392176a7c886f3e4ccaf0ef61229f3c99f0bd2f47247e12b7",
+      "exportedFile": "gate-repair-focused.log.gz",
+      "exportedSha256": "8560e6f002fc31894d21355ed6a2657e0f2fed6d48af74e90a90844af14b23e6"
+    },
+    {
+      "sourcePrivateBasename": "deployment-attempt1.log",
+      "sourceSha256": "bb8800e02d4aae7f6075ea4b27de1771ddc12620b1521032736fea8b9848a778",
+      "exportedFile": "deployment-attempt1.log.gz",
+      "exportedSha256": "1b0b6cc2c88eccb9fe5baf21123b22467a3ec6f0109c0c8c9d3462bdc8936d0c"
+    },
+    {
+      "sourcePrivateBasename": "deploy-phase-attempt1-tests.log",
+      "sourceSha256": "d595cb2615b1f53f1f69895f8ab73e8edc41410b7294598d079143fcb9d8003f",
+      "exportedFile": "deploy-phase-attempt1-tests.log.gz",
+      "exportedSha256": "91ed93475476f7b5cafb42b306daff752c63a2642ed87f923fe740c4a5d8c8e8"
+    },
+    {
+      "sourcePrivateBasename": "typecheck-final.log",
+      "sourceSha256": "8392c287b4cbe99fafdbcd20e83dc05d369df1857855e3764e7f3809c2f7d578",
+      "exportedFile": "typecheck-final.log.gz",
+      "exportedSha256": "0eccc26f1f9f758f5bcc90df28f3cd064c2fb7b664a7c41f93fb3817de2fb06f"
+    },
+    {
+      "sourcePrivateBasename": "deployment.log",
+      "sourceSha256": "8362dc1aded174d6491332e2e5e8a6e767279cb50b033a5dae37d4e98616cd64",
+      "exportedFile": "deployment.log.gz",
+      "exportedSha256": "be79d2155a574e204fa9fae11aa10aa660d60bff5b7b78347230da82a68da5e7"
+    },
+    {
+      "sourcePrivateBasename": "deploy-phase-tests.log",
+      "sourceSha256": "f0feef7774b369e53b78cccebe3faf0b6bb935715c647e7f72a84c7f5a60e4d9",
+      "exportedFile": "deploy-phase-tests.log.gz",
+      "exportedSha256": "ded0bba767853d85ec4e28e199944e74e234231672450c9adb9bae5680f04c07"
+    },
+    {
+      "sourcePrivateBasename": "writeback-validation.log",
+      "sourceSha256": "04bb7ac9e52446a25f84c47280f370d47bc36750a9bbd8aace0106bcde801472",
+      "exportedFile": "writeback-validation.log.gz",
+      "exportedSha256": "95dc8b4ca2604e397c942538d84e8f1de98ce95852c7fb05edea14d7c4966a15"
+    }
+  ]
+}

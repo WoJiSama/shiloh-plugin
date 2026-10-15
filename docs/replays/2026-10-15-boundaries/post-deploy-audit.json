@@ -1,0 +1,98 @@
+{
+  "checkedAtUtc": "2026-10-15T04:51:45.547179+00:00",
+  "commit": "900a5cb0d945c594da4d4e7b3b54fc4d3252a97b",
+  "managedFiles": 1919,
+  "mismatches": [],
+  "runtimeTreeHash": "5e020a94d5ac8ef175304af50ae43ab10122f5591829b2400948a00f5f9dedba",
+  "runtimeFileCount": 470,
+  "configs": {
+    "message.yaml": {
+      "sha256": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+      "matchesFrozenSnapshot": true
+    },
+    "persona-library.yaml": {
+      "sha256": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+      "matchesFrozenSnapshot": true
+    }
+  },
+  "expectedCommit": "c62ad84f81c589aeef7533deaa619aaefcaefe69",
+  "expectedManifestMatches": false,
+  "expectedManagedFilePayloadMatches": false,
+  "expectedManagedPayloadDifferences": [
+    "console/frontend/dist/assets/AiPage-BHPHXrrF.js",
+    "console/frontend/dist/assets/AiPage-CfBOzxHb.js",
+    "console/frontend/dist/assets/BotDetailPage-C1vIvnxr.js",
+    "console/frontend/dist/assets/BotDetailPage-DEoLevvf.js",
+    "console/frontend/dist/assets/BotsPage-DDwZ3sEk.js",
+    "console/frontend/dist/assets/BotsPage-DzN7cfWL.js",
+    "console/frontend/dist/assets/CommandsPage--mvawBli.js",
+    "console/frontend/dist/assets/CommandsPage-DnIq04Cp.js",
+    "console/frontend/dist/assets/DrawPage-B7ji0sOz.js",
+    "console/frontend/dist/assets/DrawPage-DxWHTAiK.js",
+    "console/frontend/dist/assets/EmbeddedPage-4orpY6jK.js",
+    "console/frontend/dist/assets/EmbeddedPage-CZZ7T-n3.js",
+    "console/frontend/dist/assets/GroupsPage-CE9-_jWS.js",
+    "console/frontend/dist/assets/GroupsPage-DeN_grvn.js",
+    "console/frontend/dist/assets/IdentityLabel-BsyF_htR.js",
+    "console/frontend/dist/assets/IdentityLabel-Dg_T2XFt.js",
+    "console/frontend/dist/assets/ObservePage-C6IZpvPU.js",
+    "console/frontend/dist/assets/ObservePage-Dk7wqDUm.js",
+    "console/frontend/dist/assets/PersonaPage-9fGzThpf.js",
+    "console/frontend/dist/assets/PersonaPage-DlN69nBn.js",
+    "console/frontend/dist/assets/PipelinePage-BUcN_MDF.js",
+    "console/frontend/dist/assets/PipelinePage-CXqw6lQM.js",
+    "console/frontend/dist/assets/QzoneComposer-Cpg0GNZN.js",
+    "console/frontend/dist/assets/QzoneComposer-DD70NEdJ.js",
+    "console/frontend/dist/assets/SaveBar.vue_vue_type_script_setup_true_lang-Bi39m27E.js",
+    "console/frontend/dist/assets/SaveBar.vue_vue_type_script_setup_true_lang-CDi7dghB.js",
+    "console/frontend/dist/assets/SchemaPage-BapTICJn.js",
+    "console/frontend/dist/assets/SchemaPage-DiPlt4pr.js",
+    "console/frontend/dist/assets/SemanticPage-B371BE_j.js",
+    "console/frontend/dist/assets/SemanticPage-Bet14eTG.js",
+    "console/frontend/dist/assets/index-D7eJUHI8.js",
+    "console/frontend/dist/assets/index-DOtAMSwT.js",
+    "console/frontend/dist/assets/plus-4vTBZFcP.js",
+    "console/frontend/dist/assets/plus-KTLg7J_R.js",
+    "console/frontend/dist/assets/refresh-cw-D5udoqJX.js",
+    "console/frontend/dist/assets/refresh-cw-Muu6L_w9.js",
+    "console/frontend/dist/assets/trash-2-BBudIXG4.js",
+    "console/frontend/dist/assets/trash-2-DheiQPIc.js",
+    "console/frontend/dist/index.html",
+    "dist/backend/manifest.json"
+  ],
+  "nonGeneratedPayloadMismatches": [],
+  "backendManifestOutputMatchesCandidate": true,
+  "backendManifestSourceMatchesCandidate": true,
+  "backendManifestChangedKeys": [
+    "commit"
+  ],
+  "expectedRuntimeJsMatches": true,
+  "replayRuntimeMatches": true,
+  "replayRunnerMatches": true,
+  "services": {
+    "trss-yunzai": {
+      "MainPID": "450883",
+      "NRestarts": "0",
+      "ActiveState": "active",
+      "ActiveEnterTimestamp": "Thu 2026-10-15 12:50:39 CST"
+    },
+    "bl-console": {
+      "MainPID": "450885",
+      "NRestarts": "0",
+      "ActiveState": "active",
+      "ActiveEnterTimestamp": "Thu 2026-10-15 12:50:39 CST"
+    }
+  },
+  "loadErrorsSinceCurrentStart": 0,
+  "pipelineStartsSinceCurrentStart": 1,
+  "http": {
+    "commands": 200,
+    "console": 200
+  },
+  "platformTestMessagesSent": 0,
+  "productionMemoryTestWrites": 0,
+  "backupPath": "/opt/trss-yunzai-backups/deploy-snapshots/20261015-124852",
+  "backupCommit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+  "releaseCommitVerified": true,
+  "generatedPayloadExplanation": "Only Vite build revision/time and backend manifest commit differ from c62 candidate; all other files and complete compiled backend match."
+}

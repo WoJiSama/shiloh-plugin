@@ -1,0 +1,77 @@
+{
+  "label": "baseline-a00fdd3",
+  "complete": false,
+  "failurePhase": "runtime_preparation_before_model_requests",
+  "cause": "Initial reused runtime lacked managed frontend files. Release validation failed before config snapshot or model requests.",
+  "modelRequestsSent": 0,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "scheduler": {
+    "label": "baseline-a00fdd3",
+    "repetitions": 5,
+    "concurrency": 3,
+    "scenarioOrder": [
+      "unsupported-order-with-third-party-wallet",
+      "sincere-booking-capability-question",
+      "quoted-order-is-discussion",
+      "food-preference-is-not-real-meal",
+      "verified-reminder-is-not-booking",
+      "user-narrows-to-ordinary-advice"
+    ],
+    "sampling": "one fixed run per scenario, fresh conversation for each of five repetitions; no resampling or dropped failures",
+    "runs": {
+      "sincere-booking-capability-question": {
+        "exitCode": 1,
+        "elapsedSeconds": 0.364
+      },
+      "quoted-order-is-discussion": {
+        "exitCode": 1,
+        "elapsedSeconds": 0.414
+      },
+      "unsupported-order-with-third-party-wallet": {
+        "exitCode": 1,
+        "elapsedSeconds": 0.42
+      },
+      "food-preference-is-not-real-meal": {
+        "exitCode": 1,
+        "elapsedSeconds": 0.363
+      },
+      "verified-reminder-is-not-booking": {
+        "exitCode": 1,
+        "elapsedSeconds": 0.313
+      },
+      "user-narrows-to-ordinary-advice": {
+        "exitCode": 1,
+        "elapsedSeconds": 0.331
+      }
+    },
+    "complete": false
+  },
+  "originalFiles": [
+    {
+      "name": "baseline-a00fdd3/food-preference-is-not-real-meal.log",
+      "sha256": "679363cb1935392fc7916017ddf7fb956411f87c3fd6f8439f0c0481b97b9ef8"
+    },
+    {
+      "name": "baseline-a00fdd3/quoted-order-is-discussion.log",
+      "sha256": "679363cb1935392fc7916017ddf7fb956411f87c3fd6f8439f0c0481b97b9ef8"
+    },
+    {
+      "name": "baseline-a00fdd3/sincere-booking-capability-question.log",
+      "sha256": "679363cb1935392fc7916017ddf7fb956411f87c3fd6f8439f0c0481b97b9ef8"
+    },
+    {
+      "name": "baseline-a00fdd3/unsupported-order-with-third-party-wallet.log",
+      "sha256": "679363cb1935392fc7916017ddf7fb956411f87c3fd6f8439f0c0481b97b9ef8"
+    },
+    {
+      "name": "baseline-a00fdd3/user-narrows-to-ordinary-advice.log",
+      "sha256": "679363cb1935392fc7916017ddf7fb956411f87c3fd6f8439f0c0481b97b9ef8"
+    },
+    {
+      "name": "baseline-a00fdd3/verified-reminder-is-not-booking.log",
+      "sha256": "679363cb1935392fc7916017ddf7fb956411f87c3fd6f8439f0c0481b97b9ef8"
+    }
+  ],
+  "retention": "Failed files kept in original restricted directory; prepared baseline uses a new label and never overwrites this attempt."
+}

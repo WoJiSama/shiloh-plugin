@@ -1,0 +1,15 @@
+{
+  "startingDirtyFiles": 128,
+  "changedSinceStart": [
+    "findings.md",
+    "progress.md",
+    "task_plan.md"
+  ],
+  "authorizedPlanChanges": [
+    "task_plan.md",
+    "progress.md",
+    "findings.md"
+  ],
+  "writebackTargetCount": 22,
+  "conflicts": []
+}

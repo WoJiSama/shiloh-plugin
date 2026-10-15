@@ -1,0 +1,55 @@
+{
+  "fixtureKind": "fixed_synthetic_schemas_with_real_classifier",
+  "frozenMatches": {
+    "scriptHash": true,
+    "scenariosHash": true,
+    "schemasHash": true,
+    "configHash": true,
+    "configuredIntentModel": true
+  },
+  "arms": {
+    "baseline": {
+      "sourceSha256": "061e04ed2b59ab03cff35fbc43b385458b13ce942199e125fd5c75c9210eeb3f",
+      "runtimeCommit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+      "complete": true,
+      "samples": 27,
+      "validDecisions": 0,
+      "models": {
+        "deepseek-v4-flash": 27
+      },
+      "networkStatuses": {
+        "None": 27
+      },
+      "noHttpResponse": 27,
+      "toolExecutions": 0,
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0,
+      "networkErrors": {
+        "请求超过 8 秒没有返回": 27
+      },
+      "eightSecondTimeouts": 27
+    },
+    "candidate": {
+      "sourceSha256": "56d382c7025503f73b247893bde73b388293ea94410e00c045a5922ce26610cd",
+      "runtimeCommit": "c62ad84f81c589aeef7533deaa619aaefcaefe69",
+      "complete": true,
+      "samples": 27,
+      "validDecisions": 0,
+      "models": {
+        "deepseek-v4-flash": 27
+      },
+      "networkStatuses": {
+        "None": 27
+      },
+      "noHttpResponse": 27,
+      "toolExecutions": 0,
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0,
+      "networkErrors": {
+        "请求超过 8 秒没有返回": 27
+      },
+      "eightSecondTimeouts": 27
+    }
+  },
+  "interpretation": "No effective classifier decision was returned in either arm. Timeouts are availability failures, not semantic misclassifications; no real tools, QQ or production store used."
+}
