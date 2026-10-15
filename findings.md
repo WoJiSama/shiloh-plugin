@@ -1195,3 +1195,5 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - 群history对该scope全部pending原文去重，耗尽行不会作为新输入重置预算；pending总上限统计user/group/live/exhausted所有批次，独立拆批不绕过cap。耗尽记录仍需显式清理，达到总cap后明确拒绝新批。
 - 冷恢复尊重每份持久key与attempts；重复legacy key稳定派生身份，恢复cleanup失败后重入不复制。文档occurrence在隐私过滤前计数，后续opt-out不能改变保留batch身份；timer在隐私cleanup持久完成后才启动。
 - 最终源码hook全memory219/219、0跳过，tsc --noEmit退出0，diffcheck通过；独立只读feedback复核无新增阻断。这是本地契约证据，统一构建与真实模型/线上验收由父代理继续。
+
+- 完整门禁失败定位：未读视频正文实际请求“视频里的吃法是什么”，应保留factual_question/serious_answer且局部承认不可见；两个compiled测试的host不完整，生产host已有resolveUnderstandingPrompt。歧义闲聊复用理解简报，原无条件跳过字符串断言已过时。后续仅修验收并核对运行产物等价。

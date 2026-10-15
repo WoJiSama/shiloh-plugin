@@ -271,9 +271,15 @@ for (const scenario of scenarios) {
     if (scenario.videoSource) {
       const video = context.evidence.find(item => item.kind === 'video')
       assert.equal(video.state, 'reference_only')
+      assert.equal(video.text, undefined, 'an unread video provides no facts about its eating method')
+      assert.equal(context.social.act, 'factual_question', 'the current question asks for a fact about the video')
+      assert.ok(context.evidence.some(item => item.origin === 'current' && item.kind === 'text' && item.text === scenario.rawUserText))
       assert.match(system, /证据 current\/video：仅有素材引用/)
+      assert.match(system, /仍可回应已知文字，把不确定性限于缺失部分/)
+      assert.match(system, /一两句都可以/)
       assert.equal(context.previousBotReply, undefined)
       assert.equal(context.target.kind, 'other')
+      assert.ok(context.evidence.some(item => item.origin === 'quote' && item.speaker?.userId === '303' && item.text === scenario.quote.text))
       assert.ok(system.includes('他俩吃饭像饕餮。'))
     }
     if (scenario.id === 'serious-cooling-fault') {

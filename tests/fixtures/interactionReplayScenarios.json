@@ -28,11 +28,11 @@
   {
     "id": "unread-video-keeps-text",
     "rawUserText": "大家在聊吃饭，我刚吃完；视频里的吃法是什么？",
-    "expectedKind": "conversation",
+    "expectedKind": "serious_answer",
     "videoSource": "https://assets.example.invalid/unread-meal.mp4",
     "quote": { "userId": "303", "messageId": "other-bot-comment", "name": "另一只机器人", "text": "他俩吃饭像饕餮。" },
     "modelReply": "吃饭这个话题我跟上了。视频这段还没读到，你们说的是哪种吃法？",
-    "expect": "视频未读仅影响该素材；保留可读聊天，不把另一只机器人的话当作自己说过。"
+    "expect": "当前确实在问视频里的事实；仍保留已知吃饭文字，未读仅限制该素材，不编造吃法、不把另一只机器人的话当作自己说过，回复可简短自然。"
   },
   {
     "id": "ordinary-refusal",
