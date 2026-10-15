@@ -45,7 +45,7 @@ const SIGNAL_PATTERNS: [DiagnosticSignal, RegExp][] = [
   ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏/gu]
 ]
 interface Observation {signal: DiagnosticSignal; status: DiagnosticIncidentStatus}
-interface ParsedSource {source: DiagnosticSource; observations: Observation[]; correction: boolean; power?: DiagnosticContext['power']; cooled?: boolean; clearance: boolean}
+interface ParsedSource {source: DiagnosticSource; observations: Observation[]; correction: boolean; power?: DiagnosticContext['power']; cooled?: boolean; clearance: boolean; clearanceDenied: boolean}
 
 /** Stored user messages can contain somebody else's quoted words. Keep only their own prose. */
 function separateQuotedText(text: string): {text: string; unresolvedAttribution: boolean} {
@@ -102,17 +102,22 @@ function explicitSubject(text: string, speakerId?: string): DiagnosticSubject | 
   return mentions.sort((a, b) => a.index - b.index).at(-1)?.subject
 }
 
+function diagnosticClauses(text: string): string[] {
+  // Preserve question punctuation: removing it can turn a question into a report.
+  return text.match(/[^。！？!?；;\n，,]+[。！？!?；;\n，,]*/gu) || []
+}
+
 function subjectScopedText(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'>): string {
   let subject = source.subject
   const selected: string[] = []
-  for (const clause of source.text.split(/[。！？!?；;\n，,]/u)) {
+  for (const clause of diagnosticClauses(source.text)) {
     let explicit = explicitSubject(clause, source.userId)
     // The "I" inside an attributed quote belongs to its quoted speaker.
     if ((source.origin === 'quote' || source.origin === 'forward') && explicit?.kind === 'speaker_device' && explicit.userId === source.userId) explicit = source.subject
     if (explicit) subject = explicit
     if (subject.key === source.subject.key && clause.trim()) selected.push(clause)
   }
-  return selected.join('，')
+  return selected.join('')
 }
 
 function observations(text: string): Observation[] {
@@ -122,7 +127,7 @@ function observations(text: string): Observation[] {
       for (const match of clause.matchAll(pattern)) {
         const prefix = clause.slice(Math.max(0, match.index - 18), match.index)
         const suffix = clause.slice(match.index + match[0].length, match.index + match[0].length + 14)
-        const negated = /(?:没有|没(?:有|再)?|并无|无|未(?:见|闻到|出现)?|闻不到|看不到|不是|不曾|根本没)(?:真的|任何|明显|再|闻到|看到|出现|发生)?[的过了]?\s*$/u.test(prefix)
+        const negated = /(?:没有|没(?:有|再)?|并无|无|未(?:见|闻到|出现)?|闻不到|看不到|不是|不曾|根本没)(?:真的|任何|明显|再|闻到|看到|出现|发生)?(?:其他|其余|别的)?[的过了]?\s*$/u.test(prefix)
         const figurative = hasFigurativeFrame(clause) && !/(?:真的?|确实|实际|现在).{0,6}$/u.test(prefix)
         const hypothetical = HYPOTHETICAL.test(clause) || /(?:是否|有没有|会不会|会|可能(?:会)?|疑似)\s*$/u.test(prefix) || /^(?:了)?(?:吗|么|的话|怎么办才好)/u.test(suffix)
         const status: DiagnosticIncidentStatus = negated ? 'denied' : figurative ? 'figurative' : hypothetical ? 'unknown' : 'asserted'
@@ -141,11 +146,22 @@ function isReportedPowerOn(text: string): boolean {
   return /(?:我|现在|目前).{0,7}(?:已经|又|重新)?(?:开机了|通电了|还开着|还插着电|在运行|在满载)|还没断电|(?:电源线|插头).{0,5}还插着/u.test(text)
 }
 
+function deniesProfessionalClearance(text: string): boolean {
+  return /(?:没(?:有)?|尚未|还没|未曾|并未|未).{0,6}(?:检修|检查|维修|确认|确定|排除)|(?:不能|无法|没法|不敢|尚不能)(?:确认|确定|排除)|不确定|未经(?:专业)?(?:检修|检查)|不代表.{0,8}(?:确认|排除)/u.test(text)
+}
+
 function professionalClearance(text: string): boolean {
-  if (HYPOTHETICAL.test(text) || /尚未|还没|未曾|没排除|未排除|不能确认|不确定|没法确认|吗|么(?:[，。]|$)|是否|是不是|有没有|能否|要不要|等(?:到)?(?:维修|检修|师傅|专业)|待.{0,5}(?:检修|排查|确认)|(?:确认|排除).{0,14}(?:之后|以后|再开机|再通电|才(?:能|可))/u.test(text)) return false
-  return /维修(?:师傅|人员|工程师|店|点)|专业(?:维修|检修|人员)|售后|检修(?:师傅|人员)/u.test(text)
-    && /检修(?:完|完成|结束)|检查(?:完|完成|结束)|维修(?:完|完成|结束)|修好了|换好了|已经.{0,5}(?:检修|检查|更换|修复)/u.test(text)
-    && /(?:确认|确定).{0,12}(?:(?:没有|不存在|无)(?:电气|供电|电路)(?:损坏|故障|问题)|(?:可以|能够)(?:安全)?(?:通电|开机))|(?:已(?:经)?|明确).{0,3}排除.{0,5}(?:电气|供电|电路)(?:损坏|故障)|(?:电气|供电|电路)损坏.{0,4}已(?:经)?排除/u.test(text)
+  if (HYPOTHETICAL.test(text) || deniesProfessionalClearance(text)
+    || /等(?:到)?(?:维修|检修|师傅|专业)|待.{0,5}(?:检修|排查|确认)|(?:准备|打算|计划|将要|明天|稍后|预约).{0,12}(?:检修|检查|维修|更换|确认|排除)|(?:检查|检修|维修|确认|排除).{0,14}(?:之后|以后|再开机|再通电|才(?:能|可))/u.test(text)) return false
+  // A question about whether inspection happened is not evidence. An already
+  // reported inspection may still be followed by a separate question about the next step.
+  const clauses = diagnosticClauses(text)
+  const question = /[？?]|吗|么(?:[，。]|$)|是否|是不是|有没有|能否|要不要/u
+  if (clauses.some(clause => question.test(clause) && /检修|维修|师傅|专业|确认|确定|排除|检查(?:完|过|了|结束)|已(?:经)?.{0,8}检查/u.test(clause))) return false
+  const reported = clauses.filter(clause => !question.test(clause)).join('，')
+  return /维修(?:师傅|人员|工程师|店|点)|专业(?:维修|检修|人员)|售后|检修(?:师傅|人员)/u.test(reported)
+    && /检修(?:完|完成|结束)|检查(?:完|完成|结束)|维修(?:完|完成|结束)|(?:完成了?|做完了?)(?:检修|检查|维修)|修好了|换好了|已(?:经)?.{0,8}(?:检修|检查|更换|修复)/u.test(reported)
+    && /(?:确认|确定).{0,12}(?:(?:没有|不存在|无)(?:任何)?(?:其他|其余|别的)?的?(?:电气|供电|电路)(?:损坏|故障|问题)|(?:可以|能够)(?:安全)?(?:通电|开机))|(?:已(?:经)?|明确).{0,3}排除.{0,5}(?:电气|供电|电路)(?:损坏|故障)|(?:电气|供电|电路)损坏.{0,4}已(?:经)?排除/u.test(reported)
 }
 
 function parseSource(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'>): ParsedSource {
@@ -155,22 +171,22 @@ function parseSource(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'
   const statuses = obs.map(item => item.status)
   const incidentStatus = statuses.includes('asserted') ? 'asserted' : statuses.includes('unknown') ? 'unknown' : statuses.includes('denied') ? 'denied' : statuses.includes('figurative') ? 'figurative' : 'unknown'
   // Advice, questions and hypothetical steps are not reports that those steps happened.
-  const reportClauses = scopedText.split(/[。！？!?；;\n，,]/u).filter(clause => !HYPOTHETICAL.test(clause) && !/(?:建议|应该|应当|先去|请你|需要先|是不是|是否|要不要|能不能|该不该|吗|么|的话|之后|以后)/u.test(clause))
+  const reportClauses = diagnosticClauses(scopedText).filter(clause => !HYPOTHETICAL.test(clause) && !/[？?]|(?:建议|应该|应当|先去|请你|需要先|是不是|是否|要不要|能不能|该不该|吗|么|的话|之后|以后)|(?:等(?:到)?|待)(?:它|机器)?(?:完全)?(?:冷却|凉透|放凉)|(?:冷却|凉透|放凉)后/u.test(clause))
   let power: DiagnosticContext['power'] | undefined
   for (const clause of reportClauses) {
     if (/(?:没有|没|尚未|还没|未)(?:有)?(?:拔(?:掉|下)?(?:电源(?:线)?|插头)|断电|隔离电源)|(?:电源线|插头).{0,4}(?:没|没有|未|尚未)拔/u.test(clause)) power = 'unknown'
     else if (isReportedPowerOn(clause) || /(?:又|重新).{0,6}插(?:回|上).{0,5}(?:电源|插头)|(?:电源线|插头).{0,5}(?:又|重新)插(?:回|上)/u.test(clause)) power = 'on'
     else if (!separated.unresolvedAttribution && isReportedPowerOff(clause)) power = 'off'
   }
-  const notCooled = reportClauses.some(clause => /(?:还没|没有|尚未|未)(?:完全)?(?:冷却|凉透)|(?:现在|仍然|还).{0,3}(?:烫|很热)/u.test(clause))
-  const cooled = !separated.unresolvedAttribution && reportClauses.some(clause => /(?:已经|已|现在).{0,5}(?:完全)?(?:冷却|凉透)|(?:冷却|凉透)了/u.test(clause))
+  const notCooled = reportClauses.some(clause => /(?:还没|没有|尚未|未)(?:完全)?(?:冷却|凉透|放凉)|(?:现在|仍然|还).{0,3}(?:烫|很热)/u.test(clause))
+  const cooled = !separated.unresolvedAttribution && reportClauses.some(clause => /(?:已经|已|现在).{0,5}(?:完全)?(?:冷却|凉透|放凉)|(?:冷却|凉透|放凉)了/u.test(clause))
   const transientFactsFresh = source.origin === 'current' || source.transientFactsFresh === true
   // Old observations still establish an unresolved incident. They cannot prove
   // the plug or temperature remains in that old state now.
   if (!transientFactsFresh && power !== undefined) power = 'unknown'
   return {
     source: {...source, text: scopedText, incidentStatus, signals: [...new Set(obs.map(item => item.signal))]}, observations: obs,
-    correction: REPORT_CORRECTION.test(scopedText), clearance: !separated.unresolvedAttribution && professionalClearance(scopedText),
+    correction: REPORT_CORRECTION.test(scopedText), clearance: !separated.unresolvedAttribution && professionalClearance(scopedText), clearanceDenied: deniesProfessionalClearance(scopedText),
     ...(power ? {power} : {}),
     ...(notCooled ? {cooled: false} : cooled ? {cooled: transientFactsFresh} : {})
   }
@@ -231,7 +247,8 @@ export function buildDiagnosticContext(input: DiagnosticContextInput): Diagnosti
     }
     if (item.power) {power = item.power; if (power === 'on') cooled = false}
     if (item.cooled !== undefined) cooled = item.cooled
-    if (item.clearance) damageExclusion = 'reported_professional_clearance'
+    if (item.clearanceDenied) damageExclusion = 'unknown'
+    else if (item.clearance) damageExclusion = 'reported_professional_clearance'
   }
   const states = [...signalStates.values()]
   const status: DiagnosticIncidentStatus = states.includes('asserted') ? 'asserted' : states.includes('unknown') ? 'unknown' : states.includes('denied') ? 'denied' : states.includes('figurative') ? 'figurative' : 'unknown'
@@ -256,8 +273,11 @@ export function buildDiagnosticContextPrompt(context?: DiagnosticContext): strin
   } else {
     if (context.allowedChecks.includes('static_observation')) lines.push('静态观察以实际停机、隔离电源并冷却为前提；它不能验证风扇、水泵正在运行。尚缺前提须作为先后条件说明，不得写成已执行。')
     if (context.unmetPrerequisites.includes('electrical_damage_excluded')) lines.push('电气损坏仍未排除：本轮只可安排隔离、冷却后的静态观察及专业检修，运行检测的前提尚不成立。没有烧痕、气味散去或温度下降均不是专业排除电气损坏的证据。')
-    else if (context.damageExclusion === 'reported_professional_clearance') lines.push('用户明确报告同一对象已完成专业检修并排除电气损坏；这不是独立认证。仅在报告确认的范围、外壳复原且不接触带电或运动部件的条件下描述运行监测。')
+    else if (context.damageExclusion === 'reported_professional_clearance') lines.push('用户明确报告同一对象已完成专业检修并排除电气损坏；这不是独立认证。检修放行仅覆盖报告确认的对象、故障与检查范围，不保证整机绝对安全。')
     else lines.push('没有真实电气异常报告，勿凭温度或玩笑虚构烧毁；常规运行监测与断电静态观察分开，各自满足前提。')
+    if (context.allowedChecks.includes('operational_monitoring')) lines.push('用户侧先确认外壳复原，再做非接触运行监测；不得安排开侧板凑近通电观察或主动嗅闻。')
+    lines.push('任何硬件拆接、换插板卡或硬盘、重新插紧线缆，都必须先关机、拔下电源线并确认隔离；仅关机不等于断电。需要内部带电检测的步骤交现场专业人员按工序进行，用户不要触摸、凑近观察或嗅闻；初步点亮、BIOS读数或短时运行不能证明整机安全，风扇停转也须结合零转速策略判断。')
+    if (context.sources.some(source => /温度|满载|℃|°C|TjMax|Tcase/iu.test(source.text))) lines.push('温度判断需要具体部件型号、测点与负载等依据，并结合规格、功耗、环境和实际限频情况；单个温度读数本身不能保证正常或安全。型号和测点未知时先说明判断范围或补问关键条件；正常运行、无烟无味或自动降频保护都不是整机健康证明。')
   }
   for (const source of context.sources.slice(-4)) lines.push(`依据 ${source.origin}${source.messageId ? `/${source.messageId}` : ''}${source.origin !== 'current' && !source.transientFactsFresh ? '（旧状态或时间未明，不证明当前供电和冷却状态）' : ''}：${safeTruncateUnicode(source.text, 260)}`)
   return lines.join('\n')

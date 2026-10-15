@@ -137,6 +137,103 @@ test('only explicit completed professional repair and clearance of the same devi
   assert.ok(!context.unmetPrerequisites.includes('electrical_damage_excluded'))
 })
 
+test('the frozen real-fault three-turn wording updates reported cooling and professional clearance', () => {
+  // Exact user turns from real-burning-fault-no-visible-mark-then-inspection.
+  const inputs = [
+    '认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？',
+    '认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？',
+    '维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？'
+  ]
+  const now = Date.parse('2026-10-15T06:00:00+08:00')
+  const prior: DiagnosticHistoryMessage[] = []
+  const contexts = inputs.map((rawUserText, turnIndex) => {
+    const context = buildDiagnosticContext({rawUserText, speakerId, now: now + turnIndex * 1000, history: prior})!
+    prior.push({role: 'user', userId: speakerId, text: rawUserText, at: now + turnIndex * 1000})
+    return context
+  })
+  assert.equal(contexts[0]!.incident.status, 'asserted')
+  assert.deepEqual(contexts[0]!.allowedChecks, ['static_observation'])
+  assert.equal(contexts[1]!.power, 'off')
+  assert.deepEqual(contexts[1]!.unmetPrerequisites, ['electrical_damage_excluded'])
+  assert.deepEqual(contexts[1]!.allowedChecks, ['static_observation'], 'cooling and no marks do not clear damage')
+  const cleared = contexts[2]!
+  assert.equal(cleared.incident.status, 'asserted', 'the initial incident remains in the history')
+  assert.equal(cleared.sources.at(-1)!.incidentStatus, 'denied', 'no other electrical damage is a negation')
+  assert.equal(cleared.damageExclusion, 'reported_professional_clearance')
+  assert.ok(cleared.allowedChecks.includes('operational_monitoring'))
+  assert.ok(!cleared.unmetPrerequisites.includes('electrical_damage_excluded'))
+})
+
+test('completed professional clearance accepts limited negative modifiers and a separate next-step question', () => {
+  for (const negativeFinding of ['没有其他电气损坏', '没有其他的电气损坏', '不存在任何其他供电故障', '无其余电路问题']) {
+    const rawUserText = `维修师傅已经检查了我的电脑，确认${negativeFinding}。现在能开机吗？`
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.equal(context.damageExclusion, 'reported_professional_clearance', rawUserText)
+    assert.ok(context.allowedChecks.includes('operational_monitoring'), rawUserText)
+    assert.equal(context.power, 'unknown', 'inspection does not report current power isolation')
+  }
+})
+
+test('negative, interrogative and future versions of the repaired-device report never grant clearance', () => {
+  for (const rawUserText of [
+    '维修师傅还没检查这台机器，不能确认没有其他电气损坏。现在能开机吗？',
+    '维修师傅已经检查了这台机器，但没有确认没有其他电气损坏。',
+    '专业人员检查完了，但还不能排除其他电气损坏。',
+    '维修师傅已经检查了这台机器，尚未排除其他电气损坏。',
+    '维修师傅已经检查了这台机器，确认没有其他电气损坏了吗？',
+    '维修师傅已经检查了这台机器，确认没有其他电气损坏？',
+    '维修师傅已经检查了这台机器，确认没有其他电气损坏?',
+    '维修师傅是否已经检查了这台机器，确认没有其他电气损坏？',
+    '如果维修师傅已经检查了这台机器，确认没有其他电气损坏，我能开机吗？',
+    '等维修师傅检查完了这台机器，确认没有其他电气损坏再开机。',
+    '维修师傅准备检查完这台机器，确认没有其他电气损坏。',
+    '维修师傅明天检查完这台机器，确认没有其他电气损坏。'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.equal(context.damageExclusion, 'unknown', rawUserText)
+    assert.ok(!context.allowedChecks.includes('operational_monitoring'), rawUserText)
+  }
+})
+
+test('a current correction retracts an earlier reported professional clearance', () => {
+  const context = buildDiagnosticContext({rawUserText: '刚才说错了，维修师傅根本没有检查这台机器，也没有确认是否安全。现在怎么办？', speakerId, history: [...history,
+    {role: 'user', userId: speakerId, text: '维修师傅已经检查了我的电脑，确认没有其他电气损坏。'}
+  ]})!
+  assert.equal(context.damageExclusion, 'unknown')
+  assert.ok(!context.allowedChecks.includes('operational_monitoring'))
+})
+
+test('the same repaired-device wording about another device or speaker does not clear the current incident', () => {
+  for (const rawUserText of [
+    '维修师傅已经检查了朋友的电脑，更换了损坏电源，确认没有其他电气损坏。我的电脑现在能通电吗？',
+    '维修师傅已经检查了另一台机器，更换了损坏电源，确认没有其他电气损坏。我的电脑现在能通电吗？'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.equal(context.damageExclusion, 'unknown', rawUserText)
+    assert.ok(!context.allowedChecks.includes('operational_monitoring'), rawUserText)
+  }
+  const otherSpeaker = buildDiagnosticContext({rawUserText: '我的电脑现在能通电吗？', speakerId, history: [...history,
+    {role: 'user', userId: '303', text: '维修师傅已经检查了刚才这台机器，更换了损坏电源，确认没有其他电气损坏。'}
+  ]})!
+  assert.equal(otherSpeaker.damageExclusion, 'unknown')
+  assert.ok(!otherSpeaker.allowedChecks.includes('operational_monitoring'))
+})
+
+test('punctuation-only questions and pending cooling cannot become current physical-state reports', () => {
+  for (const rawUserText of [
+    '我已经拔掉电源线？机器完全凉透了？',
+    '我已经拔掉电源线?机器完全放凉了?',
+    '等机器完全放凉了，再拔掉电源线检查。'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.equal(context.power, 'unknown', rawUserText)
+    assert.ok(context.unmetPrerequisites.includes('cooled'), rawUserText)
+  }
+  const stillHot = buildDiagnosticContext({rawUserText: '已经断电了，但是还没放凉，怎么检查？', speakerId, history})!
+  assert.equal(stillHot.power, 'off')
+  assert.ok(stillHot.unmetPrerequisites.includes('cooled'))
+})
+
 test('pending, uncertain, hypothetical or visual-only inspection does not certify electrical clearance', () => {
   for (const rawUserText of [
     '如果维修师傅检查完了，确认没有电气损坏，能开机吗？',
@@ -304,4 +401,26 @@ test('prompt renders factual provenance and unmet step conditions without a cann
   assert.match(prompt, /电气损坏仍未排除/)
   assert.match(prompt, /history\/incident-1/)
   assert.equal(buildDiagnosticContextPrompt(undefined), '')
+})
+
+test('clearance prompt bounds the confirmed scope and separates user monitoring from internal powered work', () => {
+  const context = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认没有其他电气损坏。现在能先测什么？', speakerId, history})!
+  const prompt = buildDiagnosticContextPrompt(context)
+  assert.match(prompt, /检修放行仅覆盖报告确认的对象、故障与检查范围/)
+  assert.match(prompt, /外壳复原.*非接触运行监测/)
+  assert.match(prompt, /必须先关机、拔下电源线并确认隔离/)
+  assert.match(prompt, /内部带电检测的步骤交现场专业人员/)
+  assert.match(prompt, /初步点亮、BIOS读数或短时运行不能证明整机安全/)
+  assert.doesNotMatch(prompt, /电气损坏仍未排除/)
+})
+
+test('temperature prompt requires the component, measurement and workload basis without inventing an accident', () => {
+  const context = buildDiagnosticContext({rawUserText: '认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
+  const prompt = buildDiagnosticContextPrompt(context)
+  assert.equal(context.incident.status, 'denied')
+  assert.ok(context.allowedChecks.includes('operational_monitoring'))
+  assert.match(prompt, /具体部件型号、测点与负载等依据/)
+  assert.match(prompt, /单个温度读数本身不能保证正常或安全/)
+  assert.match(prompt, /正常运行、无烟无味或自动降频保护都不是整机健康证明/)
+  assert.doesNotMatch(prompt, /电气损坏仍未排除/)
 })
