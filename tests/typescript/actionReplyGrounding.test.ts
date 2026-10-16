@@ -302,9 +302,13 @@ test('delivery rejection and interception share task scope without borrowing an 
   for (const text of [
     '做好了，只是之前投递被拒，卡在发不出去这一步。',
     '图其实早就出好了，就是之前发给你的时候被拦下来了，没送出去。',
-    '做好了，只是上次发的时候被拦下来，不是没做完。'
+    '做好了，只是上次发的时候被拦下来，不是没做完。',
+    '图做好了。不过之前发的时候投递被拒了，具体原因我没查到。'
   ]) assert.ok(validateActionReply(text, failedDelivery, raw).some(item=>item.code==='unsupported_delivery'), text)
-  for (const subject of ['之前那次投递', '只是上次发的时候', '就是之前发给你的时候', '我之前给你发的图片', '那张图的投递']) {
+  for (const subject of [
+    '之前那次投递', '只是上次发的时候', '就是之前发给你的时候', '我之前给你发的图片', '那张图的投递',
+    '不过之前发的时候投递', '只是上次发送时投递', '那张图的发送投递', '我之前给你发的时候消息投递'
+  ]) {
     for (const cause of ['被拒', '被拒绝', '被拒收', '被拦截', '被拦下', '被拦下来', '被屏蔽', '被平台拦截']) {
       const text = `${subject}${cause}了。`
       assert.ok(validateActionReply(text, failedDelivery, raw).some(item=>item.code==='unsupported_delivery'), text)
@@ -316,15 +320,20 @@ test('delivery rejection and interception share task scope without borrowing an 
     '如果上次发的时候被拦截了，可以检查一下。', '不能认定之前投递被拒绝。',
     '上次发的时候没有被拦截。', '之前投递并没有被拒。', '不是图片被屏蔽了。',
     '只是上次发的时候被拦下来了吗？', '就是之前投递被拒吗？',
+    '不过之前发的时候投递没有被拒。', '不过之前发的时候投递被拦下来了？',
+    '如果之前发的时候投递被拒，可以检查一下。',
     '“之前投递被拒”只是个假设。', '例如上次发的时候被拦下来。',
     '只是上次邀请被拒了。', '我的邀请被拒绝了。', '只是她的包裹被拦截了。',
-    '妹妹的包裹被拒收了。', '只是他上次发的图被屏蔽了。', '之前寄包裹的时候被拒收了。'
+    '妹妹的包裹被拒收了。', '只是他上次发的图被屏蔽了。', '之前寄包裹的时候被拒收了。',
+    '不过之前发邀请的时候投递被拒了。', '之前发妹妹的包裹时投递被拒收了。'
   ]) assert.deepEqual(validateActionReply(text, failedDelivery, raw), [], text)
   for (const [text, report] of [
     ['图片被拦截了。', '我刚才拦截了你发的图。'],
     ['图片被屏蔽了。', '我屏蔽了你发的图。'],
     ['图片被拒绝了。', '我拒收了你刚才发的图。'],
-    ['图片被拦下来了。', '刚才那张图片被拦截了。']
+    ['图片被拦下来了。', '刚才那张图片被拦截了。'],
+    ['不过之前发的时候投递被拒了，具体原因还没查到。', '刚才那张图片被拒收了。'],
+    ['不过之前发的时候投递被拦下来了。', '之前发的时候投递被拦截了。']
   ]) assert.deepEqual(validateActionReply(text!, failedDelivery, report!), [], text)
   assert.ok(validateActionReply('图片被拒绝了。', failedDelivery, '我屏蔽了你发的图。').some(item=>item.code==='unsupported_delivery'))
   assert.ok(validateActionReply('图片被拦截了。', failedDelivery, '如果我拦截了你发的图呢？').some(item=>item.code==='unsupported_delivery'))
@@ -373,4 +382,48 @@ test('an assertion of no delivery requires a failed or unattempted delivery rath
     '我妹妹没送出去。', '没有发出邀请。'
   ]) assert.deepEqual(validateActionReply(text, facts(), raw), [], text)
   for (const text of ['没送出去。', '没发出来过。']) assert.deepEqual(validateActionReply(text, facts(), '你把邀请发出去了吗？'), [], text)
+})
+
+test('artifact status grammar includes colloquial completion verbs and a topic connector without absorbing third-party activity', () => {
+  const raw = '第一张图出来了吗？'
+  const available = facts([fact({result:'available'})])
+  const unavailable = facts([fact({result:'unavailable'})])
+  assert.ok(validateActionReply('第一张图的还没弄好，这边没看到结果。', facts(), raw).some(item=>item.code==='unsupported_task_state'))
+  for (const topic of ['图', '这张图', '第一张图', '第一张图的']) {
+    for (const completion of ['弄好', '弄完']) {
+      const negative = `${topic}还没${completion}。`
+      const positive = `${topic}已经${completion}了。`
+      assert.ok(validateActionReply(negative, facts(), raw).some(item=>item.code==='unsupported_task_state'), negative)
+      assert.ok(validateActionReply(negative, available, raw).some(item=>item.code==='unsupported_task_state'), negative)
+      assert.deepEqual(validateActionReply(negative, unavailable, raw), [], negative)
+      assert.ok(validateActionReply(positive, facts(), raw).some(item=>item.code==='unsupported_task_state'), positive)
+      assert.ok(validateActionReply(positive, unavailable, raw).some(item=>item.code==='unsupported_task_state'), positive)
+      assert.deepEqual(validateActionReply(positive, available, raw), [], positive)
+    }
+  }
+  for (const question of ['图弄好了吗？', '第一张图弄完了吗？']) {
+    assert.ok(validateActionReply('还没呢。', facts(), question).some(item=>item.code==='unsupported_task_state'), question)
+  }
+  for (const text of [
+    '我妹妹的图已经画好了。', '我妹妹的图还没弄好。', '她的图已经弄完了。',
+    '第一张图的还没弄好吗？', '第一张图可能还没弄完。',
+    '第一张图的是否弄好还没确认。', '没有记录说明第一张图已经弄好了。',
+    '“第一张图的还没弄好”只是个例子。', '如果第一张图还没弄好，可以再核实。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), raw), [], text)
+  const unrelatedVideo = facts([fact({toolName:'videoTool',result:'unavailable'})])
+  assert.ok(validateActionReply('图的还没弄好。', unrelatedVideo, raw).some(item=>item.code==='unsupported_task_state'))
+})
+
+
+test('an omitted send verb after artifact completion still needs a matching callback', () => {
+  const reminder = facts([fact({source:'reminder',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam'}})])
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const text of ['有了结果我再单独给你。', '图好了我再给你。', '有结果就给你。']) {
+    assert.ok(validateActionReply(text, facts(), '刚才的图出来了吗？').some(item=>item.code==='unregistered_followup'), text)
+    assert.ok(validateActionReply(text, reminder, '刚才的图出来了吗？').some(item=>item.code==='unregistered_followup'), text)
+    assert.deepEqual(validateActionReply(text, live, '刚才的图出来了吗？'), [], text)
+  }
+  for (const text of ['我给你一个抱抱。', '有了结果我再给你解释。', '有了结果我不会给你。', '有了结果我再给你吗？', '“有了结果我再单独给你”不能保证。', '她图好了会给你。']) {
+    assert.deepEqual(validateActionReply(text, facts(), '刚才的图出来了吗？'), [], text)
+  }
 })

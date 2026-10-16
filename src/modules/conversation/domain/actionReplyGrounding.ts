@@ -23,7 +23,7 @@ function assertions(text: string): ReplySentence[] {
 const NON_ASSERTION = /不能(?:确认|说明|证明|保证|承诺|断定|说)|无法(?:确认|核实|保证)|不(?:确定|清楚|保证|承诺|代表|等于|证明)|没(?:有)?证据|未确认|没确认|尚不知|还不知道|不是|并非|是否|有没有|能否|是不是|会不会|不一定|可能|也许|似乎/u
 const WORDING_EXAMPLE = /例如|比如|举例|示例|假设|这句话|这种说法|这段话|不要(?:说|写|回复)|别(?:说|写|回复)|不能(?:说|写|回复)|(?:用户|别人|他|她|你)(?:说|问|写)(?:的|过|了)?/u
 const OTHER_SUBJECT = /^(?:(?:我|你)(?:妈|爸|姐姐|妹妹|哥哥|弟弟|朋友|同事)|姐姐|妹妹|哥哥|弟弟|妈妈|爸爸|他(?:们)?|她(?:们)?|CPU|GPU|电脑|设备|程序|服务器)/iu
-const TASK_TOPIC = /(?:任务|出图|生成|改图|画图|重跑|重试|进度|回执|投递)|(?:图(?:片)?|成品|结果|文件).{0,16}(?:出来|好了吗|做好|完成|发给我|发我|发送|发出|发了|怎么样)/u
+const TASK_TOPIC = /(?:任务|出图|生成|改图|画图|重跑|重试|进度|回执|投递)|(?:图(?:片)?|成品|结果|文件).{0,16}(?:出来|好了吗|做好|弄(?:好|完)|完成|发给我|发我|发送|发出|发了|怎么样)/u
 
 type EvidenceTopic = 'image' | 'video' | 'file' | 'artifact' | 'reminder' | 'generic' | 'unknown' | 'ambiguous'
 function evidenceTopic(rawText: string): EvidenceTopic {
@@ -34,7 +34,7 @@ function evidenceTopic(rawText: string): EvidenceTopic {
   const artifactCompletion = /(?:图(?:片)?|成品|结果|文件|出图|生成|改图|画图)/u.test(text) && completionBefore(text) >= 0
   if (reminder && !artifactCompletion) return 'reminder'
   const kinds: EvidenceTopic[] = []
-  if (/图片|成品图|成图|出图|改图|画图|(?:第[一二三四五六七八九十\d]+张|这张|那张|原图)|图(?=已经|已|还|尚|没|未|正|在|生成|出来|好|发|一|了|呢|吗|，|,|$)/u.test(text)) kinds.push('image')
+  if (/图片|成品图|成图|出图|改图|画图|(?:第[一二三四五六七八九十\d]+张|这张|那张|原图)|图(?=已经|已|还|尚|没|未|正|在|生成|出来|好|弄|的|发|一|了|呢|吗|，|,|$)/u.test(text)) kinds.push('image')
   if (/视频|影片/u.test(text)) kinds.push('video')
   if (/文件|报告|表格|工作簿|Excel|文档|PDF/iu.test(text)) kinds.push('file')
   if (kinds.length > 1) return 'ambiguous'
@@ -77,13 +77,13 @@ function unasserted(clause: string, question = false): boolean {
 // Only these grammatical subjects establish task scope by themselves. Loose
 // substrings such as “姐姐已经做好了饭” and “CPU正在处理指令” do not.
 const ARTIFACT = '(?:图片|成品图|成图|图|成品|结果|文件|产物|视频|报告)'
-const SUBJECT_PREFIX = '(?:(?:这|那)(?:张|份|个)?|刚才(?:那(?:张|份|个))?|之前(?:那(?:张|份|个))?|你要的|你让我(?:做|画|改|生成)的)?'
+const SUBJECT_PREFIX = '(?:第[一二三四五六七八九十0-9]+张|(?:这|那)(?:张|份|个)?|刚才(?:那(?:张|份|个))?|之前(?:那(?:张|份|个))?|你要的|你让我(?:做|画|改|生成)的)?'
 const ARTIFACT_SUBJECT = `${SUBJECT_PREFIX}${ARTIFACT}`
 const TASK_SUBJECT = `${SUBJECT_PREFIX}(?:任务|请求|处理|生成|改图|画图)`
 const PARTICLES = '(?:[呀啊啦咯喽欸呢哦哈吧～~]*)'
 const PAST = '(?:已经|已|刚才|刚刚|早就)?'
-const READY = `${PAST}(?:出来|做好|完成|生成好|生成完|改好|画好|画完|做完|好)(?:了|啦)?`
-const ABSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:跑出来|出来|做好|完成|生成(?:好|出)?|改好|产出|画完)|没(?:有)?(?:跑到|生成出|产出)(?:结果|成品))'
+const READY = `${PAST}(?:出来|做好|弄好|弄完|完成|生成好|生成完|改好|画好|画完|做完|好)(?:了|啦)?`
+const ABSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:跑出来|出来|做好|弄(?:好|完)|完成|生成(?:好|出)?|改好|产出|画完)|没(?:有)?(?:跑到|生成出|产出)(?:结果|成品))'
 const RUNNING = '(?:(?:还(?:在)?|仍(?:然)?(?:在)?|正在|目前(?:还)?在|现在(?:还)?在|在)(?:生成|处理|制作|画图|改图|运行|跑)(?:中|着)?|(?:生成|处理|制作|运行|执行)中)'
 const QUEUED = '(?:(?:还|仍|正在|目前|现在)?在排队|排队中)'
 const FAILED = `${PAST}(?:失败|没跑成|中断|出错)(?:了|啦)?`
@@ -91,12 +91,12 @@ const COMPLETED = `${PAST}(?:(?:执行|处理|生成)?(?:完成|结束)|处理�
 const SENT = '(?:(?:已经|已|刚才|刚刚|早就)(?:给你发|发给你|发你|发出|发过|发送|送达|投递)(?:了|过(?:了)?)?|(?:给你发|发给你|发你|发出|发送|送达|投递|发到(?:群里|这里|上面))(?:了|过了)|发过了|在上面了)'
 const UNSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:给你)?(?:发|发送|投递|送)(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出(?:来|去)?|达)?(?:过(?:了)?|了)?)'
 const IMPLICIT_PREFIX = '(?:(?:我这边|这边|我|目前|现在|刚才那步)(?:已经|已)?(?:把)?|刚才|刚刚)?'
-const explicitState = (subject: string, state: string) => new RegExp(`^${subject}(?:这边)?${state}${PARTICLES}$`, 'u')
+const explicitState = (subject: string, state: string) => new RegExp(`^${subject}(?:的)?(?:这边)?${state}${PARTICLES}$`, 'u')
 const implicitState = (state: string) => new RegExp(`^${IMPLICIT_PREFIX}${state}${PARTICLES}$`, 'u')
 
 interface StateClaim {dimension: 'ready' | 'absent' | 'running' | 'queued' | 'failed' | 'completed' | 'sent' | 'unsent'; explicit: RegExp[]; implicit: RegExp}
 const STATE_CLAIMS: StateClaim[] = [
-  {dimension: 'ready', explicit: [explicitState(ARTIFACT_SUBJECT, READY)], implicit: implicitState(`${PAST}(?:出来|做好|生成好|生成完|改好|画好|画完|做完)(?:了|啦)?`)},
+  {dimension: 'ready', explicit: [explicitState(ARTIFACT_SUBJECT, READY)], implicit: implicitState(`${PAST}(?:出来|做好|弄好|弄完|生成好|生成完|改好|画好|画完|做完)(?:了|啦)?`)},
   {dimension: 'absent', explicit: [explicitState(ARTIFACT_SUBJECT, ABSENT)], implicit: implicitState(ABSENT)},
   {dimension: 'running', explicit: [explicitState(ARTIFACT_SUBJECT, RUNNING), explicitState(TASK_SUBJECT, RUNNING)], implicit: implicitState(RUNNING)},
   {dimension: 'queued', explicit: [explicitState(ARTIFACT_SUBJECT, QUEUED), explicitState(TASK_SUBJECT, QUEUED)], implicit: implicitState(QUEUED)},
@@ -105,16 +105,16 @@ const STATE_CLAIMS: StateClaim[] = [
   {dimension: 'sent', explicit: [explicitState(ARTIFACT_SUBJECT, SENT), new RegExp(`^(?:我(?:这边)?|这边)?${PAST}把${ARTIFACT_SUBJECT}(?:发给你|发出|发送|送达|投递)了${PARTICLES}$`, 'u')], implicit: implicitState(SENT)},
   {dimension: 'unsent', explicit: [explicitState(ARTIFACT_SUBJECT, UNSENT)], implicit: implicitState(UNSENT)}
 ]
-const REFERENCED_IMAGE_STATE = /^(?:第[一二三四五六七八九十\d]+张|这张|那张)(?:图|图片)?(?:我(?:这边)?|这边)?(.+)$/u
+const REFERENCED_IMAGE_STATE = /^(?:第[一二三四五六七八九十\d]+张|这张|那张)(?:图|图片)?(?:的)?(?:我(?:这边)?|这边)?(.+)$/u
 const BARE_ABSENT_ANSWER = new RegExp(`^还没(?:有)?${PARTICLES}$`, 'u')
-const RESULT_STATUS_QUESTION = new RegExp(`(?:${ARTIFACT_SUBJECT}|第[一二三四五六七八九十\\d]+张(?:图|图片)?)(?:[，,]\\s*)?(?:现在|目前|已经|还|到底)?(?:出来|做好|完成|生成(?:好|完)|改好|画(?:好|完)|弄好|做完|好)(?:了|啦)?(?:没(?:有)?|[吗么])?${PARTICLES}$`, 'u')
+const RESULT_STATUS_QUESTION = new RegExp(`(?:${ARTIFACT_SUBJECT}|第[一二三四五六七八九十\\d]+张(?:图|图片)?)(?:[，,]\\s*)?(?:现在|目前|已经|还|到底)?(?:出来|做好|完成|生成(?:好|完)|改好|画(?:好|完)|弄(?:好|完)|做完|好)(?:了|啦)?(?:没(?:有)?|[吗么])?${PARTICLES}$`, 'u')
 
 function asksArtifactResult(rawUserText: string): boolean {
   return assertions(rawUserText).some(sentence => !OTHER_SUBJECT.test(sentence.text) && !WORDING_EXAMPLE.test(sentence.text)
     && (sentence.question || /[吗么]|没(?:有)?$/u.test(sentence.text)) && RESULT_STATUS_QUESTION.test(sentence.text))
 }
 
-const ASYNC_ACTION = /发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度/gu
+const ASYNC_ACTION = /发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)/gu
 const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
@@ -171,6 +171,10 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
       || OTHER_SUBJECT.test(actionPrefix) && !/我(?:会|来|再|就|到时|稍后)/u.test(actionPrefix)
       || /(?:他|她|别人)(?:会|来|再|到时)/u.test(actionPrefix)) continue
     const completion = completionBefore(before)
+    // A bare handoff after completion still promises later delivery. Ordinary
+    // gifts or an explanation supplied in this reply are outside this form.
+    const implicitHandoff = /^(?:单独)?给(?:你|您)$/u.test(match[0])
+    if (implicitHandoff && completion < 0) continue
     // “再发” may itself consume the “再” in “你再来问我，我再发”.
     const trigger = [...sentence.text.slice(0, match.index! + match[0].length).matchAll(USER_TRIGGER)].at(-1)
     if (trigger && trigger.index! + trigger[0].length >= completion) continue
@@ -178,7 +182,7 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
     // comma (“不能承诺图好了，我会发你”). An unrelated earlier clause does not.
     const conditionPrefix = completion >= 0 ? before.slice(0, completion).split(/[，,]/u).at(-1) || '' : actionPrefix
     if (NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
-    const delivery = /发|投递|补给|补上/u.test(match[0])
+    const delivery = implicitHandoff || /发|投递|补给|补上/u.test(match[0])
     if ((delivery || RERUN_OR_POLL.test(match[0]))
       && (IMMEDIATE_ACTION.test(actionPrefix) || completion < 0 && PRESENT_SELF_ACTION.test(actionPrefix))) {
       // Text supplied in this very reply needs no separate tool execution.
@@ -230,9 +234,23 @@ function stateSupported(dimension: StateClaim['dimension'], tasks: TurnTaskFact[
 const RECIPIENT_DELIVERY_CAUSE = /(?:你(?:那边|这边)?|接收方|收件方)(?:的)?(?:接收(?:设置|权限)?|收图(?:设置|权限)?|陌生人消息(?:设置|权限)?)[^，,。；;!?！？]{0,10}(?:拦住|拦在|拦截|挡住|拒收|屏蔽)|(?:你(?:那边|这边)?|接收方|收件方)(?:已经|已|把)?(?:图片|图|文件|消息|视频|我发的图)?(?:给)?(?:拒收|拒绝接收|屏蔽|拦截)(?:了)?|你(?:那边|这边)?(?:的)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|你(?:那边|这边)?(?:把)?(?:陌生人)?(?:图片|文件|消息|视频)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了|屏蔽了)|你(?:那边|这边)?(?:的)?(?:接收(?:开关|权限)?|收图)(?:是)?(?:关闭|关着|没开|未开|禁用)(?:的|了)?/u
 const DELIVERY_EVENT = '(?:(?:发|发送|投递|送达|送)(?:给(?:你|您)|(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出(?:来|去)?)?|给(?:你|您)(?:发|发送))'
 const DELIVERY_CAUSE_WORDS = '(?:拒收|拒绝(?:接收)?|拒|拦截|拦(?:下(?:来)?|住)|屏蔽)'
-// The grammar describes our artifact or its delivery, rather than any noun
-// followed by a rejection verb (an invitation or somebody else's parcel).
-const PASSIVE_DELIVERY_CAUSE = new RegExp(`^(?:只是|就是|不过|但是|但|其实|也|我(?:这边)?|这边|(?:上次|这次|那次|之前(?:那次)?|刚才(?:那次)?)(?:的)?)*(?:(?:${ARTIFACT_SUBJECT}|消息)(?:的?${DELIVERY_EVENT})?|${DELIVERY_EVENT}(?:的?(?:${ARTIFACT_SUBJECT}|消息))?)?(?:的?时候|时)?(?:已经|已|又|还|仍然|就|直接)*(?:被|遭(?:到)?)(?:(?:你|您|对方|接收方|收件方|平台|系统)(?:给)?)?(${DELIVERY_CAUSE_WORDS})`, 'u')
+const PASSIVE_DELIVERY_CAUSE = new RegExp(`(?:被|遭(?:到)?)(?:(?:你|您|对方|接收方|收件方|平台|系统)(?:给)?)?(${DELIVERY_CAUSE_WORDS})`, 'gu')
+const DELIVERY_PREFIX_PART = new RegExp(`^(?:只是|就是|不过|但是|但|其实|也|我(?:这边)?|这边|(?:上次|这次|那次|之前(?:那次)?|刚才(?:那次)?)(?:的)?|${ARTIFACT_SUBJECT}|消息|${DELIVERY_EVENT}|的?时候|的|时|已经|已|又|还|仍然|就|直接)`, 'u')
+
+function passiveDeliveryCause(clause: string): string | undefined {
+  for (const match of clause.matchAll(PASSIVE_DELIVERY_CAUSE)) {
+    let prefix = clause.slice(0, match.index).trim()
+    // A delivery can be restated (“发的时候投递被拒”). Consume only
+    // task-delivery grammar, preserving invitations and third-party parcels.
+    while (prefix) {
+      const part = DELIVERY_PREFIX_PART.exec(prefix)
+      if (!part) break
+      prefix = prefix.slice(part[0].length).trimStart()
+    }
+    if (!prefix) return match[1]
+  }
+  return undefined
+}
 
 function deliveryCauseKind(cause: string): string {
   return /^拒/u.test(cause) ? 'rejection' : cause === '屏蔽' ? 'screening' : 'interception'
@@ -242,19 +260,19 @@ function reportedPassiveCause(rawUserText: string, cause: string): boolean {
   const activeReport = new RegExp(`我(?:这边|那边)?(?:已经|刚才|之前|上次|这次)?(?:把(?:你(?:刚才)?发的)?(?:${ARTIFACT_SUBJECT}|消息))?(?:给)?(${DELIVERY_CAUSE_WORDS})`, 'u')
   return assertions(rawUserText).some(sentence => sentence.text.split(/[，,]/u).some(clause => {
     if (unasserted(clause, sentence.question) || /如果|假如|要是|倘若|若是/u.test(clause) || OTHER_SUBJECT.test(clause)) return false
-    const reported = activeReport.exec(clause)?.[1] || PASSIVE_DELIVERY_CAUSE.exec(clause)?.[1]
+    const reported = activeReport.exec(clause)?.[1] || passiveDeliveryCause(clause)
     return Boolean(reported && deliveryCauseKind(reported) === deliveryCauseKind(cause))
   }))
 }
 
 function unsupportedRecipientCause(clause: string, rawUserText: string, adjacentCause = false): boolean {
-  const passive = PASSIVE_DELIVERY_CAUSE.exec(clause)
+  const passive = passiveDeliveryCause(clause)
   if (!(RECIPIENT_DELIVERY_CAUSE.test(clause) || passive) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
     || /不能(?:归因|认定|断定)|无法(?:说明|断定)|没法(?:确认|核实)|没(?:有)?核实/u.test(clause)) return false
   // A user can report their own setting. Restating that report is allowed;
   // attributing this particular failure to it still requires causal evidence.
   const reported = passive
-    ? reportedPassiveCause(rawUserText, passive[1] || '')
+    ? reportedPassiveCause(rawUserText, passive)
     : /我(?:这边|那边)?(?:把)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|我(?:这边|那边)?(?:把)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了)|我(?:已经|刚才)?(?:拒收|拒绝接收|屏蔽)(?:了)?/u.test(withoutQuotations(rawUserText))
   return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
 }

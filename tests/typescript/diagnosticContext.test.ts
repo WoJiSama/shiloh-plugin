@@ -745,6 +745,25 @@ test('damage synonym shousun cannot turn an odor report into a confirmed diagnos
   assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，电源未受损。', notDamaged), [])
 })
 
+test('a completed denial cannot exempt a later explanatory damage assertion', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const reply of [
+    '但这些只能帮你初步判断，不能证明没坏——焦糊味基本说明里面有过热或元件烧了，大概率是电源本身的问题。',
+    '不能证明没坏—电源内部元件已经受损。',
+    '目前不能保证没坏--焦糊味说明电源已经烧毁。',
+    '不能证明没坏：焦糊味说明里面的元件烧了。',
+    '暂时无法确认整机健康，不过电源元件肯定已经烧坏。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_damage_diagnosis'), reply)
+  for (const reply of [
+    '不能证明没坏——所以仍要送检。',
+    '不能确定——电源是否已经受损还需要现场检查。',
+    '不能确认电源内部——有没有元件烧坏。',
+    '还不能证明：电源内部元件已经受损。',
+    '不能证明电源没坏——有元件受损的可能性，先保持隔离并送检。',
+    '看不到烧痕不代表没事——重新通电可能导致电源受损。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
 test('fallbacks use observed prerequisites and pass the same validation without rewriting the candidate', () => {
   const inputs = [
     {rawUserText: '电脑有焦糊味，已经拔电了，怎么办？'},

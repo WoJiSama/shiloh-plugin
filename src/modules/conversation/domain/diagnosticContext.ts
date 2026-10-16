@@ -429,7 +429,25 @@ function temperatureAssurance(clause: string): boolean {
 function replyAssertions(text: string): string[] {
   // Contrast joins independent assertions. Its uncertainty or denial applies to
   // that assertion, not to a guarantee or action on the other side of the join.
-  return diagnosticClauses(text).flatMap(clause => clause.split(/(?=但是|不过|然而|可是|但(?!凡)|却)/u)).filter(clause => clause.trim())
+  return diagnosticClauses(text).flatMap(clause => {
+    const parts = clause.split(/(——+|—|--+|[:：])/u)
+    const assertions: string[] = []
+    let current = parts[0] || ''
+    for (let index = 1; index < parts.length; index += 2) {
+      const separator = parts[index]!
+      const next = parts[index + 1] || ''
+      // An unfinished denial still governs its complement ("不能确定——是否
+      // 受损"). A complete denial such as "不能证明没坏" does not govern a
+      // new explanation or confident diagnosis after the separator.
+      const denialContinues = deniesConclusion(current)
+        && (/(?:判断|确认|确定|断定|证明|认定|保证|说|不代表|不等于|是否|是不是|有没有|有无)\s*$/u.test(current)
+          || /^\s*(?:是否|是不是|有没有|有无)/u.test(next))
+      if (denialContinues) current += separator + next
+      else {assertions.push(current); current = next}
+    }
+    assertions.push(current)
+    return assertions.flatMap(assertion => assertion.split(/(?=但是|不过|然而|可是|但(?!凡)|却)/u))
+  }).filter(clause => clause.trim())
 }
 
 function advisesUnclearedOperation(clause: string): boolean {
