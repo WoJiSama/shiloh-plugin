@@ -1629,3 +1629,110 @@ test('3c denial before a complete completion condition still asserts absent auto
     '好了会不会自动发你还没核实。','不是不会好了自动发你，是还没核实。'
   ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
 })
+
+const capabilityReplayFacts = (observedAt: number): TurnActionFacts => composedReplayFacts('group:900005',observedAt,[{
+  taskId:'synthetic-task-001', requestMessageId:'synthetic-request-001', toolName:'imageEdit', source:'task_record',
+  execution:'completed', result:'available', delivery:{state:'failed'}, followUp:{state:'none'}, observedAt
+}])
+const capabilityAndPastDeliveryReplays: {index:number; input:string; output:string; facts:TurnActionFacts; code:string}[] = [
+  {index:8, input:'刚才的图出来了吗？',
+    output:'图是做好了，傍晚背景那版成品是有的。就是之前发给你那一下没发出去，具体原因我也没查到欸。\n\n这轮我手上没有能直接重发的工具，你现在再要一次的话，我下次拿到发送能力就给你补上。',
+    facts:capabilityReplayFacts(1792159132705), code:'unregistered_followup'},
+  {index:9, input:'所以我现在没收到，是还没做好吗？',
+    output:'不是没做好，成品是有的。是发的那一步没成功，所以你才一直没收到。这轮我还是发不出去，等我有发送能力了再给你补。',
+    facts:capabilityReplayFacts(1792159135239), code:'unregistered_followup'},
+  {index:17, input:'我问的是这张图，出来了吗？',
+    output:'第一张图那张我这儿没查到完成的记录，之前也没发过欸。现在手头没法直接给你弄，你要方便的话把图再发一次，我看到就处理。',
+    facts:composedReplayFacts('group:900010',1792159158579), code:'unsupported_delivery'}
+]
+for (const replay of capabilityAndPastDeliveryReplays) test(`3a72b39 complete replay ${replay.index} retains its independent delivery proposition`, () => {
+  assert.ok(validateActionReply(replay.output,replay.facts,replay.input).some(item=>item.code===replay.code))
+})
+
+test('3a72b39 acquiring delivery capability is independent of an artifact completion registration', () => {
+  const raw = '刚才的图怎么还没收到？'
+  const failed = capabilityReplayFacts(1792159132705)
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  const sent = facts([fact({execution:'completed', result:'available', delivery:{state:'sent', messageId:'old-receipt'}})])
+  for (const reply of [
+    '我下次拿到发送能力就给你补上。','等我有发送能力了再给你补。',
+    '等我拿到重发工具，再发给你。','我之后获得补发权限，再给你补上。',
+    '等有发送工具了再给你补。','拿到发送能力后，我再发给你。','有了发送能力再给你补上。'
+  ]) for (const current of [facts(),failed,live,sent]) {
+    assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unregistered_followup'),reply)
+  }
+})
+
+test('3a72b39 a later user request cannot supply a newer delivery capability condition', () => {
+  const raw = '刚才的图怎么还没收到？'
+  const failed = capabilityReplayFacts(1792159132705)
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of [
+    '你回来再问我，我再查，等我有发送能力了再发给你。',
+    '你再发一句要图，等我有发送能力了，我再给你补上。',
+    '你再发一句要图，我下次拿到发送能力就给你补上。',
+    '你回来再问我，等有发送工具了再给你补。'
+  ]) for (const current of [failed,live]) {
+    assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unregistered_followup'),reply)
+  }
+})
+
+test('3a72b39 capability descriptions preserve local tool limits, nonassertions and user-initiated help', () => {
+  const raw = '刚才的图怎么还没收到？'
+  const failed = capabilityReplayFacts(1792159132705)
+  for (const reply of [
+    '这轮我手上没有能直接重发的工具。','这轮我还是发不出去。',
+    '后续再次发送的安排尚未核实。','这轮没有发送工具，你要的话我再想办法看看。',
+    '我不能承诺等我有发送能力了再给你补。','不能承诺等我有发送能力了，我再给你补上。',
+    '等我有发送能力了也不会发给你。','等我有发送能力了再给你补吗？',
+    '“我下次拿到发送能力就给你补上”只是个例子。',
+    '等她有发送能力了再给你补。','她下次拿到发送能力就给你补上。',
+    '等我有发送能力了，她会发给你。',
+    '你吃完回来问我，我当场查状态，有结果就发给你。',
+    '你再发一句要图，我这边重新给你发一次。','你再发一句要图，我再给你补。',
+    '等我有发送能力了，你回来再问我，我再给你补上。',
+    '我现在给你补充一句说明：上次发送没有成功。'
+  ]) assert.deepEqual(validateActionReply(reply,failed,raw),[],reply)
+})
+
+test('3a72b39 temporal adjuncts retain an omitted negative delivery predicate as a local proposition', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const failed = capabilityReplayFacts(1792159132705)
+  const notAttempted = facts([fact({delivery:{state:'not_attempted'}})])
+  const sent = facts([fact({execution:'completed', result:'available', delivery:{state:'sent', messageId:'receipt'}})])
+  for (const reply of [
+    '之前也没发过欸。','上次也没发出去。','此前也没有发给你。',
+    '当时我也没发过。','我之前也没发过。','我这边上次也没发过。','之前也没投递过。',
+    '第一张图片的完成记录还没核实，之前也没发过。',
+    '第一张图那张我这儿没查到完成的记录，之前也没发过欸。'
+  ]) {
+    for (const current of [facts(),facts([fact()]),sent]) {
+      assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_delivery'),reply)
+    }
+    for (const current of [failed,notAttempted]) assert.deepEqual(validateActionReply(reply,current,raw),[],reply)
+  }
+})
+
+test('3a72b39 historical delivery wording retains uncertainty, quotations and other subjects', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  for (const reply of [
+    '之前也没发过吗？','不能确认之前也没发过。','之前也没发过这件事尚未核实。',
+    '“之前也没发过”只是个例子。','她之前也没发过。','之前她也没发过。',
+    '我妹妹之前也没发过。','之前也没有发出邀请。',
+    '上次也没发言。','我之前也没发誓。','刚才也没发呆。',
+    '我之前也没有发送过简历。','之前我也没核实过发送记录。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  assert.deepEqual(validateActionReply('之前也没发过欸。',facts()),[])
+  const reminder = facts([fact({source:'reminder', toolName:'reminderTool', execution:'queued', followUp:{state:'registered', kind:'reminder', id:'exam', dueAt:Date.now()+60_000}})])
+  assert.deepEqual(validateActionReply('之前也没发过欸。',reminder,'明天提醒我考试。'),[])
+})
+
+test('3a72b39 historical delivery adjuncts still require and retain a matching old receipt', () => {
+  const raw = '我问的是这张图，发了吗？'
+  const sent = facts([fact({execution:'completed', result:'available', delivery:{state:'sent', messageId:'old-receipt'}})])
+  for (const reply of ['之前也已经发给你了。','我之前也已经发送了。','上次也发过了。']) {
+    assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unsupported_delivery'),reply)
+    assert.deepEqual(validateActionReply(reply,sent,raw),[],reply)
+  }
+  assert.deepEqual(validateActionReply('我之前有发送能力，刚才已经发给你了。',sent,raw),[])
+})

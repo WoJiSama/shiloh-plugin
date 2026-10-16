@@ -86,9 +86,62 @@ const composedReplayCandidates=[
   {"candidate":"做好了，图是有的。卡的是发出来那一步，不是还没做。你再等等，我想到办法就发你。","raw":"所以我现在没收到，是还没做好吗？","tasks":[{"taskId":"synthetic-task-001","requestMessageId":"synthetic-request-001","toolName":"imageEdit","source":"task_record","execution":"completed","result":"available","delivery":{"state":"failed"},"followUp":{"state":"none"},"observedAt":1792157677554}],"corrected":"图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"},
   {"candidate":"我这边只核验到你的考试提醒登记了（2100年1月1日早上八点那个），改背景的图没有对应记录，所以现在没法确认它在跑，也不会好了自动发你。\n\n想要的话重新把图发我一次，我这轮能做就直接做。","raw":"刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？","tasks":[{"taskId":"exam-reminder","requestMessageId":"exam-request","toolName":"reminderTool","source":"reminder","execution":"queued","result":"unknown","delivery":{"state":"not_attempted"},"followUp":{"state":"registered","kind":"reminder","id":"exam-reminder","dueAt":4102444800000},"observedAt":1792157892801}],"corrected":"图片处理及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"},
 ]
+const capacityReplayCandidates=[
+  {
+    "candidate": "图是做好了，傍晚背景那版成品是有的。就是之前发给你那一下没发出去，具体原因我也没查到欸。\n\n这轮我手上没有能直接重发的工具，你现在再要一次的话，我下次拿到发送能力就给你补上。",
+    "raw": "刚才的图出来了吗？",
+    "tasks": [
+      {
+        "taskId": "synthetic-task-001",
+        "requestMessageId": "synthetic-request-001",
+        "toolName": "imageEdit",
+        "source": "task_record",
+        "execution": "completed",
+        "result": "available",
+        "delivery": {
+          "state": "failed"
+        },
+        "followUp": {
+          "state": "none"
+        },
+        "observedAt": 1792159132705
+      }
+    ],
+    "corrected": "图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"
+  },
+  {
+    "candidate": "不是没做好，成品是有的。是发的那一步没成功，所以你才一直没收到。这轮我还是发不出去，等我有发送能力了再给你补。",
+    "raw": "所以我现在没收到，是还没做好吗？",
+    "tasks": [
+      {
+        "taskId": "synthetic-task-001",
+        "requestMessageId": "synthetic-request-001",
+        "toolName": "imageEdit",
+        "source": "task_record",
+        "execution": "completed",
+        "result": "available",
+        "delivery": {
+          "state": "failed"
+        },
+        "followUp": {
+          "state": "none"
+        },
+        "observedAt": 1792159135239
+      }
+    ],
+    "corrected": "图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"
+  },
+  {
+    "candidate": "第一张图那张我这儿没查到完成的记录，之前也没发过欸。现在手头没法直接给你弄，你要方便的话把图再发一次，我看到就处理。",
+    "raw": "我问的是这张图，出来了吗？",
+    "tasks": [],
+    "corrected": "第一张图片的处理结果和发送状态尚未核实。"
+  }
+]
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
   ...composedReplayCandidates,
+  ...capacityReplayCandidates,
   {candidate:'图这边我还没查到结果，不确定好没好，别急哈。\n\n考试提醒那个是登记上了的，到 2100 年 1 月 1 号早上八点会触发。发图这事目前没有后续登记，所以就算图好了也不会自动发你，到时候你再喊我一声就行。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam-reminder',dueAt:4102444800000}}],corrected:'图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。'},
   {candidate:'你回来再问我，我再查，图真正出来后我再回你。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和后续通知安排尚未核实。你之后再问一声，我再查当前状态。'},
   {candidate:'这个我这边还没查到结果，进度我不敢乱说欸。\n\n任务我之前是接了的，现在有没有跑完还没确认，等我确认到就回你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'图片处理结果尚未核实，后续通知安排也尚未确认。你之后再问一声，我再查当前状态。'},
@@ -148,7 +201,7 @@ test('qualified task claims and contradictions never become the next turn histor
  }
 })
 test('invalid composed task claims returned by repair fall back before history or learning',async()=>{
- for(const item of composedReplayCandidates){
+ for(const item of [...composedReplayCandidates,...capacityReplayCandidates]){
   const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
   session.interactionContext.rawUserText=item.raw
   session.interactionContext.actionFacts.tasks=item.tasks
@@ -238,6 +291,7 @@ test('requested recreation and human activity keep their original final reply wi
 })
 test('diagnostic certainty and active sniffing are corrected before sending or learning',async()=>{
  const cases=[
+  {"raw": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。", "candidate": "82℃满载这数其实挺健康的，大多数CPU的温度墙在95~105℃，82℃离降频还有段距离。\n\n判断的话看三点：一是你的U的Tjunction上限（查型号规格就知道）；二是满载时频率有没有掉，没掉说明没撞温度墙；三是环境温度和散热条件，夏天机箱闷的话会整体高几度。无烟无味加上运行正常，这个温度本身不用担心。", "corrected": "当前型号和测点尚未确认，82℃本身是否危险还不能确定，需要对照对应型号的规格。"},
   {raw:'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。',candidate:'82℃满载这个数本身不算危险信号，一般CPU规格里Tjunction上限在100℃左右，82℃还留有余量。',corrected:'当前型号和测点尚未确认，82℃本身是否危险还不能确定，需要对照对应型号的规格。'},
   {raw:'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。',candidate:'满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）',corrected:'降频不一定由温度导致，可能还有功耗限制；当前型号和测点尚未确认，不能判断82℃是否临界。'},
   {raw:'维修师傅已经检查了我的电脑，确认CPU没有触发温度墙。CPU满载82℃。',candidate:'CPU已经触发温度墙。',corrected:'按你转述的检查，CPU没有触发温度墙；仍需结合型号和测点对照温度规格。'},
@@ -376,5 +430,46 @@ test('long forwards split at QQ 100-node limit and stop after uncertain batch',a
   const api=createMemoryReplies({factShortId:text=>text,warn(){},makeForwardMsg:async(e,msgs)=>{sizes.push(msgs.length);return msgs}})
   await api.replyLongForward({sendObservedReply:async()=>{attempts++;return attempts===unknownAt?null:{message_id:attempts}}},{},'title','x'.repeat(205),1)
   assert.deepEqual(sizes,unknownAt?[100,100]:[100,100,5])
+ }
+})
+
+test('professional permission and operation explanations reach final history intact',async()=>{
+ const cases=[
+  {
+    "raw": "认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？",
+    "candidate": "还是别开机。冒烟加焦糊味说明出现过异常，外面看不到烧痕、味道散了，只说明没观察到现象，不能排除里面有元件出问题——具体哪里坏、坏到什么程度，光靠这些判断不了，贸然通电有可能让损坏扩大。\n\n保持断电，送修或找专业人员检测，让他们确认可以开机了再开。忍一下，别省这一步。",
+    "history": [
+      {
+        "role": "user",
+        "userId": "2",
+        "text": "认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？"
+      }
+    ]
+  },
+  {
+    "raw": "那我能先开机试一下吗？",
+    "candidate": "不能。开机就是重新通电，而电源位置的焦糊味还没被专业检测排除异常，再通电可能扩大损坏甚至有起火风险。\n\n先送去检修，等维修方明确说这台机器检测通过、可以正常使用了，再开机。",
+    "history": [
+      {
+        "role": "user",
+        "userId": "2",
+        "text": "电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？"
+      }
+    ]
+  }
+]
+ for(const item of cases){
+  const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[]
+  const interactionContext=buildTurnInteractionContext({rawUserText:item.raw,botId:'99',speaker:{userId:'2'}})
+  interactionContext.diagnosticContext=buildDiagnosticContext({rawUserText:item.raw,speakerId:'2',history:item.history})
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;throw Error('scoped professional permission must not regenerate')}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'scoped-operation'}
+  await api.handleTextResponse(host,item.candidate,event,{interactionContext},messages)
+  assert.equal(repairs,0,item.candidate)
+  assert.deepEqual(sent,[item.candidate])
+  assert.equal(messages.at(-1).content,item.candidate)
+  assert.equal(archived[0].message[0].text,item.candidate)
+  assert.equal(enhanced[0][2],item.candidate)
  }
 })

@@ -164,6 +164,8 @@ const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定�
 const FOLLOW_UP_DELIVERY_OBJECT = new RegExp(`^(?:给(?:你|您))?(?:发(?:送)?|投递)(${ARTIFACT})(?:这(?:件)?事)?$`, 'u')
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
 const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|然而|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
+const DELIVERY_TIME = '(?:之前|此前|上次|那次|当时|刚才|刚刚)'
+const PAST_DELIVERY_SUBJECT = new RegExp(`^(?:(?:${SELF_LOCATION})?${DELIVERY_TIME}|${DELIVERY_TIME}${SELF_LOCATION})(?:也|还)?$`, 'u')
 
 /** Resolve the noun phrase independently of its predicate. A descriptor such
  * as background/color does not create another task; a person inside an image
@@ -210,7 +212,11 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
   const predicateStart = Math.min(...predicates.map(({match}) => match.index))
   for (const {state, match} of predicates) {
     if (match.index !== predicateStart) continue
-    const object = taskObjectReference(clause.slice(0, match.index), context, rawTopic)
+    const subject = clause.slice(0, match.index)
+    // Time and additive adjuncts do not supply another sender. Resolve an
+    // omitted delivery subject locally, without changing artifact predicates.
+    const pastDelivery = state.dimension === 'delivery' && PAST_DELIVERY_SUBJECT.test(subject.replace(SUBJECT_CONNECTOR, '').trim())
+    const object = taskObjectReference(pastDelivery ? '' : subject, context, rawTopic)
     if (!object || object.kind === 'implicit' && !state.implicit || state.dimension === 'existence' && !context && object.kind !== 'follow_up'
       || object.kind === 'task' && state.accepts === 'artifact' || object.kind === 'artifact' && state.accepts === 'task') continue
     if (object.kind === 'follow_up') {
@@ -285,7 +291,7 @@ const SPOKEN_UPDATE = /^(?:(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:�
 const SPEECH_DELAY = /等(?:我)?(?:确认|核实|查清|弄清|查到)|(?:确认|核实|查清|弄清|查到).{0,12}(?:之后|以后|后)|稍后|待会|过会|明早|明天|到时候|到时|届时|之后|自动|主动/u
 // An omitted recipient still leaves a self-owned send. Require the complete
 // predicate boundary so “发言/发誓/发呆” cannot become delivery actions.
-const ASYNC_ACTION = /回(?:复)?(?:你|您)(?:的?消息|一声|一下)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))|(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出来|出去)|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)|我(?:这边)?(?:会|就|再|来|直接|第一时间|自动|主动)*发(?:送)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,]|$))/gu
+const ASYNC_ACTION = /回(?:复)?(?:你|您)(?:的?消息|一声|一下)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))|(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出来|出去)|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补(?:上|(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))))|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)|我(?:这边)?(?:会|就|再|来|直接|第一时间|自动|主动)*发(?:送)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,]|$))/gu
 const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:实际(?:的)?|真正(?:的)?)?(?:产出|成品)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
@@ -301,6 +307,7 @@ const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|�
 const ACQUIRED_ARTIFACT = `(?:产出|${ARTIFACT})`
 const ACQUIRED_OUTPUT = new RegExp(`(?:确认到|拿到|收到)(?:了)?(?:(?:实际|真正|真实)(?:的)?)?${ACQUIRED_ARTIFACT}(?:(?:或者|或|和|及|以及)${ACQUIRED_ARTIFACT})*(?:了)?(?:之后|以后|后|时)?(?=我|就|再|会|直接|马上|立刻|立即|第一时间|自动|主动|给|发|通知|提醒|告诉|跟|和|对|向|[，,]|$)`, 'gu')
 const DEFERRED_DELIVERY_CONDITION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?|图(?:片)?|成品|结果|文件|视频)?(?:能(?:够)?|可以)(?:重新|再次|再|补)?(?:发(?:送)?|投递)(?:图(?:片)?|成品|结果|文件|视频)?(?:给(?:你|您)|到(?:群里|这里|私聊))?(?:的时候|时|之后|以后|后)/gu
+const DEFERRED_DELIVERY_CAPABILITY = /(?:(?:等(?:到)?|待|一旦)(?:我(?:这边)?|这边)?|(?:我(?:这边)?|这边)(?:下次|之后|以后|稍后)?|^|[，,])(?:拿到|获得|具备|恢复|有(?:了)?)(?:直接|重新|再次|重|补)?(?:发(?:送)?|投递)(?:的)?(?:能力|工具|权限)(?:了)?(?:的时候|时|之后|以后|后)?(?=我|就|再|会|马上|立刻|立即|第一时间|[，,]|$)/gu
 const DEFERRED_RESOLUTION = /(?:等(?:到)?|待|一旦)?我(?:这边)?(?:想(?:到|出)|找(?:到|出))(?:办法|解决(?:方案|方法))(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
 
 interface OutputCondition {start: number; end: number; subject: 'self' | 'user' | 'other'}
@@ -365,13 +372,13 @@ function topicBefore(text: string, end: number, initial: EvidenceTopic): Evidenc
 /** A later user request can own a synchronous lookup and the result of that
  * lookup. A new completion condition or proactive action starts another
  * commitment and cannot borrow the earlier user-triggered exemption. */
-function userRequestedAction(text: string, before: string, actionEnd: number, completion: number): boolean {
+function userRequestedAction(text: string, before: string, actionEnd: number, completion: number, independentConditionEnd = -1): boolean {
   if (IMMEDIATE_ACTION.test(before.split(/[，,]/u).at(-1) || '')) return false
   const direct = [...text.slice(0, actionEnd).matchAll(USER_TRIGGER)].at(-1)
-  if (direct && direct.index! + direct[0].length >= completion
+  if (direct && direct.index! >= independentConditionEnd && direct.index! + direct[0].length >= completion
     && !/自动|主动|持续|定时/u.test(before.slice(direct.index! + direct[0].length))) return true
   const request = [...before.matchAll(USER_REQUEST_CONDITION)].at(-1)
-  if (!request) return false
+  if (!request || request.index! < independentConditionEnd) return false
   const response = before.slice(request.index! + request[0].length)
   if (/自动|主动|持续|定时/u.test(response)) return false
   if (completion < 0 || completion <= request.index! + request[0].length) return true
@@ -415,9 +422,11 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const verificationEnd = verification ? verification.index! + verification[0].length : -1
     const deliveryCondition = [...before.matchAll(DEFERRED_DELIVERY_CONDITION)].at(-1)
     const deliveryConditionEnd = deliveryCondition ? deliveryCondition.index! + deliveryCondition[0].length : -1
+    const capability = [...before.matchAll(DEFERRED_DELIVERY_CAPABILITY)].at(-1)
+    const capabilityEnd = capability ? capability.index! + capability[0].length : -1
     const resolution = [...before.matchAll(DEFERRED_RESOLUTION)].at(-1)
     const resolutionEnd = resolution ? resolution.index! + resolution[0].length : -1
-    const conditionEnd = Math.max(completion, verificationEnd, deliveryConditionEnd, resolutionEnd)
+    const conditionEnd = Math.max(completion, verificationEnd, deliveryConditionEnd, capabilityEnd, resolutionEnd)
     const outputCondition = outputConditions(before).at(-1)
     if (outputCondition && outputCondition.subject !== 'self' && outputCondition.end === completion
       && !/^(?:我(?:这边)?|这边)/u.test(selfActionPrefix)) continue
@@ -425,7 +434,10 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     // gifts or an explanation supplied in this reply are outside this form.
     const implicitHandoff = /^(?:单独)?给(?:你|您)$/u.test(match[0])
     if (implicitHandoff && conditionEnd < 0) continue
-    if (userRequestedAction(sentence.text, before, match.index! + match[0].length, conditionEnd)) continue
+    // A request before capability becomes available does not schedule a send
+    // when it later changes. A new request after that condition can still own
+    // the ordinary synchronous reply.
+    if (userRequestedAction(sentence.text, before, match.index! + match[0].length, conditionEnd, capabilityEnd)) continue
     // A negative or wording cue before the condition applies across its
     // comma (“不能承诺图好了，我会发你”). An unrelated earlier clause does not.
     const conditionPrefix = conditionEnd >= 0 ? localClauses(before.slice(0, conditionEnd)).at(-1)?.text || '' : selfActionPrefix
@@ -433,7 +445,7 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     if (!independentAssertion && NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
     const tail = sentence.text.slice(match.index! + match[0].length)
     if (SPOKEN_UPDATE.test(match[0]) && /^(?:答案|解释|说明|步骤|建议|示例|做法|思路|文字)(?:[：:]|[，,](?:先|首先|第一步))/u.test(tail)) continue
-    const delivery = implicitHandoff || /发|投递|补给|补上/u.test(match[0])
+    const delivery = implicitHandoff || /发|投递|补/u.test(match[0])
     // The suffix is the predicate of this send event, not a promise to send
     // after an earlier completion clause. Inspect each action independently.
     if (delivery && /^(?:那边|这边)?(?:失败(?:了)?|没(?:有)?发成功|没(?:有)?成功)(?:的|了)?[呀啊啦咯喽欸呢哦哈吧～~]*(?=[，,]|$)/u.test(tail)) continue
@@ -460,7 +472,7 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     // unspecified investigation or confirmation of the failure cause.
     const independentVerification = verification && !(outputCondition
       && outputCondition.start <= verificationEnd && verificationEnd <= outputCondition.end)
-    if (deliveryCondition || resolution || independentVerification || outputCondition && outputCondition.subject !== 'self'
+    if (deliveryCondition || capability || resolution || independentVerification || outputCondition && outputCondition.subject !== 'self'
       || spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {add('unsupported', match.index! + match[0].length); continue}
     if (RERUN_OR_POLL.test(match[0])) add('unsupported', match.index! + match[0].length)
     else if (completion >= 0) add('job_completion', match.index! + match[0].length)
@@ -488,7 +500,7 @@ function guaranteesFutureReceipt(sentence: ReplySentence, taskContext: boolean):
   const clauses = localClauses(sentence.text)
   const success = new RegExp(`^(?:了)?(?:一(?:次|遍|下))?(?:之后|以后|后)?(?:[，,]\\s*)?(?:(?:你|您)(?:这边|那边)?(?:就|肯定|一定|必定|保证)?|(?:就|肯定|一定|必定|保证))(?:会|能(?:够)?)?收到(?:${ARTIFACT_SUBJECT}|它)?(?:了)?${PARTICLES}(?=$|[，,])`, 'u')
   for (const action of sentence.text.matchAll(ASYNC_ACTION)) {
-    if (!/发|投递|补给|补上/u.test(action[0])) continue
+    if (!/发|投递|补/u.test(action[0])) continue
     const actionEnd = action.index! + action[0].length
     const result = success.exec(sentence.text.slice(actionEnd))
     if (!result) continue
