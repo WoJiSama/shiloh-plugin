@@ -1373,3 +1373,81 @@ test('recipient-omitted sends preserve denials, questions, quotations, third par
     '等真的出来了我会直接发呆。', '刚才我已经直接发。'
   ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
 })
+
+test('53a complete replay 0 cannot promise a later reply after verification without a registration', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const reply = '这个我这边还没查到结果，进度我不敢乱说欸。\n\n任务我之前是接了的，现在有没有跑完还没确认，等我确认到就回你。'
+  const current: TurnActionFacts = {
+    scope:{botId:'99', conversationId:'group:900001', userId:'202'},
+    observedAt:1792142227263, lookup:'ok', tasks:[]
+  }
+  assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unregistered_followup'))
+})
+
+test('direct replies after independent verification cannot borrow an artifact completion callback', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'image-callback'}})])
+  for (const reply of [
+    '等我确认到就回你。', '等我核实了再回复你。',
+    '确认到了我再回你一声。', '查清原因后我会回复你。',
+    '等确认了我再回你一下。', '核实了我再回你的消息。'
+  ]) for (const current of [facts(), live]) {
+    assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unregistered_followup'), reply)
+  }
+})
+
+test('direct replies after artifact completion require and accept the matching live callback', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'image-callback'}})])
+  const reminder = facts([fact({source:'reminder', toolName:'reminderTool', execution:'queued', followUp:{state:'registered', kind:'reminder', id:'exam', dueAt:4102444800000}})])
+  for (const reply of [
+    '图好了我就回你。', '图出来了我再回复你。',
+    '等我确认到成品我会回你。', '有结果我再回复你的消息。'
+  ]) {
+    for (const current of [facts(), reminder]) assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unregistered_followup'), reply)
+    assert.deepEqual(validateActionReply(reply, live, raw), [], reply)
+  }
+})
+
+test('direct reply actions preserve immediate speech, nonassertions, other speakers and later user requests', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  for (const reply of [
+    '我现在回你：这件事还没确认。', '我会回复你，先看这句话。',
+    '我回你一下：这句话很有意思。', '我现在回复你的消息。',
+    '等我确认到也不会回你。', '不能承诺等我确认到就回你。',
+    '等我确认到就回你吗？', '等我确认到就回复你？',
+    '“等我确认到就回你”只是个例子。', '她等确认到就回你。',
+    '等我确认到，她会回复你。', '她确认到之后会回复你。',
+    '你回来再问我，我再回你。', '你回来再问我，我再查，有结果我再回复你。',
+    '图出来后你再来问我，我再回你。', '刚才我已经回你。',
+    '等图好了我就回家。', '等图好了我回去。', '等图好了我回你家。',
+    '等图出来了我会回你家里。', '等我确认到就回复你朋友。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
+
+test('a later user request owns a bare confirmation returned by its explicit on-demand lookup', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  for (const reply of [
+    '你回来再问我，我再查，确认到就回你。',
+    '你回来再问我，我再查，确认到就回复你。',
+    '你回来再问我，我再查，确认到就发给你。',
+    '你回来再问我，我当场核实状态，确认到就回你。',
+    '你回来再问我，我再查，确认到了我就回你。',
+    '你回来再问我，我再查，核实了我就回复你。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
+
+test('a bare confirmation exemption needs an on-demand lookup and cannot own a newer asynchronous condition', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  for (const reply of [
+    '你回来再问我，确认到就回你。',
+    '你回来再问我，我再看看，确认到就回你。',
+    '确认到就回你。',
+    '你回来再问我，我再查，等我确认到就回你。',
+    '你回来再问我，我再查，图真正出来后我再回你。',
+    '你回来再问我，我再查，确认到，图真正出来后我再回复你。',
+    '你回来再问我，我再查，确认到了，图真正出来后我再回复你。',
+    '你回来再问我，我再查，确认到就主动回你。',
+    '你回来再问我，我再查，确认到就自动回复你。'
+  ]) assert.ok(validateActionReply(reply, facts(), raw).some(item=>item.code==='unregistered_followup'), reply)
+})

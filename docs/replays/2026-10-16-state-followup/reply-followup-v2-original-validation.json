@@ -1,0 +1,50 @@
+{
+  "steps": {
+    "typecheck": 0,
+    "build": 0,
+    "test-compile": 0,
+    "targeted": 0
+  },
+  "targetedTests": {
+    "tests": 315,
+    "pass": 315,
+    "fail": 0,
+    "skipped": 0
+  },
+  "originalHead": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+  "sourceManifestMatches": true,
+  "outputManifestMatches": true,
+  "businessTargetComparisons": [
+    {
+      "source": "src/contracts/diagnosticContext.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/contracts/diagnosticContext.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/actionReplyGrounding.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/actionReplyGrounding.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/diagnosticContext.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/diagnosticContext.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/turnActionFacts.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/turnActionFacts.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/turnInteractionContext.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/turnInteractionContext.js",
+      "sameCompiledOutput": true
+    }
+  ],
+  "scope": "dirty original checkout preserves concurrent changes; only five task business targets are compared with the release branch, not the entire source tree"
+}

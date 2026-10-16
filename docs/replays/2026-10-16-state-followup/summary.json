@@ -37,27 +37,27 @@
     "semanticEvaluation": "requires_entire_conversation_review; HTTP_and_structure_are_not_quality_scores"
   },
   "candidate": {
-    "commit": "d2a4a373a8dcd883aed7e6d28bb20d1a50cde80e",
+    "commit": "53aeb89ddac41520642fc3cdb922b5aad325e53f",
     "complete": true,
     "turns": 60,
     "structuralPassed": 59,
     "structuralDifferences": [
       {
-        "key": "real-fault-retains-condition:2:1",
+        "key": "fictional-meme-updated-duration-and-negative-fault:2:2",
         "failures": [
           "modelResponded"
         ]
       }
     ],
-    "httpRequests": 80,
-    "http200": 79,
-    "explicitLow": 80,
-    "repairTurns": 20,
-    "fallbackTurns": 8,
+    "httpRequests": 74,
+    "http200": 73,
+    "explicitLow": 74,
+    "repairTurns": 14,
+    "fallbackTurns": 9,
     "replyLatencyMs": {
-      "p50": 4514,
-      "p95": 13711,
-      "max": 19928
+      "p50": 3347,
+      "p95": 9265,
+      "max": 15325
     },
     "platformMessagesSent": 0,
     "productionStoreWrites": 0,

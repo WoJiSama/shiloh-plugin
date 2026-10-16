@@ -43,7 +43,7 @@ test('fact repair is text-only low and archives only the actually sent correctio
  assert.equal(session.replyGrounding.fallback,false)
 })
 test('tool calls and invalid repairs cannot execute or leak into sent history',async()=>{
- for(const repair of [{tool_calls:[{function:{name:'reminderTool'}}],content:'好了发你。'},{content:'有结果我会通知你。'}]){
+ for(const repair of [{tool_calls:[{function:{name:'reminderTool'}}],content:'好了发你。'},{content:'有结果我会通知你。'},{content:'等我确认到就回你。'}]){
   const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()};let calls=0
   host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'fallback-id'}
   host.retryRequest=async()=>{calls++;return {choices:[{message:repair}]}}
@@ -81,6 +81,8 @@ test('final grounding rechecks cancellation after generation and respects explic
 })
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
+  {candidate:'你回来再问我，我再查，图真正出来后我再回你。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和后续通知安排尚未核实。你之后再问一声，我再查当前状态。'},
+  {candidate:'这个我这边还没查到结果，进度我不敢乱说欸。\n\n任务我之前是接了的，现在有没有跑完还没确认，等我确认到就回你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'图片处理结果尚未核实，后续通知安排也尚未确认。你之后再问一声，我再查当前状态。'},
   {candidate:'这张还没确认好呢，第二张发出去的时候第一张的结果我这边没收到回执。等真的出来了我会直接发，不骗你。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和完成后发送的安排尚未核实，暂时不能确认。'},
   {candidate:'这次没查到有效的后续登记，所以做好了也不会自动发。原任务进度我也还没核实到，你吃完回来问一声，我再帮你看。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'图片处理的进度和完成后自动发送的安排尚未核实。你吃完回来问一声，我再查状态。'},
   {candidate:'图是做好了的，就是上次发送没成功。你要的话再发一次就收到了。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功；再次发送是否成功仍需实际回执确认。'},
@@ -136,8 +138,8 @@ test('qualified task claims and contradictions never become the next turn histor
  }
 })
 test('an explicit later user request can lead to another reply without a background registration',async()=>{
+ for(const candidate of ['你吃完回来在群里问一声就行，我到时候现查状态，有结果直接发你。','你回来再问我，我再查，确认到就回你。']){
  const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
- const candidate='你吃完回来在群里问一声就行，我到时候现查状态，有结果直接发你。'
  let repairs=0
  host.retryRequest=async()=>{repairs++;throw Error('ordinary user-triggered response must not regenerate')}
  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'user-triggered'}
@@ -146,6 +148,7 @@ test('an explicit later user request can lead to another reply without a backgro
  assert.deepEqual(sent,[candidate])
  assert.equal(archived[0].message[0].text,candidate)
  assert.equal(messages.at(-1).content,candidate)
+ }
 })
 test('completed results and past delivery failures keep their original wording without a new promise',async()=>{
  for(const candidate of [
