@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
-import { NAlert, NButton, NTab, NTabs, NTag, useDialog, useMessage } from 'naive-ui'
+import { NAlert, NButton, NSwitch, NTab, NTabs, NTag, useDialog, useMessage } from 'naive-ui'
 import { api } from '../lib/api'
 import { clone, describeApply, validateField } from '../lib/schemaState'
 import {
@@ -51,19 +51,37 @@ const validation = computed(() =>
 )
 const sections = computed(() =>
   groupAdminModules
-    .map((module) => ({
-      ...module,
-      groups: (view.value?.groups || [])
+    .map((module) => {
+      const groups = (view.value?.groups || [])
         .map((group) => ({
           ...group,
           fields: group.fields.filter((field) => field.field.startsWith(`${module.id}.`))
         }))
         .filter((group) => group.fields.length)
-    }))
-    .filter((module) => module.groups.length)
+      // 本群启用开关从字段网格里提出来，单独放在模块头部，先启用、再配置参数
+      const enableField = groups
+        .flatMap((group) => group.fields)
+        .find((field) => isGroupEnabled(field.field))
+      return {
+        ...module,
+        enableField,
+        groups: enableField
+          ? groups
+              .map((group) => ({
+                ...group,
+                fields: group.fields.filter((field) => field !== enableField)
+              }))
+              .filter((group) => group.fields.length)
+          : groups
+      }
+    })
+    .filter((module) => module.groups.length || module.enableField)
 )
 const current = computed(
   () => sections.value.find((section) => section.id === activeTab.value) || sections.value[0]
+)
+const currentEnabled = computed(() =>
+  current.value ? draft.value[`${current.value.id}.enabled`]?.value === true : false
 )
 const paused = computed(() =>
   sections.value.filter(
@@ -294,23 +312,14 @@ onBeforeUnmount(() => {
             }}<span v-if="sectionDirty(section.id)"> · {{ sectionDirty(section.id) }}</span>
           </NTab>
         </NTabs>
-        <section
-          v-for="group in current?.groups || []"
-          :key="group.label"
-          class="panel group-config-panel"
-        >
-          <div class="panel-heading">
+        <section v-if="current" class="panel module-header-panel" :data-module="current.id">
+          <div class="module-header-top">
             <div>
-              <h2>{{ group.label }}</h2>
-              <p>{{ current?.description }}</p>
+              <h2>{{ current.label }}</h2>
+              <p>{{ current.description }}</p>
             </div>
             <NTag
-              v-if="current"
-              :type="
-                draft[`${current.id}.enabled`]?.value && view.masters[current.id]
-                  ? 'success'
-                  : 'default'
-              "
+              :type="currentEnabled && view.masters[current.id] ? 'success' : 'default'"
               size="small"
               :bordered="false"
             >
@@ -323,50 +332,79 @@ onBeforeUnmount(() => {
               }}
             </NTag>
           </div>
-          <div class="field-grid">
-            <div
-              v-for="field in group.fields"
-              :key="field.field"
-              class="group-admin-field"
-              :class="{
-                'field-full': field.component === 'InputTextArea' || field.component === 'GSubForm'
-              }"
-              :data-field="field.field"
-            >
-              <div v-if="!isGroupEnabled(field.field)" class="inheritance-toolbar">
-                <NTag
-                  :type="draft[field.field]?.custom ? 'info' : 'default'"
-                  size="small"
-                  :bordered="false"
-                  >{{ stateLabel(field) }}</NTag
-                >
-                <NButton
-                  v-if="draft[field.field]?.custom"
-                  size="tiny"
-                  quaternary
-                  @click="reset(field)"
-                  >恢复默认</NButton
-                >
-                <NButton v-else size="tiny" quaternary @click="customize(field)"
-                  >本群自定义</NButton
-                >
-              </div>
-              <SchemaField
-                :field="field"
-                :model-value="draft[field.field]?.value"
-                :apply-hint="describeApply(field, 'groupAdmin')"
-                @update:model-value="edit(field, $event)"
-              />
-              <p
-                v-if="!isGroupEnabled(field.field) && draft[field.field]?.custom"
-                class="default-preview"
-                :title="preview(field.defaultValue)"
-              >
-                默认：{{ preview(field.defaultValue) }}
-              </p>
+          <div
+            v-if="current.enableField"
+            class="module-enable-row"
+            :class="{ 'module-enabled': currentEnabled }"
+          >
+            <div class="module-enable-copy">
+              <strong>{{ current.enableField.label }}</strong>
+              <span v-if="current.enableField.help">{{ current.enableField.help }}</span>
             </div>
+            <NSwitch
+              size="large"
+              :value="currentEnabled"
+              aria-label="本群启用开关"
+              @update:value="edit(current.enableField, $event)"
+            />
           </div>
         </section>
+        <div class="module-settings" :class="{ 'module-off': !currentEnabled }">
+          <section
+            v-for="group in current?.groups || []"
+            :key="group.label"
+            class="panel group-config-panel"
+          >
+            <div class="panel-heading">
+              <div>
+                <h2>{{ group.label }}</h2>
+              </div>
+            </div>
+            <div class="field-grid">
+              <div
+                v-for="field in group.fields"
+                :key="field.field"
+                class="group-admin-field"
+                :class="{
+                  'field-full': field.component === 'InputTextArea' || field.component === 'GSubForm'
+                }"
+                :data-field="field.field"
+              >
+                <div v-if="!isGroupEnabled(field.field)" class="inheritance-toolbar">
+                  <NTag
+                    :type="draft[field.field]?.custom ? 'info' : 'default'"
+                    size="small"
+                    :bordered="false"
+                    >{{ stateLabel(field) }}</NTag
+                  >
+                  <NButton
+                    v-if="draft[field.field]?.custom"
+                    size="tiny"
+                    quaternary
+                    @click="reset(field)"
+                    >恢复默认</NButton
+                  >
+                  <NButton v-else size="tiny" quaternary @click="customize(field)"
+                    >本群自定义</NButton
+                  >
+                </div>
+                <SchemaField
+                  :field="field"
+                  :model-value="draft[field.field]?.value"
+                  :apply-hint="describeApply(field, 'groupAdmin')"
+                  @update:model-value="edit(field, $event)"
+                />
+                <p
+                  v-if="!isGroupEnabled(field.field) && draft[field.field]?.custom"
+                  class="default-preview"
+                  :title="preview(field.defaultValue)"
+                >
+                  默认：{{ preview(field.defaultValue) }}
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
         <p v-if="dirty && validation.length" class="validation-note" role="status">
           {{ validation[0]
           }}<span v-if="validation.length > 1">，另有 {{ validation.length - 1 }} 项需要核对</span>
@@ -417,7 +455,60 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 .group-config-panel {
-  padding: 24px;
+  padding: 20px 24px;
+}
+.module-header-panel {
+  padding: 18px 24px 20px;
+}
+.module-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.module-header-top h2 {
+  font-size: 16px;
+}
+.module-header-top p {
+  color: var(--c-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.module-enable-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-soft);
+}
+.module-enable-row.module-enabled {
+  border-color: color-mix(in srgb, var(--c-green) 45%, var(--c-border));
+}
+.module-enable-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.module-enable-copy strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.module-enable-copy span {
+  font-size: 12px;
+  color: var(--c-muted);
+  line-height: 1.5;
+}
+.module-settings {
+  display: grid;
+  gap: 18px;
+  transition: opacity 0.2s ease;
+}
+.module-settings.module-off {
+  opacity: 0.55;
 }
 .panel-heading h2 {
   font-size: 15px;

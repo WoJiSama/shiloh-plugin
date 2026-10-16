@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter, RouterLink, RouterView, type Router } from 'vue-router'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { NButton, NDrawer, NTabs } from 'naive-ui'
+import { NButton, NDrawer, NSwitch, NTabs } from 'naive-ui'
 import GroupAdminPage from '../pages/GroupAdminPage.vue'
 import GroupsPage from '../pages/GroupsPage.vue'
 import SchemaField from '../components/SchemaField.vue'
@@ -175,6 +175,9 @@ async function createPage(path = '/group-admin?group=123456') {
 function field(name: string) {
   return wrapper!.findAllComponents(SchemaField).find((item) => item.props('field').field === name)!
 }
+function enableSwitch(id: string) {
+  return wrapper!.find(`section[data-module="${id}"]`).findComponent(NSwitch)
+}
 function button(text: string) {
   return wrapper!.findAllComponents(NButton).find((item) => item.text() === text)!
 }
@@ -227,7 +230,7 @@ describe('group administration draft lifecycle', () => {
       .find('[data-field="groupGuard.timeoutSeconds"]')
       .findComponent(NButton)
       .vm.$emit('click')
-    field('groupGuard.enabled').vm.$emit('update:modelValue', false)
+    enableSwitch('groupGuard').vm.$emit('update:value', false)
     await switchTab('groupModeration')
     resetButton('groupModeration.admins').vm.$emit('click')
     await flushPromises()
@@ -247,7 +250,7 @@ describe('group administration draft lifecycle', () => {
     button('恢复本群默认').vm.$emit('click')
     warning.mock.calls[0][0].onPositiveClick()
     await flushPromises()
-    expect(field('groupGuard.enabled').props('modelValue')).toBe(true)
+    expect(enableSwitch('groupGuard').props('value')).toBe(true)
     expect(field('groupGuard.timeoutSeconds').props('modelValue')).toBe(300)
     expect(wrapper!.findComponent(SaveBar).props('dirty')).toBe(2)
     await switchTab('groupNotice')

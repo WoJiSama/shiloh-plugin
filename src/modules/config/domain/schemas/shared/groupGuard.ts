@@ -204,29 +204,6 @@ const schema: ConfigSchemaItem[] = [
     componentProps: { min: 0, max: 100, placeholder: "5" }
   },
   {
-    component: "Divider",
-    label: "超长消息折叠"
-  },
-  {
-    field: "groupModeration.overlongMessage.enabled",
-    label: "超长消息折叠开关",
-    component: "Switch",
-    bottomHelpMessage: "开启后，未命中广告风控的超长消息会被自动撤回，并把原内容转成一条合并聊天记录发出"
-  },
-  {
-    field: "groupModeration.overlongMessage.maxLength",
-    label: "超长判定字数",
-    component: "InputNumber",
-    bottomHelpMessage: "消息可见文本超过该字数即视为超长。默认 1500 字",
-    componentProps: { min: 100, max: 20000, step: 50, placeholder: "1500" }
-  },
-  {
-    field: "groupModeration.overlongMessage.forwardEnabled",
-    label: "撤回后转发聊天记录",
-    component: "Switch",
-    bottomHelpMessage: "默认开启。关闭后只撤回超长消息不再转发；命中广告/刷屏规则的消息始终不会被转发"
-  },
-  {
     field: "groupModeration.adTemplateSimilarityThreshold",
     label: "模板相似阈值",
     component: "InputNumber",
@@ -293,6 +270,29 @@ const schema: ConfigSchemaItem[] = [
     label: "群内提醒模板",
     component: "InputTextArea",
     bottomHelpMessage: "支持变量：{rules}、{confidence}、{action}、{actionText}、{evidenceText}"
+  },
+  {
+    component: "Divider",
+    label: "超长消息折叠"
+  },
+  {
+    field: "groupModeration.overlongMessage.enabled",
+    label: "超长消息折叠开关",
+    component: "Switch",
+    bottomHelpMessage: "开启后，未命中广告风控的超长消息会被自动撤回，并把原内容转成一条合并聊天记录发出"
+  },
+  {
+    field: "groupModeration.overlongMessage.maxLength",
+    label: "超长判定字数",
+    component: "InputNumber",
+    bottomHelpMessage: "消息可见文本超过该字数即视为超长。默认 1500 字",
+    componentProps: { min: 100, max: 20000, step: 50, placeholder: "1500" }
+  },
+  {
+    field: "groupModeration.overlongMessage.forwardEnabled",
+    label: "撤回后转发聊天记录",
+    component: "Switch",
+    bottomHelpMessage: "默认开启。关闭后只撤回超长消息不再转发；命中广告/刷屏规则的消息始终不会被转发"
   }
 ]
 
