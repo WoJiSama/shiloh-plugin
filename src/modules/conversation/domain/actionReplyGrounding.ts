@@ -65,7 +65,7 @@ function evidenceTopic(rawText: string): EvidenceTopic {
   // “图好了提醒我” describes a completion callback, not a clock alarm.
   const artifactCompletion = /(?:图(?:片)?|成品|结果|文件|出图|生成|改图|画图)/u.test(text) && completionBefore(text) >= 0
   const kinds: EvidenceTopic[] = []
-  if (/图片|成品图|成图|出图|改图|画图|(?:改|换)(?:图(?:片)?)?背景|(?:第[一二三四五六七八九十\d]+张|这张|那张|原图)|图(?=已经|已|还|尚|没|未|正|在|生成|出来|好|弄|的|发|一|了|呢|吗|，|,|$)/u.test(text)) kinds.push('image')
+  if (/图片|成品图|成图|出图|改图|画图|发图|(?:改|换)(?:图(?:片)?)?背景|(?:第[一二三四五六七八九十\d]+张|这张|那张|原图)|图(?=已经|已|还|尚|没|未|正|在|生成|出来|好|弄|的|发|一|了|呢|吗|，|,|$)/u.test(text)) kinds.push('image')
   if (/视频|影片/u.test(text)) kinds.push('video')
   if (/文件|报告|表格|工作簿|Excel|文档|PDF/iu.test(text)) kinds.push('file')
   // A clock reminder may mention a user's later image action. A separate
@@ -158,6 +158,7 @@ const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
 const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|功能|能力|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
+const FOLLOW_UP_DELIVERY_OBJECT = new RegExp(`^(?:给(?:你|您))?(?:发(?:送)?|投递)(${ARTIFACT})(?:这(?:件)?事)?$`, 'u')
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
 const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|然而|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
 
@@ -170,6 +171,8 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     .replace(new RegExp(`(?:在${SELF_LOCATION}|${SELF_LOCATION})(?:的)?$`, 'u'), '')
   subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
   if (OTHER_SUBJECT.test(subject) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(subject)) return undefined
+  const delivery = FOLLOW_UP_DELIVERY_OBJECT.exec(subject)
+  if (delivery) return {kind:'follow_up', topic:evidenceTopic(delivery[1]!), surface:rawSubject}
   if (context && /^(?:这|那)(?:个|种)?(?:功能|能力)$/u.test(subject)) return {kind:'follow_up', topic:rawTopic, surface:rawSubject}
   if (FOLLOW_UP_OBJECT.test(subject)) return {kind: 'follow_up', topic: rawTopic, surface: rawSubject}
   if (TASK_HEAD.test(subject) || QUALIFIED_TASK_HEAD.test(subject)) {
@@ -228,12 +231,12 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
     else if (object?.kind === 'artifact') propositions.push({object, dimension: 'artifact', value: absent ? 'unavailable' : 'available'})
     else if (object?.kind === 'follow_up') propositions.push({object, dimension: 'follow_up', value: absent ? 'none' : 'registered'})
   }
-  // “改图那个没有登记后续投递” names the task first and its
-  // registered action second. A reminder row cannot supply that task's state.
-  const registration = /(?:没有|没|未|尚未|已经|已)?登记(?:后续)?投递(?:了|好)?$/u.exec(clause)
+  // A task or delivery noun can precede its registered-action predicate.
+  // A reminder row cannot supply the image delivery's registration state.
+  const registration = /(?:没有|没|未|尚未|已经|已)?登记(?:后续)?投递(?:了|好)?$|(?:目前|现在)?(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:任何|有效的?)?后续(?:登记|安排)(?:了|的)?$/u.exec(clause)
   if (registration) {
     const object = taskObjectReference(clause.slice(0,registration.index),context,rawTopic)
-    if (object && object.kind !== 'follow_up') propositions.push({object:{...object,kind:'follow_up'},dimension:'follow_up',value:/没|未/u.test(registration[0])?'none':'registered'})
+    if (object) propositions.push({object:{...object,kind:'follow_up'},dimension:'follow_up',value:/没|未/u.test(registration[0])?'none':'registered'})
   }
   const automaticDenial = context && automaticDenialObject(clause, rawTopic)
   if (automaticDenial) propositions.push({object:automaticDenial, dimension:'follow_up', value:'none'})
@@ -253,6 +256,7 @@ function automaticDenialObject(clause: string, topic: EvidenceTopic): TaskObject
   if (condition) {
     prefix = prefix.slice(0, condition.index)
     if (/(?:还没(?:有)?|没有|尚未|暂未|未|没)$/u.test(prefix)) return undefined
+    prefix = prefix.replace(/^(?:就算|即使|即便|哪怕|纵使|如果|要是|假如|一旦|等(?:到)?|待)/u, '')
   }
   const object = taskObjectReference(prefix, true, topic)
   return object ? {...object, kind:'follow_up', surface:clause} : undefined

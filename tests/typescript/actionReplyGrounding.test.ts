@@ -1451,3 +1451,71 @@ test('a bare confirmation exemption needs an on-demand lookup and cannot own a n
     '你回来再问我，我再查，确认到就自动回复你。'
   ]) assert.ok(validateActionReply(reply, facts(), raw).some(item=>item.code==='unregistered_followup'), reply)
 })
+
+const f00dReminderOnlyFacts = (): TurnActionFacts => ({
+  scope:{botId:'99', conversationId:'group:900028', userId:'202'},
+  observedAt:1792143973355, lookup:'ok', tasks:[{
+    taskId:'exam-reminder', requestMessageId:'exam-request', toolName:'reminderTool', source:'reminder',
+    execution:'queued', result:'unknown', delivery:{state:'not_attempted'},
+    followUp:{state:'registered', kind:'reminder', id:'exam-reminder', dueAt:4102444800000}, observedAt:1792143973355
+  }]
+})
+
+test('f00d complete replay 59 cannot infer absent image arrangements from a registered exam reminder', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reply = '图这边我还没查到结果，不确定好没好，别急哈。\n\n考试提醒那个是登记上了的，到 2100 年 1 月 1 号早上八点会触发。发图这事目前没有后续登记，所以就算图好了也不会自动发你，到时候你再喊我一声就行。'
+  assert.ok(validateActionReply(reply, f00dReminderOnlyFacts(), raw).some(item=>item.code==='unsupported_task_state'))
+  const cancelled = f00dReminderOnlyFacts()
+  cancelled.tasks.push(fact({source:'live_job', execution:'running', followUp:{state:'none'}}))
+  assert.deepEqual(validateActionReply(reply, cancelled, raw), [])
+})
+
+test('f00d image delivery nouns own the following registration predicate instead of a reminder state', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const none = facts([fact({source:'live_job', execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'image-callback'}})])
+  const unknown = facts([fact({source:'live_job', execution:'running', followUp:{state:'unknown'}})])
+  for (const reply of [
+    '发图这事目前没有后续登记。', '发图这件事现在没有后续安排。',
+    '发送图片这件事没有后续登记。', '给你发图这事没有后续登记。'
+  ]) {
+    for (const current of [facts(), f00dReminderOnlyFacts(), live, unknown]) {
+      assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unsupported_task_state'), reply)
+    }
+    assert.deepEqual(validateActionReply(reply, none, raw), [], reply)
+  }
+  const reminderNone = f00dReminderOnlyFacts()
+  reminderNone.tasks[0]!.followUp = {state:'none'}
+  assert.ok(validateActionReply('发图这事的登记尚未核实，所以不会自动发你。', reminderNone,
+    '考试提醒还会自动发我吗？').some(item=>item.code==='unsupported_task_state'))
+})
+
+test('f00d concessive completion conditions still assert the image automatic-delivery registration state', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const none = facts([fact({source:'live_job', execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'image-callback'}})])
+  for (const reply of [
+    '所以就算图好了也不会自动发你。', '就算图做好了也不会自动发。',
+    '即使这张图做好了也不会自动发你。', '哪怕图片出来了也不会自动发给你。'
+  ]) {
+    for (const current of [facts(), f00dReminderOnlyFacts(), live]) {
+      assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unsupported_task_state'), reply)
+    }
+    assert.deepEqual(validateActionReply(reply, none, raw), [], reply)
+  }
+})
+
+test('f00d local arrangement checks retain unknown evidence, nonassertions and user-initiated lookups', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  for (const reply of [
+    '发图这事的后续登记目前还没核实。', '发图这事目前没有查到后续登记的记录。',
+    '我不能确认发图这事目前没有后续登记。', '发图这事目前没有后续登记吗？',
+    '“发图这事目前没有后续登记”只是个例子。', '她发图这事目前没有后续登记。',
+    '她说发图这事目前没有后续登记。', '不能确认就算图好了也不会自动发你。',
+    '就算图好了也不会自动发你吗？', '“就算图好了也不会自动发你”只是个例子。',
+    '她就算图好了也不会自动发你。', '就算她的图好了也不会自动发你。',
+    '就算没做好也不会自动发你。',
+    '图的后续登记还没核实，你回来再问我，我再查，确认到就回你。',
+    '你回来再问我，我再查，有结果就发给你。'
+  ]) assert.deepEqual(validateActionReply(reply, f00dReminderOnlyFacts(), raw), [], reply)
+})

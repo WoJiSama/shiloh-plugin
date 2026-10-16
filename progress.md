@@ -1683,3 +1683,15 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 同步确认窄修已停写：用户触发取首个“我再”，只允许明确ON_DEMAND_LOOKUP后的最新局部确认，后续独立等待或产物条件仍拒绝。源码95/95、strict0；父统一strict/build/testcompile与10文件最终发送/实际产物315/315全过无跳过。日志归档reply-followup-v2-*，已通知只读评审按修正收集器复跑，不改旧期望。准备CAS同步、原目录验证和新版冻结实模。
 
 - 第六次CAS同步230目标、21实际写入，1630非目标文件、原HEAD和index均保持。原目录strict/build/testcompile及315/315回归通过，五业务源码和对应JS与隔离分支逐项一致，原目录自身manifest自洽。验证与审计归档reply-followup-v2-original-*及writeback-audit，准备提交新干净源码并冻结60轮。
+
+- 新版f00d295已提交推送，干净release包完整校验并启动同协议隔离60轮。独立只读产物复核333/333通过：旧294例、历史漏检1例、原23控制和owner15邻近控制，source/dist完整输出及distinct codes逐项一致，全部原期望保留；源码/dist/输入与首报hash保持。报告归档reply-followup-v2-compiled-review.json。生产尚未部署新版，完整模型语义复核和最终deploy.sh继续。
+
+- f00d295完整60轮结构全过，78/78请求HTTP200且全部low，18纠正9兜底，P50/P95/最大2.668/10.259/12.630秒；8协议指纹一致，平台发送/真实工具/生产存储测试写入0。raw hash a40b11312c7345879498ec2ca9c9b2b4d8627b06230fd4f5181dbfcd9323f301。两个fresh代理仅看移除expected/semanticChecks/manualReview后的完整匿名各14组，canonical输入与实际评审输入一致。
+
+- 父逐句发现f00d index59纠正后仍把仅考试提醒记录推为“发图这事目前没有后续登记，所以就算图好了也不会自动发你”。guard remaining空，完整原件保留；已交动作owner修局部对象/登记谓词，不扩日期或社交。父补完整最终发送及无效纠正再校验回归，后续源码必须另行冻结，尚未部署f00d。
+
+- f00d完整28组fresh盲评已校验、逐组揭盲并封存f00d295-review：9胜6负13平，总分211:205；自然度4胜8负16平、48:52；硬错候选1/基线7。唯一候选硬错与父index59一致。父两条最终发送RED均真实复现（2tests/0pass/2fail），日志已保留，不改写既有期望。owner确认动作名词对象/后置登记、话题切回图片与就算条件消费两个组合根因，正在同域窄修。
+
+- 图片登记对象窄修已停写：source99/99、strict0、diff检查0；父统一strict/build/testcompile与10文件最终发送/实际产物320/320全过无跳过。完整原话纠正及无效纠正兜底均已闭环，正常控制保留。日志归档arrangement-scope-*；已通知只读评审复用旧333固定期望并加完整row59和新邻近控制，不覆盖旧报告、不改期望。原目录CAS与新版冻结继续。
+
+- 第七次CAS同步254目标、36实际写入，1630非目标文件、原HEAD/index保持。原目录严格类型、构建、测试编译与320/320回归全部通过，五业务TS/JS与隔离分支逐项一致，自身manifest自洽；原目录并发改动保留。验证与审计归档arrangement-scope-original-*及writeback-audit，准备提交新版并冻结完整60轮。

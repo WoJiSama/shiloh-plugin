@@ -1,32 +1,32 @@
 {
-  "evaluatedCandidate": "53aeb89ddac41520642fc3cdb922b5aad325e53f",
+  "evaluatedCandidate": "f00d29510a8c1c008804c806507dab0ea19c76d0",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "11ca02647cb25ea188188d68afcd8a783eec604c5a4f9140d740dafd6df822b3",
-    "blind-review.json": "7f3ba4958108e9fb1ce418109c804c5c26c9c0c821a0ef2abe673afff7e83648"
+    "blind-conversations.json": "5bc15bce50a3b4964502ccdab744b3a4d3448a40a60d9f74e94d5e7bce68e904",
+    "blind-review.json": "6b38675f8b6c65d9ddcca0aacc1dba5ee3e3242646621fe6236f3c810328e18a"
   },
   "cases": 28,
   "preference": {
-    "candidate": 7,
-    "baseline": 4,
-    "tie": 17
+    "candidate": 9,
+    "baseline": 6,
+    "tie": 13
   },
   "scoreTotals": {
-    "candidate": 215,
-    "baseline": 211
+    "candidate": 211,
+    "baseline": 205
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
         "candidate": 6,
-        "baseline": 2,
-        "tie": 20
+        "baseline": 1,
+        "tie": 21
       },
       "scoreTotals": {
-        "candidate": 52,
-        "baseline": 46
+        "candidate": 53,
+        "baseline": 47
       }
     },
     "continuity": {
@@ -37,29 +37,29 @@
       },
       "scoreTotals": {
         "candidate": 56,
-        "baseline": 54
+        "baseline": 53
       }
     },
     "new_information": {
       "preference": {
-        "candidate": 0,
-        "baseline": 2,
-        "tie": 26
+        "candidate": 2,
+        "baseline": 1,
+        "tie": 25
       },
       "scoreTotals": {
         "candidate": 54,
-        "baseline": 56
+        "baseline": 53
       }
     },
     "naturalness": {
       "preference": {
-        "candidate": 0,
-        "baseline": 2,
-        "tie": 26
+        "candidate": 4,
+        "baseline": 8,
+        "tie": 16
       },
       "scoreTotals": {
-        "candidate": 53,
-        "baseline": 55
+        "candidate": 48,
+        "baseline": 52
       }
     }
   },
@@ -73,23 +73,10 @@
   },
   "hardErrors": [
     {
-      "id": "F1-001",
-      "caseId": "case-01",
-      "candidate": "candidate",
-      "description": "第一轮只有历史接单话语和空任务查询，未核实同任务有效确认或回报安排，却承诺确认后会回报，形成主动后续预期。第二轮要求用户回来再问不能删除先前承诺；这也不等于认定空列表证明任务不存在。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "等我确认到就回你。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "F1-002",
+      "id": "N1-001",
       "caseId": "case-01",
       "candidate": "baseline",
-      "description": "空tasks只说明未查到安排，不能证明没有后续任务或确定不会自动发。候选将未核实状态说成确定的安排不存在。",
+      "description": "第2轮把未返回任务记录当成不存在后续安排，并据此确定不会自动发。两轮knownTaskFacts均为lookup=ok、tasks=[]；recentContext仅有收到后先处理的承接，没有followUp=none或取消事实。空查询使安排未知，不足以支持确定否定。",
       "occurrences": [
         {
           "turn": 2,
@@ -99,10 +86,10 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-003",
+      "id": "N1-002",
       "caseId": "case-02",
       "candidate": "baseline",
-      "description": "没有核实匹配的运行任务或完成后发送安排，第一轮却保证拿到图就第一时间发。这是面向未来的主动投递承诺，并非用户回来再问后才尝试回复。第二轮改口不消除先前错误。",
+      "description": "第1轮在结果、投递与后续均未核实时，作出拿到图后第一时间主动发送的确定行动承诺。该轮lookup=ok、tasks=[]，没有已登记的完成后投递或其他可兑现后续动作的证据；recentContext的先处理也不提供该保证。",
       "occurrences": [
         {
           "turn": 1,
@@ -112,10 +99,10 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-004",
+      "id": "N1-003",
       "caseId": "case-02",
       "candidate": "baseline",
-      "description": "证据仅是空任务查询，不能证明自动发送未登记或确定不会主动发。该轮把未知安排否定为不存在，也与上轮承诺形成未解释冲突。",
+      "description": "第2轮从tasks=[]断言没有登记自动发送、不会主动发；输入没有followUp=none、取消或足以证明不存在安排的事实。该句还与第1轮拿到图第一时间发的承诺相反，而两轮任务证据相同、用户仅新增去吃饭和询问安排。",
       "occurrences": [
         {
           "turn": 2,
@@ -125,56 +112,69 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-005",
+      "id": "N1-004",
       "caseId": "case-03",
       "candidate": "baseline",
-      "description": "sent的messageId精确匹配recentContext中2026-01-01 11:59:30+08:00的送达消息，后续用户轮按披露时钟发生在2026-10-16。称该次送达发生在刚才与可匹配历史时间冲突；用户自己的刚才不能覆盖披露时钟。",
+      "description": "把已证实的历史投递说成刚才发生。任务delivery.messageId=synthetic-delivery-001，匹配recentContext中2026-01-01T11:59:30+08:00的机器人已发图消息；historyClockDisclosure说明后续轮次使用2026-10-16实际时钟，该投递并非刚才。依据是匹配投递消息时间，并非由任务观测时间推断。",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "刚才就发在群里了"
+          "exactQuote": "出来啦，刚才就发在群里了，傍晚那张，往上翻一下就能看到。"
         }
       ],
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-006",
+      "id": "N1-005",
       "caseId": "case-09",
       "candidate": "baseline",
-      "description": "材料只确认第二张任务，第一张仍未知。要求用户重发可作为选项，但保证自己会持续盯到弄好并发出，超出已核实执行和投递依据；不像尝试重发那样保留完成及送达边界。",
+      "description": "正确说明第一张无匹配记录后，对重新发图又作出盯着弄好并发出的确定完成和交付保证。已知仅有synthetic-request-other第二张任务；第一张synthetic-request-missing没有执行中任务、可用成品或已登记后续证据。再次处理可以是条件性帮助，此句却未保留尝试或结果未定的边界。",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "我这次盯着弄好发你。"
+          "exactQuote": "你要是急的话，把图再发我一次，我这次盯着弄好发你。"
         }
       ],
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-007",
+      "id": "N1-006",
       "caseId": "case-10",
       "candidate": "baseline",
-      "description": "第二张的sent记录精确对应recentContext中2026-01-01的送达消息，后续用户轮实际在2026-10-16。称该次送达在刚才有明确时钟冲突，并非从observedAt推断交付日期。",
+      "description": "将第二张已发送记录说成刚才发送。任务delivery.messageId=synthetic-delivery-other，匹配recentContext中2026-01-01T11:59:30+08:00的第二张已发机器人消息；historyClockDisclosure说明当前后续轮次使用2026-10-16实际时钟。匹配消息的历史时间与刚才不符，不能以近期叙述语气改写投递时间。",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "刚才只把第二张的傍晚背景发好了"
+          "exactQuote": "刚才只把第二张的傍晚背景发好了，"
         }
       ],
       "anonymousCandidate": "B"
     },
     {
-      "id": "F2-001",
+      "id": "N2-001",
       "caseId": "case-28",
       "candidate": "baseline",
-      "description": "首轮明确断言自动发图没有登记、不会自动发出。knownTaskFacts只返回与exam-request匹配的考试提醒及其reminder类型followUp，未提供与image-request匹配的任务状态、完整查询覆盖范围或图片投递安排。因此能支持的只是改图及其自动投递尚未核实，不能从只有考试提醒记录推出改图投递安排不存在，更不能断言不会发送。",
+      "description": "无支持的确定否定：knownTaskFacts.lookup为ok，但tasks仅列出requestMessageId为exam-request的考试提醒及其registered followUp，没有image-request对应任务或明确未登记/禁用图片后续的状态。用户说只登记考试提醒也不能排除改图任务本身的自动发送安排。由这些信息只能说图片后续尚未确认，不能确定它不会自动发送。",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "自动发图没有对应的登记，不会自动发你"
+          "exactQuote": "自动发图没有对应的登记，不会自动发你，想看进度就再来问一声吧。"
         }
       ],
       "anonymousCandidate": "A"
+    },
+    {
+      "id": "N2-002",
+      "caseId": "case-28",
+      "candidate": "candidate",
+      "description": "无支持的确定否定：输入可确认的是exam-request对应考试提醒已registered；没有给出image-request对应任务的followUp未登记状态，也没有自动发图能力或安排被否定的事实。把未查到图片后续记录推成即使图片完成也一定不会自动发出，超出了证据。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "发图这事目前没有后续登记，所以就算图好了也不会自动发你，到时候你再喊我一声就行。"
+        }
+      ],
+      "anonymousCandidate": "B"
     }
   ]
 }

@@ -81,6 +81,7 @@ test('final grounding rechecks cancellation after generation and respects explic
 })
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
+  {candidate:'图这边我还没查到结果，不确定好没好，别急哈。\n\n考试提醒那个是登记上了的，到 2100 年 1 月 1 号早上八点会触发。发图这事目前没有后续登记，所以就算图好了也不会自动发你，到时候你再喊我一声就行。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam-reminder',dueAt:4102444800000}}],corrected:'图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。'},
   {candidate:'你回来再问我，我再查，图真正出来后我再回你。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和后续通知安排尚未核实。你之后再问一声，我再查当前状态。'},
   {candidate:'这个我这边还没查到结果，进度我不敢乱说欸。\n\n任务我之前是接了的，现在有没有跑完还没确认，等我确认到就回你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'图片处理结果尚未核实，后续通知安排也尚未确认。你之后再问一声，我再查当前状态。'},
   {candidate:'这张还没确认好呢，第二张发出去的时候第一张的结果我这边没收到回执。等真的出来了我会直接发，不骗你。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和完成后发送的安排尚未核实，暂时不能确认。'},
@@ -149,6 +150,26 @@ test('an explicit later user request can lead to another reply without a backgro
  assert.equal(archived[0].message[0].text,candidate)
  assert.equal(messages.at(-1).content,candidate)
  }
+})
+test('a repaired image-arrangement denial cannot borrow a reminder or enter sent history',async()=>{
+ const {api,event,host,archived,saved,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+ const invalidRepair='图这边我还没查到结果，不确定好没好，别急哈。\n\n考试提醒那个是登记上了的，到 2100 年 1 月 1 号早上八点会触发。发图这事目前没有后续登记，所以就算图好了也不会自动发你，到时候你再喊我一声就行。'
+ session.interactionContext.rawUserText='刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+ session.interactionContext.actionFacts.tasks=[{taskId:'exam-reminder',requestMessageId:'exam-request',source:'reminder',toolName:'reminderTool',observedAt:Date.now(),execution:'queued',result:'unknown',delivery:{state:'not_attempted'},followUp:{state:'registered',kind:'reminder',id:'exam-reminder',dueAt:4102444800000}}]
+ let repairs=0
+ host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:invalidRepair}}]}}
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'reminder-independent-fallback'}
+ await api.handleTextResponse(host,'改背景的图没有登记到任务，所以也不会自动发你。',event,session,messages)
+ assert.equal(repairs,1)
+ assert.equal(session.replyGrounding.fallback,true)
+ assert.equal(sent.length,1)
+ assert.notEqual(sent[0],invalidRepair)
+ assert.match(sent[0],/尚未核实/u)
+ assert.equal(messages.at(-1).content,sent[0])
+ assert.equal(archived[0].message[0].text,sent[0])
+ assert.equal(saved.length,1)
+ assert.equal(enhanced[0][2],sent[0])
+ assert.doesNotMatch(JSON.stringify(messages),/所以就算图好了也不会自动发你/u)
 })
 test('completed results and past delivery failures keep their original wording without a new promise',async()=>{
  for(const candidate of [
