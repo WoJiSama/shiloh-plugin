@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-10-16T04:53:27.823Z",
+  "releaseCommit": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "originalHead": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+  "headUnchanged": true,
+  "indexUnchanged": true,
+  "targetCount": 51,
+  "protectedDirtyCount": 379,
+  "protectedDirtyChanged": [],
+  "targetMismatches": [],
+  "compiledBusinessTargets": 14,
+  "compiledTargetMismatches": [],
+  "sourceManifestMismatches": [],
+  "outputManifestMismatches": [],
+  "typecheckPassed": true,
+  "buildPassed": true,
+  "targeted": {
+    "tests": 186,
+    "passed": 186,
+    "failed": 0,
+    "skipped": 0
+  },
+  "scope": "Only this task targets are compared with the release; concurrent config/group-admin work remains preserved and makes the complete original source tree differ from production."
+}
