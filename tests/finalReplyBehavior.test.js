@@ -52,7 +52,9 @@ test('tool calls and invalid repairs cannot execute or leak into sent history',a
  }
 })
 test('a text-only final reply cannot archive unsupported actions, delivery causes or negative states',async()=>{
- for(const candidate of ['我现在再发一次。','我现在发给你。','我现在重跑。','上次发给你的时候被拦下来了。','之前那次投递被拒。','不过之前发的时候投递被拒了。','不过上次你要发的时候被拒了。','不过之前你要投递的时候被明确拒绝过。','做好了，就是还没发——之前你那边拒绝收，就一直搁着。','原因我还没查到，等确认了我再跟你说。','没发出来过。','还没欸。','第一张图的还没弄好。']){
+ for(const candidate of ['我现在再发一次。','我现在发给你。','我现在重跑。','上次发给你的时候被拦下来了。','之前那次投递被拒。','不过之前发的时候投递被拒了。','不过上次你要发的时候被拒了。','不过之前你要投递的时候被明确拒绝过。','做好了，就是还没发——之前你那边拒绝收，就一直搁着。','原因我还没查到，等确认了我再跟你说。','没发出来过。','还没欸。','第一张图的还没弄好。',
+  '还没出来欸……刚才只记了要处理，这会儿没查到跑完的结果。我这边现在没法直接看进度，等有实际产出我再发你，不瞎猜状态。',
+  '你要的话我现在再发一次试试。']){
   const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()};let repairs=0
   session.interactionContext.rawUserText='刚才那张图出来了吗？我还没收到。'
   host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'honest-reply'}

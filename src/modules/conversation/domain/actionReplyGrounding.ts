@@ -13,10 +13,11 @@ function withoutQuotations(text: string): string {
   return text.replace(/```[\s\S]*?```|`[^`\n]*`|“[^”\n]*”|‘[^’\n]*’|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"|'[^'\n]*'/gu, '')
 }
 
-/** Preserve question punctuation so an interrogative cannot become a claim. */
+/** Preserve question punctuation and treat hesitation marks as clause breaks;
+ * a later uncertainty disclaimer cannot erase an earlier state assertion. */
 function assertions(text: string): ReplySentence[] {
-  return [...withoutQuotations(text).matchAll(/[^。！？!?；;\n]+[。！？!?；;]?/gu)]
-    .map(match => ({text: match[0].replace(/[。！？!?；;]+$/u, '').trim(), question: /[？?]$/u.test(match[0])}))
+  return [...withoutQuotations(text).replace(/\.{3,}/gu, '…').matchAll(/[^。！？!?；;…\n]+[。！？!?；;…]?/gu)]
+    .map(match => ({text: match[0].replace(/[。！？!?；;…]+$/u, '').trim(), question: /[？?]$/u.test(match[0])}))
     .filter(sentence => Boolean(sentence.text))
 }
 
@@ -117,7 +118,7 @@ function asksArtifactResult(rawUserText: string): boolean {
 const SPOKEN_UPDATE = /^(?:(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|(?:告诉|告知)(?:你|您))$/u
 const SPEECH_DELAY = /等(?:我)?(?:确认|核实|查清|弄清|查到)|(?:确认|核实|查清|弄清|查到).{0,12}(?:之后|以后|后)|稍后|待会|过会|明早|明天|到时候|到时|届时|之后|自动|主动/u
 const ASYNC_ACTION = /(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)/gu
-const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
+const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:实际(?:的)?|真正(?:的)?)?(?:产出|成品)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
 const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持续|定时|自动|继续)(?:查|查询|检查)/u
@@ -185,8 +186,12 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
     const conditionPrefix = completion >= 0 ? before.slice(0, completion).split(/[，,]/u).at(-1) || '' : actionPrefix
     if (NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
     const delivery = implicitHandoff || /发|投递|补给|补上/u.test(match[0])
+    // Consent to an offered action does not provide execution evidence.
+    // Strip only a condition followed by our own explicit present action;
+    // third-party actions and user-triggered future requests stay separate.
+    const selfActionPrefix = actionPrefix.replace(/^(?:你|您)(?:要|需要|想要)(?:的话)?(?=我(?:这边)?(?:现在|这就|马上|立刻|立即|先|就|再|来))/u, '')
     if ((delivery || RERUN_OR_POLL.test(match[0]))
-      && (IMMEDIATE_ACTION.test(actionPrefix) || completion < 0 && PRESENT_SELF_ACTION.test(actionPrefix))) {
+      && (IMMEDIATE_ACTION.test(selfActionPrefix) || completion < 0 && PRESENT_SELF_ACTION.test(selfActionPrefix))) {
       // Text supplied in this very reply needs no separate tool execution.
       // Keep this exemption limited to an explanation, never an artifact.
       const inlineText = /(?:^|把)(?:操作)?(?:步骤|解释|说明|答案|建议|示例|做法|思路|文字)$/u.test(actionPrefix)

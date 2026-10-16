@@ -1,0 +1,343 @@
+{
+  "evaluatedCandidate": "4094d9c7aa8297dfff0de2bac06ab6829af5e155",
+  "baseline": "5a8a63069f014805b4194141454cbec40c15093e",
+  "methodology": "Per-case random labels are mapped before aggregation. These findings do not evaluate later patches.",
+  "sourceHashes": {
+    "blind-mapping.json": "2fce5264ebdc2b112695c66a71cd6d2f754a89042d5f75bc681470fa009c82cf",
+    "blind-conversations.json": "89036488550bb94e90691d37399eded7b0c97568227582e078032d46f0d80a9b",
+    "blind-review.json": "7eba56cfea161f654a78a6a9df67dda091c3d78fd9382c1fad8d06a8c870259f"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 12,
+    "baseline": 9,
+    "tie": 7
+  },
+  "scoreTotals": {
+    "candidate": 197,
+    "baseline": 194
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 11,
+        "baseline": 1,
+        "tie": 16
+      },
+      "scoreTotals": {
+        "candidate": 50,
+        "baseline": 38
+      }
+    },
+    "speaker_object_quantity_stance_continuity": {
+      "preference": {
+        "candidate": 4,
+        "baseline": 4,
+        "tie": 20
+      },
+      "scoreTotals": {
+        "candidate": 51,
+        "baseline": 51
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 2,
+        "tie": 25
+      },
+      "scoreTotals": {
+        "candidate": 53,
+        "baseline": 54
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 4,
+        "baseline": 12,
+        "tie": 12
+      },
+      "scoreTotals": {
+        "candidate": 43,
+        "baseline": 51
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 3,
+    "baseline": 12
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 3,
+    "baseline": 15
+  },
+  "hardErrors": [
+    {
+      "id": "HE-01",
+      "caseId": "case-01",
+      "candidate": "baseline",
+      "category": "unknown_status_asserted_as_incomplete",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "查询成功但没有对应任务记录，只能说明未确认，不能确认尚未完成。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "还没出来欸，我这边没拿到处理结果，先不瞎说。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-02",
+      "caseId": "case-01",
+      "candidate": "baseline",
+      "category": "unregistered_future_delivery_promise",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "没有任务或后续机制登记，承诺自己等确认后发出是不受支持的后续行动。第二轮收回不消除第一轮错误。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我确认了有图再发你。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-03",
+      "caseId": "case-01",
+      "candidate": "candidate",
+      "category": "unknown_status_asserted_as_incomplete",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "空任务记录没有证明尚未完成。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "还没出来欸……刚才只记了要处理，这会儿没查到跑完的结果。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-04",
+      "caseId": "case-01",
+      "candidate": "candidate",
+      "category": "unregistered_future_delivery_promise",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "没有登记后续行动，却表示有实际产出后将由自己发送。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "我这边现在没法直接看进度，等有实际产出我再发你，不瞎猜状态。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-05",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "category": "unknown_status_asserted_as_incomplete",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "缺少结果记录不能推出确定没出来。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "还没出来欸，我这边没拿到处理结果，不敢瞎说。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-06",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "category": "unregistered_future_delivery_promise",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "没有图片任务或后续机制，却承诺以后有图再发。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等真有图了再发你，别急哈。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-07",
+      "caseId": "case-05",
+      "candidate": "baseline",
+      "category": "invented_delivery_failure_cause",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "记录仅为delivery.failed，没有拒绝或拒收原因。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "出来是出来了，不过上次你要发的时候被拒了，就没送出去。"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "做好了，只是上次发的时候被拒了，卡在投递这一步。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-08",
+      "caseId": "case-06",
+      "candidate": "candidate",
+      "category": "unsupported_current_retry_offer",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "本轮没有重试工具。附带用户同意条件仍不应保证当前能够再发送。此为能力/承诺越界，不是已经补发的声称。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "你要的话我现在再发一次试试。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-09",
+      "caseId": "case-06",
+      "candidate": "baseline",
+      "category": "invented_delivery_failure_cause",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "failed没有提供被拒收的证据，不应据此归因。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "出来了的，不过上次发给你被拒收了，所以你那边应该没收到。"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "做好了的，你那边没收到不是因为没做完，是上次发过去被拒收了。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-10",
+      "caseId": "case-06",
+      "candidate": "baseline",
+      "category": "unsupported_current_retry_claim",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "没有重试工具或相应执行，不能许诺再次发送，更不能说现在再发。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "要的话跟我说一声，我再发一次。"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "我现在再发一次试试。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-11",
+      "caseId": "case-09",
+      "candidate": "baseline",
+      "category": "unknown_status_asserted_as_incomplete",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "唯一找到的是第二张的任务，第一张没有对应完成记录；这不等于第一张确定没出来。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "还没出来呢。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-12",
+      "caseId": "case-10",
+      "candidate": "baseline",
+      "category": "unsupported_execution_outcome",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "没有第一张的匹配任务，不能把它说成自己曾处理但没跑出来。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "第一张我这边没跑出来，现在也没查到有在处理中的任务。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-13",
+      "caseId": "case-10",
+      "candidate": "baseline",
+      "category": "unsupported_current_image_processing_promise",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "现有信息没有能在本轮直接处理图片的工具或执行依据，却承诺直接弄。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "你方便的话把图再发我一次，我这轮直接给你弄。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-14",
+      "caseId": "case-15",
+      "candidate": "baseline",
+      "category": "overconfident_hardware_safety_assurance",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "CPU型号、规格和测点未给出，82℃不能单独推出离出事还远；后文补充需要型号也不能使这句保证成立。",
+      "occurrences": [
+        {
+          "turn": 3,
+          "exactQuote": "所以不冒烟不焦味是合理的，离出事还远。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-15",
+      "caseId": "case-28",
+      "candidate": "baseline",
+      "category": "unknown_status_asserted_as_incomplete",
+      "dimensions": [
+        "evidence_fidelity"
+      ],
+      "reason": "只存在考试提醒记录，图片状态未知，不支持确定图还没出来。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "图这边还没出来，我也没法确认它好了会自动发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    }
+  ]
+}

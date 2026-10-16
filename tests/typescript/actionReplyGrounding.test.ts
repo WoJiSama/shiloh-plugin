@@ -471,3 +471,46 @@ test('deferred spoken updates need their own registration while present explanat
     assert.deepEqual(validateActionReply(text,facts(),'刚才的图出来了吗？'),[],text)
   }
 })
+
+test('hesitation punctuation separates an asserted task state from a later evidence disclaimer', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  for (const text of [
+    '还没出来欸……刚才只记了要处理，这会儿没查到跑完的结果。',
+    '还没出来欸...我还不能确认进度。',
+    '图已经做好了……是否发出还没确认。'
+  ]) assert.ok(validateActionReply(text, facts(), raw).some(item=>item.code==='unsupported_task_state'), text)
+  for (const text of [
+    '我还不能确认……没有处理结果的记录。', '图还没出来吗……我需要再核实。',
+    '“还没出来欸……刚才只记了要处理”这句话不说明实际状态。',
+    '我妹妹还没出来……我在门口等她。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), raw), [], text)
+})
+
+test('an actual-output condition needs the matching callback even when capability is disclaimed', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const text of [
+    '我这边现在没法直接看进度，等有实际产出我再发你，不瞎猜状态。',
+    '有实际的产出我再发你。', '有真正的成品就通知你。'
+  ]) {
+    assert.ok(validateActionReply(text, facts(), raw).some(item=>item.code==='unregistered_followup'), text)
+    assert.deepEqual(validateActionReply(text, live, raw), [], text)
+  }
+  for (const text of [
+    '我没法确认有实际产出就发你。', '有实际产出我也不能发你。',
+    '有实际产出你再来问我，我再发你。', '有实际产出我再发你吗？',
+    '她有实际产出就发你。', '“有实际产出我再发你”不能保证。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), raw), [], text)
+})
+
+test('conditional consent does not establish the ability to perform a present resend', () => {
+  const sent = facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'old-receipt'}})])
+  for (const text of ['你要的话我现在再发一次试试。', '你需要的话我这就再发一次。', '你想要的话我马上重跑。']) {
+    for (const current of [facts(),sent]) assert.ok(validateActionReply(text, current, '刚才那张图做好了吗？').length, text)
+  }
+  for (const text of [
+    '你要的话我现在也不能再发一次。', '你要的话我现在再发一次吗？',
+    '“你要的话我现在再发一次”只是例子。', '你要的话她现在再发一次。',
+    '你要的话我现在解释一下：图片好了，但发送失败。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), '刚才那张图做好了吗？'), [], text)
+})

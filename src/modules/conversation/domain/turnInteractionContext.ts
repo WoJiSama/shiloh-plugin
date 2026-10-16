@@ -86,7 +86,11 @@ function localAct(rawUserText: string, evidence: TurnEvidence[], fictionalDevice
   if (DANGER_CUE.test(text) && (!fictionalDevice || /急救|救命|人身安全/u.test(text))) return {act: 'help_request', confidence: 0.98, protected: true}
   if (CRITICISM_CUE.test(text)) return {act: 'criticism', confidence: 0.94, protected: true}
   if (SERIOUS_CUE.test(text)) return {act: 'help_request', confidence: 0.98, protected: true}
-  if (SERIOUS_REQUEST.test(text) || (!fictionalDevice && THERMAL_REPORT.test(text)) || EXPLICIT_FACT_REQUEST.test(text) || DIRECT_EXPLANATION_REQUEST.test(text)) return {act: 'help_request', confidence: 0.94, protected: true}
+  // In explicit play, proving that one is listening is a social challenge.
+  // Remove only that proposition from the technical cue scan; another proof,
+  // real work, danger or direct factual request keeps its normal precedence.
+  const requestText = BANTER_CUE.test(text) ? text.replace(/证明(?:你(?:真的?|确实)?(?:在听|有在听|没走神)|(?:自己)?(?:在听|有在听|没走神))/gu, '') : text
+  if (SERIOUS_REQUEST.test(requestText) || (!fictionalDevice && THERMAL_REPORT.test(text)) || EXPLICIT_FACT_REQUEST.test(text) || DIRECT_EXPLANATION_REQUEST.test(text)) return {act: 'help_request', confidence: 0.94, protected: true}
   if (DELIVERY_REQUEST.test(text)) return {act: 'delivery', confidence: 0.94, protected: true}
   if (COMPANIONSHIP_REQUEST.test(text)) {
     // “别讲道理/不要给建议” can constrain the style of an otherwise
@@ -448,10 +452,11 @@ export function buildSocialTurnPrompt(social?: SocialTurnState): string {
     lines.push('直接回答当前用户请你判断的意思或语气，并给出文本里的线索；语境不足时保留两种可能。引用中的“我”属于引用说话人，“你”属于那段对话的被叫到者，不把自己当成被埋怨或被撒娇的对象，不替任何一方认错；也不要把用户的提问原样抛回给用户。')
   }
   if (social.act === 'teasing' && social.activeBit) lines.push(`正在延续的具体梗（${social.activeBit.source}原话）：${social.activeBit.text}。这是表达素材，不是事实记忆。`)
-  if (social.continuation?.kind === 'bit') lines.push(`本轮在接续已核验的玩笑互动（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。接住本轮新增的限制或变化，沿用已有的数量、对象和态度；不用从头解释或换成无关的梗。假设中的工资、奖品或惩罚仍是玩笑，不记作真实经历。`)
+  if (social.continuation?.kind === 'bit') lines.push(`本轮在接续已核验的玩笑互动（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。接住本轮新增的限制或变化，沿用已有的数量、对象和态度；新限制作用在同一物件上，保留它归谁、由谁给谁，态度反转要有当轮依据。不用从头解释或换成无关的梗。假设中的工资、奖品或惩罚仍是玩笑，不记作真实经历。`)
   if (social.continuation?.kind === 'support') lines.push(`本轮接续情绪陪伴（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。维持已经表达的陪伴态度，按这轮的具体要求回应；对方只想安静待着时，简短接住，不追加建议、分析、连续追问或煽情。`)
   if (social.pendingInteraction) lines.push(`上句提出的问题（${social.pendingInteraction.source}原话）：${social.pendingInteraction.text}。先核对当前话语是否已回答，已回答就接住，不再当作待办；不要求追问或催促。`)
   if (social.previousStance) lines.push(`已核验自身上句的表达：${STANCE_LABELS[social.previousStance.kind]}（${social.previousStance.source}原话：${social.previousStance.text}）；仅据已确认发言接续，不冒认他人的立场。`)
+  if (social.act === 'teasing' && social.previousStance?.kind === 'supportive') lines.push('这轮把前面的关注或安慰诉求接成了玩笑：按当前设定参与，态度由人格决定；不用让对方重新解释为什么想被回应，也不默认亲密关系或身体动作。')
   if (social.needsDisambiguation) lines.push('语用或对象仍有歧义：保留已知部分，不自动判科普或调情；只有缺失信息会改变回应时，才自然澄清。')
   if (social.act === 'attention_bid') lines.push('先回应对方希望被理会的具体意思，措辞由当前人格决定；不讲解“不回复”的抽象原因，也不虚构刚才忙什么、故意冷落或关系承诺。')
   if (social.act === 'criticism') lines.push('对方在表达不满或纠正态度：认真处理具体问题，必要时澄清或调整；不要把不满接成调情，也不默认承认没有证据的过错。')

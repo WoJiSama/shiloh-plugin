@@ -78,6 +78,27 @@ test('a three-turn quantity joke survives confirmed-send continuity and richer p
   assert.equal(third.social?.continuation?.previous.text, secondReply)
   assert.equal(third.social?.activeBit?.text, third.rawUserText)
   assert.match(buildTurnInteractionPrompt(third), /沿用已有的数量、对象和态度/)
+  assert.match(buildTurnInteractionPrompt(third), /新限制作用在同一物件上/)
+})
+
+test('a confirmed attention response carries its stance into an explicit playful follow-up', async () => {
+  const continuityScope = {groupId: 'attention-to-play-pragmatics', userId: '202', botId: '99', persona}
+  const first = buildTurnInteractionContext({...scope, rawUserText: '你为什么不理我呀'})
+  const reply = '在呢，我听着。'
+  await recordTurnContinuity({...continuityScope, lastReply: reply, social: buildSocialContinuity(first, reply)})
+  for (const rawUserText of ['给你三秒钟把我哄好，开玩笑的', '逗你呢，给你十秒钟证明在听']) {
+    const next = buildTurnInteractionContext({...scope, rawUserText, continuity: await loadTurnContinuity(continuityScope)})
+    assert.equal(next.kind, 'banter', rawUserText)
+    assert.equal(next.social?.previousStance?.kind, 'supportive')
+    const prompt = buildTurnInteractionPrompt(next)
+    assert.match(prompt, /不用让对方重新解释为什么想被回应/)
+    assert.match(prompt, /态度由人格决定/)
+  }
+  for (const rawUserText of ['认真问，Redis是什么？', '逗你呢，帮我证明勾股定理', '逗你呢，证明在听，再证明这条公式', '逗你呢，不过电脑冒烟了怎么办']) {
+    const serious = buildTurnInteractionContext({...scope, rawUserText, continuity: await loadTurnContinuity(continuityScope)})
+    assert.equal(serious.kind, 'serious_answer', rawUserText)
+    assert.doesNotMatch(buildTurnInteractionPrompt(serious), /这轮把前面的关注或安慰诉求接成了玩笑/)
+  }
 })
 
 test('changed quantities and specific answers can extend other verified jokes without relying on biscuit words', () => {
