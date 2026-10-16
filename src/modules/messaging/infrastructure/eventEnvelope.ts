@@ -1,31 +1,50 @@
 import type { EventEnvelope, MessageSegment } from '../../../contracts/pipeline.js'
 import { createHash } from "node:crypto"
+import {formatForwardCompleteness, parseForwardCompleteness} from '../../conversation/domain/forwardCompleteness.js'
 
 interface RawEvent extends Record<string,unknown> {bot?:{uin?:unknown;adapter?:{id?:unknown;name?:unknown}};sender?:{user_id?:unknown};group?:{name?:unknown;group_name?:unknown}}
 const MAX_STRING_LENGTH = 100000
 const MAX_ARRAY_LENGTH = 500
 const MAX_DEPTH = 10
 
-function copySerializable(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+function copySerializable(value: unknown, depth = 0, seen = new WeakSet<object>(), onTruncate = () => {}): unknown {
   if (value === null || value === undefined) return value
-  if (typeof value === "string") return value.length > MAX_STRING_LENGTH ? value.slice(0, MAX_STRING_LENGTH) : value
+  if (typeof value === "string") {if (value.length > MAX_STRING_LENGTH) onTruncate(); return value.length > MAX_STRING_LENGTH ? value.slice(0, MAX_STRING_LENGTH) : value}
   if (["number", "boolean"].includes(typeof value)) return value
   if (typeof value === "bigint") return String(value)
-  if (typeof value !== "object" || depth >= MAX_DEPTH) return undefined
+  if (typeof value !== "object") return undefined
+  if (depth >= MAX_DEPTH) {onTruncate(); return undefined}
   if (Buffer.isBuffer(value)) return undefined
-  if (seen.has(value)) return undefined
+  if (seen.has(value)) {onTruncate(); return undefined}
   seen.add(value)
 
   if (Array.isArray(value)) {
-    return value.slice(0, MAX_ARRAY_LENGTH).map(item => copySerializable(item, depth + 1, seen))
+    if (value.length > MAX_ARRAY_LENGTH) onTruncate()
+    return value.slice(0, MAX_ARRAY_LENGTH).map(item => copySerializable(item, depth + 1, seen, onTruncate))
   }
 
   const output: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value)) {
-    const copied = copySerializable(item, depth + 1, seen)
+    const copied = copySerializable(item, depth + 1, seen, onTruncate)
     if (copied !== undefined) output[key] = copied
   }
   return output
+}
+
+function copyForwardContext(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return copySerializable(value)
+  const {completeness: unverified, ...body} = value as Record<string, unknown>
+  const verified = parseForwardCompleteness(unverified)
+  let truncated = false
+  const copied = copySerializable(body, 0, new WeakSet(), () => {truncated = true}) as Record<string, unknown>
+  if (!verified) return copied
+  // Runtime serialization has its own structural limits. Keep validated counts
+  // intact and disclose any additional clipping instead of upgrading the copy.
+  const completeness = truncated ? {...verified, state: verified.state === 'unavailable' ? 'unavailable' as const : 'partial' as const,
+    snapshotTruncated: true, textTruncated: verified.textTruncated || String(body.text || '').length > String(copied.text || '').length} : verified
+  copied.completeness = completeness
+  if (truncated && typeof copied.text === 'string') copied.text = [formatForwardCompleteness(completeness), copied.text.replace(/^【转发读取范围】[^\n]*(?:\n|$)/, '')].filter(Boolean).join('\n')
+  return copied
 }
 function stableHash(parts: unknown[] = []) {
   return createHash("sha256").update(parts.map(item => String(item ?? "")).join("\u001f")).digest("hex").slice(0, 24)
@@ -88,6 +107,11 @@ export function createEventEnvelope(e: RawEvent = {}, forcedPostType = "", fallb
 
 export function envelopeToRuntimeEvent(envelope: Partial<EventEnvelope> = {}, message = envelope.message) {
   const isGroup = envelope.conversationType === "group"
+  const segments = Array.isArray(message) ? message : []
+  const copiedMessage = copySerializable(segments.map(segment => segment?.type === 'forward_context' ? {type:'forward_context'} : segment)) as MessageSegment[]
+  for (let index = 0; index < copiedMessage.length; index++) {
+    if (segments[index]?.type === 'forward_context') copiedMessage[index] = copyForwardContext(segments[index]) as MessageSegment
+  }
   return {
     event_id: envelope.eventId,
     post_type: envelope.postType,
@@ -102,8 +126,8 @@ export function envelopeToRuntimeEvent(envelope: Partial<EventEnvelope> = {}, me
     time: Math.floor(Number(envelope.occurredAt || Date.now()) / 1000),
     raw_message: envelope.rawMessage || "",
     msg: envelope.rawMessage || "",
-    message: copySerializable(Array.isArray(message) ? message : []),
-    forward_context: copySerializable(envelope.forwardContext || null),
+    message: copiedMessage,
+    forward_context: copyForwardContext(envelope.forwardContext || null),
     sender: copySerializable(envelope.sender || {}),
     source: copySerializable(envelope.source || null),
     operator_id: envelope.operatorId ? Number(envelope.operatorId) || envelope.operatorId : undefined,

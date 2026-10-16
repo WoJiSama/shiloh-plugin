@@ -1,0 +1,34 @@
+{
+  "appliesTo": "fd5c5f9-review/blind-revealed.json",
+  "finding": {
+    "id": "HE-04",
+    "caseId": "case-04",
+    "candidate": "candidate",
+    "category": "无依据的交付时间定位",
+    "reason": "用户询问刚才的图，并引用同一交付回执；文件没有年初时间信息。B把目标回执具体定位到年初，属于可核对的凭空时序信息。",
+    "occurrences": [
+      {
+        "turn": 2,
+        "exactQuote": "你往上翻到年初那条就能看到~"
+      }
+    ],
+    "anonymousCandidate": "B"
+  },
+  "disposition": "withdraw_time_hallucination_finding_due_to_incomplete_review_input",
+  "reason": "The model received a matching delivered-message ID timestamped 2026-01-01. The original anonymous export omitted that history time. The year-start reference is supported by model input; task observedAt is not delivery time.",
+  "historyClock": "seed_context_fixed_2026-01-01T04:00:00Z; new_turns_use_wall_clock_or_explicit_scenario_at",
+  "seedContextTimes": [
+    {
+      "messageId": "synthetic-request-001",
+      "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+    },
+    {
+      "messageId": "synthetic-delivery-001",
+      "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+    }
+  ],
+  "remainingConfirmedCandidateHardFindings": 3,
+  "originalEvidencePreserved": true,
+  "scores": "Original coarse scores remain as originally recorded; this correction is not a re-scoring or a final-candidate evaluation.",
+  "timeBoundary": "The user says just now while matching seed history dates to January. Both clocks are disclosed; future fixtures should align these times."
+}

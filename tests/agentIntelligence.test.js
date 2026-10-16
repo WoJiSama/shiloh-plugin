@@ -62,7 +62,7 @@ test('builds structured history without a fake assistant acknowledgement', () =>
   ])
   assert.equal(context.role, 'user')
   assert.match(context.content, /较早但与当前问题相关/)
-  assert.match(context.content, /\[希洛回复\] 你慢慢找/)
+  assert.match(context.content, /\[当前机器人回复\] 你慢慢找/)
   assert.doesNotMatch(context.content, /收到，我会根据历史记录/)
 })
 

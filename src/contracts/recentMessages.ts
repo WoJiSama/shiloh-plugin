@@ -1,12 +1,16 @@
 import type { MessageCacheOptions } from '../modules/messaging/domain/messageCacheTtl.js'
+import type { PersonaScope } from './persona.js'
+import type {ForwardCompleteness} from './forwardContext.js'
 export interface Segment { type: string; url?: string; fid?: string; text?: string; size?: number; name?: string; id?: string | number; qq?: string | number; title?: string; [field: string]: unknown }
 export interface Sender { user_id?: string | number | undefined; nickname?: string | undefined; card?: string; role?: string | undefined; title?: string | undefined; level?: unknown; identity?: string }
 export interface MessageEvent {
  self_id?: string | number; message_type?: string; message?: Segment[]; raw_message?: string; sender?: Sender; time: number
  event_id?: unknown; message_id?: unknown; source?: unknown; group_id?: string | number; group_name?: string
+ personaSource?: PersonaScope
+ forward_context?: {completeness?:ForwardCompleteness}
  group?: {getFileUrl(fid: string): Promise<string>}; friend?: {getFileUrl(fid: string): Promise<string>}
 }
-export interface StoredMessage { time: string; sender: Sender; content: string; event_id?: unknown; message_id?: unknown; group_name?: string | null | undefined; [field:string]:unknown }
+export interface StoredMessage { time: string; at?: number; sender: Sender; content: string; event_id?: unknown; message_id?: unknown; group_name?: string | null | undefined; personaSource?: PersonaScope; forwardCompleteness?:ForwardCompleteness; [field:string]:unknown }
 export interface RecentOptions extends MessageCacheOptions { privateMaxMessages?: number; groupMaxMessages?: number; messageMaxLength?: number; preEnrichedMessage?: Segment[]; throwOnError?: boolean }
 export interface RecentMessagePorts {
  redis: {get(key: string): Promise<string | null>; set(key: string, value: string, options: {EX: number}): Promise<unknown>; del(...keys: string[]): Promise<unknown>; keys(pattern: string): Promise<string[]>; scanIterator?(options: {MATCH:string;COUNT:number}): AsyncIterable<string | string[]>; scan?(cursor: string, ...args: (string|number)[]): Promise<[string|number,string[]]>}

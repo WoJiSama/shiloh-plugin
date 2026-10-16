@@ -2,8 +2,9 @@
 import { authorityRank, clamp, compactText } from './constants.js'
 import {memoryRecord} from '../../../../contracts/memoryEngine.js'
 import type {MemoryLlmConfig,MemoryLlmPorts,MemoryFact,MemoryEntity,MemoryId} from '../../../../contracts/memoryEngine.js'
-import { makeFact } from './entityModel.js'
+import { makeFact,normalizePersonaSource,personaSourceKey } from './entityModel.js'
 import { memStats } from './stats.js'
+import {finiteTimestamp,memoryDate} from './temporalContext.js'
 
 // 反思巩固器：把实体的零散 facts 交给 LLM 合并去冗余解矛盾（consolidateEntity），
 // 并基于群 facts + 最近文本产出高层洞察（reflectGroup）。
@@ -58,6 +59,27 @@ function latestAt(facts:MemoryFact[]) {
   return facts.reduce((max, f) => Math.max(max, Number(f.at) || 0), 0)
 }
 
+function sourceIndices(value:unknown,count:number):number[] {
+  if (!Array.isArray(value) || !value.length || !value.every(n => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= count)) return []
+  return [...new Set(value.map(n => Number(n) - 1))]
+}
+
+function sameFactContext(sources:MemoryFact[]) {
+  return new Set(sources.map(fact => fact.eventAt ?? null)).size === 1
+    && new Set(sources.map(fact => JSON.stringify([personaSourceKey(fact.personaSource),fact.heardFrom || '']))).size === 1
+}
+
+function sourceMetadata(sources:MemoryFact[]) {
+  const personaSource = normalizePersonaSource(sources[0]?.personaSource)
+  return {eventAt:sources[0]?.eventAt,refs:mergeRefs(sources),...(personaSource ? {personaSource} : {}),...(sources[0]?.heardFrom ? {heardFrom:sources[0].heardFrom} : {})}
+}
+
+function describeFact(fact:MemoryFact,index:number) {
+  const eventAt = finiteTimestamp(fact.eventAt)
+  const source = normalizePersonaSource(fact.personaSource)
+  return `${index + 1}. ${fact.text} [事件日期：${eventAt !== undefined ? memoryDate(eventAt) : '未记录'}；来源：${source ? JSON.stringify(source) : fact.heardFrom || '未记录'}]`
+}
+
 const CONSOLIDATE_PROMPT = `你是长期记忆巩固器。给你某个用户的若干条零散事实（带编号），请合并语义重复、消解矛盾（保留更可信/更新的说法），输出更紧凑的事实列表。只输出 JSON 数组，不要解释。
 每个元素字段：
 - text: 合并后的简洁事实文本（中文）
@@ -65,15 +87,18 @@ const CONSOLIDATE_PROMPT = `你是长期记忆巩固器。给你某个用户的�
 - tags: 可选标签数组
 规则：
 - 同一事实只保留一条；矛盾时保留更可信的一方并丢弃另一方。
+- 只能合并来源与事件日期一致的事实；保留原有日期，不要把“明天”等相对日期重新解释成执行时的日期。
 - 不要凭空发明事实；不要输出与输入无关的内容。
 - 无需合并时可原样返回；无可保留内容时输出 []。`
 
 const GROUP_REFLECT_PROMPT = `你是群聊记忆反思器。根据群内已沉淀的事实与最近的发言，提炼 0 到 3 条高层"洞察"（群体氛围/共识/反复出现的梗或话题/群规倾向）。只输出 JSON 数组，不要解释。
 每个元素字段：
 - text: 一句话洞察（中文，简洁）
+- sources: 必填整数数组，引用“已有群事实”的编号（从 1 开始）；无可靠编号来源则不要产出洞察
 - tags: 可选标签数组
 规则：
 - 最多 3 条；没有可靠洞察时输出 []。
+- 不合并不同事件日期或不同人格来源；近期发言只辅助理解，不能代替有编号事实的证据，也不能把旧事件说成现在发生。
 - 只做概括，不要复述单条事实，不要发明未出现的信息。`
 
 export class Reflector {
@@ -127,7 +152,7 @@ export class Reflector {
       return { facts: allFacts, changed: false }
     }
 
-    const listing = reflectable.map((f, i) => `${i + 1}. ${f.text}`).join('\n')
+    const listing = reflectable.map(describeFact).join('\n')
     const userPrompt = `用户的零散事实：\n${listing}\n\n请输出合并后的 JSON 数组。`
 
     let content
@@ -142,25 +167,29 @@ export class Reflector {
 
     const items = extractJsonArray(content)
     const merged = []
+    const covered = new Set<number>()
     for (const item of items) {
       if (!item || typeof item !== 'object') continue
       const text = compactText(item.text, 240)
       if (!text) continue
-      const sourceIdx = (Array.isArray(item.sources) ? item.sources : [])
-        .map(n => Number(n) - 1)
-        .filter(i => Number.isInteger(i) && i >= 0 && i < reflectable.length)
-      const sources = sourceIdx.length ? sourceIdx.map(i => reflectable[i]!) : reflectable
+      const sourceIdx = sourceIndices(item.sources,reflectable.length)
+      if (!sourceIdx.length) continue
+      const sources = sourceIdx.map(i => reflectable[i]!)
+      // A merged fact must not erase a schedule or turn several observers into
+      // one persona's experience. Keep the original facts when metadata differs.
+      if (!sameFactContext(sources)) continue
       const { authority, confidence } = pickStrongest(sources)
       const tags = [...new Set([...(Array.isArray(item.tags) ? item.tags : []), ...mergeTags(sources)])]
       merged.push(makeFact({
         text,
         tags,
-        refs: mergeRefs(sources),
         authority,
         confidence,
         at: latestAt(sources),
+        ...sourceMetadata(sources),
         origin: 'reflection'
       }))
+      for (const index of sourceIdx) covered.add(index)
     }
 
     if (merged.length === 0) {
@@ -168,7 +197,7 @@ export class Reflector {
     }
 
     // config fact 永不动；其余被合并产物替换。
-    return { facts: [...configFacts, ...merged], changed: true }
+    return { facts: [...configFacts,...reflectable.filter((_fact,index) => !covered.has(index)),...merged], changed: true }
   }
 
   // 基于群 facts + 最近文本产出 0-3 条洞察 fact。失败/未配置 -> insights:[]。
@@ -176,7 +205,8 @@ export class Reflector {
     if (!this.canUse()) return { insights: [] }
 
     const activeFacts = (Array.isArray(facts) ? facts : []).filter(isActiveFact)
-    const factListing = activeFacts.map((f, i) => `${i + 1}. ${f.text}`).join('\n') || '无'
+    if (!activeFacts.length) return {insights:[]}
+    const factListing = activeFacts.map(describeFact).join('\n') || '无'
     const textListing = (Array.isArray(recentTexts) ? recentTexts : [])
       .map((t, i) => `${i + 1}. ${compactText(t, 200)}`)
       .filter(line => line.replace(/^\d+\.\s*$/, '') !== '')
@@ -198,13 +228,18 @@ export class Reflector {
       if (!item || typeof item !== 'object') continue
       const text = compactText(item.text, 240)
       if (!text) continue
-      const tags = [...new Set(['洞察', ...(Array.isArray(item.tags) ? item.tags : [])])]
+      const indexes = sourceIndices(item.sources,activeFacts.length)
+      if (!indexes.length) continue
+      const sources = indexes.map(index => activeFacts[index]!)
+      if (!sameFactContext(sources)) continue
+      const tags = [...new Set(['洞察', ...(Array.isArray(item.tags) ? item.tags : []),...mergeTags(sources)])]
       insights.push(makeFact({
         text,
         tags,
         authority: 'mention',
         confidence: GROUP_INSIGHT_CONFIDENCE,
-        at: Number(latestAt(activeFacts)) || 0,
+        at: latestAt(sources),
+        ...sourceMetadata(sources),
         origin: 'reflection'
       }))
       if (insights.length >= MAX_GROUP_INSIGHTS) break

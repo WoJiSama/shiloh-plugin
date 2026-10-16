@@ -1,0 +1,79 @@
+{
+  "backend": {
+    "total": 2007,
+    "pass": 2005,
+    "fail": 0,
+    "skip": 2,
+    "skipReason": "host music integration unavailable locally"
+  },
+  "frontend": {
+    "pass": 34,
+    "fail": 0
+  },
+  "typecheck": "pass",
+  "boundaries": "pass",
+  "backendBuild": "pass",
+  "frontendBuild": "pass",
+  "dryReplay": {
+    "total": 27,
+    "pass": 27,
+    "claim": "structural only"
+  },
+  "logs": {
+    "bl-task-grounding-phase-c74b691-20261015.log": {
+      "sha256": "2fc3adbb98a2b6ee207b822938557a385d7ad4a89ccca02fe4e2b701e3b325bc",
+      "localPath": "/tmp/bl-task-grounding-phase-c74b691-20261015.log"
+    },
+    "bl-task-grounding-no-legacy-20261015.log": {
+      "sha256": "aefbb9ec0b1e7f747a94f3e02aef5def62fd7e834e93fbb14b6f637ba13db4da",
+      "localPath": "/tmp/bl-task-grounding-no-legacy-20261015.log"
+    },
+    "bl-task-grounding-pack-final-20261015.log": {
+      "sha256": "2f3197cff81cb96d7ff3f9f17d7f9966b1c8ebe8c56a5eb054364dfc92233694",
+      "localPath": "/tmp/bl-task-grounding-pack-final-20261015.log"
+    },
+    "bl-task-grounding-phase-integrated-20261015.log": {
+      "localPath": "/tmp/bl-task-grounding-phase-integrated-20261015.log",
+      "sha256": "4aa3cb7b6b4af5ca67b8ecc1d7335ca2626565ee8d02db84bae415bd4175a580"
+    }
+  },
+  "replayCommit": "c74b69195ff9c06cb0a418b17acae3aeff407329",
+  "integratedCommit": "7e60652",
+  "integratedBackend": {
+    "total": 2008,
+    "pass": 2006,
+    "fail": 0,
+    "skip": 2
+  },
+  "finalRelease": {
+    "commit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+    "command": "bash scripts/deploy.sh",
+    "skipTests": false,
+    "backendTests": {
+      "total": 2016,
+      "pass": 2014,
+      "fail": 0,
+      "skip": 2,
+      "skipReason": "host music integration environment"
+    },
+    "frontendTests": {
+      "pass": 34,
+      "fail": 0
+    },
+    "typecheck": true,
+    "moduleBoundaries": true,
+    "backendBuild": true,
+    "frontendBuild": true,
+    "releaseVerification": true,
+    "managedFiles": 1919,
+    "phaseGateLog": "final-phase-gate.log.gz",
+    "phaseGateLogSha256": "47711520ff131119a782b42ba071b0133c34da6832602bc707379894eba3ce73",
+    "deploymentLog": "deployment.log.gz",
+    "deploymentLogSha256": "08e1b93de0ce36e4d90d6eaf262914a1a33a8c174a1189de77e7bf4c90278041",
+    "diagnosticSupplementTurns": 30,
+    "originalCandidateTurnsPreserved": 135,
+    "productionAudit": "post-deploy-audit.json",
+    "phaseGateLogCompressedSha256": "af9be732bb1dc58d1ecc7f6e654892f070ccdba7068cd51890fd89d4b3040c48",
+    "deploymentLogCompressedSha256": "f7ae751771c802d85e32c23e7b723a65d8c83e0100f9993046e923ab83e474e8"
+  }
+}

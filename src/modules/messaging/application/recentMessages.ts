@@ -1,6 +1,9 @@
 import { resolveMessageCacheTtlSeconds } from '../domain/messageCacheTtl.js'
 import { safeTruncateUnicode } from '../../models/domain/unicodeText.js'
 import type { RecentMessagePorts, RecentOptions, Segment, Sender, MessageEvent, StoredMessage } from '../../../contracts/recentMessages.js'
+import {parseSentPersonaSource} from '../../conversation/domain/personaProvenance.js'
+import {findForwardCompleteness, parseForwardCompleteness} from '../../conversation/domain/forwardCompleteness.js'
+
 function parseStoredMessages(value: unknown): StoredMessage[] {
  if (!Array.isArray(value)) throw new Error('消息历史格式无效')
  const object = (item: unknown): Record<string, unknown> | null => item !== null && typeof item === 'object' && !Array.isArray(item) ? item as Record<string,unknown> : null
@@ -10,7 +13,10 @@ function parseStoredMessages(value: unknown): StoredMessage[] {
   for (const field of ['nickname','card','role','title','identity']) if (sender[field] !== undefined && typeof sender[field] !== 'string') throw new Error('消息历史发送者格式无效')
   if (sender.user_id !== undefined && typeof sender.user_id !== 'number' && typeof sender.user_id !== 'string') throw new Error('消息历史发送者格式无效')
   if (item.group_name !== undefined && item.group_name !== null && typeof item.group_name !== 'string') throw new Error('消息历史群名称格式无效')
-  return item as StoredMessage
+  const personaSource = parseSentPersonaSource(item.personaSource, item.source, sender.user_id)
+  const forwardCompleteness = parseForwardCompleteness(item.forwardCompleteness) || findForwardCompleteness(item.message, item.forward_context)
+  const {personaSource: _unverifiedSource, forwardCompleteness: _unverifiedCompleteness, ...record} = item
+  return {...record, ...(personaSource ? {personaSource} : {}), ...(forwardCompleteness ? {forwardCompleteness} : {})} as StoredMessage
  })
 }
 
@@ -372,6 +378,7 @@ return class MessageManager {
   async formatMessage(message: MessageEvent & {sender: Sender}, options: RecentOptions = {}) {
     const isGroup = message.message_type === 'group';
     const isBot = message.sender.user_id === botIdentity.uin;
+    const personaSource = parseSentPersonaSource(message.personaSource, message.source, message.sender.user_id);
     const enrichedMessage = Array.isArray(options.preEnrichedMessage)
       ? options.preEnrichedMessage
       : await enrichDouyinMessageSegments(
@@ -379,9 +386,13 @@ return class MessageManager {
         message.raw_message
       );
     const formattedMessage = { ...message, message: enrichedMessage };
+    const forwardCompleteness = findForwardCompleteness(enrichedMessage, message.forward_context);
 
     return {
       time: ports.formatTime(message.time * 1000),
+      // Keep an unambiguous clock for short-lived physical observations. The
+      // display timestamp can be local and must not authorize current state.
+      at: message.time * 1000,
       sender: {
         user_id: message.sender.user_id,
         nickname: isBot ? botIdentity.nickname : (message.sender.card || message.sender.nickname),
@@ -396,6 +407,8 @@ return class MessageManager {
       ...(message.self_id !== undefined ? { self_id: message.self_id } : {}),
       message_type: message.message_type,
       source: message.source || null,
+      ...(personaSource ? {personaSource} : {}),
+      ...(forwardCompleteness ? {forwardCompleteness} : {}),
       group_id: isGroup ? message.group_id : null,
       group_name: isGroup ? message.group_name : null,
       message: enrichedMessage,

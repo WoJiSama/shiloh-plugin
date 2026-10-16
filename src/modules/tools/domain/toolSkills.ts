@@ -1,4 +1,4 @@
-import {toolRecord,type ToolSkillSource} from "../../../contracts/toolExecution.js"
+import {toolRecord,type ToolSkillSource,type ToolDefinition} from "../../../contracts/toolExecution.js"
 function normalizeText(value:unknown = "", maxLength = 480) {
   return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength)
 }
@@ -37,22 +37,26 @@ export function resolveToolSkill(tool:ToolSkillSource = {}) {
   }
 }
 
-export function buildToolSkillCatalog(toolInstances:Record<string,ToolSkillSource> = {}, availableToolNames:string[] = []) {
-  const allowed = new Set(availableToolNames)
-  return Object.values(toolInstances)
-    .filter(tool => tool?.name && allowed.has(tool.name))
-    .map(tool => {
-      const skill = resolveToolSkill(tool)
+export function buildToolSkillCatalog(toolInstances:Record<string,ToolSkillSource> = {}, availableToolNames:string[] = [], definitions:ToolDefinition[] = []) {
+  const runtime = new Map(definitions.flatMap(item => item.function?.name ? [[item.function.name, item.function] as const] : []))
+  return [...new Set(availableToolNames)]
+    .map(name => {
+      const tool = toolInstances[name] || Object.values(toolInstances).find(item => item?.name === name)
+      const definition = runtime.get(name)
+      if (!tool && !definition) return ""
+      const skill = resolveToolSkill(tool || definition)
+      const parameters = definition?.parameters || skill.parameters
       return [
-        `- ${skill.name}: ${skill.purpose || "执行已注册能力"}`,
+        `- ${name}: ${normalizeText(definition?.description, 600) || skill.purpose || "执行已注册能力"}`,
         skill.whenToUse ? `  use: ${skill.whenToUse}` : "",
         skill.boundaries ? `  boundary: ${skill.boundaries}` : "",
         skill.instructions ? `  instructions: ${skill.instructions}` : "",
-        `  parameters: ${summarizeParameters(skill.parameters) || "none"}`,
+        `  parameters: ${summarizeParameters(parameters) || "none"}`,
+        !tool ? `  schema: ${JSON.stringify(parameters)}` : "",
         ...skill.examples.map(example => `  example: ${example}`)
       ].filter(Boolean).join("\n")
     })
-    .join("\n")
+    .filter(Boolean).join("\n")
 }
 
 export function normalizeToolSkillParams(tool:ToolSkillSource|undefined, params:Record<string,unknown> = {}, context:Record<string,unknown> = {}) {

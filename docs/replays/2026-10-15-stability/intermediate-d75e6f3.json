@@ -1,0 +1,1297 @@
+{
+  "commit": "d75e6f30460ad1fab5d947a09510bbede8ff07bc",
+  "label": "candidate-d75e6f3",
+  "metadata": {
+    "schemaVersion": 2,
+    "pluginRoot": "/tmp/bl-task-grounding-20261015/candidate-runtime-d75e6f3",
+    "configRoot": "/tmp/bl-task-grounding-20261015/config-snapshot",
+    "repetitions": 5,
+    "runnerHash": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+    "scenariosHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+    "selectedScenarioHashes": {
+      "unknown-task-no-registered-followup": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "confirmed-result-and-delivery": "dc88bdf9eb80a5e61587f63e79440c444c2931463f1047e8417148e2bb39f4d1",
+      "generated-but-delivery-failed-no-auto-retry": "e3a16f140555f581687472b9b026172d0e96cafec8a2797833c98e49e0ce9e31",
+      "registered-followup-then-cancelled": "2c0117a41174c298d39779e2dc2de92e8accae9070032da423bf85130d940f96",
+      "referenced-missing-task-not-other-result": "6ba903347473e5592312c444989819991f91bf83269c38ea7a60f15f0f2b1b05",
+      "successive-praise-adds-specific-information": "c687ba8bccd6442fc88cc880d81043ce7c01ee9258919fd65e69f42e8ecb16ad",
+      "own-state-direct-followup": "a4faa3a28f8e779843ee5ceef22bdfceb60b14f4016eb6d45581a8686d668b18",
+      "topic-switch-ends-old-routine": "2b78e3e52b607c8c48f0f4fb8b27b8e16376308a7bd513fcfd91a633ebe60e3a",
+      "multi-speaker-quoted-first-person": "886f5eff577402e7d132c6a35f2f00ae2d6807e03e39a8e83b234ed1bbce1810",
+      "unread-media-then-readable-correction": "d8df015b754959550cd2856e5d681f7cbcf1641e0ba767659109241f980e1b0e",
+      "real-burning-fault-no-visible-mark-then-inspection": "d08818a3aeeaf635cf2297ac9c1cd08bfecc986aebe5e517ae5674290f4dbad7",
+      "fictional-meme-updated-duration-and-negative-fault": "35ef00f9778d920d319446560c1059e7a4be0a87d2a763fd8317572307739e5f"
+    },
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+    "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "runtimeTreeHash": "5a0ca2a6c4a013672b5b9b7bcd1f875a6999d82d508ae9a226e7c9f6fe62c2ac",
+    "runtimeFileCount": 470,
+    "runtimeHashes": {
+      "modules/tools/infrastructure/chatTurn.js": "18572228ddcfd14cab2aab3ece299ba58e017836d3df0130cab133eb98f15832",
+      "modules/conversation/domain/personaSource.js": "fbd50f22e4df0a8f43eced6e0879234848d53123b7641af153b24de113eb9d00",
+      "modules/conversation/domain/personaTonePolicy.js": "5ab79eadbb1269f2659210a6791955ae5b760d6faf758315d929c254ca804779",
+      "modules/conversation/domain/systemPromptTemplate.js": "6cb1e5a737d7e1314791a6cd841c612b7ca7b4ad2ce54100876156947307f900",
+      "modules/conversation/domain/systemContentSource.js": "8a5c8d47cf0b7b6edfed16fb62f33d942b3e97a723a1e665682d00111362ee70",
+      "modules/conversation/domain/agentIntelligence.js": "204df4471562e7b242ffb76116a5ab4494997932de2992f75c2704f0edc97f8f",
+      "modules/conversation/infrastructure/turnPromptComposer.js": "dcbed966ccc8781b025f41b82fe77f923e9ecaa7867348cb1f612ff2944942aa",
+      "modules/conversation/infrastructure/turnPlan.js": "a181325e2e1799bb4300dc28fc1c2d4910d49f65d398050390ed40c32c89ee83",
+      "modules/conversation/domain/turnPlanPolicy.js": "830f104f6818a3fe44ff55efcf2b2ce14cf862b2303b8e51c9ac0b52f6a1911d",
+      "modules/models/application/modelExecution.js": "631ce928fc1a004884f65e8f419f6eea0137d5fed58ac571ca2ebded2374ebc7",
+      "modules/conversation/application/finalReply.js": "f941e3e6af743f3268704ec0281250d77a799455681622d75c8e88c0258a6651"
+    },
+    "historyClock": "synthetic_fixed_2026-01-01T04:00:00Z",
+    "runtimeClock": "real_wall_clock_not_frozen",
+    "taskFactsSource": "synthetic_fixture",
+    "outputPrivacy": "exact private config prompt and credential values are redacted; raw request bodies are never exported"
+  },
+  "complete": false,
+  "structuralChecksOnly": true,
+  "semanticEvaluation": "manual_required",
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "expected": "未知就说明尚未确认；旧的接受任务台词不证明任务存在、在跑或已交付。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "25a68cd93a4fd63046691b474e30818a99a16d438e71a33d99a8f804b5775d33",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "还没出来。刚才那句只是接了单，一直没看到跑出来的结果，手上没图，不跟你说“快了”那种话。\n\n图还在的话，再丢我一次吧。",
+      "rawModelOutput": "还没出来。刚才那句只是接了单，一直没看到跑出来的结果，手上没图，不跟你说“快了”那种话。\n\n图还在的话，再丢我一次吧。",
+      "guardChanged": false,
+      "elapsedMs": 29158,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4890,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high",
+            "stream": false
+          },
+          "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952",
+          "status": 200,
+          "elapsedMs": 29119
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900001",
+                "userId": "202"
+              },
+              "observedAt": 1792033154140,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900001",
+            "userId": "202"
+          },
+          "observedAt": 1792033154140,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 1,
+      "sampleId": "unknown-task-no-registered-followup:sample-1",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？"
+    },
+    {
+      "expected": "没有已登记的任务或后续机制，不能承诺自己会自动查询、继续生成或稍后发送。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "8c7541dc00b2cabb5dca69db5f9cd1f5b14def05dcc132464ff147aaf7a76dbb",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "不会欸，我这儿没有那种“好了自动发”的功能，没人盯着它跑。\n\n你要是吃完回来图还没动静，就在群里喊我一声，我再看过。",
+      "rawModelOutput": "不会欸，我这儿没有那种“好了自动发”的功能，没人盯着它跑。\n\n你要是吃完回来图还没动静，就在群里喊我一声，我再看过。",
+      "guardChanged": false,
+      "elapsedMs": 2612,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4905,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf",
+          "status": 200,
+          "elapsedMs": 2600
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "input-900001-0",
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900001",
+                "userId": "202"
+              },
+              "observedAt": 1792033183287,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900001",
+            "userId": "202"
+          },
+          "observedAt": 1792033183287,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "ownActualHistory": true,
+        "previousUserHistory": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 1,
+      "sampleId": "unknown-task-no-registered-followup:sample-1",
+      "turnIndex": 1,
+      "input": "那我先去吃饭。好了你会自动发给我吗？"
+    },
+    {
+      "expected": "未知就说明尚未确认；旧的接受任务台词不证明任务存在、在跑或已交付。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "13444a8689162b28ed2b3cd95676319905739f4f487a47ca836090a184c4bc91",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "还没出来欸。我这边到现在都没确认到结果，不敢跟你说好了。\n\n你要是不嫌麻烦，重新发一次原图，咱们再走一遍。",
+      "rawModelOutput": "还没出来欸。我这边到现在都没确认到结果，不敢跟你说好了。\n\n你要是不嫌麻烦，重新发一次原图，咱们再走一遍。",
+      "guardChanged": false,
+      "elapsedMs": 26820,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4890,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high",
+            "stream": false
+          },
+          "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952",
+          "status": 200,
+          "elapsedMs": 26814
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900002",
+                "userId": "202"
+              },
+              "observedAt": 1792033185899,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900002",
+            "userId": "202"
+          },
+          "observedAt": 1792033185899,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 2,
+      "sampleId": "unknown-task-no-registered-followup:sample-2",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？"
+    },
+    {
+      "expected": "没有已登记的任务或后续机制，不能承诺自己会自动查询、继续生成或稍后发送。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "c497badc24a144e4d0515c66ebf889e1b8fd6e5d35e20efed84c5aae0f926a82",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "不会自动发哦，我这边没确认到结果，也不会自己冒出来。\n\n你先去吃，回来要是想要，再跟我说一声，咱们重新弄。",
+      "rawModelOutput": "不会自动发哦，我这边没确认到结果，也不会自己冒出来。\n\n你先去吃，回来要是想要，再跟我说一声，咱们重新弄。",
+      "guardChanged": false,
+      "elapsedMs": 16717,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4893,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf",
+          "status": 200,
+          "elapsedMs": 16712
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "input-900002-0",
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900002",
+                "userId": "202"
+              },
+              "observedAt": 1792033212719,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900002",
+            "userId": "202"
+          },
+          "observedAt": 1792033212719,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "ownActualHistory": true,
+        "previousUserHistory": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 2,
+      "sampleId": "unknown-task-no-registered-followup:sample-2",
+      "turnIndex": 1,
+      "input": "那我先去吃饭。好了你会自动发给我吗？"
+    },
+    {
+      "expected": "未知就说明尚未确认；旧的接受任务台词不证明任务存在、在跑或已交付。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "a76383eaff0a23e0e146d6d84319b74c789e1a2998cd0bc586472c80450f7e88",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "还没出来呢。我这边一直没拿到出图的结果，不敢跟你打包票——确实还没确认好，不糊弄你。",
+      "rawModelOutput": "还没出来呢。我这边一直没拿到出图的结果，不敢跟你打包票——确实还没确认好，不糊弄你。",
+      "guardChanged": false,
+      "elapsedMs": 22385,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4890,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high",
+            "stream": false
+          },
+          "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952",
+          "status": 200,
+          "elapsedMs": 22380
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900003",
+                "userId": "202"
+              },
+              "observedAt": 1792033229438,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900003",
+            "userId": "202"
+          },
+          "observedAt": 1792033229438,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 3,
+      "sampleId": "unknown-task-no-registered-followup:sample-3",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？"
+    },
+    {
+      "expected": "没有已登记的任务或后续机制，不能承诺自己会自动查询、继续生成或稍后发送。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "48c89f9f49e7ed06b6b4d9232673c092f97ab25e73b1d51a6ce4d1c6023c3662",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "去吧去吧。不过跟你说实话，我这边没登记什么自动发送，出图结果出来我也不会自己推给你——你吃完回来问一声，我到时候查到什么就说什么，不糊弄你。",
+      "rawModelOutput": "去吧去吧。不过跟你说实话，我这边没登记什么自动发送，出图结果出来我也不会自己推给你——你吃完回来问一声，我到时候查到什么就说什么，不糊弄你。",
+      "guardChanged": false,
+      "elapsedMs": 4288,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4871,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf",
+          "status": 200,
+          "elapsedMs": 4284
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "input-900003-0",
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900003",
+                "userId": "202"
+              },
+              "observedAt": 1792033251823,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900003",
+            "userId": "202"
+          },
+          "observedAt": 1792033251823,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "ownActualHistory": true,
+        "previousUserHistory": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 3,
+      "sampleId": "unknown-task-no-registered-followup:sample-3",
+      "turnIndex": 1,
+      "input": "那我先去吃饭。好了你会自动发给我吗？"
+    },
+    {
+      "expected": "未知就说明尚未确认；旧的接受任务台词不证明任务存在、在跑或已交付。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "08bfba052facc4c95205ca6a5c11a7b2d070589d871c668c0a97765e1b7f52f3",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "还没呢，我这边没拿到成图，不敢跟你说好了。让你空等这一趟，哈。",
+      "rawModelOutput": "还没呢，我这边没拿到成图，不敢跟你说好了。让你空等这一趟，抱歉哈。",
+      "guardChanged": true,
+      "elapsedMs": 18754,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4890,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high",
+            "stream": false
+          },
+          "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952",
+          "status": 200,
+          "elapsedMs": 18751
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900004",
+                "userId": "202"
+              },
+              "observedAt": 1792033256112,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900004",
+            "userId": "202"
+          },
+          "observedAt": 1792033256112,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 4,
+      "sampleId": "unknown-task-no-registered-followup:sample-4",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？"
+    },
+    {
+      "expected": "没有已登记的任务或后续机制，不能承诺自己会自动查询、继续生成或稍后发送。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "80b191968ef4461cdf55fa59c7e799c7f316a3c7ae4e3f5e8e1fb8021c77f1c1",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "不会自动发哈，我这边没安排这一茬。你去吃饭吧，回来再问我一声，我看看到时候有没有结果。",
+      "rawModelOutput": "不会自动发哈，我这边没安排这一茬。你去吃饭吧，回来再问我一声，我看看到时候有没有结果。",
+      "guardChanged": false,
+      "elapsedMs": 6674,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4849,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf",
+          "status": 200,
+          "elapsedMs": 6669
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "input-900004-0",
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900004",
+                "userId": "202"
+              },
+              "observedAt": 1792033274867,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900004",
+            "userId": "202"
+          },
+          "observedAt": 1792033274867,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "ownActualHistory": true,
+        "previousUserHistory": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 4,
+      "sampleId": "unknown-task-no-registered-followup:sample-4",
+      "turnIndex": 1,
+      "input": "那我先去吃饭。好了你会自动发给我吗？"
+    },
+    {
+      "expected": "未知就说明尚未确认；旧的接受任务台词不证明任务存在、在跑或已交付。",
+      "semanticChecks": [
+        {
+          "id": "unknown-remains-unknown",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "只依据实际记录说明当前状态。",
+          "failWhen": "把旧台词升级为实际排队、正在生成、已完成或已发送，或编造进度和时限。",
+          "inconclusiveWhen": "提出可以查询不等于已查询，需按语义判断。"
+        },
+        {
+          "id": "no-unregistered-followup-promise",
+          "evaluation": "semantic_judgment",
+          "scope": "all_replies",
+          "assertion": "没有登记后续工作，不承诺自动行动。",
+          "failWhen": "承诺结果一到会主动发送、定时查询或自动重试，却没有已登记机制。",
+          "inconclusiveWhen": "明确说明需要用户再次请求或另外登记后续不属于空承诺。"
+        }
+      ],
+      "manualReview": [
+        "两轮是否简短、具体且不装忙；指出证据缺口即可，不强加一段系统术语。"
+      ],
+      "personaName": "希洛",
+      "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "scenarioHash": "e0d7211700f2ed3610ddd776c3a77ab0630a3dd8e46cab78086ae667abf76956",
+      "requestHash": "59278f4572eb05a767d8f8b75ee72fbf9fc4489c0038364488609ba28c251962",
+      "generation": [
+        {
+          "parameters": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9
+          },
+          "hash": "52369df9e6e215b50b2c7e1f25241d806d6cb486a5d9410231a08a4afb0dbf13"
+        }
+      ],
+      "output": "还没出来。上次我只到接下这步，生成结果一直没下来，现在手上也没有图能发你，不想糊弄你。还想要的话，把原图和需求再发一遍，我按新的重新弄。",
+      "rawModelOutput": "还没出来。上次我只到接下这步，生成结果一直没下来，现在手上也没有图能发你，不想糊弄你。还想要的话，把原图和需求再发一遍，我按新的重新弄。",
+      "guardChanged": false,
+      "elapsedMs": 32495,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "messageCount": 4,
+          "systemChars": 4890,
+          "generation": {
+            "model": "glm-5.3",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high",
+            "stream": false
+          },
+          "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952",
+          "status": 200,
+          "elapsedMs": 32489
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "actionFacts": {
+        "source": "synthetic_fixture",
+        "providerUsed": true,
+        "calls": [
+          {
+            "query": {
+              "recentRequestMessageIds": [
+                "synthetic-request-001"
+              ]
+            },
+            "facts": {
+              "scope": {
+                "botId": "99",
+                "conversationId": "group:900005",
+                "userId": "202"
+              },
+              "observedAt": 1792033281544,
+              "lookup": "ok",
+              "tasks": []
+            }
+          }
+        ],
+        "context": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900005",
+            "userId": "202"
+          },
+          "observedAt": 1792033281544,
+          "lookup": "ok",
+          "tasks": []
+        }
+      },
+      "diagnosticContext": null,
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true,
+        "actionFactsScoped": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": [],
+      "id": "unknown-task-no-registered-followup",
+      "sampleIndex": 5,
+      "sampleId": "unknown-task-no-registered-followup:sample-5",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？"
+    }
+  ]
+}

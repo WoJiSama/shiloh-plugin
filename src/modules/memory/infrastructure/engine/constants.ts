@@ -17,6 +17,7 @@ export const KEY = Object.freeze({
   facts:    (groupId: unknown) => `ytbot:mem:g:${groupId}:facts`,
   workflows: (groupId: unknown) => `ytbot:mem:g:${groupId}:workflows`,
   knowledge: (groupId: unknown) => `ytbot:mem:g:${groupId}:knowledge`,
+  pending:  (groupId: unknown) => `ytbot:mem:g:${groupId}:pending-extractions`,
   meta:     (groupId: unknown) => `ytbot:mem:g:${groupId}:meta`,
   prefix:   (groupId: unknown) => `ytbot:mem:g:${groupId}:`
 })

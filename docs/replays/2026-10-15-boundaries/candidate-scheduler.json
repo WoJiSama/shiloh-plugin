@@ -1,0 +1,41 @@
+{
+  "label": "candidate-c62ad84",
+  "repetitions": 5,
+  "concurrency": 3,
+  "scenarioOrder": [
+    "unsupported-order-with-third-party-wallet",
+    "sincere-booking-capability-question",
+    "quoted-order-is-discussion",
+    "food-preference-is-not-real-meal",
+    "verified-reminder-is-not-booking",
+    "user-narrows-to-ordinary-advice"
+  ],
+  "sampling": "one fixed run per scenario, fresh conversation for each of five repetitions; no resampling or dropped failures",
+  "runs": {
+    "quoted-order-is-discussion": {
+      "exitCode": 1,
+      "elapsedSeconds": 24.118
+    },
+    "unsupported-order-with-third-party-wallet": {
+      "exitCode": 0,
+      "elapsedSeconds": 50.06
+    },
+    "verified-reminder-is-not-booking": {
+      "exitCode": 0,
+      "elapsedSeconds": 17.949
+    },
+    "sincere-booking-capability-question": {
+      "exitCode": 0,
+      "elapsedSeconds": 68.228
+    },
+    "food-preference-is-not-real-meal": {
+      "exitCode": 0,
+      "elapsedSeconds": 48.9
+    },
+    "user-narrows-to-ordinary-advice": {
+      "exitCode": 0,
+      "elapsedSeconds": 29.373
+    }
+  },
+  "complete": true
+}

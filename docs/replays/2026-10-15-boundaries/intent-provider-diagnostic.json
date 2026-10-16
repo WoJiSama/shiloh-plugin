@@ -1,0 +1,15 @@
+{
+  "kind": "independent_two_request_diagnostic_not_formal_replay",
+  "results": [
+    {
+      "variant": "unchanged",
+      "elapsedMs": 45010,
+      "error": "请求超过 45 秒没有返回"
+    },
+    {
+      "variant": "explicit_thinking_disabled",
+      "elapsedMs": 45002,
+      "error": "请求超过 45 秒没有返回"
+    }
+  ]
+}

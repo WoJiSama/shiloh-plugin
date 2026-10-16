@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-15",
+  "timezone": "Asia/Shanghai",
+  "runtimeCommit": "89650bde93c20c71e38242180da61c8ce12d39fe",
+  "backendTests": {"total": 1926, "passed": 1924, "failed": 0, "skipped": 2, "skipReason": "host music integration"},
+  "frontendTests": {"passed": 34, "failed": 0},
+  "typecheckPassed": true,
+  "boundaryCheckPassed": true,
+  "buildsPassed": true,
+  "stagedReplay": {"turns": 20, "structuralPassed": 20, "semanticFailuresRemainDisclosed": true},
+  "postdeployReplay": {"turns": 4, "structuralPassed": 4, "http200": 4, "model": "glm-5.3", "platformTestMessages": 0, "productionStoreWrites": 0, "configUnchangedDuringReplay": true},
+  "managedFilesVerified": 1907,
+  "managedFileDifferences": 0,
+  "candidateRuntimeModuleDifferences": 0,
+  "runnerHashMatches": true,
+  "reviewedPersonaMatches": true,
+  "personaLibraryUnchanged": true,
+  "systemContentHash": "9dfb0bfd6d0b324131ccb35a17d85504821f72771e5f7671d572d4cb26d877bd",
+  "health": {"trssYunzai": "active", "console": "active", "serviceRestarts": 0, "consoleRestarts": 0, "startupLoadErrors": 0, "pipelineStarted": true, "commandsPage": 200, "consolePage": 200},
+  "codeRollbackSnapshot": "/opt/trss-yunzai-backups/deploy-snapshots/20261015-015205",
+  "privateConfigBackup": "/opt/trss-yunzai-backups/conversation-config-2026-10-14T17-54-46-631Z/message.yaml"
+}

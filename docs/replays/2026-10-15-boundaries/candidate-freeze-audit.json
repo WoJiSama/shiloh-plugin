@@ -1,0 +1,13 @@
+{
+  "commit": "c62ad84f81c589aeef7533deaa619aaefcaefe69",
+  "manifestSha256": "2836945b5bfa74e6683f6e735fe4c87ece3e743a2e4ae45c18e1758d504891da",
+  "managedFiles": 1919,
+  "mismatches": [],
+  "frozenInputMatches": {
+    "config-snapshot/config/message.yaml": true,
+    "config-snapshot/config/persona-library.yaml": true,
+    "eval/conversation-boundary-scenarios.json": true,
+    "eval/conversationQualityReplay.mjs": true
+  },
+  "nodeModules": "linked_existing_production_dependencies"
+}

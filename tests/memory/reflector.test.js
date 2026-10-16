@@ -113,7 +113,7 @@ test('consolidateEntity returns changed:false when LLM yields no usable items', 
 
 test('reflectGroup produces insight facts with required shape', async () => {
   const r = new Reflector(AI)
-  trackCalls(r, '[{"text":"群里热衷讨论咖啡","tags":["梗"]},{"text":"对新人友好"}]')
+  trackCalls(r, '[{"text":"群里热衷讨论咖啡","sources":[1],"tags":["梗"]},{"text":"对新人友好","sources":[1]}]')
   const { insights } = await r.reflectGroup({
     groupId: 'g1',
     facts: [makeFact({ text: '群规：不要刷屏', at: 50 })],
@@ -130,8 +130,8 @@ test('reflectGroup produces insight facts with required shape', async () => {
 
 test('reflectGroup caps insights at 3', async () => {
   const r = new Reflector(AI)
-  trackCalls(r, '[{"text":"a"},{"text":"b"},{"text":"c"},{"text":"d"},{"text":"e"}]')
-  const { insights } = await r.reflectGroup({ groupId: 'g1', facts: [], recentTexts: [] })
+  trackCalls(r, '[{"text":"a","sources":[1]},{"text":"b","sources":[1]},{"text":"c","sources":[1]},{"text":"d","sources":[1]},{"text":"e","sources":[1]}]')
+  const { insights } = await r.reflectGroup({ groupId: 'g1', facts: [makeFact({text:'已有可靠事实'})], recentTexts: [] })
   assert.equal(insights.length, 3)
 })
 
@@ -247,4 +247,89 @@ test('consolidateEntity stays silent on _callChat failure but still counts the f
     log.restore()
     restore()
   }
+})
+
+const SCOPE={botId:'b1',personaId:'p1',personaVersion:'v1',personaName:'希洛'}
+
+test('consolidation preserves same-source event metadata and uncovered facts',async()=>{
+  const r=new Reflector(AI)
+  trackCalls(r,'[{"text":"周五参加数学考试","sources":[1,2]}]')
+  const eventAt=Date.parse('2026-10-17T12:00:00+08:00')
+  const entity=makeEntity({qq:'1',facts:[
+    makeFact({text:'周五考试',eventAt,personaSource:SCOPE,heardFrom:'希洛',at:100}),
+    makeFact({text:'考数学',eventAt,personaSource:SCOPE,heardFrom:'希洛',at:200}),
+    makeFact({text:'下周有面试',eventAt:eventAt+86400000,personaSource:SCOPE,at:300})
+  ]})
+  const out=await r.consolidateEntity(entity)
+  assert.equal(out.changed,true)
+  assert.equal(out.facts.length,2)
+  const merged=out.facts.find(fact=>fact.origin==='reflection')
+  assert.equal(merged.eventAt,eventAt)
+  assert.deepEqual(merged.personaSource,SCOPE)
+  assert.equal(merged.heardFrom,'希洛')
+  assert.equal(out.facts.find(fact=>fact.text==='下周有面试').eventAt,eventAt+86400000)
+})
+
+for(const change of [{eventAt:999},{eventAt:null},{personaSource:{...SCOPE,botId:'b2'}},{personaSource:{...SCOPE,personaVersion:'v2'}},{heardFrom:'星彩'}]){
+  test(`consolidation refuses incompatible temporal or observer metadata ${JSON.stringify(change)}`,async()=>{
+    const r=new Reflector(AI)
+    trackCalls(r,'[{"text":"不应混合","sources":[1,2]}]')
+    const baseline={eventAt:1000,personaSource:SCOPE,heardFrom:'希洛'}
+    const entity=makeEntity({qq:'1',facts:[makeFact({text:'事实A',...baseline}),makeFact({text:'事实B',...baseline,...change})]})
+    const out=await r.consolidateEntity(entity)
+    assert.equal(out.changed,false)
+    assert.deepEqual(out.facts,entity.facts)
+  })
+}
+
+test('consolidation cannot claim unspecified or malformed source rows',async()=>{
+  const r=new Reflector(AI)
+  const entity=makeEntity({qq:'1',facts:[makeFact({text:'原事实',personaSource:SCOPE})]})
+  for(const sources of [undefined,[true],['1'],[0],[999]]){
+    trackCalls(r,JSON.stringify([{text:'不可信合并',sources}]))
+    const out=await r.consolidateEntity(entity)
+    assert.equal(out.changed,false)
+    assert.deepEqual(out.facts,entity.facts)
+  }
+})
+
+test('group reflection requires cited facts and preserves event time, persona provenance and refs',async()=>{
+  const r=new Reflector(AI)
+  const eventAt=Date.parse('2026-10-17T12:00:00+08:00')
+  const calls=trackCalls(r,'[{"text":"周五讨论考试安排","sources":[1,2]}]')
+  const {insights}=await r.reflectGroup({groupId:'g',facts:[
+    makeFact({text:'明天数学考试',eventAt,personaSource:SCOPE,heardFrom:'希洛',refs:['111'],at:100}),
+    makeFact({text:'考试后一起讨论',eventAt,personaSource:SCOPE,heardFrom:'希洛',refs:['222'],at:200})
+  ],recentTexts:['辅助文本不能变成有来源的证据']})
+  assert.equal(insights.length,1)
+  assert.equal(insights[0].eventAt,eventAt)
+  assert.equal(insights[0].at,200)
+  assert.deepEqual(insights[0].personaSource,SCOPE)
+  assert.equal(insights[0].heardFrom,'希洛')
+  assert.deepEqual(insights[0].refs,['111','222'])
+  assert.match(calls[0].messages[1].content,/事件日期：2026-10-17/)
+  assert.match(calls[0].messages[0].content,/sources: 必填整数数组/)
+})
+
+for(const change of [{eventAt:999},{eventAt:null},{personaSource:{...SCOPE,botId:'b2'}},{personaSource:{...SCOPE,personaVersion:'v2'}},{heardFrom:'星彩'}]){
+  test(`group reflection rejects incompatible event or source metadata ${JSON.stringify(change)}`,async()=>{
+    const r=new Reflector(AI)
+    trackCalls(r,'[{"text":"不能混合来源的洞察","sources":[1,2]}]')
+    const base={eventAt:1000,personaSource:SCOPE,heardFrom:'希洛'}
+    const {insights}=await r.reflectGroup({facts:[makeFact({text:'事实A',...base}),makeFact({text:'事实B',...base,...change})]})
+    assert.deepEqual(insights,[])
+  })
+}
+
+test('group reflection rejects missing, malformed and partially invalid references and cannot derive solely from raw text',async()=>{
+  const r=new Reflector(AI)
+  const facts=[makeFact({text:'原有事实',personaSource:SCOPE})]
+  for(const sources of [undefined,[],[true],['1'],[0],[999],[1,999]]){
+    trackCalls(r,JSON.stringify([{text:'无证据洞察',sources}]))
+    assert.deepEqual((await r.reflectGroup({facts})).insights,[])
+  }
+  let called=false
+  r._callChat=async()=>{called=true;return '[{"text":"未知来源","sources":[1]}]'}
+  assert.deepEqual((await r.reflectGroup({facts:[],recentTexts:['明天会开会']})).insights,[])
+  assert.equal(called,false)
 })

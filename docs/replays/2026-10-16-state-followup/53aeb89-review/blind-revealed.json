@@ -1,0 +1,180 @@
+{
+  "evaluatedCandidate": "53aeb89ddac41520642fc3cdb922b5aad325e53f",
+  "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
+  "sourceHashes": {
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-conversations.json": "11ca02647cb25ea188188d68afcd8a783eec604c5a4f9140d740dafd6df822b3",
+    "blind-review.json": "7f3ba4958108e9fb1ce418109c804c5c26c9c0c821a0ef2abe673afff7e83648"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 7,
+    "baseline": 4,
+    "tie": 17
+  },
+  "scoreTotals": {
+    "candidate": 215,
+    "baseline": 211
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 6,
+        "baseline": 2,
+        "tie": 20
+      },
+      "scoreTotals": {
+        "candidate": 52,
+        "baseline": 46
+      }
+    },
+    "continuity": {
+      "preference": {
+        "candidate": 2,
+        "baseline": 0,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 56,
+        "baseline": 54
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 0,
+        "baseline": 2,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 54,
+        "baseline": 56
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 0,
+        "baseline": 2,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 53,
+        "baseline": 55
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 1,
+    "baseline": 7
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 1,
+    "baseline": 7
+  },
+  "hardErrors": [
+    {
+      "id": "F1-001",
+      "caseId": "case-01",
+      "candidate": "candidate",
+      "description": "第一轮只有历史接单话语和空任务查询，未核实同任务有效确认或回报安排，却承诺确认后会回报，形成主动后续预期。第二轮要求用户回来再问不能删除先前承诺；这也不等于认定空列表证明任务不存在。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我确认到就回你。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "F1-002",
+      "caseId": "case-01",
+      "candidate": "baseline",
+      "description": "空tasks只说明未查到安排，不能证明没有后续任务或确定不会自动发。候选将未核实状态说成确定的安排不存在。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "不会自动发哦，这边没挂后续任务。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "F1-003",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "description": "没有核实匹配的运行任务或完成后发送安排，第一轮却保证拿到图就第一时间发。这是面向未来的主动投递承诺，并非用户回来再问后才尝试回复。第二轮改口不消除先前错误。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "F1-004",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "description": "证据仅是空任务查询，不能证明自动发送未登记或确定不会主动发。该轮把未知安排否定为不存在，也与上轮承诺形成未解释冲突。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "没登记上自动发送这种东西，我不会主动发的。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "F1-005",
+      "caseId": "case-03",
+      "candidate": "baseline",
+      "description": "sent的messageId精确匹配recentContext中2026-01-01 11:59:30+08:00的送达消息，后续用户轮按披露时钟发生在2026-10-16。称该次送达发生在刚才与可匹配历史时间冲突；用户自己的刚才不能覆盖披露时钟。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才就发在群里了"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "F1-006",
+      "caseId": "case-09",
+      "candidate": "baseline",
+      "description": "材料只确认第二张任务，第一张仍未知。要求用户重发可作为选项，但保证自己会持续盯到弄好并发出，超出已核实执行和投递依据；不像尝试重发那样保留完成及送达边界。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "我这次盯着弄好发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "F1-007",
+      "caseId": "case-10",
+      "candidate": "baseline",
+      "description": "第二张的sent记录精确对应recentContext中2026-01-01的送达消息，后续用户轮实际在2026-10-16。称该次送达在刚才有明确时钟冲突，并非从observedAt推断交付日期。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才只把第二张的傍晚背景发好了"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "F2-001",
+      "caseId": "case-28",
+      "candidate": "baseline",
+      "description": "首轮明确断言自动发图没有登记、不会自动发出。knownTaskFacts只返回与exam-request匹配的考试提醒及其reminder类型followUp，未提供与image-request匹配的任务状态、完整查询覆盖范围或图片投递安排。因此能支持的只是改图及其自动投递尚未核实，不能从只有考试提醒记录推出改图投递安排不存在，更不能断言不会发送。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "自动发图没有对应的登记，不会自动发你"
+        }
+      ],
+      "anonymousCandidate": "A"
+    }
+  ]
+}

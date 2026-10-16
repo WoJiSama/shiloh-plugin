@@ -13,6 +13,6 @@ const api=createFinalReply({randomUUID,
  logger:{warn:(...args)=>globalThis.logger?.warn?.(...args),info:(...args)=>globalThis.logger?.info?.(...args),error:(...args)=>globalThis.logger?.error?.(...args)},bot:()=>globalThis.Bot||{},
  extractModrinthForwardItems,stripModrinthForwardMarkers,buildGenericChatFailureReply,applyOutputPersonaGuards,findRecentBotImage,recordEpisode,
  recordTurnContinuity:options=>recordContinuity({...options,redis:globalThis.redis}),getActiveConversation,trackingKey:trackingConversationKey,
- rememberPersonaReply:(event,text)=>personaFeedbackManager.rememberBotReply(event,text),rememberStyleReply:(event,text,config)=>globalStyleLearnerManager.rememberBotReply(event,text,config)
+ rememberPersonaReply:(event,text,source)=>personaFeedbackManager.rememberBotReply(event,text,source),rememberStyleReply:(event,text,config)=>globalStyleLearnerManager.rememberBotReply(event,text,config)
 })
 export const {handleTextResponse,updateEnhancedSystems,getFriendlyFailureMessage,sendFinalReplyAsTextImage}=api

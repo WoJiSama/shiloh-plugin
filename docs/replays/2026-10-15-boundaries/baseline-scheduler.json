@@ -1,0 +1,41 @@
+{
+  "label": "baseline-a00fdd3-prepared",
+  "repetitions": 5,
+  "concurrency": 3,
+  "scenarioOrder": [
+    "unsupported-order-with-third-party-wallet",
+    "sincere-booking-capability-question",
+    "quoted-order-is-discussion",
+    "food-preference-is-not-real-meal",
+    "verified-reminder-is-not-booking",
+    "user-narrows-to-ordinary-advice"
+  ],
+  "sampling": "one fixed run per scenario, fresh conversation for each of five repetitions; no resampling or dropped failures",
+  "runs": {
+    "quoted-order-is-discussion": {
+      "exitCode": 1,
+      "elapsedSeconds": 74.945
+    },
+    "unsupported-order-with-third-party-wallet": {
+      "exitCode": 0,
+      "elapsedSeconds": 84.639
+    },
+    "sincere-booking-capability-question": {
+      "exitCode": 0,
+      "elapsedSeconds": 96.687
+    },
+    "verified-reminder-is-not-booking": {
+      "exitCode": 0,
+      "elapsedSeconds": 30.771
+    },
+    "food-preference-is-not-real-meal": {
+      "exitCode": 0,
+      "elapsedSeconds": 52.127
+    },
+    "user-narrows-to-ordinary-advice": {
+      "exitCode": 0,
+      "elapsedSeconds": 34.959
+    }
+  },
+  "complete": true
+}

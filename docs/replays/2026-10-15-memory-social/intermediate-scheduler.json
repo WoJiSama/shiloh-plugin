@@ -1,0 +1,51 @@
+{
+  "label": "candidate-0068ba2",
+  "repetitions": 3,
+  "concurrency": 3,
+  "scenarioOrder": [
+    "attention-not-explanation",
+    "biscuit-bit-continuity",
+    "third-person-attention",
+    "dated-memory-next-turn",
+    "public-fact-persona-switch",
+    "comfort-without-lecture",
+    "real-fault-retains-condition",
+    "partial-forward-last-line"
+  ],
+  "sampling": "three independent conversations per scenario; no resampling or discarded failures",
+  "runs": {
+    "third-person-attention": {
+      "exitCode": 0,
+      "elapsedSeconds": 61.628
+    },
+    "attention-not-explanation": {
+      "exitCode": 0,
+      "elapsedSeconds": 98.869
+    },
+    "dated-memory-next-turn": {
+      "exitCode": 1,
+      "elapsedSeconds": 76.175
+    },
+    "biscuit-bit-continuity": {
+      "exitCode": 1,
+      "elapsedSeconds": 141.773
+    },
+    "comfort-without-lecture": {
+      "exitCode": 1,
+      "elapsedSeconds": 83.533
+    },
+    "public-fact-persona-switch": {
+      "exitCode": 1,
+      "elapsedSeconds": 178.824
+    },
+    "partial-forward-last-line": {
+      "exitCode": 0,
+      "elapsedSeconds": 65.804
+    },
+    "real-fault-retains-condition": {
+      "exitCode": 1,
+      "elapsedSeconds": 163.16
+    }
+  },
+  "complete": true
+}

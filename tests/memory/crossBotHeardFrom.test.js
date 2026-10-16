@@ -68,3 +68,58 @@ test("群提取盖源与用户提取盖源一致", async () => {
   const facts = await manager.store.getFacts("g2")
   assert.equal(facts[0]?.heardFrom, "星彩")
 })
+
+const SCOPE={botId:'b1',personaId:'p1',personaVersion:'version-1234567890',personaName:'希洛'}
+
+test('完整来源要求 bot、人格 ID 与版本一致；同名 bot 和旧来源不会冒认亲历',()=>{
+  const fact=makeFact({text:'周五有考试',confidence:0.9,personaSource:SCOPE,heardFrom:'希洛'})
+  const own=buildGroupFactsPrompt([fact],'',6,3000,'希洛',SCOPE)
+  assert.doesNotMatch(own,/公开记录来源/)
+  for(const viewer of [{...SCOPE,botId:'b2'},{...SCOPE,personaId:'p2'},{...SCOPE,personaVersion:'v2'}]){
+    const prompt=buildGroupFactsPrompt([fact],'',6,3000,'希洛',viewer)
+    assert.match(prompt,/公开记录来源：希洛，bot b1，人格 p1，版本 version-1234/)
+    assert.doesNotMatch(prompt,/你当时|你的另一个账号|你另一个账号/)
+  }
+  const legacy=buildGroupFactsPrompt([makeFact({text:'旧记忆',heardFrom:'希洛'})],'',6,3000,'希洛',SCOPE)
+  assert.match(legacy,/旧来源名称：希洛；账号与人格版本未记录/)
+})
+
+test('公开事实跨人格共享，事件日期与来源在所有注入分支明确保留',()=>{
+  const at=Date.parse('2026-10-17T12:00:00+08:00')
+  const facts=[
+    makeFact({text:'明天考试',eventAt:at,personaSource:SCOPE,heardFrom:'希洛',confidence:0.9,authority:'self'}),
+    makeFact({text:'低置信度消息',eventAt:at,personaSource:SCOPE,confidence:0.5,authority:'mention'}),
+    makeFact({text:'群里教学',eventAt:at,personaSource:SCOPE,confidence:0.7,authority:'teaching'})
+  ]
+  const prompt=buildContextualPrompt({
+    speakerEntity:{qq:'111',facts,aliases:[]},mentionedEntities:[{qq:'222',facts:[facts[0]],aliases:[]}],refsFacts:[facts[0]],groupFacts:[facts[0]],pendingFacts:[facts[0]],viewer:{...SCOPE,botId:'b2'},config:{promptMaxChars:10000}
+  })
+  assert.match(prompt,/明天考试（事件日期：2026-10-17）/)
+  assert.match(prompt,/好像 低置信度消息（事件日期：2026-10-17）.*公开记录来源/)
+  assert.match(prompt,/据群里教学.*群里教学（事件日期：2026-10-17）.*公开记录来源/)
+  assert.equal((prompt.match(/公开记录来源：/g)||[]).length,7)
+  assert.match(prompt,/来源不同或未记录时不可说成当前人格亲历/)
+  assert.match(prompt,/相对日期以标注的事件日期为准/)
+})
+
+test('保存重载保持完整来源，同文本不同日期或人格不能被去重抹掉',async()=>{
+  const redis=createFakeRedis()
+  const first=new MemoryManager({enabled:true},{redis})
+  const eventAt=Date.parse('2026-10-17T12:00:00+08:00')
+  const facts=[
+    makeFact({text:'明天考试',eventAt,at:1,personaSource:SCOPE,heardFrom:'希洛'}),
+    makeFact({text:'明天考试',eventAt:eventAt+86400000,at:2,personaSource:SCOPE,heardFrom:'希洛'}),
+    makeFact({text:'明天考试',eventAt,at:3,personaSource:{...SCOPE,botId:'b2'},heardFrom:'希洛'})
+  ]
+  await first.applyOps('g',facts.map(fact=>({stream:'entityFact',qq:'111',authority:'self',fact})))
+  await first.applyOps('g',[{stream:'groupFact',authority:'mention',fact:makeFact({text:'每周三讨论代码',personaSource:SCOPE})}])
+  const second=new MemoryManager({enabled:true,promptMaxChars:5000},{redis})
+  const loaded=(await second.store.getEntities('g'))['111'].facts
+  assert.equal(loaded.length,3)
+  assert.deepEqual(loaded.map(fact=>fact.personaSource.botId),['b1','b1','b2'])
+  const prompt=await second.getContextualMemoryPrompt('g','111','考试',Date.now(),{viewer:{...SCOPE,botId:'b3'},viewerBotName:'希洛'})
+  assert.match(prompt,/2026-10-17/)
+  assert.match(prompt,/2026-10-18/)
+  assert.match(prompt,/每周三讨论代码/)
+  assert.match(prompt,/公开记录来源：希洛，bot b1/)
+})

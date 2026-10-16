@@ -4,6 +4,7 @@ import { envelopeToRuntimeEvent, isEnvelopeFromBot } from './eventEnvelope.js'
 import { AsyncSemaphore, KeyedSerialQueue } from './keyedSerialQueue.js'
 import type { PipelinePorts,PipelineOptions,PipelineEmitter,EventJob } from '../../../contracts/messagePipeline.js'
 import type { EventEnvelope, MessageSegment, ForwardContext } from '../../../contracts/pipeline.js'
+import {parseForwardCompleteness} from '../../conversation/domain/forwardCompleteness.js'
 export function isEventJob(value: unknown): value is EventJob {
  if (!value || typeof value !== 'object') return false
  const job = value as Record<string, unknown>
@@ -67,7 +68,8 @@ function appendForwardContextSegment(message: MessageSegment[] = [], context: Fo
       text,
       forward_ids: Array.isArray(context.forwardIds) ? context.forwardIds.map(String) : [],
       media: Array.isArray(context.media) ? context.media : [],
-      forward_nodes: Array.isArray(context.forwardNodes) ? context.forwardNodes : []
+      forward_nodes: Array.isArray(context.forwardNodes) ? context.forwardNodes : [],
+      ...(context.completeness ? {completeness: context.completeness} : {})
     }
   ]
 }
@@ -261,10 +263,13 @@ class MessagePipeline {
         const forwardContext = await this.resolveForwardContext(envelope)
         if (forwardContext) {
           envelope.forwardContext = forwardContext
+          delete envelope.forwardContextFailure
           message = appendForwardContextSegment(message, forwardContext)
-          this.logger?.info?.(`[MessagePipeline] 已展开合并转发 event=${envelope.eventId} nodes=${forwardContext.forwardIds?.length || 0} media=${forwardContext.media?.length || 0}`)
+          this.logger?.info?.(`[MessagePipeline] 合并转发展开 event=${envelope.eventId} state=${forwardContext.completeness?.state || 'unknown'} processed=${forwardContext.completeness?.processedNodes ?? 'unknown'} knownTotal=${forwardContext.completeness?.knownTotalNodes ?? 'unknown'} forwards=${forwardContext.forwardIds?.length || 0} media=${forwardContext.media?.length || 0}`)
         }
       } catch (error) {
+        const completeness = error && typeof error === 'object' && 'completeness' in error ? parseForwardCompleteness(error.completeness) : undefined
+        if (completeness) envelope.forwardContextFailure = completeness
         if (error && typeof error === "object" && "code" in error && error.code === "forward_context_unavailable") throw error
         this.logger?.warn?.(`[MessagePipeline] 合并转发展开失败 event=${envelope.eventId}: ${cleanError(error)}`)
       }

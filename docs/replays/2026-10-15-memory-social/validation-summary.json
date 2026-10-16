@@ -1,0 +1,76 @@
+{
+  "runtimeCommit": "71812bc04e9cb0abdfc9ada4090e8330e058b3b5",
+  "businessReplayCommit": "ecc72abe2aaa8956d21b7d1eafc76065d2f65b41",
+  "fullPhaseGate": {
+    "firstAttempt": {
+      "tests": 2213,
+      "pass": 2206,
+      "fail": 5,
+      "skip": 2,
+      "log": "final-verify-phase.log.gz"
+    },
+    "deployed": {
+      "backend": {
+        "tests": 2216,
+        "pass": 2214,
+        "fail": 0,
+        "skip": 2
+      },
+      "frontend": {
+        "tests": 34,
+        "pass": 34,
+        "fail": 0
+      },
+      "skipReason": "document/knowledge card screenshots require local Chromium",
+      "strictTypecheck": true,
+      "boundaries": true,
+      "frontendTypecheckAndBuild": true,
+      "migrationReport": true,
+      "log": "final-deploy-phase-tests.log.gz"
+    }
+  },
+  "focusedEvidence": {
+    "unifiedPreReplay": {
+      "tests": 357,
+      "pass": 357,
+      "fail": 0,
+      "skip": 0,
+      "log": "followup-targeted.log.gz"
+    },
+    "testRepair": {
+      "tests": 57,
+      "pass": 57,
+      "fail": 0,
+      "skip": 0,
+      "log": "gate-followup-targeted.log.gz"
+    },
+    "originalWorkspaceWriteback": {
+      "tests": 350,
+      "pass": 350,
+      "fail": 0,
+      "skip": 0,
+      "log": "original-writeback-targeted.log.gz"
+    }
+  },
+  "deployment": {
+    "managedFiles": 1942,
+    "managedMismatches": 0,
+    "backendJsCount": 477,
+    "replayRuntimeMatches": true,
+    "configurationHashesUnchanged": true,
+    "servicesActive": true,
+    "loadErrors": 0,
+    "pipelineStarts": 1,
+    "http": {
+      "commands": 200,
+      "console": 200
+    },
+    "snapshot": "/opt/trss-yunzai-backups/deploy-snapshots/20261015-192650"
+  },
+  "limitations": [
+    "Model naturalness scored separately from structural checks",
+    "Original frozen model replay retains 18 kind differences",
+    "Two true extraction timeouts and two invalid-output failures retained as pending",
+    "Real provider retry exhaustion/restart and QQ platform delivery were not exercised"
+  ]
+}

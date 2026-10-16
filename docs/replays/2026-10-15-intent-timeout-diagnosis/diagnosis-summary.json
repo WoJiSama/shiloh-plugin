@@ -1,0 +1,99 @@
+{
+  "kind": "followup_diagnostic_not_replacement_of_frozen_replay",
+  "model": "deepseek-v4-flash",
+  "earlierEvidence": {
+    "formalSamples": 54,
+    "eightSecondTimeouts": 54,
+    "separateMinimal45SecondTimeouts": 2,
+    "interpretationCorrection": "The wrapper deadline includes complete response body reading. status:null and the old noHttpResponse fields do not prove that no HTTP headers arrived. The historical network stage and root cause were not captured."
+  },
+  "currentRouteEqualsFrozen": {
+    "url": true,
+    "key": true,
+    "model": true
+  },
+  "transportHashesEqualAcrossBaselineCandidateLive": true,
+  "currentMinimalRequests": [
+    {
+      "label": "minimal-default",
+      "status": 200,
+      "bodyCompleteMs": 735
+    },
+    {
+      "label": "minimal-thinking-disabled",
+      "status": 200,
+      "bodyCompleteMs": 650
+    }
+  ],
+  "currentClassifierProbes": [
+    {
+      "label": "previous-minimal-diagnostic",
+      "status": 200,
+      "headersMs": 147,
+      "bodyCompleteMs": 1001,
+      "withinProductionBudget": true
+    },
+    {
+      "label": "full-classifier-default",
+      "status": 200,
+      "headersMs": 102,
+      "bodyCompleteMs": 1671,
+      "withinProductionBudget": true
+    },
+    {
+      "label": "full-classifier-thinking-disabled",
+      "status": 200,
+      "headersMs": 94,
+      "bodyCompleteMs": 1244,
+      "withinProductionBudget": true
+    }
+  ],
+  "unchangedHarnessRerun": {
+    "script": "../2026-10-15-boundaries/tool-boundary-shadow.mjs",
+    "concurrency": 3,
+    "repetitions": 3,
+    "samples": 27,
+    "http200": 27,
+    "expectedScenarioMatches": 27,
+    "warnings": 0,
+    "frozenMetadataMatches": {
+      "runtimeCommit": true,
+      "scriptHash": true,
+      "scenariosHash": true,
+      "schemasHash": true,
+      "configHash": true,
+      "configuredIntentModel": true
+    },
+    "inputAndExpectedLabelsMatch": true,
+    "sourcePrivateSha256": "d47d9d5d6a99fe98f2b3ef99986c483ce2fdc98b236c22497edf5a0e320bec66",
+    "oldCandidateSourceSha256": "56d382c7025503f73b247893bde73b388293ea94410e00c045a5922ce26610cd"
+  },
+  "productionPlannerLogSummary": {
+    "records": 1,
+    "successes": 1,
+    "timeouts": 0,
+    "sanitizedRecords": [
+      {
+        "elapsedMs": 1401,
+        "intent": "chat",
+        "timeout": false,
+        "failure": false
+      }
+    ]
+  },
+  "sideEffects": {
+    "productionConfigChanges": 0,
+    "businessCodeChanges": 0,
+    "serviceRestarts": 0,
+    "toolExecutions": 0,
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0
+  },
+  "conclusion": "The same route and unchanged classifier harness work now within the existing budget. The earlier timed-out requests remain valid observations, but neither a persistent model failure nor the specific historical cause is established. No timeout, provider or thinking setting was changed.",
+  "limitations": [
+    "This is a later diagnostic, not a replacement or resampling of the original A/B evidence.",
+    "Current successes cannot explain retrospectively whether old requests stalled before headers, during body receipt, or elsewhere.",
+    "Five controlled phase requests and one 27-request run do not establish long-term availability or all production routing behavior.",
+    "A single thinking-on/off timing pair is not a causal performance comparison."
+  ]
+}

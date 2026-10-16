@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {replyRenderingFixture} from './helpers/replyRenderingFixture.js'
 import {createSmartReply} from '../dist/backend/modules/conversation/application/smartReply.js'
+import {createPersonaSnapshot} from '../dist/backend/modules/conversation/infrastructure/personaSnapshot.js'
 
 test('unknown transport outcome does not retry segmented text or mentions',async()=>{
  for(const mentions of [false,true]) {
@@ -27,6 +28,19 @@ test('smart card permits preparation fallback but never uncertain delivery fallb
   await api.sendSmartReply({reply:async()=>{attempts++;if(afterSend)throw Error('socket closed');return {message_id:1}}},'text',{force:true})
   assert.equal(attempts,1)
  }
+})
+
+test('smart card preserves inherited identity and captures the persona before loading its renderer',async()=>{
+ const initial=createPersonaSnapshot({botId:99,persona:{name:'甲'}})
+ const replacement=createPersonaSnapshot({botId:99,persona:{name:'乙'}})
+ let rendered=0,sends=0
+ const event=Object.assign(Object.create({self_id:99,group_id:1,user_id:2,reply:async()=>{sends++;return {message_id:1}}}),{_personaSnapshot:initial})
+ const api=createSmartReply({warn(){},getTextImageTool:async()=>{
+  await Promise.resolve();event._personaSnapshot=replacement
+  return {execute:async(_payload,e)=>{rendered++;assert.equal(e.self_id,99);assert.equal(e.group_id,1);assert.equal(e.user_id,2);assert.equal(e._personaSnapshot,initial);await e.reply('image')}}
+ }})
+ await api.sendSmartReply(event,'正文',{force:true})
+ assert.equal(rendered,1);assert.equal(sends,1)
 })
 test('smart reply state advances only after a confirmed receipt',async()=>{
  for(const outcome of ['sent','unknown','throw']){

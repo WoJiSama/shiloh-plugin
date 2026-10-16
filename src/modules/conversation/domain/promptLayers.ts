@@ -13,6 +13,7 @@ const FULL_PROMPT_LAYERS = [
   "memory",
   "midtermMemory",
   "expression",
+  "interaction",
   "personaTone",
   "narrativeWriting",
   "solutionExplanation",
@@ -26,7 +27,7 @@ const FULL_PROMPT_LAYERS = [
 ]
 
 // 闲聊保底层：人设相关 + 少量记忆 + 主线摘要（用户的原始诉求;中期记忆是长聊不断片的关键层）
-const CHAT_PROMPT_LAYERS = ["identityBindings", "emotion", "memory", "midtermMemory", "personaTone", "personaFeedback"]
+const CHAT_PROMPT_LAYERS = ["identityBindings", "emotion", "memory", "midtermMemory", "interaction", "personaTone", "personaFeedback"]
 
 // resolvePrimaryModelIntent 低置信/超时返回 null，能拿到 intent 即代表 conf>=0.7
 const TASK_INTENT_KINDS = new Set([

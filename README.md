@@ -16,7 +16,7 @@
 - 把记忆抽取、保存、召回、prompt 注入拆成更清晰的管线。
 - 减少工具输出、系统消息、机器人回复、低价值闲聊污染长期记忆。
 - 优化长任务期间的回复体验，避免用户不知道任务是否开始或是否卡住。
-- 整理锅巴配置入口，让记忆相关参数更容易调。
+- 记忆策略、对话追踪与骰子基础设置在控制台编辑，锅巴移除对应重复入口。
 - 清理仓库中的硬编码敏感信息，改成通过配置或环境变量注入。
 
 当前只按我的环境维护：
@@ -273,8 +273,8 @@ memorySystem:
 相关文件：
 
 - `config_default/message.yaml`
-- `models/Guoba/schemas/memory.js`
-- `models/Guoba/schemas/aiModels.js`
+- `models/configSchemas/memory.js`
+- `src/modules/config/domain/aiProviderConfig.ts`
 - `functions/functions_tools/VoiceTool.js`
 - `functions/functions_tools/VideoAnalysisTool.js`
 - `utils/apiClient.js`
@@ -308,9 +308,11 @@ git clone --depth=1 https://github.com/Cat-bl/shiloh-plugin plugins/shiloh-plugi
 - `config/message.yaml`
 - `config/mcp-servers.yaml`
 
-## 推荐使用锅巴配置
+## 配置入口
 
-本仓库配置项较多，建议用锅巴改配置。
+对话与权限、AI 模型、人设与画像、消息搬运、群管理和风控通过管理控制台配置，安装与启动见 [控制台说明](console/README.md)。这些已完整覆盖的配置已从锅巴移除。
+
+智能追踪参数、归档、记忆、知识、情绪、表达与表情策略、语音、工具凭据及娱乐模块基础设置暂时保留在锅巴。自定义补充提示 `systemContent` 也继续使用锅巴编辑。
 
 在 Yunzai 根目录执行：
 
@@ -325,7 +327,7 @@ pnpm install --filter=guoba-plugin
 #锅巴登录
 ```
 
-打开锅巴面板后，可以在 Web UI 里管理本插件的大部分配置。
+打开锅巴面板后，可管理上述剩余设置。升级后请刷新已打开的旧页面；包含已迁移字段的旧表单会拒绝保存，相关配置请到控制台修改。
 
 ## 常用指令
 
@@ -518,7 +520,10 @@ utils/memory/
   记忆重构后的核心模块，包括 Redis 存储、抽取路由、embedding、召回和反思。
 
 models/Guoba/schemas/
-  锅巴配置 schema。
+  尚未迁移的锅巴配置 schema。
+
+src/modules/config/domain/schemas/shared/
+  控制台独立配置声明，models/configSchemas/ 提供导出。
 
 config_default/message.yaml
   默认配置模板。
@@ -541,4 +546,4 @@ config_default/mcp-servers.yaml
 
 这个 README 主要面向我自己的改造版，内容会优先描述本仓库的设计目标和改造主线。
 
-详细参数最终以 `config_default/message.yaml`、锅巴 schema 和实际代码为准。上游功能如果发生变化，本仓库不保证同步更新说明。
+详细参数最终以 `config_default/message.yaml`、控制台与剩余锅巴 schema 和实际代码为准。上游功能如果发生变化，本仓库不保证同步更新说明。

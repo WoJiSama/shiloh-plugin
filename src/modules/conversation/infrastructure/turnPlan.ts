@@ -32,7 +32,7 @@ function inferIntent(responseKind:string, requiredCapabilities:string[]) {
   return responseKind === "knowledge" ? "knowledge" : "chat"
 }
 
-// 复杂度判定:命中即升 reasoning 档(换档位而非换人)。除学术推导类原有关键词外,
+// 复杂度判定:命中即选 reasoning 路由，具体思考预算由配置决定。除学术推导类原有关键词外,
 // 覆盖群里真实发生的复杂问法——多约束对比、故障排查、方案规划;
 // 连环追问(疑问信号 ≥3)也算。注意门槛靠 isCasualChatTurn 反向兜底:
 // 命中这些模式的回合不可能是 casual,不会误伤短闲聊的提速路径。
@@ -48,8 +48,10 @@ import {needsDeliberateReasoning,isCasualChatTurn} from "../domain/turnPlanPolic
 export function createTurnPlan({
   responseKind = "chat",
   intentText = "",
+  interactionKind,
   availableCapabilities = [],
   requiredCapabilities = [],
+  toolDecision,
   toolChoice = "auto",
   toolScopeLocked = false,
   forcedToolCall = null,
@@ -59,29 +61,33 @@ export function createTurnPlan({
 }:TurnPlanInput = {}):TurnPlan {
   const available = normalizeNames(availableCapabilities)
   const requested = normalizeNames(requiredCapabilities)
+  const noTools = toolDecision?.intent === "chat" || toolChoice === "none"
   const forcedName = forcedToolName(toolChoice, forcedToolCall)
-  const committedAction = Boolean(toolScopeLocked || forcedToolCall || forcedName)
-  const requestedRequired = requested.filter(name =>
+  const committedAction = !noTools && Boolean(toolScopeLocked || forcedToolCall || forcedName)
+  const requestedRequired = (toolDecision?.toolName ? [toolDecision.toolName] : requested).filter(name =>
     explicitEmojiRequest || !OPTIONAL_CAPABILITIES.has(name)
   )
-  const required = requestedRequired.length
+  const required = noTools ? [] : requestedRequired.length
     ? requestedRequired
     : committedAction
     ? normalizeNames(available.length ? available : [forcedName])
     : explicitEmojiRequest
       ? normalizeNames(["sendLocalEmojiTool"])
       : []
-  const optional = available.filter(name => !required.includes(name))
+  const optional = noTools ? [] : available.filter(name => !required.includes(name))
   const hasRequiredAction = required.length > 0
-  const casual = !hasRequiredAction && responseKind === "chat" && isCasualChatTurn(intentText)
+  const seriousAnswer = interactionKind === "serious_answer"
+  const deliveryStatus = interactionKind === "delivery"
+  const groundedReply = seriousAnswer || deliveryStatus
+  const casual = !groundedReply && !hasRequiredAction && responseKind === "chat" && isCasualChatTurn(intentText)
   // A reaction remains optional: `tool_choice: auto` still permits a normal
   // text reply. It must nevertheless reach the tool-capable model, otherwise
   // the emoji tool is silently stripped before the request is made.
   const hasOptionalReaction = casual && optional.some(name => OPTIONAL_CAPABILITIES.has(name))
   const executionMode = hasRequiredAction || hasOptionalReaction ? "tool" : "chat"
-  // 升档不再要求 knowledge 档:技术性追问常被 responseKind 判成 chat(排障类被显式排除在
-  // 教育讲解之外),它们同样值得高思考档;casual 已被 isCasualChatTurn 排除,不受影响
-  const reasoning = executionMode === "chat" && needsDeliberateReasoning(intentText)
+  // 认真处理问题与思考预算分开：技术追问即使被判为 chat，也保留 reasoning 路由和
+  // 证据约束，但不会因此自动提高到 high；casual 仍由 isCasualChatTurn 排除。
+  const reasoning = executionMode === "chat" && (groundedReply || needsDeliberateReasoning(intentText))
   const modelProfile = hasOptionalReaction
     ? "casual"
     : executionMode === "tool"
@@ -104,12 +110,17 @@ export function createTurnPlan({
       toolChoice: executionMode === "tool" ? toolChoice : "none"
     },
     capabilities: { required, optional, available },
+    ...(toolDecision ? {toolDecision} : {}),
     context: { historyMode, selectedHistoryCount },
     presentation: { kind: responseKind === "knowledge" ? "knowledge" : "text" },
     observability: {
-      routeReason: executionMode === "tool"
+      routeReason: toolDecision?.intent === "chat" ? "semantic_chat" : executionMode === "tool"
         ? committedAction ? "committed_action" : hasOptionalReaction ? "optional_reaction" : "requested_action"
-        : optional.length
+        : seriousAnswer
+          ? "serious_answer"
+          : deliveryStatus
+            ? "delivery_status"
+          : optional.length
           ? "optional_capabilities"
           : "no_required_action"
     }
@@ -132,13 +143,16 @@ export function recordTurnPlanToolOutcome(plan:TurnPlan|null|undefined, { toolNa
 
 export function deriveTurnPlanRequest(plan:Partial<TurnPlan> = {}, config:{chatAiConfig?:{complexReasoningEffort?:unknown}} = {}) {
   const profile = plan?.execution?.modelProfile || "adaptive"
-  // reasoning 档真正升 thinking 档位:effort 经 options.generation 直达请求体
+  // reasoning 路由的预算经 options.generation 直达请求体，默认 low。
   // (apiClient: generation.reasoningEffort 优先于 backend.reasoningEffort)。
-  // 配置 complexReasoningEffort 可改档(minimal/low/medium/high/max);置 false/none 关闭升档。
-  const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "high").trim().toLowerCase()
+  // complexReasoningEffort 可显式改档；false/none 仅停止覆盖并继承后端，不是关闭思考。
+  const configuredEffort = String(config?.chatAiConfig?.complexReasoningEffort ?? "low").trim().toLowerCase()
   const escalateEffort = ["minimal", "low", "medium", "high", "max"].includes(configuredEffort) ? configuredEffort : ""
   return {
     toolChoice: plan?.execution?.toolChoice || "none",
+    ...(plan.execution?.mode === "chat" ? {
+      executionPrompt: "【本轮执行范围】\n本次只生成并发出当前回复，没有可调用的工具；这次回复不会新登记自动查询、重试、生成或稍后投递。已经核验且仍有效的后续登记可以按其实际范围说明，不能因为本轮只有文字就否认既有登记；没有核验到登记则不能承诺稍后行动。即使加上条件，‘好了我第一时间发你’‘有结果就通知你’也属于后续承诺，必须有已核验的有效登记才能说。没有登记时只回答当前状态，不能暗示会继续查看或主动补发。基于已有结果回答，缺少当前结果就保持未确认。不要用将来会做某件事代替实际调用，也不要替用户重新发起旧任务。"
+    } : {}),
     requestOptions: profile === "fast"
       ? { forceChatBackend: true, routeLabel: "快速知识回复" }
       : profile === "reasoning"

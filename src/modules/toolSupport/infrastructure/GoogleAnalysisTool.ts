@@ -1,6 +1,7 @@
 import { AbstractTool } from './AbstractTool.js';
 import {resolveChatCompletionUrl} from '../../models/domain/chatCompletionUrl.js';
 import {reserveProgressReply} from '../../conversation/domain/progressReplyBudget.js';
+import {withPersonaSnapshot} from '../../conversation/domain/personaSnapshotConfig.js';
 import type {DrawEvent, DrawOptions} from '../../../contracts/bananaTool.js';
 import {parseDrawEvent,parseDrawOptions} from './bananaDecoders.js';
 import {toolRecord as record} from '../../../contracts/toolExecution.js';
@@ -347,13 +348,14 @@ class GoogleImageAnalysisTool extends AbstractTool {
     logWarn(...args:unknown[]) {ports.logger.warn(...args);}
 
     async sendProgress(e:DrawEvent, { config = {}, opts = {}, signal }:{config?:Record<string,unknown>;opts?:DrawOptions;signal?:AbortSignal} = {}) {
+        const progressConfig = withPersonaSnapshot(config, e);
         if (!e?.reply || signal?.aborted) return false;
         const reservation = reserveProgressReply(e);
         if (!reservation) return false;
         let deliveryAttempted=false;
         try {
             const text = await this.progressReplyFactory({
-                config,
+                config: progressConfig,
                 taskType: '图片识别',
                 userText: e?.msg || e?.raw_message || opts?.prompt || '识别这张图片',
                 stage: '已收到图片引用，正在读取并等待识别结果',
@@ -366,9 +368,9 @@ class GoogleImageAnalysisTool extends AbstractTool {
                 reservation.release();
                 return false;
             }
-            const guardedText = ports.guardReply(text, config?.personaGuard, {
+            const guardedText = ports.guardReply(text, progressConfig.personaGuard, {
                 userText: e?.msg || e?.raw_message || opts?.prompt || '',
-                botNames: [record(config.persona).name]
+                botNames: [progressConfig.persona?.name]
             });
             if (!guardedText) {
                 reservation.release();

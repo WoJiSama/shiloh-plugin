@@ -68,7 +68,8 @@ test("handleTool resolves the layer profile before assembling prompts", () => {
   const composePos = src.indexOf("await composeTurnPromptLayers({")
   assert.ok(intentPos > 0 && profilePos > intentPos && composePos > profilePos, "意图判定必须先于分层画像，分层画像先于组装")
   assert.ok(composerSrc.includes("applyPromptLayerProfile(profile, layerMap)"), "组装器内按画像裁剪层")
-  assert.ok(src.includes("profile === \"chat\"\n          ? \"\""), "闲聊回合跳过理解卡片")
+  // Ordinary chat skips the brief while ambiguous chat reuses it; the compiled
+  // turn tests exercise both paths instead of matching source formatting.
   assert.ok(!src.includes("runShadowIntent"), "影子意图已随 P4 转正移除，不再有并行模型调用")
 })
 

@@ -1,18 +1,57 @@
+import type {PersonaIdentity} from '../../../contracts/persona.js'
+import type {SocialContinuity, SocialStance} from '../../../contracts/turnInteraction.js'
+import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
+
 interface Store {get(key:string):Promise<unknown>;set(key:string,value:string,options:{EX:number}):Promise<unknown>}
-interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number}
-interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number}
+export interface Continuity {intent:string;route:string;tools:string[];lastReply:string;at:number;botId?:string;persona?:PersonaIdentity;social?:SocialContinuity}
+interface Scope {redis?:Store|null;groupId?:string|number;userId?:string|number;botId?:string|number;persona?:PersonaIdentity}
+
+const SOCIAL_STANCES: readonly SocialStance[] = ['playful', 'supportive', 'matter_of_fact', 'repairing', 'boundary', 'neutral']
+function parseSocialContinuity(value: unknown, lastReply: string): SocialContinuity | undefined {
+  if (!lastReply.trim() || !value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  const reply = lastReply.replace(/\s+/g, ' ').trim()
+  const readExcerpt = (field: string) => {
+    const text = typeof raw[field] === 'string' ? raw[field].replace(/\s+/g, ' ').trim() : ''
+    return text && Array.from(text).length <= 180 && reply.includes(text) ? text : undefined
+  }
+  const activeBit = readExcerpt('activeBit')
+  const pendingInteraction = readExcerpt('pendingInteraction')
+  const stance = typeof raw.stance === 'string' && SOCIAL_STANCES.includes(raw.stance as SocialStance) ? raw.stance as SocialStance : undefined
+  return activeBit || pendingInteraction || stance ? {
+    ...(activeBit ? {activeBit} : {}), ...(pendingInteraction ? {pendingInteraction} : {}), ...(stance ? {stance} : {})
+  } : undefined
+}
+
+function parsePersona(value: unknown): PersonaIdentity | null {
+  if (!value || typeof value !== 'object') return null
+  const identity = value as Record<string, unknown>
+  if (typeof identity.personaId !== 'string' || !identity.personaId.trim()
+    || typeof identity.personaVersion !== 'string' || !identity.personaVersion.trim()
+    || typeof identity.personaName !== 'string') return null
+  return {personaId: identity.personaId, personaVersion: identity.personaVersion, personaName: identity.personaName}
+}
+
 function parseRecord(value:unknown):Continuity|null {
  if(!value||typeof value!=='object')return null
  const r=value as Record<string,unknown>
  if(typeof r.at!=='number'||!Number.isFinite(r.at))return null
- return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply:typeof r.lastReply==='string'?r.lastReply:'',at:r.at}
+ const persona = r.persona === undefined ? undefined : parsePersona(r.persona)
+ if(persona === null)return null
+ const lastReply = typeof r.lastReply === 'string' ? safeTruncateUnicode(r.lastReply, 240) : ''
+ const social = parseSocialContinuity(r.social, lastReply)
+ return {intent:typeof r.intent==='string'?r.intent:'',route:typeof r.route==='string'?r.route:'',tools:Array.isArray(r.tools)?r.tools.filter((x):x is string=>typeof x==='string'):[],lastReply,at:r.at,...(typeof r.botId==='string'?{botId:r.botId}:{}),...(persona ? {persona} : {}),...(social ? {social} : {})}
 }
 const TURN_CONTINUITY_TTL_MS = 10 * 60 * 1000
 const KEY_PREFIX = "blchat:turn_continuity:"
+const PERSONA_KEY_PREFIX = "blchat:turn_continuity_v2:"
 const memoryFallback = new Map<string,Continuity>()
 
-function scopeKey(groupId:string|number = "", userId:string|number = "") {
-  return `${KEY_PREFIX}${groupId}:${userId}`
+function scopeKey(groupId:string|number = "", userId:string|number = "", botId?:string|number, persona?:PersonaIdentity) {
+  // A separate namespace prevents legacy writers from overwriting scoped records.
+  // Tuple encoding keeps separators in group/user/persona identifiers unambiguous.
+  if (persona) return `${PERSONA_KEY_PREFIX}${JSON.stringify([String(groupId), String(userId), botId === undefined ? null : String(botId), persona.personaId, persona.personaVersion])}`
+  return `${KEY_PREFIX}${groupId}:${userId}${botId === undefined ? "" : `:${String(botId)}`}`
 }
 
 function isRedisLike(store:Store|null) {
@@ -28,20 +67,30 @@ export async function recordTurnContinuity({
   redis:client = null,
   groupId = "",
   userId = "",
+  botId,
+  persona,
   intent = "",
   route = "",
   tools = [],
   lastReply = "",
+  social,
   at = Date.now()
-}:Scope & {intent?:string;route?:string;tools?:unknown[];lastReply?:string;at?:number} = {}) {
-  const record = {
+}:Scope & {intent?:string;route?:string;tools?:unknown[];lastReply?:string;social?:SocialContinuity;at?:number} = {}) {
+  const identity = persona === undefined ? undefined : parsePersona(persona)
+  if (identity === null) throw new TypeError('Turn continuity requires a valid persona identity and version')
+  const reply = safeTruncateUnicode(String(lastReply || ''), 240)
+  const socialState = parseSocialContinuity(social, reply)
+  const record: Continuity = {
     intent: String(intent || "").slice(0, 40),
     route: String(route || "").slice(0, 20),
     tools: (Array.isArray(tools) ? tools : []).map(item => String(item || "").slice(0, 60)).slice(0, 6),
-    lastReply: String(lastReply || "").slice(0, 240),
-    at
+    lastReply: reply,
+    at,
+    ...(botId === undefined ? {} : { botId: String(botId) }),
+    ...(identity ? {persona: identity} : {}),
+    ...(socialState ? {social: socialState} : {})
   }
-  const key = scopeKey(groupId, userId)
+  const key = scopeKey(groupId, userId, botId, identity)
   memoryFallback.set(key, record)
   const store = isRedisLike(client) ? client : null
   if (!store) return record
@@ -53,8 +102,10 @@ export async function recordTurnContinuity({
   return record
 }
 
-export async function loadTurnContinuity({ redis:client = null, groupId = "", userId = "" }:Scope = {}) {
-  const key = scopeKey(groupId, userId)
+export async function loadTurnContinuity({ redis:client = null, groupId = "", userId = "", botId, persona }:Scope = {}) {
+  const identity = persona === undefined ? undefined : parsePersona(persona)
+  if (identity === null) return null
+  const key = scopeKey(groupId, userId, botId, identity)
   let record:Continuity|null = null
   const store = isRedisLike(client) ? client : null
   if (store) {
@@ -65,7 +116,13 @@ export async function loadTurnContinuity({ redis:client = null, groupId = "", us
       record = null
     }
   }
-  if (!record) record = memoryFallback.get(key) || null
+  if (!record) record = parseRecord(memoryFallback.get(key))
+  // A persona-scoped turn never borrows legacy speech or another revision's stance.
+  // Legacy callers likewise cannot interpret scoped records as their own history.
+  if (record?.botId !== (botId === undefined ? undefined : String(botId))) return null
+  if (identity
+    ? record?.persona?.personaId !== identity.personaId || record.persona.personaVersion !== identity.personaVersion
+    : record?.persona !== undefined) return null
   if (!record || Number.isFinite(record.at) !== true || Date.now() - Number(record.at) > TURN_CONTINUITY_TTL_MS) return null
   return record
 }
@@ -75,7 +132,8 @@ export function buildTurnContinuityPrompt(record:Continuity|null = null) {
   const lines = ["【上一轮任务摘要】（同一用户 10 分钟内）"]
   if (record.intent) lines.push(`- 上一轮意图：${record.intent}${record.route ? `（${record.route}）` : ""}`)
   if (record.tools?.length) lines.push(`- 已用工具：${record.tools.join("、")}`)
+  else lines.push('- 执行证据：此摘要没有可确认的工具结果。上一轮接下任务或表示会处理不等于当前正在运行、已成功或已失败。')
   if (record.lastReply) lines.push(`- 你上一轮的回复（节选）：${record.lastReply}`)
-  lines.push("用户接着说话时，先基于上一轮结果接续：已成功的工具不要重复执行，已失败的不要声称已完成；需要新信息再调用工具。")
+  lines.push("用户接着说话时，先基于上一轮结果接续：已成功的工具不要重复执行，已失败的不要声称已完成；需要新信息再调用工具。发言记录不独立证明进度，缺结果时说明尚未确认，不补运行状态、失败原因或完成时间。")
   return lines.join("\n")
 }

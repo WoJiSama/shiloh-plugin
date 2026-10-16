@@ -44,7 +44,7 @@ return class GroupModerationMessage extends Plugin {
   }
 
   isCorpusManager(e:AdminEvent & {reply(message:unknown):Promise<unknown>}) {
-    const config = groupModerationManager.getConfig()
+    const config = groupModerationManager.getConfig(e.group_id)
     return e?.isMaster
       || groupModerationManager.isNativeGroupAdmin(e)
       || groupModerationManager.isConfiguredAdmin(config, e?.group_id, e?.user_id)
@@ -60,7 +60,7 @@ return class GroupModerationMessage extends Plugin {
       await e.reply("先引用那条广告消息，再发送 .广告入库，我才能拿到内容。")
       return true
     }
-    const config = groupModerationManager.getConfig()
+    const config = groupModerationManager.getConfig(e.group_id)
     const content = await groupModerationManager.extractContent(reply, config)
     const quotedUserId = reply?.sender?.user_id || reply?.user_id || ""
 
@@ -96,7 +96,7 @@ return class GroupModerationMessage extends Plugin {
       await e.reply("先引用那条消息，再发送 .广告出库，我才能定位要删的样本。")
       return true
     }
-    const config = groupModerationManager.getConfig()
+    const config = groupModerationManager.getConfig(e.group_id)
     const content = await groupModerationManager.extractContent(reply, config)
     if (!content.text) {
       await e.reply("引用的消息里没有文字，没法定位样本。可以用 .广告样本 查编号后 .广告样本 删除 <编号>。")

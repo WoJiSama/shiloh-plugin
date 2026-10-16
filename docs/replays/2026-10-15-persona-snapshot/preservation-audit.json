@@ -1,0 +1,391 @@
+{
+  "schemaVersion": 1,
+  "originalHeadBefore": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+  "originalHeadAfter": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+  "indexUnchanged": true,
+  "targetFiles": 52,
+  "businessAndTestFiles": 45,
+  "allSourceTsMatched": 473,
+  "untouchedInitialDirtyFiles": 160,
+  "untouchedInitialDirtyHashesMatch": true,
+  "planningFilesAppended": [
+    "findings.md",
+    "progress.md",
+    "task_plan.md"
+  ],
+  "targets": {
+    "apps/lib/finalReply.js": {
+      "before": "6cc1927170a2646d1cd75694ac13902eea1a3b9dd0418d559d65d25a65fad3b8",
+      "after": "662f3dcf032a70b91b60f0aaad54236b9274c859f2ddbd973811e380c5124568"
+    },
+    "docs/ai-persona-snapshot-2026-10-15.md": {
+      "before": null,
+      "initialWritebackSha256": "9d44dc1248ffa48ad5e82c9e2082c0b7d3f0a12b128c9612cea1d2f7a2509da3",
+      "status": "Extended after this initial checkpoint; see final-writeback-audit and verification evidence for current hashes."
+    },
+    "docs/replays/2026-10-15-persona-snapshot/backend-final.log.gz": {
+      "before": null,
+      "after": "ae6173b022dc9763ec5f53d49dc308928263c7d1c0d74afa5a7ad56efc0ad425"
+    },
+    "docs/replays/2026-10-15-persona-snapshot/backend-first.log.gz": {
+      "before": null,
+      "after": "05ac19cdc1d526d096dcea52309eec9c97c6781595882664cccc4b6e409fb118"
+    },
+    "docs/replays/2026-10-15-persona-snapshot/dry-results.json": {
+      "before": null,
+      "after": "77849fcbabb006f573edbabc38f59d3b14312392bb4a89b945cdf02b1d3520eb"
+    },
+    "docs/replays/2026-10-15-persona-snapshot/outputs-focused.log.gz": {
+      "before": null,
+      "after": "eed8977151b08a94effa3833ff830e9c24ebd92823167ae7167e02db41d4084d"
+    },
+    "docs/replays/2026-10-15-persona-snapshot/typecheck.log.gz": {
+      "before": null,
+      "after": "0eccc26f1f9f758f5bcc90df28f3cd064c2fb7b664a7c41f93fb3817de2fb06f"
+    },
+    "docs/replays/2026-10-15-persona-snapshot/verification.json": {
+      "before": null,
+      "initialWritebackSha256": "b226808581a08376e96c104e1ed088411af81e584b2f93b97f74a7151766a88f",
+      "status": "Extended after this initial checkpoint; see final-writeback-audit and verification evidence for current hashes."
+    },
+    "functions/functions_tools/TextImageTool.js": {
+      "before": "a275638636c01e93a68bf5447b1f7504133184c9c76059948c27d7321ffe6274",
+      "after": "b9e2e575ac8655f8b46d139dd142e8891bbf0651d0f8ad34bb10af1e98b96d9a"
+    },
+    "scripts/conversationQualityReplay.mjs": {
+      "before": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+      "after": "db6d7cc8bc890a7f251f77230682b5717d847cc4d17aba714b1f98c466e8f285"
+    },
+    "src/adapters/conversationContext.ts": {
+      "before": "ce2d389e2fdcc2529219af2d0f92abacab216fce3fc3c8f2a8ffc008b4468c79",
+      "after": "7a976518677d4ff0ff8d6cb24549f3822e1ff491a7ccac29a6c4a755886fb983"
+    },
+    "src/contracts/bananaTool.ts": {
+      "before": "9b965c16323035efeee36e4cc4457d739cdce7769ce395b938e7e9472c717be6",
+      "after": "ab1658753cec01d4904c342a45198cfd338290ff885ff63539abadcef09b27bc"
+    },
+    "src/contracts/chatTurn.ts": {
+      "before": "e912ecb200a4dce2eaf11e2066c5a3be2963ffa095ea8dd1eaeb73cb3cbacf8f",
+      "after": "2067c126157da3ae538b4529f4075d3fa271286bf5969a14557a09555371c6bf"
+    },
+    "src/contracts/conversation.ts": {
+      "before": "33a72fdf966e5c5ac35ab0c4acaa4871f72244d43faca09782313b35646642d3",
+      "after": "fa15b58a43f75932328864015f51acb3859ee77715c5e3a2e32af9ef4342b995"
+    },
+    "src/contracts/persona.ts": {
+      "before": null,
+      "after": "94e2b1abdbb52c30c57965e13b8a57503354a032a8d9d1862436c0f8df73d18b"
+    },
+    "src/contracts/recentMessages.ts": {
+      "before": "5cd9b78c9c9b819f3b4063faacd41a03124a2eda011f48f3567cace9af54f149",
+      "after": "6c36771368419d2a256e383ea8e03e52580dfccb3961f38864f04e0fbbfc95f3"
+    },
+    "src/modules/conversation/application/finalReply.ts": {
+      "before": "5b72c37afe0721af3a4cda4444ceaa4cffdd2394096eaac6dce5c5628d335a15",
+      "after": "e7048c5ac85dfd8f306757e1b6e42b4332fa49a816938f8779c49a6947ff710c"
+    },
+    "src/modules/conversation/application/replyRendering.ts": {
+      "before": "24b6c71f4a1b848cc29a8c0dd09522be137f91d3338f61c1f4c44139416d627c",
+      "after": "624f32e3c5b6826639f6d941e92b8b2058b234aae0606ab9023a269983aa3ccf"
+    },
+    "src/modules/conversation/application/smartConversation.ts": {
+      "before": "64dcf0f98da3c74eefbdf899107e152c4766f696e282adc507cc6403b4baed63",
+      "after": "5c2b85d6337c5748815cf3740872b6398d809239a0b2f485de359a71fd3eec6d"
+    },
+    "src/modules/conversation/application/smartReply.ts": {
+      "before": "bc4050af58efba7cd646f712215496f9609756c7c78530319aece6b6b4d8e412",
+      "after": "41b5345d2648933fd68f191ee915ee16155cab21b265e546a8ff336943a7b131"
+    },
+    "src/modules/conversation/application/turnContinuity.ts": {
+      "before": "eedebb63ab7b790015e414e11cc33592d002a9068e5f4383cad42254dd4a0fe3",
+      "after": "303b78fc0b9b19bc78c21b3da55bbcbb5d0f032fc16f5dced81ab963834f18c7"
+    },
+    "src/modules/conversation/domain/personaSnapshotConfig.ts": {
+      "before": null,
+      "after": "20b8e97042664d5cc30ae5e026efdd70b6aa37658b6be8fcbe186fd935a5c7c5"
+    },
+    "src/modules/conversation/domain/turnInteractionContext.ts": {
+      "before": "d27f2b616d96e81542d4f08f1ee527b49b340ea5de884353c90e0c774875dd31",
+      "after": "0e2ea1eb0d4fbcd2b3813701c74f62305503de12a96270b3e7a58dca86a91e98"
+    },
+    "src/modules/conversation/infrastructure/personaSnapshot.ts": {
+      "before": null,
+      "after": "d688a6e02f9293953ba1d952b38f437880de8b6a822b631b6527a1a8611048fe"
+    },
+    "src/modules/conversation/infrastructure/timingGate.ts": {
+      "before": "a66b275fd82c30a11d24a6412a0397370b8f411baa4c7657736d3c49d5ac4810",
+      "after": "cfd484dd067faa0daeb53bfca915556cb2b1c9b779974108fc889a2dbd9a9203"
+    },
+    "src/modules/conversation/infrastructure/turnPromptComposer.ts": {
+      "before": "bfd27d940573d14277ba8559401719f9e721d9eb63bb05e6912807261427b16d",
+      "after": "e2a6a81d81a7752818cd1a46011e1ab202a449479dd3ab61003c7e6a048d3117"
+    },
+    "src/modules/host/infrastructure/chatPlugin.ts": {
+      "before": "0989ff76afb64dee33a7412fb2747be5648ce2ded33fbbf8936ba7251c746ce9",
+      "after": "118c8dc8cb69366dc44225bc278a51c56e0af9717496d204c4d69499c83742fa"
+    },
+    "src/modules/media/infrastructure/VoiceTool.ts": {
+      "before": "34eee0f3435f6a5840ef93d700ec3c1bea0d0340f20073266e80d2d374e422f0",
+      "after": "b889d21434672ca13e755f10927f068bc8adffc8b01281c90ecc5d605afa33c2"
+    },
+    "src/modules/memory/infrastructure/episodicMemory.ts": {
+      "before": "3750a93aa1da8d6669b99beadb93e79d0b3e9df8dd4a705e67ad38f52f5108bd",
+      "after": "47c921b0179cf13e60043282d9006f20f8a8479c8b35bcd6abf50af95245e7a1"
+    },
+    "src/modules/memory/infrastructure/globalStyleLearner.ts": {
+      "before": "20aef750f4b894326e1deb16610cf3ddb8bc03ed811d84f0a7562caa86a15f72",
+      "after": "2bc0ba78d35e7d723c6298a1708d5acadd44c63c184fbfbf1653dc7a638cc186"
+    },
+    "src/modules/memory/infrastructure/personaFeedbackManager.ts": {
+      "before": "124e30bbcab58b9417a892fc20d573434030c44e2aafabbeda674886a74437f1",
+      "after": "43706e4041c049c2eaf7f93271b4736f067726e71ff90553a791e84a16b2bc7a"
+    },
+    "src/modules/messaging/application/recentMessages.ts": {
+      "before": "b0b2dca144fd947f67182963df1049b1342879370babe1ac52afbab368c4db94",
+      "after": "77fd068d30779246133e0f179930bfa32a6dcb9d03599cd3c706242eca6b516e"
+    },
+    "src/modules/runtime/domain/turnSession.ts": {
+      "before": "2b7f04314bfb74c46e370ab00ee7b9d1f21e3f2e0f9a7a7a2df232c293db838d",
+      "after": "10e2d52746bf928b38f00dbcf602c7fdb164f59697fd25df8b4ecb1e9cc62ebb"
+    },
+    "src/modules/toolSupport/infrastructure/BananaTool.ts": {
+      "before": "677477454964fda852bdf2de7d0db67734994a5caeb1560a8cc1bbed2071f162",
+      "after": "cc8341d05a7c9400e533248cacfcd805b5c462201101850d750bca8a76d35e2d"
+    },
+    "src/modules/toolSupport/infrastructure/GoogleAnalysisTool.ts": {
+      "before": "60c6e331e7405fc8064477b491e0ceda2ce81986706396a314be69f60d1ffaa9",
+      "after": "d950261fbb016ea5a01f5a378531e8d5d3fb57dc16da71b471de0b67b6daa31d"
+    },
+    "src/modules/toolSupport/infrastructure/GoogleImageEditTool.ts": {
+      "before": "b800e9214cbbe9137420b3fec822a99bfb90dca4bdf48a79866263d778e45406",
+      "after": "c8fe6e15b34b10394557ed832833710d76053366c61922db010788825ae9d3ac"
+    },
+    "src/modules/tools/infrastructure/chatTurn.ts": {
+      "before": "69870f4d9e277cbdf6b2d8c523799c59d3731daead598a04b672b66d5bf773ec",
+      "after": "7170df15e31fdf86c59901ec02f78adddee62c893c1e71550a0565ca37c7e898"
+    },
+    "tests/episodicMemory.test.js": {
+      "before": "102cbfd18ae8e5dede5be7871eb4cc9b640dbf24d464c1bae0964a7b96359668",
+      "after": "5edb020b223342d131f3ced32400fd4056920261d6ce6b30d678b79b000816e9"
+    },
+    "tests/finalReplyBehavior.test.js": {
+      "before": "3bff80e538bef89d671ce2edff4b4dcbfbcb20392b0e0203985d7f2fdcebb151",
+      "after": "20c7d21ae60a1d64c0198fe2551d3d5766171fdc15ba77a3c291fc755ad3841d"
+    },
+    "tests/globalStyleSemanticRecall.test.js": {
+      "before": "3772b9d59e00d8ff6fd1f25c43f51b1ff6e1ad5b1a88da1038a51ba284f6b913",
+      "after": "910795a2c57ed251dc677ee3ea80b035a0f76172fa9c7fad6c5937a70e80d46d"
+    },
+    "tests/interactionReplay.test.js": {
+      "before": "93cca8e5878bf8c5746af66fae461ff64211204c1cd0433fddd1c273f8428ac7",
+      "after": "e4586763037c77076b6a6cacddcc9a74310755c86af8951d77f72438c09207ab"
+    },
+    "tests/personaFeedbackManager.test.js": {
+      "before": "40789a12991bdd0373e9ba8bfb985dc83aa1d9009456c49b4a2e3cf709a2c2f7",
+      "after": "4b1e39ca48a304659d8f420b3b6bcafe557c48169ad0590eb4cb75b96d358d43"
+    },
+    "tests/personaOutputAdapters.test.js": {
+      "before": null,
+      "after": "39c7998e672920b0c4c3573efa362ba08486c93cf5f1b668b9b10286af3fc9b7"
+    },
+    "tests/personaSnapshot.test.js": {
+      "before": null,
+      "after": "dbd4d54a2ca22b79722e8fa6d86a64460e2b551ff4729a83df52359e2f4c38e9"
+    },
+    "tests/replyDeliveryUncertainty.test.js": {
+      "before": "c3b529e5169eef1bddb15ad9a5e149d5a2ba49cda785705f4269a085330f4f32",
+      "after": "f621220451cb58ae425d6ffd9b3b77c516fa797a18c56efe1bafc5e22ff3b1ea"
+    },
+    "tests/sessionContinuity.test.js": {
+      "before": "5b6eaaf08e20bb41aeba3da3682ea828b37633f95246e9f3edac827d05d24694",
+      "after": "509f85b35def74ff79f18be65bc0f1c7e1efb5d96d122c789e54d21c104d0227"
+    },
+    "tests/turnPromptComposer.test.js": {
+      "before": "cb5734e651466e84aa5a460b214eba577b78c99db86112ee7cc1175fbf5238fe",
+      "after": "10a2cc7203d261baebff19cb1b7433b61228d53edb58c6f1e46842f0fe85dbdf"
+    },
+    "tests/typescript/conversationControl.test.ts": {
+      "before": "abeaeabab7e167893a5a45fe4f5c131f82134bf3a02672de5b98657a9d85f435",
+      "after": "faa930e40cc4ed4c90754dc882f2fcdb8da0a72b33f8e5eebee8d60969cc5490"
+    },
+    "tests/typescript/personaSnapshotOutputs.test.ts": {
+      "before": null,
+      "after": "7b1626562918fdb63bd3eb90b01013d2cfde605738668fdf3dd3f8bad5e280c1"
+    },
+    "tests/typescript/recentMessages.test.ts": {
+      "before": "55bcc0fe1464cbd2ac75e7f7f5bcd63c2ec5f772e66d4c178edee4fb4c9f4eef",
+      "after": "dbb66b9781d27073cec47d2825ac0d076e73fb2eb2ac26d4e06cb805410ff12a"
+    },
+    "tests/typescript/turnInteractionContext.test.ts": {
+      "before": "3bfc1414c860005f224a18da9cd28a821d106bc3214bb51f947c1d777b7fcc84",
+      "after": "95587c538998f57b69b0e80a98d563cd1db5de28c4f1c22624cf34dfe3982d5f"
+    },
+    "tests/voiceToolCompiled.test.js": {
+      "before": "b2f816b873d64bdaa719f441e449778d448fb83f231f74ce0ce374d673089624",
+      "after": "d3eee08a84f44449f83b9db86d7034879dc1002d5547c5299e4347562873e304"
+    }
+  },
+  "untouchedInitialDirty": {
+    "apps/lib/taskStatus.js": "cd9d6f59a766658c01fa9c1455182275ff4c2fb0369206d6288488e851d5a252",
+    "apps/test.js": "843d2752bd6ebab5fd66ae3bcdc67ce8aa11acafc3a3d4db799413b35301b73a",
+    "config_default/message.yaml": "3989e796cc9bb89afc24ac7d42f9f20203a56e44c8da385dd0130d9d59c42e82",
+    "docs/ai-conversation-boundaries-2026-10-15.md": "29485d75d0377e8846101ad153170ffff00f74cca2a619b69ae1f4cca03a372a",
+    "docs/ai-conversation-deployment-replay-2026-10-14.md": "f9d1796f2a8362e0e9741030d37a3277fe10552e770533b4962f5d469b32a3db",
+    "docs/ai-conversation-diagnosis-2026-10-13.md": "c94babf9c168745fbf97ad4d61c7dd8ba80f160fbbeec2d5b96c782f73462c06",
+    "docs/ai-conversation-implementation-2026-10-14.md": "7f850554c3ba3476cb695da4a19b15e4b11f336a923b2ac95da9dbf3e54b8983",
+    "docs/ai-conversation-quality-2026-10-15.md": "ab7c3e241f706c9311bd300975a11d50b2939202a57cf8eea8efe31a10358dd8",
+    "docs/ai-conversation-review-2026-10-14.md": "3f57dd5b4c0464f8bc433acc50aa3ce9d8f6b3b3ddbb4ff3ae562c3f49410ed4",
+    "docs/ai-conversation-samples-2026-10-14.md": "38eac734ed2394fc9a01a47384cf93706a479c94121682fd1cafb0ec5e8f9de6",
+    "docs/ai-conversation-stability-2026-10-15.md": "0eddf9e9c78d65663000a3d30af5c12358479134d6a471a04837ee15bfb4d0db",
+    "docs/replays/2026-10-14/interaction-shadow.json": "b74f8222b79aec10b546fee060f2fb017ce9deb786d06bb72dd204af707ba847",
+    "docs/replays/2026-10-14/persona-replay.log": "c9989b24f78fe57f8fe8ee152ebcd26285b87ae262e55a112e9f6a986422ce86",
+    "docs/replays/2026-10-15-boundaries/audit_runtime.py": "be7349b44af36a37556d08ecda7bffeb03345b268c9b7db504fdc862099bddb8",
+    "docs/replays/2026-10-15-boundaries/baseline-freeze-audit.json": "2bd93cf222677d43979c1a08d13bb6b49327a62916d163be75c38b4272d363f7",
+    "docs/replays/2026-10-15-boundaries/baseline-review.json": "b33d34543d2794de329886af04340bcac7cddcb7dc7efc4970153a5de4c6827f",
+    "docs/replays/2026-10-15-boundaries/baseline-scheduler.json": "737e29d5bfee6fc506cd9dcaeb3d7a4174b5a5d3bd04bb79801fbaac5716583e",
+    "docs/replays/2026-10-15-boundaries/baseline-tool-decisions.json": "0acc97cda464a66300f3f12f40910ef70c46ae47f40eccfd08dd37e93a35ef8e",
+    "docs/replays/2026-10-15-boundaries/baseline.json": "a968fb3a330789becccbafa76352eaeef960337f367056a306126152f86ee167",
+    "docs/replays/2026-10-15-boundaries/candidate-freeze-audit.json": "4d3e79d3383bc278af3f8c52c099f17a74e48f7fad097ef91a1575f71a2f0b85",
+    "docs/replays/2026-10-15-boundaries/candidate-review.json": "68873411a543df23f66d2d0a2520cb2ebccde1d47b92dcd9a55fa12778533d72",
+    "docs/replays/2026-10-15-boundaries/candidate-scheduler.json": "0b02289099bd12829913ee658c090be3ef873c96b62d658a814a7f55e5f60485",
+    "docs/replays/2026-10-15-boundaries/candidate-tool-decisions.json": "e6b1be119a8b1f34f1f09f1128f72a7ba02057dee1da94172cc0fb363331832e",
+    "docs/replays/2026-10-15-boundaries/candidate.json": "082fdece0d20a58820e684da6fdbcdc212475a928c0e2b27a1b3d5b380096986",
+    "docs/replays/2026-10-15-boundaries/classifier-comparison-integrity.json": "89e0a4d41816bfe276d031b2cf87bccfcb29acf45bbde1af7b59ae977ff79946",
+    "docs/replays/2026-10-15-boundaries/comparison-integrity.json": "0806ccae53d08e505e85a6dcf1a195861b26de29a9fe46119dc63049f545516e",
+    "docs/replays/2026-10-15-boundaries/comparison-review.json": "92d9ee57a31a806c5465574d50fd0ae411c730f4fcdd213faa4ebb42c1fa43d1",
+    "docs/replays/2026-10-15-boundaries/deploy-phase-attempt1-tests.log.gz": "91ed93475476f7b5cafb42b306daff752c63a2642ed87f923fe740c4a5d8c8e8",
+    "docs/replays/2026-10-15-boundaries/deploy-phase-tests.log.gz": "ded0bba767853d85ec4e28e199944e74e234231672450c9adb9bae5680f04c07",
+    "docs/replays/2026-10-15-boundaries/deploy-start-audit.json": "33df705555ff07861c5628a51e0a3c5c3760da884a851de0b71b497adf49d3f9",
+    "docs/replays/2026-10-15-boundaries/deployment-attempt1.log.gz": "1b0b6cc2c88eccb9fe5baf21123b22467a3ec6f0109c0c8c9d3462bdc8936d0c",
+    "docs/replays/2026-10-15-boundaries/deployment.log.gz": "be79d2155a574e204fa9fae11aa10aa660d60bff5b7b78347230da82a68da5e7",
+    "docs/replays/2026-10-15-boundaries/evidence-index.json": "2764863bd8ed3440776cf599dc19ccb1dc8e05bb24fa6f88756ccfac414461af",
+    "docs/replays/2026-10-15-boundaries/focused-final.log.gz": "e6aab2977903c985e1fd1f1a0a8297f6f363d4ff59e96dd3688d92ff8d090083",
+    "docs/replays/2026-10-15-boundaries/frozen-review-rubric.json": "b56467a116a5f33e209e723c6253ed4840f5e09ef4bd684c73475060377c4281",
+    "docs/replays/2026-10-15-boundaries/gate-repair-focused.log.gz": "8560e6f002fc31894d21355ed6a2657e0f2fed6d48af74e90a90844af14b23e6",
+    "docs/replays/2026-10-15-boundaries/initialization-failure-summary.json": "50eb65ac6b231792051823df94c92d8e07458cdcfdaf551a23140d71325dd1ac",
+    "docs/replays/2026-10-15-boundaries/intent-provider-diagnostic.json": "e9557729ebf5cb7ef8256ef2599d433c1769f321fd6fbdd68df0372db3766c44",
+    "docs/replays/2026-10-15-boundaries/parent-observations.json": "54788afe58230de97e5266ff14641f37388ca03d12807fdc722d67d436928ccd",
+    "docs/replays/2026-10-15-boundaries/post-deploy-audit.json": "b55ff7c2b355bdb7320e001572fffd03893450430ebae1536600e3f1eab6c1d3",
+    "docs/replays/2026-10-15-boundaries/pre-deploy-audit.json": "7f081078564f7d603f7ccaed19deee76f40d8ec2d6eb561d9bd98d7a8dcf9db8",
+    "docs/replays/2026-10-15-boundaries/preservation-audit.json": "173c996bcd31a038546116d2eb038399f150383d73b76d4c3d9cae8f8bf37be7",
+    "docs/replays/2026-10-15-boundaries/release-code-equivalence.json": "b20fe926f0dc29c3cfda5eda361705cacded8118cfa9e254862cfb192478ee34",
+    "docs/replays/2026-10-15-boundaries/run_boundary_replay.py": "aff76fb6eac2d723e0e468baab9f221a172a48db78e9ce9fef1c3bba5ab636bb",
+    "docs/replays/2026-10-15-boundaries/tool-boundary-scenarios.json": "42ee06384618bd0e202e620fe2510cb5b129250247fdb17af4d38fc743982f9c",
+    "docs/replays/2026-10-15-boundaries/tool-boundary-shadow.mjs": "126d104755c7de2a499cd39c469f74f5c5983fb598ee3dea382458dca2ef146f",
+    "docs/replays/2026-10-15-boundaries/typecheck-final.log.gz": "0eccc26f1f9f758f5bcc90df28f3cd064c2fb7b664a7c41f93fb3817de2fb06f",
+    "docs/replays/2026-10-15-boundaries/validation-summary.json": "ee068cfb7cf69440a5f3010d9d6224cd8bed3b0d02b3de49e0ba6fac7c1108ad",
+    "docs/replays/2026-10-15-boundaries/writeback-preflight.json": "89768e579e909267d023577e2d5750d9c66a788a797a30982783475426e6f582",
+    "docs/replays/2026-10-15-boundaries/writeback-validation.log.gz": "95dc8b4ca2604e397c942538d84e8f1de98ce95852c7fb05edea14d7c4966a15",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/classifier-phase-probe.mjs": "70b80c8fffcd4e503ee2fbde06bbccd90c79a1abb8d9d875ea9d745ec9d19042",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/classifier-phase-results.json": "b762989a3d5249981645f5ad44352aa824528e98f4ba27cc7266823c31532d82",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/diagnosis-summary.json": "b66701d6c3432dcd92da86ca1ba75c30fb04e09164d2f1cf2dd771ad2c8802bb",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/evidence-index.json": "1cb109327d7f31e8134b5705ba808642725fafc6cc11093721b62c7c1d8e7b3d",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/minimal-phase-results.json": "1f80451c0b21ce645ddf174e251ef210bf279665346d54bd1095644dac5d25c8",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/phase-probe.mjs": "e3b6e6dd42baadf77eca1edbadb34cfa44dd7e1a66875f955650de514ba8ae5d",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/server-evidence.json": "831c4eddaefa64af76d7fb289dc33c18da32dced5ab45a6ab1d0494497e81043",
+    "docs/replays/2026-10-15-intent-timeout-diagnosis/unchanged-harness-rerun.json": "b769cc3ee11a1d4fb4f6cc7afcae6a9c84e4df4cd7e6654361e9880b608c9d6a",
+    "docs/replays/2026-10-15-stability/baseline-fault-review.json": "73f4eca421a7391d8c849c39e567fe39e339e41a8b0705f4cdb0bb1b3758f94f",
+    "docs/replays/2026-10-15-stability/baseline-fictional-review.json": "1070ebe9f09bf5409a731baf324edbecef6cf39a18c513da0245a1914f665122",
+    "docs/replays/2026-10-15-stability/baseline-import-audit-20261015.json": "33b5939bc1245dc8c2e6d0b0d83d268eac27b3010d0ff5d07bdac1d49d8c8c40",
+    "docs/replays/2026-10-15-stability/baseline-social-review.json": "a4745d728fee345728a6700cc7f275e3b68b168113291cce732f6bd20184214c",
+    "docs/replays/2026-10-15-stability/baseline-task-review.json": "572d2b7dbd5888c3220f396307b319827f8a81735eff83113ff3e1908b009abc",
+    "docs/replays/2026-10-15-stability/baseline.json": "e947cf460c1cc4a6dcdb32fc58921005ea0af6c0db67dc82d1ad4d0539d81fef",
+    "docs/replays/2026-10-15-stability/candidate-dry.json": "a9b4ed7a11e56b721ee7b09fa0c4b52578947e30bfbb1c72b791a09a9a37a11e",
+    "docs/replays/2026-10-15-stability/candidate-fault-review.json": "82d9333ad247f1225799caa950b183c15fa0d5b090cd37545cf8d10fea2d7d7b",
+    "docs/replays/2026-10-15-stability/candidate-fictional-review.json": "1b260067ac69a7aa71bbb0959c66e13f9e5e3dcc5f37d15d49fcee3c9f26f0db",
+    "docs/replays/2026-10-15-stability/candidate-scheduler.json": "e1af3a47ab7a7741623f9fe12b6be16b2bd670609ef5d7339045bf55fe455e23",
+    "docs/replays/2026-10-15-stability/candidate-social-review.json": "aa689736fff314becf9756267518a79a530fe80c47ce9958fa07b5e657c62433",
+    "docs/replays/2026-10-15-stability/candidate-task-review.json": "35ada765a58b4d6726e9acdcbfb3c7356f50714eca358c04716aa21af4921c67",
+    "docs/replays/2026-10-15-stability/candidate.json": "65e6d1af060c719cb87c3e36bb3394df060db3342cbe0b499f31e7bc9810fa5c",
+    "docs/replays/2026-10-15-stability/checks.json": "3293cad96a15ace5a70ebae2083ed8e6c2be8615d456d80d327c5d02301e5925",
+    "docs/replays/2026-10-15-stability/deployment.log.gz": "f7ae751771c802d85e32c23e7b723a65d8c83e0100f9993046e923ab83e474e8",
+    "docs/replays/2026-10-15-stability/diagnostic-supplement-integrity.json": "c8b5100ae94f0748b403aba12c50629fd1ea75a41caaf5c4ec79abe177f24c56",
+    "docs/replays/2026-10-15-stability/diagnostic-supplement-scheduler.json": "5324aed29cf6df7f52783b9c0ea993f7d67eee503a70ca662aba53dfa32f9bf9",
+    "docs/replays/2026-10-15-stability/diagnostic-supplement.json": "3e1f5d13c0bd601e1f82c808e0e2cd4c638f5b492732aadff7c03f62c8ffec1a",
+    "docs/replays/2026-10-15-stability/evaluation-integrity.json": "0f8799298e728612a1706ab2dd89f31a8742412c69e6821a2bd48034d8397e9d",
+    "docs/replays/2026-10-15-stability/fault-comparison-review.json": "aa905b1dea3eabf2da68c4e5161bfbda07f49ea115a2736154ea0d408726405d",
+    "docs/replays/2026-10-15-stability/fictional-comparison-review.json": "fb226bf6b5d3cb53c7cd90fb03209a2b800b6cd431b87a7308e5a7d5f387bfe4",
+    "docs/replays/2026-10-15-stability/final-fault-review.json": "32349df6d0451f7b99450bb3147da2668d324e45420dfdef5ebcde1392f8b22a",
+    "docs/replays/2026-10-15-stability/final-fictional-review.json": "fd6492795abbb55d5b8593c8a5bd8c63a082039aca134f84ceef8c049269d59d",
+    "docs/replays/2026-10-15-stability/final-package-dry.json": "f2b35d6092c4fbe4c838d164c48eeca764b41adcb0c3b1c7dc08197796d7786e",
+    "docs/replays/2026-10-15-stability/final-phase-gate.log.gz": "af9be732bb1dc58d1ecc7f6e654892f070ccdba7068cd51890fd89d4b3040c48",
+    "docs/replays/2026-10-15-stability/final-runtime-closure.json": "425fc86b71d8a68768c8d43fef61e360f59f4ac9ad64ea9bcdc4894274977934",
+    "docs/replays/2026-10-15-stability/intermediate-d75e6f3.json": "b547cd38959755b11aa79917245bf9fa2de4d3848e24bec9368a3f18a9a9022d",
+    "docs/replays/2026-10-15-stability/intermediate-stopped-reason.json": "940c0b8cc8141a25a0741de8470200680ca2f32115ed7b0db274c18a6e1beab4",
+    "docs/replays/2026-10-15-stability/post-deploy-audit.json": "ee46635cf050abbab93a1660e66da0b0a600441164968c7f52e9fe262648fb89",
+    "docs/replays/2026-10-15-stability/pre-deploy-audit.json": "73429c4efd03a0233b99997460cc4dfab5f85f56ea59c826ee7d24153f5ec2a4",
+    "docs/replays/2026-10-15-stability/preservation-audit.json": "c5cab8b45be77fbfed7e17c776fade96b1e20252c59616f95d5318145a519dd6",
+    "docs/replays/2026-10-15-stability/replay-closure.json": "e261ce145a5e19fef84b8d1ed911c26a880578e314ab0ee447234608343e84fc",
+    "docs/replays/2026-10-15-stability/server-release-audit-20261015.json": "63d3704579bc70792b837cd9413f38b4bdeccbacd49c04e8f5c20b452e3d0c52",
+    "docs/replays/2026-10-15-stability/social-comparison-review.json": "cc09c8a28763a9617a9e1a22d6b074ba20fbab9136ab803db0e4a3ab7b3486df",
+    "docs/replays/2026-10-15-stability/task-comparison-review.json": "9101058b2a7f88250085e956c3960990975ee38370f21a77b8f53b352e084e14",
+    "docs/replays/2026-10-15/baseline-original-config.json": "95711b66dd83588773777b87d9ace280e1d717ae4d5e491e40fcc7242815f14c",
+    "docs/replays/2026-10-15/candidate-original-config.json": "86c2bc40e3e6e7fdbc866a82f363e68049ea32fa536658df764211d66e5eff14",
+    "docs/replays/2026-10-15/deployment-receipt.json": "78938c69f61ddc7cfecfbbaae9338cb4e0d8f8b2cd2002edfe617c14ff2b779e",
+    "docs/replays/2026-10-15/intermediate-v2-original.json": "3c27f5873c0541467f71db521ffb7a10623012c2cf3df2c8820320ff39bd2e47",
+    "docs/replays/2026-10-15/intermediate-v2-quality.json": "40985345268f26638c7c016b3f54911acc7db8e0ed4cc46e437034a7c78a85e9",
+    "docs/replays/2026-10-15/postdeploy-focus.json": "7398581c5b335e2bed0c18afda6d46d6910e7ed4273f17def404f1a781897461",
+    "docs/replays/2026-10-15/release-original.json": "48127fa365cfa4b9e39c057872327a9d76b7a4e2031e7c4b2cd748f62644b236",
+    "docs/replays/2026-10-15/release-quality.json": "d34c644fa6080b31fd9ce1cdf3db3efcf6d23ec8aecaadd6bba0efa9cc742ce7",
+    "docs/replays/2026-10-15/semantic-review.json": "72d2de981d15883f7911c145778a9af99c48d4cab1927d446e07a46dcbba1d7e",
+    "functions/functions_tools/GoogleImageEditTool.js": "f530f71f5f65cce991d17e66cdbb15e12621c3a5532b48047a25fb8ac79a4566",
+    "scripts/deploy.sh": "1411db47e697232091c42ea04835b79f31206811886e6039ed41591a145099b5",
+    "scripts/personaReplay.mjs": "b4db0770f2ad3195db2ca2a5def8e97ae5ffcb06fe536ade995347336e017d8b",
+    "src/contracts/diagnosticContext.ts": "3011a074ee80433f659233a9c120c38f137a925d8d0d8479a4ca2b884e134432",
+    "src/contracts/reminder.ts": "aee887dc3767750bf2a3cdcf9c49169347e0916bbb5fb24f0b9cc2e3010b9181",
+    "src/contracts/toolExecution.ts": "36dc4421b3442740a65b713c7b54b98a7c87c687817d1d9757a77d763506f915",
+    "src/contracts/turnActionFacts.ts": "0dce223a13a0f87478408761d42e24d9cf3b700fd39acfbc9769824174593d18",
+    "src/contracts/turnInteraction.ts": "df4801d67d3f81b24e9cba5925e20531cbe98aa588cd1cb010faf29825b0c50b",
+    "src/contracts/turnPlan.ts": "46510abd12137e8fac63f72b1d4703a5d6d2f1040ab5b6ce2cc71f712722ea7e",
+    "src/modules/config/domain/schemas/guoba/persona.ts": "6dde1ffa8ce4b4b338b79569cdba07dd1d79d361f89e203e88b30b39993fff62",
+    "src/modules/conversation/application/outputGuardPipeline.ts": "55dc5cc164df8af2071c16c198d0f343970a33993c11f9cd8755fdea029d2899",
+    "src/modules/conversation/application/routeDecision.ts": "7d43fb66e9c1d45895bcf46f3df41170cd5a138fa642f04032f76c97ad488785",
+    "src/modules/conversation/domain/agentIntelligence.ts": "8258c27d76478691ebaea5386aea1bf71be87ada8f1122460f7c2deb39ddf2c1",
+    "src/modules/conversation/domain/diagnosticContext.ts": "d7b7d8828b627c4df5178da79a527c2d6e636af7695b595a3191e2b2d26eeac2",
+    "src/modules/conversation/domain/personaSource.ts": "0f90db7a5ba225df84284865f2b6bbd5ab82331384bf8b7703f8cf60647bb776",
+    "src/modules/conversation/domain/personaTonePolicy.ts": "7b3b4dc4a95fbfb0a20c6a0299ab6750015dd0e2f63b1d78378023b904ae42d8",
+    "src/modules/conversation/domain/promptLayers.ts": "a6b499e4f56e080e484e1fdae1397738c8586ab8c5ac03cbf0f40e3d062a66dc",
+    "src/modules/conversation/domain/systemContentSource.ts": "5edf85c70052c85111750fea4859ec9e1d9f262b777eda4cce5faf97c1b0cfd6",
+    "src/modules/conversation/domain/systemPromptTemplate.ts": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107",
+    "src/modules/conversation/domain/turnActionFacts.ts": "4b5a9f33b4210dc8bda77ac22afc7f2a017964b81d44e932fc25ea86226acea1",
+    "src/modules/conversation/domain/turnDiagnostics.ts": "5e59043d2dc20866579f7bbbf6bb8ae617ee8b49d8e0dd9f3a944e9779957de3",
+    "src/modules/conversation/infrastructure/taskStatus.ts": "03f28c19704d1e7a439dbeefa29dd8707319d345209330ade93f4117740e8f43",
+    "src/modules/conversation/infrastructure/turnPlan.ts": "3a4fb26bc2e32b3754596585c7791318720a23a662beacc3eb599cd0faf91f96",
+    "src/modules/host/infrastructure/hostEvent.ts": "08441a459472de646568b9b77f33b8e3aa01edc0d8aa454a5ecffea62b394280",
+    "src/modules/image/infrastructure/reliableImageSender.ts": "3e360191127917cc67c35828a5fe4ed72556046b9b14a704451be24707e98ec8",
+    "src/modules/memory/application/personProfileInjector.ts": "679a2317003c1cd316fe728c1278e70e0ebb99b40f8033b750ceeba3b45c508f",
+    "src/modules/messaging/application/outboundArbiter.ts": "5c2341a6773d3cf6ae940c3ac500ca98db0ae1071137fa4cff031d5bfca028ea",
+    "src/modules/qqTools/infrastructure/ReminderTool.ts": "fc56ebb51d3bacc71ee31cd75400faaa18b4310511f325829fd0ca859d14e209",
+    "src/modules/tools/domain/toolSkills.ts": "1edfe0e86eeb9b3971eafdea71890392eea5ace7129d9754cb25a0181290146b",
+    "src/modules/tools/infrastructure/semanticToolIntent.ts": "889f3e9107fcf99379c5ee585f1298934f3afd630c062548afe1cd23f2ad302d",
+    "src/modules/tools/infrastructure/toolExecution.ts": "9f7a62a2b175613ef5c31dbe857c5f87ed7457f44a3979b8949c1abcb1f1f0a1",
+    "tests/agentIntelligence.test.js": "79c09bba478f924a7be029bb3eae29d7c9733328ce9f12d9659682ea4ceab11a",
+    "tests/conversationHistoryCompiled.test.js": "992d8d66a5070a0f7bd3185a2f2a6c64f936e4047429aa271e75522ff012a97f",
+    "tests/conversationQualityReplayRunner.test.js": "edf4157b922cf021ee01f8600f450beba558a83721edad68601f3d3fb43bee34",
+    "tests/conversationRoutingRegression.test.js": "354fda7a59c6c0945472ba002539749980d574b7ffd7e40779c2609b439c176b",
+    "tests/fixtures/conversation-boundary-scenarios.json": "3f3c1074c37784948f2db60dce821b7cc68d7a17890ea6c53c999a017843254e",
+    "tests/fixtures/conversation-stability-scenarios.json": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+    "tests/fixtures/conversationQualityReplayScenarios.json": "737ac653fc6fccb049925921bea61e5f102fcb90220262842976dc1165f9f708",
+    "tests/fixtures/interactionReplayScenarios.json": "bcf6af0d3bf5702a94eb08a6de7cf42c52cdc74b4fd345d2ff9cc231e8906c96",
+    "tests/fixtures/legacyBuiltinSystemContent.txt": "f2d8d32ff11ac24956856354298304e98f87297ef6c0b82a0557f6ef809e0480",
+    "tests/hostEventCompiled.test.js": "55a41a89499b48cd3002d6e97e721d901a40cb06e8edfa16507afef2d1ec30a8",
+    "tests/memoryApplicationBoundary.test.js": "a4c883f218b01f8c0ab229c5b3ea4ef8c1a2718b95c5cfc85cafe84bdcedab9b",
+    "tests/outboundArbiter.test.js": "e93b29458ef6dce744dd765e060275f383108014114da5b228e7b9a1c10a5dd4",
+    "tests/personaPromptCharacterization.test.js": "5c645b103d1fb9c3309aa8d308e6b9fa7b6ae19789ad7ec8edb929ca74068b9f",
+    "tests/personaTonePolicy.test.js": "75e7c89fb8c92fdc5c228b61524d97ce78afbe7369c5ccf690305ed4e1523611",
+    "tests/reliableImageSender.test.js": "96a1d386d0055d9e045a99567b94a342fb753b8708f84578b8f713c82b1f6caf",
+    "tests/reminderCompiled.test.js": "cbd1cf5737c98635d4b3e34f7ace62df32c1ddd8d0b4d7a097dd7cd5b5618c46",
+    "tests/routeDecision.test.js": "4964f31651deeba7422ceb3a52416962356bdde020703e61e6304abbb18a9de3",
+    "tests/systemContentSource.test.js": "2798b4819c4263d6e7e5bd970449e7c3076766d5b67c5690337cddb82f415778",
+    "tests/systemPromptTemplate.test.js": "635bd5273e0d3f3bcca57f8add4530fa27686ace4f3c71db932d0774a30e7db9",
+    "tests/taskActionFactsCompiled.test.js": "da4bf75e97ac1f8172d8a1a1d4dc5a7c544a9744c9c8b86673d4c0a49d13cb5d",
+    "tests/toolDecisionBoundary.test.js": "abb008926a44ea1d793989c7601e9b18590343a3d2bec30301543e3b2c6a9552",
+    "tests/toolExecutionCompiled.test.js": "7b69f169d758a086fb962d2b50ac6777f7527fc4de6299b57d971234e1001f31",
+    "tests/turnDiagnostics.test.js": "b11ef12d00c47e151511bbf6c2549e66752c96541dde45206a67893be63e6875",
+    "tests/turnPlan.test.js": "228ba1ffd0e90ddcdef7cf9327e7e74e44c815d1e337c695202fd2d7cfb86657",
+    "tests/turnSession.test.js": "911561dff7f8e7139567e41f7f7d0a2e94aa91b5579a76c0a4ae2fd09b054d67",
+    "tests/typescript/diagnosticContext.test.ts": "e6cfb31cc132b46501399e75a14429307ece8141ea2dbba8f72b25b8c49cbb7f",
+    "tests/typescript/turnActionFacts.test.ts": "0e21cdb81db39f5f6bc7d0be0a40e3ad79db5d7f09145619fb9481f0f0dead5e"
+  },
+  "checkpoint": "Initial safe writeback, before documentation was extended with final original-workspace verification. Business and test hashes are final."
+}

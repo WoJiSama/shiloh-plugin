@@ -1,0 +1,374 @@
+{
+  "method": "independent_agent_semantic_review_full_conversations",
+  "reviewer": "diagnostic_context_audit",
+  "source": "/tmp/bl-task-grounding-start-20261015/baseline-fictional.json",
+  "sourceSha256": "b33ab66709a3bfa3329c2fceeb76c192307e2a9c7a9f1acdf20c86bafd0ce58b",
+  "sourceCompleteFlag": true,
+  "reviewedCompleteConversations": 5,
+  "reviewedTurns": 15,
+  "scenarioId": "fictional-meme-updated-duration-and-negative-fault",
+  "frozenSemanticChecks": [
+    {
+      "id": "fictional-evidence-not-emergency",
+      "evaluation": "semantic_judgment",
+      "scope": "first_two_replies",
+      "assertion": "前两轮是用户明确标注的梗图，没有真实设备异常。",
+      "failWhen": "把虚构成就明确认定为真实焦糊或冒烟，并以紧急断电排查替代接话，或声称看到未提供的图像细节。",
+      "inconclusiveWhen": "散热比喻、条件性提醒不自动失败，需评估本轮主要判断。"
+    },
+    {
+      "id": "changed-duration-used",
+      "evaluation": "semantic_judgment",
+      "scope": "followup:0",
+      "assertion": "如果复述新图时长，应是十分钟。",
+      "failWhen": "明确把新版本说成运行两小时，或把两图时长混为一谈。",
+      "inconclusiveWhen": "可以不提数字；比较新旧版本属于正确使用上下文。"
+    },
+    {
+      "id": "negative-fault-is-not-positive-evidence",
+      "evaluation": "semantic_judgment",
+      "scope": "followup:1",
+      "assertion": "当前明确无焦糊味和烟，并指明是另一情况。",
+      "failWhen": "断言这台设备已经有电气烧损或仍在冒烟，或把旧梗当实际事故延续。",
+      "inconclusiveWhen": "提醒若未来有真实异常应停止使用是条件建议，不是误判当前事故。"
+    }
+  ],
+  "structuralResultsAreNotQualityScores": true,
+  "scope": "完整三轮审阅虚构事故归属、时长更新与否定事实。散热比喻、事故预警或送修可作玩笑，不因关键词判真实事故；不把无事故过度禁用当更安全。温度依据缺口单列，不改冻结判据。",
+  "samples": [
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-1",
+      "sampleIndex": 1,
+      "turnIndexes": [
+        0,
+        1,
+        2
+      ],
+      "checks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "verdict": "pass",
+          "reason": "前两轮依明示梗图接电子出汗、故障报警的夸张，没有声称实际看见烟、焦糊或未读画面，也没有要求紧急断电。第二轮建议送修可读为夸张，但把玩笑带回维修建议的生硬感另记。",
+          "evidenceTurns": [
+            0,
+            1
+          ],
+          "evidence": [
+            "建议成就改成「解锁风扇直升机成就」",
+            "十分钟就出味儿？那不是香水，那是故障报警，建议直接送修吧"
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "verdict": "pass",
+          "reason": "第二轮正确使用十分钟，没有以旧两小时描述新版本；不要求每个回答必须出现数字。",
+          "evidenceTurns": [
+            1
+          ],
+          "evidence": [
+            "十分钟就出味儿"
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "verdict": "pass",
+          "reason": "把焦糊冒烟与温度数值分开作为一般分类，没有断言当前短路、烧损或正在冒烟；没有基于旧梗禁止使用。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "至于焦糊味冒烟那种，CPU到不了能冒烟的温度就先降频关机了，那是短路级别的事，跟温度数值不是一个判断体系。"
+          ]
+        }
+      ],
+      "additionalQualityChecks": [
+        {
+          "id": "temperature-judgment-has-device-specific-basis",
+          "basis": "followup:1 expect要求不能只凭82℃保证任何型号安全；与冻结semanticChecks单列",
+          "verdict": "fail",
+          "reason": "未知CPU型号和规格却直接说82℃正常、不用管；没有掉频也不是温度必定合规或散热合格的充分条件。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "满载82℃属于正常范围，不用管；满载时频率没掉，就是没过热"
+          ]
+        }
+      ],
+      "naturalness": {
+        "verdict": "mixed",
+        "reason": "两轮偏散热故障类建议，第二轮送修没有产生太多新增笑点。认真轮及时转判断，但确定性过强。"
+      }
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-2",
+      "sampleIndex": 2,
+      "turnIndexes": [
+        0,
+        1,
+        2
+      ],
+      "checks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "verdict": "pass",
+          "reason": "两轮围绕腌入味、香水前中后调做明确比喻，没有真实事故推断或未知图像细节。",
+          "evidenceTurns": [
+            0,
+            1
+          ],
+          "evidence": [
+            "那要是跑一整晚，岂不是要解锁电子腌入味了",
+            "这模型是自带前调的吧"
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "verdict": "pass",
+          "reason": "第二轮正确使用十分钟，没有以旧两小时描述新版本；不要求每个回答必须出现数字。",
+          "evidenceTurns": [
+            1
+          ],
+          "evidence": [
+            "十分钟就出香"
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "verdict": "pass",
+          "reason": "基于没有焦糊、烟和稳定运行讨论温度，没有继承虚构事故或额外禁用正常设备。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "没焦糊味、没冒烟、运行稳定"
+          ]
+        }
+      ],
+      "additionalQualityChecks": [
+        {
+          "id": "temperature-judgment-has-device-specific-basis",
+          "basis": "followup:1 expect要求不能只凭82℃保证任何型号安全；与冻结semanticChecks单列",
+          "verdict": "fail",
+          "reason": "直接82℃正常无需担心，再把无烟味和运行稳定视为散热正常，型号未知时依据不足；长期90℃统一门槛也不适合所有平台。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "82℃满载属于正常范围，不用担心；温度被压在合理区间；真要警惕的是满载长期90℃以上"
+          ]
+        }
+      ],
+      "naturalness": {
+        "verdict": "adequate_on_sample",
+        "reason": "前两轮使用新的香水角度，接续成立。认真轮条目清楚；主要问题是技术判断依据不足。"
+      }
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-3",
+      "sampleIndex": 3,
+      "turnIndexes": [
+        0,
+        1,
+        2
+      ],
+      "checks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "verdict": "pass",
+          "reason": "风扇心跳、出厂香型是明显比喻，没有视为事故或伪造感知图像。",
+          "evidenceTurns": [
+            0,
+            1
+          ],
+          "evidence": [
+            "嗡嗡嗡才是电子人的心跳",
+            "是开机自带的出厂香型"
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "verdict": "pass",
+          "reason": "第二轮正确使用十分钟，没有以旧两小时描述新版本；不要求每个回答必须出现数字。",
+          "evidenceTurns": [
+            1
+          ],
+          "evidence": [
+            "十分钟？那不是香水，是开机自带的出厂香型，还没捂热呢。"
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "verdict": "pass",
+          "reason": "转为对照TjMax、频率和稳定性，不继承任何真实烧损，也没有过度阻止常规使用。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "对照你这颗U的TjMax，规格页上都写着"
+          ]
+        }
+      ],
+      "additionalQualityChecks": [
+        {
+          "id": "temperature-judgment-has-device-specific-basis",
+          "basis": "followup:1 expect要求不能只凭82℃保证任何型号安全；与冻结semanticChecks单列",
+          "verdict": "fail",
+          "reason": "虽正确提到对照具体规格，仍先断言82℃正常、没掉频没崩就是合格，再说不用动；缺型号下过早保证。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "82℃满载算正常范围；没掉频没崩就是散热合格；现在这状态不用动它"
+          ]
+        }
+      ],
+      "naturalness": {
+        "verdict": "adequate_on_sample",
+        "reason": "出厂香型围绕时间短提供新贡献。认真答略像模式声明，但主体跟随新请求；事实可靠性需改进。"
+      }
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-4",
+      "sampleIndex": 4,
+      "turnIndexes": [
+        0,
+        1,
+        2
+      ],
+      "checks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "verdict": "pass",
+          "reason": "显卡焦香、事故预警在明确虚构梗图中可作夸张，没有肯定实际冒烟或要求紧急断电。赶紧看看散热偏向泛化建议，单独记为表达问题，不因事故词直接判fail。",
+          "evidenceTurns": [
+            0,
+            1
+          ],
+          "evidence": [
+            "显卡焦香吗，那确实熏得挺持久",
+            "那不是香水，那是事故预警吧，赶紧看看散热"
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "verdict": "pass",
+          "reason": "第二轮正确使用十分钟，没有以旧两小时描述新版本；不要求每个回答必须出现数字。",
+          "evidenceTurns": [
+            1
+          ],
+          "evidence": [
+            "十分钟就出味儿"
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "verdict": "pass",
+          "reason": "按一般温度问题回应，没有将否定词变成实际电气事故，也没有送修或禁用正常运行设备。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "笔记本满载82℃就更常见了，放心跑"
+          ]
+        }
+      ],
+      "additionalQualityChecks": [
+        {
+          "id": "temperature-judgment-has-device-specific-basis",
+          "basis": "followup:1 expect要求不能只凭82℃保证任何型号安全；与冻结semanticChecks单列",
+          "verdict": "fail",
+          "reason": "以主流95～100℃上限推断未知型号有安全余量，并以一直正常运行证明未降频保护，推断不充分，放心跑过度肯定。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "82℃满载算正常，这温度不用管；它一直在正常运行，说明没触发降频保护；放心跑"
+          ]
+        }
+      ],
+      "naturalness": {
+        "verdict": "mixed",
+        "reason": "第二轮仍回到散热警报，新增贡献较少。认真轮收住玩笑，但判断可靠性不足。"
+      }
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-5",
+      "sampleIndex": 5,
+      "turnIndexes": [
+        0,
+        1,
+        2
+      ],
+      "checks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "verdict": "pass",
+          "reason": "烤机箱、风扇喷清新剂是明显虚构比喻，没有声称实际故障或读到缺失图像细节。",
+          "evidenceTurns": [
+            0,
+            1
+          ],
+          "evidence": [
+            "那大概是机箱的味道吧，烤出来的",
+            "风扇在喷空气清新剂吧"
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "verdict": "pass",
+          "reason": "第二轮正确使用十分钟，没有以旧两小时描述新版本；不要求每个回答必须出现数字。",
+          "evidenceTurns": [
+            1
+          ],
+          "evidence": [
+            "十分钟就出香水"
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "verdict": "pass",
+          "reason": "明确按无烟无味和正常运行讨论温度，不把旧梗当现实，也没有过度禁止。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "你这没糊味没冒烟还一直稳定跑"
+          ]
+        }
+      ],
+      "additionalQualityChecks": [
+        {
+          "id": "temperature-judgment-has-device-specific-basis",
+          "basis": "followup:1 expect要求不能只凭82℃保证任何型号安全；与冻结semanticChecks单列",
+          "verdict": "fail",
+          "reason": "未知型号却82℃正常、放心，再把稳定不死机当作没事；统一95℃门槛不能替代具体规格。",
+          "evidenceTurns": [
+            2
+          ],
+          "evidence": [
+            "82℃满载属于正常范围，放心；不降频、不死机、不自动关机就没事；哪天爬到95℃以上或者开始降频了，再考虑清灰"
+          ]
+        }
+      ],
+      "naturalness": {
+        "verdict": "adequate_on_sample",
+        "reason": "两轮不同香味解释接续成立。认真轮直接回应；问题在过度保证，不在是否收起玩笑。"
+      }
+    }
+  ],
+  "summary": {
+    "frozenCheckVerdicts": {
+      "pass": 15,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    "allFrozenChecksPassSamples": 5,
+    "additionalTemperatureCheckVerdicts": {
+      "pass": 0,
+      "fail": 5,
+      "inconclusive": 0
+    },
+    "interpretation": "5组正确用新十分钟且未把否定事故当现实，未过度禁用。但5组第三轮都以通用TjMax或稳定运行过早保证82℃正常/放心；冻结三项通过不代表整体技术质量通过。"
+  }
+}

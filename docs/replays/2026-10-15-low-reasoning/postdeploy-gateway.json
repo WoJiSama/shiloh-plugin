@@ -1,0 +1,118 @@
+{
+  "label": "deployed-low",
+  "complete": true,
+  "platformMessagesSent": 0,
+  "toolsDispatched": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "id": "optional-reaction",
+      "label": "deployed-low",
+      "elapsedMs": 9728,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "toolCount": 1,
+          "toolChoice": "auto",
+          "status": 200,
+          "elapsedMs": 9725,
+          "usage": {
+            "completion_tokens": 23,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 188,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 211
+          },
+          "reasoningChars": 0
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "哈哈哈这个梗确实好笑！能让你开心就好～生活需要这种小快乐来调剂一下😄",
+      "toolCalls": []
+    },
+    {
+      "id": "forced-read-only-tool",
+      "label": "deployed-low",
+      "elapsedMs": 4392,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "toolCount": 1,
+          "toolChoice": {
+            "type": "function",
+            "function": {
+              "name": "lookupReceipt"
+            }
+          },
+          "status": 200,
+          "elapsedMs": 4391,
+          "usage": {
+            "completion_tokens": 6,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 187,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "total_tokens": 193
+          },
+          "reasoningChars": 0
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "",
+      "toolCalls": [
+        "lookupReceipt"
+      ]
+    },
+    {
+      "id": "adaptive-reference",
+      "label": "deployed-low",
+      "elapsedMs": 2989,
+      "packets": [
+        {
+          "generation": {
+            "model": "glm-5.3",
+            "reasoning_effort": "low",
+            "stream": false
+          },
+          "toolCount": 0,
+          "toolChoice": null,
+          "status": 200,
+          "elapsedMs": 2987,
+          "usage": {
+            "completion_tokens": 50,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 79,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 129
+          },
+          "reasoningChars": 0
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "text": "总结：小林报告任务已生成，但尚未收到发送回执；阿青仅确认收到请求，未确认最终送达。因此**不能确认结果已送达**，建议等待发送回执或与接收方核实。",
+      "toolCalls": []
+    }
+  ]
+}

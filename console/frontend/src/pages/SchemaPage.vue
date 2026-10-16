@@ -22,15 +22,25 @@ import {
   equal,
   initialValues,
   validateField,
+  validatePolicyFields,
   describeApply,
   type SchemaFieldDefinition,
   type SchemaGroup,
   type SchemaView
 } from '../lib/schemaState'
 import { useSchemaSaveShortcut } from '../lib/schemaKeyboard'
+import { groupAdminModules } from '../lib/groupAdminState'
+import { policyAdvanced, policyHelp, policySections, type PolicyKind } from '../lib/policySections'
 
 const props = defineProps<{
-  kind: 'pipeline' | 'riskControl' | 'persona' | 'reasoning' | 'conversation'
+  kind:
+    | 'pipeline'
+    | 'riskControl'
+    | 'persona'
+    | 'reasoning'
+    | 'conversation'
+    | 'groupAdmin'
+    | PolicyKind
   embedded?: boolean
 }>()
 const message = useMessage()
@@ -48,6 +58,10 @@ const root = ref<HTMLElement | null>(null)
 let request: AbortController | undefined, saveRequest: AbortController | undefined
 let generation = 0
 const titles = {
+  dice: '骰子基础设置',
+  tracking: '对话追踪',
+  memory: '记忆策略',
+  groupAdmin: '群管理默认策略',
   conversation: '对话设置',
   reasoning: '思考程度',
   pipeline: '消息管道',
@@ -55,6 +69,10 @@ const titles = {
   persona: '默认人设与画像'
 }
 const descriptions = {
+  dice: '配置默认检定、掷骰上限、暗骰与团录行为。',
+  tracking: '控制严格模式追踪与智能模式的群聊参与、续话和防刷屏策略。',
+  memory: '配置记忆提取、召回、巩固、纠错和中期摘要。',
+  groupAdmin: '设置群管理总开关与默认参数，单群可按需覆盖。',
   conversation: '设置对话触发、访问权限、上下文与回复方式。',
   reasoning: '按用途设置思考程度，保存后用于后续请求。',
   pipeline: '可靠接收、媒体搬运与健康报告，在一个地方配置。',
@@ -79,9 +97,9 @@ const validation = computed(() => {
       Number(draft.value['riskControl.delayMaxMs'] ?? 400)
   )
     failures.push('随机延迟上限不能小于下限')
-  return failures
+  return [...failures, ...validatePolicyFields(props.kind, draft.value, changedFields.value)]
 })
-useUnsavedGuard(() => dirty.value > 0)
+useUnsavedGuard(() => dirty.value > 0 || saving.value)
 useSchemaSaveShortcut(
   root,
   () =>
@@ -93,6 +111,20 @@ useSchemaSaveShortcut(
 
 const sections = computed(() => {
   const groups = view.value?.groups || []
+  if (['dice', 'tracking', 'memory'].includes(props.kind))
+    return policySections(props.kind as PolicyKind, groups)
+  if (props.kind === 'groupAdmin')
+    return groupAdminModules
+      .map((part) => ({
+        ...part,
+        groups: groups
+          .map((group) => ({
+            ...group,
+            fields: group.fields.filter((field) => field.field.startsWith(`${part.id}.`))
+          }))
+          .filter((group) => group.fields.length)
+      }))
+      .filter((part) => part.groups.length)
   if (props.kind === 'conversation') {
     const parts = [
       { id: 'access', label: '触发与私聊', labels: ['对话开关与触发', '私聊功能'] },
@@ -158,24 +190,38 @@ const current = computed(
   () => sections.value.find((section) => section.id === activeTab.value) || sections.value[0]
 )
 const sectionHelp = computed(() =>
-  props.kind === 'conversation'
-    ? (
-        {
-          access:
-            '决定哪些消息可以触发对话，以及谁能私聊机器人。关闭对话总开关不影响骰子、搬运和群管。',
-          permissions:
-            '设置可使用对话的群、需要屏蔽的用户和违禁词。关闭群白名单后，所有群都可使用对话。',
-          context: '控制近期聊天记录和每次请求选择的上下文，复杂请求可自动使用更强的模型。',
-          models:
-            '为短闲聊、进度回复和翻译单独设置模型。留空时沿用现有回退顺序；思考档位在 AI 模型页设置。',
-          replies: '设置文字与表情的回复节奏，并增强对引用、转发和图片的理解。'
-        } as Record<string, string>
-      )[current.value?.id || '']
-    : ''
+  ['dice', 'tracking', 'memory'].includes(props.kind)
+    ? policyHelp[props.kind as PolicyKind][current.value?.id || ''] || ''
+    : props.kind === 'conversation'
+      ? (
+          {
+            access:
+              '决定哪些消息可以触发对话，以及谁能私聊机器人。关闭对话总开关不影响骰子、搬运和群管。',
+            permissions:
+              '设置可使用对话的群、需要屏蔽的用户和违禁词。关闭群白名单后，所有群都可使用对话。',
+            context: '控制近期聊天记录和每次请求选择的上下文，复杂请求可自动使用更强的模型。',
+            models:
+              '为短闲聊、进度回复和翻译单独设置模型。留空时沿用现有回退顺序；思考档位在 AI 模型页设置。',
+            replies: '设置文字与表情的回复节奏，并增强对引用、转发和图片的理解。'
+          } as Record<string, string>
+        )[current.value?.id || '']
+      : ''
 )
 function isAdvanced(field: SchemaFieldDefinition) {
-  return props.kind === 'pipeline' && /Ttl|Concurrency|mediaArtifact|mediaShared/.test(field.field)
+  return (
+    (props.kind === 'pipeline' && /Ttl|Concurrency|mediaArtifact|mediaShared/.test(field.field)) ||
+    policyAdvanced(props.kind, field)
+  )
 }
+const advancedTitle = computed(() =>
+  props.kind === 'dice'
+    ? '高级设置 · 存储目录'
+    : props.kind === 'tracking'
+      ? '高级设置 · 判断预算与状态细节'
+      : props.kind === 'memory'
+        ? '高级设置 · 去重与裁决预算'
+        : '高级设置 · 并发、缓存与目录'
+)
 function basicFields(group: SchemaGroup) {
   return group.fields.filter((field) => !isAdvanced(field))
 }
@@ -204,6 +250,8 @@ function applyView(next: SchemaView, preserve: boolean, comparison = baseline.va
     activeTab.value = sections.value[0]?.id || ''
 }
 async function load(preserve = false) {
+  if (saving.value) return
+  const comparison = clone(preserve ? baseline.value : draft.value)
   const seq = ++generation
   request?.abort()
   request = new AbortController()
@@ -212,7 +260,7 @@ async function load(preserve = false) {
   try {
     const next = await api<SchemaView>(`/api/config/${props.kind}`, { signal: request.signal })
     if (seq !== generation) return
-    applyView(next, preserve)
+    applyView(next, true, comparison)
     conflict.value = false
   } catch (cause: any) {
     if (cause?.name !== 'AbortError' && seq === generation)
@@ -227,6 +275,8 @@ async function save() {
     message.error(validation.value[0])
     return
   }
+  const seq = generation
+  const kind = props.kind
   const snapshot = clone(draft.value)
   const snapshotBaseline = clone(baseline.value)
   const values: Record<string, any> = {},
@@ -239,28 +289,31 @@ async function save() {
   }
   saving.value = true
   error.value = ''
-  saveRequest = new AbortController()
+  const controller = new AbortController()
+  saveRequest = controller
   try {
     const result = await api<{ changed: number; applyHint?: string; revision?: string }>(
-      `/api/config/${props.kind}`,
+      `/api/config/${kind}`,
       {
         method: 'PUT',
         body: JSON.stringify({ values, secrets, revision: view.value.revision }),
-        signal: saveRequest.signal
+        signal: controller.signal
       }
     )
+    if (seq !== generation || controller.signal.aborted) return
     // Compare with the submitted snapshot so edits made while the request was running stay in the draft.
-    const next = await api<SchemaView>(`/api/config/${props.kind}`, { signal: saveRequest.signal })
+    const next = await api<SchemaView>(`/api/config/${kind}`, { signal: controller.signal })
+    if (seq !== generation || controller.signal.aborted) return
     applyView(next, true, snapshot)
     saved.value = result.applyHint || `已保存 ${result.changed} 项配置`
     conflict.value = false
     message.success(dirty.value ? '已保存本次提交，之后的编辑仍保留在草稿中' : '配置已保存')
   } catch (cause: any) {
-    if (cause?.name === 'AbortError') return
+    if (cause?.name === 'AbortError' || seq !== generation || controller.signal.aborted) return
     conflict.value = cause.status === 409
     error.value = cause.message || '保存失败，草稿已保留'
   } finally {
-    saving.value = false
+    if (seq === generation) saving.value = false
   }
 }
 function discard() {
@@ -277,6 +330,7 @@ function discard() {
   })
 }
 function reload() {
+  if (saving.value) return
   if (!dirty.value) {
     void load()
     return
@@ -303,7 +357,7 @@ onBeforeUnmount(() => {
   request?.abort()
   saveRequest?.abort()
 })
-defineExpose({ dirty, reload })
+defineExpose({ dirty, reload, saving, loading })
 </script>
 
 <template>
@@ -336,6 +390,9 @@ defineExpose({ dirty, reload })
     >
     <PageState :loading="loading && !view" :error="!view ? error : ''" @retry="load()">
       <template v-if="view">
+        <NAlert v-if="kind === 'memory'" type="info" :show-icon="false" title="保存后的记忆处理">
+          保存会重新装配记忆服务，尚未摘要的中期缓冲会重新累积。已开始或已排队的摘要可能按旧参数完成；已有摘要与消息归档会保留。
+        </NAlert>
         <div class="config-summary panel">
           <div>
             <span class="summary-label">配置状态</span
@@ -363,7 +420,7 @@ defineExpose({ dirty, reload })
             <h2>{{ group.label }}</h2>
             <span class="muted">{{ group.fields.length }} 项设置</span>
           </div>
-          <div class="field-grid">
+          <div v-if="basicFields(group).length" class="field-grid">
             <SchemaField
               v-for="field in basicFields(group)"
               :key="field.field"
@@ -373,7 +430,7 @@ defineExpose({ dirty, reload })
             />
           </div>
           <NCollapse v-if="advancedFields(group).length" class="advanced-settings"
-            ><NCollapseItem name="advanced" title="高级设置 · 并发、缓存与目录"
+            ><NCollapseItem name="advanced" :title="advancedTitle"
               ><div class="field-grid">
                 <SchemaField
                   v-for="field in advancedFields(group)"

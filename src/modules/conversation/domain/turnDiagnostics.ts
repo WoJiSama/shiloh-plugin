@@ -1,6 +1,8 @@
 import type {ToolChoice} from '../../../contracts/turnPlan.js'
-interface DiagnosticInput {at?:number;groupId?:unknown;userId?:unknown;turnId?:string;promptLayerReport?:{profile?:string;reason?:string;included?:{name:string;chars:number}[];totalChars?:number;omitted?:string[]};routeApplied?:string[];routeToolChoice?:ToolChoice;turnPlan?:string;modelCalls?:{stage:string;ms:number}[];tools?:{name:string;ok:boolean;ms:number}[]}
-interface Diagnostic {at:number;groupId:string;userId:string;turnId:string;profile:string;layerReason:string;layerCount:number;layerTotalChars:number;layerDetail:string;omittedLayers:string[];routeApplied:string[];routeTool:string;turnPlan:string;modelCalls:{stage:string;ms:number}[];tools:{name:string;ok:boolean;ms:number}[];guardStats:ReturnType<ReturnType<typeof createOutputGuardPipeline>["getOutputGuardStats"]>}
+import type {InteractionKind} from '../../../contracts/turnInteraction.js'
+interface InteractionDiagnostic {kind:InteractionKind;evidenceCount:number;referenceOnlyCount:number;unavailableCount:number}
+interface DiagnosticInput {at?:number;groupId?:unknown;userId?:unknown;turnId?:string;interaction?:InteractionDiagnostic;promptLayerReport?:{profile?:string;reason?:string;included?:{name:string;chars:number}[];totalChars?:number;omitted?:string[]};routeApplied?:string[];routeToolChoice?:ToolChoice;turnPlan?:string;modelCalls?:{stage:string;ms:number}[];tools?:{name:string;ok:boolean;ms:number}[]}
+interface Diagnostic {at:number;groupId:string;userId:string;turnId:string;interaction:InteractionDiagnostic|null;profile:string;layerReason:string;layerCount:number;layerTotalChars:number;layerDetail:string;omittedLayers:string[];routeApplied:string[];routeTool:string;turnPlan:string;modelCalls:{stage:string;ms:number}[];tools:{name:string;ok:boolean;ms:number}[];guardStats:ReturnType<ReturnType<typeof createOutputGuardPipeline>["getOutputGuardStats"]>}
 // 回合诊断环形缓冲:把每回合的提示词分层报告、路由命中轨迹、执行计划摘要
 // 保留最近若干条,供 #希洛调试 命令回显。数据源全部来自既有观测产物
 // (turnPromptComposer 的 report、routeDecision 的 applied、turnPlan 日志、输出守卫统计),
@@ -22,6 +24,7 @@ function recordTurnDiagnostics(entry:DiagnosticInput = {}) {
     groupId: entry.groupId ? String(entry.groupId) : "",
     userId: entry.userId ? String(entry.userId) : "",
     turnId: entry.turnId || "",
+    interaction: entry.interaction ? {...entry.interaction} : null,
     profile: entry.promptLayerReport?.profile || "",
     layerReason: entry.promptLayerReport?.reason || "",
     layerCount: entry.promptLayerReport?.included?.length ?? 0,
@@ -69,6 +72,7 @@ function formatTurnDiagnosticsText({ groupId = "", limit = 3 }: {groupId?:string
       `${turn.layerCount}层/${turn.layerTotalChars}c`
     )
     if (turn.layerDetail) lines.push(`   层明细: ${turn.layerDetail}`)
+    if (turn.interaction) lines.push(`   互动: ${turn.interaction.kind} 证据=${turn.interaction.evidenceCount} 素材引用=${turn.interaction.referenceOnlyCount} 读取失败=${turn.interaction.unavailableCount}`)
     if (turn.omittedLayers?.length) lines.push(`   已裁剪层: ${turn.omittedLayers.join(",")}`)
     lines.push(
       `   路由: ${turn.routeApplied.length ? turn.routeApplied.join("→") : "(模型自选)"} ` +

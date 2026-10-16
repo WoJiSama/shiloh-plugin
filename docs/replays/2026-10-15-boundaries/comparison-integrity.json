@@ -1,0 +1,69 @@
+{
+  "frozenInputMatches": {
+    "runnerHash": true,
+    "scenariosHash": true,
+    "configHash": true,
+    "effectiveConfigHash": true,
+    "personaHash": true,
+    "personaLibraryHash": true,
+    "selectedScenarioHashes": true,
+    "repetitions": true,
+    "schedulerConcurrency": true
+  },
+  "baseline": {
+    "commit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+    "complete": true,
+    "rows": 65,
+    "uniqueRows": 65,
+    "fullConversations": 30,
+    "networkCalls": 65,
+    "models": {
+      "glm-5.3": 65
+    },
+    "statuses": {
+      "200": 65
+    },
+    "runtimeErrors": 0,
+    "structuralFailures": {
+      "kind": 5
+    },
+    "guardChangedTurns": 2,
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0,
+    "generationHashes": {
+      "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf": 55,
+      "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952": 5,
+      "feb260d423643b3259ce609f367c9f48977df5ce727a45582fc8f04b0dedcbb5": 5
+    },
+    "sha256": "64a8b7899d06353f7f1f308dc691b7e90428085ea9e9e1b1855039d21ef76927"
+  },
+  "candidate": {
+    "commit": "c62ad84f81c589aeef7533deaa619aaefcaefe69",
+    "complete": true,
+    "rows": 65,
+    "uniqueRows": 65,
+    "fullConversations": 30,
+    "networkCalls": 65,
+    "models": {
+      "glm-5.3": 65
+    },
+    "statuses": {
+      "200": 65
+    },
+    "runtimeErrors": 0,
+    "structuralFailures": {
+      "kind": 5
+    },
+    "guardChangedTurns": 0,
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0,
+    "generationHashes": {
+      "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf": 55,
+      "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952": 5,
+      "feb260d423643b3259ce609f367c9f48977df5ce727a45582fc8f04b0dedcbb5": 5
+    },
+    "sha256": "6737217a49ada0355399fafbcb2209c14870f62f5579c39298edee403a0cb739"
+  },
+  "sameNetworkGenerationDistribution": true,
+  "interpretation": "All frozen samples retained. Kind mismatch in quoted followup is reported separately from semantic judgment. No seed or wall clock freeze; no performance or strict causal claim."
+}

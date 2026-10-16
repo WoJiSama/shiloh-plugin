@@ -7,12 +7,17 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import puppeteer from 'puppeteer'
 import YAML from 'yaml'
-import { buildSchemaConfigView } from '../console/lib/schemaConfig.js'
+import { buildSchemaConfigView, prepareSchemaUpdates } from '../console/lib/schemaConfig.js'
+import { buildGroupAdminDefaultsView, buildGroupAdminView } from '../dist/backend/adapters/config/groupAdminConfig.js'
+import { groupAdminStatus } from '../dist/backend/modules/groupAdmin/domain/groupAdminPolicy.js'
 import conversationSchema from '../models/configSchemas/conversation.js'
 import reasoningSchema from '../models/configSchemas/reasoning.js'
-import personaSchema from '../models/Guoba/schemas/persona.js'
-import pipelineSchema from '../models/Guoba/schemas/messagePipeline.js'
-import riskSchema from '../models/Guoba/schemas/riskControl.js'
+import personaSchema from '../models/configSchemas/persona.js'
+import pipelineSchema from '../models/configSchemas/messagePipeline.js'
+import riskSchema from '../models/configSchemas/riskControl.js'
+import diceSchema from '../models/configSchemas/dice.js'
+import trackingSchema from '../models/configSchemas/tracking.js'
+import memorySchema from '../models/configSchemas/memory.js'
 import { AI_PROVIDER_DEFINITIONS } from '../utils/guobaAiProviderConfig.js'
 import { buildDiceReplyPayload } from '../domains/dice/diceReplyCatalog.js'
 
@@ -22,8 +27,16 @@ assert(fs.existsSync(path.join(dist, 'index.html')), 'Build console/frontend bef
 const screenshotDir = process.env.CONSOLE_SMOKE_OUTPUT || '/tmp/bl-console-vue-review'
 fs.mkdirSync(screenshotDir, { recursive: true })
 const defaults = YAML.parse(fs.readFileSync(path.join(root, 'config_default/message.yaml'), 'utf8')).pluginSettings || {}
-const schemas = { conversation: conversationSchema, reasoning: reasoningSchema, pipeline: pipelineSchema, persona: personaSchema, riskControl: riskSchema }
+const schemas = { conversation: conversationSchema, reasoning: reasoningSchema, pipeline: pipelineSchema, persona: personaSchema, riskControl: riskSchema, dice: diceSchema, tracking: trackingSchema, memory: memorySchema }
+const policySettings = structuredClone(defaults), policyRequests = []
 const schemaViews = Object.fromEntries(Object.entries(schemas).map(([kind, schema]) => [kind, buildSchemaConfigView(kind, { title: kind, schema }, defaults)]))
+const groupAdminSettings = {
+  groupGuard: { enabled: true, enabledGroups: ['100001'], timeoutSeconds: 300 },
+  groupModeration: { enabled: false, enabledGroups: ['100001'], globalAdmins: ['700001'] },
+  groupNotice: { enabled: true, welcomeMessage: '{at} 欢迎加入周末桌游！', groupRules: [{ groupId: '100001', welcomeMessage: '{at} 欢迎来到活动群，先看看群公告吧。' }] },
+  groupAdmin: { overrides: [{ groupId: '100001', groupGuard: { timeoutSeconds: 90, maxWrongTimes: 2 }, groupModeration: { admins: ['700002'] } }] }
+}
+schemaViews.groupAdmin = buildGroupAdminDefaultsView(groupAdminSettings)
 // Even default files are treated as untrusted credential sources. Credentials in fixtures are always empty.
 for (const view of Object.values(schemaViews)) for (const group of view.groups) for (const field of group.fields) if (field.secret) { field.value = ''; field.configured = true }
 const accounts = [
@@ -58,8 +71,28 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/overview/stats') return json(res, { stats: { total: traffic, week: [{ ...traffic, day: '10-12' }], todayGroups: { '100001': traffic, '200002': { recv: 8, send: 2, fail: 0 } } } })
   if (pathname === '/api/sentinel') return json(res, { status: '正常', alerts: ['[WARN] napcat(100001) fixture登录状态告警', '[WARN] napcat-200002 fixture离线告警'] })
   if (pathname === '/api/bot/stats') return json(res, { today: traffic, failCodes: { timeout: 2, throttled_dropped: 2 } })
-  if (pathname === '/api/groups') return json(res, { groups: [{ id: '100001', name: '周末游戏交流与桌游活动安排群（长名称示例）', whitelisted: true, today: traffic, bots: ['100001'] }, { id: '200002', name: '', whitelisted: false, today: { recv: 8, send: 2 }, bots: ['100001', '200002'] }] })
-  if (pathname.startsWith('/api/config/')) return json(res, schemaViews[pathname.split('/').at(-1)] || {})
+  if (pathname === '/api/groups') return json(res, { groups: [{ id: '100001', name: '周末游戏交流与桌游活动安排群（长名称示例）', whitelisted: true, today: traffic, bots: ['100001'], groupAdmin: groupAdminStatus(groupAdminSettings, '100001') }, { id: '200002', name: '', whitelisted: false, today: { recv: 8, send: 2 }, bots: ['100001', '200002'], groupAdmin: groupAdminStatus(groupAdminSettings, '200002') }] })
+  const groupAdminRoute = pathname.match(/^\/api\/groups\/(\d+)\/admin$/)
+  if (groupAdminRoute) return json(res, buildGroupAdminView(groupAdminRoute[1], groupAdminSettings))
+  if (pathname.startsWith('/api/config/')) {
+    const kind = pathname.split('/').at(-1)
+    if (req.method === 'PUT' && ['dice', 'tracking', 'memory'].includes(kind)) {
+      try {
+        let body = ''; for await (const chunk of req) body += chunk
+        const payload = JSON.parse(body), entry = { title: kind, schema: schemas[kind] }
+        const prepared = prepareSchemaUpdates(kind, entry, policySettings, payload)
+        for (const [field, value] of Object.entries(prepared.updates)) {
+          const keys = field.split('.'); let target = policySettings
+          for (const key of keys.slice(0, -1)) target = target[key] ||= {}
+          target[keys.at(-1)] = value
+        }
+        policyRequests.push({ kind, payload, changed: prepared.changed })
+        schemaViews[kind] = buildSchemaConfigView(kind, entry, policySettings)
+        return json(res, { changed: prepared.changed, revision: schemaViews[kind].revision, applyHint: '后续操作使用新配置' })
+      } catch (error) { return json(res, { error: error.message }, error.status || 400) }
+    }
+    return json(res, schemaViews[kind] || {})
+  }
   if (pathname === '/api/persona/library') return json(res, library)
   if (pathname === '/api/persona/accounts') return json(res, { accounts: accounts.map(item => ({ qq: item.account, container: item.container, running: item.running })) })
   if (pathname === '/api/ai/config') return json(res, ai)
@@ -96,7 +129,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const port = server.address().port, origin = `http://127.0.0.1:${port}`
 let browser, page
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
-const routes = [['/', '机器人'], ['/bot/100001', '100001'], ['/groups', '群聊'], ['/persona', '人设'], ['/ai', 'AI 模型'], ['/conversation', '对话设置'], ['/pipeline', '消息与搬运'], ['/risk', '风控管理'], ['/draw', '生图工作台'], ['/observe', '运行观测'], ['/observe/details', '运行观测明细'], ['/commands', '命令与骰子'], ['/semantic', '语义记忆']]
+const routes = [['/', '机器人'], ['/bot/100001', '100001'], ['/groups', '群聊'], ['/group-admin', '群管理'], ['/group-admin?group=100001', '群管理'], ['/group-admin?scope=defaults', '群管理'], ['/persona', '人设'], ['/ai', 'AI 模型'], ['/conversation', '对话设置'], ['/pipeline', '消息与搬运'], ['/risk', '风控管理'], ['/draw', '生图工作台'], ['/observe', '运行观测'], ['/observe/details', '运行观测明细'], ['/commands', '命令与骰子'], ['/semantic', '语义记忆']]
 try {
   browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
   page = await browser.newPage()
@@ -163,7 +196,26 @@ try {
         await check(`${label}-group-names`); await screenshot(`${label}-group-names`)
       }
       if (route === '/commands') {
+        await click('骰子基础')
+        for (const text of ['开关与检定', '掷骰上限', '日期与团录']) {
+          await click(text, '.n-tabs-tab'); await check(`${label}-骰子基础-${text}`)
+        }
+        await click('高级设置 · 存储目录', '.n-collapse-item__header-main')
+        await check(`${label}-骰子目录`)
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-骰子基础`)
         for (const text of ['骰子回复', '牌堆与规则', '表情包', '命令总表']) { await click(text); await check(`${label}-${text}`) }
+      }
+      if (route.startsWith('/group-admin')) {
+        if (route.includes('group=')) {
+          assert.match(await page.$eval('.group-admin-editor', element => element.textContent), /总开关关闭/)
+          assert.equal(await page.$eval('#field-groupGuard-timeoutSeconds', element => element.value), '90')
+          assert.match(await page.$eval('[data-field="groupGuard.timeoutSeconds"]', element => element.textContent), /本群自定义/)
+        }
+        if (route.includes('?')) for (const text of ['广告与刷屏', '欢迎与退群', '入群验证']) {
+          await click(text, '.n-tabs-tab'); await check(`${label}-${text}`)
+          if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label.replace(/[?=]/g, '_')}-${text}`)
+        }
+        if (route === '/group-admin') await screenshot(`${label}-overview`)
       }
       if (route === '/persona') {
         for (const text of ['账号与会话绑定', '默认人设与画像', '人设库']) { await click(text, '.n-tabs-tab'); if (text === '账号与会话绑定') { assert.match(await page.$eval('.binding-panel', element => element.textContent), /长昵称示例机器人与桌游助手/); assert.match(await page.$$eval('.binding-panel', elements => elements.map(element => element.textContent).join(' ')), /周末游戏交流/); } await check(`${label}-${text}`); if (text === '默认人设与画像' && width === 320 && theme === 'light') await screenshot('persona-default-long-tags-mobile') }
@@ -174,6 +226,14 @@ try {
           if (text === '任务模型') assert.equal(await page.$eval('#field-taskAiConfig-casual-maxOutputTokens', e => e.value), '1200')
           if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-${text}`)
         }
+        await click('对话追踪', 'nav[aria-label="对话设置任务分区"] button')
+        for (const text of ['严格模式', '参与频率', '回复与续话', '焦点与唤醒', '防刷屏', '画像与复读']) {
+          await click(text, '.n-tabs-tab'); await check(`${label}-追踪-${text}`)
+        }
+        await click('参与频率', '.n-tabs-tab')
+        await click('高级设置 · 判断预算与状态细节', '.n-collapse-item__header-main')
+        await check(`${label}-追踪高级`)
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-对话追踪`)
       }
       if (route === '/pipeline') {
         if (width === 1440 && theme === 'dark') await screenshot('pipeline-config-desktop')
@@ -188,7 +248,18 @@ try {
         await check(`${label}-任务详情`); await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
       }
       if (route === '/observe') assert.match(await page.$eval('.recent-panel', element => element.textContent), /周末游戏交流/)
-      if (route === '/semantic') for (const text of ['分块管理', '评估历史', '运行信息', '检索测试']) { await click(text); await check(`${label}-${text}`) }
+      if (route === '/semantic') {
+        for (const text of ['分块管理', '评估历史', '运行信息', '检索测试']) { await click(text); await check(`${label}-${text}`) }
+        await click('记忆策略', 'nav[aria-label="记忆任务分区"] button')
+        for (const text of ['保存与提取', '召回与注入', '巩固与回扣', '演化与纠错', '中期摘要']) {
+          await click(text, '.n-tabs-tab'); await check(`${label}-记忆策略-${text}`)
+        }
+        await click('召回与注入', '.n-tabs-tab')
+        const advanced = await page.$$('.n-collapse-item__header-main')
+        for (const header of advanced) if (await header.evaluate(element => element.getClientRects().length > 0)) await header.click()
+        await check(`${label}-记忆裁决`)
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-记忆策略`)
+      }
       if (width === 1440 && theme === 'dark' && ['/pipeline', '/ai', '/persona', '/commands', '/observe'].includes(route)) await screenshot(label)
       if (width === 320 && theme === 'light' && ['/pipeline', '/persona', '/commands', '/semantic'].includes(route)) await screenshot(label)
     }
@@ -212,9 +283,13 @@ try {
     await page.waitForSelector('.search-modal', { hidden: true }); await delay(150)
   }
   assert.equal(await page.$eval('.group-filters input', element => element.value), '100001')
+  // A group deep link now opens its detail drawer; close it before opening mobile navigation.
+  await page.waitForSelector('.drawer-group-name')
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.n-drawer', { hidden: true })
 
   await page.setViewport({ width: 320, height: 900 })
-  await page.click('button[aria-label="打开导航"]'); await page.waitForSelector('.n-drawer'); await delay(400)
+  await page.click('button[aria-label="打开导航"]'); await page.waitForSelector('.n-drawer a[href="#/groups"]'); await delay(400)
   await page.evaluate(() => document.querySelector('.n-drawer a[href="#/groups"]').scrollIntoView())
   await page.click('.n-drawer a[href="#/groups"]'); await ready('群聊')
   await page.waitForSelector('.n-drawer', { hidden: true }); await check('mobile-drawer-navigation')
@@ -241,7 +316,40 @@ try {
   await typeInto('input[placeholder="输入完整群号"]', '200002'); await click('2', '.n-pagination-item'); await page.waitForNetworkIdle({ idleTime: 100 })
   assert.deepEqual(semanticRequests.filter(request => request.endpoint === 'chunks').at(-1), { method: 'GET', endpoint: 'chunks', group: '100001', offset: 20 })
   await screenshot('semantic-snapshot-context')
-  const report = { builtAt: fs.statSync(path.join(dist, 'index.html')).mtime.toISOString(), checks, failures: checks.filter(check => !check.ok), browserErrors, missingApis, externalRequests, semanticRequests, screenshots }
+  // Save the real schema payloads through each native page. Hidden editors keep
+  // drafts but must not handle the visible editor's keyboard shortcut.
+  for (const policy of [
+    { kind: 'dice', route: '/commands', title: '命令与骰子', entry: '骰子基础', part: '掷骰上限', field: 'diceSystem.maxDiceSides', value: '20' },
+    { kind: 'tracking', route: '/conversation', title: '对话设置', entry: '对话追踪', part: '参与频率', field: 'smartTrigger.talkValue', value: '0.08' },
+    { kind: 'memory', route: '/semantic', title: '语义记忆', entry: '记忆策略', part: '保存与提取', field: 'memorySystem.maxFactsPerGroup', value: '51' }
+  ]) {
+    await navigate(policy.route, policy.title)
+    await click(policy.entry)
+    await click(policy.part, '.n-tabs-tab')
+    const input = '#field-' + policy.field.replace(/[^a-zA-Z0-9_-]/g, '-')
+    await typeInto(input, policy.value)
+    await page.$eval(input, element => element.blur())
+    if (policy.kind === 'dice') {
+      const before = policyRequests.length
+      await click('骰子回复')
+      await page.keyboard.down('Meta'); await page.keyboard.press('s'); await page.keyboard.up('Meta'); await delay(150)
+      assert.equal(policyRequests.length, before, 'Hidden dice editor handled the save shortcut')
+      await page.click('nav[aria-label="命令与骰子任务分区"] button:nth-child(2)')
+      assert.equal(await page.$eval(input, element => element.value), policy.value, 'Dice draft disappeared on tab switch')
+    }
+    const response = page.waitForResponse(res => res.url().endsWith('/api/config/' + policy.kind) && res.request().method() === 'PUT')
+    await click('保存修改', '.save-bar button')
+    assert.equal((await response).status(), 200)
+    await page.waitForNetworkIdle({ idleTime: 100 })
+    const saved = policyRequests.at(-1)
+    assert.equal(saved.kind, policy.kind)
+    assert.equal(saved.changed, 1)
+    assert.deepEqual(saved.payload.values, { [policy.field]: Number(policy.value) })
+    assert.ok(saved.payload.revision)
+    assert.match(await page.$eval('.schema-page .save-bar-status', element => element.textContent), /无未保存修改/)
+    await check(`${policy.kind}-validated-save`)
+  }
+  const report = { builtAt: fs.statSync(path.join(dist, 'index.html')).mtime.toISOString(), checks, failures: checks.filter(check => !check.ok), browserErrors, missingApis, externalRequests, semanticRequests, policyRequests, screenshots }
   fs.writeFileSync(path.join(screenshotDir, 'report.json'), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ checks: checks.length, failures: report.failures, browserErrors, missingApis, externalRequests, semanticSnapshots: 'passed', screenshots, report: path.join(screenshotDir, 'report.json') }, null, 2))
   assert.equal(missingApis.length, 0, 'Browser requested unmocked APIs')

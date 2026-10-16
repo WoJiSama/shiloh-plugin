@@ -1,6 +1,7 @@
 import type {ImageServicePorts} from './imageService.js'
+import type {PersonaSnapshot} from './persona.js'
 export type DrawId=string|number
-export interface DrawEvent {group_id?:DrawId|null;user_id?:DrawId;self_id?:DrawId;message_id?:DrawId;message_type?:string;msg?:string;raw_message?:string;nickname?:string;sender?:{user_id?:DrawId|undefined;nickname?:string;card?:string};bot?:DrawBot|null;isGroup?:boolean;_progressReplyState?:{sent?:boolean;reserved?:boolean};reply(message:unknown):Promise<unknown>}
+export interface DrawEvent {group_id?:DrawId|null;user_id?:DrawId;self_id?:DrawId;message_id?:DrawId;message_type?:string;msg?:string;raw_message?:string;nickname?:string;sender?:{user_id?:DrawId|undefined;nickname?:string;card?:string};bot?:DrawBot|null;isGroup?:boolean;_personaSnapshot?:PersonaSnapshot;_progressReplyState?:{sent?:boolean;reserved?:boolean};reply(message:unknown):Promise<unknown>}
 export interface DrawBot {uin?:DrawId;nickname?:string;pickGroup?(id:number):{sendMsg?(message:unknown):Promise<unknown>};pickFriend?(id:number):{sendMsg?(message:unknown):Promise<unknown>};sendApi?(action:string,params:Record<string,unknown>):Promise<unknown>}
 export interface DrawOptions extends Record<string,unknown> {prompt?:string;images?:string[]|string|undefined;provider?:string;aspectRatio?:string;referencePurpose?:string;progressText?:string;agentContext?:string}
 export interface DrawJob {id:string;opts:DrawOptions;e:DrawEvent;scopeKey:string;requesterName:string;requesterId:DrawId;messageId:DrawId;queuedAt:number;notifyFailure:boolean;skipProgressNotice:boolean;recovered?:boolean}

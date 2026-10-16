@@ -1,3 +1,4 @@
+import { resolveGroupAdminSettings } from '../domain/groupAdminPolicy.js'
 import {adminRecord,adminError,requireAdminBot,decodeAdminEvent} from '../../../contracts/groupAdmin.js'
 import type {AdminPorts,AdminEvent,GroupId,ModerationConfig,ModerationResult,GroupMember} from '../../../contracts/groupAdmin.js'
 
@@ -75,8 +76,8 @@ export function isIgnoredBotUser(userId:unknown, config:Partial<ModerationConfig
 export class GroupModerationManager {
   floodTrackers = new Map<string,number[]>()
   constructor(private readonly ports:AdminPorts,private readonly corpus:AdCorpusStore) {}
-  getConfig() {
-    return normalizeGroupModerationConfig(this.ports.readSettings().groupModeration)
+  getConfig(groupId?:GroupId) {
+    return normalizeGroupModerationConfig(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupModeration)
   }
 
   isGroupEnabled(config:ModerationConfig, groupId:GroupId|undefined) {
@@ -403,7 +404,7 @@ export class GroupModerationManager {
     if (!groupId || !userId) return false
     if (String(userId) === String(e?.self_id || this.ports.getBot()?.uin || "")) return false
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (isIgnoredBotUser(userId, config)) {
       this.ports.logger?.debug?.(`[GroupModer] 跳过白名单机器人 user=${userId}`)
       return false

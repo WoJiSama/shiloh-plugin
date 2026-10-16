@@ -50,12 +50,13 @@ test("短闲聊不被误伤:仍走 casual 提速路径", () => {
   assert.equal(needsDeliberateReasoning("哈哈哈笑死"), false)
 })
 
-test("reasoning 档请求默认携带 reasoning_effort: high", () => {
+test("reasoning 路由默认携带 low 预算并保留执行范围", () => {
   const plan = createTurnPlan({ responseKind: "knowledge", intentText: "请完整推导这个公式" })
   const request = deriveTurnPlanRequest(plan)
-  assert.deepEqual(request.requestOptions.generation, { reasoningEffort: "high" })
+  assert.deepEqual(request.requestOptions.generation, { reasoningEffort: "low" })
   assert.equal(request.requestOptions.routeLabel, "复杂知识推理")
   assert.equal(request.toolChoice, "none")
+  assert.match(request.executionPrompt, /没有核验到登记则不能承诺稍后行动/)
 })
 
 test("配置可改档与关闭", () => {
@@ -65,6 +66,7 @@ test("配置可改档与关闭", () => {
     "medium"
   )
   assert.equal(deriveTurnPlanRequest(plan, { chatAiConfig: { complexReasoningEffort: "max" } }).requestOptions.generation.reasoningEffort, "max")
+  assert.equal(deriveTurnPlanRequest(plan, { chatAiConfig: { complexReasoningEffort: "high" } }).requestOptions.generation.reasoningEffort, "high")
   for (const off of ["false", "none", "", "无效值"]) {
     const request = deriveTurnPlanRequest(plan, { chatAiConfig: { complexReasoningEffort: off } })
     assert.equal(request.requestOptions.generation, undefined, `配置 ${off} 应关闭升档`)

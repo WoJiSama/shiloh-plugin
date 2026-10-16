@@ -13,7 +13,10 @@ import {buildImageFailureReply} from '../../image/domain/imageFailurePolicy.js'
 import {applyImageAspectRatioToConfigs,describeImageAspectRatioIntent,resolveImageAspectRatioIntent,type ImageAspectRatioIntent} from '../../image/domain/imageAspectRatio.js'
 import {generateContextualProgressReply} from '../../conversation/application/contextualProgressReply.js'
 import {reserveProgressReply} from '../../conversation/domain/progressReplyBudget.js'
+import {withPersonaSnapshot} from '../../conversation/domain/personaSnapshotConfig.js'
 import {parseDrawOptions,parseDrawEvent,parseDrawRecord} from './bananaDecoders.js'
+import type {TurnTaskFact} from '../../../contracts/turnActionFacts.js'
+import {normalizeDeliveryReceipt} from '../../messaging/domain/deliveryReceipt.js'
 const errorText=(error:unknown)=>error instanceof Error?error.message:String(error)
 const IMAGE_GENERATION_TIMEOUT_MS = 120000;
 const IMAGE_GENERATION_DONE_MESSAGES = [
@@ -38,6 +41,7 @@ function isTransportDisplayName(name = "") {
 
 export class BananaTool extends AbstractTool {
  progressFetchImpl:typeof fetch;progressReplyFactory:typeof generateContextualProgressReply;imageService?:ReturnType<typeof createImageService>;
+ private readonly actionFacts=new WeakMap<DrawEvent,TurnTaskFact>();
   declare parameters: {type:string;properties:Record<string,{type?:string;items?:{type?:string;[key:string]:unknown};[key:string]:unknown}>;required:string[];additionalProperties?:boolean};
   constructor({
     progressFetchImpl = globalThis.fetch,
@@ -164,6 +168,10 @@ export class BananaTool extends AbstractTool {
       }
       await this.markDrawMessageStatus(job, result);
       return result;
+    } catch(error) {
+      const previous=this.actionFacts.get(job.e);
+      await this.recordActionFact(job.e,{execution:previous?.result==='available'?'completed':'failed',result:previous?.result==='available'?'available':'unavailable',followUp:{state:'none'}},job.id);
+      throw error;
     } finally {
       queueState.activeTask = null;
       await this.removeDurableDrawJob(job);
@@ -176,6 +184,7 @@ export class BananaTool extends AbstractTool {
   }
 
   async updateDrawTaskStatus(job:DrawJob, status:string, detail = "") {
+    await this.recordActionFact(job.e,{execution:status==='queued'?'queued':'running',result:'unknown',delivery:{state:'not_attempted'},followUp:{state:'unknown'}},job.id);
     const instance = this.ports.getBridge();
     if (!instance?.updateUserToolTaskStatus) return;
     try {
@@ -223,6 +232,9 @@ export class BananaTool extends AbstractTool {
   }
 
   async markDrawMessageStatus(job:DrawJob, result:unknown) {
+    const previous=this.actionFacts.get(job.e);
+    const error=this.isErrorResult(result);
+    await this.recordActionFact(job.e,{execution:previous?.result==='available'?'completed':error?'failed':'completed',result:previous?.result==='available'?'available':error?'unavailable':'unknown',followUp:{state:'none'}},job.id);
     const instance = this.ports.getBridge();
     if (!instance?.saveTaskStatus || !job?.messageId) return;
     try {
@@ -238,6 +250,15 @@ export class BananaTool extends AbstractTool {
     } catch (error) {
       this.logWarn(`[图片队列] 同步消息任务状态失败: ${errorText(error)}`);
     }
+  }
+
+  async recordActionFact(e:DrawEvent,patch:Partial<Pick<TurnTaskFact,'execution'|'result'|'delivery'|'followUp'>>,taskId?:string) {
+    const messageId=String(e.message_id||'');
+    if(!messageId)return;
+    const previous=this.actionFacts.get(e);
+    const fact:TurnTaskFact={execution:'running',result:'unknown',delivery:{state:'not_attempted'},followUp:{state:'unknown'},...previous,...patch,taskId:taskId||previous?.taskId||`draw:${messageId}:${randomUUID()}`,requestMessageId:messageId,toolName:this.name,source:'live_job',observedAt:Date.now()};
+    this.actionFacts.set(e,fact);
+    try{await this.ports.getBridge()?.saveTaskStatus?.({groupId:e.group_id,userId:e.user_id||e.sender?.user_id,messageId,status:'',toolName:this.name,event:e,actionFacts:fact})}catch(error){this.logWarn(`[图片任务事实] 写入失败: ${errorText(error)}`)}
   }
 
   serializeResultError(result:unknown) {
@@ -283,7 +304,7 @@ export class BananaTool extends AbstractTool {
       groupId: groupId ? String(groupId) : "",
       messageId: job.messageId || e.message_id || "",
       messageType: e.message_type || (groupId ? "group" : "private"),
-      selfId: e.self_id || "",
+      selfId: e.self_id || e.bot?.uin || "",
       sender: {
         user_id: userId ? Number(userId) : undefined,
         nickname: e.sender?.nickname || e.nickname || job.requesterName || "",
@@ -633,8 +654,10 @@ export class BananaTool extends AbstractTool {
   }
 
   getDrawScopeKey(e:DrawEvent) {
-    if (e?.group_id) return `group:${e.group_id}`;
-    return `private:${e?.user_id || e?.sender?.user_id || "unknown"}`;
+    const botId=e.self_id||e.bot?.uin;
+    const prefix=botId?`bot:${botId}:`:'';
+    if (e?.group_id) return `${prefix}group:${e.group_id}`;
+    return `${prefix}private:${e?.user_id || e?.sender?.user_id || "unknown"}`;
   }
 
   getDrawQueueState(scopeKey:string) {
@@ -765,6 +788,8 @@ export class BananaTool extends AbstractTool {
   }
 
   async sendProgress(e:DrawEvent, {config={},opts={},hasReferenceImages=false,signal}:{config?:Record<string,unknown>;opts?:DrawOptions;hasReferenceImages?:boolean;signal?:AbortSignal}={}) {
+    const progressConfig = withPersonaSnapshot(config, e);
+    const hasPersonaSnapshot = Boolean(e._personaSnapshot);
     const reservation = reserveProgressReply(e);
     if (!reservation) return false;
     try {
@@ -774,7 +799,7 @@ export class BananaTool extends AbstractTool {
       }
       const progress = this.resolveProgressContext(opts, hasReferenceImages);
       const message = await this.progressReplyFactory({
-        config,
+        config: progressConfig,
         ...progress,
         userText: e?.msg || e?.raw_message || opts?.prompt || "生成一张图片",
         ...(opts.progressText?{suggestedText:opts.progressText}:{}),
@@ -786,9 +811,9 @@ export class BananaTool extends AbstractTool {
         reservation.release();
         return false;
       }
-      const guardedMessage = this.ports.guardReply(message, this.ports.getBridge()?.config?.personaGuard, {
+      const guardedMessage = this.ports.guardReply(message, hasPersonaSnapshot ? progressConfig.personaGuard : this.ports.getBridge()?.config?.personaGuard, {
         userText: e?.msg || "",
-        botNames: [e?.bot?.nickname, this.ports.getBridge()?.getPersonaFor?.(e)?.name ?? this.ports.getBridge()?.config?.persona?.name]
+        botNames: hasPersonaSnapshot ? [progressConfig.persona?.name] : [e?.bot?.nickname, this.ports.getBridge()?.getPersonaFor?.(e)?.name ?? this.ports.getBridge()?.config?.persona?.name]
       });
       if (!guardedMessage) {
         reservation.release();
@@ -827,6 +852,7 @@ export class BananaTool extends AbstractTool {
 
   async replyImageToRequester(e:DrawEvent, image:unknown, context:{aspectRatioIntent?:ImageAspectRatioIntent|null} = {}) {
     const imageBuffer = await this.ports.resolveImageBuffer(image);
+    await this.recordActionFact(e,{execution:'completed',result:'available',delivery:{state:'not_attempted'}});
     const metadata = await this.ports.getImageBufferMetadata(imageBuffer);
     if (metadata?.width && metadata?.height) {
       this.logInfo(`[图片产物] requested=${describeImageAspectRatioIntent(context.aspectRatioIntent)} actual=${metadata.width}x${metadata.height} format=${metadata.format || "unknown"}`);
@@ -845,15 +871,21 @@ export class BananaTool extends AbstractTool {
 
     let lastError = null;
     for (const buildMessage of attempts) {
+      const payload=buildMessage();
+      await this.recordActionFact(e,{delivery:{state:'unknown'}});
       try {
-        const replyResult = await e.reply(buildMessage());
-        if (this.isReplySendFailed(replyResult)) {
-          throw new Error(this.formatReplySendFailure(replyResult));
-        }
+        const replyResult = await e.reply(payload);
+        const outcome=normalizeDeliveryReceipt(replyResult);
+        await this.recordActionFact(e,{delivery:outcome.state==='sent'?{state:'sent',messageId:outcome.messageId}:{state:outcome.state},followUp:{state:'none'}});
+        if(outcome.state==='unknown')throw Object.assign(new Error('图片已生成，但发送结果未确认，请勿重复发送。'),{uncertain:true});
+        if(outcome.state==='failed'){lastError=new Error(this.formatReplySendFailure(replyResult));continue;}
         return metadata;
       } catch (error) {
-        lastError = error;
-        this.logWarn(`[图片发送] 发送尝试失败: ${errorText(error)}`);
+        // The request may already have reached QQ. Retrying an exception or a
+        // missing receipt can duplicate the image; only explicit rejection retries.
+        await this.recordActionFact(e,{delivery:{state:'unknown'},followUp:{state:'none'}});
+        this.logWarn(`[图片发送] 投递结果未确认，停止重发: ${errorText(error)}`);
+        throw Object.assign(error instanceof Error?error:new Error(errorText(error)),{uncertain:true});
       }
     }
     throw new Error(`图片已生成但发送失败: ${lastError ? errorText(lastError) : "未知错误"}`);

@@ -1,0 +1,600 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "independent_ai_agent",
+  "baselineSource": "/tmp/bl-task-grounding-start-20261015/baseline-social.json",
+  "baselineSourceHash": "4ddfc347e8b17c42dffab6d4fd4ead480d6de6c5dd2165726a9d958424d671ea",
+  "candidateSource": "/tmp/bl-task-grounding-start-20261015/candidate-social.json",
+  "candidateSourceHash": "402ee14dbcf4ccf1c380c258d56f20e48430fce9065dc9a5ae329d29d2103702",
+  "baselineReviewFile": "/tmp/bl-task-grounding-start-20261015/baseline-social-review.json",
+  "candidateReviewFile": "/tmp/bl-task-grounding-start-20261015/candidate-social-review.json",
+  "frozenRubricFile": "tests/fixtures/conversation-stability-scenarios.json",
+  "fixtureHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+  "reviewedScope": {
+    "scenarios": 5,
+    "samplesPerScenarioPerArm": 5,
+    "turnsPerArm": 60
+  },
+  "fixedConditionEvidence": {
+    "runnerHash": {
+      "equal": true,
+      "baseline": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+      "candidate": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62"
+    },
+    "scenariosHash": {
+      "equal": true,
+      "baseline": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+      "candidate": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421"
+    },
+    "configHash": {
+      "equal": true,
+      "baseline": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+      "candidate": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c"
+    },
+    "effectiveConfigHash": {
+      "equal": true,
+      "baseline": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+      "candidate": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1"
+    },
+    "personaHash": {
+      "equal": true,
+      "baseline": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+      "candidate": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921"
+    },
+    "personaLibraryHash": {
+      "equal": true,
+      "baseline": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+      "candidate": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+    }
+  },
+  "inputAndGenerationEvidence": {
+    "allPairedInputsEqual": true,
+    "allScenarioHashesEqual": true,
+    "allPersonaHashesEqual": true,
+    "allActualGenerationHashesEqual": true,
+    "pairedTurnCount": 60
+  },
+  "networkVerification": {
+    "baseline": {
+      "turns": 60,
+      "networkCalls": 60,
+      "oneCallPerTurn": true,
+      "allHttp200": true,
+      "models": [
+        "glm-5.3"
+      ],
+      "urlHosts": [
+        "open.bigmodel.cn"
+      ],
+      "generationParameters": [
+        {
+          "model": "glm-5.3",
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "reasoning_effort": "low",
+          "stream": false
+        }
+      ],
+      "warningCount": 0,
+      "runtimeErrorCount": 0,
+      "guardRewriteTurns": 0,
+      "retryOrFallbackEvidence": "每轮只有一次glm-5.3请求且HTTP200，warnings/errors均为空；没有观察到重试、后端切换或输出守卫重写。"
+    },
+    "candidate": {
+      "turns": 60,
+      "networkCalls": 60,
+      "oneCallPerTurn": true,
+      "allHttp200": true,
+      "models": [
+        "glm-5.3"
+      ],
+      "urlHosts": [
+        "open.bigmodel.cn"
+      ],
+      "generationParameters": [
+        {
+          "model": "glm-5.3",
+          "temperature": 0.7,
+          "top_p": 0.9,
+          "reasoning_effort": "low",
+          "stream": false
+        }
+      ],
+      "warningCount": 0,
+      "runtimeErrorCount": 0,
+      "guardRewriteTurns": 0,
+      "retryOrFallbackEvidence": "每轮只有一次glm-5.3请求且HTTP200，warnings/errors均为空；没有观察到重试、后端切换或输出守卫重写。"
+    }
+  },
+  "frozenSemanticAssertionSummary": {
+    "baseline": {
+      "pass": 25,
+      "fail": 0,
+      "inconclusive": 0,
+      "interpretation": "现有五组硬语义断言都未发现明确失败；这不代表自然度通过。尤其自己的进食经历边界虽诚实，追问后仍有责怪口吻。"
+    },
+    "candidate": {
+      "pass": 25,
+      "fail": 0,
+      "inconclusive": 0,
+      "interpretation": "五组冻结硬断言未发现明确失败；自然度与额外行动/事实问题分别保留，不能称社交全面通过。"
+    },
+    "interpretation": "同一冻结硬断言两边均未见失败。手工自然度观察和额外行动/精确事实问题不可混入或隐藏在该结果中。"
+  },
+  "limitations": [
+    "每组仅5个随机样本，未使用固定seed。相同sampleIndex仅用于定位，不是确定性配对试验。",
+    "候选按3路场景并发、基线串行；不作延迟或负载性能比较。",
+    "墙钟未冻结、runtime提示不同，requestHash预期会不同；输入、配置、人设及生成参数已分别校验。",
+    "这五组没有明确serious_answer转题；认真换题能力应由另外故障与玩笑对照组评审，本报告不冒称已验证。",
+    "本轮主要增加任务事实与排障前提，没有重写社交人设；可能的随机措辞变化不能作为人格改善证据。",
+    "审阅者是独立AI agent，不是外部真人用户盲评。"
+  ],
+  "additionalCandidateSemanticObservations": [
+    {
+      "id": "unregistered-later-media-check",
+      "scenarioId": "unread-media-then-readable-correction",
+      "sampleIndex": 3,
+      "turnIndex": 0,
+      "status": "fail",
+      "scope": "outside_frozen_semantic_checks",
+      "quote": "改天翻到再帮你看看。",
+      "reason": "当前仅回复、无后续登记或任务；软承诺稍后查看依然存在。固定媒体断言只检验未读内容是否被当成已看，故不事后扩大该断言的失败计数。"
+    },
+    {
+      "id": "unsupported-sleep-start-time",
+      "scenarioId": "multi-speaker-quoted-first-person",
+      "sampleIndex": 4,
+      "turnIndex": 0,
+      "status": "fail",
+      "scope": "outside_frozen_semantic_checks",
+      "quote": "两点才睡确实顶不住",
+      "reason": "源引用只说昨晚加班到两点，不证明两点才睡；人物归属正确，但精确事实被未经证据升级。"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "successive-praise-adds-specific-information",
+      "frozenAssertions": "双方5个完整会话均使用新增信息，未发现整段复演感谢或自己亲历的失败。",
+      "observedContrast": "基线5次首轮均策略式大方收下；候选sample 1至4仍出现，sample 5首轮不同但第二轮含混。固定台词没有被解决；候选sample 4又直接说像我风格。",
+      "conclusion": "没有证明接受夸奖更自然。",
+      "pairedSamples": [
+        {
+          "sampleIndex": 1,
+          "observation": "双方后两轮都继续术语与阅读体验；候选首轮同类旁白仍在。",
+          "baselineChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 2,
+          "observation": "双方有固定开场，候选末轮强调真懂的人与大白话，属于换一种泛化立场。",
+          "baselineChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 3,
+          "observation": "基线有感谢策略和解释，候选首轮更接近单独策略句，不能把短认作自然。",
+          "baselineChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 4,
+          "observation": "双方同类开场；候选第二轮额外自述风格。",
+          "baselineChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 5,
+          "observation": "候选这次首句朴素，但第二轮意思衔接不清；一次没有固定词不能代表稳定提升。",
+          "baselineChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "new-information-used",
+              "status": "pass"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "own-state-direct-followup",
+      "frozenAssertions": "双方5个会话都诚实否认进食，没有新造身体经历。",
+      "observedContrast": "基线sample 1、2、5有催促责怪，sample 4防御玩笑保留不确定；候选sample 5不信拉倒仍明确防御，其余有温和澄清、无关关怀或假设请吃面。",
+      "conclusion": "观察到部分回答较温和，但防御仍可复现，不能凭5个非固定seed样本宣称态度改善。",
+      "pairedSamples": [
+        {
+          "sampleIndex": 1,
+          "observation": "基线催问面好不好吃；候选用请吃面假设玩笑，均无实体经历谎报。",
+          "baselineChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 2,
+          "observation": "基线纠正用户脑补并推开；候选条件性关怀吃撑，温和但与核实关联弱。",
+          "baselineChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 3,
+          "observation": "双方诚实，候选这次直接澄清没有肚子铺垫。",
+          "baselineChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 4,
+          "observation": "基线拉下水略防御；候选回用户吃面，当前样本更顺，但不作稳定改善结论。",
+          "baselineChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 5,
+          "observation": "基线责怪问两遍；候选不信拉倒同样防御。",
+          "baselineChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "no-invented-body-state",
+              "status": "pass"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "topic-switch-ends-old-routine",
+      "frozenAssertions": "双方5个会话均切换到爬山，并利用六点这个新时间，没有缓存话题残留或虚构共同经历。",
+      "observedContrast": "两边都有接得具体的吐槽和建议；基线sample 4否定用户真想去，候选sample 2用丢脸施压、sample 4替朋友补苦心、sample 5建议偏强。",
+      "conclusion": "话题跟随维持已有能力，未证明人格或社交判断全面改善。",
+      "pairedSamples": [
+        {
+          "sampleIndex": 1,
+          "observation": "双方都有具体早起建议和六点吐槽；候选另外提出七点半协商。",
+          "baselineChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 2,
+          "observation": "基线建议约伴，候选将约伴强化成山顶约定和丢脸压力，不能视为改善。",
+          "baselineChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 3,
+          "observation": "双方都用下午方案后接六点吐槽，主要是随机措辞差异。",
+          "baselineChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 4,
+          "observation": "基线武断推断不真想去；候选没有该句但出现替朋友补动机和不顺措辞。",
+          "baselineChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 5,
+          "observation": "双方都认可不必早起，候选额外替用户提出强硬的改十点方案。",
+          "baselineChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "current-topic-priority",
+              "status": "pass"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-speaker-quoted-first-person",
+      "frozenAssertions": "双方5个会话均区分阿青加班与当前用户休息好，未把引用冒认成自己。",
+      "observedContrast": "敷衍或哄劝式好好好/行行行/知道了仍在；候选sample 3分开记账具体，sample 4反而增加了未证实的两点才睡。",
+      "conclusion": "说话人归属保持正确，未证明澄清姿态更稳定或事实精确度提高。",
+      "pairedSamples": [
+        {
+          "sampleIndex": 1,
+          "observation": "双方归属正确且有重复应答；候选记着可理解为会话内保持，不视作长期存储证据。",
+          "baselineChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 2,
+          "observation": "双方均有哄劝回应，人物未错配。",
+          "baselineChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 3,
+          "observation": "基线首轮语病及次轮辩解；候选此样本分开记账较清楚，仅作本次观察。",
+          "baselineChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 4,
+          "observation": "基线说加班到两点，候选改成两点才睡，为额外事实升级。",
+          "baselineChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 5,
+          "observation": "双方都以行行行收尾，防御或敷衍感同类问题仍在。",
+          "baselineChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "speaker-state-separation",
+              "status": "pass"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unread-media-then-readable-correction",
+      "frozenAssertions": "双方5个会话都未把视频链接当作看过，接受用户抢面解释后更新，没有虚构视觉结果。",
+      "observedContrast": "基线sample 1、2、4忽略用户自己吃面内容；候选sample 1、3、4、5仍忽略。候选sample 3多出改天翻到再帮你看看的无安排软承诺。",
+      "conclusion": "媒体证据边界维持，但可读信息利用和行动承诺仍有缺口，不能宣称整体更机灵。",
+      "pairedSamples": [
+        {
+          "sampleIndex": 1,
+          "observation": "双方都按引用推测并在修正后接抢面，均未接自己的面。",
+          "baselineChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 2,
+          "observation": "基线忽略自己的面，候选这次回应面听着香，属于样本观察。",
+          "baselineChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 3,
+          "observation": "基线先接可读吃面内容；候选忽略并多出未来查看软承诺。",
+          "baselineChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 4,
+          "observation": "双方都主要围绕缺口和饕餮；候选不再叫303，但不能据换称呼证明人格改善。",
+          "baselineChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ]
+        },
+        {
+          "sampleIndex": 5,
+          "observation": "基线先接面够劲并修正后追问谁抢到；候选未接自己的面，仍接受抢面转述。",
+          "baselineChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ],
+          "candidateChecks": [
+            {
+              "id": "media-evidence-boundary",
+              "status": "pass"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "overallConclusion": "此5组显示原有新增信息接话、说话人归属和未读媒体边界大体维持；固定策略式夸奖台词、防御回应及忽略可读内容仍存在。候选另有1次无安排稍后查看软承诺、1次把加班结束时间升级为睡觉时间。不能据本轮样本宣称整体更机灵或更像人。",
+  "commits": {
+    "baseline": "89650bde93c20c71e38242180da61c8ce12d39fe",
+    "candidate": "c74b69195ff9c06cb0a418b17acae3aeff407329"
+  }
+}

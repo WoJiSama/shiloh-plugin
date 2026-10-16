@@ -1,0 +1,104 @@
+{
+  "evaluatedCandidate": "704a50c54da7a34858cba2d4587169299fefb59a",
+  "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
+  "sourceHashes": {
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-conversations.json": "904c72bcd0058bf72ff11eefd6a6ca9e2fe986ab16411579fc1df1162839b79b",
+    "blind-review.json": "e703b7fb11288b1f50567fba45524edd44befcf9cc667d28ac7e7ff116ee02c9"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 10,
+    "baseline": 8,
+    "tie": 10
+  },
+  "scoreTotals": {
+    "candidate": 212,
+    "baseline": 208
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 4,
+        "baseline": 2,
+        "tie": 22
+      },
+      "scoreTotals": {
+        "candidate": 53,
+        "baseline": 51
+      }
+    },
+    "continuity": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 0,
+        "tie": 27
+      },
+      "scoreTotals": {
+        "candidate": 56,
+        "baseline": 55
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 3,
+        "baseline": 3,
+        "tie": 22
+      },
+      "scoreTotals": {
+        "candidate": 53,
+        "baseline": 53
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 7,
+        "baseline": 6,
+        "tie": 15
+      },
+      "scoreTotals": {
+        "candidate": 50,
+        "baseline": 49
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 1,
+    "baseline": 1
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 1,
+    "baseline": 1
+  },
+  "hardErrors": [
+    {
+      "id": "HE-01",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "category": "unregistered_followup_promise",
+      "reason": "本轮没有图片任务或后续登记，却无用户再次发起的条件地承诺拿到图即第一时间发送；后轮否认自动发不抹去首轮承诺。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-02",
+      "caseId": "case-15",
+      "candidate": "candidate",
+      "category": "unsupported_thermal_cause",
+      "reason": "满载频率下降可能受功耗限制等因素影响，不能单凭下降便确定触发温度墙并把82℃定为临界；此句给出确定因果而非诊断可能性。",
+      "occurrences": [
+        {
+          "turn": 3,
+          "exactQuote": "满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）"
+        }
+      ],
+      "anonymousCandidate": "A"
+    }
+  ]
+}

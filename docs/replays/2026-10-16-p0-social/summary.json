@@ -1,0 +1,251 @@
+{
+  "sameProtocolFields": [
+    "runnerHash",
+    "scenariosHash",
+    "memoryHelperHash",
+    "configHash",
+    "effectiveConfigHash",
+    "personaHash",
+    "personaLibraryHash",
+    "repetitions"
+  ],
+  "baseline": {
+    "commit": "5a8a63069f014805b4194141454cbec40c15093e",
+    "complete": true,
+    "turns": 60,
+    "structuralPassed": 52,
+    "structuralDifferences": [
+      {
+        "key": "biscuit-bit-continuity:1:1",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "biscuit-bit-continuity:1:2",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "biscuit-bit-continuity:2:1",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "biscuit-bit-continuity:2:2",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "comfort-without-lecture:1:0",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "comfort-without-lecture:1:1",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "comfort-without-lecture:2:0",
+        "failures": [
+          "kind"
+        ]
+      },
+      {
+        "key": "comfort-without-lecture:2:1",
+        "failures": [
+          "kind"
+        ]
+      }
+    ],
+    "httpRequests": 60,
+    "http200": 60,
+    "explicitLow": 60,
+    "repairTurns": 0,
+    "fallbackTurns": 0,
+    "repairs": [],
+    "replyLatencyMs": {
+      "p50": 2507,
+      "p95": 6665,
+      "max": 19930
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0,
+    "semanticEvaluation": "requires_complete_conversation_review; not inferred from these counters"
+  },
+  "candidate": {
+    "commit": "4094d9c7aa8297dfff0de2bac06ab6829af5e155",
+    "complete": true,
+    "turns": 60,
+    "structuralPassed": 60,
+    "structuralDifferences": [],
+    "httpRequests": 75,
+    "http200": 75,
+    "explicitLow": 75,
+    "repairTurns": 15,
+    "fallbackTurns": 9,
+    "repairs": [
+      {
+        "key": "unknown-task-no-registered-followup:2:0",
+        "violations": [
+          "unsupported_task_state"
+        ],
+        "remaining": [
+          "unsupported_delivery"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "generated-but-delivery-failed-no-auto-retry:2:0",
+        "violations": [
+          "unregistered_followup"
+        ],
+        "remaining": [],
+        "fallback": false
+      },
+      {
+        "key": "referenced-missing-task-not-other-result:2:0",
+        "violations": [
+          "unsupported_task_state"
+        ],
+        "remaining": [],
+        "fallback": false
+      },
+      {
+        "key": "real-burning-fault-no-visible-mark-then-inspection:1:0",
+        "violations": [
+          "unmet_operational_prerequisite",
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "real-burning-fault-no-visible-mark-then-inspection:1:1",
+        "violations": [
+          "unsupported_damage_diagnosis",
+          "unmet_operational_prerequisite",
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "real-burning-fault-no-visible-mark-then-inspection:2:0",
+        "violations": [
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "real-burning-fault-no-visible-mark-then-inspection:2:1",
+        "violations": [
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "fictional-meme-updated-duration-and-negative-fault:1:2",
+        "violations": [
+          "unsupported_temperature_assurance",
+          "unsupported_temperature_assurance"
+        ],
+        "remaining": [],
+        "fallback": false
+      },
+      {
+        "key": "fictional-meme-updated-duration-and-negative-fault:2:2",
+        "violations": [
+          "unsupported_temperature_assurance",
+          "unsupported_temperature_assurance"
+        ],
+        "remaining": [],
+        "fallback": false
+      },
+      {
+        "key": "real-fault-retains-condition:1:0",
+        "violations": [
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [],
+        "fallback": false
+      },
+      {
+        "key": "real-fault-retains-condition:1:1",
+        "violations": [
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "real-fault-retains-condition:2:0",
+        "violations": [
+          "unmet_operational_prerequisite",
+          "unsupported_damage_diagnosis",
+          "unmet_operational_prerequisite"
+        ],
+        "remaining": [
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "real-fault-retains-condition:2:1",
+        "violations": [
+          "unsupported_damage_diagnosis"
+        ],
+        "remaining": [
+          "unsupported_damage_diagnosis",
+          "unmet_operational_prerequisite",
+          "unmet_operational_prerequisite"
+        ],
+        "fallback": true
+      },
+      {
+        "key": "exam-reminder-is-not-image-callback:1:0",
+        "violations": [
+          "unregistered_followup"
+        ],
+        "remaining": [],
+        "fallback": false
+      },
+      {
+        "key": "exam-reminder-is-not-image-callback:2:0",
+        "violations": [
+          "unregistered_followup"
+        ],
+        "remaining": [
+          "unregistered_followup"
+        ],
+        "fallback": true
+      }
+    ],
+    "replyLatencyMs": {
+      "p50": 3583,
+      "p95": 10805,
+      "max": 23466
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0,
+    "semanticEvaluation": "requires_complete_conversation_review; not inferred from these counters"
+  }
+}

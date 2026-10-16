@@ -1,4 +1,6 @@
 export interface ContextRecord { [key:string]:unknown }
+import type {ForwardCompleteness, ForwardReadEntry} from '../../../contracts/forwardContext.js'
+import {formatForwardCompleteness} from '../domain/forwardCompleteness.js'
 export interface MediaAsset {source:string;fileName:string;name:string;fileId:string;type:string;origin:string;senderName:string;senderUserId:string;forwardId:string;label:string;position?:number}
 export interface ForwardNode {user_id:string;nickname:string;time:number|undefined;message:ContextRecord[];nested_forwards:{id:string;nodes:ForwardNode[]}[]}
 export interface ForwardGroup {getForwardMsg?(id:string):Promise<unknown>}
@@ -19,29 +21,36 @@ function compactText(text = "", maxLength = 6000) {
 const FORWARD_SNAPSHOT_MAX_SEGMENTS = 100
 const FORWARD_SNAPSHOT_MAX_STRING_LENGTH = 100000
 
-function copyForwardSnapshotValue(value:unknown, depth = 0, seen = new WeakSet<object>()):unknown {
+function copyForwardSnapshotValue(value:unknown, depth = 0, seen = new WeakSet<object>(), onTruncate = () => {}):unknown {
   if (value === null || value === undefined) return value
-  if (typeof value === "string") return value.slice(0, FORWARD_SNAPSHOT_MAX_STRING_LENGTH)
+  if (typeof value === "string") {
+    if (value.length > FORWARD_SNAPSHOT_MAX_STRING_LENGTH) onTruncate()
+    return value.slice(0, FORWARD_SNAPSHOT_MAX_STRING_LENGTH)
+  }
   if (["number", "boolean"].includes(typeof value)) return value
   if (typeof value === "bigint") return String(value)
-  if (typeof value !== "object" || depth >= 8 || Buffer.isBuffer(value) || seen.has(value)) return undefined
+  if (typeof value !== "object" || Buffer.isBuffer(value) || seen.has(value)) return undefined
+  if (depth >= 8) {onTruncate(); return undefined}
   seen.add(value)
   if (Array.isArray(value)) {
+    if (value.length > FORWARD_SNAPSHOT_MAX_SEGMENTS) onTruncate()
     return value.slice(0, FORWARD_SNAPSHOT_MAX_SEGMENTS)
-      .map(item => copyForwardSnapshotValue(item, depth + 1, seen))
+      .map(item => copyForwardSnapshotValue(item, depth + 1, seen, onTruncate))
       .filter(item => item !== undefined)
   }
   const copied:ContextRecord = {}
   for (const [key, item] of Object.entries(value)) {
-    const next = copyForwardSnapshotValue(item, depth + 1, seen)
+    const next = copyForwardSnapshotValue(item, depth + 1, seen, onTruncate)
     if (next !== undefined) copied[key] = next
   }
   return copied
 }
 
-function snapshotForwardSegments(segments:unknown = []):ContextRecord[] {
-  return normalizeMessageSegments(segments).slice(0, FORWARD_SNAPSHOT_MAX_SEGMENTS).map(segment => {
-    const copied = record(copyForwardSnapshotValue(segment))
+function snapshotForwardSegments(segments:unknown = [], onTruncate = () => {}):ContextRecord[] {
+  const normalized = normalizeMessageSegments(segments)
+  if (normalized.length > FORWARD_SNAPSHOT_MAX_SEGMENTS) onTruncate()
+  return normalized.slice(0, FORWARD_SNAPSHOT_MAX_SEGMENTS).map(segment => {
+    const copied = record(copyForwardSnapshotValue(segment, 0, new WeakSet(), onTruncate))
     if (!copied || typeof copied !== "object") return null
     if (copied.type === "forward") {
       const id = extractForwardIdFromSegment(copied)
@@ -109,7 +118,7 @@ export function getReplyTargetUserId(input:unknown = {}):unknown {
  const reply=record(input),sender=record(reply.sender),nested=record(record(reply.data).sender)
  return sender.user_id || sender.qq || reply.sender_id || reply.user_id || reply.qq || nested.user_id || nested.qq || ''
 }
-export function extractReadableTextFromSegments(segments:unknown = [], fallback = "") {
+export function extractReadableTextFromSegments(segments:unknown = [], fallback = "", maxLength = 6000) {
   const parts = []
   for (const segment of normalizeMessageSegments(segments)) {
     const data = getSegmentData(segment)
@@ -131,7 +140,7 @@ export function extractReadableTextFromSegments(segments:unknown = [], fallback 
       parts.push(`[文件${fileName ? `:${fileName}` : ""}]`)
     }
   }
-  return compactText(parts.join("")) || compactText(fallback)
+  return compactText(parts.join(""), maxLength) || compactText(fallback, maxLength)
 }
 
 function normalizeMediaSource(value:unknown = "", type = "image") {
@@ -240,120 +249,144 @@ function dedupeAssets(assets:MediaAsset[] = [], maxItems = 12) {
   return result
 }
 
-export async function collectForwardContext(group:ForwardGroup|null, segments:unknown = [], options:{maxDepth?:number;maxLines?:number;maxImages?:number;maxText?:number} = {}) {
-  const maxDepth = Math.max(1, Number(options.maxDepth) || 3)
-  const maxLines = Math.max(1, Number(options.maxLines) || 80)
-  const maxImages = Math.max(1, Number(options.maxImages) || 12)
+export async function collectForwardContext(group:ForwardGroup|null, segments:unknown = [], options:{maxDepth?:number;maxLines?:number;maxNodes?:number;maxImages?:number;maxText?:number} = {}) {
+  const limit = (value: unknown, fallback: number, ceiling: number) => typeof value === 'number' && Number.isFinite(value) ? Math.min(ceiling, Math.max(1, Math.floor(value))) : fallback
+  const maxDepth = limit(options.maxDepth, 3, 16)
+  const maxNodes = limit(options.maxNodes ?? options.maxLines, 80, 2000)
+  const maxImages = limit(options.maxImages, 12, 100)
+  const maxText = limit(options.maxText, 6000, 100000)
   const lines:string[] = []
   const images:MediaAsset[] = []
   const media:MediaAsset[] = []
-  const visited = new Set()
-  const active = new Set()
+  const active = new Set<string>()
   const snapshots = new Map<string,ForwardNode[]>()
+  const entries = new Map<string, ForwardReadEntry>()
+  const failed = new Set<string>(), depthLimited = new Set<string>(), cycles = new Set<string>()
+  const completeness: ForwardCompleteness = {version: 1, state: 'complete', knownTotalNodes: 0, processedNodes: 0,
+    omittedKnownNodes: 0, totalExact: true, failedForwardIds: [], depthLimitedForwardIds: [], cycleForwardIds: [],
+    nodeLimitReached: false, textTruncated: false, mediaTruncated: false, snapshotTruncated: false, entries: []}
   let nodeCount = 0
 
-  const snapshotForward = async (forwardId:string, depth = 0):Promise<ForwardNode[]> => {
+  // Build text, media and durable snapshots from the exact same response. Each
+  // distinct forward id is requested at most once, including failed requests.
+  const visit = async (forwardId:string, depth = 0):Promise<ForwardNode[]> => {
     const id = String(forwardId || "").trim()
-    if (!id || depth >= maxDepth || nodeCount >= maxLines || !group?.getForwardMsg) return []
-    const snapshot=snapshots.get(id)
-    if (snapshot) return snapshot
-    if (active.has(id)) return []
+    if (!id) return []
+    if (active.has(id)) {cycles.add(id); return []}
+    const previous = entries.get(id)
+    if (previous) {
+      // A forward skipped only because of nesting may also be an explicit root.
+      // It has not been fetched yet; allow that shallower occurrence to read it.
+      if (previous.reason !== 'depth_limit' || depth >= previous.depth) return snapshots.get(id) || []
+      entries.delete(id)
+      depthLimited.delete(id)
+      // The earlier nested occurrence stays clipped rather than being backfilled
+      // with shared arrays that could make the durable snapshot cyclic.
+      completeness.snapshotTruncated = true
+    }
+    const entry: ForwardReadEntry = {forwardId: id, depth, totalNodes: null, processedNodes: 0, state: 'partial'}
+    entries.set(id, entry)
+    if (depth >= maxDepth) {entry.reason = 'depth_limit'; depthLimited.add(id); return []}
+    if (nodeCount >= maxNodes) {entry.reason = 'node_limit'; completeness.nodeLimitReached = true; return []}
+    if (!group?.getForwardMsg) {entry.state = 'unavailable'; entry.reason = 'fetch_failed'; failed.add(id); return []}
     active.add(id)
-    let messages = []
+    let messages: ContextRecord[]
     try {
-      messages = normalizeForwardMessageList(await group.getForwardMsg(id))
-    } catch {
-      active.delete(id)
-      return []
-    }
-    const nodes:ForwardNode[] = []
-    for (const message of messages) {
-      if (nodeCount >= maxLines) break
-      const messageSegments = normalizeMessageSegments(message)
-      const nested = []
-      for (const nestedId of extractForwardIdsFromSegments(messageSegments)) {
-        nested.push({ id: nestedId, nodes: await snapshotForward(nestedId, depth + 1) })
+      const payload = await group.getForwardMsg(id)
+      const data = record(payload).data ?? payload
+      const shape = record(data)
+      if (!Array.isArray(data) && !Array.isArray(shape.messages) && !Array.isArray(shape.nodes)) {
+        entry.state = 'unavailable'; entry.reason = 'malformed_response'; failed.add(id); return []
       }
-      nodes.push({
-        user_id: String(getReplyTargetUserId(message) || ""),
-        nickname: getForwardSenderName(message),
-        time: Number(message?.time || record(message?.sender).time || 0) || undefined,
-        message: snapshotForwardSegments(messageSegments),
-        nested_forwards: nested.filter(item => item.id)
-      })
-      nodeCount++
-    }
-    active.delete(id)
-    snapshots.set(id, nodes)
-    return nodes
-  }
-
-  const visit = async (forwardId:string, depth = 0):Promise<void> => {
-    const id = String(forwardId || "").trim()
-    if (!id || depth >= maxDepth || lines.length >= maxLines || visited.has(id) || !group?.getForwardMsg) return
-    visited.add(id)
-
-    let messages = []
-    try {
-      messages = normalizeForwardMessageList(await group.getForwardMsg(id))
+      messages = normalizeForwardMessageList(payload)
     } catch {
-      return
+      entry.state = 'unavailable'; entry.reason = 'fetch_failed'; failed.add(id)
+      return []
+    } finally {
+      // Kept active during recursive processing below; failed reads clear here.
+      if (entry.state === 'unavailable') active.delete(id)
     }
-
+    entry.totalNodes = messages.length
+    completeness.knownTotalNodes += messages.length
+    const nodes:ForwardNode[] = []
+    snapshots.set(id, nodes)
     const indent = "  ".repeat(depth)
     for (const message of messages) {
-      if (lines.length >= maxLines) break
+      if (nodeCount >= maxNodes) {entry.reason = 'node_limit'; completeness.nodeLimitReached = true; break}
+      // Reserve the parent before entering children, so nested forwards cannot
+      // overrun the node budget or push snapshots beyond the displayed evidence.
+      nodeCount++
+      entry.processedNodes++
       const messageSegments = normalizeMessageSegments(message)
       const senderName = getForwardSenderName(message)
       const senderUserId = getReplyTargetUserId(message)
       const text = extractReadableTextFromSegments(
         messageSegments,
-        String(message.raw_message || message.message_text || message.content_text || "")
+        String(message.raw_message || message.message_text || message.content_text || ""), maxText + 1
       )
       if (text) lines.push(`${indent}${senderName}: ${text}`)
-
-      if (media.length < maxImages * 2) {
-        const messageMedia = extractMediaAssetsFromSegments(messageSegments, {
+      const messageMedia = extractMediaAssetsFromSegments(messageSegments, {
           origin: "forward",
           senderName,
           senderUserId,
           forwardId: id
         })
-        for (const asset of messageMedia) {
+      for (const asset of messageMedia) {
           const sameTypeIndex = media.filter(item => item.type === asset.type && item.senderName === senderName).length + 1
           const labeled = {
             ...asset,
             label: `合并转发中 ${senderName} 的第${sameTypeIndex}${mediaUnit(asset.type)}${mediaLabel(asset.type)}`
           }
-          media.push(labeled)
-          if (asset.type === "image") images.push(labeled)
-          if (images.length >= maxImages && media.length >= maxImages * 2) break
-        }
+          const assetKey = (value: MediaAsset) => `${value.type}:${value.fileId || canonicalizeMediaSource(value.source)}`
+          if (!media.some(item => assetKey(item) === assetKey(labeled))) {
+            if (media.length < maxImages * 2) media.push(labeled)
+            else completeness.mediaTruncated = true
+          }
+          if (asset.type === "image" && !images.some(item => assetKey(item) === assetKey(labeled))) {
+            if (images.length < maxImages) images.push(labeled)
+            else completeness.mediaTruncated = true
+          }
       }
-
+      const nested = []
       for (const nestedId of extractForwardIdsFromSegments(messageSegments)) {
-        if (lines.length < maxLines) lines.push(`${indent}${senderName}: [嵌套转发记录]`)
-        await visit(nestedId, depth + 1)
+        lines.push(`${indent}${senderName}: [嵌套转发记录]`)
+        nested.push({id: nestedId, nodes: await visit(nestedId, depth + 1)})
       }
+      nodes.push({user_id: String(senderUserId || ''), nickname: senderName,
+        time: Number(message?.time || record(message?.sender).time || 0) || undefined,
+        message: snapshotForwardSegments(messageSegments, () => {completeness.snapshotTruncated = true}), nested_forwards: nested})
     }
+    active.delete(id)
+    entry.state = entry.processedNodes < messages.length ? 'partial' : 'complete'
+    return nodes
   }
-
-  for (const forwardId of extractForwardIdsFromSegments(segments)) {
-    await visit(forwardId, 0)
-  }
-
   const forwardNodes = []
   for (const forwardId of extractForwardIdsFromSegments(segments)) {
-    forwardNodes.push({ id: forwardId, nodes: await snapshotForward(forwardId, 0) })
+    forwardNodes.push({ id: forwardId, nodes: await visit(forwardId, 0) })
   }
-
+  completeness.processedNodes = nodeCount
+  completeness.omittedKnownNodes = completeness.knownTotalNodes - nodeCount
+  completeness.failedForwardIds = [...failed]
+  completeness.depthLimitedForwardIds = [...depthLimited]
+  completeness.cycleForwardIds = [...cycles]
+  completeness.entries = [...entries.values()]
+  completeness.totalExact = !completeness.omittedKnownNodes && !failed.size && !depthLimited.size && !cycles.size && !completeness.nodeLimitReached
+  const rawText = lines.join('\n').replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+  completeness.textTruncated = rawText.length > maxText
+  const incomplete = !completeness.totalExact || completeness.textTruncated || completeness.mediaTruncated || completeness.snapshotTruncated
+  completeness.state = failed.size && !nodeCount ? 'unavailable' : incomplete ? 'partial' : 'complete'
+  const body = compactText(rawText, maxText)
+  const range = formatForwardCompleteness(completeness)
   return {
-    text: compactText(lines.join("\n"), Number(options.maxText) || 6000),
+    // The range remains outside the body budget so even tiny excerpts cannot
+    // erase the warning and imply that unseen nodes were read.
+    text: [range, body].filter(Boolean).join('\n'),
     lines,
     images: dedupeAssets(images, maxImages),
     media: dedupeAssets(media, maxImages * 2),
-    forwardIds: [...visited],
-    forwardNodes
+    forwardIds: [...entries.keys()],
+    forwardNodes,
+    completeness
   }
 }
 
@@ -405,9 +438,11 @@ export async function resolveGroupContextAssets({ e = {}, group = null, reply = 
     files: media.filter(asset => asset.type === "file"),
     currentForwardText: currentForward.text,
     quotedForwardText: quotedForward.text,
+    currentForwardCompleteness: currentForward.completeness,
+    quotedForwardCompleteness: quotedForward.completeness,
     forwardNodes: currentForward.forwardNodes,
     quotedForwardNodes: quotedForward.forwardNodes,
-    forwardText: compactText([currentForward.text, quotedForward.text].filter(Boolean).join("\n"), 8000)
+    forwardText: [currentForward.text, quotedForward.text].filter(Boolean).join("\n")
   }
 }
 

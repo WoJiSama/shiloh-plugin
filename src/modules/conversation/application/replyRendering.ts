@@ -8,6 +8,8 @@ import { sanitizeFinalReplyText, stripChatLogSpeakerPrefixes } from "../domain/r
 import { containsCodeFence, flattenCodeFences } from "../domain/qqCodeFenceText.js"
 import { extractChatKeywords } from "../domain/messageIntent.js"
 import { planTextReplyMessages } from "../domain/replyRhythm.js"
+import { withPersonaSnapshot } from "../domain/personaSnapshotConfig.js"
+import type { PersonaSnapshot } from "../../../contracts/persona.js"
 
 import { ThinkingProcessor } from "../../models/domain/thinkingProcessor.js"
 
@@ -19,7 +21,7 @@ import { SendPacer } from "../domain/sendPacing.js"
 type Id = string | number
 export interface Member {card?:string;nickname?:string}
 export interface Group {getMemberMap():Promise<Map<number,Member>>}
-export interface ReplyEvent {group_id?:Id;user_id?:Id;self_id?:Id;bot?:{uin?:Id};group?:Group;msg?:string;_proactiveReply?:boolean;_proactiveReplyAnchorAt?:number;_forbiddenAnchorAt?:number;message_type?:string;reply(payload:unknown,quote?:boolean):Promise<unknown>}
+export interface ReplyEvent {group_id?:Id;user_id?:Id;self_id?:Id;bot?:{uin?:Id};group?:Group;msg?:string;_personaSnapshot?:PersonaSnapshot;_proactiveReply?:boolean;_proactiveReplyAnchorAt?:number;_forbiddenAnchorAt?:number;message_type?:string;reply(payload:unknown,quote?:boolean):Promise<unknown>}
 interface ReplyConfig {sendPacing?:ConstructorParameters<typeof SendPacer>[0];forbiddenWords?:import('../domain/forbiddenWordGuard.js').ForbiddenConfig;persona?:{name?:string};personaGuard?:{enabled?:boolean;badPatterns?:string[]};chatTriggerMode?:string;smartTrigger?:{continuationKeywordMaxCount?:number;proactiveReplyNoQuote?:boolean;typingSpeed?:number};replyRhythm?:Parameters<typeof planTextReplyMessages>[1];messageSplitMaxChars?:number;messageSplitMaxSegments?:number}
 export interface ReplyDeliveryPort {
  config:ReplyConfig;_sendPacer?:SendPacer;_sendPacerSource?:ReplyConfig['sendPacing'];
@@ -117,6 +119,9 @@ async function sendObservedReply(host:ReplyDeliveryPort, e:ReplyEvent, payload:u
   }
 
 async function sendSegmentedMessage(host:ReplyDeliveryPort, e:ReplyEvent, output:string, quoteChance = 0.5, { alreadyGuarded = false } = {}) {
+    const personaConfig = withPersonaSnapshot(host.config, e)
+    const snapshotBotName = e._personaSnapshot ? personaConfig.persona?.name : undefined
+    const hasPersonaSnapshot = Boolean(e._personaSnapshot)
     let deliveryAttempted = false
     try {
       const groupId = e?.group_id
@@ -157,8 +162,8 @@ async function sendSegmentedMessage(host:ReplyDeliveryPort, e:ReplyEvent, output
       if (typeof output === "string" && !alreadyGuarded) {
         output = applyOutputPersonaGuards(output, {
           userText: e?.msg || "",
-          botNames: [ports.bot().nickname, (typeof host.getPersonaFor === "function" ? host.getPersonaFor(e) : host.config?.persona)?.name].filter((name):name is string=>typeof name === "string"),
-          personaGuard: host.config.personaGuard
+          botNames: [hasPersonaSnapshot ? snapshotBotName : (typeof host.getPersonaFor === "function" ? host.getPersonaFor(e) : host.config?.persona)?.name].filter((name):name is string=>typeof name === "string"),
+          personaGuard: hasPersonaSnapshot ? personaConfig.personaGuard : host.config.personaGuard
         })
       }
       output = sanitizeFinalReplyText(output)

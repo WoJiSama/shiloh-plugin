@@ -2,6 +2,10 @@ interface IntentBackend {intentAiUrl?:string;intentAiApikey?:string|string[];int
 interface IntentOptions {text?:string;hasImages?:boolean;config?:{intentAiConfig?:IntentBackend;toolsAiConfig?:IntentBackend};fetchImpl?:typeof fetch;timeoutMs?:number;now?:()=>number}
 function record(value:unknown):Record<string,unknown>{return value && typeof value==='object' && !Array.isArray(value)?value as Record<string,unknown>:{}}
 import { resolveChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
+import {parseSocialInterpretation, socialInterpretationInstruction} from '../domain/turnInteractionContext.js'
+import type {SocialInterpretation} from '../domain/turnInteractionContext.js'
+
+export interface ModelIntentResult {intent: string; confidence: number; reason: string; social?: SocialInterpretation}
 
 // 意图层核心：全模型意图判定（已转正为主判定路径）。
 // 正则瀑布降级为精确命令直配 + 模型故障兜底；本模块是模型判定的唯一实现。
@@ -36,7 +40,8 @@ const SYSTEM_PROMPT = [
   "- 明确的游戏数据查询（三角洲等）→ deltaforce",
   "- 磁力/磁链 → magnet",
   "- 情绪化短语、表情包刷屏、与机器人无关的闲聊 → chat 或 noise",
-  "输出格式：{\"intent\":\"...\",\"confidence\":0.0-1.0,\"reason\":\"不超过20字的依据\"}",
+  "输出格式：{\"intent\":\"...\",\"confidence\":0.0-1.0,\"reason\":\"不超过20字的依据\",\"social\":{\"act\":\"conversation\",\"confidence\":0.0}}",
+  socialInterpretationInstruction(),
   "没有把握时给 chat 并降低 confidence。"
 ].join("\n")
 
@@ -52,7 +57,7 @@ export async function classifyIntentWithModel({
   fetchImpl = fetch,
   timeoutMs = 6000,
   now = Date.now
-}:IntentOptions = {}) {
+}:IntentOptions = {}): Promise<ModelIntentResult> {
   const content = String(text || "").trim()
   if (!content) return { intent: "noise", confidence: 1, reason: "空消息" }
 
@@ -94,10 +99,12 @@ export async function classifyIntentWithModel({
     if (!match) return { intent: "unavailable", confidence: 0, reason: "无 JSON 输出" }
     const parsed = record(JSON.parse(match[0]))
     const intent = typeof parsed.intent === "string" && MODEL_INTENT_LABELS.includes(parsed.intent) ? parsed.intent : "chat"
+    const social = parseSocialInterpretation(parsed.social)
     return {
       intent,
       confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
-      reason: String(parsed.reason || "").slice(0, 40)
+      reason: String(parsed.reason || "").slice(0, 40),
+      ...(social ? {social} : {})
     }
   } catch (error) {
     const aborted = error instanceof Error && error.name === "AbortError" || /abort/i.test(String(error instanceof Error ? error.message : ""))

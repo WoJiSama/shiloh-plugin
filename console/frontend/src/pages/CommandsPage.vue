@@ -8,18 +8,26 @@ import SaveBar from '../components/SaveBar.vue'
 import DiceSettings from '../components/DiceSettings.vue'
 import DiceAssets from '../components/DiceAssets.vue'
 import EmojiManager from '../components/EmojiManager.vue'
+import SchemaPage from './SchemaPage.vue'
 import { useUnsavedGuard } from '../composables/useUnsavedGuard'
 import { useOpsResource, errorText } from '../lib/operations'
 import { commandsApi, clone, changes, type CommandDomain } from '../lib/commands'
 
 const dialog = useDialog()
 const tab = ref('registry')
+const diceVisited = ref(false)
+const dicePage = ref<InstanceType<typeof SchemaPage> | null>(null)
 const tabs = [
   { id: 'registry', label: '命令总表' },
+  { id: 'dice-basic', label: '骰子基础' },
   { id: 'dice', label: '骰子回复' },
   { id: 'assets', label: '牌堆与规则' },
   { id: 'emoji', label: '表情包' }
 ]
+function selectTab(id: string) {
+  if (id === 'dice-basic') diceVisited.value = true
+  tab.value = id
+}
 const resource = useOpsResource((signal) =>
   commandsApi<{ domains: CommandDomain[]; commandCount: number; loadError?: string }>('data', {
     signal
@@ -188,7 +196,7 @@ async function exportDoc() {
     <PageHeader
       title="命令与骰子"
       eyebrow="机器人能力"
-      description="维护命令说明与权限标记，配置骰子回复，管理牌堆、规则包与表情素材。"
+      description="维护命令说明与权限标记，设置骰子行为与回复，管理牌堆、规则包与表情素材。"
       ><template #actions
         ><NButton v-if="tab === 'registry'" :loading="exporting" @click="exportDoc"
           >导出已保存文档</NButton
@@ -198,19 +206,28 @@ async function exportDoc() {
           :disabled="saving"
           @click="reload"
           >重新加载</NButton
+        ><NButton
+          v-if="tab === 'dice-basic'"
+          :disabled="dicePage?.saving || dicePage?.loading"
+          @click="dicePage?.reload()"
+          >刷新配置</NButton
         ></template
       ></PageHeader
     >
-    <nav class="task-tabs" aria-label="命令与骰子任务分区">
+    <nav class="task-tabs" role="tablist" aria-label="命令与骰子任务分区">
       <button
         v-for="item in tabs"
         :key="item.id"
+        role="tab"
         :aria-selected="tab === item.id"
-        @click="tab = item.id"
+        @click="selectTab(item.id)"
       >
         {{ item.label
         }}<NTag v-if="item.id === 'registry' && dirty" type="warning" size="small">{{
           dirty
+        }}</NTag>
+        <NTag v-if="item.id === 'dice-basic' && dicePage?.dirty" type="warning" size="small">{{
+          dicePage.dirty
         }}</NTag>
       </button>
     </nav>
@@ -379,6 +396,13 @@ async function exportDoc() {
         <SaveBar :dirty="dirty" :saving="saving" :saved="saved" @save="save" @discard="discard" />
       </PageState>
     </div>
+    <SchemaPage
+      v-if="diceVisited"
+      v-show="tab === 'dice-basic'"
+      ref="dicePage"
+      kind="dice"
+      embedded
+    />
     <DiceSettings v-show="tab === 'dice'" />
     <DiceAssets v-show="tab === 'assets'" />
     <EmojiManager v-show="tab === 'emoji'" />

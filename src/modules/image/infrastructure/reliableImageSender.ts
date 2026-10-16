@@ -1,9 +1,14 @@
 import sharp from "sharp"
+import {normalizeDeliveryReceipt} from '../../messaging/domain/deliveryReceipt.js'
 
 function isRecord(value: unknown): value is Record<string, unknown> { return !!value && typeof value === 'object' }
 export interface ImageDownloadOptions {timeoutMs?: number; maxBytes?: number; fetchImpl?: typeof fetch}
 export interface ImageReplyEvent {reply(message: unknown): Promise<unknown>}
 export interface ImageSendOptions extends ImageDownloadOptions {buildMessage(buffer: Buffer): unknown}
+export class ImageDeliveryError extends Error {
+  readonly uncertain:boolean
+  constructor(message:string,readonly state:'failed'|'unknown'){super(message);this.name='ImageDeliveryError';this.uncertain=state==='unknown'}
+}
 
 const DEFAULT_TIMEOUT_MS = 60000
 const DEFAULT_MAX_BYTES = 20 * 1024 * 1024
@@ -84,7 +89,11 @@ export async function getImageBufferMetadata(imageBuffer: unknown) {
 export async function sendImageReliably(event: ImageReplyEvent, image: unknown, options: ImageSendOptions): Promise<unknown> {
   const imageBuffer = await resolveImageBuffer(image, options)
   const buildMessage = options.buildMessage
-  const result = await event.reply(buildMessage(imageBuffer))
-  if (isMessageSendFailed(result)) throw new Error(formatMessageSendFailure(result))
+  const payload=buildMessage(imageBuffer)
+  let result:unknown
+  try{result=await event.reply(payload)}catch{throw new ImageDeliveryError('图片已生成，但发送结果未确认，请勿重复发送。','unknown')}
+  const outcome=normalizeDeliveryReceipt(result)
+  if(outcome.state==='failed')throw new ImageDeliveryError(formatMessageSendFailure(result),'failed')
+  if(outcome.state==='unknown')throw new ImageDeliveryError('图片已生成，但发送结果未确认，请勿重复发送。','unknown')
   return result
 }

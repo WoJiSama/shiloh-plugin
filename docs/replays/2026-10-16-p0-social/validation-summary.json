@@ -1,0 +1,54 @@
+{
+  "releaseCommit": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "fullGate": {
+    "backend": {
+      "tests": 2303,
+      "passed": 2301,
+      "failed": 0,
+      "skipped": 2,
+      "skipReason": "Local Chromium is unavailable for two card screenshot tests"
+    },
+    "frontend": {
+      "tests": 34,
+      "passed": 34,
+      "failed": 0
+    },
+    "sourceAndTestTypecheck": true,
+    "boundaries": true,
+    "backendAndFrontendBuild": true,
+    "migrationReport": true
+  },
+  "targetedFollowup": {
+    "tests": 81,
+    "passed": 81,
+    "failed": 0,
+    "skipped": 0
+  },
+  "rollbackSnapshot": "/opt/trss-yunzai-backups/deploy-snapshots/20261016-124411",
+  "managedFiles": 1948,
+  "backendJsCount": 479,
+  "configsUnchanged": true,
+  "reasoning": "low",
+  "modelReplay": {
+    "file": "installed-7548294.json",
+    "summary": "installed-summary.json",
+    "turns": 60,
+    "httpRequests": 70,
+    "http200": 70,
+    "explicitLow": 70
+  },
+  "originalWriteback": {
+    "audit": "writeback-audit.json",
+    "targets": 51,
+    "protectedDirtyFiles": 379,
+    "headAndIndexPreserved": true,
+    "sourceAndTestTypecheck": true,
+    "build": true,
+    "targeted": {
+      "tests": 186,
+      "passed": 186,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

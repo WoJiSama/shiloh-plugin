@@ -66,3 +66,63 @@ test("explicit rigorous knowledge requests may opt into reasoning", () => {
   assert.equal(plan.execution.mode, "chat")
   assert.equal(plan.execution.modelProfile, "reasoning")
 })
+
+test("serious interaction excludes optional emoji before choosing the reasoning route", () => {
+  const plan = createTurnPlan({
+    intentText: "CPU 95℃正常吗",
+    interactionKind: "serious_answer",
+    availableCapabilities: ["sendLocalEmojiTool"],
+    requiredCapabilities: ["sendLocalEmojiTool"]
+  })
+  assert.equal(plan.execution.mode, "chat")
+  assert.equal(plan.execution.modelProfile, "reasoning")
+  assert.equal(plan.presentation.kind, "text")
+  assert.equal(plan.observability.routeReason, "serious_answer")
+  assert.deepEqual(plan.capabilities.required, [])
+  assert.deepEqual(deriveTurnPlanRequest(plan).requestOptions.generation, {reasoningEffort: "low"})
+  assert.match(deriveTurnPlanRequest(plan).executionPrompt, /没有可调用的工具/)
+  assert.equal(deriveTurnPlanRequest(plan, {chatAiConfig: {complexReasoningEffort: false}}).requestOptions.generation, undefined)
+})
+
+test("serious interaction preserves a required tool action", () => {
+  const plan = createTurnPlan({
+    intentText: "认真查一下设备召回公告",
+    interactionKind: "serious_answer",
+    availableCapabilities: ["searchInformationTool", "sendLocalEmojiTool"],
+    requiredCapabilities: ["searchInformationTool"]
+  })
+  assert.equal(plan.execution.mode, "tool")
+  assert.equal(plan.execution.modelProfile, "task")
+  assert.deepEqual(plan.capabilities.required, ["searchInformationTool"])
+  assert.equal(deriveTurnPlanRequest(plan).executionPrompt, undefined)
+})
+
+test("delivery status checks preserve evidence reasoning instead of selecting a casual reaction", () => {
+  const plan = createTurnPlan({intentText: "刚才改背景的图出来了吗？", interactionKind: "delivery", availableCapabilities: ["sendLocalEmojiTool"]})
+  assert.equal(plan.execution.mode, "chat")
+  assert.equal(plan.execution.modelProfile, "reasoning")
+  assert.equal(plan.observability.routeReason, "delivery_status")
+  assert.equal(deriveTurnPlanRequest(plan).requestOptions.generation.reasoningEffort, "low")
+  assert.match(deriveTurnPlanRequest(plan).executionPrompt, /不要替用户重新发起旧任务/)
+})
+
+test('explicit chat cannot be promoted by stale candidates, locks, calls or emoji requests', () => {
+  const decision = {intent: 'chat', goal: '只接梗'}
+  const plan = createTurnPlan({intentText: '别搜索，接个梗', toolDecision: decision,
+    availableCapabilities: ['searchInformationTool', 'sendLocalEmojiTool'], requiredCapabilities: ['searchInformationTool'],
+    toolChoice: {type: 'function', function: {name: 'searchInformationTool'}}, toolScopeLocked: true,
+    forcedToolCall: {function: {name: 'searchInformationTool'}}, explicitEmojiRequest: true})
+  assert.equal(plan.execution.mode, 'chat')
+  assert.equal(plan.execution.toolChoice, 'none')
+  assert.deepEqual(plan.capabilities.required, [])
+  assert.deepEqual(plan.capabilities.optional, [])
+  assert.equal(plan.toolDecision, decision)
+  assert.equal(plan.observability.routeReason, 'semantic_chat')
+})
+
+test('explicit selected capability wins over stale regex candidates', () => {
+  const plan = createTurnPlan({toolDecision: {intent: 'tool', toolName: 'reminderTool'},
+    availableCapabilities: ['reminderTool', 'searchInformationTool'], requiredCapabilities: ['searchInformationTool']})
+  assert.deepEqual(plan.capabilities.required, ['reminderTool'])
+  assert.equal(plan.execution.mode, 'tool')
+})

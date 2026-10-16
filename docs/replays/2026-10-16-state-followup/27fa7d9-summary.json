@@ -1,0 +1,45 @@
+{
+  "commit": "27fa7d9b7edf2d110e1c5dd1cb3b16debca8ffc5",
+  "complete": true,
+  "turns": 60,
+  "structuralPassed": 57,
+  "structuralDifferences": [
+    {
+      "id": "biscuit-bit-continuity",
+      "sample": 2,
+      "turn": 1,
+      "failures": [
+        "kind"
+      ]
+    },
+    {
+      "id": "biscuit-bit-continuity",
+      "sample": 2,
+      "turn": 2,
+      "failures": [
+        "kind"
+      ]
+    },
+    {
+      "id": "real-fault-retains-condition",
+      "sample": 2,
+      "turn": 1,
+      "failures": [
+        "modelResponded"
+      ]
+    }
+  ],
+  "httpRequests": 79,
+  "http200": 78,
+  "explicitLow": 79,
+  "repairTurns": 19,
+  "fallbackTurns": 8,
+  "replyLatencyMs": {
+    "p50": 4291,
+    "p95": 12354,
+    "max": 16468
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "semanticEvaluation": "not_final_candidate; independent_source_review_found_two_regressions; full_raw_results_retained"
+}

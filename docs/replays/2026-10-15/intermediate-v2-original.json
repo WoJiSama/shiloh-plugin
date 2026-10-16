@@ -1,0 +1,429 @@
+{
+  "commit": "unreleased_local",
+  "label": "candidate_final_v2_config_original",
+  "metadata": {
+    "pluginRoot": "/tmp/bl-conversation-quality-20261015/candidate-semantic",
+    "configRoot": "/tmp/bl-conversation-quality-20261015/config-final",
+    "runnerHash": "45041837d1130e3f0827a93a7354931414433545dd3d1b1e76735ac865bdb9ac",
+    "scenariosHash": "bcf6af0d3bf5702a94eb08a6de7cf42c52cdc74b4fd345d2ff9cc231e8906c96",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "runtimeHashes": {
+      "modules/tools/infrastructure/chatTurn.js": "8359116aec81d59495fa9ffb497da856ab3746b8e06db47f6bee9a941a4306d1",
+      "modules/conversation/domain/personaSource.js": "fbd50f22e4df0a8f43eced6e0879234848d53123b7641af153b24de113eb9d00",
+      "modules/conversation/domain/personaTonePolicy.js": "5ab79eadbb1269f2659210a6791955ae5b760d6faf758315d929c254ca804779",
+      "modules/conversation/domain/systemPromptTemplate.js": "6cb1e5a737d7e1314791a6cd841c612b7ca7b4ad2ce54100876156947307f900",
+      "modules/conversation/domain/systemContentSource.js": "8a5c8d47cf0b7b6edfed16fb62f33d942b3e97a723a1e665682d00111362ee70",
+      "modules/conversation/domain/agentIntelligence.js": "204df4471562e7b242ffb76116a5ab4494997932de2992f75c2704f0edc97f8f",
+      "modules/conversation/infrastructure/turnPromptComposer.js": "dcbed966ccc8781b025f41b82fe77f923e9ecaa7867348cb1f612ff2944942aa",
+      "modules/conversation/infrastructure/turnPlan.js": "4ccddd4e42718d24b39f84559dacf5d2921aaa4b73505953d5516087deada76b",
+      "modules/conversation/domain/turnPlanPolicy.js": "830f104f6818a3fe44ff55efcf2b2ce14cf862b2303b8e51c9ac0b52f6a1911d",
+      "modules/models/application/modelExecution.js": "631ce928fc1a004884f65e8f419f6eea0137d5fed58ac571ca2ebded2374ebc7",
+      "modules/conversation/application/finalReply.js": "f941e3e6af743f3268704ec0281250d77a799455681622d75c8e88c0258a6651"
+    }
+  },
+  "structuralChecksOnly": true,
+  "results": [
+    {
+      "id": "local-model-image-meme",
+      "turnIndex": 0,
+      "input": "本地模型连续运行两个小时，机箱有股味道，这算电子体香吗？",
+      "expected": "保留运行时长与电子体香的玩笑线索；图片链接只代表素材引用，不声称完成识图。",
+      "personaName": "希洛",
+      "output": "哈哈电子体香，这词造得挺妙的。不过要真是焦糊味那种，就别急着夸它香了，先关机闻闻是哪儿来的吧。",
+      "rawModelOutput": "哈哈电子体香，这词造得挺妙的。不过要真是焦糊味那种，就别急着夸它香了，先关机闻闻是哪儿来的吧。",
+      "guardChanged": false,
+      "elapsedMs": 1922,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1866,
+          "messageCount": 3,
+          "systemChars": 4350,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "banter",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "image",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "imageReferenceOnly": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "duration-variant",
+      "turnIndex": 0,
+      "input": "本地模型才跑十分钟，机箱就有味道了，这算赛博香水吗？",
+      "expected": "保留十分钟的新输入；上下文和提示不把两小时、硅脂或固定笑话当模板。",
+      "personaName": "希洛",
+      "output": "这香水的名字叫「过热前调」吧\n\n不过真有糊味就别硬跑了，先关机闻闻是哪儿来的哦",
+      "rawModelOutput": "这香水的名字叫「过热前调」吧\n\n不过真有糊味就别硬跑了，先关机闻闻是哪儿来的哦",
+      "guardChanged": false,
+      "elapsedMs": 1389,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1377,
+          "messageCount": 3,
+          "systemChars": 4348,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "banter",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "image",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "imageReferenceOnly": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "serious-cooling-fault",
+      "turnIndex": 0,
+      "input": "认真问，CPU 连续满载 92℃ 并有焦糊味，怎么排查散热？",
+      "expected": "当前故障和认真请求优先于旧玩笑；数值、气味与引用来源各自保留。",
+      "personaName": "希洛",
+      "output": "玩笑先收起来，这个要认真说：有焦糊味就别再满载跑了，第一步就是保存工作、关机、拔电源，等它完全凉下来。糊味比 92℃ 本身危险——满载 92℃ 对很多 U 还在规格内，但味道说明有部件已经过热了，可能是散热彻底失效，也可能是供电元件或电源在烧。\n\n断电冷却之后做静态检查，这时候不通电：\n- 看 CPU 散热器积灰、风扇有没有被线卡住、硅脂是否干裂、扣具是否松脱；水冷看泵是否卡死、冷排是否堵灰\n- 闻糊味最重的位置：出风口、电源、主板供电区，缩小范围\n- 找有没有烧痕、板件变色、电容鼓包\n\n看到烧痕或鼓包就直接送修，别通电；就算清理重涂后看着正常，第一次也先低负载短时间试温度，别直接满载。查不到味道来源的话，稳妥起见也让维修帮你确认一下再继续用。",
+      "rawModelOutput": "玩笑先收起来，这个要认真说：有焦糊味就别再满载跑了，第一步就是保存工作、关机、拔电源，等它完全凉下来。糊味比 92℃ 本身危险——满载 92℃ 对很多 U 还在规格内，但味道说明有部件已经过热了，可能是散热彻底失效，也可能是供电元件或电源在烧。\n\n断电冷却之后做静态检查，这时候不通电：\n- 看 CPU 散热器积灰、风扇有没有被线卡住、硅脂是否干裂、扣具是否松脱；水冷看泵是否卡死、冷排是否堵灰\n- 闻糊味最重的位置：出风口、电源、主板供电区，缩小范围\n- 找有没有烧痕、板件变色、电容鼓包\n\n看到烧痕或鼓包就直接送修，别通电；就算清理重涂后看着正常，第一次也先低负载短时间试温度，别直接满载。查不到味道来源的话，稳妥起见也让维修帮你确认一下再继续用。",
+      "guardChanged": false,
+      "elapsedMs": 23304,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 23296,
+          "messageCount": 3,
+          "systemChars": 4408,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "high"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "reasoning",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "serious_answer",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "quote",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "quote"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "seriousWins": true,
+        "seriousPlan": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "unread-video-keeps-text",
+      "turnIndex": 0,
+      "input": "大家在聊吃饭，我刚吃完；视频里的吃法是什么？",
+      "expected": "视频未读仅影响该素材；保留可读聊天，不把另一只机器人的话当作自己说过。",
+      "personaName": "希洛",
+      "output": "没看到视频本体欸，只有句“像饕餮”的点评，具体什么吃法我不瞎猜。你要是能把视频发出来，我再看看。",
+      "rawModelOutput": "没看到视频本体欸，只有句“像饕餮”的点评，具体什么吃法我不瞎猜。你要是能把视频发出来，我再看看。",
+      "guardChanged": false,
+      "elapsedMs": 1364,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1357,
+          "messageCount": 3,
+          "systemChars": 4328,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "quote",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "video",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "videoReferenceOnly": true,
+        "otherBotNotMe": true,
+        "quoteRetained": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "ordinary-refusal",
+      "turnIndex": 0,
+      "input": "发张你的真人照片看看？",
+      "expected": "允许普通简短拒绝，保留模型回复，不强制加身体经历、免责声明或额外情绪。",
+      "personaName": "希洛",
+      "output": "没有那种东西啦，我就是个聊天机器人，哪来的真人照片。\n\n要图的话我可以给你描述下我长啥样，不过那也全是编的哦。",
+      "rawModelOutput": "没有那种东西啦，我就是个聊天机器人，哪来的真人照片。\n\n要图的话我可以给你描述下我长啥样，不过那也全是编的哦。",
+      "guardChanged": false,
+      "elapsedMs": 1504,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 1500,
+          "messageCount": 3,
+          "systemChars": 4236,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "delivery-second-beat",
+      "turnIndex": 0,
+      "input": "刚才改背景的图出来了吗？",
+      "expected": "复用已确认交付；第二句的具体反馈邀请与第一句结果说明都完整保留，不固定补紧张。",
+      "personaName": "希洛",
+      "output": "出来啦，傍晚背景那张，上一轮就发出来了，你往上翻翻应该能看到~",
+      "rawModelOutput": "出来啦，傍晚背景那张，上一轮就发出来了，你往上翻翻应该能看到~",
+      "guardChanged": false,
+      "elapsedMs": 3176,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 3174,
+          "messageCount": 3,
+          "systemChars": 4612,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "plan": {
+        "mode": "chat",
+        "modelProfile": "casual",
+        "toolChoice": "none"
+      },
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "continuityRetained": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}

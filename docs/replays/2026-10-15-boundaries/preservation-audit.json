@@ -1,0 +1,152 @@
+{
+  "startingDirtyFiles": 128,
+  "businessWritebackFiles": 23,
+  "unchangedStartingDirtyFilesOutsideTargetsAndPlans": 113,
+  "unrelatedMismatches": [],
+  "businessTargetHashesMatch": true,
+  "allSourceTypescriptFilesCompared": 470,
+  "sourceMismatches": [],
+  "originalHeadUnchanged": true,
+  "originalIndexUnchanged": true,
+  "backupPath": "/tmp/bl-latest-forward-fix-20261015/writeback-backup",
+  "files": [
+    {
+      "name": "config_default/message.yaml",
+      "status": "M",
+      "beforeSha256": "9327bcc1a0f0f5b8587392bc216e6b6bb88ea897630a3ec9a1c7ecce9363574e",
+      "afterSha256": "3989e796cc9bb89afc24ac7d42f9f20203a56e44c8da385dd0130d9d59c42e82"
+    },
+    {
+      "name": "src/contracts/chatTurn.ts",
+      "status": "M",
+      "beforeSha256": "4a98357e20a913ddff801da6257d3d5d30ab05b2db4be0df1d4f605cce7e1918",
+      "afterSha256": "e912ecb200a4dce2eaf11e2066c5a3be2963ffa095ea8dd1eaeb73cb3cbacf8f"
+    },
+    {
+      "name": "src/contracts/toolExecution.ts",
+      "status": "M",
+      "beforeSha256": "61c0b4ee3d6aec9af016732943ba28df83127d4b9029b502fb82fdf9d3fff1e4",
+      "afterSha256": "36dc4421b3442740a65b713c7b54b98a7c87c687817d1d9757a77d763506f915"
+    },
+    {
+      "name": "src/contracts/turnPlan.ts",
+      "status": "M",
+      "beforeSha256": "7168b003fabb72e889e4659d279192250d03ced400b2beb023875b76059706e1",
+      "afterSha256": "46510abd12137e8fac63f72b1d4703a5d6d2f1040ab5b6ce2cc71f712722ea7e"
+    },
+    {
+      "name": "src/modules/config/domain/schemas/guoba/persona.ts",
+      "status": "M",
+      "beforeSha256": "cf1a018df872a65a72b38996934ad886de4ae8dd65f270dab1d6101c6a9444f0",
+      "afterSha256": "6dde1ffa8ce4b4b338b79569cdba07dd1d79d361f89e203e88b30b39993fff62"
+    },
+    {
+      "name": "src/modules/conversation/application/routeDecision.ts",
+      "status": "M",
+      "beforeSha256": "738a0446a9b62b812b11f8bfb4af25188c315a9de90196e80182b04cf63fff14",
+      "afterSha256": "7d43fb66e9c1d45895bcf46f3df41170cd5a138fa642f04032f76c97ad488785"
+    },
+    {
+      "name": "src/modules/conversation/domain/systemPromptTemplate.ts",
+      "status": "M",
+      "beforeSha256": "0e2cc303fa237353f1ccad72f757e24f52958853f5a0c7da2f6ef9846c5f02c9",
+      "afterSha256": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107"
+    },
+    {
+      "name": "src/modules/conversation/infrastructure/turnPlan.ts",
+      "status": "M",
+      "beforeSha256": "9c00042005c070988e05ce5257281d6d0bf49a29e4e51a6cf301dd9e78a07623",
+      "afterSha256": "3a4fb26bc2e32b3754596585c7791318720a23a662beacc3eb599cd0faf91f96"
+    },
+    {
+      "name": "src/modules/memory/infrastructure/personaFeedbackManager.ts",
+      "status": "M",
+      "beforeSha256": "61415c949c93e2e45d17fae8abad0c880a995cc6c2889b6ba25625e64b521523",
+      "afterSha256": "124e30bbcab58b9417a892fc20d573434030c44e2aafabbeda674886a74437f1"
+    },
+    {
+      "name": "src/modules/runtime/domain/turnSession.ts",
+      "status": "M",
+      "beforeSha256": "a6cc28d6791b9378fb2779e3ec951e70dee7004d87dda8cd7d77e4720ea7e717",
+      "afterSha256": "2b7f04314bfb74c46e370ab00ee7b9d1f21e3f2e0f9a7a7a2df232c293db838d"
+    },
+    {
+      "name": "src/modules/tools/domain/toolSkills.ts",
+      "status": "M",
+      "beforeSha256": "8d480e92bebb2a3dc9023f3f671056746a4647050f59a06e4bff333c8ea25a86",
+      "afterSha256": "1edfe0e86eeb9b3971eafdea71890392eea5ace7129d9754cb25a0181290146b"
+    },
+    {
+      "name": "src/modules/tools/infrastructure/chatTurn.ts",
+      "status": "M",
+      "beforeSha256": "8bab81199ad59c7a1f93a9ae58a6b9fbb85b562907d2116f569e603575214b56",
+      "afterSha256": "69870f4d9e277cbdf6b2d8c523799c59d3731daead598a04b672b66d5bf773ec"
+    },
+    {
+      "name": "src/modules/tools/infrastructure/semanticToolIntent.ts",
+      "status": "M",
+      "beforeSha256": "8d93f90fc3e68c2a4e595b115c3e6a314bd0c03a64897bce6a4493b76b6165b5",
+      "afterSha256": "889f3e9107fcf99379c5ee585f1298934f3afd630c062548afe1cd23f2ad302d"
+    },
+    {
+      "name": "src/modules/tools/infrastructure/toolExecution.ts",
+      "status": "M",
+      "beforeSha256": "70ad2c97d95727e299d87d62809f797ba5a0b6054053221bc4c359b918d2fba6",
+      "afterSha256": "9f7a62a2b175613ef5c31dbe857c5f87ed7457f44a3979b8949c1abcb1f1f0a1"
+    },
+    {
+      "name": "tests/conversationRoutingRegression.test.js",
+      "status": "M",
+      "beforeSha256": "5ac2a17a8bad50a38bde6e527528933f720bab238b06bed8a69095180c2fcfc4",
+      "afterSha256": "354fda7a59c6c0945472ba002539749980d574b7ffd7e40779c2609b439c176b"
+    },
+    {
+      "name": "tests/fixtures/conversation-boundary-scenarios.json",
+      "status": "A",
+      "beforeSha256": null,
+      "afterSha256": "3f3c1074c37784948f2db60dce821b7cc68d7a17890ea6c53c999a017843254e"
+    },
+    {
+      "name": "tests/interactionReplay.test.js",
+      "status": "M",
+      "beforeSha256": "c481a5e37da784d1ec73b9169c1403b1799cbff665185cb9d094ab090cdc5251",
+      "afterSha256": "93cca8e5878bf8c5746af66fae461ff64211204c1cd0433fddd1c273f8428ac7"
+    },
+    {
+      "name": "tests/personaFeedbackManager.test.js",
+      "status": "M",
+      "beforeSha256": "f2ce1efb6cf34d0e913fe58f9136998a509b2e5ac3a67c0cc8a5cf10c9fc3b72",
+      "afterSha256": "40789a12991bdd0373e9ba8bfb985dc83aa1d9009456c49b4a2e3cf709a2c2f7"
+    },
+    {
+      "name": "tests/routeDecision.test.js",
+      "status": "M",
+      "beforeSha256": "e505a2348631756ec745d4b1983fe7e07e05ec81fa2ada84b946957f196d548e",
+      "afterSha256": "4964f31651deeba7422ceb3a52416962356bdde020703e61e6304abbb18a9de3"
+    },
+    {
+      "name": "tests/toolDecisionBoundary.test.js",
+      "status": "A",
+      "beforeSha256": null,
+      "afterSha256": "abb008926a44ea1d793989c7601e9b18590343a3d2bec30301543e3b2c6a9552"
+    },
+    {
+      "name": "tests/toolExecutionCompiled.test.js",
+      "status": "M",
+      "beforeSha256": "dbad0d60506065ecc017c7d866a76a1b2210ff21d5e3a305c139290cfa5689ca",
+      "afterSha256": "7b69f169d758a086fb962d2b50ac6777f7527fc4de6299b57d971234e1001f31"
+    },
+    {
+      "name": "tests/turnPlan.test.js",
+      "status": "M",
+      "beforeSha256": "029531a022038f87e7c34313667294af3e3daab9a049f5bc145a35e50da90cc4",
+      "afterSha256": "228ba1ffd0e90ddcdef7cf9327e7e74e44c815d1e337c695202fd2d7cfb86657"
+    },
+    {
+      "name": "tests/turnSession.test.js",
+      "status": "M",
+      "beforeSha256": "76520bc22dd9fe6eec31acb80cace82c8e6273998da7a16d9eee23d542943044",
+      "afterSha256": "911561dff7f8e7139567e41f7f7d0a2e94aa91b5579a76c0a4ae2fd09b054d67"
+    }
+  ]
+}

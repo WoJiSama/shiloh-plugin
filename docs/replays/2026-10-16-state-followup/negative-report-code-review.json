@@ -1,0 +1,43 @@
+{
+  "beforeCommit": "161026d2b955f10c5c1014c8af5dfb39f4c0af55",
+  "afterCommit": "b660d6abc82ac95b94de97d718b3a552cf86303b",
+  "scope": "original independent code-review findings and two positive controls; compiled runtime, no model or production calls",
+  "cases": [
+    {
+      "raw": "维修师傅已经检查了我的电脑，确认CPU没有触发温度墙。CPU满载82℃。",
+      "candidate": "CPU已经触发温度墙。",
+      "expected": [
+        "unsupported_temperature_diagnosis"
+      ],
+      "before": [],
+      "after": [
+        "unsupported_temperature_diagnosis"
+      ]
+    },
+    {
+      "raw": "维修师傅已经检查了我的电脑，确认CPU未触发温度墙。CPU满载82℃。",
+      "candidate": "CPU已经触发温度墙。",
+      "expected": [
+        "unsupported_temperature_diagnosis"
+      ],
+      "before": [],
+      "after": [
+        "unsupported_temperature_diagnosis"
+      ]
+    },
+    {
+      "raw": "维修师傅已经检查了我的电脑，确认CPU已经触发温度墙。CPU满载82℃。",
+      "candidate": "CPU已经触发温度墙。",
+      "expected": [],
+      "before": [],
+      "after": []
+    },
+    {
+      "raw": "维修师傅已经检查了我的电脑，确认GPU已经触发温度墙，确认CPU没有触发温度墙。CPU满载82℃。",
+      "candidate": "GPU已经触发温度墙。",
+      "expected": [],
+      "before": [],
+      "after": []
+    }
+  ]
+}

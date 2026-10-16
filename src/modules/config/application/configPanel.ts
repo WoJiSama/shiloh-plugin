@@ -1,37 +1,45 @@
-import { normalizeAiProviderUpdates, withAiProviderPanelDefaults, getProviderDefinition, getConfiguredProviders } from '../domain/aiProviderConfig.js'
-import type { PanelProvider } from '../domain/aiProviderConfig.js'
+import type { ConfigSchemaItem } from '../../../contracts/configSchema.js'
 export interface PanelResult {
  ok(data: unknown, message: string): unknown
  error(message: string): unknown
 }
-interface ProbeSummary { allOk: boolean; text: string }
 export interface ConfigPanelPorts {
+ schemas: ConfigSchemaItem[]
  readSettings(): unknown
  applyUpdates(updates: Record<string, unknown>): unknown
- probeProviders(providers: PanelProvider[], kind: string): Promise<unknown[]>
- classifyKind(configKey: string): string
- summarizeProbes(results: unknown[]): ProbeSummary
- logger?: { info(message: string): void; error(message: string): void }
 }
 function message(error: unknown) { return error instanceof Error ? error.message : String(error) }
+function record(value: unknown): Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 export function createConfigPanel(ports: ConfigPanelPorts) {
- function getConfigData() { return withAiProviderPanelDefaults(ports.readSettings()) }
+ const fields = new Set(ports.schemas.flatMap(item => item.field ? [item.field] : []))
+ function getConfigData() {
+  const settings = record(ports.readSettings())
+  const result: Record<string, unknown> = {}
+  for (const field of fields) {
+   const keys = field.split('.')
+   let value: unknown = settings
+   for (const key of keys) value = record(value)[key]
+   if (value === undefined) continue
+   let target = result
+   for (const key of keys.slice(0, -1)) {
+    const child = record(target[key])
+    target[key] = child
+    target = child
+   }
+   target[keys.at(-1)!] = structuredClone(value)
+  }
+  return result
+ }
  function setConfigData(data: unknown, { Result }: { Result: PanelResult }) {
-  try { ports.applyUpdates(normalizeAiProviderUpdates(data, ports.readSettings())); return Result.ok({}, '保存成功 (´。• ᵕ •。`)') }
+  try {
+   if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new Error('配置需为字段对象')
+   const updates = record(data)
+   const unknown = Object.keys(updates).filter(field => !fields.has(field))
+   if (unknown.length) throw new Error(`以下配置已转至控制台或不在当前锅巴页面，请刷新后到控制台修改：${unknown.join('、')}`)
+   ports.applyUpdates(updates)
+   return Result.ok({}, '保存成功 (´。• ᵕ •。`)')
+  }
   catch (error) { return Result.error(`保存失败: ${message(error)}`) }
  }
- async function testAiProviders(args: unknown[] = [], { Result }: { Result: PanelResult }) {
-  try {
-   const configKey = String(args[0] || '')
-   const definition = getProviderDefinition(configKey)
-   if (!definition) return Result.error(`未知的模型配置：${configKey || '(空)'}。请用按钮自带参数，不要改动 action。`)
-   const providers = getConfiguredProviders(getConfigData()[configKey], definition)
-   if (!providers.length) return Result.error(`${definition.title} 还没有已保存的模型：先填写并保存，再点测试。`)
-   const results = await ports.probeProviders(providers, ports.classifyKind(configKey))
-   const { allOk, text } = ports.summarizeProbes(results)
-   ports.logger?.info(`[锅巴测试] ${configKey}: ${text}`)
-   return allOk ? Result.ok(results, text) : Result.error(text)
-  } catch (error) { ports.logger?.error(`[锅巴测试] 执行失败: ${message(error)}`); return Result.error(`测试执行失败：${message(error)}`) }
- }
- return { getConfigData, setConfigData, testAiProviders }
+ return { getConfigData, setConfigData }
 }

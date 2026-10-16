@@ -2,7 +2,7 @@
 import { RedisStore } from './engine/redisStore.js'
 import { MemoryExtractor } from './engine/extractor.js'
 import { upsertAlias, resolveAlias, listAliasesForQQ } from './engine/aliasRegistry.js'
-import { makeEntity, makeFact, slimGroupFacts, factShortId } from './engine/entityModel.js'
+import { makeEntity, makeFact, slimGroupFacts, factShortId, normalizePersonaSource, personaSourceKey } from './engine/entityModel.js'
 import { resolveClaim } from './engine/conflictResolver.js'
 import { classifyBoundary } from './engine/boundary.js'
 import { buildAliasPrompt, buildEntityPrompt, buildGroupFactsPrompt, buildContextualPrompt } from './engine/retriever.js'
@@ -14,11 +14,15 @@ import { memStats } from './engine/stats.js'
 import { formatGroupWorkflowExecutionPrompt, selectRelevantGroupWorkflowRules } from './engine/groupWorkflow.js'
 import { describeGroupKnowledgeEntry, findGroupKnowledgeDeletionCandidates, formatGroupKnowledgePrompt, parseSemanticGroupMemoryOutput, selectRelevantGroupKnowledge } from './engine/groupKnowledge.js'
 
-import type { MemoryId, MemoryRedisClient, MemoryLlmConfig, MemoryLlmPorts, MemoryFact, MemoryEntity, GroupMember, KnowledgeEntry, WorkflowRule } from '../../../contracts/memoryEngine.js'
+import type { MemoryId, MemoryRedisClient, MemoryLlmConfig, MemoryLlmPorts, MemoryFact, MemoryEntity, GroupMember, KnowledgeEntry, WorkflowRule, MemoryOperation, MemoryExtractionMessage, MemoryExtractionMeta, MemoryExtractionResult, PendingMemoryExtraction } from '../../../contracts/memoryEngine.js'
+import type { PersonaScope } from '../../../contracts/persona.js'
 import { memoryRecord } from '../../../contracts/memoryEngine.js'
+import {finiteTimestamp,memoryDate} from './engine/temporalContext.js'
+import {randomUUID} from 'node:crypto'
 type Fact = MemoryFact
 type EntityMap = Record<string, MemoryEntity>
-type Operation = { stream: 'alias'; qq: string; text: string; authority: string; confidence: number; by: string[]; at: number; createdBy?: string; sourceMessageId?: string; proposalId?: string } | { stream: 'entityFact'; qq: string; authority: string; fact: Fact } | { stream: 'groupFact'; authority: string; fact: Fact }
+type Operation = MemoryOperation
+interface ExtractionBuffer {scopeKey:string;groupId:MemoryId;userId:MemoryId;messages:MemoryExtractionMessage[];timer:ReturnType<typeof setTimeout>|null;heardFrom:string;personaSource?:PersonaScope;attempts:number;retryAt:number;retryExhausted:boolean;running:boolean;waitingForScope?:boolean;lastFailure?:string}
 
 interface ReflectTargets { entityQQs: string[]; groupOverThreshold: boolean }
 interface AdminOptions { groupId?: MemoryId; userId?: MemoryId; scope?: string | null; query?: string; limit?: number; id?: string; requesterQQ?: MemoryId; requesterIsGroupManager?: boolean; enabled?: boolean }
@@ -36,6 +40,10 @@ const DEFAULT_CONFIG = {
   userExtractMaxBatchMessages: 6,
   groupExtractMinIntervalMinutes: 10,
   groupExtractMaxBatchMessages: 12,
+  extractRetryMaxAttempts: 3,
+  extractRetryBaseMs: 15000,
+  extractPendingMaxMessages: 60,
+  extractPendingMaxBatches: 200,
   promptMaxGroupFacts: 6,
   promptMaxEntityFacts: 6,
   promptMaxChars: 1200,
@@ -107,8 +115,9 @@ function mayChangeSharedRecord(record: { createdBy?: MemoryId; by?: string[] }, 
 
 class MemoryManager {
  config: typeof DEFAULT_CONFIG & MemoryLlmConfig; store: RedisStore; extractor: MemoryExtractor; embeddings: Embeddings; reflector: Reflector; REDIS_PREFIX: string;
- userBuffers = new Map<string, { groupId: MemoryId; userId: MemoryId; messages: string[]; timer: ReturnType<typeof setTimeout> | null; heardFrom: string }>();
- groupBuffers = new Map<MemoryId, string[]>(); lastGroupExtractAt = new Map<MemoryId, number>(); scopeQueues = new Map<MemoryId, Promise<unknown>>(); optedOutCache = new Map<MemoryId, Set<string>>();
+ userBuffers = new Map<string, ExtractionBuffer>();
+ pendingRestoreTasks = new Map<string, Promise<void>>();
+ groupBuffers = new Map<string, ExtractionBuffer>(); lastGroupExtractAt = new Map<MemoryId, number>(); scopeQueues = new Map<MemoryId, Promise<unknown>>(); optedOutCache = new Map<MemoryId, Set<string>>();
   constructor(config: Partial<typeof DEFAULT_CONFIG> & MemoryLlmConfig = {}, { redis = ports.defaultRedis }: { redis?: MemoryRedisClient } = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
     this.store = new RedisStore({ redis })
@@ -136,20 +145,21 @@ class MemoryManager {
 
   // ---- 串行队列（每群一个，保证 read-modify-write 安全）----
   enqueueGroup<T>(groupId: MemoryId, task: () => Promise<T>): Promise<T> {
-    const prev = this.scopeQueues.get(groupId) || Promise.resolve()
+    const groupKey = String(groupId)
+    const prev = this.scopeQueues.get(groupKey) || Promise.resolve()
     const next = prev.catch(() => {}).then(task).finally(() => {
-      if (this.scopeQueues.get(groupId) === next) this.scopeQueues.delete(groupId)
+      if (this.scopeQueues.get(groupKey) === next) this.scopeQueues.delete(groupKey)
     })
-    this.scopeQueues.set(groupId, next)
+    this.scopeQueues.set(groupKey, next)
     return next
   }
 
   // ---- 写入：把 parseAndRoute 的 ops 落库 ----
-  async applyOps(groupId: MemoryId, ops: Operation[] = []) {
+  async applyOps(groupId: MemoryId, ops: Operation[] = [], {isCurrent}: {isCurrent?:()=>boolean} = {}) {
     if (!ops.length) return { written: 0 }
     const result = await this.enqueueGroup(groupId, async () => {
       const meta = await this.store.getMeta(groupId)
-      if (meta.disabled) return { written: 0 }
+      if (meta.disabled || (isCurrent && !isCurrent())) return { written: 0 }
 
       let entities = await this.store.getEntities(groupId)
       let aliasDoc = await this.store.getAlias(groupId)
@@ -233,16 +243,20 @@ class MemoryManager {
     return vector ? { ...fact, embedding: vector } : fact
   }
 
-  // 去重定位：完全同文本永远算同一事实；embedding 都在且 cosine≥semanticDupCosine 也算同一。
+  // 同一来源和事件日期内去重。相似句子不能抹掉另一次事件，
+  // 也不能把另一人格的观察换成当前人格自己的来源。
   _findDupFactIndex(facts: Fact[], incoming: Fact) {
     const list = facts || []
-    const exact = list.findIndex(f => f.text === incoming.text)
+    const sameContext = (fact:Fact) => (fact.eventAt ?? null) === (incoming.eventAt ?? null)
+      && personaSourceKey(fact.personaSource) === personaSourceKey(incoming.personaSource)
+      && (fact.heardFrom || '') === (incoming.heardFrom || '')
+    const exact = list.findIndex(f => f.text === incoming.text && sameContext(f))
     if (exact >= 0) return exact
     if (!this.embeddings.canUse() || !Array.isArray(incoming.embedding)) return -1
     const threshold = Number.isFinite(this.config.semanticDupCosine) ? this.config.semanticDupCosine : 0.88
     for (let i = 0; i < list.length; i++) {
       const f = list[i]!
-      if (f.superseded || !Array.isArray(f.embedding)) continue
+      if (f.superseded || !sameContext(f) || !Array.isArray(f.embedding)) continue
       if (cosineSimilarity(incoming.embedding, f.embedding) >= threshold) return i
     }
     return -1
@@ -278,8 +292,7 @@ class MemoryManager {
     this.enqueueGroup(groupId, () => this._runReflection(groupId, targets))
       .catch(err => {
         ports.logger?.warn?.(`[Memory] 反思失败 group=${groupId}: ${err?.message || err}`)
-        // 反思任务已释放锁，可安全另起 enqueue 记失败计数。
-        this._recordExtractOutcome(groupId, false)
+        memStats.inc('reflect.failed')
       })
   }
 
@@ -314,9 +327,8 @@ class MemoryManager {
       }
     }
 
-    // §P0-3 反思成功（锁内同步写 meta，避免另起 enqueue）：刷新 lastExtractAt、清零 failureCount。
-    const fresh = await this.store.getMeta(groupId)
-    await this.store.saveMeta(groupId, { ...fresh, lastExtractAt: nowMs(), failureCount: 0 })
+    // Reflection is a separate task. It cannot clear an extraction failure or
+    // claim that a skipped/failed extraction completed successfully.
   }
 
   _trimEntities(entities: EntityMap) {
@@ -345,8 +357,9 @@ class MemoryManager {
 
   // ---- 语境化注入（mention 感知 / 语义召回 / refs 反查 / 时间回扣）----
   // 一次性读 entities/alias/facts，解析提及，组装六段语境提示。disabled 群返回 ''。
-  async getContextualMemoryPrompt(groupId: MemoryId, speakerQQ: MemoryId, message: string, now = Date.now(), { viewerBotName = "" } = {}) {
+  async getContextualMemoryPrompt(groupId: MemoryId, speakerQQ: MemoryId, message: string, now = Date.now(), { viewerBotName = "", viewer }: {viewerBotName?:string;viewer?:PersonaScope} = {}) {
     if (!this.config.enabled) return ''
+    await this.restorePendingExtractions(groupId)
     const meta = await this.store.getMeta(groupId)
     if (meta.disabled) return ''
 
@@ -393,7 +406,8 @@ class MemoryManager {
       pendingFacts,
       query,
       config: this.config,
-      viewerBotName: String(viewerBotName || "").slice(0, 24)
+      viewerBotName: String(viewerBotName || "").slice(0, 24),
+      ...(viewer ? {viewer} : {})
     })
   }
 
@@ -916,8 +930,10 @@ class MemoryManager {
   // 用户记忆抽取:防抖 + 批量缓冲。同一用户的连续发言先攒到 buffer,
   // 静默 userExtractDebounceSeconds 后或攒满 userExtractMaxBatchMessages 时,一次性抽取,
   // 避免每条消息都打一次 LLM。
-  extractAndSaveMemories(groupId: MemoryId, userId: MemoryId, userMessage: string, _botReply = '', meta: Record<string, unknown> = {}) {
+  async extractAndSaveMemories(groupId: MemoryId, userId: MemoryId, userMessage: string, _botReply = '', meta: MemoryExtractionMeta = {}) {
     if (!this.config.enabled) return { queued: false }
+    await this.restorePendingExtractions(groupId)
+    if ((await this.store.getMeta(groupId)).disabled) return {queued:false,reason:'disabled'}
 
     // §0.2 写入侧 opt-out：用户在 optedOut → 不缓冲不抽取（隐私）。同步查缓存，惰性预热。
     if (this._isOptedOut(groupId, userId)) {
@@ -930,30 +946,204 @@ class MemoryManager {
       return { queued: false, reason: 'boundary' }
     }
 
-    const key = `${groupId}:${userId}`
-    const buf = this.userBuffers.get(key) || { groupId, userId, messages: [], timer: null, heardFrom: "" }
-    if (meta.heardFrom) buf.heardFrom = String(meta.heardFrom).slice(0, 24)
-    buf.messages.push(compactText(userMessage, 500))
+    const at = finiteTimestamp(meta.at) ?? nowMs()
+    const scopeKey = JSON.stringify([String(groupId),String(userId),personaSourceKey(meta.personaSource),memoryDate(at)])
+    const open = this._acceptingExtractionBuffer(this.userBuffers,scopeKey)
+    if (!open && this._pendingBatchCount(groupId) >= this._pendingBatchLimit()) return {queued:false,reason:'pending-batches-full'}
+    const key = open?.[0] || this._newExtractionBatchKey(scopeKey)
+    const buf = open?.[1] || this._createExtractionBuffer(groupId,userId,meta,scopeKey)
+    const pendingLimit = Math.max(1,Math.min(500,Number(this.config.extractPendingMaxMessages) || 60))
+    if (buf.messages.length >= pendingLimit) {
+      memStats.inc('extract.user.pending-rejected')
+      return {queued:false,reason:'pending-full',buffered:buf.messages.length}
+    }
+    // Keep the actual utterance, including long quoted text and its source clock.
+    // Pending input must survive a restart without a second lossy summary.
+    buf.messages.push({content:userMessage,at,source:'user'})
     this.userBuffers.set(key, buf)
+    try { await this._persistPendingExtractions(groupId) }
+    catch { return this._retainFailedExtraction('user',key,buf,'pending-store') }
 
     const maxBatch = Math.max(1, Number(this.config.userExtractMaxBatchMessages) || 6)
     if (buf.messages.length >= maxBatch) {
       return this._flushUserBuffer(key)
     }
 
-    if (buf.timer) clearTimeout(buf.timer)
+    if (buf.retryAt) return {queued:true,reason:'retry-wait',buffered:buf.messages.length,nextRetryAt:buf.retryAt}
+    if (buf.running) return {queued:true,reason:'in-flight',buffered:buf.messages.length}
     const debounceMs = Math.max(0, Number(this.config.userExtractDebounceSeconds) || 0) * 1000
     if (debounceMs > 0) {
-      buf.timer = setTimeout(() => {
-        this._flushUserBuffer(key).catch(err => ports.logger?.error?.('[MemoryManager] 用户记忆抽取失败:', err))
-      }, debounceMs)
-      buf.timer.unref?.()
+      this._scheduleExtractionBuffer('user',key,buf,debounceMs)
     } else {
       // 防抖关闭 → 退化为即时抽取
       return this._flushUserBuffer(key)
     }
     memStats.inc('extract.user.buffered')
     return { queued: true, buffered: buf.messages.length }
+  }
+
+  _createExtractionBuffer(groupId:MemoryId,userId:MemoryId,meta:MemoryExtractionMeta,scopeKey:string):ExtractionBuffer {
+    const personaSource = normalizePersonaSource(meta.personaSource)
+    return {scopeKey,groupId,userId,messages:[],timer:null,heardFrom:compactText(personaSource?.personaName || meta.heardFrom,24),...(personaSource ? {personaSource} : {}),attempts:0,retryAt:0,retryExhausted:false,running:false}
+  }
+
+  _newExtractionBatchKey(scopeKey:string) {
+    return JSON.stringify([scopeKey,randomUUID()])
+  }
+
+  _acceptingExtractionBuffer(buffers:Map<string,ExtractionBuffer>,scopeKey:string) {
+    // Once a request starts, its input and attempt budget are fixed. Fresh input
+    // cannot inherit an older batch's failed attempts, including its final one.
+    return [...buffers].find(([_key,buf]) => buf.scopeKey === scopeKey && !buf.running && !buf.retryExhausted && buf.attempts === 0)
+  }
+
+  _pendingBatchCount(groupId:MemoryId) {
+    return [...this.userBuffers.values(),...this.groupBuffers.values()].filter(buf => String(buf.groupId) === String(groupId)).length
+  }
+
+  _pendingBatchLimit() {
+    return Math.max(1,Math.min(1000,Number(this.config.extractPendingMaxBatches) || 200))
+  }
+
+  _privacySafeGroupMessages(messages:MemoryExtractionMessage[],optedOut:string[]) {
+    const excluded = new Set(optedOut)
+    if (!excluded.size) return messages
+    // Old group batches did not record authors. Forward/quote authorQQ identifies
+    // the sender of the envelope, never the people inside it. With any opt-out,
+    // unknown original authors cannot safely be sent to the extraction model.
+    return messages.filter(message => message.source !== 'forward' && message.source !== 'quote'
+      && typeof message.authorQQ === 'string' && Boolean(message.authorQQ.trim()) && !excluded.has(message.authorQQ.trim()))
+  }
+
+  /** Restore only a known group. No Redis-wide scan or model call is required. */
+  restorePendingExtractions(groupId:MemoryId):Promise<void> {
+    const groupKey = String(groupId)
+    const existing = this.pendingRestoreTasks.get(groupKey)
+    if (existing) return existing
+    const task = this.enqueueGroup(groupId,async () => {
+      const [pending,meta] = await Promise.all([this.store.getPendingExtractions(groupId),this.store.getMeta(groupId)])
+      this.optedOutCache.set(groupKey,new Set(meta.optedOut))
+      // A previous restore may have loaded records before its cleanup write
+      // failed. Reconcile those same identities without duplicating batches or
+      // resetting their attempt budgets when this restore is retried.
+      for (const [kind,buffers] of [['user',this.userBuffers],['group',this.groupBuffers]] as const) {
+        for (const [key,buf] of buffers) {
+          if (String(buf.groupId) !== groupKey) continue
+          if (kind === 'group') buf.messages = this._privacySafeGroupMessages(buf.messages,meta.optedOut)
+          if (meta.disabled || !buf.messages.length || kind === 'user' && meta.optedOut.includes(String(buf.userId))) {
+            if (buf.timer) clearTimeout(buf.timer)
+            buffers.delete(key)
+          }
+        }
+      }
+      const occurrences = new Map<string,number>()
+      const restored:Array<{kind:'user'|'group';key:string;buf:ExtractionBuffer}> = []
+      for (const raw of pending) {
+        const entry = memoryRecord(raw)
+        if ((entry.kind !== 'user' && entry.kind !== 'group') || typeof entry.key !== 'string' || String(entry.groupId) !== groupKey || !Array.isArray(entry.messages)) {
+          memStats.inc('extract.pending.invalid')
+          continue
+        }
+        const kind = entry.kind
+        // Count document positions before privacy filtering so a newly opted-out
+        // earlier record cannot change a later duplicate legacy key's identity.
+        const identity = JSON.stringify([kind,entry.key])
+        const occurrence = occurrences.get(identity) || 0
+        occurrences.set(identity,occurrence + 1)
+        const key = occurrence ? JSON.stringify([entry.key,'recovered-duplicate',occurrence]) : entry.key
+        const userId = String(entry.userId || '')
+        if (meta.disabled || (kind === 'user' && meta.optedOut.includes(userId))) continue
+        const restoredMessages = entry.messages.flatMap(rawMessage => {
+          const row = memoryRecord(rawMessage)
+          if (typeof row.content !== 'string') return []
+          const at = finiteTimestamp(row.at)
+          return [{content:row.content,...(at !== undefined ? {at} : {}),...(typeof row.role === 'string' ? {role:row.role} : {}),...(typeof row.source === 'string' ? {source:row.source} : {}),...(typeof row.authorQQ === 'string' ? {authorQQ:row.authorQQ} : {})}]
+        })
+        const messages = kind === 'group' ? this._privacySafeGroupMessages(restoredMessages,meta.optedOut) : restoredMessages
+        if (!messages.length) continue
+        const personaSource = normalizePersonaSource(entry.personaSource)
+        const scopeKey = kind === 'user'
+          ? JSON.stringify([groupKey,userId,personaSourceKey(personaSource),memoryDate(finiteTimestamp(messages[0]?.at) ?? 0)])
+          : JSON.stringify([groupKey,personaSourceKey(personaSource)])
+        const buffers = kind === 'user' ? this.userBuffers : this.groupBuffers
+        // Preserve batch identity rather than collapsing every record of a
+        // persona into one scope key. Legacy scope-only keys remain readable.
+        // If an old document really contains repeated keys, derive stable
+        // separate identities so retrying a failed restore stays idempotent.
+        const existing = buffers.get(key)
+        if (existing) {
+          restored.push({kind,key,buf:existing})
+          continue
+        }
+        const buf = this._createExtractionBuffer(groupId,userId,{heardFrom:typeof entry.heardFrom === 'string' ? entry.heardFrom : '',...(personaSource ? {personaSource} : {})},scopeKey)
+        buf.messages = messages
+        buf.attempts = typeof entry.attempts === 'number' && Number.isInteger(entry.attempts) ? Math.max(0,entry.attempts) : 0
+        buf.retryAt = finiteTimestamp(entry.retryAt) ?? 0
+        buf.retryExhausted = entry.retryExhausted === true || buf.attempts >= Math.max(1,Math.min(6,Number(this.config.extractRetryMaxAttempts) || 3))
+        if (typeof entry.lastFailure === 'string') buf.lastFailure = entry.lastFailure
+        buffers.set(key,buf)
+        restored.push({kind,key,buf})
+      }
+      if (meta.disabled || meta.optedOut.length) await this._savePendingExtractions(groupId)
+      // No restored timer starts before privacy cleanup has been durably saved.
+      for (const {kind,key,buf} of restored) {
+        if (!buf.retryExhausted && buf.lastFailure !== 'unconfigured') {
+          const delay = buf.retryAt > 0 ? Math.max(1,buf.retryAt - nowMs()) : Math.max(1,Number(this.config.userExtractDebounceSeconds) || 0)*1000
+          this._scheduleExtractionBuffer(kind,key,buf,delay)
+        }
+      }
+    })
+    this.pendingRestoreTasks.set(groupKey,task)
+    task.catch(() => { if (this.pendingRestoreTasks.get(groupKey) === task) this.pendingRestoreTasks.delete(groupKey) })
+    return task
+  }
+
+  // Called under enqueueGroup; never recursively enqueue the same group.
+  _savePendingExtractions(groupId:MemoryId) {
+    const pending:PendingMemoryExtraction[] = []
+    for (const [kind,buffers] of [['user',this.userBuffers],['group',this.groupBuffers]] as const) {
+      for (const [key,buf] of buffers) {
+        if (String(buf.groupId) !== String(groupId) || !buf.messages.length) continue
+        pending.push({key,scopeKey:buf.scopeKey,kind,groupId:String(groupId),userId:String(buf.userId || ''),messages:buf.messages.map(message => ({...message})),heardFrom:buf.heardFrom,...(buf.personaSource ? {personaSource:buf.personaSource} : {}),attempts:buf.attempts,retryAt:buf.retryAt,retryExhausted:buf.retryExhausted,...(buf.lastFailure ? {lastFailure:buf.lastFailure} : {})})
+      }
+    }
+    return this.store.savePendingExtractions(groupId,pending)
+  }
+
+  async _persistPendingExtractions(groupId:MemoryId) {
+    await this.restorePendingExtractions(groupId)
+    return this.enqueueGroup(groupId,() => this._savePendingExtractions(groupId))
+  }
+
+  _discardPendingExtractions(groupId:MemoryId,userId?:MemoryId) {
+    for (const buffers of [this.userBuffers,this.groupBuffers]) {
+      for (const [key,buf] of buffers) {
+        if (String(buf.groupId) !== String(groupId) || (userId !== undefined && buf.userId && String(buf.userId) !== String(userId))) continue
+        if (buf.timer) clearTimeout(buf.timer)
+        buffers.delete(key)
+      }
+    }
+  }
+
+  _scheduleExtractionBuffer(kind:'user'|'group',key:string,buf:ExtractionBuffer,delayMs:number):void {
+    if (buf.timer) clearTimeout(buf.timer)
+    buf.timer = setTimeout(() => {
+      buf.timer = null
+      this._flushExtractionBuffer(kind,key).catch(() => ports.logger?.warn?.('[Memory] 抽取重试失败'))
+    },Math.max(1,delayMs))
+    buf.timer.unref?.()
+  }
+
+  /** Also used when a caller resumes a due batch; never exceeds the retry limit. */
+  async retryPendingExtractions({now = nowMs(),groupId}:{now?:number;groupId?:MemoryId} = {}) {
+    if (groupId !== undefined) await this.restorePendingExtractions(groupId)
+    const results = []
+    for (const [kind,buffers] of [['user',this.userBuffers],['group',this.groupBuffers]] as const) {
+      for (const [key,buf] of buffers) {
+        if ((groupId === undefined || String(buf.groupId) === String(groupId)) && !buf.running && !buf.retryExhausted && buf.retryAt <= now) results.push(await this._flushExtractionBuffer(kind,key,now))
+      }
+    }
+    return results
   }
 
   // §0.2 同步判断用户是否 opt-out（读进程内缓存）。未知群 → 视为未 opt-out，并惰性后台预热缓存。
@@ -976,91 +1166,206 @@ class MemoryManager {
   }
 
   async _flushUserBuffer(key: string) {
-    const buf = this.userBuffers.get(key)
-    if (!buf || !buf.messages.length) return { written: 0 }
-    this.userBuffers.delete(key)
-    if (buf.timer) clearTimeout(buf.timer)
-    memStats.inc('extract.user.flushed')
-    // 抽取在锁外,applyOps 自行加锁(避免同 key 嵌套 enqueue 死锁)。
-    let ops
-    try {
-      ops = await this.extractor.extract({
-        groupId: buf.groupId,
-        speakerQQ: String(buf.userId),
-        messages: buf.messages.map(content => ({ content })),
-        at: nowMs()
-      })
-    } catch (e) {
-      ports.logger?.warn?.(`[Memory] 用户记忆抽取失败 group=${buf.groupId}: ${e instanceof Error ? e.message : String(e)}`)
-      this._recordExtractOutcome(buf.groupId, false)
-      return { written: 0, error: true }
-    }
-    // 盖源:本轮缓冲里的事实带上"在场收听的 bot 人设名"
-    if (buf.heardFrom) {
-      for (const op of ops) {
-        if (op.fact && typeof op.fact === "object") op.fact = { ...op.fact, heardFrom: buf.heardFrom }
-      }
-    }
-    const result = await this.applyOps(buf.groupId, ops)
-    this._recordExtractOutcome(buf.groupId, true)
-    return result
+    return this._flushExtractionBuffer('user',key)
   }
 
-  // §P0-3 在抽取/反思成功或失败后更新 meta.lastExtractAt/failureCount（经 enqueueGroup 串行）。
-  // 成功 → lastExtractAt=now, failureCount=0；失败 → failureCount++。fire-and-forget，失败静默。
-  _recordExtractOutcome(groupId: MemoryId, ok: boolean) {
-    this.enqueueGroup(groupId, async () => {
+  async _flushExtractionBuffer(kind:'user'|'group',key:string,retryClock = nowMs()):Promise<{written:number;status:string;error?:boolean;reason?:string;nextRetryAt?:number;retryExhausted?:boolean}> {
+    const buffers = kind === 'user' ? this.userBuffers : this.groupBuffers
+    const buf = buffers.get(key)
+    if (!buf || !buf.messages.length) return {written:0,status:'skipped',reason:'empty'}
+    if (buf.running) return {written:0,status:'pending',reason:'in-flight'}
+    if (buf.retryExhausted) return {written:0,status:'failed',reason:'retry-exhausted',retryExhausted:true}
+    if (buf.retryAt > retryClock) return {written:0,status:'pending',reason:'retry-wait',nextRetryAt:buf.retryAt}
+    if ([...buffers.values()].some(other => other !== buf && other.scopeKey === buf.scopeKey && other.running)) {
+      buf.waitingForScope = true
+      return {written:0,status:'pending',reason:'scope-in-flight'}
+    }
+    if (buf.timer) clearTimeout(buf.timer)
+    buf.timer = null
+    buf.running = true
+    let messages:MemoryExtractionMessage[] = []
+    try {
+      // Persist captured input before making a model request. A crash during
+      // transport leaves the original utterances available for bounded replay.
+      await this._persistPendingExtractions(buf.groupId)
+      const storedMeta = await this.store.getMeta(buf.groupId)
+      if (buffers.get(key) !== buf) return {written:0,status:'skipped',reason:'cancelled'}
+      if (!this.config.enabled || storedMeta.disabled || (kind === 'user' && storedMeta.optedOut.includes(String(buf.userId)))) {
+        buffers.delete(key)
+        await this._persistPendingExtractions(buf.groupId)
+        return {written:0,status:'skipped',reason:'disabled'}
+      }
+      if (kind === 'group') {
+        const allowed = this._privacySafeGroupMessages(buf.messages,storedMeta.optedOut)
+        if (allowed.length !== buf.messages.length) {
+          buf.messages = allowed
+          if (!allowed.length) buffers.delete(key)
+          await this._persistPendingExtractions(buf.groupId)
+          if (!allowed.length) return {written:0,status:'skipped',reason:'opted-out'}
+          if (buffers.get(key) !== buf) return {written:0,status:'skipped',reason:'cancelled'}
+        }
+      }
+      messages = buf.messages.slice()
+      memStats.inc(`extract.${kind}.flushed`)
+      const extracted = await this.extractor.extract({groupId:buf.groupId,speakerQQ:kind === 'user' ? String(buf.userId) : '',messages,at:finiteTimestamp(messages[0]?.at) ?? nowMs()})
+      // Older injected extractors return arrays. Production extractors always
+      // return a discriminated outcome, including a genuine empty success.
+      const outcome:MemoryExtractionResult = Array.isArray(extracted) ? {status:'success',ops:extracted} : extracted
+      if (buffers.get(key) !== buf) return {written:0,status:'skipped',reason:'cancelled'}
+      if (outcome.status === 'skipped') {
+        return await this.enqueueGroup(buf.groupId,async () => {
+          if (buffers.get(key) !== buf) return {written:0,status:'skipped',reason:'cancelled'}
+          buf.retryAt = 0
+          buf.lastFailure = outcome.reason
+          await this._savePendingExtractions(buf.groupId)
+          await this._saveExtractOutcome(buf.groupId,'skipped',{reason:outcome.reason})
+          return {written:0,status:'skipped',reason:outcome.reason}
+        })
+      }
+      if (outcome.status === 'failed') return await this._retainFailedExtraction(kind,key,buf,outcome.reason)
+      const safe = kind === 'group' ? outcome.ops.filter(op => op.stream === 'groupFact') : outcome.ops
+      const ops = safe.map(op => 'fact' in op ? {...op,fact:{...op.fact,...(buf.heardFrom ? {heardFrom:buf.heardFrom} : {}),...(buf.personaSource ? {personaSource:buf.personaSource} : {})}} : op)
+      const result = await this.applyOps(buf.groupId,ops,{isCurrent:() => buffers.get(key) === buf})
+      // Remove only the captured input. New utterances arriving during the LLM
+      // call remain queued and cannot be lost on either completion or failure.
+      return await this.enqueueGroup(buf.groupId,async () => {
+        if (buffers.get(key) !== buf) return {written:0,status:'skipped',reason:'cancelled'}
+        const remaining = buf.messages.slice(messages.length)
+        const previous = {attempts:buf.attempts,retryAt:buf.retryAt,lastFailure:buf.lastFailure}
+        buf.messages = remaining
+        buf.attempts = 0
+        buf.retryAt = 0
+        delete buf.lastFailure
+        try {
+          await this._savePendingExtractions(buf.groupId)
+          await this._saveExtractOutcome(buf.groupId,'success')
+        } catch (error) {
+          // Requeue the committed facts on a failed acknowledgement; fact writes
+          // already deduplicate on replay, so this remains at-least-once.
+          buf.messages = [...messages,...buf.messages]
+          buf.attempts = previous.attempts
+          buf.retryAt = previous.retryAt
+          if (previous.lastFailure) buf.lastFailure = previous.lastFailure
+          throw error
+        }
+        if (!buf.messages.length) buffers.delete(key)
+        else this._scheduleExtractionBuffer(kind,key,buf,Math.max(1,Number(this.config.userExtractDebounceSeconds) || 0)*1000)
+        if (kind === 'group') this.lastGroupExtractAt.set(buf.scopeKey,nowMs())
+        return {...result,status:'success'}
+      })
+    } catch {
+      return await this._retainFailedExtraction(kind,key,buf,'transport-or-store')
+    } finally {
+      buf.running = false
+      for (const [nextKey,next] of buffers) {
+        if (next.scopeKey !== buf.scopeKey || next.running || next.retryExhausted || !next.waitingForScope) continue
+        delete next.waitingForScope
+        this._scheduleExtractionBuffer(kind,nextKey,next,Math.max(1,next.retryAt - nowMs()))
+      }
+    }
+  }
+
+  async _retainFailedExtraction(kind:'user'|'group',key:string,buf:ExtractionBuffer,reason:string) {
+    const buffers = kind === 'user' ? this.userBuffers : this.groupBuffers
+    return this.enqueueGroup(buf.groupId,async () => {
+      if (buffers.get(key) !== buf) return {written:0,status:'skipped',reason:'cancelled'}
+      buf.attempts += 1
+      buf.lastFailure = reason
+      const maxAttempts = Math.max(1,Math.min(6,Number(this.config.extractRetryMaxAttempts) || 3))
+      buf.retryExhausted = buf.attempts >= maxAttempts
+      const delay = Math.min(300000,Math.max(1000,Number(this.config.extractRetryBaseMs) || 15000) * 2 ** Math.max(0,buf.attempts - 1))
+      buf.retryAt = buf.retryExhausted ? 0 : nowMs() + delay
+      if (!buf.retryExhausted) this._scheduleExtractionBuffer(kind,key,buf,delay)
+      memStats.inc(`extract.${kind}.failed`)
+      ports.logger?.warn?.(`[Memory] ${kind} extraction ${reason}; attempt=${buf.attempts}; ${buf.retryExhausted ? 'retry-exhausted' : 'retry-scheduled'}`)
+      try {
+        await this._savePendingExtractions(buf.groupId)
+        await this._saveExtractOutcome(buf.groupId,'failed',{reason,nextRetryAt:buf.retryAt})
+      } catch {
+        memStats.inc('extract.pending.store-failed')
+        ports.logger?.warn?.('[Memory] 待抽取队列持久化失败；本进程保留待处理原文')
+      }
+      return {written:0,status:'failed',error:true,reason,nextRetryAt:buf.retryAt,retryExhausted:buf.retryExhausted}
+    })
+  }
+
+  // Only extraction outcomes update extraction status. Failure metadata is
+  // durable alongside the original input and bounded-retry queue.
+  _recordExtractOutcome(groupId: MemoryId, outcome:boolean|'success'|'failed'|'skipped', options:{reason?:string;nextRetryAt?:number} = {}) {
+    return this.enqueueGroup(groupId,() => this._saveExtractOutcome(groupId,outcome,options)).catch(() => {})
+  }
+
+  async _saveExtractOutcome(groupId:MemoryId,outcome:boolean|'success'|'failed'|'skipped',options:{reason?:string;nextRetryAt?:number} = {}) {
       const meta = await this.store.getMeta(groupId)
-      const next = ok
-        ? { ...meta, lastExtractAt: nowMs(), failureCount: 0 }
-        : { ...meta, failureCount: (Number(meta.failureCount) || 0) + 1 }
+      const status = typeof outcome === 'boolean' ? outcome ? 'success' : 'failed' : outcome
+      const next = status === 'success'
+        ? {...meta,lastExtractAt:nowMs(),lastExtractAttemptAt:nowMs(),lastExtractStatus:status,lastExtractFailure:'',nextRetryAt:0,failureCount:0}
+        : status === 'failed'
+          ? {...meta,lastExtractAttemptAt:nowMs(),lastExtractStatus:status,lastExtractFailure:options.reason || 'failed',nextRetryAt:options.nextRetryAt || 0,failureCount:(Number(meta.failureCount) || 0) + 1}
+          : {...meta,lastExtractAttemptAt:nowMs(),lastExtractStatus:status,lastExtractFailure:options.reason || 'skipped'}
       await this.store.saveMeta(groupId, next)
-    }).catch(() => {})
   }
 
   // 群记忆抽取:最小间隔节流。距上次该群抽取不足 groupExtractMinIntervalMinutes 则跳过,
   // 避免每次回复都整理一遍群记忆。
-  async extractAndSaveGroupMemories(groupId: MemoryId, chatHistory: { content: string }[] = [], meta: Record<string, unknown> = {}) {
+  async extractAndSaveGroupMemories(groupId: MemoryId, chatHistory: MemoryExtractionMessage[] = [], meta: MemoryExtractionMeta = {}) {
     if (!this.config.enabled || !Array.isArray(chatHistory) || !chatHistory.length) return { queued: false }
+    await this.restorePendingExtractions(groupId)
+    const storedMeta = await this.store.getMeta(groupId)
+    if (storedMeta.disabled) return {queued:false,reason:'disabled'}
 
     const intervalMs = Math.max(0, Number(this.config.groupExtractMinIntervalMinutes) || 0) * 60000
-    const last = this.lastGroupExtractAt.get(groupId) || 0
+    const scopeKey = JSON.stringify([String(groupId),personaSourceKey(meta.personaSource)])
+    const messages = this._privacySafeGroupMessages(chatHistory,storedMeta.optedOut)
+      .filter(m => m.role !== 'assistant' && m.source !== 'send' && m.source !== 'tool' && classifyBoundary(m.content).verdict === 'candidate')
+      .slice(-this.config.groupExtractMaxBatchMessages)
+    const scopeBatches = [...this.groupBuffers].filter(([_key,buf]) => buf.scopeKey === scopeKey)
+    // Histories overlap between turns. In particular, do not put the rows of an
+    // exhausted batch into a fresh batch and silently restart their retry budget.
+    const rowKey = (message:MemoryExtractionMessage) => JSON.stringify([message.authorQQ || '',message.at ?? null,message.role || 'user',message.source || 'user',message.content])
+    const seen = new Set(scopeBatches.flatMap(([_key,buf]) => buf.messages.map(rowKey)))
+    const added = messages.filter(message => {
+      const id = rowKey(message)
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+    const open = this._acceptingExtractionBuffer(this.groupBuffers,scopeKey)
+    if (open) {
+      const [key,pending] = open
+      const limit = Math.max(1,Math.min(500,Number(this.config.extractPendingMaxMessages) || 60))
+      if (pending.messages.length + added.length > limit) return {queued:false,reason:'pending-full',buffered:pending.messages.length,rejectedMessages:added.length}
+      if (added.length) {
+        pending.messages.push(...added.map(message => ({...message,content:String(message.content || '')})))
+        await this._persistPendingExtractions(groupId)
+      }
+      return this._flushExtractionBuffer('group',key)
+    }
+    if (!added.length) {
+      const retryable = scopeBatches.find(([_key,buf]) => !buf.retryExhausted)
+      return retryable ? this._flushExtractionBuffer('group',retryable[0]) : {queued:false,reason:scopeBatches.length ? 'no-new-candidate' : 'no-candidate'}
+    }
+    if (this._pendingBatchCount(groupId) >= this._pendingBatchLimit()) return {queued:false,reason:'pending-batches-full'}
+    const last = this.lastGroupExtractAt.get(scopeKey) || 0
     if (intervalMs > 0 && nowMs() - last < intervalMs) {
       memStats.inc('extract.group.throttled')
       return { queued: false, reason: 'throttled' }
     }
 
-    const messages = chatHistory
-      .filter(m => classifyBoundary(m.content).verdict === 'candidate')
-      .slice(-this.config.groupExtractMaxBatchMessages)
-    if (!messages.length) return { queued: false, reason: 'no-candidate' }
-
-    this.lastGroupExtractAt.set(groupId, nowMs())
     memStats.inc('extract.group.run')
-    // 抽取在锁外,applyOps 自行加锁。
-    let ops
-    try {
-      ops = await this.extractor.extract({ groupId, speakerQQ: '', messages, at: nowMs() })
-    } catch (e) {
-      ports.logger?.warn?.(`[Memory] 群记忆抽取失败 group=${groupId}: ${e instanceof Error ? e.message : String(e)}`)
-      this._recordExtractOutcome(groupId, false)
-      return { written: 0, error: true }
-    }
-    // 群抽取只接受 groupFact / alias（teaching），过滤掉需要 speaker 的 self/preference
-    const safe = ops.filter(op => op.stream === 'groupFact' || (op.stream === 'alias' && op.authority === 'teaching'))
-    if (meta.heardFrom) {
-      for (const op of safe) {
-        if (op.fact && typeof op.fact === "object") op.fact = { ...op.fact, heardFrom: String(meta.heardFrom).slice(0, 24) }
-      }
-    }
-    const result = await this.applyOps(groupId, safe)
-    this._recordExtractOutcome(groupId, true)
-    return result
+    const key = this._newExtractionBatchKey(scopeKey)
+    const buf = this._createExtractionBuffer(groupId,'',meta,scopeKey)
+    buf.messages = added.map(message => ({...message,content:String(message.content || ''),...(finiteTimestamp(message.at) !== undefined ? {at:message.at!} : {})}))
+    this.groupBuffers.set(key,buf)
+    try { await this._persistPendingExtractions(groupId) }
+    catch { return this._retainFailedExtraction('group',key,buf,'pending-store') }
+    return this._flushExtractionBuffer('group',key)
   }
 
   // ---- admin 命令（保留返回契约）----
   // §P0-3 返回真实字段（去掉不存在的 importanceThreshold/lastAttemptAt 等）。
   async adminStatus({ groupId, userId }: AdminOptions = {}) {
+    await this.restorePendingExtractions(groupId)
     const [meta, entities, facts, aliasDoc, workflows, knowledge] = await Promise.all([
       this.store.getMeta(groupId),
       this.store.getEntities(groupId),
@@ -1087,7 +1392,12 @@ class MemoryManager {
         knowledgeCount: knowledge.filter(entry => entry?.enabled !== false).length,
         disabled: meta.disabled,
         lastExtractAt: Number(meta.lastExtractAt) || 0,
-        failureCount: Number(meta.failureCount) || 0
+        failureCount: Number(meta.failureCount) || 0,
+        lastExtractAttemptAt: Number(meta.lastExtractAttemptAt) || 0,
+        lastExtractStatus: String(meta.lastExtractStatus || ''),
+        lastExtractFailure: String(meta.lastExtractFailure || ''),
+        nextRetryAt: Number(meta.nextRetryAt) || 0,
+        pendingExtractions: [...this.userBuffers.values(),...this.groupBuffers.values()].filter(buf => String(buf.groupId) === String(groupId)).length
       },
       config: {
         saveStrictness: this.config.saveStrictness,
@@ -1154,8 +1464,13 @@ class MemoryManager {
   }
 
   async adminClearMemories({ groupId }: AdminOptions = {}) {
-    const n = await this.store.clearGroup(groupId)
-    return { cleared: n, groupId }
+    await this.restorePendingExtractions(groupId)
+    return this.enqueueGroup(groupId,async () => {
+      this._discardPendingExtractions(groupId)
+      this.optedOutCache.delete(String(groupId))
+      const n = await this.store.clearGroup(groupId)
+      return { cleared: n, groupId }
+    })
   }
 
   async adminDeleteGroupWorkflow({ groupId, id }: AdminOptions = {}) {
@@ -1263,6 +1578,7 @@ class MemoryManager {
   // 返回 { enabled: <是否在记> }（enabled=true 表示仍在记忆该用户）。
   async adminSetUserMemoryEnabled({ groupId, userId, enabled }: AdminOptions = {}) {
     const uid = String(userId)
+    await this.restorePendingExtractions(groupId)
     return this.enqueueGroup(groupId, async () => {
       const meta = await this.store.getMeta(groupId)
       const current = new Set((meta.optedOut || []).map(String))
@@ -1271,19 +1587,35 @@ class MemoryManager {
       const optedOut = [...current]
       await this.store.saveMeta(groupId, { ...meta, optedOut })
       this.optedOutCache.set(String(groupId), new Set(optedOut))
+      if (!enabled) {
+        // A group batch can include this person's utterance. Drop the batch
+        // rather than retain their text in a shared pending queue.
+        this._discardPendingExtractions(groupId,userId)
+        await this._savePendingExtractions(groupId)
+      }
       return { enabled: !current.has(uid) }
     })
   }
   async adminSetGroupMemoryEnabled({ groupId, enabled }: AdminOptions) {
-    const meta = await this.store.getMeta(groupId)
-    meta.disabled = !enabled
-    await this.store.saveMeta(groupId, meta)
-    return { enabled: !meta.disabled }
+    await this.restorePendingExtractions(groupId)
+    return this.enqueueGroup(groupId,async () => {
+      const meta = await this.store.getMeta(groupId)
+      meta.disabled = !enabled
+      await this.store.saveMeta(groupId, meta)
+      if (!enabled) {
+        this._discardPendingExtractions(groupId)
+        await this._savePendingExtractions(groupId)
+      }
+      return { enabled: !meta.disabled }
+    })
   }
 
   async clearGroupMemory(groupId: MemoryId) { return this.adminClearMemories({ groupId }) }
   async clearUserMemory(groupId: MemoryId, userId: MemoryId) {
+    await this.restorePendingExtractions(groupId)
     return this.enqueueGroup(groupId, async () => {
+      this._discardPendingExtractions(groupId,userId)
+      await this._savePendingExtractions(groupId)
       const entities = await this.store.getEntities(groupId)
       delete entities[String(userId)]
       await this.store.saveEntities(groupId, entities)
@@ -1292,7 +1624,7 @@ class MemoryManager {
   }
 
   // 兼容旧外部直接清键调用（apps/test.js admin）
-  async clearGroupRedis(groupId: MemoryId) { return this.store.clearGroup(groupId) }
+  async clearGroupRedis(groupId: MemoryId) { return (await this.adminClearMemories({groupId})).cleared }
 }
 return MemoryManager
 }

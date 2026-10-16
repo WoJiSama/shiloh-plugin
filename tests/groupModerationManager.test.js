@@ -163,7 +163,7 @@ test("renders natural-language moderation report instead of json object", () => 
 })
 
 test("group guard schema exposes composite moderation settings", async () => {
-  const { default: groupGuardSchema } = await import("../models/Guoba/schemas/groupGuard.js")
+  const { default: groupGuardSchema } = await import("../models/configSchemas/groupGuard.js")
   const fields = groupGuardSchema.map(item => item.field).filter(Boolean)
   const labels = groupGuardSchema.map(item => item.label).filter(Boolean)
 

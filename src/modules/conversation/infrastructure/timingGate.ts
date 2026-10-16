@@ -2,18 +2,23 @@ import type {ConversationEvent,ConversationState,GateResult,Prefilter} from '../
 import { sideLLMCall } from '../../../adapters/sideLLM.js'
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from '../../models/domain/chatCompletionUrl.js'
 import { hasBotTextAnchor, getReplySender, messageQuotesUser } from '../domain/messageContext.js'
-import { getMentionTargetId, messageMentionsUser } from '../domain/mentionTargets.js'
+import { collectMentionTargetIds, getMentionTargetId, messageMentionsUser } from '../domain/mentionTargets.js'
+import {buildPersonaParticipationPrompt, type PersonaText} from '../domain/personaSource.js'
+import {createPersonaSnapshot} from './personaSnapshot.js'
+import type {PersonaGuardConfig, PersonaSnapshot} from '../../../contracts/persona.js'
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
+import {buildTurnInteractionContext, buildSocialTurnPrompt, socialInterpretationInstruction, withTurnSocialInterpretation} from '../domain/turnInteractionContext.js'
 interface AttentionHook {word:string;count:number}
 export interface TimingGateHost {
- config:{smartTrigger?:{gateContextSize?:number;promptHintBusyGroupRate?:number;promptHintRateLimitWarn?:number;attentionDrift?:{enabled?:boolean;windowMinutes?:number;level?:string}};triggerPrefixes?:unknown[];
+ config:{systemContent?:string;personaGuard?:PersonaGuardConfig;smartTrigger?:{gateContextSize?:number;promptHintBusyGroupRate?:number;promptHintRateLimitWarn?:number;attentionDrift?:{enabled?:boolean;windowMinutes?:number;level?:string}};triggerPrefixes?:unknown[];
  trackAiConfig?:{trackAiUrl?:string;trackAiModel?:string;trackAiApikey?:string}};
- getPersonaFor(e:ConversationEvent):unknown;messageManager:{formatMessageHistory(kind:'group',id:string|number,size:number):Promise<string>};computeGroupMsgRate5min(state:ConversationState):number
+ getPersonaSnapshotFor?(e:ConversationEvent):PersonaSnapshot;getPersonaFor(e:ConversationEvent):PersonaText|null;messageManager:{formatMessageHistory(kind:'group',id:string|number,size:number):Promise<string>};computeGroupMsgRate5min(state:ConversationState):number
 }
 export interface TimingGatePorts {
  logger:{warn(message:string):void};bot():{uin?:string|number;nickname?:string};now?():number;sideLLMCall?:typeof sideLLMCall;
  resolvePersonaName(persona:unknown):string;
  computeAddresseeSignal(input:{e:ConversationEvent;botId:string|number|undefined;mentionsBotName:boolean;quotesBot:boolean;sameUserAsLastReply:string|number|boolean|null;prefilterKind:string}):{groupAddressed:boolean;targetKind:string;pronounWithoutBotAnchor:boolean};
- buildPersonaTonePrompt(input:{userText:string;persona:unknown}):string;
+ buildPersonaTonePrompt(input:{userText:string;persona:unknown;interactionContext?:TurnInteractionContext}):string;
  getGroupTopicPrompt(groupId:string|number):string;getGroupSocialPrompt(groupId:string|number):string;
  detectAttentionHook(input:{groupId:string|number;windowMs:number}):AttentionHook|null;
 }
@@ -38,7 +43,14 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
     const smartCfg = host.config.smartTrigger || {}
     const ctxSize = Math.max(5, Math.min(100, Number(smartCfg.gateContextSize) || 20))
     // 账号人设名优先:门控判定与提示词必须用本账号的名字,不能拿主号昵称串台
-    const botName = resolvePersonaName(host.getPersonaFor(e)) || ports.bot().nickname || '机器人'
+    const personaSnapshot = host.getPersonaSnapshotFor?.(e) ?? createPersonaSnapshot({
+      botId: e.self_id || e.bot?.uin || ports.bot().uin || '',
+      persona: host.getPersonaFor(e) as {name?:string;[key:string]:unknown} || {},
+      systemContent: host.config.systemContent || '',
+      ...(host.config.personaGuard ? {personaGuard:host.config.personaGuard} : {})
+    })
+    const botId = personaSnapshot.botId
+    const botName = resolvePersonaName(personaSnapshot.persona) || ports.bot().nickname || '机器人'
 
     let history = ''
     try {
@@ -77,7 +89,6 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
       let currentMsgQuotesBot = false
       let atBot = false
       try {
-        const botId = e?.bot?.uin || ports.bot().uin
         currentMsgQuotesBot = messageQuotesUser(e, botId)
         if (Array.isArray(e?.message)) {
           for (const seg of e.message) {
@@ -98,13 +109,29 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
     // 触发决策与主链路共享同一份人设与对象信号：Gate 判断"要不要回"，主链路判断"回给谁"，口径必须一致
     const addresseeSignal = computeAddresseeSignal({
       e,
-      botId: e?.bot?.uin || ports.bot().uin,
+      botId,
       mentionsBotName,
       quotesBot: currentMsgQuotesBot,
       sameUserAsLastReply,
       prefilterKind
     })
     const { groupAddressed, targetKind, pronounWithoutBotAnchor } = addresseeSignal
+    const quoteSegment = [e.source, typeof e.reply === 'object' ? e.reply : undefined, ...(e.message || []).filter(segment => segment.type === 'reply')]
+      .find(segment => segment && getReplySender(segment) !== undefined)
+    const quoteSender = quoteSegment ? getReplySender(quoteSegment) : undefined
+    const gateContext = buildTurnInteractionContext({
+      rawUserText: currentText,
+      botId: personaSnapshot.botId,
+      persona: personaSnapshot,
+      speaker: {userId: e.user_id, name: e.sender?.card || e.sender?.nickname || '用户'},
+      mentionUserIds: collectMentionTargetIds(e),
+      addressee: {targetKind},
+      ...(quoteSegment ? {quote: {
+        ...(typeof quoteSender === 'string' || typeof quoteSender === 'number' ? {userId: quoteSender} : {}),
+        ...(quoteSegment.text ? {text: quoteSegment.text} : {}),
+        ...(quoteSegment.id !== undefined ? {messageId: quoteSegment.id} : {})
+      }} : {})
+    })
     const triggerReason = e?._deferredReason
       ? 'deferred'
       : (prefilterKind === 'continuation_strong' ? `continuation_strong(${prefilterReason})` : 'regular')
@@ -123,8 +150,10 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
 
     const gatePersonaTone = buildPersonaTonePrompt({
       userText: currentText,
-      persona: host.getPersonaFor(e)
+      persona: personaSnapshot.persona,
+      interactionContext: gateContext
     })
+    const participationPrompt = buildPersonaParticipationPrompt(personaSnapshot.persona)
     const systemPrompt = `你是 QQ 群聊节奏判断助手。机器人名字叫"${botName}"。
 当前北京时间：${new Date(now()).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
 你需要判断 ${botName} 是否应该现在插话、保持沉默、或稍后再说。
@@ -151,8 +180,11 @@ async function runTimingGate(host:TimingGateHost, e:ConversationEvent, state:Con
 - 看到"触发原因=continuation_strong"且消息明显在向 ${botName} 提问/反馈：可以 continue；如果只是相关词命中但没有对 ${botName} 说，仍然 no_action
 - 没有明确"应该插"的理由时，必须 no_action
 
+${participationPrompt}
 ${gatePersonaTone ? `\n${gatePersonaTone}\n` : ""}
-只返回严格的 JSON，格式：{"decision":"continue|no_action|wait","wait_seconds":3,"reason":"简短理由"}
+${buildSocialTurnPrompt(gateContext.social)}
+${socialInterpretationInstruction()}
+只返回严格的 JSON，格式：{"decision":"continue|no_action|wait","wait_seconds":3,"reason":"简短理由","social":{"act":"conversation","target":"unknown","confidence":0.0}}
 wait 时 wait_seconds 取 3-15 之间。不要任何其他文字、不要 markdown、不要代码块包装。`
 
     const specialSignals = []
@@ -216,8 +248,11 @@ ${specialSignalsBlock}
         logger.warn(`[TimingGate] 非法decision group=${e?.group_id || ''} decision=${parsed.decision}`)
         return { decision: 'no_action', reason: 'invalid_decision' }
       }
+      const interpreted = withTurnSocialInterpretation(gateContext, parsed.social, 'gate_model')
+      if (dec === 'continue' && interpreted.target.kind === 'other') return {decision: 'no_action', reason: 'addressed_to_other'}
       return {
         decision: dec,
+        ...(dec === 'continue' ? {personaSnapshot, ...(interpreted.social ? {social: interpreted.social} : {})} : {}),
         wait_seconds: Number(parsed.wait_seconds) || 5,
         reason: String(parsed.reason || '').slice(0, 80)
       }

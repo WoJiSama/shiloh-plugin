@@ -1,3 +1,4 @@
+import { resolveGroupAdminSettings } from '../domain/groupAdminPolicy.js'
 import {adminRecord,adminError,requireAdminBot} from '../../../contracts/groupAdmin.js'
 import type {AdminPorts,AdminEvent,GroupId,GuardConfig,PendingGuard} from '../../../contracts/groupAdmin.js'
 import {
@@ -23,7 +24,7 @@ const DEFAULT_GROUP_GUARD_CONFIG:GuardConfig = {
   timeoutMessage: "用户 {userId} 入群验证超时，已移出群聊"
 }
 
-function normalizeConfig(input:unknown = {}):GuardConfig {
+export function normalizeGroupGuardConfig(input:unknown = {}):GuardConfig {
   const raw=adminRecord(input)
   const config = { ...DEFAULT_GROUP_GUARD_CONFIG, ...(raw || {}) }
   for(const key of ['enabled','verifyInviteJoin','kickOnTimeout','kickOnWrongAnswer'] as const)config[key]=typeof raw[key]==='boolean'?raw[key]:DEFAULT_GROUP_GUARD_CONFIG[key]
@@ -58,8 +59,8 @@ export class GroupGuardManager {
   pending = new Map<string,PendingGuard>()
   constructor(private readonly ports:AdminPorts) {}
 
-  getConfig() {
-    return normalizeConfig(this.ports.readSettings().groupGuard)
+  getConfig(groupId?:GroupId) {
+    return normalizeGroupGuardConfig(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupGuard)
   }
 
   getKey(groupId:GroupId, userId:GroupId) {
@@ -119,7 +120,7 @@ export class GroupGuardManager {
     if (!groupId || !userId) return false
     if (String(userId) === String(e?.self_id || this.ports.getBot()?.uin)) return false
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (!this.isGroupEnabled(config, groupId)) return false
     if (e?.sub_type === "invite" && !config.verifyInviteJoin) return false
 
@@ -172,7 +173,7 @@ export class GroupGuardManager {
     const item = this.pending.get(key)
     if (!item) return false
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (!this.isGroupEnabled(config, groupId)) {
       this.clearPending(key)
       return false
@@ -238,7 +239,7 @@ export class GroupGuardManager {
     const item = this.pending.get(key)
     if (!item) return
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     this.clearPending(key)
     if (!this.isGroupEnabled(config, groupId)) return
 
@@ -256,7 +257,7 @@ export class GroupGuardManager {
   }
 
   async kickUser(e:AdminEvent, groupId:GroupId, userId:GroupId, reason:string) {
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (!this.isGroupEnabled(config, groupId)) return false
     if (!await this.isBotAdmin(e, groupId)) return false
     if (await this.isTargetProtected(e, groupId, userId)) return false

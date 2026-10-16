@@ -19,19 +19,24 @@ export function createOutboundArbiter({ logger, trace }: OutboundArbiterOptions 
   const stats = { sent: 0, dropped: 0, deferred: 0 }
 
   const dispatch = (send: Send) => {
-    queueTail = queueTail.then(async () => {
+    const result = queueTail.then(async () => {
       dispatching = true
       try {
-        await send()
+        const receipt=await send()
         stats.sent++
         trace?.countOutbound()
+        return receipt
       } catch (error) {
         logger?.warn?.(`[出站仲裁] 单条出站发送失败，不阻断后续出站: ${error instanceof Error ? error.message : String(error)}`)
+        throw error
       } finally {
         dispatching = false
       }
     })
-    return queueTail
+    // The queue itself always advances; each caller still receives its own
+    // adapter receipt or rejection rather than an unrelated resolved tail.
+    queueTail=result.then(()=>{},()=>{})
+    return result
   }
 
   const arbiter = {

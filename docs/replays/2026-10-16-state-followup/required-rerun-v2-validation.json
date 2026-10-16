@@ -1,0 +1,22 @@
+{
+  "steps": {
+    "typecheck": 0,
+    "build": 0,
+    "test-compile": 0,
+    "targeted": 0
+  },
+  "targetedTests": {
+    "tests": 237,
+    "pass": 237,
+    "fail": 0,
+    "skipped": 0
+  },
+  "parentCommit": "27fa7d9b7edf2d110e1c5dd1cb3b16debca8ffc5",
+  "sourceHook": {
+    "tests": 53,
+    "pass": 53,
+    "fail": 0,
+    "skipped": 0
+  },
+  "scope": "Explicit new-rendition request source and local omitted subject continuity. Frozen candidate commit follows; replay and deploy gate are pending."
+}

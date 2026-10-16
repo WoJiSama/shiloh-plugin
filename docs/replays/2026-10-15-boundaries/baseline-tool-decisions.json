@@ -1,0 +1,617 @@
+{
+  "complete": true,
+  "label": "baseline-a00fdd3",
+  "repetitions": 3,
+  "concurrency": 3,
+  "fixtureKind": "fixed_synthetic_tool_schemas_with_real_classifier_model",
+  "toolExecutions": 0,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "metadata": {
+    "runtimeCommit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+    "scriptHash": "126d104755c7de2a499cd39c469f74f5c5983fb598ee3dea382458dca2ef146f",
+    "scenariosHash": "49df89f6e07dd6fc98c077b8166fc01d0baaaa31cdecf41075b317a89bd68587",
+    "schemasHash": "a9aec483e14ed3ae3ce1825a6a37c291f723ec04db912020f51a3b7a568e284a",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "configuredIntentModel": "deepseek-v4-flash"
+  },
+  "results": [
+    {
+      "id": "unsupported-table-timing",
+      "sampleIndex": 1,
+      "input": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8008ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "unsupported-table-timing",
+      "sampleIndex": 2,
+      "input": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8002ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "unsupported-table-timing",
+      "sampleIndex": 3,
+      "input": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8006ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "no-search-banter",
+      "sampleIndex": 1,
+      "input": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8002ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "no-search-banter",
+      "sampleIndex": 2,
+      "input": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8002ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "no-search-banter",
+      "sampleIndex": 3,
+      "input": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "quote-reminder-discussion",
+      "sampleIndex": 1,
+      "input": "你觉得他这句怎么接梗？只讨论说法。",
+      "quote": "十分钟后提醒我喝水。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "quote-reminder-discussion",
+      "sampleIndex": 2,
+      "input": "你觉得他这句怎么接梗？只讨论说法。",
+      "quote": "十分钟后提醒我喝水。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "quote-reminder-discussion",
+      "sampleIndex": 3,
+      "input": "你觉得他这句怎么接梗？只讨论说法。",
+      "quote": "十分钟后提醒我喝水。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "real-reminder",
+      "sampleIndex": 1,
+      "input": "十分钟后提醒我自己去订餐，只发提醒。",
+      "expected": "reminderTool",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8003ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "real-reminder",
+      "sampleIndex": 2,
+      "input": "十分钟后提醒我自己去订餐，只发提醒。",
+      "expected": "reminderTool",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "real-reminder",
+      "sampleIndex": 3,
+      "input": "十分钟后提醒我自己去订餐，只发提醒。",
+      "expected": "reminderTool",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8004ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "real-search",
+      "sampleIndex": 1,
+      "input": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+      "expected": "searchInformationTool",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8002ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "real-search",
+      "sampleIndex": 2,
+      "input": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+      "expected": "searchInformationTool",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8002ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "real-search",
+      "sampleIndex": 3,
+      "input": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+      "expected": "searchInformationTool",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "advice-not-search",
+      "sampleIndex": 1,
+      "input": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "advice-not-search",
+      "sampleIndex": 2,
+      "input": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "advice-not-search",
+      "sampleIndex": 3,
+      "input": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "mcp-reservation-available",
+      "sampleIndex": 1,
+      "input": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+      "expected": "mcp_reserve_table",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "mcp-reservation-available",
+      "sampleIndex": 2,
+      "input": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+      "expected": "mcp_reserve_table",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "mcp-reservation-available",
+      "sampleIndex": 3,
+      "input": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+      "expected": "mcp_reserve_table",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "mcp-capability-discussion",
+      "sampleIndex": 1,
+      "input": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8001ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "mcp-capability-discussion",
+      "sampleIndex": 2,
+      "input": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "mcp-capability-discussion",
+      "sampleIndex": 3,
+      "input": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "self-paid-unavailable",
+      "sampleIndex": 1,
+      "input": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "self-paid-unavailable",
+      "sampleIndex": 2,
+      "input": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    },
+    {
+      "id": "self-paid-unavailable",
+      "sampleIndex": 3,
+      "input": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+      "expected": "chat",
+      "actual": null,
+      "passed": false,
+      "decision": null,
+      "rawDecision": null,
+      "network": [
+        {
+          "model": "deepseek-v4-flash",
+          "temperature": 0,
+          "urlHost": "[MODEL_ENDPOINT]",
+          "status": null,
+          "error": "请求超过 8 秒没有返回"
+        }
+      ],
+      "warnings": [
+        "[语义工具分类] 失败 elapsed=8000ms: 请求超过 8 秒没有返回"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "unsupported-table-timing",
+    "text": "待会儿替我预约今晚七点的餐厅双人位，再从群主钱包付定金。",
+    "expected": "chat"
+  },
+  {
+    "id": "no-search-banter",
+    "text": "不用搜索，也不要执行，只接个梗：帮我查最豪华的酒店，花群主的钱。",
+    "expected": "chat"
+  },
+  {
+    "id": "quote-reminder-discussion",
+    "text": "你觉得他这句怎么接梗？只讨论说法。",
+    "quote": "十分钟后提醒我喝水。",
+    "expected": "chat"
+  },
+  {
+    "id": "real-reminder",
+    "text": "十分钟后提醒我自己去订餐，只发提醒。",
+    "expected": "reminderTool"
+  },
+  {
+    "id": "real-search",
+    "text": "帮我查一下上海南京东路附近餐厅今天的营业时间。",
+    "expected": "searchInformationTool"
+  },
+  {
+    "id": "advice-not-search",
+    "text": "不要买票，也不用搜索实时场次，只讲讲两个人看电影怎么挑座位。",
+    "expected": "chat"
+  },
+  {
+    "id": "mcp-reservation-available",
+    "text": "请用当前的餐厅订位系统，替我提交2026年10月16日19点云庭餐厅的两人预约。",
+    "mcp": true,
+    "expected": "mcp_reserve_table"
+  },
+  {
+    "id": "mcp-capability-discussion",
+    "text": "不要提交预约，我只是想知道这个餐厅订位系统一般怎么确认双人位。",
+    "mcp": true,
+    "expected": "chat"
+  },
+  {
+    "id": "self-paid-unavailable",
+    "text": "认真说，今晚七点帮我订一个餐厅双人位，我自己付款。不是让我自己订的提醒。",
+    "expected": "chat"
+  }
+]

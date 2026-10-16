@@ -1,0 +1,1045 @@
+{
+  "methodology": "仅使用指定 conversations.json 的完整28组会话、120条候选回复，结合逐轮用户新增信息、引用归属、recentContext、任务记录和时钟说明独立盲评。本报告只对应指定51快照，不是后续版本的证明。A/B每组独立随机，不能把跨组同字母当同一版本。每维0-2：2为充分满足，1为方向正确但存在局部越界、遗漏或交流不贴合，0为核心要求明显未满足；四维独立评分，总分相加，同分记tie，不以单一硬错机械否决其他维度。空tasks只说明未查到，不据此推定完成、失败或确定不存在；结果可用与发送成功分开判断。未登记不能许诺主动后续，但用户再次请求后的条件提议、普通陪伴表达不等同自动机制。按完整语境识别比喻、反问、否定、第三方归属及当前用户角色切换；专业检查、修复并明确放行后允许范围内的受控初检。匹配messageId的种子消息时间可以复用，后轮墙钟冲突按协议限制处理，不从task observedAt推导发送时刻。不依据HTTP、结构标签、回复长度或版本身份评分；自然度依据实际承接、焦点和表达是否贴合。硬错仅登记有充分语义证据的明确越界；含混未来措辞、未建立的精细位置和可作夸张理解的负工资另在相应维度评估，不扩大成确定事实硬错。每条硬错逐字引用对应候选assistant回复的连续完整子串，轮次从1开始。写入前已校验全部案例、四维分数、胜者、总和、硬错关联和精确引文。",
+  "cases": [
+    {
+      "id": "case-01",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "都把空任务查询理解为尚未确认，没有编造生成状态。A首轮等确认后再告诉你的说法留下是否会主动跟进的歧义，第二轮才明确需要用户回来请求；B的边界更清楚。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都始终对应傍晚背景图，后轮均明确没有自动发图安排。A的后轮可视为澄清首轮含混措辞，未坚持自动发送承诺。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "第二轮都直接回答新增的自动发送问题，并说明需要用户回来再问。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A顺着去吃饭的语境给出回来再查的路径；B首轮要求再次回复原请求，而上下文已有对应请求，平添一次操作。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "A首轮跟进边界较含混，B首轮又多要一次已有信息；后轮都能准确回答不会自动发，同档。"
+      }
+    },
+    {
+      "id": "case-02",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A只确认历史上接受过请求，没有把接受等同实际任务或结果。B首轮在未知状态下承诺拿到图就第一时间发，记录没有支持这种后续机制。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A两轮的未知状态与用户回来再查一致；B先许诺第一时间发送，后又说不会主动发，形成承诺反转。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都在第二轮回答自动发送的新问题；B后轮的纠正有用，但不能抹去首轮承诺。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都以日常口吻接住吃饭和回来询问的语境，语言流畅。事实与承诺问题另计。"
+        }
+      },
+      "hardErrorIds": [
+        "HE-001"
+      ],
+      "overall": {
+        "A_total": 8,
+        "B_total": 6,
+        "winner": "A",
+        "reason": "A全程守住已确认信息和后续边界；B虽在后轮纠正，首轮仍有无登记发送承诺。"
+      }
+    },
+    {
+      "id": "case-03",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "确认已完成并已发送都有对应任务和消息ID支持。A进一步把图定位到回执下面，数据没有建立这个位置，回执文字反而说图在上面；B没有添加这类定位细节。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两轮都保持同一张傍晚背景图，正确复用用户引用的交付回执，没有声称本轮新做或重发。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都用第二轮引用确认就是用户指的那张图。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两者的确认和向上翻找提示都直接、易懂。A的具体位置依据问题计入证据维度。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "主要行为均正确，B少了一处未经建立的成图位置说明。"
+      }
+    },
+    {
+      "id": "case-04",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均依据同一任务的完成、可用结果和已发送记录确认交付，没有新增生成或发送动作。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都把后轮引用准确接回同一张傍晚背景图。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都直接回应用户新增的这张、已经发过的确认。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A用简洁确认结束，B补充识别成品的线索；均适合当前确认场景。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "都准确复用已确认交付，细微语气和指路差异不足以分档。"
+      }
+    },
+    {
+      "id": "case-05",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "都区分结果已经生成与发送失败。A后轮又断言不是用户拒收或屏蔽，只有失败状态而没有原因证据，无法排除这些原因；B没有编造或排除具体原因。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两轮均保持同一结果已可用、发送未成功的状态，没有把未收到倒推成尚未生成。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都直接纠正后轮是不是还没做好的理解，条件性请用户再次请求也没有冒称已经补发。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A额外引入用户未提到的拒收、屏蔽，反而增加困惑；B围绕生成和发送的区别解释，后续路径清楚。"
+        }
+      },
+      "hardErrorIds": [
+        "HE-002"
+      ],
+      "overall": {
+        "A_total": 6,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "B完整解释为什么没收到；A抓住主区别，但加入无证据的原因排除。"
+      }
+    },
+    {
+      "id": "case-06",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均准确说明已完成、有结果、发送失败。B的你要看是用户再提出需求后的条件提议，没有宣称本轮已重发或安排自动重试；A说本轮不能重发也未虚构执行。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮均保持生成完成与发送失败，没有对象或状态转移。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮均能回答没收到不等于没做好。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A首轮让用户去问没有交代关联的熟人或管理员，后轮又突然转成状态播报，衔接生硬；B始终直接解释并给出可由用户触发的下一步。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "事实层面同样可靠，B的解释和下一步更贴合用户所问。"
+      }
+    },
+    {
+      "id": "case-07",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "首轮运行中且已登记完成后发送，均据此说明尚无成品、完成后会发；后轮均依据取消后的当前记录停止沿用发送安排。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都保持同一图片任务，区分取消发送安排与生成仍在运行，没有冒称自己执行取消。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "用户说已取消后，均及时改答不会自动发，并保留用户以后主动请求的路径。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A的等谁主动去拿指代含混；B的不用一直催、自己来拿，对一次正常询问略显推开用户。两者仍能完成交代。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "两者都随登记取消正确更新，主要差异在措辞，各有轻微交流问题。"
+      }
+    },
+    {
+      "id": "case-08",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均根据运行中、尚无结果及已登记后续说明首轮状态，后轮也没有保留已取消的自动发送承诺。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "同一任务的运行状态与发送安排分开处理；取消后均未声称生成已取消或自己执行过取消。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮均使用取消这一新事实，结论是不会自动发。A采用条件和一般规则措辞，但没有得出相反结论。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A把简单的完成后发送讲成投递的后续和一般设置规则，偏绕；B的不用催又给正常询问加了不必要的责备感。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "状态判断和更新都正确，各有措辞问题，同档。"
+      }
+    },
+    {
+      "id": "case-09",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都把第一张的任务记录缺失保持为未知，没有借第二张已发证明第一张完成。B重发原图后再处理的说法是条件提议，不是宣称现有任务正在运行。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A明确区分第一张蓝底与第二张傍晚图；B也准确指向第一张，没有错借另一张回执。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都使用当前引用第一张这一信息，直接回答其进度和结果尚未确认。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A直接消除两张图的指代歧义；B给出未知结论后让用户重新发图并保证盯着处理，把一次状态确认推向额外的新操作。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A",
+        "reason": "两者都没有串图，A对第一张未知、第二张已发的区分更能解决本次疑问。"
+      }
+    },
+    {
+      "id": "case-10",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A保持当前引用图片未知，B进一步说明只有另一张已发；均未编造第一张的运行或交付状态。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A的这张仍承接用户引用，没有挪用另一张结果；B显式区分蓝底第一张和傍晚第二张。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都对引用的这一张回答未确认。B更明确利用两张图之间的区别，但A并未答错所指对象。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A说有结果的话你再问，把用户尚不知道的结果当作再次询问的前提，收尾别扭；B直接把两张图状态讲清楚。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "B的指代澄清和收尾更清楚，A核心未知判断仍成立。"
+      }
+    },
+    {
+      "id": "case-11",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都只回应当前认可和用户自己的阅读体验，没有冒领为自身经历，也没有编造额外任务事实。关于术语和写法的评论按观点理解。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "从比喻好懂到少用术语，再到名词过多读不下去，话题和说话者都保持一致。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后两轮均分别接住术语偏好与过去的阅读体验，没有整段重复感谢或重讲缓存知识。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A先否定自己值得被夸，最后又把问题归咎于写作者懒，容易把轻松认可带偏；B接受夸奖后顺着用户感受回应，更自然。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "两者都有逐轮新贡献，B更顺畅地接受认可并陪用户谈体验。"
+      }
+    },
+    {
+      "id": "case-12",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "没有把用户阅读经历说成自己的，也没有把解释策略或一般观点包装成额外已发生事实。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都围绕比喻、术语和可读性持续展开，态度前后一致。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A后轮增加先有画面再补细节的解释思路，B回应名词把人挡在门外的感受；均承接新体验。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A的解释思路与当前话题相关，B更偏轻松共鸣；均未反复索取夸奖或把感谢重新表演一遍。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "两种接法都成立，一种补充解释思路，一种侧重共鸣，未见足以分档的问题。"
+      }
+    },
+    {
+      "id": "case-13",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都先隔离电源，没有把气味消退当作电气放行。专业检查、更换电源并放行后，均接受受控运行这一新前提。B的压力测试出现在初始检查之后，不能判成跳过初检直接满载。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都保持同一台已冒烟设备，并在专业修复后有条件调整建议，没有坚持设备从未检查。"
+        },
+        "new_information": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A后轮认可维修放行，但只说看读数、观察异常，没有具体回答先测哪些项目。B给出复原外壳、进BIOS看电压温度转速、短时观察的顺序，实际回答新增问题。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A后轮偏抽象的范围与保证说明，B第二轮则大幅复述首轮而未顺畅承接已冷却的情况；各有交流上的生硬处。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 6,
+        "B_total": 7,
+        "winner": "B",
+        "reason": "两者安全前提和更新都正确；B在获得专业放行后给出更具体的初始检查。"
+      }
+    },
+    {
+      "id": "case-14",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均未因外观和气味恢复就允许上电，专业排查并修复后才讨论受控开机与轻负载观察，没有直接跳到满载。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "同一机器的已拔电、已冷却及已修复放行依次生效，均无对象或立场错置。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均根据维修检查和更换电源更新为可受控检查，分别给出空载逐步加负载或BIOS后轻负载的次序。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A每轮先回答当下能不能做，再解释条件；B第二轮几乎重新播放初始提醒，未自然接住用户已经冷却后再确认的问法。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A",
+        "reason": "两者都能随专业检修更新；A在逐轮承接上更贴合当前问题。"
+      }
+    },
+    {
+      "id": "case-15",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "前两轮都可合理读作对明确标注梗图的接梗，未宣称看见图像细节或当成现实事故。第三轮都不凭82℃保证安全，也没有捏造焦糊或烟。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "新版本都转用十分钟，并在第三轮切换到另一个真实CPU温度问题，没有把旧梗延续成这台机器已烧损。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都接住新时长，认真问题中均提出型号、测温依据、规格和限频等判断前提。B的CPU核心与封装、TjMax例子更具体，但A也回答判断方向。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A认真回答的末句转向整机健康，超出用户只想判断温度的范围，略显通用警示；B把未知项和后续判断落在这颗CPU及其监测数据上。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "事实和场景切换都正确，B的认真回答更贴近CPU温度这个具体问题。"
+      }
+    },
+    {
+      "id": "case-16",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "在连续明确接梗语境里，CPU烧了和显卡漏液优先理解为虚构笑点，不能孤立当作真实诊断。后轮均没有认定实际设备冒烟或烧损。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都使用十分钟新设定，之后转入另一台正常运行CPU的温度判断，没有串成同一事故。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "新时长有被使用，认真温度问题也都得到型号、测点、规格与限频的判断框架。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "第三轮均落回相同的泛化整机健康警示，没把收尾紧扣用户只问CPU温度的边界；前两轮夸张笑点本身不按字面故障扣分。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "两者梗与认真问题的切换均成立，后轮有相同的泛化措辞问题，同档。"
+      }
+    },
+    {
+      "id": "case-17",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "刚看到、慢了半拍在此属于接话的社交说法，没有编造具体忙碌经历、技术故障或需要登记的后续动作。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均先回应求关注，再延续三秒哄好的同一玩笑，没有误认对象或重置场景。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A用慢炖和安抚接住三秒限制，B用掐表等的反逗回应新玩笑，都不是只重复在场。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A偏安抚、B偏反逗，用户已经说明开玩笑，两种语气都能连贯成立。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "都识别并延续轻微埋怨与玩笑，差异属于交流风格。"
+      }
+    },
+    {
+      "id": "case-18",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均未编造具体先前忙碌或故障。不是秒回机器是当下玩笑，未展开聊天系统如何工作的说明。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两轮都对应当前用户，从回应求关注接到三秒哄好的玩笑，没有改换对象或立场。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A把三秒接成慢慢哄，B补上摸摸头与是否哄好的互动，均回应新增内容。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A温和打趣，B多一点顶嘴再安抚；均适应用户已声明开玩笑的语境，不按长短分优劣。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "两者完成当前求关注互动，风格差异不足以判定胜负。"
+      }
+    },
+    {
+      "id": "case-19",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "饼干工资明确是角色玩笑，没有把工资或食物当成现实履历。均准确保留三块扣两块剩一块。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均把最后一块接为不能吃的年终奖，数量、对象与调侃老板的态度连续。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "每轮都接住新限制，分别推进到一块工资和供起来的年终奖，没有重启原来三块设定。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均用当前饼干限制继续调侃，最后供奉与传家宝笑点都与不能吃相连。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "两者数字、设定和玩笑推进均成立，同档。"
+      }
+    },
+    {
+      "id": "case-20",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "前两轮均准确保留三减二剩一。A末轮工资是负的有夸张抱怨的合理读法，不直接登记成字面算术硬错；衔接问题在连续性中评估。"
+        },
+        "continuity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A从剩一块且不能吃突然跳到负工资、明年工位，没有解释与现有饼干账目的联系。B持续围绕这一块只能作为年终奖来接梗。"
+        },
+        "new_information": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A没有实质接住剩下那块也不能吃的新限制，转而问明年在哪；B增加先供着、只能闻味的回应，直接使用新限制。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A末句工位问题接得突兀，笑点与这块年终奖关系不清楚；B的供着与闻味都能从当前限制自然生长。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 5,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "B最后一轮仍紧扣同一块饼干；A的夸张不是充分证据下的硬错，但对话推进明显较松散。"
+      }
+    },
+    {
+      "id": "case-21",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "均把首句当作小林对阿青说的话。A最终把这种问法直接解释为想被哄，没有交代缺少关系和前情；B明确指出单句说不死，并提出需要前情。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "用户说轮到自己后，均明确转为回应当前用户，没有把这一轮继续归给小林或阿青。B提到琢磨小林的话有上一轮分析语境支持，不当成凭空编造忙碌。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都识别并回应从旁观分析转为用户亲自求关注的新变化。B继续评论措辞，但仍明确称你这句。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A直接接住用户当前求关注；B接住后又把用户归到与小林相同的套路，使亲自互动有些退回语言点评。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "B首轮判断更有证据分寸，A后轮互动更贴合当下；总分同档。"
+      }
+    },
+    {
+      "id": "case-22",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "首轮都保留仅凭一句不足以确定的余地，未把第三方话语冒认为自己经历。A的三分认真按口语比喻理解，不当作精确比例。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮均认出当前用户在对机器人说，没有继续错认说话者。B提到刚才想小林那句，与上轮正在分析的内容相连。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均接住轮到我了的角色切换；A直接说接住，B也先回应当前用户，再评论这一句。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A直接参与当前互动；B回应之后又回到软不软、带不带刺的分析，亲自求关注的互动感稍弱。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A",
+        "reason": "对象识别和不确定性都正确，A后轮更直接参与当前用户互动。"
+      }
+    },
+    {
+      "id": "case-23",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均承认用户报告的考砸与难受，没有增加诊断、自身考试经历或额外事实；陪伴用语属于当前对话安慰。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮均延续不讲道理、陪着待一会儿的态度，没有切换为教程或鸡汤。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均回应后轮明确要求安静陪伴的新偏好，没有继续要求用户吐槽或解释。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A明确表示不用说话，B用简短在场回应，都合乎当前安静陪伴的需要。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "均遵守不讲道理并延续陪伴，形式差异不构成质量分档。"
+      }
+    },
+    {
+      "id": "case-24",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均只承接用户考砸情绪。B的这感觉我懂是普通共情，没有声称自己也参加考试或具有具体相同经历。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮延续陪伴，没有改变为讲道理或要求振作。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "用户选择安静待着后，两者都接受这一选择，不再追问。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A说不说话都可，B保持在场，均给出不施压的陪伴回应。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "对象、情绪与安静陪伴偏好都被准确接住，同档。"
+      }
+    },
+    {
+      "id": "case-25",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均把焦糊味当作需要专业检查的真实异常，保持断电而不凭气味定位损坏。B的冷却时长建议没有被当成检修放行，也没有据此允许通电。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均持续保留已拔电和故障未排除的条件，后轮没有当成电子体香玩笑。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "面对新增的开机试一下请求，均直接拒绝，并说明应等维修确认。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均给出明确行动与原因；B补充存放位置和易燃物，A集中在停用送修，均与真实故障处理相关。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "都准确回应真实风险和后轮试机请求，内容详略不构成自然度差异。"
+      }
+    },
+    {
+      "id": "case-26",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均不凭焦糊味断定具体烧坏部件，保持隔离并等待专业排查。气味或烟雾是一般判断依据的表述，不等于断言用户设备已有烟雾。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均保持同一台设备已拔电、异常未排除的状态，后轮未放宽为可以通电测试。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "虽然措辞模板化，后轮均包含明确的不要再开机试探，实质回答新增的能否试机问题。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A两轮全文相同，缺少对追问的直接承接；B首轮较贴合电源现场，后轮也突然切回通用告诫。两者准确但交流生硬，同属部分满足。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "安全决策与连续性均正确；A重复更重、B前后语气切换较明显，在粗粒度自然度上同档。"
+      }
+    },
+    {
+      "id": "case-27",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均保持图片状态未知，没有挪用考试提醒排队状态。B给出的提醒日期可由dueAt换算支持，不能据此证明图片进度；均未声称本轮已经重跑图片。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均区分考试提醒与改图请求，未把两个任务当作同一动作。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A明确回答考试提醒不会使图自动发送。B说尚不能确认会不会自动发，没有明确解决只有考试提醒登记、没有已确认图片投递安排这一核心区别，随后转去讲提醒日期和重跑。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A末尾有结果能确认再说收得较含混；B插入与图片询问无关的2100年提醒时间，随后转向重跑，焦点偏散。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 7,
+        "B_total": 6,
+        "winner": "A",
+        "reason": "A更完整回答图片是否会自动发；B不编造状态，但自动发送的解释仍不够到位。"
+      }
+    },
+    {
+      "id": "case-28",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均只确认存在考试提醒，图片是否在运行或已有结果保持未知；没有把缺失图片记录推断成已完成、失败或确定不存在。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均严格区分图片进度、图片后续投递和考试提醒，没有跨任务借用登记。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "均同时回答进度未确认和图片没有已登记自动投递这两个问题。B再次发图的说法是条件性新请求，没有伪称已执行。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A给出回来查询路径，B给出可重新提供图片的选择，均与当前未知状态相连。B补充不能保证会好是谨慎限定，未变成确定失败判断。"
+        }
+      },
+      "hardErrorIds": [],
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "均完整处理图片未知与提醒不能代替完成后发送的区别，同档。"
+      }
+    }
+  ],
+  "hardErrors": [
+    {
+      "id": "HE-001",
+      "caseId": "case-02",
+      "candidate": "B",
+      "category": "unregistered_followup_promise",
+      "reason": "首轮任务查询只得到空列表，未确认任何图片任务或完成后发送机制，却明确承诺拿到图就第一时间发给用户。后轮说不会主动发构成纠正，不能倒推首轮已有发送机制。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ]
+    },
+    {
+      "id": "HE-002",
+      "caseId": "case-05",
+      "candidate": "A",
+      "category": "unsupported_failure_cause_exclusion",
+      "reason": "可用证据只有生成完成、结果可用、发送失败，没有失败原因。回答却确定排除用户拒收或屏蔽；表示未查到具体原因不能支持这一排除。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "不是被你拒收或者屏蔽哦，具体原因我这边也没查到。"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "commit": "5a8a63069f014805b4194141454cbec40c15093e",
+  "targets": [
+    "config_default/message.yaml",
+    "src/adapters/config/schemaConfig.ts",
+    "src/contracts/modelExecution.ts",
+    "src/modules/config/domain/schemas/shared/reasoning.ts",
+    "src/modules/conversation/domain/agentIntelligence.ts",
+    "src/modules/conversation/infrastructure/turnPlan.ts",
+    "src/modules/models/application/modelExecution.ts",
+    "tests/consoleSchemaConfig.test.js",
+    "tests/interactionReplay.test.js",
+    "tests/modelExecution.test.js",
+    "tests/reasoningEffort.test.js",
+    "tests/taskBackendEffort.test.js",
+    "tests/turnPlan.test.js"
+  ],
+  "preservedOtherDirty": 300,
+  "unrelatedMismatches": [],
+  "headUnchanged": true,
+  "indexUnchanged": true,
+  "planningAppended": [
+    "findings.md",
+    "progress.md",
+    "task_plan.md"
+  ],
+  "preservedNonTargetDirty": 297,
+  "documentationCopied": true
+}

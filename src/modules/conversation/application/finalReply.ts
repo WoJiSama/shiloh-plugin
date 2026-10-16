@@ -16,11 +16,24 @@ import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 import {isImageGenerationRequest,isImageAnalysisRequest} from '../domain/messageIntent.js'
 import {recordDrawTextFallback,clearDrawFailureNote} from '../domain/drawFailureNote.js'
 import type {ReplyEvent} from './replyRendering.js'
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
+import type {PersonaIdentity, PersonaScope, PersonaSnapshot} from '../../../contracts/persona.js'
+import type {MemoryExtractionMeta,MemoryExtractionMessage} from '../../../contracts/memoryEngine.js'
+import type {SocialContinuity} from '../../../contracts/turnInteraction.js'
+import type {ForwardCompleteness} from '../../../contracts/forwardContext.js'
+import {buildSocialContinuity} from '../domain/turnInteractionContext.js'
+import {groundFinalReply, type ReplyGroundingAudit} from './groundedReply.js'
+import {validateTurnActionFacts, unknownTurnActionFacts} from '../domain/turnActionFacts.js'
+import {validateActionReply} from '../domain/actionReplyGrounding.js'
+import type {ActionFactsEvent, ActionFactsQuery, TurnActionFacts} from '../../../contracts/turnActionFacts.js'
+import type {ChatProviderConfig, ChatRequestData} from '../../../contracts/modelGateway.js'
+import type {ExecutionOptions} from '../../../contracts/modelExecution.js'
+import {buildChatRequestData} from '../../models/domain/modelGateway.js'
 export interface Message {role:string;content:string;tool_call_id?:string;name?:string}
-export interface FinalEvent extends ReplyEvent {message_id?:string|number;sender?:{card?:string;nickname?:string;role?:string};message_type?:string;message?:import('../../../contracts/chatEvent.js').MessageSegment[]}
-export interface FinalSession {userContent?:string;rawArgs?:string;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
-interface Config {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean}|undefined;memorySystem?:{enabled?:boolean}|undefined}
-interface ArchivedMessage {self_id?:string|number;source?:string;sender?:{self_id?:string|number;user_id?:string|number|undefined;nickname?:string|undefined};content?:string}
+export interface FinalEvent extends ReplyEvent {_personaSnapshot?:PersonaSnapshot;message_id?:string|number;time?:number;_receivedAt?:number;sender?:{card?:string;nickname?:string;role?:string};message_type?:string;message?:import('../../../contracts/chatEvent.js').MessageSegment[]}
+export interface FinalSession {personaSnapshot?:PersonaSnapshot;userContent?:string;rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;actionFactsQuery?:ActionFactsQuery;replyGrounding?:ReplyGroundingAudit;taskContext?:{messageId?:unknown};turnTrace?:{addModelCall(kind:string,elapsed:number):void};toolContent?:unknown;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
+interface Config extends ChatProviderConfig {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean}|undefined;memorySystem?:{enabled?:boolean}|undefined}
+interface ArchivedMessage {self_id?:string|number;source?:string;sender?:{self_id?:string|number;user_id?:string|number|undefined;nickname?:string|undefined};content?:string;raw_message?:string;message?:{type?:string;text?:string;data?:{text?:string}}[];at?:unknown;time?:unknown;forwardCompleteness?:ForwardCompleteness}
 export interface FinalReplyHost {
  config:Config;processToolSpecificMessage(content:string,toolName?:string):string|Promise<string>;getPersonaFor(event:FinalEvent):{name?:string};
  getTextImageTemplateForFinalReply(context:{content:string;output:string;session:FinalSession;toolName?:string|undefined;e:FinalEvent}):string|false|null;
@@ -28,21 +41,23 @@ export interface FinalReplyHost {
  formatTime():string;setTrackingWithTimer(key:string,options:{chatHistory:Message[]}):unknown;
  messageManager:{recordMessage(record:import('../../../contracts/recentMessages.js').MessageEvent):Promise<unknown>;getMessages(type:string,groupId:string|number):Promise<ArchivedMessage[]>};
  trimMessageHistory(messages:Message[]):Message[];saveGroupUserMessages(groupId:string|number|undefined,userId:string|number|undefined,messages:Message[]):Promise<unknown>;
- updateEnhancedSystems(event:FinalEvent,userMessage:string,reply:string):Promise<unknown>;
+ updateEnhancedSystems(event:FinalEvent,userMessage:string,reply:string,personaSnapshot?:PersonaSnapshot):Promise<unknown>;
  emotionManager:{updateEmotionFromMessage(groupId:string|number|undefined,text:string,isAtBot:boolean,selfId:string):Promise<unknown>};
- memoryManager:{extractAndSaveMemories(groupId:string|number|undefined,userId:string|number|undefined,text:string,reply:string,context:{source:string;messageId?:string|number|undefined;senderName?:string|undefined;heardFrom:string}):unknown;extractAndSaveGroupMemories(groupId:string|number,history:{role:string;source:string;content:string}[],context:{heardFrom:string}):unknown}
+ memoryManager:{extractAndSaveMemories(groupId:string|number|undefined,userId:string|number|undefined,text:string,reply:string,context:MemoryExtractionMeta):unknown;extractAndSaveGroupMemories(groupId:string|number,history:MemoryExtractionMessage[],context:MemoryExtractionMeta):unknown}
+ getTurnActionFacts?(event:ActionFactsEvent,query?:ActionFactsQuery):Promise<TurnActionFacts>;
+ retryRequest?(request:ChatRequestData,toolContent:unknown,retries:number,toolName?:string,options?:ExecutionOptions):Promise<{choices?:{message?:{content?:unknown;tool_calls?:unknown[]}}[];error?:unknown}>;
 }
 interface FinalPorts {
  randomUUID():string;
  logger:{warn(...args:unknown[]):void;info(...args:unknown[]):void;error(...args:unknown[]):void};bot():{uin:string|number;nickname?:string};
  buildGenericChatFailureReply(text:string,options:{failureKind:string;isGreeting?:boolean;failureDetail?:string}):string;
  extractModrinthForwardItems(text:string):string[];stripModrinthForwardMarkers(text:string):string;
- applyOutputPersonaGuards(text:string,options:{userText:string;toolName?:string|undefined;botNames:string[];personaGuard?:Config['personaGuard'];polish:boolean}):string;
+ applyOutputPersonaGuards(text:string,options:{userText:string;toolName?:string|undefined;botNames:string[];personaGuard?:Config['personaGuard'];polish:boolean;interactionContext?:TurnInteractionContext}):string;
  findRecentBotImage(event:FinalEvent,options:{botId:string|number;maxAgeMs:number;limit:number}):Promise<unknown>;
- recordEpisode(options:{groupId:string|number;userId?:string|number|undefined;userName:string;summary:string;reply:string;maxPerGroup:number}):unknown;
- recordTurnContinuity(options:{groupId?:string|number|undefined;userId?:string|number|undefined;intent:string;route:string;tools:string[];lastReply:string}):Promise<unknown>;
+ recordEpisode(options:{groupId:string|number;userId?:string|number|undefined;userName:string;summary:string;reply:string;maxPerGroup:number;source?:PersonaScope}):unknown;
+ recordTurnContinuity(options:{groupId?:string|number|undefined;userId?:string|number|undefined;botId:string|number;intent:string;route:string;tools:string[];lastReply:string;persona?:PersonaIdentity;social?:SocialContinuity|undefined}):Promise<unknown>;
  getActiveConversation(event:FinalEvent):{chatHistory?:Message[]}|undefined;trackingKey(event:FinalEvent):string;
- rememberPersonaReply(event:FinalEvent & {message_id?:unknown},text:string):unknown;rememberStyleReply(event:FinalEvent,text:string,config:unknown):unknown;
+ rememberPersonaReply(event:FinalEvent & {message_id?:unknown},text:string,source?:PersonaScope):unknown;rememberStyleReply(event:FinalEvent,text:string,config:unknown):unknown;
 }
 export function createFinalReply(ports:FinalPorts) {
 const {logger,extractModrinthForwardItems,stripModrinthForwardMarkers,applyOutputPersonaGuards,findRecentBotImage,recordEpisode,recordTurnContinuity}=ports
@@ -54,6 +69,12 @@ function buildInternalStatusSafeReply(toolName = '', session:FinalSession = {}) 
 }
 
 async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEvent, session:FinalSession, messages:Message[], toolName?:string) {
+    const personaSnapshot = session.personaSnapshot ?? e._personaSnapshot
+    const personaName = personaSnapshot?.personaName ?? resolvePersonaName(host.getPersonaFor(e))
+    const replySelfId = personaSnapshot?.botId || e.self_id || e.bot?.uin || ports.bot().uin
+    const turnEvent:FinalEvent = personaSnapshot ? Object.assign(Object.create(e), {_personaSnapshot: personaSnapshot}) : e
+    e = turnEvent
+    const rawUserText = session.rawUserText ?? session.interactionContext?.rawUserText ?? session.rawArgs ?? e.msg ?? ''
     let output = await host.processToolSpecificMessage(content, toolName)
     if (!output) {
       logger.warn("[最终回复清理] 模型回复只包含伪工具格式，已跳过发送")
@@ -77,10 +98,11 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     if (toolName === "modrinthTool") output = stripModrinthForwardMarkers(output)
     if (!modrinthItems.length) {
       output = applyOutputPersonaGuards(output, {
-        userText: session?.userContent || e?.msg || "",
+        userText: rawUserText,
+        ...(session.interactionContext ? {interactionContext: session.interactionContext} : {}),
         toolName,
-        botNames: [ports.bot().nickname, host.getPersonaFor(e)?.name].filter((name):name is string=>typeof name === "string"),
-        personaGuard: host.config.personaGuard,
+        botNames: [personaName, ports.bot().nickname].filter((name):name is string=>typeof name === "string"),
+        personaGuard: personaSnapshot ? personaSnapshot.personaGuard : host.config.personaGuard,
         polish: true
       })
     } else {
@@ -90,8 +112,57 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
       logger.warn("[最终回复清理] 风格拦截后回复为空，已跳过发送")
       return
     }
+    if (!modrinthItems.length && session.interactionContext) {
+      const refresh = async () => {
+        const context = session.interactionContext!
+        if (!context.actionFacts && !validateActionReply(output, undefined, context.rawUserText).length) return context
+        const query = session.actionFactsQuery ?? {recentRequestMessageIds: [
+          ...(context.actionFacts?.tasks || []).map(task => task.requestMessageId),
+          String(e.message_id ?? session.taskContext?.messageId ?? '')
+        ].filter(Boolean)}
+        let facts = validateTurnActionFacts(context.actionFacts, e, Date.now(), query)
+        if (host.getTurnActionFacts) {
+          try {
+            facts = validateTurnActionFacts(await host.getTurnActionFacts(e, query), e, Date.now(), query)
+          }
+          catch {facts = unknownTurnActionFacts(e)}
+        }
+        session.interactionContext = {...context, actionFacts: facts}
+        return session.interactionContext
+      }
+      const grounded = await groundFinalReply({
+        candidate: output, context: session.interactionContext, refresh,
+        ...(host.retryRequest ? {regenerate: async (candidate:string, instruction:string) => {
+          const started = Date.now()
+          try {
+            const response = await host.retryRequest!(buildChatRequestData(host.config, [
+              ...messages.map(message=>({...message})), {role: 'assistant', content: candidate}, {role: 'system', content: instruction}
+            ], [], 'none'), session.toolContent, 0, undefined, {
+              forceChatBackend: true, routeLabel: '事实纠正', signal: AbortSignal.timeout(10_000),
+              generation: {reasoningEffort: 'low'}
+            })
+            const message = response.choices?.[0]?.message
+            return !message?.tool_calls?.length && typeof message?.content === 'string' ? message.content : undefined
+          } finally {session.turnTrace?.addModelCall('grounding_repair', Date.now() - started)}
+        }} : {}),
+        prepare: async text => {
+          const plain = await host.processToolSpecificMessage(text, toolName)
+          const cleaned = redactInternalStatusLeaks(plain)
+          if (cleaned.heavy) return ''
+          return applyOutputPersonaGuards(cleaned.text, {
+            userText: rawUserText, ...(session.interactionContext ? {interactionContext: session.interactionContext} : {}), toolName,
+            botNames: [personaName, ports.bot().nickname].filter((name):name is string=>typeof name === 'string'),
+            personaGuard: personaSnapshot ? personaSnapshot.personaGuard : host.config.personaGuard, polish: true
+          })
+        }
+      })
+      output = grounded.text
+      session.interactionContext = grounded.context
+      session.replyGrounding = grounded.audit
+      if (grounded.audit.violations.length) logger.warn(`[回复事实校验] violations=${grounded.audit.violations.map(item=>item.code).join(',')} repair=${grounded.audit.repairAttempted} fallback=${grounded.audit.fallback}`)
+    }
     const narrativeReply = !modrinthItems.length
-      ? splitNarrativeReply(output, session?.userContent || e?.msg || "")
+      ? splitNarrativeReply(output, rawUserText)
       : null
     if (narrativeReply?.lead) {
       output = narrativeReply.story
@@ -146,17 +217,21 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
         groupId: e.group_id,
         userId: e?.user_id,
         userName: e?.sender?.card || e?.sender?.nickname || "",
-        summary: String(session?.userContent || e?.msg || "").slice(0, 120),
+        summary: safeTruncateUnicode(rawUserText, 120),
         reply: session.lastFinalReply,
+        ...(personaSnapshot ? {source: personaSnapshot} : {}),
         maxPerGroup: Number(host.config?.episodicMemory?.maxPerGroup) || 200
       })
     }
     await recordTurnContinuity({
       groupId: e?.group_id,
       userId: e?.user_id,
+      botId: replySelfId,
+      ...(personaSnapshot ? {persona: personaSnapshot} : {}),
       intent: session?.modelIntentDecision?.intent || "",
       route: session?.initialExecutionRoute?.mode || "",
       tools: (session?.turnPlan?.outcomes || []).map(outcome => `${outcome.toolName}${outcome.success === false ? "(失败)" : "(成功)"}`).slice(0, 6),
+      social:buildSocialContinuity(session.interactionContext, session.lastFinalReply),
       lastReply: session.lastFinalReply
     }).catch(() => {})
 
@@ -171,12 +246,12 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
         // 添加用户消息
         const senderRole = roleMap[e.sender?.role || ""] || "member"
         const senderName = e.sender?.card || e.sender?.nickname || "未知用户"
-        const userMsg = `${host.formatTime()} ${senderName}(qq号: ${e.user_id})[群身份: ${senderRole}]: 在群里说: ${safeTruncateUnicode(session.userContent || e.msg || '', 200)}`
+        const userMsg = `${host.formatTime()} ${senderName}(qq号: ${e.user_id})[群身份: ${senderRole}]: 在群里说: ${safeTruncateUnicode(rawUserText, 200)}`
         chatHistory.push({ role: 'user', content: userMsg })
 
         // 添加机器人回复
-        const turnSelfId = e?.self_id || e?.bot?.uin || ports.bot().uin
-        const botMsg = `${host.formatTime()} ${resolvePersonaName(host.getPersonaFor(e))}(qq号:${turnSelfId})[群身份: member]: 在群里说: ${safeTruncateUnicode(output, 200)}`
+        const turnSelfId = replySelfId
+        const botMsg = `${host.formatTime()} ${personaName}(qq号:${turnSelfId})[群身份: member]: 在群里说: ${safeTruncateUnicode(output, 200)}`
         chatHistory.push({ role: 'bot', content: botMsg })
 
         // 只保留最近10条
@@ -194,8 +269,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     try {
       // 工具结果只保留在本轮上下文和日志中，不写入群聊历史，避免后续普通回复泄露内部状态。
       // 多账号:回复归档用事件自身的 bot 身份与人设名,不再写死主号
-      const replySelfId = e.self_id || e.bot?.uin || ports.bot().uin
-      const replyPersonaName = resolvePersonaName(host.getPersonaFor(e))
+      const replyPersonaName = personaName
       await host.messageManager.recordMessage({
         ...(e.message_type?{message_type:e.message_type}:{}),
         ...(e.group_id!==undefined?{group_id:e.group_id}:{}),
@@ -204,6 +278,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
         time: now + 1,
         message: [{ type: "text", text: output }],
         source: "send",
+        ...(personaSnapshot ? {personaSource: personaSnapshot} : {}),
         sender: { user_id: replySelfId, nickname: replyPersonaName, card: replyPersonaName, role: "member" }
       })
     } catch (error) {
@@ -211,7 +286,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     }
 
     try {
-      ports.rememberPersonaReply({ ...e, message_id: deliveredMessageId }, output)
+      ports.rememberPersonaReply(Object.assign(Object.create(turnEvent), {message_id: deliveredMessageId}), output, personaSnapshot)
       ports.rememberStyleReply(e, output, host.config.globalStyleLearning)
     } catch (error) {
       logger.warn(`[希洛反馈] 记录最近回复或自主风格轮次失败: ${error instanceof Error ? error.message : String(error)}`)
@@ -244,13 +319,15 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     await host.saveGroupUserMessages(e.group_id, e.user_id, messages)
 
     // 更新情感、记忆、表达学习（异步，不阻塞）
-    // 使用 e.msg 纯消息内容，而不是格式化的 userContent
-    host.updateEnhancedSystems(e, e.msg || '', output).catch(err => {
+    host.updateEnhancedSystems(turnEvent, rawUserText, output, personaSnapshot).catch(err => {
       logger.error('[增强系统] 更新失败:', err)
     })
   }
 
-async function updateEnhancedSystems(host:FinalReplyHost, e:FinalEvent, userMessage:string, botReply:string) {
+async function updateEnhancedSystems(host:FinalReplyHost, e:FinalEvent, userMessage:string, botReply:string, snapshot?:PersonaSnapshot) {
+    const personaSource = snapshot ?? e._personaSnapshot
+    const heardFrom = personaSource?.personaName ?? resolvePersonaName(host.getPersonaFor(e))
+    const at = messageTimestamp(e.time) ?? messageTimestamp(e._receivedAt) ?? Date.now()
     const { group_id: groupId, user_id: userId } = e
     let emotionState = null
 
@@ -267,32 +344,55 @@ async function updateEnhancedSystems(host:FinalReplyHost, e:FinalEvent, userMess
         source: "user",
         messageId: e.message_id,
         senderName: e.sender?.card || e.sender?.nickname,
+        at,
+        ...(personaSource ? {personaSource} : {}),
         // 共享记忆盖源:这条事实是"当前 bot"在场时听来的,其他 bot 引用时可说"听XX说过"
-        heardFrom: resolvePersonaName(host.getPersonaFor(e))
+        heardFrom
       })).catch(error=>logger.warn("[记忆] 用户提取失败",error))
       // 提取群全局记忆（传入聊天记录）
       if (groupId) {
         const history = await host.messageManager.getMessages('group', groupId)
         const eventBotId = String(e?.self_id || e?.bot?.uin || ports.bot().uin)
-        const chatHistory = (history || []).slice(0, 40).map(msg => {
-          // 归档的发送记录带 self_id;旧记录回退按 sender 匹配任一已知身份
-          const recordSelfId = String(msg.self_id || msg.sender?.self_id || "")
-          const isBotMsg = msg.source === "send" || recordSelfId === eventBotId ||
+        const chatHistory = (history || []).slice(0, 40).filter(msg =>
+          !msg.forwardCompleteness || msg.forwardCompleteness.state === 'complete'
+        ).filter(msg => !(msg.source === 'forward' || /转发了合并聊天记录|转发记录内容|嵌套转发记录|【转发读取范围】/.test(String(msg.content || ''))) || msg.forwardCompleteness?.state === 'complete').flatMap(msg => {
+          // self_id identifies the receiving account on inbound group messages;
+          // it does not identify the author of that public statement.
+          const isBotMsg = msg.source === "send" ||
             String(msg.sender?.user_id || "") === eventBotId
-          return {
+          const at = messageTimestamp(msg.at) ?? messageTimestamp(msg.time)
+          const segments = msg.message || []
+          const ownText = segments.filter(segment=>segment.type === 'text').map(segment=>segment.text ?? segment.data?.text ?? '').join('')
+          const forwardText = segments.filter(segment=>segment.type === 'forward_context').map(segment=>segment.text ?? '').filter(Boolean).join('\n')
+          const content = ownText || (!msg.forwardCompleteness ? msg.raw_message : '') || (!segments.length ? msg.content : '') || ''
+          const isForward = Boolean(msg.forwardCompleteness && !ownText)
+          const rows:MemoryExtractionMessage[] = content ? [{
             role: isBotMsg ? 'assistant' : 'user',
-            source: msg.source || (isBotMsg ? "send" : "user"),
-            content: `${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${msg.content}`
-          }
+            source: isForward ? 'forward' : msg.source || (isBotMsg ? "send" : "user"),
+            ...(msg.sender?.user_id !== undefined ? {authorQQ: String(msg.sender.user_id)} : {}),
+            ...(!isForward && at !== undefined ? {at} : {}),
+            content: `${isForward ? '[以下为第三方转发，不能归为转发者自述]' : ''}${msg.sender?.nickname || '未知'}(QQ:${msg.sender?.user_id}): ${content}`
+          }] : []
+          if (forwardText) rows.push({role:'user',source:'forward',...(msg.sender?.user_id !== undefined ? {authorQQ: String(msg.sender.user_id)} : {}),content:`[以下为第三方转发，不能归为转发者自述；原日期仅按记录中明确时间理解]\n${forwardText}`})
+          return rows
         })
         Promise.resolve(host.memoryManager.extractAndSaveGroupMemories(groupId, chatHistory, {
-          heardFrom: resolvePersonaName(host.getPersonaFor(e))
+          heardFrom, at, ...(personaSource ? {personaSource} : {})
         })).catch(error=>logger.warn("[记忆] 群提取失败",error))
       }
     }
 
     // 表达学习已移至 handleRandomReply 静默收集，不在此处调用
   }
+function messageTimestamp(value:unknown):number|undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value < 1e11 ? value * 1000 : value
+  if (typeof value !== 'string' || !value.trim()) return undefined
+  const text=value.trim()
+  if (/^\d+(?:\.\d+)?$/.test(text)) return messageTimestamp(Number(text))
+  const local=/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text)
+  const parsed=Date.parse(local ? `${local[1]}-${local[2]!.padStart(2,'0')}-${local[3]!.padStart(2,'0')}T${local[4]!.padStart(2,'0')}:${local[5]}:${local[6] || '00'}+08:00` : text)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+}
 function getFriendlyFailureMessage(toolName = "", context:FailureContext = {}) {
     const committedReply = buildCommittedActionReply(context?.session)
     if (committedReply) return committedReply
@@ -357,7 +457,8 @@ async function sendFinalReplyAsTextImage(host:{sendObservedReply(event:FinalEven
  try {
   const tool=host.toolInstances?.textImageTool
   if(!tool)throw new Error('textImageTool unavailable')
-  const result=await tool.execute({text:output,template},{...e,reply:async(payload,quote)=>{attempted=true;receipt=await host.sendObservedReply(e,payload,quote,"agent_final_card");return receipt}})
+  const cardEvent:FinalEvent=Object.assign(Object.create(e),{_personaSnapshot:e._personaSnapshot,reply:async(payload:unknown,quote?:boolean)=>{attempted=true;receipt=await host.sendObservedReply(e,payload,quote,"agent_final_card");return receipt}})
+  const result=await tool.execute({text:output,template},cardEvent)
   if(typeof result === 'string' && result.trim().startsWith('error:'))throw new Error(result)
   return extractDeliveryMessageId(receipt)
  } catch(error) {

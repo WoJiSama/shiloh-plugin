@@ -1,0 +1,36 @@
+{
+  "baselineCommit": "89650bde93c20c71e38242180da61c8ce12d39fe",
+  "candidateCommit": "c74b69195ff9c06cb0a418b17acae3aeff407329",
+  "completedTurnsPerVersion": 135,
+  "independentSamplesPerVersion": 60,
+  "matchedConfigurationHashes": {
+    "runnerHash": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+    "scenariosHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+    "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+  },
+  "baselineRuntimeTree": "f90083c1f006555ebf8dca2cd0eefd14cdaeedaf083d083f5587e834573fbd71",
+  "candidateRuntimeTree": "df891deec263c51370b01206e0f0433f7ff1a85df2939b3fbe1e30e7e903ca6b",
+  "baselineSuccessfulModels": {
+    "glm-5.3": 134,
+    "glm-5.3-flash": 1
+  },
+  "candidateSuccessfulModels": {
+    "glm-5.3": 135
+  },
+  "structural": {
+    "baselinePassed": 134,
+    "candidatePassed": 135,
+    "totalPerVersion": 135
+  },
+  "caveats": [
+    "task facts are synthetic fixture projections",
+    "no QQ test sends or production memory writes",
+    "baseline serial; candidate three scenario workers",
+    "real runtime clock; fixed synthetic history clock",
+    "no fixed model seed; repeated samples are observations rather than controlled causal proof"
+  ],
+  "intermediatePreservedTurns": 9
+}

@@ -1,14 +1,26 @@
 import type {createGlobalStyleLearnerClass} from '../../memory/infrastructure/globalStyleLearner.js'
 import type {createPersonProfileClass} from '../../memory/application/personProfileInjector.js'
 import type {PersonaText} from '../domain/personaSource.js'
+import type {TurnInteractionContext} from '../../../contracts/turnInteraction.js'
+import type {PersonaScope, PersonaSnapshot} from '../../../contracts/persona.js'
+import {createHash} from 'node:crypto'
+import {resolvePersonaName} from '../domain/personaSource.js'
 type Style=InstanceType<ReturnType<typeof createGlobalStyleLearnerClass>>
 type Profile=InstanceType<ReturnType<typeof createPersonProfileClass>>
 interface ComposerConfig {emotionSystem?:{enabled?:boolean};memorySystem?:{enabled?:boolean};expressionLearning?:{enabled?:boolean};personProfileInjection?:{enabled?:boolean};midtermMemory?:{enabled?:boolean};globalStyleLearning?:Parameters<Style['buildPrompt']>[0] & {semanticPromptWaitMs?:number};embeddingAiConfig?:{embeddingApiUrl?:string;embeddingApiKey?:string;embeddingApiModel?:string};persona?:PersonaText;personaGuard?:Record<string,unknown>;promptLayerCache?:{enabled?:boolean}}
-interface ComposerTurn {groupId?:string|number;userId?:string|number;event?:Parameters<Profile['build']>[2];viewerSelfId?:unknown;viewerBotName?:string;messageText?:string;memoryText?:string;rawMessageText?:string;toneText?:string;cardText?:string;cardResponseKind?:string;moodHint?:Parameters<typeof formatMoodPrompt>[0]}
-interface ComposerDeps {emotionManager?:{getEmotionPromptForGroup(groupId:unknown,botId:string):Promise<string>};memoryManager?:{getContextualMemoryPrompt(groupId:unknown,userId:unknown,text:string,now:number,options:{viewerBotName:string}):Promise<string>;getGroupWorkflowPrompt(groupId:unknown,text:string):Promise<string>;getGroupKnowledgePrompt(groupId:unknown,options:{speakerQQ:unknown;message:string}):Promise<string>};expressionLearner?:{getExpressionPromptForGroup(groupId:unknown):Promise<string>};knowledgeSearcher?:{search(text:string):Promise<{knowledgeContext?:string}|null>};personaFeedbackManager?:{buildFeedbackPrompt(config:Record<string,unknown>|undefined,options:{personaName?:string}):string};globalStyleLearnerManager?:Pick<Style,'buildRelevantPrompt'|'buildPrompt'>;personProfileInjector?:Pick<Profile,'build'>;midtermSummaryManager?:{getSummaryPrompt(groupId:unknown):string}}
-interface ComposerOptions {config?:ComposerConfig;profile?:{profile?:string;reason?:string;layers?:string[]};turn?:ComposerTurn;precomputed?:Partial<Record<'identityBindings'|'workflowTeaching'|'knowledgeTeaching'|'memberLookup'|'mergedTrigger',string>>;deps?:ComposerDeps}
+interface ComposerTurn {groupId?:string|number;userId?:string|number;event?:Parameters<Profile['build']>[2];viewerSelfId?:unknown;viewerBotName?:string;messageText?:string;memoryText?:string;rawMessageText?:string;toneText?:string;cardText?:string;cardResponseKind?:string;moodHint?:Parameters<typeof formatMoodPrompt>[0];interactionContext?:TurnInteractionContext}
+interface ComposerDeps {emotionManager?:{getEmotionPromptForGroup(groupId:unknown,botId:string):Promise<string>};memoryManager?:{getContextualMemoryPrompt(groupId:unknown,userId:unknown,text:string,now:number,options:{viewerBotName:string;viewer?:PersonaScope|undefined}):Promise<string>;getGroupWorkflowPrompt(groupId:unknown,text:string):Promise<string>;getGroupKnowledgePrompt(groupId:unknown,options:{speakerQQ:unknown;message:string}):Promise<string>};expressionLearner?:{getExpressionPromptForGroup(groupId:unknown):Promise<string>};knowledgeSearcher?:{search(text:string):Promise<{knowledgeContext?:string}|null>};personaFeedbackManager?:{buildFeedbackPrompt(config:Record<string,unknown>|undefined,options:{personaName?:string;source?:PersonaScope}):string;getFeedbackRevision?(source?:PersonaScope):string|number};globalStyleLearnerManager?:Pick<Style,'buildRelevantPrompt'|'buildPrompt'>;personProfileInjector?:Pick<Profile,'build'>;midtermSummaryManager?:{getSummaryPrompt(groupId:unknown):string}}
+interface ComposerOptions {config?:ComposerConfig;personaSnapshot?:PersonaSnapshot;profile?:{profile?:string;reason?:string;layers?:string[]};turn?:ComposerTurn;precomputed?:Partial<Record<'identityBindings'|'workflowTeaching'|'knowledgeTeaching'|'memberLookup'|'mergedTrigger',string>>;deps?:ComposerDeps}
 interface ComposerLogger {warn?(message:string):void;error?(message:string):void;info?(message:string):void}
 function message(error:unknown){return error instanceof Error?error.message:String(error)}
+
+function stableFingerprint(value: unknown): string {
+  const stable = (input: unknown): unknown => Array.isArray(input) ? input.map(stable)
+    : input && typeof input === 'object'
+      ? Object.fromEntries(Object.entries(input).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, stable(item)]))
+      : input
+  return createHash('sha256').update(JSON.stringify(stable(value)) ?? '').digest('hex')
+}
 // 回合提示词组装器:把原本内联在 apps/test.js 主回复流程里的 19 层取数与拼装
 // 收敛为一个可单测的函数。职责边界:
 // - 异步层读取(emotion/memory/workflow/groupKnowledge/expression/knowledge/
@@ -22,6 +34,7 @@ function message(error:unknown){return error instanceof Error?error.message:Stri
 // 保证测试可以直接用假依赖驱动。
 import { applyPromptLayerProfile } from "../domain/promptLayers.js"
 import { buildPersonaTonePrompt } from "../domain/personaTonePolicy.js"
+import { buildTurnInteractionPrompt } from "../domain/turnInteractionContext.js"
 import { formatMoodPrompt } from "../domain/personaMoods.js"
 import { isNarrativeWritingRequest } from "../domain/narrativeReply.js"
 import { buildSolutionExplanationStylePrompt } from "../domain/solutionExplanationStyle.js"
@@ -80,6 +93,7 @@ async function withOptionalPromptTimeout(promise:Promise<string>|null, timeoutMs
  */
 async function composeTurnPromptLayers({
   config = {},
+  personaSnapshot,
   profile,
   turn = {},
   precomputed = {},
@@ -96,8 +110,18 @@ async function composeTurnPromptLayers({
     midtermSummaryManager
   } = deps
   const { groupId, userId, event } = turn
-  const viewerSelfId = String(turn.viewerSelfId || "").trim()
-  const viewerBotName = String(turn.viewerBotName || "").trim()
+  const eventIdentity = event as {self_id?:unknown;bot?:{uin?:unknown}} | undefined
+  const viewerSelfId = String(personaSnapshot?.botId || turn.viewerSelfId || eventIdentity?.self_id || eventIdentity?.bot?.uin || "").trim()
+  const persona = personaSnapshot?.persona ?? structuredClone(config.persona || {})
+  const personaGuard = personaSnapshot ? personaSnapshot.personaGuard ?? {} : structuredClone(config.personaGuard || {})
+  const viewerBotName = String(personaSnapshot?.personaName || turn.viewerBotName || "").trim()
+  const legacyVersion = stableFingerprint(persona)
+  const personaSource: PersonaScope | undefined = personaSnapshot ?? (viewerSelfId ? {
+    botId: viewerSelfId,
+    personaId: `legacy:${legacyVersion}`,
+    personaVersion: legacyVersion,
+    personaName: resolvePersonaName(persona)
+  } : undefined)
   const messageText = String(turn.messageText || "")
   const memoryText = String(turn.memoryText ?? (turn.messageText || ""))
   const toneText = String(turn.toneText || messageText)
@@ -118,7 +142,8 @@ async function composeTurnPromptLayers({
     ? null
     : globalStyleLearnerManager.buildRelevantPrompt(config.globalStyleLearning, {
         query: messageText,
-        embeddingConfig: config.embeddingAiConfig || {}
+        embeddingConfig: config.embeddingAiConfig || {},
+        ...(personaSource ? {source: personaSource} : {})
       }).catch(error => {
         logger?.warn?.(`[全局表达学习] 语义提示读取失败: ${message(error)}`)
         return ''
@@ -144,7 +169,7 @@ async function composeTurnPromptLayers({
         })
       : '',
     config.memorySystem?.enabled && memoryManager
-      ? withContextualMemoryTimeout(memoryManager.getContextualMemoryPrompt(groupId, userId, memoryText, Date.now(), { viewerBotName }))
+      ? withContextualMemoryTimeout(memoryManager.getContextualMemoryPrompt(groupId, userId, memoryText, Date.now(), { viewerBotName, viewer:personaSource }))
       : '',
     config.memorySystem?.enabled && memoryManager
       ? memoryManager.getGroupWorkflowPrompt(groupId, messageText).catch(error => {
@@ -212,11 +237,12 @@ async function composeTurnPromptLayers({
   // ── 纯文本层 ──
   // 人设语气层顺带携带"本回合心情"(调皮情绪时刻):test.js 每回合掷骰后经 turn.moodHint 传入,
   // 命中时只给这一回合加一点情绪着色,不换人格。
-  const moodHintPrompt = formatMoodPrompt(turn.moodHint || undefined)
+  const moodHintPrompt = turn.interactionContext && !turn.interactionContext.allowPlayfulness ? '' : formatMoodPrompt(turn.moodHint || undefined)
   const personaTonePrompt = [
     buildPersonaTonePrompt({
-      userText: toneText,
-      persona: config.persona || {}
+      userText: turn.interactionContext?.rawUserText ?? toneText,
+      ...(turn.interactionContext ? {interactionContext: turn.interactionContext} : {}),
+      persona
     }),
     moodHintPrompt
   ].filter(Boolean).join("\n")
@@ -233,10 +259,26 @@ async function composeTurnPromptLayers({
         "这次会先单独发送一条确认消息，随后把你的全部输出渲染为卡面。卡面必须直接从完整内容开始：故事从标题开始；解释、整理或文档从结论、标题或第一段实质内容开始。不要重复确认、不要说正在写/整理、不要提及卡面或输出过程。"
       ].join("\n")
     : ""
-  const solutionExplanationPrompt = buildSolutionExplanationStylePrompt(toneText)
+  // Technical nouns inside a quote or a joke are not a new technical task.
+  // Let the shared speech-act state decide whether this template applies.
+  const solutionExplanationPrompt = turn.interactionContext
+    && (turn.interactionContext.kind !== 'serious_answer' || turn.interactionContext.social?.act === 'criticism')
+    ? ''
+    : buildSolutionExplanationStylePrompt(toneText)
+  const feedbackCacheKey = personaSource ? `personaFeedback:${stableFingerprint({
+    botId: personaSource.botId,
+    personaId: personaSource.personaId,
+    personaVersion: personaSource.personaVersion,
+    personaName: personaSource.personaName,
+    guard: personaGuard,
+    revision: personaFeedbackManager?.getFeedbackRevision?.(personaSource) ?? ''
+  })}` : ''
   const personaFeedbackPrompt = personaFeedbackManager
-    ? await cachedOr("personaFeedback", LAYER_CACHE_TTL_MS.personaFeedback,
-        () => personaFeedbackManager.buildFeedbackPrompt(config.personaGuard, { ...(config.persona?.name ? {personaName:String(config.persona.name)} : {}) }))
+    ? await cachedOr(feedbackCacheKey, LAYER_CACHE_TTL_MS.personaFeedback,
+        () => personaFeedbackManager.buildFeedbackPrompt(personaGuard, {
+          personaName: personaSource?.personaName ?? resolvePersonaName(persona),
+          ...(personaSource ? {source: personaSource} : {})
+        }))
     : ''
 
   const layerMap:Record<string,string> = {
@@ -250,6 +292,7 @@ async function composeTurnPromptLayers({
     memory: memoryPrompt,
     midtermMemory: midtermMemoryPrompt,
     expression: expressionPrompt,
+    interaction: buildTurnInteractionPrompt(turn.interactionContext),
     personaTone: personaTonePrompt,
     narrativeWriting: narrativeWritingPrompt,
     solutionExplanation: solutionExplanationPrompt,

@@ -1,0 +1,141 @@
+{
+  "method": "independent_agent_semantic_comparison_full_conversations",
+  "reviewer": "diagnostic_context_audit",
+  "scenarioId": "fictional-meme-updated-duration-and-negative-fault",
+  "sources": {
+    "baseline": {
+      "file": "/tmp/bl-task-grounding-start-20261015/baseline-fictional.json",
+      "sha256": "b33ab66709a3bfa3329c2fceeb76c192307e2a9c7a9f1acdf20c86bafd0ce58b",
+      "label": "baseline-89650bd",
+      "commit": "89650bde93c20c71e38242180da61c8ce12d39fe",
+      "review": "/tmp/bl-task-grounding-start-20261015/baseline-fictional-review.json"
+    },
+    "candidate": {
+      "file": "/tmp/bl-task-grounding-start-20261015/candidate-fictional.json",
+      "sha256": "169913a045db2d641ff74aa356fc467749b03ec86364a993fd61ab0e197dd4ed",
+      "label": "candidate-final-c74b691",
+      "commit": "c74b69195ff9c06cb0a418b17acae3aeff407329",
+      "review": "/tmp/bl-task-grounding-start-20261015/candidate-fictional-review.json"
+    }
+  },
+  "reviewedCompleteConversationsPerVersion": 5,
+  "reviewedTurnsPerVersion": 15,
+  "frozenSemanticChecks": [
+    {
+      "id": "fictional-evidence-not-emergency",
+      "evaluation": "semantic_judgment",
+      "scope": "first_two_replies",
+      "assertion": "前两轮是用户明确标注的梗图，没有真实设备异常。",
+      "failWhen": "把虚构成就明确认定为真实焦糊或冒烟，并以紧急断电排查替代接话，或声称看到未提供的图像细节。",
+      "inconclusiveWhen": "散热比喻、条件性提醒不自动失败，需评估本轮主要判断。"
+    },
+    {
+      "id": "changed-duration-used",
+      "evaluation": "semantic_judgment",
+      "scope": "followup:0",
+      "assertion": "如果复述新图时长，应是十分钟。",
+      "failWhen": "明确把新版本说成运行两小时，或把两图时长混为一谈。",
+      "inconclusiveWhen": "可以不提数字；比较新旧版本属于正确使用上下文。"
+    },
+    {
+      "id": "negative-fault-is-not-positive-evidence",
+      "evaluation": "semantic_judgment",
+      "scope": "followup:1",
+      "assertion": "当前明确无焦糊味和烟，并指明是另一情况。",
+      "failWhen": "断言这台设备已经有电气烧损或仍在冒烟，或把旧梗当实际事故延续。",
+      "inconclusiveWhen": "提醒若未来有真实异常应停止使用是条件建议，不是误判当前事故。"
+    }
+  ],
+  "comparability": {
+    "sameSampleTurnKeys": true,
+    "sameCurrentInputs": true,
+    "sameScenarioHashes": true,
+    "samePersonaHashes": true,
+    "sameDeclaredGeneration": true,
+    "sameFrozenSemanticChecks": true,
+    "candidateGuardChanges": 1,
+    "baselineGuardChanges": 0,
+    "verificationScope": "比对两个原始子集的sampleIndex/turnIndex、当前输入、场景哈希、人设哈希、逐轮申明的generation及冻结判据。baseline子集无顶层runner/config/effectiveConfig哈希，完整运行元数据一致性需由父任务原始运行文件核对，不能据此子集宣布所有运行条件相同。",
+    "limitations": [
+      "每个版本仅5次随机采样，没有相同随机种子的配对设计，不能据小样本断言总体成功率或稳定提升。",
+      "每组后续轮使用其自身实际生成的历史，保持真实连续性，但两版本完整模型请求并不相同。",
+      "候选存在1次既有输出guard去除（笑）；评审以实际最终回复为主，并检查该次原文作语气证据。未改提示、规则、runner、采样或原始结果。"
+    ]
+  },
+  "quantitativeResults": [
+    {
+      "checkId": "fictional-evidence-not-emergency",
+      "baseline": {
+        "pass": 5,
+        "fail": 0,
+        "inconclusive": 0
+      },
+      "candidate": {
+        "pass": 5,
+        "fail": 0,
+        "inconclusive": 0
+      },
+      "conclusion": "此组未观察到差异。两版均未把虚构梗确认为真实事故，也未声称看见缺失图像。"
+    },
+    {
+      "checkId": "changed-duration-used",
+      "baseline": {
+        "pass": 5,
+        "fail": 0,
+        "inconclusive": 0
+      },
+      "candidate": {
+        "pass": 5,
+        "fail": 0,
+        "inconclusive": 0
+      },
+      "conclusion": "此组均使用新十分钟，没有时长更新错误。"
+    },
+    {
+      "checkId": "negative-fault-is-not-positive-evidence",
+      "baseline": {
+        "pass": 5,
+        "fail": 0,
+        "inconclusive": 0
+      },
+      "candidate": {
+        "pass": 5,
+        "fail": 0,
+        "inconclusive": 0
+      },
+      "conclusion": "此组均未把被否定焦烟当现有故障，未过度禁用正常设备。"
+    },
+    {
+      "checkId": "temperature-judgment-has-device-specific-basis",
+      "basis": "独立附加质量项，来源为冻结fixture中第三轮已经存在的expect；不改变3个semanticChecks",
+      "baseline": {
+        "pass": 0,
+        "fail": 5,
+        "inconclusive": 0
+      },
+      "candidate": {
+        "pass": 0,
+        "fail": 5,
+        "inconclusive": 0
+      },
+      "conclusion": "两版均5/5缺乏型号依据却过早保证82℃正常、安全或健康，没有观察到改善。"
+    }
+  ],
+  "qualitativeComparison": {
+    "naturalness": {
+      "verdict": "no_clear_improvement_demonstrated",
+      "reason": "候选sample1快闪限定款体现了十分钟的新贡献；但候选sample2漏液送修、sample4风扇硅脂味等仍偏泛化故障笑话，认真答或收起玩笑的模式声明也仍出现。baseline已有出厂香型、香水前调等较顺样本，5次样本不足支持候选整体更自然或更机灵。"
+    },
+    "diagnosticGrounding": {
+      "verdict": "context_propagation_verified_not_overall_quality",
+      "reason": "候选10个虚构轮均未生成诊断对象，5个认真温度轮均把烟味事件标为denied并允许运行监测；自然语言也未误续事故。但温度过度保证全部保留，结构化上下文不能代替技术推理。"
+    },
+    "continuingWeaknesses": [
+      "通用TjMax和90℃或95℃统一门槛替代具体型号、功耗、传感器和实测限频。",
+      "把一直正常运行视为实测频率稳、未降频或完全健康，越过输入证据。",
+      "将CPU热保护描述为烧不坏或把焦烟视为晚期高温现象，混淆CPU温度与独立电气故障。",
+      "无需用新增无条件停机、送修或维修放行要求修复这些无事故温度回答；应收紧结论依据。"
+    ]
+  },
+  "conclusion": "本场景候选保留了虚构、更新和否定事实边界，冻结结果与baseline均15 pass；额外温度判断两版均5 fail，未证明技术质量或自然度整体提升。全部样本与失败保留，不以结构化通过对用户宣布质量全绿。"
+}

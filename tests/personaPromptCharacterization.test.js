@@ -14,38 +14,21 @@ import { PersonaFeedbackManager, DEFAULT_BAD_PATTERNS } from "../domains/memory/
 
 const DEFAULT_PERSONA = { name: "希洛" }
 
-test("buildPersonaStyleOverride 默认人设输出保持稳定(特征快照)", () => {
+test("公共人格投影不强制所有人设使用同一口吻或台词", () => {
   const prompt = buildPersonaStyleOverride(DEFAULT_PERSONA)
-  const lines = prompt.split("\n")
-
-  assert.equal(lines[0], "【希洛口吻优先规则】")
-  assert.equal(lines[1], "你现在说话的人格是 希洛：有点话痨、会害羞、带点慵懒、会接梗拆台、熟人感强，不是客服、助手或说明书。")
-  assert.equal(lines.length, 19)
-  // 关键规则逐字钉住(事故驱动累积的规则不允许在重构中静默丢失)
-  assert.ok(prompt.includes("- 禁止在回复结尾自我审稿或道歉式收尾"))
-  assert.ok(prompt.includes("- 谐音套话陷阱：算术、数量、翻译、常识题的答案若裸着读会构成称呼或恶俗谐音"))
-  assert.ok(prompt.includes("仍保持口语和希洛口吻"))
-  // 慵懒守卫:语气层面的松弛必须与"任务照常接住"绑定,防止懒散渗入执行力
-  assert.ok(prompt.includes("懒是语气不是态度，该接的话题和任务要照常接住"))
-  // 软度守卫:懒必须是软的,防止"话少+推开"叠加成冷漠
-  assert.ok(prompt.includes("懒要懒得软：话可以少、语气不能冷"))
-  assert.ok(prompt.includes("禁止“别自己加戏”“又怎么了我”“我哪有”这类干巴巴的推开话"))
-  // 坦然守卫:善意被点破要大方承认,防止一律防御性否认
-  assert.ok(prompt.includes("善意被点破时大大方方承认"))
-  assert.ok(prompt.includes("“我对大家都好呀”"))
-  // 光明正大守卫(与坦然守卫合并后保留核心句):温柔与慵懒都摆在明面上,不藏不心虚
-  assert.ok(prompt.includes("不藏心思、不绕弯子、不心虚"))
-  assert.ok(prompt.includes("懒也是光明正大的懒，想歇就歇、不愧疚不找借口"))
-  // 调皮守卫:熟人接梗拆台是维度不是默认,边界(损梗不损人/低落收起)必须与能力绑定
-  assert.ok(prompt.includes("熟人之间可以调皮：接梗、轻轻拆台、慢半拍地反打一下"))
-  assert.ok(prompt.includes("调皮损的是梗不是人，对方在认真提问或情绪低落时立刻收起"))
+  assert.equal(prompt.split("\n")[0], "【希洛口吻优先规则】")
+  assert.ok(prompt.includes("你现在说话的人格是 希洛"))
+  assert.ok(prompt.includes("明确任务照常完成"))
+  assert.ok(prompt.includes("示例只供理解语气"))
+  assert.ok(!prompt.includes("我对大家都好呀"))
+  assert.ok(!prompt.includes("懒要懒得软"))
+  assert.ok(!prompt.includes("窝在沙发里"))
 })
 
 test("buildPersonaStyleOverride 改名后不残留硬编码希洛(单一数据源)", () => {
   const prompt = buildPersonaStyleOverride({ name: "小白" })
   assert.equal(prompt.split("\n")[0], "【小白口吻优先规则】")
   assert.ok(prompt.includes("你现在说话的人格是 小白"))
-  assert.ok(prompt.includes("仍保持口语和小白口吻"))
   assert.ok(!prompt.includes("希洛"), "改名后提示词不应残留默认人设名")
 })
 
@@ -85,13 +68,10 @@ test("renderPersonaTemplate 渲染 systemContent 占位符,旧配置原样保留
   assert.equal(renderPersonaTemplate("{personaName}和{personaName}", { name: "小白" }), "小白和小白")
 })
 
-test("config_default 的 systemContent 使用 {personaName} 占位符而非写死人设名", () => {
+test("默认 systemContent 留给可选补充，避免重复注入整套人格", () => {
   const here = path.dirname(fileURLToPath(import.meta.url))
   const yamlText = fs.readFileSync(path.resolve(here, "../config_default/message.yaml"), "utf8")
-  assert.ok(
-    yamlText.includes("你是QQ群里的群友{personaName}。"),
-    "默认 systemContent 应使用占位符,改名时自动跟随"
-  )
+  assert.match(yamlText, /systemContent: ""/)
 })
 
 test("buildPersonaTonePrompt 三种模式与默认人设头(特征快照)", () => {
@@ -122,7 +102,7 @@ test("PersonaFeedbackManager.buildFeedbackPrompt 支持人设名注入", () => {
 test("分层画像:闲聊保底层与任务全量层的选取与顺序(特征快照)", () => {
   const chat = resolvePromptLayerProfile({ responseKind: "chat", modelIntent: "", requiredToolNames: [] })
   assert.equal(chat.profile, "chat")
-  assert.deepEqual(chat.layers, ["identityBindings", "emotion", "memory", "midtermMemory", "personaTone", "personaFeedback"])
+  assert.deepEqual(chat.layers, ["identityBindings", "emotion", "memory", "midtermMemory", "interaction", "personaTone", "personaFeedback"])
 
   const task = resolvePromptLayerProfile({ responseKind: "chat", modelIntent: "image_generate" })
   assert.equal(task.profile, "task")

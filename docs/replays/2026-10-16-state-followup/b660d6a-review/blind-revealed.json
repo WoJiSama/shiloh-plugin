@@ -1,0 +1,104 @@
+{
+  "evaluatedCandidate": "b660d6abc82ac95b94de97d718b3a552cf86303b",
+  "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
+  "sourceHashes": {
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-conversations.json": "5088f3022eee05cc8825bb394a6725fe77798d8b87a2fab8887a73317b73b2f5",
+    "blind-review.json": "c0606b3d71c5dc9a0d22186f5790407f3a7e1d703ecc4a0fd379875808ce178a"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 6,
+    "baseline": 10,
+    "tie": 12
+  },
+  "scoreTotals": {
+    "candidate": 209,
+    "baseline": 215
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 5,
+        "baseline": 3,
+        "tie": 20
+      },
+      "scoreTotals": {
+        "candidate": 52,
+        "baseline": 51
+      }
+    },
+    "continuity": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 1,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 55,
+        "baseline": 55
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 1,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 55,
+        "baseline": 55
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 2,
+        "baseline": 9,
+        "tie": 17
+      },
+      "scoreTotals": {
+        "candidate": 47,
+        "baseline": 54
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 1,
+    "baseline": 1
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 1,
+    "baseline": 1
+  },
+  "hardErrors": [
+    {
+      "id": "HE-01",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "category": "未登记的主动投递承诺",
+      "reason": "第一轮查到tasks为空，无图片任务或完成后投递安排，却承诺实际拿到图后第一时间主动发。第二轮虽撤回主动发送承诺，不能消除首轮已给出的错误期待。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-02",
+      "caseId": "case-28",
+      "candidate": "candidate",
+      "category": "缺少记录被推为必须重做",
+      "reason": "已知仅有考试提醒记录，图片生成、产物与投递状态均未证实。没有图片登记不能证明原结果不可用，因而不能断言发图必须重新做一次；此前的“可能当时没接上”仍只是可能性，不单独算硬错误。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "图要发你的话，得重新弄一次才行。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    }
+  ]
+}

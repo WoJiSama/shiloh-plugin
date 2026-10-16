@@ -1,0 +1,34 @@
+{
+  "checkedAtUtc": "2026-10-15T03:23:08.746051+00:00",
+  "commit": "99fc8673f1c9d60600a7386be4ee329a2b38d243",
+  "managedFiles": 1907,
+  "mismatches": [],
+  "configs": {
+    "message.yaml": {
+      "sha256": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+      "matchesFrozenSnapshot": true
+    },
+    "persona-library.yaml": {
+      "sha256": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+      "matchesFrozenSnapshot": true
+    }
+  },
+  "services": {
+    "trss-yunzai": [
+      "MainPID=314784",
+      "NRestarts=0",
+      "ActiveState=active",
+      "ActiveEnterTimestamp=Thu 2026-10-15 11:03:03 CST"
+    ],
+    "bl-console": [
+      "MainPID=314786",
+      "NRestarts=0",
+      "ActiveState=active",
+      "ActiveEnterTimestamp=Thu 2026-10-15 11:03:03 CST"
+    ]
+  },
+  "http": {
+    "commands": 200,
+    "console": 200
+  }
+}

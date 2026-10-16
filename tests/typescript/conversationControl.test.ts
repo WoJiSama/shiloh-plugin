@@ -7,6 +7,8 @@ import {createGroupRuntime} from '../../src/modules/runtime/application/groupRun
 import {createSmartConversation,type SmartConversationHost,type ConversationState} from '../../src/modules/conversation/application/smartConversation.js'
 import {createStrictConversation,type StrictConversationHost} from '../../src/modules/conversation/infrastructure/strictConversation.js'
 import {createTimingGate,type TimingGateHost} from '../../src/modules/conversation/infrastructure/timingGate.js'
+import {createPersonaSnapshot} from '../../src/modules/conversation/infrastructure/personaSnapshot.js'
+import type {ConversationEvent} from '../../src/modules/conversation/application/smartConversation.js'
 const logger={info(_m:string){},warn(_m:string){},error(_m:string,_e?:unknown){}}
 function state():ConversationState {
  const runtime=createGroupRuntime<ReturnType<typeof setTimeout>,null,null>({now:()=>1000,cancelTimer:clearTimeout,peekTopic:()=>null,peekSocial:()=>null})
@@ -53,6 +55,22 @@ test('smart lock is acquired before awaits; concurrent event queues and failed t
  assert.equal(await runtime.handleRandomReplySmart(host,{group_id:'g',user_id:3,msg:'second'}),false)
  assert.equal(s.queuedWhileInFlight,1);assert.ok(s.rerunEvent && typeof s.rerunEvent === 'object' && 'user_id' in s.rerunEvent);assert.equal(s.rerunEvent.user_id,3)
  rejectTurn(new Error('send failed'));await assert.rejects(first,/send failed/);assert.equal(s.inFlight,false)
+})
+
+test('smart conversation hands Gate persona to the actual turn only after a successful debounce',async()=>{
+ const snapshot=createPersonaSnapshot({botId:1,personaId:'a',persona:{name:'甲'},systemContent:'原设定'})
+ for(const outcome of ['continue','wait','no_action','interrupted'] as const){
+  const s=state(),host=smartHost(s),e:ConversationEvent={group_id:'g',user_id:2,self_id:1,msg:'接着说'}
+  host.checkTriggers=()=>false
+  host.runTimingGate=async()=>({decision:outcome==='interrupted'?'continue':outcome,reason:'test',...(outcome==='continue'||outcome==='interrupted'?{personaSnapshot:snapshot}:{})})
+  let debounced=false,handled=0
+  host.applyReplyDebounce=async()=>{assert.equal(e._pendingPersonaSnapshot,undefined);await Promise.resolve();debounced=true;return outcome!=='interrupted'}
+  host.handleTool=async event=>{handled++;assert.equal(debounced,true);assert.equal(event._pendingPersonaSnapshot,snapshot);return true}
+  const runtime=createSmartConversation({logger,bot:()=>({uin:1}),now:()=>1000000,updateGroupTopic(){},updateGroupSocial(){},detectAttentionHook:()=>null,anchorEventConversation(){},resolveLongTaskFeedbackPolicy:()=>null})
+  assert.equal(await runtime.handleRandomReplySmart(host,e),outcome==='continue')
+  assert.equal(handled,outcome==='continue'?1:0)
+  if(outcome!=='continue')assert.equal(e._pendingPersonaSnapshot,undefined)
+ }
 })
 function strictHost():StrictConversationHost{return {
  config:{enabled:true,excludeMessageTypes:[],trackAiConfig:{trackAiUrl:'https://example.test',trackAiApikey:'key',trackAiModel:'m'}},
@@ -105,4 +123,16 @@ test('strict tracking model receives event bot identity through direct, queued a
  assert.match(requests[2]?.messages[0]?.content || '',/secondary bot.*QQ号2/s)
  await runtime.isUserTalkingToBot(host,'legacy')
  assert.match(requests[3]?.messages[0]?.content || '',/main bot.*QQ号1/s)
+})
+
+
+test('timing gate保留当前人设参与偏好和全部边界，不注入固定接夸台词', async()=>{
+ let prompt=''
+ const runtime=createTimingGate({logger,bot:()=>({uin:1}),resolvePersonaName:()=> '安序',computeAddresseeSignal:()=>({groupAddressed:true,targetKind:'group',pronounWithoutBotAnchor:false}),buildPersonaTonePrompt:()=>'',getGroupTopicPrompt:()=>'',getGroupSocialPrompt:()=>'',detectAttentionHook:()=>null,sideLLMCall:async options=>{prompt=String(options?.messages?.[0]?.content);return {ok:true,content:'{"decision":"no_action"}'}}})
+ const boundaries=Array.from({length:10},(_,i)=>`稳定边界${i}`)
+ const host:TimingGateHost={config:{trackAiConfig:{trackAiUrl:'https://example.test',trackAiModel:'m',trackAiApikey:'key'}},getPersonaFor:()=>({name:'安序',preferences:['喜欢有依据的信息'],boundaries}),messageManager:{formatMessageHistory:async()=>''},computeGroupMsgRate5min:()=>0}
+ await runtime.runTimingGate(host,{group_id:'g'},state())
+ assert.match(prompt,/喜欢有依据的信息/)
+ for(const boundary of boundaries)assert.ok(prompt.includes(boundary))
+ assert.ok(!prompt.includes('我对大家都好呀'))
 })

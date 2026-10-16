@@ -1,0 +1,49 @@
+{
+  "runtimeCommit": "5a8a63069f014805b4194141454cbec40c15093e",
+  "primaryCommit": "9dab562",
+  "fullDeployGate": {
+    "backend": {
+      "total": 2230,
+      "pass": 2228,
+      "fail": 0,
+      "skip": 2,
+      "skipReason": "Chromium is not available in this checkout"
+    },
+    "frontend": {
+      "pass": 34,
+      "fail": 0
+    },
+    "strictTypecheck": true,
+    "boundaries": true,
+    "build": true,
+    "releaseManifestFilesVerified": 1942
+  },
+  "targetedGatewayAndPlanner": {
+    "pass": 90,
+    "fail": 0,
+    "skip": 0
+  },
+  "schemaAndExecutionContract": {
+    "pass": 59,
+    "fail": 0,
+    "skip": 0
+  },
+  "originalWorkspaceAfterWriteback": {
+    "pass": 97,
+    "fail": 0,
+    "skip": 0
+  },
+  "firstDeployAttempt": {
+    "serverTouched": false,
+    "backend": {
+      "total": 2230,
+      "pass": 2227,
+      "fail": 1,
+      "skip": 2
+    },
+    "failedTest": "reasoning selections preserve inheritance, validate supported choices, and declare hot application",
+    "reason": "New tool effort field changes the schema; coverage updated to include validation, inheritance and hot application."
+  },
+  "sourceTypeRepair": "Provider flat named tool_choice is typed only at the HTTP boundary; source-hook tests alone did not prove strict type correctness.",
+  "realModelQualityClaim": "Only outgoing effort and request execution are validated; kind mismatches, unregistered future commitments and latency outliers remain."
+}

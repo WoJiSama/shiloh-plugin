@@ -39,6 +39,12 @@ export interface Group {
   whitelisted: boolean
   today: { recv: number; send: number }
   bots: string[]
+  groupAdmin?: {
+    groupGuard: boolean
+    groupModeration: boolean
+    groupNotice: boolean
+    customized: boolean
+  }
 }
 export interface PersonaLibrary {
   revision?: string

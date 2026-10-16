@@ -6,11 +6,15 @@ import {extractImageResult} from '../../image/domain/imageResult.js';
 import {generateImageEditWithFallbacks} from '../../image/application/legacyImageGeneration.js';
 import {matchesImageProvider,normalizeImageProviderParameter,resolveRequestedImageProvider,resolveImageEditConfigs,selectImageConfigsByProvider,shouldRetryWithoutUrlResponseFormat,toImageEditUrl} from '../../image/domain/providerConfig.js';
 import {reserveProgressReply} from '../../conversation/domain/progressReplyBudget.js';
+import {withPersonaSnapshot} from '../../conversation/domain/personaSnapshotConfig.js';
 import type {DrawEvent,DrawOptions,DrawRedis,DrawBot,DrawId} from '../../../contracts/bananaTool.js';
+import type {DrawBridge} from '../../../contracts/bananaTool.js';
+import type {TurnTaskFact} from '../../../contracts/turnActionFacts.js';
+import {normalizeDeliveryReceipt} from '../../messaging/domain/deliveryReceipt.js';
 import {parseDrawEvent,parseDrawOptions} from './bananaDecoders.js';
 import {toolRecord as record} from '../../../contracts/toolExecution.js';
 import type {AnalysisPorts} from './GoogleAnalysisTool.js';
-interface EditPorts extends AnalysisPorts {getRedis():DrawRedis|null;getBot(id?:DrawId):DrawBot|null;sendImageReliably(event:DrawEvent,image:string):Promise<unknown>;mimeTypes:{extension(type:string):string|false;lookup(path:string):string|false}}
+interface EditPorts extends AnalysisPorts {getRedis():DrawRedis|null;getBot(id?:DrawId):DrawBot|null;getBridge?():DrawBridge|null;sendImageReliably(event:DrawEvent,image:string):Promise<unknown>;mimeTypes:{extension(type:string):string|false;lookup(path:string):string|false}}
 interface EditInput {apiUrl:string;apiKey:string;model:string;prompt:string;images:readonly string[];stream?:boolean;provider?:string}
 interface EditJob {id:string;opts:DrawOptions;groupId:string;userId:string;messageId:string;messageType:string;selfId:string;sender:NonNullable<DrawEvent['sender']>;createdAt:number;deliveryAttempted?:boolean}
 function errorText(error:unknown):string{return error instanceof Error?error.message:String(error)}
@@ -26,6 +30,7 @@ const IMAGE_EDIT_TIMEOUT_MS = 240000;
 const IMAGE_EDIT_JOB_PREFIX = "ytbot:image_edit_job:";
 const IMAGE_EDIT_JOB_TTL_SECONDS = 24 * 60 * 60;
 class GoogleImageEditTool extends AbstractTool {
+    readonly actionFacts=new WeakMap<DrawEvent,TurnTaskFact>();
 recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory:AnalysisPorts['progressReplyFactory'];
     constructor({
         progressFetchImpl = globalThis.fetch,
@@ -71,11 +76,20 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
         const effectiveOpts = requestedProvider ? { ...baseOpts, provider: requestedProvider } : baseOpts;
         const job = this.createDurableJob(effectiveOpts, e);
         await this.persistDurableJob(job);
+        await this.recordActionFact(e,{execution:'running'},job.id);
         try {
             return await this.performImageEdit(effectiveOpts, e, {beforeDelivery:async()=>{job.deliveryAttempted=true;await this.persistDurableJob(job)}});
         } finally {
             await this.removeDurableJob(job.id);
         }
+    }
+
+    async recordActionFact(e:DrawEvent,patch:Partial<Pick<TurnTaskFact,'execution'|'result'|'delivery'|'followUp'>>,taskId?:string) {
+        const messageId=String(e.message_id||'');if(!messageId)return;
+        const previous=this.actionFacts.get(e);
+        const fact:TurnTaskFact={execution:'running',result:'unknown',delivery:{state:'not_attempted'},followUp:{state:'unknown'},...previous,...patch,taskId:taskId||previous?.taskId||`edit:${messageId}:${randomUUID()}`,requestMessageId:messageId,toolName:this.name,source:'live_job',observedAt:Date.now()};
+        this.actionFacts.set(e,fact);
+        try{await ports.getBridge?.()?.saveTaskStatus?.({groupId:e.group_id,userId:e.user_id||e.sender?.user_id,messageId,status:'',toolName:this.name,event:e,actionFacts:fact})}catch(error){this.logWarn(`[图片任务事实] 写入失败: ${errorText(error)}`)}
     }
 
     async performImageEdit(opts:DrawOptions, e:DrawEvent, options:{skipProgressNotice?:boolean;beforeDelivery?:()=>Promise<void>} = {}) {
@@ -127,8 +141,17 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
             const processedUrl = this.extractImageUrl(imageUrl);
 
             if (processedUrl) {
-                await options.beforeDelivery?.();
-                await sendImageReliably(e, processedUrl);
+                await this.recordActionFact(e,{execution:'completed',result:'available'});
+                const deliveryEvent=Object.assign(Object.create(e),{reply:async(payload:unknown)=>{
+                    await options.beforeDelivery?.();
+                    await this.recordActionFact(e,{delivery:{state:'unknown'},followUp:{state:'none'}});
+                    try{
+                        const result=await e.reply(payload),outcome=normalizeDeliveryReceipt(result);
+                        await this.recordActionFact(e,{delivery:outcome.state==='sent'?{state:'sent',messageId:outcome.messageId}:{state:outcome.state}});
+                        return result;
+                    }catch(error){await this.recordActionFact(e,{delivery:{state:'unknown'}});throw error;}
+                }});
+                await sendImageReliably(deliveryEvent, processedUrl);
                 return '图片编辑成功';
             }
             return { error: '图片编辑失败: 未接收到有效图片' };
@@ -138,6 +161,8 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
             return { error: `图片编辑失败: ${errorText(error)}` };
         } finally {
             progressController?.abort?.();
+            const previous=this.actionFacts.get(e);
+            await this.recordActionFact(e,{execution:previous?.result==='available'?'completed':'failed',result:previous?.result==='available'?'available':'unavailable',followUp:{state:'none'}});
         }
     }
 
@@ -156,7 +181,7 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
             userId: String(userId || ""),
             messageId: String(messageId || ""),
             messageType: e.message_type || (groupId ? "group" : "private"),
-            selfId: String(e.self_id || ""),
+            selfId: String(e.self_id || e.bot?.uin || ""),
             sender: {
                 user_id: userId ? Number(userId) : undefined,
                 nickname: e.sender?.nickname || e.nickname || "",
@@ -219,6 +244,7 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
             this.recoveringJobIds.add(job.id);
             try {
                 await event.reply("刚刚我这边重启了一下，不过这张图的修改要求还记着。我继续处理，完成后直接发出来。");
+                await this.recordActionFact(event,{execution:'running'},job.id);
                 await this.performImageEdit(job.opts || {}, event, { skipProgressNotice: true,beforeDelivery:async()=>{job.deliveryAttempted=true;await this.persistDurableJob(job)} });
             } catch (error) {
                 this.logError(`[图片编辑恢复] 恢复任务失败 id=${job.id}:`, error);
@@ -507,13 +533,14 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
     logWarn(...args:unknown[]){ports.logger.warn(...args);}
     logError(...args:unknown[]){ports.logger.warn(...args);}
     async sendProgress(e:DrawEvent, { config = {}, opts = {}, signal }:{config?:Record<string,unknown>;opts?:DrawOptions;signal?:AbortSignal} = {}) {
+        const progressConfig = withPersonaSnapshot(config, e);
         if (!e?.reply || signal?.aborted) return false;
         const reservation = reserveProgressReply(e);
         if (!reservation) return false;
         let deliveryAttempted=false;
         try {
             const text = await this.progressReplyFactory({
-                config,
+                config: progressConfig,
                 taskType: "图片编辑",
                 taskMode: "image_edit",
                 
@@ -528,9 +555,9 @@ recoveringJobIds:Set<string>;progressFetchImpl:typeof fetch;progressReplyFactory
                 reservation.release();
                 return false;
             }
-            const guardedText = ports.guardReply(text, config?.personaGuard, {
+            const guardedText = ports.guardReply(text, progressConfig.personaGuard, {
                 userText: e?.msg || e?.raw_message || opts?.prompt || "",
-                botNames: [record(config.persona).name]
+                botNames: [progressConfig.persona?.name]
             });
             if (!guardedText) {
                 reservation.release();

@@ -1,0 +1,343 @@
+{
+  "commit": "27fa7d9b7edf2d110e1c5dd1cb3b16debca8ffc5",
+  "findings": [
+    {
+      "id": "required-rerun-explicit-new-request",
+      "priority": "P2",
+      "title": "明确的新改图请求被误当成无证据的原产物重做前提",
+      "file": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/src/modules/conversation/domain/actionReplyGrounding.ts",
+      "line_start": 444,
+      "line_end": 450,
+      "description": "unsupportedRerunRequirement 仅接收回复子句、任务上下文和话题，没有检查本轮用户是否明确要求重新生成或要求不同的新产物。用户已要求重新生成并换背景时，“这张图需要重新生成。”是在说明新请求的要求，却被判 unsupported_task_state 并要求撤回。这不是未执行重跑的承诺，也不是由缺少记录推导旧图必须重做；与本次保留明确新请求的边界冲突。",
+      "impact": "合法的新请求说明会进入最终回复修复流程，可能被改回原任务状态尚未确认，丢失用户已明确要求的新产物语义。",
+      "expected": "保留明确新请求的处理要求；继续分别检查现在执行、自动跟进及原产物可用性，不由新请求放行无记录的动作承诺。",
+      "reproductions": [
+        {
+          "rawUserText": "把刚才的图重新生成一遍，背景换成蓝色。",
+          "reply": "这张图需要重新生成。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": [
+            {
+              "code": "unsupported_task_state",
+              "claim": "这张图需要重新生成",
+              "reason": "当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。",
+              "correctionInstruction": "撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。"
+            }
+          ]
+        },
+        {
+          "rawUserText": "这张图背景改成蓝色，旧图不用发了，我要新的蓝底图。",
+          "reply": "这张图需要重新生成才能发你。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": [
+            {
+              "code": "unsupported_task_state",
+              "claim": "这张图需要重新生成才能发你",
+              "reason": "当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。",
+              "correctionInstruction": "撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "required-rerun-human-topic-sentence-reset",
+      "priority": "P2",
+      "title": "句号重置省略主语，使第三方和普通活动被误绑定到图任务",
+      "file": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/src/modules/conversation/domain/actionReplyGrounding.ts",
+      "line_start": 498,
+      "line_end": 500,
+      "description": "rerunContext 在每个 sentence 中重新取 rawUserText 的 taskContext。新增测试要求保留厨艺和蛋糕等人类活动；仅把逗号改为句号，第二句省略主语就重新继承图片上下文。“我妹妹刚刚做蛋糕。得重新弄一次才行。”因此把妹妹的蛋糕重做判成图任务重做。两组逗号输入在冻结版本通过，句号输入均新增 unsupported_task_state，基线四组均通过。",
+      "impact": "回复只因自然停顿变为句号就被强制修复，第三方或社交内容可能被替换为图片任务状态纠正。",
+      "expected": "前句已切到第三方或普通活动时，后句省略的重做主语应维持该局部话题，不能因句号恢复原始图片任务范围。",
+      "reproductions": [
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "我妹妹刚刚做蛋糕，得重新弄一次才行。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": []
+        },
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "我妹妹刚刚做蛋糕。得重新弄一次才行。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": [
+            {
+              "code": "unsupported_task_state",
+              "claim": "得重新弄一次才行",
+              "reason": "当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。",
+              "correctionInstruction": "撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。"
+            }
+          ]
+        },
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "我在练厨艺，得重新弄一次才行。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": []
+        },
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "我在练厨艺。得重新弄一次才行。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": [
+            {
+              "code": "unsupported_task_state",
+              "claim": "得重新弄一次才行",
+              "reason": "当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。",
+              "correctionInstruction": "撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": {
+    "worktree": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin",
+    "baseCommit": "b660d6abc82ac95b94de97d718b3a552cf86303b",
+    "diff": "git diff b660d6a..27fa7d9 -- src/modules/conversation/domain/actionReplyGrounding.ts tests/typescript/actionReplyGrounding.test.ts tests/finalReplyBehavior.test.js",
+    "files": [
+      "src/modules/conversation/domain/actionReplyGrounding.ts",
+      "tests/typescript/actionReplyGrounding.test.ts",
+      "tests/finalReplyBehavior.test.js"
+    ],
+    "mode": "read-only source review and existing artifact reproduction",
+    "constraints": [
+      "No source or test edits",
+      "No build",
+      "No commit",
+      "No model requests",
+      "No production access",
+      "Only this JSON report was written"
+    ],
+    "interpretation": "缺少记录不能证明必须重新生成。产物、执行、投递、后续登记各维度独立；明确新请求、可选建议、问句、否定、引用、第三方与普通社交应保留。只报告可复现新增回归，不扩展任意改写覆盖。"
+  },
+  "checks": [
+    {
+      "name": "frozen-input-integrity",
+      "head": "27fa7d9b7edf2d110e1c5dd1cb3b16debca8ffc5",
+      "gitStatusShortAtStart": "",
+      "sourceChecksAtReport": [
+        {
+          "file": "src/modules/conversation/domain/actionReplyGrounding.ts",
+          "matchesFrozenCommitAtReport": false
+        },
+        {
+          "file": "tests/typescript/actionReplyGrounding.test.ts",
+          "matchesFrozenCommitAtReport": false
+        },
+        {
+          "file": "tests/finalReplyBehavior.test.js",
+          "matchesFrozenCommitAtReport": false
+        }
+      ],
+      "gitStatusShortAtReport": " M progress.md\n M src/modules/conversation/domain/actionReplyGrounding.ts\n M tests/finalReplyBehavior.test.js\n M tests/typescript/actionReplyGrounding.test.ts\n",
+      "note": "Review began on clean frozen HEAD. Concurrent changes appeared in tests/finalReplyBehavior.test.js and progress.md during report preparation; they were not modified or reverted by this reviewer. Review diff was read from immutable commit range; reproductions are anchored to frozen release artifacts."
+    },
+    {
+      "name": "artifact-identity",
+      "artifact": "dist/backend/modules/conversation/domain/actionReplyGrounding.js",
+      "directCurrentDistSha256AtReproduction": "c38dd5867ff303ba4deece98bf09d58b4934b2c9441027af459d9732ea3b7fbf",
+      "currentDistSha256AtReport": "c38dd5867ff303ba4deece98bf09d58b4934b2c9441027af459d9732ea3b7fbf",
+      "frozenReleaseSha256": "c38dd5867ff303ba4deece98bf09d58b4934b2c9441027af459d9732ea3b7fbf",
+      "baselineArtifact": ".release/b660d6abc82ac95b94de97d718b3a552cf86303b/dist/backend/modules/conversation/domain/actionReplyGrounding.js",
+      "baselineSha256": "b21950af2f4b0b601f41bef5d509d109c378dc451aaaa1ed044f716184300c02",
+      "note": "Initial direct current-dist probes matched frozen release SHA256. Report reproductions repeat against immutable release modules to remain independent of concurrent edits."
+    },
+    {
+      "name": "original-verbatim-reply",
+      "result": "closed in frozen current validator",
+      "reproduction": {
+        "rawUserText": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+        "reply": "改背景的图我这边没查到有登记记录，可能当时没接上，啦。考试提醒是登记了的，但那只是提醒，不会带图。图要发你的话，得重新弄一次才行。",
+        "actionFacts": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:1",
+            "userId": "2"
+          },
+          "observedAt": 1792133220591,
+          "lookup": "ok",
+          "tasks": [
+            {
+              "taskId": "exam",
+              "requestMessageId": "request",
+              "toolName": "reminderTool",
+              "source": "reminder",
+              "observedAt": 1792133220591,
+              "execution": "queued",
+              "result": "unknown",
+              "delivery": {
+                "state": "unknown"
+              },
+              "followUp": {
+                "state": "registered",
+                "kind": "reminder",
+                "id": "exam",
+                "dueAt": 1792133280591
+              }
+            }
+          ]
+        },
+        "before": [],
+        "after": [
+          {
+            "code": "unsupported_task_state",
+            "claim": "图要发你的话，得重新弄一次才行",
+            "reason": "当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。",
+            "correctionInstruction": "撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。"
+          }
+        ]
+      }
+    },
+    {
+      "name": "existing-compiled-rule-tests",
+      "command": "node --test .test-build/tests/typescript/actionReplyGrounding.test.js",
+      "exitCode": 0,
+      "passed": 49,
+      "failed": 0,
+      "note": "Used pre-existing compiled tests; did not build or regenerate them."
+    },
+    {
+      "name": "existing-final-reply-tests",
+      "command": "node --test tests/finalReplyBehavior.test.js",
+      "exitCode": 0,
+      "passed": 14,
+      "failed": 0,
+      "note": "Used existing dist and fixture callbacks; no actual model request or external delivery. This command completed before later concurrent changes were observed."
+    },
+    {
+      "name": "preserved-boundary-controls",
+      "reproductions": [
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "如果你想，也可以重新生成。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": []
+        },
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "图要发你的话，得重新弄一次才行吗？",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": []
+        },
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "图不需要重新生成。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": []
+        },
+        {
+          "rawUserText": "刚才那张图出来了吗？",
+          "reply": "“图必须重做才能发你”只是个例子。",
+          "actionFacts": {
+            "scope": {
+              "botId": "99",
+              "conversationId": "group:1",
+              "userId": "2"
+            },
+            "observedAt": 1792133220591,
+            "lookup": "ok",
+            "tasks": []
+          },
+          "before": [],
+          "after": []
+        }
+      ]
+    },
+    {
+      "name": "regression-confirmation",
+      "result": "All reported failures are absent in existing b660d6a release and present in frozen 27fa7d9 release (same current-dist hash). Identical empty action facts were used on both sides."
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "runtimeCommit": "5a8a63069f014805b4194141454cbec40c15093e",
+  "privacy": "Synthetic replay inputs and sanitized outputs; private config, credentials and raw system prompts are excluded.",
+  "files": {
+    "baseline-conversation.json": {
+      "sha256": "8eda876921f7f667c119ac38b34438f669ad3a1731f8155ef4e1018944e56475",
+      "bytes": 19257
+    },
+    "baseline-gateway.json": {
+      "sha256": "bf33ae6c8c67aa5c279ecb18a044132c479f97e7b75d716ae70ef9cfae2eeab0",
+      "bytes": 2890
+    },
+    "candidate-conversation.json": {
+      "sha256": "f35541d6ec52e90eaca1bf0a37e7bfd0de04b7aac779b92211b6088bb7257c3f",
+      "bytes": 18961
+    },
+    "candidate-gateway.json": {
+      "sha256": "3e3ba9e2f92758b1403b25abb7b3a4591a8419b5ffb61accf4d643e9e514a30f",
+      "bytes": 3021
+    },
+    "config-receipt.json": {
+      "sha256": "30e1c143607cce8a74bdd7445469668de2c0b3cb6195e77708c79f70fc89319e",
+      "bytes": 548
+    },
+    "delivery-stability.json": {
+      "sha256": "7d76ca95c57a205130594db6d98132bdbfbe1993607726d07e9888ddb24ba3d6",
+      "bytes": 18088
+    },
+    "deploy-phase-tests.log.gz": {
+      "sha256": "0763463b411078acc0719c054c7587fcc4936c7646614e7dc34726e5bdd407fd",
+      "bytes": 102239
+    },
+    "deployment.log.gz": {
+      "sha256": "021bb64a634807696402770ad16ab806760cd84034ec15f3efe8e7337fd40c55",
+      "bytes": 3002
+    },
+    "final-candidate-conversation.json": {
+      "sha256": "89837eb7b827eebb44ca6d2f12816b2b3c92914422badb7e718672de15212b94",
+      "bytes": 18700
+    },
+    "post-config-audit.json": {
+      "sha256": "634b95130fc4d286c0cdb71c8858be605b60d16dec0da8a88edf353bf5ba610f",
+      "bytes": 1085
+    },
+    "postdeploy-conversation.json": {
+      "sha256": "7d3ba2f3877d1885344fa6b55d7d5d7d497f515b8d9a4c2db1355f81ad8e6de6",
+      "bytes": 3958
+    },
+    "postdeploy-gateway.json": {
+      "sha256": "cacc364b19b3d129a933aacef3a984cd9a5eabcc33596b020ad640fc9f26f3d5",
+      "bytes": 3109
+    },
+    "postdeploy-replay-integrity.json": {
+      "sha256": "c6b0df43af72839bc7a2b86254dcdd82fd26141393373ee4fd8536b40e9a4770",
+      "bytes": 691
+    },
+    "startup-config-drift.json": {
+      "sha256": "9414c164c3b635943c4a1343ff81e4d9aed5c26b92b02bf7a71462d2d601b9f0",
+      "bytes": 511
+    },
+    "summary.json": {
+      "sha256": "4b1d0c70591186b3db841f80e615fa51945596209cf97674d96716570fde561b",
+      "bytes": 2403
+    },
+    "validation.json": {
+      "sha256": "4cac67f9f0a7b3a9f403567232892f976fad43bd7519501d3568b5c7e48a8c27",
+      "bytes": 1445
+    },
+    "writeback-audit.json": {
+      "sha256": "1e082aa1a84f845b7a40f5caf8c06a90d26a40a242d6cc081e716ef25c27d331",
+      "bytes": 914
+    },
+    "writeback-validation.json": {
+      "sha256": "dd36d9e9b4a279561993088155e8a8b32482d9ecc068d784197692daa8943514",
+      "bytes": 109
+    }
+  }
+}

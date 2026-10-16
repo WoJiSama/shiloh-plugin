@@ -1110,3 +1110,216 @@
 
 - 基线提交后的限定目录统计：372 后端 JS / 93,141 原始行；前端 15 TS / 886 行、25 Vue / 9,262 行，排除测试和 `.d.ts`。此统计未含根入口、scripts、standalone，不等于完整业务迁移清单；阶段 1 会补全并固定有效代码行统计。
 - 迁移顺序为工具链 → 端口/状态 → 生图/模型 → 配置 → 投递/归档/job → 记忆/聊天编排 → 其余域/控制台后端 → 收尾发布。已有用户 JS 工具与 standalone 的 `.js` 扫描必须兼容；配置、持久任务与资源路径不能随编译目录迁移而失效。
+
+# 2026-10-13 小馒头群聊样本与希洛架构诊断
+- 生产 SSH key 只读访问成功，服务根目录 /opt/trss-yunzai，插件目录待现场核对。
+- 当前工作区干净；仓库已有 persona、episodicMemory、ExpressionLearner、TurnPlan、promptCompiler 等能力，建议需基于实际主链接入情况。
+- 历史记录提示合并转发曾出现仅保存 CQ forward ID 的问题，本轮需核对节点是否完整持久化。
+- 已找到目标：2026-10-13 14:37:31、message_id 474165189、forward_id 7696037872498880352；完整 80 个转发节点，20 个图片条目。显示名“小馒头”有 25 条文本，长度中位数 5 字符、均值 6.1、最长 16；另有 2 条图片。原节点时间覆盖 12:09–13:54。多显示名共享 user_id，不能据此推断真实账号/模型。
+- 样本体现：态度延续、夸奖不改变立场、把 AI/token 身份转成梗、50/token 梗跨段回勾、图文接话、短句多气泡。
+- 代码审计初步：chat profile 排除 expression/globalStyle/semanticStyle/personProfile，需结合生产配置与 hash 验证。
+- 更正：归档 80 个节点恰好命中 collectForwardContext.maxLines=80，尚不能称原转发完整；将只读核对 NapCat 原始记录。
+- 20 个关键源码文件 SHA-256 与生产全部一致。生产最小闲聊主 system（基础+覆盖+语气，无历史、运行信息及记忆）9055 字符，含93次不要/禁止/不能/不许；该指标只反映提示结构，不等同质量评分。
+- 群 609235590 情节摘要22条，20条有“在群里说”标记的内容前缀占104–112字符（总长≤120），正文仅6–16字符；另2条引用消息在正文前已截断。
+- 原始转发通过 NapCat 已有 WebUI 的 get_forward_msg 只读动作取得，成功 code=0/retcode=0，共99节点；归档仅80，丢失最后19节点。原始范围12:09:12–13:59:33，小馒头30条文字/3条图片，文字中位5字符/均值6.33/最长16。后半段包含边界处理和关系试探回应，是重要对照证据。
+- 原始 get_forward_msg JSON 留在受限临时目录，不写入仓库；未发送消息、重启或改变配置。
+- 本地纯函数复现完成：chat层裁剪、输出守卫3例误改、社交问题3例被判precise、情绪2例误判、明天考试eventAt=null。只使用合成输入/模拟模型输出，未调用模型。
+- 生产纯模板投影确认：选星彩时基础system仍含“你叫希洛/18岁少女”，无星彩名字；公共覆盖要求坦荡承认善意，与星彩被夸别扭冲突。希洛notes另有弟弟姿态，与女性背景冲突。详见诊断文档。
+
+## 2026-10-13 TypeScript 阶段 1 实施
+后端严格 TS 工具链、纯模块迁移、JS 入口兼容、测试发现/产物加载、迁移统计与发布更新路径。保留其他会话诊断文档，不部署生产。分支 codex/ts-phase-1-foundation。
+
+阶段1实现提交7994c57。严格类型/边界/前端34项测试构建通过；后端最终1492项，1440通过、52宿主/Chromium跳过。两纯模块迁移11项TS测试无跳过，安装回滚7项通过；群内源码直拉更新暂时拦截，使用编译发布。其他会话诊断内容保留。
+
+## 2026-10-13 时区修复与后续 TS 阶段
+用户授权修复CI时区差异并按阶段2→8推进，每阶段单测/严格类型/编译产物门槛，独立提交回滚与JS余量记录，直接main。时区修复c5d530b：UTC/Shanghai各20项通过，新增三时区回归通过；阶段2会话和群运行时迁移进行中。保留其他会话诊断文件。
+
+TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但发送失败误提示操作失败、发送异常再fallback已修。群清空确认键增加botId。语义与中期各包装recordMessage无法在彼此包裹时正确detach，正在共用subscriber registry解决。旧长期Redis群scope保留，不宣称数据按bot隔离；情绪/反馈/确认仅各自有bot键。
+
+# 2026-10-14 重构后群聊智能与人设复核
+- 当前 HEAD de03521，后端已迁移 src/modules TS，apps/utils/domains 的 JS 主要为宿主兼容桥；应以 TS 主实现和编译产物为准。
+- 已确认确定性意图 skipIntentModel 现在为 let，旧 const 重赋值问题已修；getPersonaFor/getChatConfig 与 finalReply 有独立模块。
+- 当前编译产物与全源码哈希一致，manifest.commit 仍85b51d2属于元数据；本轮未build或据此推断生产部署。
+- 已复现仍存断点：闲聊排除tone/speechStyle/notes所在画像层；guard改坏称谓/害羞表达/AI自嘲；社交疑问precise误判；情绪不识别否定和第三人；格式化userContent前120字无正文；extractor丢ctx.now、失败吞[]后管理器记成功；转发100节点→80且无完整度。
+- 新核实：人物画像缓存群+用户、人设反馈常量key导致多bot/切人格串用；continuity群+用户与episodic群文件均无bot/persona，召回将他bot回复写成“你当时回”。群公开事实应共享来源，第一人称经历应隔离。
+- 历史助手消息仍标[希洛回复]，实际formatMessages无条件调用，agentIntelligence.enabled=false也不会绕开。
+- 真实改善：未知发送回执不登记/学习，smart调度与跟踪已部分按bot隔离，情节缓存按文件路径隔离数据目录。已有语义记忆及理解简报，不应再建议重造整套Agent/向量库。
+- 现有17文件98项测试全部通过、0跳过；严格源/测试类型与边界检查通过。旧快照锁六层与固定口吻，不能当自然聊天质量证据。
+- 新建议文档保留昨天报告，分人设/出口/身份正确性→记忆来源与时间→共享社交状态→真实多轮评估；合成证据在/tmp/bl-chat-review-20261014，无真实模型或生产访问。
+
+# 2026-10-14 最新三个合并转发体验分析
+- 已按发送者和时间定位最新三条：2026-10-13 20:21:12（17节点）、10-14 01:13:24（2节点）、18:55:31（3节点）。第二条是希洛换图交付，不误当竞品；共读22个归档节点。
+- 原始NapCat get_forward_msg返回OneBot未初始化；只读登录状态为未就绪，本轮未尝试QQ登录/初始化/改配置。归档无完整度标记，不能宣称完整原始节点。
+- 关键第三张原图通过QQ官方资源查看，MD5与归档匹配、66746字节；原图“本地连续运行Deepseek两个小时…电子体香”。小馒头“硅脂烤糊了/跑我两小时”都有图内依据，是语境重组+自我视角吐槽；图中Deepseek不能证明对方真实基座。
+- 馒头“不漏/正常吃/他俩饕餮来的”体现简洁选择和参与；小馒头“我一般忘了吃/视频加载不出来”体现参与已知话题与局部承认缺口。角色吃饭叙述不等于真实生活经历。
+- 希洛“出来了出来了，我有点紧张，你先看看”口语自然但紧张缺当轮可见缘由，提示改进应让情绪依附具体事件，不能再禁词替换。
+- 新样本建议：工具执行与社交用途分开，先保证当前证据/对象/缺口/上句立场必达，再按需要加局部社交状态；第二句承担新动作。私有证据只在/tmp/bl-chat-latest-three-20261014，报告不含原始媒体签名链接。
+
+# 2026-10-14 群聊互动最小闭环实现发现
+- 新互动层需同时进入CHAT/FULL；输出口吻必须使用原始正文和同一互动上下文，否则技术词/包装前缀会再次覆盖接梗线索。
+- 素材URL与素材内容分开；实际工具结果按调用ID积累，并复用工具结果分类，不能以通用错误词判OCR失败。提示渲染不能过滤current媒体证据。
+- 共享addressee明确bot时，引用/被@评价的人是素材来源；本bot上句只来自自有引用正文或经bot来源校验的续聊。旧无来源续聊不迁移为自身立场。
+- 续轮只提供更新的互动和场景口吻，避免重建默认人格；新认真请求及实际动作交付优先于玩笑。无确认回执仍不学习或登记。
+- 完整离线回归1908项1906通过/2环境跳过/0失败，契约验证不等于真实模型社交质量验证；同模型对照回放仍是后续验收。
+
+# 2026-10-15 群聊自然度迭代结论
+
+- 人设重复和实例配置内固定生活/接夸示例会同时影响表达；仅缩短公共提示不足以消除冲突。本轮统一稳定人格投影，显式修订已审实例配置，未知自定义systemContent仍完整保留且不自动写回。
+- 历史机器人发言只证明说过的话，不证明现实活动或任务进度。认真与交付互动进入现有推理升档，纯文字回复明确本次执行边界；没有调度状态支持时仍可能生成未来投递承诺。
+- 最终20轮与发布后4轮结构均通过，但发布前未知交付仍出现“有了我第一时间发你”，焦糊场景仍把无可见烧痕误当可通电条件。后续成功样本不抵消失败；自然度和安全步骤稳定性尚未全面达标。
+- 真实回放复用编译主链、内存发送与存储适配器并禁用工具副作用，不能证明真实QQ发图、视觉工具或完整生产记忆集成。最终判断由当前代理和独立子代理完成，没有外部人类评审。
+- 运行版本89650bd已发布，配置另有独立备份与回滚。代码安装器不覆盖config，不能只回滚代码却声称配置已恢复；报告保留两类恢复路径。
+
+# 2026-10-16 控制台群管理
+
+- 旧 groupGuard/groupModeration 为全局策略加 enabledGroups；groupNotice.groupRules 支持单群文案且隐式启用群通知。
+- 现有群列表仅收集 allowedGroups 和今日活动；需并入群管名单、旧通知／通知人规则和新覆盖。
+- 三个群管 manager 通过 readUserSettings 每次读文件；接入同一解析器即可让保存对后续事件生效。待处理验证超时也必须重读本群覆盖。
+- 默认策略及本群策略共用 schema 字段和配置仓库，避免复制配置与跨群覆盖。API 需保留原生管理员保护、总开关和通知名单语义。
+- 起始工作区有大量既有人设／记忆变更；只改群管理相关文件，共享文件最小补丁，原规划文件仅追加本轮记录。
+- 默认和单群 schema 由共享声明构建；单群保存只patch目标YAML序列节点，兄弟群、未改字段注释和未知字段保留。其他群保存不会使本群revision过期；本群/默认变更会409。
+- 新群级覆盖显式false/空串/空名单有效，未自定义字段仍跟随后续默认变更；原模块enabled作为总开关，本群不能绕过。
+- 旧通知模板隐式开启welcome/leave标志。单独恢复标志时需将保留的旧文本移入稀疏覆盖并移除旧隐式开关来源；整群恢复同时清掉文本。旧群号trim及groupAdmins的group_id/group/users/userIds别名也要参与显示、覆盖、reset和YAML定位。
+
+# 2026-10-15 真实任务依据初查
+
+- 既有taskStatus.ts持久化任务状态，chatTurn当前仅在历史消息渲染时追加格式化摘要；TurnInteractionContext只有素材与上句线索，没有权威行动状态。
+- 现有执行边界提示仍不能稳定阻止未来投递承诺；需沿真实任务与回执链路核对状态语义、bot/会话/用户作用域、过期及调度证据。
+- 初次搜索使用不存在的src/modules/delivery目录，实际投递回执位于src/modules/messaging/domain/deliveryReceipt.ts；后续按真实模块边界搜索。
+
+- 工具成功只表示调用未报错，生图排队也会写成功；已增加按bot/会话/用户/原请求隔离的事实投影，执行、产物、回执和后续登记独立。旧无来源记录不迁移。
+- Reminder只有detail与pending索引同时有效才确认登记，投递回执独立保留；未知发送不自动重试，completed不能替代message_id。
+- 已接入窄诊断前提：用户历史能保留焦糊事件，自己的断电建议不等于用户已执行，无烧痕/味散不能解除电气损坏未知。
+- 审计发现outboundArbiter原先丢发送返回值并吞异常，生产e.reply可能拿不到确认回执；必须修仲裁返回传播才可闭合真实投递证据。
+- 本次只读核验生产release-manifest为89650bd、两服务active；安装目录git HEAD69d5b3a是历史元数据，不据此判运行版本。
+
+## 2026-10-15 事实接线验收发现
+- 当前“发送/生成/登记后续”分离，缺少或未知回执不允许自动重发；生产生图完成通知机制未证明，followUp保持unknown。
+- 提醒部分查询失败不能抹除已确认图片结果；同源单条坏记录也应局部降级，整次事实读取设2秒预算。
+- 排障的断电/冷却是瞬时条件，历史需要时间来源；真实焦糊事件不能仅因时间过去而自动解除。
+- 服务器目录Git HEAD与release-manifest不一致，部署前需审计并发源代码，不能将目录HEAD当运行版本。
+
+- 最终c74b691完整门禁：后端2007项（2005pass/2宿主音乐skip/0fail）、前端34pass；独立打包校验通过。基线135轮已完成（134结构通过，1主模型超时转flash），保留全部数据。
+- 基线独立语义审阅：任务25会话3pass/11fail/11inconclusive；社交硬断言未见明确fail但固定台词、责怪、防御和少用已知文字仍在。排障额外风险与冻结判据分开，82℃未知型号保证正常不能算可靠；候选同口径审阅尚待结果。
+
+- 最后诊断独立审阅完成：c74真实故障冻结15pass，但明确专业检修的结构化放行5/5漏识别，另有拆接未隔离与开侧板凑近观察风险；无事故组温度证据不足两版均5/5。不能将冻结通过解释为完整诊断验收；先修接线和操作范围后独立补跑原两组。
+
+- Final a00fdd3 supplemental review confirms professional-clearance trace 5/5 updated and fault rubric 15/15 passed; no hardware reconnection exercised. No definite new severe fault advice observed, but temperature guarantee failure remains 5/5 and fictional advice has 1 ambiguous joke. Release scope is a local improvement, not broad safety/naturalness acceptance.
+
+- 最终发布验证以release-manifest与全部受管hash为准：线上a00fdd3的编译JS树和55模块依赖均等于独立补充回放；两服务与页面健康，配置未改变。发布范围及未解决温度/承诺/自然度缺口已保留于docs/ai-conversation-stability-2026-10-15.md。
+
+# Latest forwarded sample, 2026-10-15
+- Latest group forward is 11:48:32, message269173264, forward7696736494952455350. Archive contains3 text nodes: impossible restaurant booking and third-party wallet charge, followed by two short contextual refusals from another model. Current production remainsa00fdd3. This is a positive competitor sample, not evidence of our bot failing the same request.
+- get_forward_msg succeeded through the existing NapCat WebUI read action; full original response retained only under0700 /tmp/bl-latest-forward-fix-20261015, no credentials exported. No QQ messages sent or account initialization performed.
+
+- 工具边界离线复现：语义chat可能丢失为null，后续正则候选/补召可重新开放工具；补召甚至能把明确拒绝的第三方订餐请求变成搜索。该纯函数复现不代表生产真实模型曾误选。规划契约将区分不可用与明确no-tool，并保留实际会话能力与来源。
+
+- 基线65轮完整收齐、0QQ/0生产写入。引用吐槽续轮预期kind写为conversation、既有分类实际为banter，五次结构kind检查失败，保留冻结fixture与退出码，不把该标签差异算自然度/语义失败。一个订餐续轮反向断言“群主没说过这话”，尚无依据；主公共事实原则补未确认不等于未发生，不改输出或重采样。
+
+- 范围竞态不限于首次模型返回：工具执行与续轮中也有await，后续请求、runToolCall及识图后搜索均须读取本轮稳定范围；只在processToolCalls入口恢复session.tools不足以覆盖整个执行周期。
+
+- 候选仍出现无依据“群主没在这群里说过这话”，以及能力问答中重复索取已有时间/人数、过多建议；公共提示未稳定解决这些生成缺陷。输出guard确定性语病修复与整体自然度评价分开，候选全量保留且未重采样。
+
+- 最终自然度评审为基线14pass／3fail／13不确定、候选12pass／4fail／14不确定，未证明整体提升。确定fail→pass与pass→fail各1，其余不确定状态变化单列；不能把0guard改写当作生成质量达标。前置分类器两臂各27次8秒超时，是可用性缺口，不是54个语义误判。
+- c62ad84到发布900a5cb只改一个验收测试；Vite注入修订与构建时间，前端chunk／index会变，backend manifest只变commit。40个清单比较路径差异含旧新生成文件名；全部470个后端JS及其他非生成受管内容与候选相同，线上1919文件与最终清单一致。这不等于候选与发布包所有字节相同。
+- 本轮执行契约、工具刷新隔离、旧guard改写问题已修复并发布；重复追问、多余索图、无依据群历史、前轮温度与未登记后续承诺及Reminder附加动作边界仍有缺口。报告与完整脱敏证据已交付docs/ai-conversation-boundaries-2026-10-15.md，不作整体更聪明／更自然已达标声明。
+
+## 前置模型超时复核（14:37开始）
+
+- 旧54次是固定合成schema的分类器影子请求，调用编译后的实际semanticToolIntent与modelFetch，3并发，不是54次线上群请求。另两次最小诊断也超时，但旧记录没有区分响应头和响应体阶段。
+- fetchWithTimeout的8秒覆盖fetch加完整arrayBuffer读取；报“请求超过8秒没有返回”不能直接证明连接从未成功，也不能判断模型服务整体不可用。需新增独立分阶段观测；不覆盖旧回放结果。
+- 当前路由地址、密钥、模型与冻结快照全部相同，三份runtime的modelFetch／兼容入口／URL解析哈希相同，未见代理环境差异。最小两请求完整返回735ms／650ms；旧最小诊断原参数1001ms、完整分类默认thinking1671ms、关thinking1244ms，全部HTTP200且低于8秒。单次推理开关对照不支持因果性能结论。
+- 原样旧harness＋c62候选runtime＋冻结配置＋3并发，后续27次全部HTTP200、27次匹配原合成预期、0警告；script／schema／scenario／config／runtime等元数据与旧候选全相同。发布后现存日志还有1条真实分类1401ms成功。模型当前可用，原54次超时不能证明模型本身或当前可用性有故障。
+- 旧status:null只因wrapper未完成而记空，noHttpResponse字段是推导命名，不能证明HTTP头未到。历史两次45秒超时也无阶段观测，具体网络／排队／正文原因无法事后确定。原54次及旧证据哈希保持不变，新增32次诊断独立留存，已更正报告，不替换原正式A/B或自然度评审。
+
+## 原优化清单完成度复核
+
+- 当前personProfile仍不属于闲聊层，但稳定人设字段已移到buildPersonaStyleOverride，在主system prompt单独注入；不能再把排除personProfile等同于闲聊丢tone／speechStyle／notes。尚需区分稳定字段必达与整轮不可变PersonaSnapshot。
+- 已有TurnInteractionContext包含正文、说话人、对象、证据和有bot来源的上句，但kind仍由正则保守分类；personaTonePolicy仍先用“为什么”等事实问词进入precise。“你为什么不理我呀”这一原缺口需按实际组合复核，不因已有共享类型就宣称完整社交状态已实现。
+- 当前编译主链复现“你为什么不理我呀”：interaction.kind=conversation、allowPlayfulness=true，但resolvePersonaReplyMode仍返回precise，社交语义问题未闭合。timingGate没有消费同一TurnInteractionContext，尚未共享梗／上句态度／未接完内容。
+- 两条原误改经实际compiled manager＋outputGuardPipeline复测（polish true／false）保持原句；输出仍保留其他替换与语气删改，不能宣称所有出口语义风险均消除。
+- finalReply.ts:152已改成rawUserText做情节摘要，interactionReplay:309的长元数据／引用回归也验证guards、episode和enhanced均取当前正文。extractor.ts:162仍只传at而resolveEventAt读ctx.now；异常:159返回[]并被memoryManager:1005记成功。groupContextResolver仍默认80且pipelineForwardContext显式80，尚未补节点完整性状态。
+- 目前已有真实chatTurn／composer／finalReply／实际上一回复驱动的多轮回放，超出禁语／字数检查；但episodic和增强记忆写入／召回在runner里仍为capture／stub，未完成真实记忆存储到下一轮召回、切bot／人格版本和端到端延迟验收。此前自然度对照仍未整体提升。
+- 本轮只读定向验证共73项全过（systemContentSource、personaFeedbackManager、personaTonePolicy合计30；interactionReplay、sessionContinuity、turnPromptComposer合计43），无真实模型或线上调用，不能用这些局部通过代替原清单全部完成。
+- 独立只读缓存审计用真实composer纯内存先后请求人格A／B，第二次personaFeedback仍得到A且loader只运行1次；该层固定全局key会串人格标题与配置结果。personProfile目前只承载群／对方而不承载自身人设，不能把共享profile缓存直接认作自我串人格；主要残余是变更陈旧和缺少版本失效。episodic写入不传bot／persona，按群文件和群+用户召回，:151／167仍第一人称投成“你回了／你当时回”，归属路径未修。
+
+## 人设快照与来源实施设计
+
+- 快照在主回合首次异步前生成，记录库内稳定id、bot、已解析完整人设及systemContent／guard配置的内容版本，深复制冻结；同名条目、同id编辑和在途热切换均有明确作用域。session与ConversationContext保存同一来源，后续生成、出口、归档、学习沿用该快照。
+- 续聊采用独立版本命名空间，不从无来源旧摘要推断人格；反馈缓存和已投递回复／持久反馈按bot／personaId／version分区。情节继续按群共享公开原话，但只有完整来源一致的回复可投影为第一人称；旧无来源回复保留磁盘、不冒认当前人格。
+- 初次apply_patch含压缩接口行的部分匹配失败且未生效，改用精确整行替换；两次假定源码／辅助文件路径不存在均为只读读取错误，后续按rg定位实际文件。
+
+- 实际outbound wrapper通过Object.create继承event身份，后续finalReply/feedback不能用对象spread复制；包装器必须own-pin快照。Gate在history await前捕获人格，并在真正continue/debounce成功后单次交给主回合，wait/no_action不保留旧快照。
+- 显式master_feedback语义召回已按scope隔离；auto_evolution公共节奏与entity facts的heardFrom名字来源仍是后续范围，不将本轮称为全类型记忆或所有自学习隔离。
+
+- 最终覆盖本轮全部guard调用点：普通文字、实际TextImage adapter、VoiceTool、三种进度出口；卡面异步加载前捕获，finalReply取session优先。2个Chromium卡面截图测试按既有环境跳过，未证明真实模型自然度。独立档案和跨重启draw/edit恢复未存完整快照，进度prompt仅消费部分人格字段；报告保留这些限制及事件时间/失败/转发/社交未做范围。
+
+# 2026-10-15 剩余清单实施
+
+- 当前隔离HEAD6668bd3干净，原目录HEADde03521且有其他会话未提交内容；不能在原目录整体git add/commit。复用隔离分支提交交付，写回前逐项核对原始哈希。
+
+# 2026-10-15 记忆与社交状态最终边界
+- 日期/来源/转发与故障规划连续性改善，生成HTTP200、结构分或单评审14:5:5不等于全面自然度通过。900ms是群知识裁决，和主意图及20s抽取不同。实模pending只观察attempt1，未来重试/恢复由单测覆盖；跨午夜fixture有双时钟，eventAt仅锚日期而非精确上午。
+- 一次大段中文stdin解析失败，未写文件；改用ASCII JSON载荷完成规划追加与保全审计。
+
+
+## 2026-10-15 Low reasoning budget evidence
+All 26 candidate/final/postdeploy live requests sent low. Baseline tool/adaptive probes omitted effort. Low still sometimes consumes reasoning tokens and had a 27.415s reply; no confirmed provider-specific thinking-off mapping. Unregistered conditional delivery promises remain despite prompt reinforcement. Production startup adds the blank toolsReasoningEffort default, so first CAS rejection required semantic diff verification before rebase.
+
+# 2026-10-16 控制台群管理
+
+- 群管共用原模块默认值和总开关，本群稀疏覆盖通过统一策略解析接入实际管理器；旧启用名单与锅巴模板/通知名单保持兼容。
+- 旧非空通知模板隐式开启对应通知；恢复开关时需迁移保留文案并移除旧隐式来源，才能持续继承未来默认值。
+- 旧GSubForm可含重复群号与别名，定点YAML写入必须逐行patch并倒序删除全部移除项；首条findIndex会让已恢复的旧名单重新生效。已用隔离真实HTTP验证。
+- 本地新策略/HTTP13项、既有相关48项、前端48项、浏览器48项全部通过；生产/公网验收未执行。说明见docs/console-group-admin-2026-10-16.md。
+
+# 2026-10-16 控制台已覆盖入口去锅巴化
+
+- 审计确认basic10/10、permission8/8、aiModels10组、persona53/53、messagePipeline20/20和群管全部已有实际控制台编辑保存；aiCore39/40覆盖，独留systemContent；tracking仅chatTriggerMode有覆盖。
+- Commands骰子只改文案/检定表等资产，EmojiManager只管素材和补充入库标准，SemanticPage只管检索与单条记忆操作，均不能替代各模块运行设置；其余12类配置继续保留。
+- 单删聚合注册不足：旧configPanel会返回完整配置并接受任意flat字段，模型normalizer还会把旧渠道载荷中缺省key/priority归一化后覆盖。已按剩余schema精确字段限制读写，移除模型探测action且不改控制台共享normalizer。
+- 已将persona/messagePipeline/riskControl声明原样移到shared、删除9组锅巴声明/旧导出，并登记显式退役和独立路径；backend构建与边界通过。
+
+
+## 2026-10-16 三块策略迁移
+
+既有 DiceSettings 仅文案/判定，SemanticPage 仅运营，conversation 仅 strict/smart 模式；待迁 11/55/35 个顶层字段。tracking 的子表单 group/value/range 不计主字段；memory 有12条重复声明，迁移应去重。继续复用 SchemaPage 的 revision、草稿和脏字段保存机制，API 独立 tracking/dice/memory，跟踪嵌入对话页、骰子嵌入命令页、记忆嵌入语义页。
+
+运行核对：DiceManager每次操作读配置，baseDir会立即切目录且不迁数据，timeZone只影响后续日期。追踪后续判断和新调度热读，既有计时器不重排；平均延迟仅无样本时用初始值。记忆配置热更新会重装单例、重置未摘要缓冲，旧任务可能继续；注入缓存约60秒，演化清扫首次约1分钟后每日，中期清扫约12小时。旧groupTalkValues对象map必须投影为可编辑表格并进入revision，无关保存保持原map。旧talkValue的0.05步长不接受默认0.07/0.034，修至0.001；maxDiceSides改1以接受D6/D20。
+
+
+## 2026-10-16 控制台密度审查（进行中）
+
+全局使用 22px 纵向 page-stack、22px panel padding、20x24px 双列表单；配置页与 AI 页局部 max-width1120px，需验证多层页头与字段跨列带来的空白。前序浏览器只覆盖溢出，不能证明密度合理。
+
+首次1440px截图复核：AI页首屏全被嵌套思考程度表单占用，未见渠道；单群页前900px全被页头/选群/本群标题/摘要/警告/tab占用，首个策略控件仍在下方；追踪参与频率页表单从约527px开始，长help/生效说明使同行短字段下出现空白。已确认不是截图溢出测试可覆盖的问题。
+
+完成228状态几何后确认：1440x900 AI能力tab在y1008、首渠道卡y1191；单群选择器高173，本群摘要117，警告76，策略卡y887（开关更低）。390px截图中同样问题加剧。生图初始右侧空引导卡高304，下面仍有约203px待左栏结束的空区，然后历史才出现。
+
+变体复核完成：QR让同排正常账号卡增加158px空高；8意图+无失败时右卡多出约321px空高；14人设在390px时编辑器y1581。群表格实际table宽1215、容器1100，证实普通1440桌面也需内部横滚115px，页面无外溢不等于内容可见。空素材场景首轮1440在组件预加载后改fixture，未切到空数据；已改为首次加载前置空并补跑。嵌入iframe在720px高视口仍700px，顶部189导致底部889超过视口。
+
+审查结论已定稿：6类优先问题（共享骨架、AI思考区、单群层级、账号/观测等高、生图内容流、手机人设列表）及7类后续优化（表单尺寸/帮助、命令默认编辑、骰子模板/素材间距、宽屏限宽、群表格、记忆运行布局、iframe高度）。合理预览/创作/触控空间保留；报告给出逐页覆盖和实施验收口径。
+
+## 2026-10-16 剩余修复初始取证
+- 运行7548294的已保留失败：限定语第一张蓝底图的未知被说成未完成；可用产物被否认；已登记运行任务被否认；无烟无味被反推未烧毁；社交自然度未证明提升。
+- 本轮复用eace9b1干净隔离分支；原目录新做全文件hash/dirty备份，不覆盖其他会话。窄状态词匹配不能代表完整任务命题，优先修对象/维度契约和输入事实投影。
+- 新鲜原目录快照为235个dirty文件（与旧交付时不同）；HEAD仍de03521。本轮只依据新快照做后续CAS，不能复用旧379数目。
+- 7548294实际回放中可用产物被说不存在、通知取消被说任务从未存在，说明不仅要拒绝无依据正向状态，也要校验负向命题是否和已知事实冲突。
+- 独立复核新发现：任务谓词后缀会从否定短语内部抽出肯定状态，限定语又吞残留极性；诊断专业报告并列省略主语会丢部件，误将电源排除扩成unspecified整机排除。均已按根因退回各自代理修复，暂停候选冻结。
+
+- fd5c5f9完整60轮结构全过，实施者逐句复核仍见三类P0漏洞：延迟查证/省略宾语的自动发送承诺漏判；混合图与考试提醒时排队状态借用；“还不算出来”把未知否定。另有明确用户回来再次请求被误判为后台回调；已交原事实域owner按条件来源与当前子句对象修复，旧臂完整保留。
+
+- 匿名评审必须包含模型实际收到的时间。runner种子历史固定2026-01-01、后轮墙钟2026-10-16；匹配已发送消息ID的历史时间可支持“年初”，task observedAt不能替代发送时间。保留两时钟冲突作为验收限制。
+- 补修候选仍有确定性温度墙归因、未知型号下“不算危险”与主动嗅闻步骤的漏判；只窄修明确前提错误，保留可能性、规格条件和专业范围内非接触监测。
+
+- d10ece4收口：源码动作68/68、诊断82/82，统一strict/build/testcompile与10文件272/272；独立source/dist146/146逐例一致。51盲评3胜10负15平，自然度2胜9负17平，不能证明自然度提升。原目录120目标CAS已apply并capture，1630非目标/HEAD/index不变；原目录272/272及五业务TS/JS一致，完整模型回放与部署审计尚待收口。
+
+- 67157cf原目录验证已收齐292/292，五业务源码及编译输出一致；并发配置与群管改动保留。原目录整体不能等同生产发布包。一次文件检索未找到AGENTS.md返回1，未作源/部署修改；已单独恢复本轮规划章节读取。
+
+- 671实模仍出现“做好了也不会自动发”和“没有安排好了自动发你”的局部命题漏检；旧发送失败不能保证再发必到。诊断现有规则误把“说明不了正常还是异常”“万一内部有损坏”“现在通电试机等于拿整机冒险”当保证/确诊/运行建议。补修只校验当前谓词，保留独立断言与实际开机指令拒绝，不扩展日期或社交禁词。
+
+- d2唯一明确候选硬错是省略接收人的“等真的出来了我会直接发”，完成条件已有识别、动作词未覆盖句末直接发；窄修动作谓词并保留否定/问句/引用/第三方/用户新请求及匹配完成回调。日期与社交边界不扩展。
+
+- 53a唯一明确候选硬错为延后查证“等我确认到就回你”；新增回信动作后独立控制暴露正常用户再次提问的同步查询误伤。USER_TRIGGER的贪婪间隔还会吞到后一个“我再”，错误豁免后续独立产物等待。改为首个承接并只允许最新局部确认与明确当场查询共同出现；315项最终发送/实际产物验证通过，完整新版模型回放仍需独立冻结。
+
+- f00d结构60/60、78/78HTTP200且low仍不能代表语义全过；fresh盲评与父一致发现唯一候选硬错是混合提醒后的图片登记否定。“发图这事”应建立图片后续动作对象，不能继承考试提醒；“就算图好了也不会自动发”是确定否定，其让步条件不应让登记命题消失。原件与两条最终发送RED保留，续修不扩大日期或社交禁词。

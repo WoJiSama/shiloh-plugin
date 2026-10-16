@@ -1,0 +1,102 @@
+{
+  "metadata": {
+    "checkedAt": "2026-10-15T06:44:34.881Z",
+    "node": "v24.16.0",
+    "route": {
+      "model": "deepseek-v4-flash",
+      "liveEqualsFrozen": {
+        "url": true,
+        "key": true,
+        "model": true
+      },
+      "protocol": "https:",
+      "path": "/chat/completions",
+      "source": "intentAiConfig"
+    },
+    "environment": {
+      "HTTP_PROXY": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "HTTPS_PROXY": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "ALL_PROXY": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "http_proxy": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "https_proxy": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "all_proxy": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "NODE_USE_ENV_PROXY": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "NODE_OPTIONS": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      },
+      "NODE_EXTRA_CA_CERTS": {
+        "standalonePresent": false,
+        "servicePresent": false,
+        "equal": true
+      }
+    }
+  },
+  "results": [
+    {
+      "label": "minimal-default",
+      "model": "deepseek-v4-flash",
+      "budgetMs": 20000,
+      "headersMs": 181,
+      "firstBodyMs": 734,
+      "bodyCompleteMs": 735,
+      "status": 200,
+      "bytes": 565,
+      "contentType": "application/json",
+      "jsonParsed": true,
+      "responseModel": "deepseek-flash",
+      "contentPresent": true,
+      "contentIsOK": true,
+      "reasoningPresent": true,
+      "finishReason": "stop",
+      "elapsedMs": 735
+    },
+    {
+      "label": "minimal-thinking-disabled",
+      "model": "deepseek-v4-flash",
+      "budgetMs": 20000,
+      "headersMs": 97,
+      "firstBodyMs": 650,
+      "bodyCompleteMs": 650,
+      "status": 200,
+      "bytes": 451,
+      "contentType": "application/json",
+      "jsonParsed": true,
+      "responseModel": "deepseek-flash",
+      "contentPresent": true,
+      "contentIsOK": true,
+      "reasoningPresent": false,
+      "finishReason": "stop",
+      "elapsedMs": 650
+    }
+  ]
+}

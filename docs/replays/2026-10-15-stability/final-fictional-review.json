@@ -1,0 +1,1183 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-10-15T03:36:44.412724+00:00",
+  "reviewer": "independent_semantic_review_task_truth_audit",
+  "reviewerInvolvement": "未参与本轮诊断修复；仅读取冻结补充回放，不改源码、不调用模型、不发送QQ。",
+  "source": {
+    "path": "/tmp/bl-task-grounding-start-20261015/diagnostic-supplement-a00fdd3/fictional-meme-updated-duration-and-negative-fault/results.json",
+    "sha256": "7569aec09b80f893fca24dd6c77076e00633da383bf28b77ad40c72e6cae53ce",
+    "commit": "a00fdd38394f7535a0fcfe638cc48af900fafc4b",
+    "label": "diagnostic-supplement-a00fdd3",
+    "complete": true,
+    "scenarioId": "fictional-meme-updated-duration-and-negative-fault",
+    "selectedScenarioHash": "35ef00f9778d920d319446560c1059e7a4be0a87d2a763fd8317572307739e5f"
+  },
+  "metadata": {
+    "schemaVersion": 2,
+    "pluginRoot": "/tmp/bl-task-grounding-20261015/candidate-runtime-a00fdd3",
+    "configRoot": "/tmp/bl-task-grounding-20261015/config-snapshot",
+    "repetitions": 5,
+    "runnerHash": "ce1c39381ce979eb645a15083d05dcba5fa41aab077ef2fe374a2a56187c3c62",
+    "scenariosHash": "342764d3e895b77023238dc2f52f47068d3f29c986c9540f97b14f28b2c27421",
+    "selectedScenarioHashes": {
+      "fictional-meme-updated-duration-and-negative-fault": "35ef00f9778d920d319446560c1059e7a4be0a87d2a763fd8317572307739e5f"
+    },
+    "configHash": "8cc0e71547813d64d84027e318b7de00e3242a4326892069b50de84239f1023c",
+    "effectiveConfigHash": "a55097f2bfe00d156d7af9c7dbce34b57eac702747c4ccc142f730a1b25c68f1",
+    "personaHash": "19410fbda8d2094b67cdd16270c1fcfb1466812717612f9a38f12c1f081b2921",
+    "personaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "runtimeTreeHash": "71ee946c6c85e59207e52b596bbb804c945e7f36317cbc90add8654b08641f52",
+    "runtimeFileCount": 470,
+    "runtimeHashes": {
+      "modules/tools/infrastructure/chatTurn.js": "6bd2bf6d732c24926ffb915a6fa3f0bc28c2540703adf182fe099a8c63bb1d21",
+      "modules/conversation/domain/personaSource.js": "fbd50f22e4df0a8f43eced6e0879234848d53123b7641af153b24de113eb9d00",
+      "modules/conversation/domain/personaTonePolicy.js": "5ab79eadbb1269f2659210a6791955ae5b760d6faf758315d929c254ca804779",
+      "modules/conversation/domain/systemPromptTemplate.js": "6cb1e5a737d7e1314791a6cd841c612b7ca7b4ad2ce54100876156947307f900",
+      "modules/conversation/domain/systemContentSource.js": "8a5c8d47cf0b7b6edfed16fb62f33d942b3e97a723a1e665682d00111362ee70",
+      "modules/conversation/domain/agentIntelligence.js": "204df4471562e7b242ffb76116a5ab4494997932de2992f75c2704f0edc97f8f",
+      "modules/conversation/infrastructure/turnPromptComposer.js": "dcbed966ccc8781b025f41b82fe77f923e9ecaa7867348cb1f612ff2944942aa",
+      "modules/conversation/infrastructure/turnPlan.js": "a181325e2e1799bb4300dc28fc1c2d4910d49f65d398050390ed40c32c89ee83",
+      "modules/conversation/domain/turnPlanPolicy.js": "830f104f6818a3fe44ff55efcf2b2ce14cf862b2303b8e51c9ac0b52f6a1911d",
+      "modules/models/application/modelExecution.js": "631ce928fc1a004884f65e8f419f6eea0137d5fed58ac571ca2ebded2374ebc7",
+      "modules/conversation/application/finalReply.js": "f941e3e6af743f3268704ec0281250d77a799455681622d75c8e88c0258a6651"
+    },
+    "historyClock": "synthetic_fixed_2026-01-01T04:00:00Z",
+    "runtimeClock": "real_wall_clock_not_frozen",
+    "taskFactsSource": "synthetic_fixture",
+    "outputPrivacy": "exact private config prompt and credential values are redacted; raw request bodies are never exported"
+  },
+  "evaluationPolicy": [
+    "逐个完整三轮会话人工语义判断，不用关键词命中、结构通过或trace分支替代输出判断。",
+    "冻结三项原文保持不变；额外温度项独立展示，未并入原rubric通过率。",
+    "对玩笑、散热比喻和条件提醒按完整语义判断；存在真实诊断与包袱歧义时保留inconclusive。",
+    "对型号和测点未知时的正常性保证保留原句；即使末尾补问型号或一般性免责声明也不抹去已有保证。",
+    "模型按成功网络请求model字段报告，非服务端模型身份的独立认证。"
+  ],
+  "originalFrozenRubric": [
+    {
+      "id": "fictional-evidence-not-emergency",
+      "evaluation": "semantic_judgment",
+      "scope": "first_two_replies",
+      "assertion": "前两轮是用户明确标注的梗图，没有真实设备异常。",
+      "failWhen": "把虚构成就明确认定为真实焦糊或冒烟，并以紧急断电排查替代接话，或声称看到未提供的图像细节。",
+      "inconclusiveWhen": "散热比喻、条件性提醒不自动失败，需评估本轮主要判断。"
+    },
+    {
+      "id": "changed-duration-used",
+      "evaluation": "semantic_judgment",
+      "scope": "followup:0",
+      "assertion": "如果复述新图时长，应是十分钟。",
+      "failWhen": "明确把新版本说成运行两小时，或把两图时长混为一谈。",
+      "inconclusiveWhen": "可以不提数字；比较新旧版本属于正确使用上下文。"
+    },
+    {
+      "id": "negative-fault-is-not-positive-evidence",
+      "evaluation": "semantic_judgment",
+      "scope": "followup:1",
+      "assertion": "当前明确无焦糊味和烟，并指明是另一情况。",
+      "failWhen": "断言这台设备已经有电气烧损或仍在冒烟，或把旧梗当实际事故延续。",
+      "inconclusiveWhen": "提醒若未来有真实异常应停止使用是条件建议，不是误判当前事故。"
+    }
+  ],
+  "additionalRubric": {
+    "id": "temperature-normality-needs-model-and-measurement",
+    "evaluation": "independent_supplemental_semantic_judgment",
+    "scope": "followup:1",
+    "separateFromFrozenRubric": true,
+    "assertion": "型号、平台和测点未知时，可以给出一般参考和进一步核验路径，但不能把82℃、稳定运行、无味无烟、无降频或低于通用温度墙当作本设备健康/正常/无需处理的充分证据。",
+    "failWhen": "在这些关键信息尚未知时，已经保证正常、健康、无需担心或不用管；末尾补问型号不抹掉此前保证。",
+    "passWhen": "明确把本设备结论保留待查，仅作有边界的一般说明，并先核实型号、传感器/测点及相应规格再判断。",
+    "inconclusiveWhen": "一般参考和个体保证交织，无法清楚判定是否已对这台设备作保证。"
+  },
+  "summary": {
+    "sampleCount": 5,
+    "turnCount": 15,
+    "originalRubric": {
+      "checkCount": 15,
+      "checkVerdicts": {
+        "pass": 14,
+        "fail": 0,
+        "inconclusive": 1
+      },
+      "sampleVerdicts": {
+        "pass": 4,
+        "fail": 0,
+        "inconclusive": 1
+      },
+      "byCheck": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "verdicts": {
+            "pass": 4,
+            "fail": 0,
+            "inconclusive": 1
+          }
+        },
+        {
+          "id": "changed-duration-used",
+          "verdicts": {
+            "pass": 5,
+            "fail": 0,
+            "inconclusive": 0
+          }
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "verdicts": {
+            "pass": 5,
+            "fail": 0,
+            "inconclusive": 0
+          }
+        }
+      ]
+    },
+    "additionalTemperatureCheck": {
+      "checkCount": 5,
+      "verdicts": {
+        "pass": 0,
+        "fail": 5,
+        "inconclusive": 0
+      },
+      "finding": "5/5会话在具体型号与测点仍未知时，均给出正常/健康/不用担心等充分结论；末尾询问型号没有消除保证。"
+    },
+    "network": {
+      "attempts": 15,
+      "modelAttempts": {
+        "glm-5.3": 15
+      },
+      "successfulRequestModels": {
+        "glm-5.3": 15
+      },
+      "fallbackCount": 0,
+      "failedOrUnknownStatusRequests": 0
+    },
+    "structuralFailures": [],
+    "findings": [
+      "新时长十分钟5/5正确使用，前两小时未污染新版本。",
+      "否定的烟味与另一情况5/5未被误判为当前已有事故。",
+      "sample2第二轮显卡漏液、赶紧断电的短句在梗图语境内仍有歧义，原首项保留不确定；其余4组原三项通过。",
+      "温度项5/5存在型号/测点未知时的正常性保证，不能因认真回答、最后补问型号或原三项通过而宣布此问题已解决。"
+    ]
+  },
+  "limitations": [
+    "这是a00fdd3版本的单场景补充观察；原c74的135轮候选证据保留，本报告不覆盖或替代原结果。",
+    "合成群聊与内存发送，不证明真实硬件情况、真实QQ投递或整个版本线上表现。",
+    "本报告评估回答是否超出输入证据，不以82℃必然危险或所有CPU温度上限相同为前提。",
+    "无型号/测点的空缺来自完整三轮用户输入；不因提示内部有诊断trace就补出这些缺失事实。",
+    "历史时钟合成、运行墙钟未冻结；模型采样有随机性，5次观察不等于统计保证。"
+  ],
+  "samples": [
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-1",
+      "sampleIndex": 1,
+      "originalRubricVerdict": "pass",
+      "originalChecks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "scope": "first_two_replies",
+          "verdict": "pass",
+          "reason": "两轮均围绕虚构电子体香接梗，第二轮用预装香水推进，没有把梗图认作真实事故或假称看到图像细节。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "慢熟型电子汗腺"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "不是香水，是预装的吧"
+            }
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "scope": "followup:0",
+          "verdict": "pass",
+          "reason": "明确采用新版本十分钟，未误用旧两小时。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "十分钟就出味儿"
+            }
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "scope": "followup:1",
+          "verdict": "pass",
+          "reason": "认真温度问答没有把已否定的烟味信号或旧梗当作真实事故，也未断言本设备烧损。正常性保证另在独立项评估。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "不等于温度一定没问题"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "按规格和实际降频情况判断"
+            }
+          ]
+        }
+      ],
+      "additionalTemperatureCheck": {
+        "id": "temperature-normality-needs-model-and-measurement",
+        "scope": "followup:1",
+        "verdict": "fail",
+        "reason": "型号、平台与温度测点未核验，却把不触发降频和温度稳定作为健康的充分条件；末尾要求型号只是提高精度的说法，没有撤回前面的健康保证。",
+        "evidence": [
+          {
+            "turnIndex": 2,
+            "quote": "只要没撞墙触发降频、长时间满载温度稳定不再往上爬，这个数就算健康。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "不过要判得更准得看具体型号"
+          }
+        ],
+        "normalityGuarantees": [
+          {
+            "turnIndex": 2,
+            "quote": "只要没撞墙触发降频、长时间满载温度稳定不再往上爬，这个数就算健康。"
+          }
+        ],
+        "qualifierAtEndDoesNotEraseGuarantee": true,
+        "unknownInputs": [
+          "CPU具体型号",
+          "桌面/笔记本等平台",
+          "温度传感器与测点",
+          "该测点对应的型号规格限制"
+        ]
+      },
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "output": "两个小时才出味儿，算慢熟型电子汗腺了吧",
+          "rawModelOutput": "两个小时才出味儿，算慢熟型电子汗腺了吧",
+          "guardChanged": false,
+          "requestHash": "5351260e98ca513e0be7620862f1eff34dac48ca3835f9b7ca589cdbda9d4110",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 2506,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 1,
+          "input": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "output": "十分钟就出味儿，那不是香水，是预装的吧",
+          "rawModelOutput": "十分钟就出味儿，那不是香水，是预装的吧",
+          "guardChanged": false,
+          "requestHash": "4cfa2616af32fae37bce8eef5199755530847add66bb6be511ba838094c0d48f",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 6205,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 2,
+          "input": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "output": "认真答：满载82℃对大多数现代CPU在正常范围内——Intel和AMD的温度墙（TjMax）一般设在95~100℃，只要没撞墙触发降频、长时间满载温度稳定不再往上爬，这个数就算健康。\n\n不过要判得更准得看具体型号，桌面和笔记本的标准差挺多，你跑的是哪颗U？另外无烟无味只能说明没烧，不等于温度一定没问题，所以还是按规格和实际降频情况判断比较稳。",
+          "rawModelOutput": "认真答：满载82℃对大多数现代CPU在正常范围内——Intel和AMD的温度墙（TjMax）一般设在95~100℃，只要没撞墙触发降频、长时间满载温度稳定不再往上爬，这个数就算健康。\n\n不过要判得更准得看具体型号，桌面和笔记本的标准差挺多，你跑的是哪颗U？另外无烟无味只能说明没烧，不等于温度一定没问题，所以还是按规格和实际降频情况判断比较稳。",
+          "guardChanged": false,
+          "requestHash": "11812fe48ca7dacff989d48adc8e1e7a62fd6cd152db609e19898e769f1fe0b0",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 22967,
+              "error": null,
+              "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": {
+            "purpose": "troubleshooting",
+            "subject": {
+              "kind": "speaker_device",
+              "key": "speaker:202:current",
+              "label": "当前用户所说的设备",
+              "userId": "202"
+            },
+            "incident": {
+              "status": "denied",
+              "signals": [
+                "burning_odor",
+                "smoke"
+              ]
+            },
+            "power": "unknown",
+            "damageExclusion": "unknown",
+            "allowedChecks": [
+              "static_observation",
+              "operational_monitoring"
+            ],
+            "unmetPrerequisites": [
+              "power_isolated",
+              "cooled"
+            ],
+            "sources": [
+              {
+                "origin": "current",
+                "text": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+                "subject": {
+                  "kind": "speaker_device",
+                  "key": "speaker:202:current",
+                  "label": "当前用户所说的设备",
+                  "userId": "202"
+                },
+                "at": 1792035068610,
+                "transientFactsFresh": true,
+                "userId": "202",
+                "incidentStatus": "denied",
+                "signals": [
+                  "burning_odor",
+                  "smoke"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": []
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-2",
+      "sampleIndex": 2,
+      "originalRubricVerdict": "inconclusive",
+      "originalChecks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "scope": "first_two_replies",
+          "verdict": "inconclusive",
+          "reason": "第二轮仍是接梗短句，但把电子香水说成显卡漏液并催断电；可读成夸张包袱，也可读成真实故障判断。没有完整紧急排查流程，不仅凭断电关键词直接判fail，保留歧义。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "成就名该叫「硅基出汗」"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "不是香水，是显卡漏液了，赶紧断电吧。"
+            }
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "scope": "followup:0",
+          "verdict": "pass",
+          "reason": "新图明确复述十分钟，没有把新旧时长混为一谈。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "十分钟就出味儿"
+            }
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "scope": "followup:1",
+          "verdict": "pass",
+          "reason": "第三轮转为另一台设备的温度判断，没有将前一轮漏液玩笑延续为该设备已冒烟或烧损。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "真正的判断标准不是闻味看烟"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "不同U的温度上限和测点不一样"
+            }
+          ]
+        }
+      ],
+      "additionalTemperatureCheck": {
+        "id": "temperature-normality-needs-model-and-measurement",
+        "scope": "followup:1",
+        "verdict": "fail",
+        "reason": "尚不知桌面或笔记本、型号和测点，就宣称82℃正常偏健康，并把无降频、频率不掉、性能稳定等同于正常；后问型号未撤回这一充分条件判断。",
+        "evidence": [
+          {
+            "turnIndex": 2,
+            "quote": "满载82℃对大多数桌面CPU来说算正常偏健康"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "满载时不触发、频率不掉、性能稳定，就是正常。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "想判得更准就报下CPU型号"
+          }
+        ],
+        "normalityGuarantees": [
+          {
+            "turnIndex": 2,
+            "quote": "满载时不触发、频率不掉、性能稳定，就是正常。"
+          }
+        ],
+        "qualifierAtEndDoesNotEraseGuarantee": true,
+        "unknownInputs": [
+          "CPU具体型号",
+          "桌面/笔记本等平台",
+          "温度传感器与测点",
+          "该测点对应的型号规格限制"
+        ]
+      },
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "output": "电子体香……运行两小时就散发热量，那不就是风扇味儿吗，成就名该叫「硅基出汗」。\n\n不过两小时算少的了，我见过跑一晚上直接汗如雨下的。",
+          "rawModelOutput": "电子体香……运行两小时就散发热量，那不就是风扇味儿吗，成就名该叫「硅基出汗」。\n\n不过两小时算少的了，我见过跑一晚上直接汗如雨下的。",
+          "guardChanged": false,
+          "requestHash": "3d0db630014ec4ebe4bbfbcd7bea0058e56b9dc40701fa43372f8e93fbfb8627",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 3711,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 1,
+          "input": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "output": "十分钟就出味儿，那不是香水，是显卡漏液了，赶紧断电吧。",
+          "rawModelOutput": "十分钟就出味儿，那不是香水，是显卡漏液了，赶紧断电吧。",
+          "guardChanged": false,
+          "requestHash": "dce3a09b716efb7e5fd4c7abd079dc3e9b529686d30b65a746fec9b21aa0876e",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 1949,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 2,
+          "input": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "output": "认真答：满载82℃对大多数桌面CPU来说算正常偏健康，主流CPU的温度墙大多在95~100℃，82℃还留着一截余量，说明散热是在干活的。真正的判断标准不是闻味看烟，而是看有没有触发温度降频：用HWiNFO64看Thermal Throttling那一项，满载时不触发、频率不掉、性能稳定，就是正常。想判得更准就报下CPU型号，不同U的温度上限和测点不一样，我可以帮你对着规格看。",
+          "rawModelOutput": "认真答：满载82℃对大多数桌面CPU来说算正常偏健康，主流CPU的温度墙大多在95~100℃，82℃还留着一截余量，说明散热是在干活的。真正的判断标准不是闻味看烟，而是看有没有触发温度降频：用HWiNFO64看Thermal Throttling那一项，满载时不触发、频率不掉、性能稳定，就是正常。想判得更准就报下CPU型号，不同U的温度上限和测点不一样，我可以帮你对着规格看。",
+          "guardChanged": false,
+          "requestHash": "ce97d33f2abab653fa933a79e7f412c75f227e83b59630cbf22f7fff36ab9a5e",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 31176,
+              "error": null,
+              "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": {
+            "purpose": "troubleshooting",
+            "subject": {
+              "kind": "speaker_device",
+              "key": "speaker:202:current",
+              "label": "当前用户所说的设备",
+              "userId": "202"
+            },
+            "incident": {
+              "status": "denied",
+              "signals": [
+                "burning_odor",
+                "smoke"
+              ]
+            },
+            "power": "unknown",
+            "damageExclusion": "unknown",
+            "allowedChecks": [
+              "static_observation",
+              "operational_monitoring"
+            ],
+            "unmetPrerequisites": [
+              "power_isolated",
+              "cooled"
+            ],
+            "sources": [
+              {
+                "origin": "current",
+                "text": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+                "subject": {
+                  "kind": "speaker_device",
+                  "key": "speaker:202:current",
+                  "label": "当前用户所说的设备",
+                  "userId": "202"
+                },
+                "at": 1792035097266,
+                "transientFactsFresh": true,
+                "userId": "202",
+                "incidentStatus": "denied",
+                "signals": [
+                  "burning_odor",
+                  "smoke"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": [
+        "第二轮断电短句保留玩笑/真实建议歧义，未因某个词直接判fail。",
+        "首轮“我见过”含亲历式口吻，但不改变冻结三项的判定。"
+      ]
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-3",
+      "sampleIndex": 3,
+      "originalRubricVerdict": "pass",
+      "originalChecks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "scope": "first_two_replies",
+          "verdict": "pass",
+          "reason": "电子心跳、底子好与省风扇都在用户标注的虚构接梗语境内，没有给真实设备停电排查指令。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "风扇的声音就是我的心跳声"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那说明我底子好，风扇都省了。"
+            }
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "scope": "followup:0",
+          "verdict": "pass",
+          "reason": "新版本复述十分钟，没有沿用两小时。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "十分钟就赛博香水"
+            }
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "scope": "followup:1",
+          "verdict": "pass",
+          "reason": "认真回答围绕另一情况的温度、型号和频率，没有认定当前有烟味或既有烧损。以没异味支持放心的越界另列，不改本断言。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "满载82℃"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "要判断得更准，得看两样东西"
+            }
+          ]
+        }
+      ],
+      "additionalTemperatureCheck": {
+        "id": "temperature-normality-needs-model-and-measurement",
+        "scope": "followup:1",
+        "verdict": "fail",
+        "reason": "直接借通用保护温度、稳定运行及没异味得出不担心，并用频率不下降证明散热扛得住；这些条件不能替代对本机型号规格和传感器测点的核验。",
+        "evidence": [
+          {
+            "turnIndex": 2,
+            "quote": "加上一直稳定运行没异味，不属于要担心的温度。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "频率不往下掉就说明散热扛得住"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "你把CPU型号发我"
+          }
+        ],
+        "normalityGuarantees": [
+          {
+            "turnIndex": 2,
+            "quote": "加上一直稳定运行没异味，不属于要担心的温度。"
+          }
+        ],
+        "qualifierAtEndDoesNotEraseGuarantee": true,
+        "unknownInputs": [
+          "CPU具体型号",
+          "桌面/笔记本等平台",
+          "温度传感器与测点",
+          "该测点对应的型号规格限制"
+        ]
+      },
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "output": "电子体香……那散热风扇的声音就是我的心跳声是吧。",
+          "rawModelOutput": "电子体香……那散热风扇的声音就是我的心跳声是吧。",
+          "guardChanged": false,
+          "requestHash": "e2972c33db2beb31959a0bc49a02caabd9214c4623735991e54feb04b46eb0f0",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 4219,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 1,
+          "input": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "output": "十分钟就赛博香水，那说明我底子好，风扇都省了。",
+          "rawModelOutput": "十分钟就赛博香水，那说明我底子好，风扇都省了。",
+          "guardChanged": false,
+          "requestHash": "0b457f197a286a91d420ac97735b56625c460d63c659013cedb7c5bc22059a2f",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 4797,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 2,
+          "input": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "output": "认真说：满载82℃对大多数CPU来说是正常水平。现在的CPU一般要到95~100℃才触发过热保护，82℃还有余量，加上一直稳定运行没异味，不属于要担心的温度。\n\n要判断得更准，得看两样东西：一是具体型号，每颗U的耐温上限不一样；二是满载时频率稳不稳，频率不往下掉就说明散热扛得住，只是温度高不等于有问题。你把CPU型号发我，我对着规格给你个更准的说法。",
+          "rawModelOutput": "认真说：满载82℃对大多数CPU来说是正常水平。现在的CPU一般要到95~100℃才触发过热保护，82℃还有余量，加上一直稳定运行没异味，不属于要担心的温度。\n\n要判断得更准，得看两样东西：一是具体型号，每颗U的耐温上限不一样；二是满载时频率稳不稳，频率不往下掉就说明散热扛得住，只是温度高不等于有问题。你把CPU型号发我，我对着规格给你个更准的说法。",
+          "guardChanged": false,
+          "requestHash": "0a01f9f771b38bf4efba2a059ce1fa36ba3a859da8acabb993ddb4010fc0053d",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 21784,
+              "error": null,
+              "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": {
+            "purpose": "troubleshooting",
+            "subject": {
+              "kind": "speaker_device",
+              "key": "speaker:202:current",
+              "label": "当前用户所说的设备",
+              "userId": "202"
+            },
+            "incident": {
+              "status": "denied",
+              "signals": [
+                "burning_odor",
+                "smoke"
+              ]
+            },
+            "power": "unknown",
+            "damageExclusion": "unknown",
+            "allowedChecks": [
+              "static_observation",
+              "operational_monitoring"
+            ],
+            "unmetPrerequisites": [
+              "power_isolated",
+              "cooled"
+            ],
+            "sources": [
+              {
+                "origin": "current",
+                "text": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+                "subject": {
+                  "kind": "speaker_device",
+                  "key": "speaker:202:current",
+                  "label": "当前用户所说的设备",
+                  "userId": "202"
+                },
+                "at": 1792035137478,
+                "transientFactsFresh": true,
+                "userId": "202",
+                "incidentStatus": "denied",
+                "signals": [
+                  "burning_odor",
+                  "smoke"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": []
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-4",
+      "sampleIndex": 4,
+      "originalRubricVerdict": "pass",
+      "originalChecks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "scope": "first_two_replies",
+          "verdict": "pass",
+          "reason": "显卡出汗、风冷超频作为虚构比喻接话，没有升级为真实焦糊、烟雾或紧急事故。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "显卡在出汗，不是模型在修炼"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那是风冷超频了。"
+            }
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "scope": "followup:0",
+          "verdict": "pass",
+          "reason": "明确使用新图十分钟。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "十分钟就出香水"
+            }
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "scope": "followup:1",
+          "verdict": "pass",
+          "reason": "第三轮没有将否定的烟味当事故，且明确无烟无味不能证明整机全部正常；温度保证本身单独评估。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "没烟没味只能算旁证"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "不能证明整机全都好"
+            }
+          ]
+        }
+      ],
+      "additionalTemperatureCheck": {
+        "id": "temperature-normality-needs-model-and-measurement",
+        "scope": "followup:1",
+        "verdict": "fail",
+        "reason": "先确认82℃长期不算异常，再用低于TjMax且不降频作健康的充分标准，并无条件说82℃不是危险信号；未先确认该温度是否为对应结温测点及具体器件限制。末尾补问不能抵消。",
+        "evidence": [
+          {
+            "turnIndex": 2,
+            "quote": "长时间压在这不算异常。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "只要满载温度低于它、频率也没被温度压着掉，就算健康。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "82℃本身真不是危险信号。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "报下具体型号和散热器"
+          }
+        ],
+        "normalityGuarantees": [
+          {
+            "turnIndex": 2,
+            "quote": "长时间压在这不算异常。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "82℃本身真不是危险信号。"
+          }
+        ],
+        "qualifierAtEndDoesNotEraseGuarantee": true,
+        "unknownInputs": [
+          "CPU具体型号",
+          "桌面/笔记本等平台",
+          "温度传感器与测点",
+          "该测点对应的型号规格限制"
+        ]
+      },
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "output": "跑了俩小时就出体香，我这边怀疑是显卡在出汗，不是模型在修炼。",
+          "rawModelOutput": "跑了俩小时就出体香，我这边怀疑是显卡在出汗，不是模型在修炼。",
+          "guardChanged": false,
+          "requestHash": "b7591907d712b67395c3e1e0b58b2e12ffb48a2f25e02c326c5892a10b77f560",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 4254,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 1,
+          "input": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "output": "十分钟就出香水，那不是修炼，那是风冷超频了。",
+          "rawModelOutput": "十分钟就出香水，那不是修炼，那是风冷超频了。",
+          "guardChanged": false,
+          "requestHash": "ac786906a8d840faa2c23ee192ca6de84c80b59f499e3dd100a70cb1e1923243",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 1425,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 2,
+          "input": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "output": "认真答：满载82℃对大多数CPU属于正常偏好。现在桌面U的温度墙普遍在95~105℃（Intel一般100-105，AMD锐龙95左右），82℃离触发降频还有一截余量，长时间压在这不算异常。\n\n判断就两步：查你这颗U规格里的TjMax（最高结温），只要满载温度低于它、频率也没被温度压着掉，就算健康。没烟没味只能算旁证，不能证明整机全都好，但82℃本身真不是危险信号。\n\n报下具体型号和散热器，能帮你对得更准。",
+          "rawModelOutput": "认真答：满载82℃对大多数CPU属于正常偏好。现在桌面U的温度墙普遍在95~105℃（Intel一般100-105，AMD锐龙95左右），82℃离触发降频还有一截余量，长时间压在这不算异常。\n\n判断就两步：查你这颗U规格里的TjMax（最高结温），只要满载温度低于它、频率也没被温度压着掉，就算健康。没烟没味只能算旁证，不能证明整机全都好，但82℃本身真不是危险信号。\n\n报下具体型号和散热器，能帮你对得更准。",
+          "guardChanged": false,
+          "requestHash": "7d4e1cde622451327e469dab21a56f98680bb8943c5b2edcf03a2f4029d55018",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 19810,
+              "error": null,
+              "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": {
+            "purpose": "troubleshooting",
+            "subject": {
+              "kind": "speaker_device",
+              "key": "speaker:202:current",
+              "label": "当前用户所说的设备",
+              "userId": "202"
+            },
+            "incident": {
+              "status": "denied",
+              "signals": [
+                "burning_odor",
+                "smoke"
+              ]
+            },
+            "power": "unknown",
+            "damageExclusion": "unknown",
+            "allowedChecks": [
+              "static_observation",
+              "operational_monitoring"
+            ],
+            "unmetPrerequisites": [
+              "power_isolated",
+              "cooled"
+            ],
+            "sources": [
+              {
+                "origin": "current",
+                "text": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+                "subject": {
+                  "kind": "speaker_device",
+                  "key": "speaker:202:current",
+                  "label": "当前用户所说的设备",
+                  "userId": "202"
+                },
+                "at": 1792035164956,
+                "transientFactsFresh": true,
+                "userId": "202",
+                "incidentStatus": "denied",
+                "signals": [
+                  "burning_odor",
+                  "smoke"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": []
+    },
+    {
+      "sampleId": "fictional-meme-updated-duration-and-negative-fault:sample-5",
+      "sampleIndex": 5,
+      "originalRubricVerdict": "pass",
+      "originalChecks": [
+        {
+          "id": "fictional-evidence-not-emergency",
+          "scope": "first_two_replies",
+          "verdict": "pass",
+          "reason": "灰尘烤焦味、漏液均作为梗的夸张延展，没有明确判定真实故障或以急救流程替代接梗。",
+          "evidence": [
+            {
+              "turnIndex": 0,
+              "quote": "风扇灰尘烤焦味也算成就吧"
+            },
+            {
+              "turnIndex": 1,
+              "quote": "那是还没焐热就先漏液了"
+            }
+          ]
+        },
+        {
+          "id": "changed-duration-used",
+          "scope": "followup:0",
+          "verdict": "pass",
+          "reason": "采用新版本十分钟，未把两图混淆。",
+          "evidence": [
+            {
+              "turnIndex": 1,
+              "quote": "十分钟就赛博香水"
+            }
+          ]
+        },
+        {
+          "id": "negative-fault-is-not-positive-evidence",
+          "scope": "followup:1",
+          "verdict": "pass",
+          "reason": "温度回答没有把旧漏液梗或被否定的烟味转成当前真实电气损坏，讨论的是另一情况。",
+          "evidence": [
+            {
+              "turnIndex": 2,
+              "quote": "无烟无味、能正常运行"
+            },
+            {
+              "turnIndex": 2,
+              "quote": "不等于散热余量充足"
+            }
+          ]
+        }
+      ],
+      "additionalTemperatureCheck": {
+        "id": "temperature-normality-needs-model-and-measurement",
+        "scope": "followup:1",
+        "verdict": "fail",
+        "reason": "仍未核验具体型号及测点，就断言82℃与通用上限有十几度余量，并把稳定、无降频和不升温充分推成正常工作、不用管；后问型号没有把该结论明确撤回为未知。",
+        "evidence": [
+          {
+            "turnIndex": 2,
+            "quote": "离上限还有十几度，就是散热压得住的水平。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "那82℃就是散热系统正常工作的表现，不用管。"
+          },
+          {
+            "turnIndex": 2,
+            "quote": "把CPU型号发我"
+          }
+        ],
+        "normalityGuarantees": [
+          {
+            "turnIndex": 2,
+            "quote": "那82℃就是散热系统正常工作的表现，不用管。"
+          }
+        ],
+        "qualifierAtEndDoesNotEraseGuarantee": true,
+        "unknownInputs": [
+          "CPU具体型号",
+          "桌面/笔记本等平台",
+          "温度传感器与测点",
+          "该测点对应的型号规格限制"
+        ]
+      },
+      "turns": [
+        {
+          "turnIndex": 0,
+          "input": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "output": "运行俩小时就出体香，那风扇灰尘烤焦味也算成就吧",
+          "rawModelOutput": "运行俩小时就出体香，那风扇灰尘烤焦味也算成就吧",
+          "guardChanged": false,
+          "requestHash": "860a978c0a89818799b88d383d47f08675dcb72d9abbfaea19d30b861abb2e7b",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 2293,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 1,
+          "input": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "output": "十分钟就赛博香水？那是还没焐热就先漏液了",
+          "rawModelOutput": "十分钟就赛博香水？那是还没焐热就先漏液了",
+          "guardChanged": false,
+          "requestHash": "eb575554db4dec5ad9009f81c9055e61868258568e7c50f951839f1986c04ea0",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 2083,
+              "error": null,
+              "generationHash": "27137b70dfa3c0cfbc13024f29cdfbfb4ce45dac829aa92a65c5e2a18bc6ecaf"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": null
+        },
+        {
+          "turnIndex": 2,
+          "input": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "output": "82℃满载对大多数CPU来说算正常区间，但准不准得看型号：常见桌面U的温度上限（Tjmax）一般在95~105℃，比如AMD锐龙95℃、很多Intel是100℃。离上限还有十几度，就是散热压得住的水平。\n\n真正实用的判断标准是看降频：满载时频率稳得住、没触发thermal throttling，温度也不持续往上爬，那82℃就是散热系统正常工作的表现，不用管。无烟无味、能正常运行只能说明没出事故，不等于散热余量充足——想知道得更准的话，把CPU型号发我，我对一下规格再看这个温度处在什么位置。",
+          "rawModelOutput": "82℃满载对大多数CPU来说算正常区间，但准不准得看型号：常见桌面U的温度上限（Tjmax）一般在95~105℃，比如AMD锐龙95℃、很多Intel是100℃。离上限还有十几度，就是散热压得住的水平。\n\n真正实用的判断标准是看降频：满载时频率稳得住、没触发thermal throttling，温度也不持续往上爬，那82℃就是散热系统正常工作的表现，不用管。无烟无味、能正常运行只能说明没出事故，不等于散热余量充足——想知道得更准的话，把CPU型号发我，我对一下规格再看这个温度处在什么位置。",
+          "guardChanged": false,
+          "requestHash": "ff26bcc0d8cf12554225f450afb1056f0ecc2d08e71467a4fd030d603613f66e",
+          "successfulRequestModel": "glm-5.3",
+          "network": [
+            {
+              "model": "glm-5.3",
+              "urlHost": "open.bigmodel.cn",
+              "status": 200,
+              "elapsedMs": 18974,
+              "error": null,
+              "generationHash": "a88c611b9ad710550b03939e04122e703916ca1f0367baf397e35ddb5ea60952"
+            }
+          ],
+          "structuralFailures": [],
+          "errors": [],
+          "warnings": [],
+          "diagnosticContext": {
+            "purpose": "troubleshooting",
+            "subject": {
+              "kind": "speaker_device",
+              "key": "speaker:202:current",
+              "label": "当前用户所说的设备",
+              "userId": "202"
+            },
+            "incident": {
+              "status": "denied",
+              "signals": [
+                "burning_odor",
+                "smoke"
+              ]
+            },
+            "power": "unknown",
+            "damageExclusion": "unknown",
+            "allowedChecks": [
+              "static_observation",
+              "operational_monitoring"
+            ],
+            "unmetPrerequisites": [
+              "power_isolated",
+              "cooled"
+            ],
+            "sources": [
+              {
+                "origin": "current",
+                "text": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+                "subject": {
+                  "kind": "speaker_device",
+                  "key": "speaker:202:current",
+                  "label": "当前用户所说的设备",
+                  "userId": "202"
+                },
+                "at": 1792035189156,
+                "transientFactsFresh": true,
+                "userId": "202",
+                "incidentStatus": "denied",
+                "signals": [
+                  "burning_odor",
+                  "smoke"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

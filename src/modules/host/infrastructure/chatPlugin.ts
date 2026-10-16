@@ -1,6 +1,8 @@
 import {decodeHostModelResponse} from './hostModelResponse.js'
 import {normalizeHostChatEvent,decodeReplyEvent} from './hostEvent.js'
 import {decodeHostConfig} from './hostConfig.js'
+import type {ActionFactsEvent,ActionFactsQuery,TurnActionFacts} from '../../../contracts/turnActionFacts.js'
+import {validateTurnActionFacts} from '../../conversation/domain/turnActionFacts.js'
 import type {ChatTurnEvent} from '../../../contracts/chatTurn.js'
 import {normalizeFailureMessages,normalizeFailureSession,normalizeFailureEvent,type ToolFailureContext} from './toolFailureContext.js'
 function modrinthRecord(value:unknown):Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
@@ -34,6 +36,8 @@ import {createConfigStore} from '../../config/infrastructure/configStore.js'
 import {mergeDeepConfig} from '../../config/infrastructure/configStore.js'
 import {classifyIntentWithModel} from '../../conversation/application/modelIntentClassifier.js'
 import {resolvePersonaName} from '../../conversation/domain/personaSource.js'
+import {createPersonaSnapshot} from '../../conversation/infrastructure/personaSnapshot.js'
+import type {PersonaSnapshot} from '../../../contracts/persona.js'
 import {createPersonaLibrary} from '../../conversation/infrastructure/personaLibrary.js'
 import {isCodeOrMarkdownRequest} from '../../conversation/domain/turnPresentation.js'
 import {isEducationalExplanationRequest} from '../../conversation/domain/turnPresentation.js'
@@ -129,6 +133,7 @@ getActiveToolTaskRedisKey: ReturnType<typeof import('../../conversation/infrastr
 getTaskStatusTtlSeconds: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['getTaskStatusTtlSeconds'];
 saveTaskStatus: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['saveTaskStatus'];
 getTaskStatus: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['getTaskStatus'];
+getTurnActionFacts: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['getTurnActionFacts'];
 clearTaskStatus: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['clearTaskStatus'];
 updateUserToolTaskStatus: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['updateUserToolTaskStatus'];
 getUserToolTaskStatus: ReturnType<typeof import('../../conversation/infrastructure/taskStatus.js').createTaskStatus>['getUserToolTaskStatus'];
@@ -195,7 +200,7 @@ conversationHistory:ReturnType<typeof createConversationHistory>;
 redis:{get(key:string):Promise<string|null>;set(key:string,value:string,options:{EX:number}):Promise<unknown>;del(...keys:string[]):Promise<unknown>;keys(pattern:string):Promise<string[]>;scan(cursor:string,...args:unknown[]):Promise<unknown>;scanIterator?(options:{MATCH:string;COUNT:number}):AsyncIterable<string|string[]>};
 }
 export function createChatPlugin(ports:ChatPluginPorts) {
-const {handleTextResponse,updateEnhancedSystems,getFriendlyFailureMessage,sendFinalReplyAsTextImage,formatMemoryFactLines,formatMemoryFacts,replyMemoryForward,replyLongForward,checkPendingReminders,YTapi,mcpManager,pluginBridge,formatTurnDiagnosticsText,analyzeReplyText,resolveToolRequestMergeMs,installObservabilityLog,createChatTurnDurability,rebuildChatTurnEvent,resolveLongTaskFeedbackPolicy,findForbiddenWord,anchorEventConversation,markConversationInterrupted,chatScopeKey,getSmartRuntimeState,smartRuntimeGroupIds,smartRuntimeSize,hasSmartRuntimeState,registerGroupRuntimeProviders,registerRuntimeSweep,runRuntimeSweeps,mcpStatus,testMCPTool,isChatManager,forbiddenWordList,handleForbiddenList,handleForbiddenAdd,handleForbiddenRemove,resolvePersonaTargetGroup,formatPersonaDetail,handlePersonaList,handlePersonaCurrent,handlePersonaDetail,handlePersonaSwitch,handlePersonaReset,handlePersonaSave,handlePersonaDelete,handlePersonaReload,handlePersonaBindings,resolveConversationPhase,applyRateLimitGuard,resolveTalkValue,idleCompensationMet,computeAvgReplyLatency,recordReplyLatency,computeGroupMsgRate5min,getDirectTriggerMergeMs,getDirectTriggerMergeMaxMessages,runTimingGateFn,handleRandomReplySmartFn,setTrackingWithTimer,joinRepeat,detectGroupRepeat,isUserTalkingToBot,addToBatchJudgment,processBatchJudgments,batchIsUserTalkingToBot,fallbackToSingleJudgment,handleRandomReply,getTaskStatusCacheKey,getTaskStatusRedisKey,getActiveToolTaskCacheKey,getActiveToolTaskRedisKey,getTaskStatusTtlSeconds,saveTaskStatus,getTaskStatus,clearTaskStatus,updateUserToolTaskStatus,getUserToolTaskStatus,clearUserToolTaskStatus,getRuntimeToolTaskStatus,getCurrentUserToolTaskStatus,buildDrawTaskStatusReply,buildReplySegment,buildTaskStatusReplyMessage,handleActiveDrawStatusQuestion,formatTaskStatusForPrompt,formatTime,buildMessageContent,formatMessages,handleToolInnerFn,parseToolConfigEntry,prewarmModrinthCardRenderer,renderModrinthCard,shouldUseSemanticToolIntent,normalizeToolDecision,classifySemanticToolIntent,buildToolCallFromDecision,buildMissingToolCommitmentCall,extractJsonObject,getQuotedPromptContextText,getRecentPromptContextText,getRecentDrawContextText,resolveContextualDrawGeneration,getUnderstandingEnhancementConfig,shouldInjectUnderstandingContext,extractForwardContextFromUserContent,gatherUnderstandingMaterials,resolveUnderstandingPrompt,buildUnderstandingContextPrompt,buildImageGenerationPrompt,getImageGenerationReferenceImages,buildImageEditPrompt,sendObservedReply,sendSegmentedMessage,splitMessage,splitLongMessageByPunctuation,convertAtInString,findMember,processToolSpecificMessage,normalizeAssistantToolMessage,serializeToolResult,getToolCallName,shouldRunTerminalToolsInBackground,buildGroundedImageAnalysisPrompt,extractToolResultText,buildImageVerificationSearchToolCall,startBackgroundTerminalToolCalls,runToolCall,dedupeToolCalls,processToolCalls,executeTool,chokidar,schedule,logger,redis,conversationHistory}=ports
+const {handleTextResponse,updateEnhancedSystems,getFriendlyFailureMessage,sendFinalReplyAsTextImage,formatMemoryFactLines,formatMemoryFacts,replyMemoryForward,replyLongForward,checkPendingReminders,YTapi,mcpManager,pluginBridge,formatTurnDiagnosticsText,analyzeReplyText,resolveToolRequestMergeMs,installObservabilityLog,createChatTurnDurability,rebuildChatTurnEvent,resolveLongTaskFeedbackPolicy,findForbiddenWord,anchorEventConversation,markConversationInterrupted,chatScopeKey,getSmartRuntimeState,smartRuntimeGroupIds,smartRuntimeSize,hasSmartRuntimeState,registerGroupRuntimeProviders,registerRuntimeSweep,runRuntimeSweeps,mcpStatus,testMCPTool,isChatManager,forbiddenWordList,handleForbiddenList,handleForbiddenAdd,handleForbiddenRemove,resolvePersonaTargetGroup,formatPersonaDetail,handlePersonaList,handlePersonaCurrent,handlePersonaDetail,handlePersonaSwitch,handlePersonaReset,handlePersonaSave,handlePersonaDelete,handlePersonaReload,handlePersonaBindings,resolveConversationPhase,applyRateLimitGuard,resolveTalkValue,idleCompensationMet,computeAvgReplyLatency,recordReplyLatency,computeGroupMsgRate5min,getDirectTriggerMergeMs,getDirectTriggerMergeMaxMessages,runTimingGateFn,handleRandomReplySmartFn,setTrackingWithTimer,joinRepeat,detectGroupRepeat,isUserTalkingToBot,addToBatchJudgment,processBatchJudgments,batchIsUserTalkingToBot,fallbackToSingleJudgment,handleRandomReply,getTaskStatusCacheKey,getTaskStatusRedisKey,getActiveToolTaskCacheKey,getActiveToolTaskRedisKey,getTaskStatusTtlSeconds,saveTaskStatus,getTaskStatus,getTurnActionFacts,clearTaskStatus,updateUserToolTaskStatus,getUserToolTaskStatus,clearUserToolTaskStatus,getRuntimeToolTaskStatus,getCurrentUserToolTaskStatus,buildDrawTaskStatusReply,buildReplySegment,buildTaskStatusReplyMessage,handleActiveDrawStatusQuestion,formatTaskStatusForPrompt,formatTime,buildMessageContent,formatMessages,handleToolInnerFn,parseToolConfigEntry,prewarmModrinthCardRenderer,renderModrinthCard,shouldUseSemanticToolIntent,normalizeToolDecision,classifySemanticToolIntent,buildToolCallFromDecision,buildMissingToolCommitmentCall,extractJsonObject,getQuotedPromptContextText,getRecentPromptContextText,getRecentDrawContextText,resolveContextualDrawGeneration,getUnderstandingEnhancementConfig,shouldInjectUnderstandingContext,extractForwardContextFromUserContent,gatherUnderstandingMaterials,resolveUnderstandingPrompt,buildUnderstandingContextPrompt,buildImageGenerationPrompt,getImageGenerationReferenceImages,buildImageEditPrompt,sendObservedReply,sendSegmentedMessage,splitMessage,splitLongMessageByPunctuation,convertAtInString,findMember,processToolSpecificMessage,normalizeAssistantToolMessage,serializeToolResult,getToolCallName,shouldRunTerminalToolsInBackground,buildGroundedImageAnalysisPrompt,extractToolResultText,buildImageVerificationSearchToolCall,startBackgroundTerminalToolCalls,runToolCall,dedupeToolCalls,processToolCalls,executeTool,chokidar,schedule,logger,redis,conversationHistory}=ports
 
 
 const groupContext=createHostGroupContext({getBot:ports.getBot,debug:logger.debug})
@@ -837,6 +842,16 @@ class ExamplePlugin extends ports.Plugin {
 
   async clearTaskStatus(...args: Tail<Parameters<typeof clearTaskStatus>>) { return await clearTaskStatus(this,...args) }
 
+  async getTurnActionFacts(e:ActionFactsEvent,query:ActionFactsQuery={}) {
+    const tasks=await getTurnActionFacts(this,e,query)
+    const reminder=this.toolInstances?.reminderTool
+    if(!reminder||typeof reminder!=='object'||!('getActionFacts' in reminder)||typeof reminder.getActionFacts!=='function')return tasks
+    try {
+      const scheduled=validateTurnActionFacts(await Reflect.apply(reminder.getActionFacts,reminder,[e,query]) as TurnActionFacts,e,Date.now(),query)
+      return {...tasks,lookup:tasks.lookup==='ok'&&scheduled.lookup==='ok'?'ok' as const:'unavailable' as const,tasks:[...tasks.tasks,...scheduled.tasks]}
+    } catch {return {...tasks,lookup:'unavailable' as const}}
+  }
+
   async updateUserToolTaskStatus(...args: Tail<Parameters<typeof updateUserToolTaskStatus>>) { return await updateUserToolTaskStatus(this,...args) }
 
   async getUserToolTaskStatus(...args: Tail<Parameters<typeof getUserToolTaskStatus>>) { return await getUserToolTaskStatus(this,...args) }
@@ -857,8 +872,9 @@ class ExamplePlugin extends ports.Plugin {
 
   formatTaskStatusForPrompt(...args: Tail<Parameters<typeof formatTaskStatusForPrompt>>) { return formatTaskStatusForPrompt(this,...args) }
 
-  getToolRunKey(groupId:unknown, userId:unknown, toolName:unknown) {
-    return `${groupId}:${userId}:${toolName}`
+  getToolRunKey(groupId:unknown, userId:unknown, toolName:unknown, event?:ActionFactsEvent) {
+    const botId=event?.self_id||event?.bot?.uin
+    return `${botId?`bot:${botId}:`:""}${groupId}:${userId}:${toolName}`
   }
 
   async beginConversationTask(e:Pick<ChatTurnEvent,"group_id"|"user_id"|"message_id">) {
@@ -955,6 +971,8 @@ class ExamplePlugin extends ports.Plugin {
   // 其次按 bot 账号默认(accountBindings),否则 message.yaml 默认
   getPersonaFor(e:unknown) {
     const event=modrinthRecord(e)
+    const snapshot = event._personaSnapshot as PersonaSnapshot | undefined
+    if (snapshot?.persona && snapshot.botId === String(event.self_id || modrinthRecord(event.bot).uin || '')) return snapshot.persona
     try {
       return this.personaLibrary?.resolve({
         messageType: String(event.message_type || ""),
@@ -967,10 +985,28 @@ class ExamplePlugin extends ports.Plugin {
   }
 
   // 按会话人设生成的配置视图:未绑定群直接复用全局配置对象(零开销),绑定群浅拷贝替换 persona
-  getChatConfig(e:unknown) {
+  getChatConfig(e:unknown): import('./hostConfig.js').HostConfig {
+    const snapshot = modrinthRecord(e)._personaSnapshot as PersonaSnapshot | undefined
+    if (snapshot) {
+      const {personaGuard: _liveGuard, ...config} = this.config
+      return {...config, persona: snapshot.persona, systemContent: snapshot.systemContent, ...(snapshot.personaGuard ? {personaGuard: snapshot.personaGuard} : {})}
+    }
     const persona = this.getPersonaFor(e)
     if (!persona || persona === this.config?.persona) return this.config
     return { ...this.config, persona }
+  }
+
+  getPersonaSnapshotFor(e:unknown): PersonaSnapshot {
+    const event = modrinthRecord(e)
+    const botId = String(event.self_id || modrinthRecord(event.bot).uin || '')
+    const resolved = this.personaLibrary?.resolve({messageType: String(event.message_type || ''), groupId: String(event.group_id || ''), selfId: botId})
+    return createPersonaSnapshot({
+      botId,
+      personaId: resolved?.id || 'default',
+      persona: resolved?.persona || this.config.persona || {},
+      systemContent: this.config.systemContent || '',
+      ...(this.config.personaGuard ? {personaGuard: this.config.personaGuard} : {})
+    })
   }
 
   mergeConfig(defaults:Record<string,unknown>, user:unknown) {

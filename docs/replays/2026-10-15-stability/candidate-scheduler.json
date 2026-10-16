@@ -1,0 +1,71 @@
+{
+  "label": "candidate-final-c74b691",
+  "commit": "c74b691",
+  "concurrency": 3,
+  "scheduling": "each frozen scenario run once with five independent repetitions; no retries or discarded samples",
+  "scenarioOrder": [
+    "unknown-task-no-registered-followup",
+    "confirmed-result-and-delivery",
+    "generated-but-delivery-failed-no-auto-retry",
+    "registered-followup-then-cancelled",
+    "referenced-missing-task-not-other-result",
+    "successive-praise-adds-specific-information",
+    "own-state-direct-followup",
+    "topic-switch-ends-old-routine",
+    "multi-speaker-quoted-first-person",
+    "unread-media-then-readable-correction",
+    "real-burning-fault-no-visible-mark-then-inspection",
+    "fictional-meme-updated-duration-and-negative-fault"
+  ],
+  "runs": {
+    "confirmed-result-and-delivery": {
+      "exitCode": 0,
+      "elapsedSeconds": 100.149
+    },
+    "unknown-task-no-registered-followup": {
+      "exitCode": 0,
+      "elapsedSeconds": 136.192
+    },
+    "generated-but-delivery-failed-no-auto-retry": {
+      "exitCode": 0,
+      "elapsedSeconds": 187.795
+    },
+    "successive-praise-adds-specific-information": {
+      "exitCode": 0,
+      "elapsedSeconds": 33.276
+    },
+    "registered-followup-then-cancelled": {
+      "exitCode": 0,
+      "elapsedSeconds": 131.728
+    },
+    "own-state-direct-followup": {
+      "exitCode": 0,
+      "elapsedSeconds": 29.906
+    },
+    "topic-switch-ends-old-routine": {
+      "exitCode": 0,
+      "elapsedSeconds": 47.871
+    },
+    "multi-speaker-quoted-first-person": {
+      "exitCode": 0,
+      "elapsedSeconds": 29.005
+    },
+    "unread-media-then-readable-correction": {
+      "exitCode": 0,
+      "elapsedSeconds": 38.404
+    },
+    "referenced-missing-task-not-other-result": {
+      "exitCode": 0,
+      "elapsedSeconds": 191.148
+    },
+    "fictional-meme-updated-duration-and-negative-fault": {
+      "exitCode": 0,
+      "elapsedSeconds": 119.134
+    },
+    "real-burning-fault-no-visible-mark-then-inspection": {
+      "exitCode": 0,
+      "elapsedSeconds": 473.734
+    }
+  },
+  "complete": true
+}

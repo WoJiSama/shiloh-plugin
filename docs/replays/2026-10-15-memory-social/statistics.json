@@ -1,0 +1,390 @@
+{
+  "baseline-6668bd3": {
+    "turns": 48,
+    "conversations": 24,
+    "allStructuralPassTurns": 24,
+    "failureCounts": {
+      "kind": 21,
+      "memoryEventDate": 3,
+      "memoryCommitted": 1,
+      "extractionCommitted": 1,
+      "longTermRecall": 1,
+      "seriousWins": 3,
+      "seriousPlan": 3
+    },
+    "checks": {
+      "actionFactsScoped": {
+        "pass": 3,
+        "fail": 0
+      },
+      "extractionCommitted": {
+        "pass": 5,
+        "fail": 1
+      },
+      "finalOutput": {
+        "pass": 48,
+        "fail": 0
+      },
+      "handled": {
+        "pass": 48,
+        "fail": 0
+      },
+      "interactionLayer": {
+        "pass": 48,
+        "fail": 0
+      },
+      "kind": {
+        "pass": 27,
+        "fail": 21
+      },
+      "longTermRecall": {
+        "pass": 8,
+        "fail": 1
+      },
+      "memoryCommitted": {
+        "pass": 5,
+        "fail": 1
+      },
+      "memoryEventDate": {
+        "pass": 0,
+        "fail": 3
+      },
+      "modelResponded": {
+        "pass": 48,
+        "fail": 0
+      },
+      "noExtraIntent": {
+        "pass": 48,
+        "fail": 0
+      },
+      "noRuntimeError": {
+        "pass": 48,
+        "fail": 0
+      },
+      "ownActualHistory": {
+        "pass": 15,
+        "fail": 0
+      },
+      "personaProjection": {
+        "pass": 9,
+        "fail": 0
+      },
+      "previousUserHistory": {
+        "pass": 15,
+        "fail": 0
+      },
+      "rawBody": {
+        "pass": 48,
+        "fail": 0
+      },
+      "seriousPlan": {
+        "pass": 3,
+        "fail": 3
+      },
+      "seriousWins": {
+        "pass": 3,
+        "fail": 3
+      },
+      "target": {
+        "pass": 48,
+        "fail": 0
+      }
+    },
+    "generationNetworkStatus": {
+      "200": 48
+    },
+    "generationModels": {
+      "glm-5.3": 48
+    },
+    "generationParameters": {
+      "{\"model\": \"glm-5.3\", \"reasoning_effort\": \"low\", \"stream\": false, \"temperature\": 0.7, \"top_p\": 0.9}": 45,
+      "{\"model\": \"glm-5.3\", \"reasoning_effort\": \"high\", \"stream\": false, \"temperature\": 0.7, \"top_p\": 0.9}": 3
+    },
+    "memoryNetworkStatus": {
+      "None": 64,
+      "200": 56
+    },
+    "memoryModels": {
+      "glm-5.3-flash": 120
+    },
+    "memoryExtractionResults": {
+      "legacy_unclassified": 96
+    },
+    "understandingStatus": {},
+    "guardChangedTurns": 0,
+    "runtimeErrorTurns": 0,
+    "pendingBatchesAtConversationEnd": 0,
+    "exhaustedBatchesAtConversationEnd": 0,
+    "replyElapsedMs": {
+      "n": 48,
+      "p50": 2101,
+      "p95": 12739,
+      "max": 28026
+    },
+    "memoryDrainElapsedMs": {
+      "n": 48,
+      "p50": 13808,
+      "p95": 20001,
+      "max": 20001
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0
+  },
+  "candidate-0068ba2": {
+    "turns": 48,
+    "conversations": 24,
+    "allStructuralPassTurns": 27,
+    "failureCounts": {
+      "kind": 21,
+      "seriousWins": 3,
+      "seriousPlan": 3
+    },
+    "checks": {
+      "actionFactsScoped": {
+        "pass": 3,
+        "fail": 0
+      },
+      "extractionCommitted": {
+        "pass": 6,
+        "fail": 0
+      },
+      "finalOutput": {
+        "pass": 48,
+        "fail": 0
+      },
+      "handled": {
+        "pass": 48,
+        "fail": 0
+      },
+      "interactionLayer": {
+        "pass": 48,
+        "fail": 0
+      },
+      "kind": {
+        "pass": 27,
+        "fail": 21
+      },
+      "longTermRecall": {
+        "pass": 9,
+        "fail": 0
+      },
+      "memoryCommitted": {
+        "pass": 6,
+        "fail": 0
+      },
+      "memoryEventDate": {
+        "pass": 3,
+        "fail": 0
+      },
+      "modelResponded": {
+        "pass": 48,
+        "fail": 0
+      },
+      "noExtraIntent": {
+        "pass": 48,
+        "fail": 0
+      },
+      "noRuntimeError": {
+        "pass": 48,
+        "fail": 0
+      },
+      "ownActualHistory": {
+        "pass": 15,
+        "fail": 0
+      },
+      "personaProjection": {
+        "pass": 9,
+        "fail": 0
+      },
+      "previousUserHistory": {
+        "pass": 15,
+        "fail": 0
+      },
+      "rawBody": {
+        "pass": 48,
+        "fail": 0
+      },
+      "seriousPlan": {
+        "pass": 3,
+        "fail": 3
+      },
+      "seriousWins": {
+        "pass": 3,
+        "fail": 3
+      },
+      "target": {
+        "pass": 48,
+        "fail": 0
+      }
+    },
+    "generationNetworkStatus": {
+      "200": 48
+    },
+    "generationModels": {
+      "glm-5.3": 48
+    },
+    "generationParameters": {
+      "{\"model\": \"glm-5.3\", \"reasoning_effort\": \"low\", \"stream\": false, \"temperature\": 0.7, \"top_p\": 0.9}": 45,
+      "{\"model\": \"glm-5.3\", \"reasoning_effort\": \"high\", \"stream\": false, \"temperature\": 0.7, \"top_p\": 0.9}": 3
+    },
+    "memoryNetworkStatus": {
+      "None": 59,
+      "200": 66
+    },
+    "memoryModels": {
+      "glm-5.3-flash": 125
+    },
+    "memoryExtractionResults": {
+      "success": 65,
+      "legacy_unclassified": 12,
+      "failed": 11,
+      "pending": 8
+    },
+    "understandingStatus": {},
+    "guardChangedTurns": 0,
+    "runtimeErrorTurns": 0,
+    "pendingBatchesAtConversationEnd": 10,
+    "exhaustedBatchesAtConversationEnd": 0,
+    "replyElapsedMs": {
+      "n": 48,
+      "p50": 2859,
+      "p95": 12458,
+      "max": 20580
+    },
+    "memoryDrainElapsedMs": {
+      "n": 48,
+      "p50": 14568,
+      "p95": 20005,
+      "max": 20013
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0
+  },
+  "candidate-ecc72ab": {
+    "turns": 48,
+    "conversations": 24,
+    "allStructuralPassTurns": 30,
+    "failureCounts": {
+      "kind": 18
+    },
+    "checks": {
+      "actionFactsScoped": {
+        "pass": 3,
+        "fail": 0
+      },
+      "extractionCommitted": {
+        "pass": 6,
+        "fail": 0
+      },
+      "finalOutput": {
+        "pass": 48,
+        "fail": 0
+      },
+      "handled": {
+        "pass": 48,
+        "fail": 0
+      },
+      "interactionLayer": {
+        "pass": 48,
+        "fail": 0
+      },
+      "kind": {
+        "pass": 30,
+        "fail": 18
+      },
+      "longTermRecall": {
+        "pass": 9,
+        "fail": 0
+      },
+      "memoryCommitted": {
+        "pass": 6,
+        "fail": 0
+      },
+      "memoryEventDate": {
+        "pass": 3,
+        "fail": 0
+      },
+      "modelResponded": {
+        "pass": 48,
+        "fail": 0
+      },
+      "noExtraIntent": {
+        "pass": 48,
+        "fail": 0
+      },
+      "noRuntimeError": {
+        "pass": 48,
+        "fail": 0
+      },
+      "ownActualHistory": {
+        "pass": 15,
+        "fail": 0
+      },
+      "personaProjection": {
+        "pass": 9,
+        "fail": 0
+      },
+      "previousUserHistory": {
+        "pass": 15,
+        "fail": 0
+      },
+      "rawBody": {
+        "pass": 48,
+        "fail": 0
+      },
+      "seriousPlan": {
+        "pass": 6,
+        "fail": 0
+      },
+      "seriousWins": {
+        "pass": 6,
+        "fail": 0
+      },
+      "target": {
+        "pass": 48,
+        "fail": 0
+      }
+    },
+    "generationNetworkStatus": {
+      "200": 48
+    },
+    "generationModels": {
+      "glm-5.3": 48
+    },
+    "generationParameters": {
+      "{\"model\": \"glm-5.3\", \"reasoning_effort\": \"low\", \"stream\": false, \"temperature\": 0.7, \"top_p\": 0.9}": 42,
+      "{\"model\": \"glm-5.3\", \"reasoning_effort\": \"high\", \"stream\": false, \"temperature\": 0.7, \"top_p\": 0.9}": 6
+    },
+    "memoryNetworkStatus": {
+      "None": 50,
+      "200": 78
+    },
+    "memoryModels": {
+      "glm-5.3-flash": 128
+    },
+    "memoryExtractionResults": {
+      "success": 76,
+      "legacy_unclassified": 16,
+      "failed": 4
+    },
+    "understandingStatus": {},
+    "guardChangedTurns": 0,
+    "runtimeErrorTurns": 0,
+    "pendingBatchesAtConversationEnd": 4,
+    "exhaustedBatchesAtConversationEnd": 0,
+    "replyElapsedMs": {
+      "n": 48,
+      "p50": 2294,
+      "p95": 31425,
+      "max": 34295
+    },
+    "memoryDrainElapsedMs": {
+      "n": 48,
+      "p50": 9273,
+      "p95": 18718,
+      "max": 20003
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0
+  }
+}
