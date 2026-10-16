@@ -1724,3 +1724,14 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 独立固定矩阵766项source/dist输出相等，旧643实测无漂移，新123/123通过；唯一旧孤立代词期望失败保留。报告local-operation-compiled-review.json和固定输入已归档。归档前读取不存在README及首个apply_patch上下文失败均未改源文件；核验后重新追加本轮记录。
 
 - CAS首次因其他会话提交至bf4619f而拒绝写入；已确认318个接受目标hash全未变，保留旧baseline并备份新index/dirty/全文件hash，建立baseline-head-bf4619f及新CAS脚本。第十次同步354目标、50实际写入，1631非目标、新HEAD/index保持。原目录strict/build/testcompile及356/356通过，五业务TS/JS一致，manifest自洽；证据local-operation-original-*与writeback-audit已归档。
+
+- 916bb76已commit/push并冻结完整60轮：59结构通过、71请求70HTTP200且全low，11纠正3兜底，P50/P95/最大2.499/9.278/19.323秒；8项协议指纹一致，QQ/真实工具/生产测试写入0。一次纠正请求失败原样保留。核验runner tools=[]及toolChoice=none后，匿名输入为两臂补相同executionEnvironment，canonical逐字对应，未改变模型协议。
+- 两fresh评审完成28完整组，schema/分数/胜负/精确引文一次合并通过；封存916bb76-review。综合6胜10负12平、200:207，自然度4胜5负19平、50:51，硬错候选5/基线7。四项涉及无工具回放中的未来再次请求后重做/重发能力表述，原评保留且不把本轮无工具视为下一次请求的工具路由事实；既有任务契约漏检为row59自动跟进否定。
+- 继续窄补row59引号名词主题与指示代词跟进；row57“点亮”同义启动及换电源不等于专业放行。父新最终发送三组在冻结dist上真实RED。诊断首修暴露旧完整并列假设警告误伤，已保持原期望并补局部并列能力边界；灯/手电筒明确对象不当设备启动，source103/103通过，首次失败日志保留。动作owner及独立固定矩阵准备中，尚未build新版或部署。
+
+- 任务owner已停写：source133/133、strict noEmit通过，quoted名词与typed跟进分别保留对象归属，row12合法“完成前不乱发”不扩大拒绝。父诊断补正常“确认可以点亮后再点亮”的专业许可补语；source103/103、实际RED及各次误伤均保留。全owner停写后统一strict/backend build/testcompile和10文件最终发送/实际产物365/365通过，无跳过；quoted-start-*日志及验证已归档，独立810固定source/dist复核进行中。一次zsh未匹配日志通配符返回1，未改文件，随后采用Path.glob归档。
+
+- 独立810项source/dist完整输出一致，旧766实测无漂移；808符合冻结期望，保留原孤立代词差异和新增control装配遗漏考试提醒的1失败。该完整row59控制仍断言考试提醒已登记却只装image none，实际unregistered_followup正确针对提醒；原报告/期望保持，另做保留exam+image的最小补充，不改生产逻辑。
+- 原目录其他会话新增01a4856群管提交，CAS正确拒绝后核验354个接受目标hash全未变，保留旧baseline并建立新快照/保护。第十一次同步391目标、51实际写入，1631非目标、新HEAD/index保持；原目录strict/build/testcompile及365/365通过，五业务TS/JS一致、manifest自洽，证据quoted-start-original-*和writeback-audit归档。
+
+- 独立最小补充3/3通过，source/dist完整输出相等：整份row59保留真实exam reminder后，image none放行，registered/unknown仅拦后续图片否定，不误伤考试提醒。原810固定输入/期望/原报告与actual哈希不变，补充输入和逐项证据另存quoted-start-supplement-*。准备提交干净源码及新版完整冻结，尚未部署。

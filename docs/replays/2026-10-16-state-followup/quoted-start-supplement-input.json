@@ -1,0 +1,254 @@
+{
+  "workspace": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin",
+  "replay": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/docs/replays/2026-10-16-state-followup/candidate-916bb76.json",
+  "supplementPurpose": "Preserve the actual exam reminder task while varying only the image completion follow-up registration; preserve the original 810 report and its failed fixture unchanged.",
+  "protectedReportsAndInputs": {
+    "/tmp/bl-startup-topic-compiled-review-20261016.json": "9f09ca25853e43d5a460fef0591ca89417f7360b6ca234fe466650d0b9068120",
+    "/tmp/bl-startup-topic-compiled-review-20261016/fixed-input-expectations-v3.json": "c48c9d5be51f019d5047306b101624baee7046e83b33b5dd421d50ecbf06818a",
+    "/tmp/bl-startup-topic-compiled-review-20261016/source.stdout.json": "b6c60d15346e932090c26358a6abe0d88c04969886bc6276b3e28f9a3dc5274c",
+    "/tmp/bl-startup-topic-compiled-review-20261016/dist.stdout.json": "5964ae1590ef079ce3a40044a776aeb29e485e1714f513e8e752cefeedfcf677",
+    "/tmp/bl-compound-operation-compiled-review-20261016.json": "023110f34bb0ea7b073bd2e11ee6b859f033ddae5395f630d24a25b7d169428c",
+    "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/docs/replays/2026-10-16-state-followup/candidate-916bb76.json": "1cf541ac4c5ddbd7ef13054e21fc5ad231a12815a5507ee6a2cefc688fcc2b60"
+  },
+  "inputs": [
+    {
+      "id": "full-row59-reminder-and-image-none",
+      "validator": "validateActionReply",
+      "input": {
+        "reply": "你那条考试提醒是登记上了，2100年1月1号早上八点触发。改背景的图这边我这轮没查到相关记录，做没做好、出来没出来都还没法确认，也就不能替你打包票。\n\n“好了自动发”这种没有哦，没这个自动跟进。你要是还想要，直接再来找我要一次就行，我到时候按当轮能做的帮你查和发。",
+        "facts": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900028",
+            "userId": "202"
+          },
+          "observedAt": 1792162483918,
+          "lookup": "ok",
+          "tasks": [
+            {
+              "taskId": "exam-reminder",
+              "requestMessageId": "exam-request",
+              "toolName": "reminderTool",
+              "source": "reminder",
+              "execution": "queued",
+              "result": "unknown",
+              "delivery": {
+                "state": "not_attempted"
+              },
+              "followUp": {
+                "state": "registered",
+                "kind": "reminder",
+                "id": "exam-reminder",
+                "dueAt": 4102444800000
+              },
+              "observedAt": 1792162483918
+            },
+            {
+              "taskId": "image-supplement-job",
+              "requestMessageId": "image-request",
+              "toolName": "imageEdit",
+              "source": "live_job",
+              "observedAt": 1792162483918,
+              "execution": "running",
+              "result": "unknown",
+              "delivery": {
+                "state": "unknown"
+              },
+              "followUp": {
+                "state": "none"
+              }
+            }
+          ]
+        },
+        "rawUserText": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？"
+      },
+      "expectedCodes": [],
+      "expectationContract": "exactUniqueCodesAndClaimDimension",
+      "expectedClaimDimension": "none",
+      "provenance": {
+        "replay": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/docs/replays/2026-10-16-state-followup/candidate-916bb76.json",
+        "resultIndex": 59,
+        "fullReplyAndRawUserTextCopiedUnchanged": true,
+        "realReminderTaskCopiedUnchanged": true,
+        "additionalImageFact": {
+          "taskId": "image-supplement-job",
+          "requestMessageId": "image-request",
+          "toolName": "imageEdit",
+          "source": "live_job",
+          "observedAt": 1792162483918,
+          "execution": "running",
+          "result": "unknown",
+          "delivery": {
+            "state": "unknown"
+          },
+          "followUp": {
+            "state": "none"
+          }
+        },
+        "expectationsFixedBeforeExecution": true
+      }
+    },
+    {
+      "id": "full-row59-reminder-and-image-registered",
+      "validator": "validateActionReply",
+      "input": {
+        "reply": "你那条考试提醒是登记上了，2100年1月1号早上八点触发。改背景的图这边我这轮没查到相关记录，做没做好、出来没出来都还没法确认，也就不能替你打包票。\n\n“好了自动发”这种没有哦，没这个自动跟进。你要是还想要，直接再来找我要一次就行，我到时候按当轮能做的帮你查和发。",
+        "facts": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900028",
+            "userId": "202"
+          },
+          "observedAt": 1792162483918,
+          "lookup": "ok",
+          "tasks": [
+            {
+              "taskId": "exam-reminder",
+              "requestMessageId": "exam-request",
+              "toolName": "reminderTool",
+              "source": "reminder",
+              "execution": "queued",
+              "result": "unknown",
+              "delivery": {
+                "state": "not_attempted"
+              },
+              "followUp": {
+                "state": "registered",
+                "kind": "reminder",
+                "id": "exam-reminder",
+                "dueAt": 4102444800000
+              },
+              "observedAt": 1792162483918
+            },
+            {
+              "taskId": "image-supplement-job",
+              "requestMessageId": "image-request",
+              "toolName": "imageEdit",
+              "source": "live_job",
+              "observedAt": 1792162483918,
+              "execution": "running",
+              "result": "unknown",
+              "delivery": {
+                "state": "unknown"
+              },
+              "followUp": {
+                "state": "registered",
+                "kind": "job_completion",
+                "id": "image-callback"
+              }
+            }
+          ]
+        },
+        "rawUserText": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？"
+      },
+      "expectedCodes": [
+        "unsupported_task_state"
+      ],
+      "expectationContract": "exactUniqueCodesAndClaimDimension",
+      "expectedClaimDimension": "image_automatic_followup",
+      "provenance": {
+        "replay": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/docs/replays/2026-10-16-state-followup/candidate-916bb76.json",
+        "resultIndex": 59,
+        "fullReplyAndRawUserTextCopiedUnchanged": true,
+        "realReminderTaskCopiedUnchanged": true,
+        "additionalImageFact": {
+          "taskId": "image-supplement-job",
+          "requestMessageId": "image-request",
+          "toolName": "imageEdit",
+          "source": "live_job",
+          "observedAt": 1792162483918,
+          "execution": "running",
+          "result": "unknown",
+          "delivery": {
+            "state": "unknown"
+          },
+          "followUp": {
+            "state": "registered",
+            "kind": "job_completion",
+            "id": "image-callback"
+          }
+        },
+        "expectationsFixedBeforeExecution": true
+      }
+    },
+    {
+      "id": "full-row59-reminder-and-image-unknown",
+      "validator": "validateActionReply",
+      "input": {
+        "reply": "你那条考试提醒是登记上了，2100年1月1号早上八点触发。改背景的图这边我这轮没查到相关记录，做没做好、出来没出来都还没法确认，也就不能替你打包票。\n\n“好了自动发”这种没有哦，没这个自动跟进。你要是还想要，直接再来找我要一次就行，我到时候按当轮能做的帮你查和发。",
+        "facts": {
+          "scope": {
+            "botId": "99",
+            "conversationId": "group:900028",
+            "userId": "202"
+          },
+          "observedAt": 1792162483918,
+          "lookup": "ok",
+          "tasks": [
+            {
+              "taskId": "exam-reminder",
+              "requestMessageId": "exam-request",
+              "toolName": "reminderTool",
+              "source": "reminder",
+              "execution": "queued",
+              "result": "unknown",
+              "delivery": {
+                "state": "not_attempted"
+              },
+              "followUp": {
+                "state": "registered",
+                "kind": "reminder",
+                "id": "exam-reminder",
+                "dueAt": 4102444800000
+              },
+              "observedAt": 1792162483918
+            },
+            {
+              "taskId": "image-supplement-job",
+              "requestMessageId": "image-request",
+              "toolName": "imageEdit",
+              "source": "live_job",
+              "observedAt": 1792162483918,
+              "execution": "running",
+              "result": "unknown",
+              "delivery": {
+                "state": "unknown"
+              },
+              "followUp": {
+                "state": "unknown"
+              }
+            }
+          ]
+        },
+        "rawUserText": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？"
+      },
+      "expectedCodes": [
+        "unsupported_task_state"
+      ],
+      "expectationContract": "exactUniqueCodesAndClaimDimension",
+      "expectedClaimDimension": "image_automatic_followup",
+      "provenance": {
+        "replay": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin/docs/replays/2026-10-16-state-followup/candidate-916bb76.json",
+        "resultIndex": 59,
+        "fullReplyAndRawUserTextCopiedUnchanged": true,
+        "realReminderTaskCopiedUnchanged": true,
+        "additionalImageFact": {
+          "taskId": "image-supplement-job",
+          "requestMessageId": "image-request",
+          "toolName": "imageEdit",
+          "source": "live_job",
+          "observedAt": 1792162483918,
+          "execution": "running",
+          "result": "unknown",
+          "delivery": {
+            "state": "unknown"
+          },
+          "followUp": {
+            "state": "unknown"
+          }
+        },
+        "expectationsFixedBeforeExecution": true
+      }
+    }
+  ]
+}

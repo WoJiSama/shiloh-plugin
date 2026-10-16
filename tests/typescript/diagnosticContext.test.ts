@@ -1528,3 +1528,30 @@ test('a post-start active smell instruction is distinct from naturally noticing 
   for (const reply of ["\u65e2\u7136\u5e08\u5085\u67e5\u8fc7\u7535\u6e90\u3001\u7ebf\u6750\u548c\u677f\u5361\uff0c\u8fd8\u6362\u4e86\u7535\u6e90\uff0c\u5728\u5e97\u91cc\u53d7\u63a7\u5f00\u673a\u662f\u5408\u7406\u7684\u3002\u80fd\u6d4b\u7684\u8bdd\u6309\u8fd9\u4e2a\u987a\u5e8f\u6765\uff1a\n\n1. **\u70b9\u4eae\u548c\u81ea\u68c0**\uff1a\u5f00\u673a\u770b\u80fd\u4e0d\u80fd\u8fc7 POST/BIOS \u81ea\u68c0\uff0c\u6709\u6ca1\u6709\u62a5\u8b66\u58f0\u6216\u62a5\u9519\u7801\uff0cBIOS \u91cc\u770b\u7535\u538b\u3001\u6e29\u5ea6\u8bfb\u6570\u662f\u5426\u5728\u6b63\u5e38\u8303\u56f4\u3002\n2. **\u98ce\u6247\u89c2\u5bdf**\uff1a\u9694\u7740\u673a\u7bb1\u7f51\u5b54\u6216\u9762\u677f\u770b\u5404\u98ce\u6247\u8f6c\u4e0d\u8f6c\uff0c\u4e0d\u62c6\u4fa7\u677f\u51d1\u8fd1\u3002\n3. **\u8fdb\u7cfb\u7edf\u524d\u7684\u4fe1\u53f7**\uff1a\u5f00\u673a\u540e\u95fb\u6709\u6ca1\u6709\u5f02\u5473\u590d\u53d1\u3001\u542c\u6709\u6ca1\u6709\u5f02\u54cd\uff0c\u4e00\u65e6\u51fa\u73b0\u7acb\u523b\u65ad\u7535\u3002\n4. **\u77ed\u65f6\u4f4e\u8d1f\u8f7d**\uff1a\u5148\u8fdb\u7cfb\u7edf\u6216\u8fdb BIOS \u7a7a\u8f6c\u5341\u51e0\u5206\u949f\uff0c\u7a33\u5b9a\u518d\u9010\u6b65\u52a0\u8d1f\u8f7d\uff0c\u522b\u4e00\u4e0a\u6765\u5c31\u8dd1\u538b\u529b\u6d4b\u8bd5\u3002\n\n\u8981\u6ce8\u610f\uff1a\u77ed\u65f6\u70b9\u4eae\u6b63\u5e38\u53ea\u8bf4\u660e\u76ee\u524d\u6ca1\u89c2\u5bdf\u5230\u5f02\u5e38\uff0c\u4e0d\u7b49\u4e8e\u6574\u673a\u7edd\u5bf9\u5b89\u5168\u3002\u5e08\u5085\u786e\u8ba4\u7684\u8303\u56f4\u53ea\u8986\u76d6\u4ed6\u68c0\u67e5\u8fc7\u7684\u7535\u6e90\u3001\u7ebf\u6750\u548c\u677f\u5361\uff0c\u4e4b\u540e\u5934\u51e0\u5929\u7528\u7684\u65f6\u5019\u7559\u610f\u6e29\u5ea6\u548c\u6c14\u5473\uff0c\u6709\u4e0d\u5bf9\u52b2\u5c31\u505c\u3002", "\u5f00\u673a\u540e\u95fb\u6709\u6ca1\u6709\u5f02\u5473\u590d\u53d1\u3002"]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsafe_inspection_action'), reply)
   for (const reply of ["\u5f00\u673a\u540e\u82e5\u81ea\u7136\u95fb\u5230\u5f02\u5473\uff0c\u505c\u6b62\u8fd0\u884c\u5e76\u8054\u7cfb\u5e08\u5085\u3002", "\u4e0d\u8981\u5728\u5f00\u673a\u540e\u4e3b\u52a8\u95fb\u7535\u6e90\u3002", "\u7531\u7ef4\u4fee\u5e08\u5085\u5f00\u673a\u540e\u6309\u81ea\u5df1\u7684\u5de5\u5e8f\u68c0\u67e5\u3002"]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
 })
+
+test('starting the same uncleared device by saying light it up still requires professional clearance', () => {
+  const context = buildDiagnosticContext({rawUserText: '那我能先开机试一下吗？', speakerId, history: [{role: 'user', userId: speakerId, text: '电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'}]})!
+  for (const reply of [
+    '先别开机。焦糊味说明电源可能有问题，损坏还没排除，再通电有二次损坏甚至起火的风险，这次试机换不来可靠结论。保持断电，等它完全冷却后只做静态检查（外观、线材有没有烧痕变形），要再点亮也得等送修确认或换上新电源之后。',
+    '先点亮试一下。',
+    '换个新电源之后再点亮。',
+    '你现在点亮电脑。',
+    '先点亮手电筒，然后点亮电脑试一下。',
+    '等检测过了，再点亮。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unmet_operational_prerequisite'), reply)
+  for (const reply of [
+    '不要点亮。',
+    '指示灯点亮了，也不代表整机安全。',
+    '点亮也不能证明没有损坏。',
+    '即使能点亮，也不代表整机安全。',
+    '现在点亮可能让故障扩大。',
+    '先点亮手电筒照外壳，只看不动手。',
+    '先点亮房间的灯，方便观察外观。',
+    '等专业人员检修确认没问题并放行后再点亮。',
+    '先送修，让专业人员确认可以点亮后再点亮。',
+    '由维修师傅在检测台上点亮。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+  const cleared = buildDiagnosticContext({rawUserText: '维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？', speakerId, history: [{role: 'user', userId: speakerId, text: '我的电脑冒烟有焦糊味，已经拔电放凉了。'}]})!
+  assert.ok(cleared.allowedChecks.includes('operational_monitoring'))
+  assert.deepEqual(validateDiagnosticReply('可以先点亮，在现场专业人员放行范围内看和听，不接触内部。', cleared), [])
+})

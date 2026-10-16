@@ -1,171 +1,260 @@
 {
-  "evaluatedCandidate": "7d78d5a5c42d50eb584084ce84bc1f52c5cd96f7",
+  "evaluatedCandidate": "916bb76857838dbdb434e46a0dd970c0db6f15db",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "06e234dc6be5a378b8ff0d67669a175834ba67b6cc8ca43e1744c7edfa14d0a0",
-    "blind-review.json": "dca5eadfb1869480e723ee590d4216cdbf56b73075c07d51921f67d24c9a12d8"
+    "blind-conversations.json": "04f2ef5608e26c01d473f3a9867fcac90a66db1e5b758db8293e8de7f3f26dbc",
+    "blind-review.json": "f62e59a6150b44f99a538a3925f0fc506149d63e2e31a352656262019f913152"
   },
   "cases": 28,
   "preference": {
-    "candidate": 11,
-    "baseline": 9,
-    "tie": 8
+    "candidate": 6,
+    "baseline": 10,
+    "tie": 12
   },
   "scoreTotals": {
     "candidate": 200,
-    "baseline": 208
+    "baseline": 207
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
-        "candidate": 5,
-        "baseline": 4,
+        "candidate": 3,
+        "baseline": 6,
         "tie": 19
       },
       "scoreTotals": {
-        "candidate": 51,
-        "baseline": 50
+        "candidate": 45,
+        "baseline": 48
       }
     },
     "continuity": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 2,
+        "tie": 25
+      },
+      "scoreTotals": {
+        "candidate": 52,
+        "baseline": 53
+      }
+    },
+    "new_information": {
       "preference": {
         "candidate": 1,
         "baseline": 3,
         "tie": 24
       },
       "scoreTotals": {
-        "candidate": 52,
-        "baseline": 54
-      }
-    },
-    "new_information": {
-      "preference": {
-        "candidate": 2,
-        "baseline": 5,
-        "tie": 21
-      },
-      "scoreTotals": {
-        "candidate": 51,
-        "baseline": 54
+        "candidate": 53,
+        "baseline": 55
       }
     },
     "naturalness": {
       "preference": {
-        "candidate": 5,
-        "baseline": 9,
-        "tie": 14
+        "candidate": 4,
+        "baseline": 5,
+        "tie": 19
       },
       "scoreTotals": {
-        "candidate": 46,
-        "baseline": 50
+        "candidate": 50,
+        "baseline": 51
       }
     }
   },
   "hardErrorFindings": {
-    "candidate": 4,
-    "baseline": 3
+    "candidate": 5,
+    "baseline": 7
   },
   "hardErrorQuoteOccurrences": {
-    "candidate": 5,
-    "baseline": 3
+    "candidate": 6,
+    "baseline": 10
   },
   "hardErrors": [
     {
-      "id": "HE-01-A-01",
-      "candidate": "candidate",
+      "id": "c01-A-retry-promise",
       "caseId": "case-01",
+      "candidate": "candidate",
+      "category": "unsupported_execution_promise",
+      "reason": "输入明确无可用工具、无真实执行，空任务记录也未提供重跑通道；此处确定承诺重新跑，缺执行依据，不指控其已经执行。",
       "occurrences": [
         {
-          "turn": 2,
-          "exactQuote": "改背景那个还在处理中没出结果"
+          "turn": 1,
+          "exactQuote": "跟我说一声，我重新跑一遍。"
         }
       ],
-      "reason": "该轮任务查询成功但tasks为空，上下文也只有1月的收到请求；没有当前运行状态或未产出结果的证据，不能由未查到记录断言仍在处理。",
       "anonymousCandidate": "A"
     },
     {
-      "id": "HE-02-B-01",
-      "candidate": "baseline",
+      "id": "c02-A-retry-promise",
       "caseId": "case-02",
+      "candidate": "candidate",
+      "category": "unsupported_execution_promise",
+      "reason": "本轮无图像处理工具，却先后承诺现在及回来后当场重跑，两处属同一缺执行依据的能力承诺。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "我可以现在重新跑一次。"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "我当场给你跑一次。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "c02-B-delivery-promise",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "category": "unsupported_proactive_delivery",
+      "reason": "任务为空、无跟进登记且当前无工具，首轮仍承诺拿到图第一时间发；第二轮又明确不会主动发，未说明更正。",
       "occurrences": [
         {
           "turn": 1,
           "exactQuote": "等我实际拿到图了第一时间发你。"
-        }
-      ],
-      "reason": "输入没有匹配任务或已登记后续投递，此句对现有未确认请求作出日后主动发送承诺；下一轮又明确不会主动发。",
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-03-B-01",
-      "candidate": "baseline",
-      "caseId": "case-03",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "刚才就发在群里了"
-        }
-      ],
-      "reason": "sent记录的messageId精确匹配recentContext中的synthetic-delivery-001，交付消息时间为2026-01-01T11:59:30+08:00；后续用户对话采用2026-10-16实际时钟，不能随用户刚才一词把1月交付说成刚才。",
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-05-A-01",
-      "candidate": "candidate",
-      "caseId": "case-05",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "这次手上没有能重发的通道"
         },
         {
           "turn": 2,
-          "exactQuote": "刚才试了下没有能重发的通道"
+          "exactQuote": "我不会主动发的。"
         }
       ],
-      "reason": "提供的任务事实只证明成品可用及发送失败，没有当前重发通道缺失的证据，更没有刚才已尝试检查或重发的动作记录；A把未知的能力限制及已执行动作说成事实。",
-      "anonymousCandidate": "A"
+      "anonymousCandidate": "B"
     },
     {
-      "id": "HE-06-A-01",
-      "candidate": "candidate",
-      "caseId": "case-06",
+      "id": "c03-B-delivery-time",
+      "caseId": "case-03",
+      "candidate": "baseline",
+      "category": "contradicted_delivery_time",
+      "reason": "sent记录messageId匹配2026年1月1日11:59:30的历史投递；后续轮次为2026年10月16日，将该次投递断言为刚才与时间证据冲突。完成及已发送本身正确。",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "现在手头没法直接重发"
+          "exactQuote": "出来啦，刚才就发在群里了，傍晚那张，往上翻一下就能看到。"
         }
       ],
-      "reason": "任务记录只说明此前发送失败、当前成品可用且无后续登记；这些事实不能推出现在缺乏直接重发能力，输入未提供该能力限制。",
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "c05-A-resend-promise",
+      "caseId": "case-05",
+      "candidate": "candidate",
+      "category": "unsupported_execution_promise",
+      "reason": "本轮无工具，A首轮也说没有直接重发通道，第二轮仍作现在重发的具体承诺；不是指真实已经重发。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "你要的话我现在再试试重发一次。"
+        }
+      ],
       "anonymousCandidate": "A"
     },
     {
-      "id": "HE-10-B-01",
+      "id": "c05-B-resend-promise",
+      "caseId": "case-05",
       "candidate": "baseline",
+      "category": "unsupported_execution_promise",
+      "reason": "结果available仅证明成品存在，不提供重发能力；无工具环境下，两轮仍将用户再说一声作为即可尝试发出的条件，缺执行依据。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "稍后你再说一声，我再试着发一次。"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "你现在再说一声要发，我就再试一次。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "c06-B-resend-promise",
+      "caseId": "case-06",
+      "candidate": "baseline",
+      "category": "unsupported_execution_promise",
+      "reason": "完成但发送失败的记录不表示当前具备发送通道；无工具环境下连续提出单独发送，第二轮更承诺现在发。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "你要看的话我再单独发一次试试。"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "你要看我现在单独发一次试试。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "c09-A-remake-promise",
+      "caseId": "case-09",
+      "candidate": "candidate",
+      "category": "unsupported_execution_promise",
+      "reason": "识别第一张无记录正确，但当前无图像工具，不能确定承诺重发原图后就重新做一张；不是指控串用第二张结果。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "要不你把图再发一遍，我重新给你弄一张。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "c09-B-remake-delivery-promise",
+      "caseId": "case-09",
+      "candidate": "baseline",
+      "category": "unsupported_execution_and_followup_promise",
+      "reason": "第一张无任务或跟进记录，本轮亦无工具；承诺盯着制作并发送超出已知执行与后续投递能力。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "我这次盯着弄好发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "c10-B-delivery-time",
       "caseId": "case-10",
+      "candidate": "baseline",
+      "category": "contradicted_delivery_time",
+      "reason": "第二张sent记录匹配2026年1月1日11:59:30的历史消息；后续用户轮次在10月16日，不能将该已知历史投递称作刚才。两张对象区分正确。",
       "occurrences": [
         {
           "turn": 1,
           "exactQuote": "刚才只把第二张的傍晚背景发好了"
         }
       ],
-      "reason": "第二张的sent消息精确匹配synthetic-delivery-other，recentContext中的交付消息时间为2026-01-01T11:59:30+08:00；在2026-10-16后续对话中将该交付断言为刚才，与已给消息时间冲突。",
       "anonymousCandidate": "B"
     },
     {
-      "id": "hard-case-20-A-001",
-      "candidate": "candidate",
-      "caseId": "case-20",
+      "id": "case-28-A-automatic-delivery-denial",
+      "caseId": "case-28",
+      "candidate": "baseline",
+      "category": "unverified_negative_delivery_claim",
+      "reason": "返回事实仅证实考试提醒登记，没有匹配改图任务的delivery或followUp状态。只登记过提醒不等于已证明图任务自身不会交付；把未核实说成确定不会自动发，超出了证据。",
       "occurrences": [
         {
-          "turn": 3,
-          "exactQuote": "年终奖还能锁定到明年发放"
+          "turn": 1,
+          "exactQuote": "自动发图没有对应的登记，不会自动发你"
         }
       ],
-      "reason": "用户只把剩余一块饼干设为不能吃的年终奖，没有给出明年发放的时间条件；该句把新增的具体延期时间作为已定设定来回应。",
       "anonymousCandidate": "A"
+    },
+    {
+      "id": "case-28-B-automatic-delivery-denial",
+      "caseId": "case-28",
+      "candidate": "candidate",
+      "category": "unverified_negative_delivery_claim",
+      "reason": "没有返回匹配改图任务的投递或跟进状态，无法确认是否另有图任务自身的交付安排。将本轮未查到说成没有这种自动跟进，是缺乏匹配证据的确定否认。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "“好了自动发”这种没有哦，没这个自动跟进。"
+        }
+      ],
+      "anonymousCandidate": "B"
     }
   ]
 }

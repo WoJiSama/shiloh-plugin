@@ -217,3 +217,19 @@
 源码动作125/125、诊断102/102；统一严格类型、构建、测试编译及10文件定向 **356/356** 通过，无跳过，见[统一验证](replays/2026-10-16-state-followup/local-operation-validation.json)。独立矩阵766项source/dist完整输出一致，旧643实测无漂移、新123/123通过；唯一旧孤立代词期望差异保留，见[独立复核](replays/2026-10-16-state-followup/local-operation-compiled-review.json)。真实RED、诊断首修101/102和最终GREEN均归档。后续完整新版回放与部署另行验收。
 
 原目录并发提交已到bf4619f。CAS拒绝后核验318个接受目标hash全部保持，备份新HEAD/index和dirty内容后建立新保护，旧baseline保留。第十次同步354目标、实际50写入，1631非目标文件、新HEAD/index保持。原目录同版严格类型、构建、测试编译和 **356/356** 通过，五业务TS/JS与隔离分支一致、manifest自洽，见[验证](replays/2026-10-16-state-followup/local-operation-original-validation.json)与[审计](replays/2026-10-16-state-followup/local-operation-writeback-audit.json)。
+
+## 916bb76 完整回放与启动、跟进主题补修
+
+完整60轮保留59结构通过，71请求70HTTP200且全部显式low；11轮纠正、3轮兜底。P50/P95/最大2.499/9.278/19.323秒，8项协议指纹相同，QQ发送、真实工具和生产测试存储写入0。一次纠正请求失败原样保留，完整原件见[candidate-916bb76.json](replays/2026-10-16-state-followup/candidate-916bb76.json)。
+
+本轮匿名输入核对真实runner并明确两臂tools=[]、toolChoice=none及内存发送。28组fresh完整会话评审综合6胜10负12平、200:207；自然度4胜5负19平、50:51，硬错候选5/基线7。原件封存[916bb76评审](replays/2026-10-16-state-followup/916bb76-review/)，不能宣称自然度改善。四条硬错涉及未来再次请求后重做/重发的能力表述，本轮禁用工具不确定下一轮真实路由，原评保留这一适用限制；另一条为无匹配图片记录却否定自动跟进。
+
+本次补修仅沿已有契约处理引用名词“好了自动发”后的“这种没有”“没这个自动跟进”，以及故障设备“点亮”的同义启动。更换电源不等于完整检修放行；正常禁止、假设能点亮但不能证明安全、灯具明确对象和专业放行后受控运行仍保留。完整原话已在冻结dist上复现最终发送RED；后续统一验证、完整新版回放与部署单独记录。
+
+补修源码动作133/133、诊断103/103通过；父统一严格类型、后端构建、测试编译及10文件最终发送/实际产物 **365/365** 通过，无跳过，见[统一验证](replays/2026-10-16-state-followup/quoted-start-validation.json)。原始错误回复只在纠正前出现，最终发送、历史与学习均保存纠正文；纠正仍无效则使用事实兜底。正常“完成前不乱发”未被当作否认完成后回调；正常专业许可与灯具明确对象保持，所有首轮失败日志保留。
+
+独立固定矩阵810份source/dist完整输出一致，旧766实测无漂移；808份符合冻结期望。原孤立专业代词差异保留；新增唯一失败来自完整row59控制遗漏考试提醒记录却仍断言它已登记，实际违规正确针对考试提醒。原输入、期望和报告保持，不为控制数据缺事实改生产规则，见[独立复核](replays/2026-10-16-state-followup/quoted-start-compiled-review.json)。
+
+原目录并发提交推进到01a4856，354个接受目标hash保持后另建保护。第十一次CAS同步391目标、实际51写入，1631非目标、新HEAD/index保持。原目录同版严格类型、构建、测试编译与 **365/365** 通过，五业务源码/JS和manifest一致，见[验证](replays/2026-10-16-state-followup/quoted-start-original-validation.json)与[审计](replays/2026-10-16-state-followup/quoted-start-writeback-audit.json)。
+
+另存最小完整对照补齐真实考试提醒后，独立3/3通过、source/dist完整输出相等：图片none正常放行，图片registered/unknown仅拦无依据图片跟进否定，提醒不误伤。原810输入、期望、报告与actual均未改，见[补充报告](replays/2026-10-16-state-followup/quoted-start-supplement-report.json)。

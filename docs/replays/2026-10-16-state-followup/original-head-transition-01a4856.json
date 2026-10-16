@@ -1,0 +1,10 @@
+{
+  "previousHead": "bf4619fb30d4dafd91b5b5804fbc80757f429e27",
+  "newHead": "01a48566c38d484123704fe749c87749fab30313",
+  "acceptedTargetCount": 354,
+  "acceptedTargetsUnchanged": true,
+  "headIsDescendant": true,
+  "snapshot": "/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-fact-state-start-20261016-z3pus4g5/head-01a4856-20261016-230653",
+  "newIndexSha256": "405302c2a8bd966d1480b5be8b3e328c7674f1a6602eacffded51d4097cbd782",
+  "previousBaselinePreserved": true
+}
