@@ -1156,74 +1156,149 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - 新样本建议：工具执行与社交用途分开，先保证当前证据/对象/缺口/上句立场必达，再按需要加局部社交状态；第二句承担新动作。私有证据只在/tmp/bl-chat-latest-three-20261014，报告不含原始媒体签名链接。
 
 # 2026-10-14 群聊互动最小闭环实现发现
-- 生产部署后补充：manifest.commit=d398a4a，chatTurn、interactionContext、composer、finalReply 四个编译文件哈希匹配；两服务 active，命令页与控制台 200。
-- 线上真实 chatAiConfig=glm-5.3，配置位于插件 config/message.yaml，凭据仅在服务器内读取。16/16 人设回放自动检查通过，但脚本只拼提示不走完整回合，不能据此评定互动智能。
-- 真实模型常规输出仍出现虚构刷手机情景和重复“我对大家都这样”，需要另列人工质量局限。
-- 日志表达学习 404 在部署前 21:00-22:09 已有 7 次；表情审查文本模型拒绝 image 内容的 400 在部署前也存在，均不是本次发布新引入。
 - 新互动层需同时进入CHAT/FULL；输出口吻必须使用原始正文和同一互动上下文，否则技术词/包装前缀会再次覆盖接梗线索。
 - 素材URL与素材内容分开；实际工具结果按调用ID积累，并复用工具结果分类，不能以通用错误词判OCR失败。提示渲染不能过滤current媒体证据。
 - 共享addressee明确bot时，引用/被@评价的人是素材来源；本bot上句只来自自有引用正文或经bot来源校验的续聊。旧无来源续聊不迁移为自身立场。
 - 续轮只提供更新的互动和场景口吻，避免重建默认人格；新认真请求及实际动作交付优先于玩笑。无确认回执仍不学习或登记。
 - 完整离线回归1908项1906通过/2环境跳过/0失败，契约验证不等于真实模型社交质量验证；同模型对照回放仍是后续验收。
 
-- 部署后真实影子结果：结构6/6，但社会表达并非6/6自然度合格；视频文字承接和确认交付符合语义边界，机箱玩笑仍转提醒，故障回答含不安全步骤措辞。后续应收敛公共人设提示并检查故障回答可执行性，避免新增禁词套模板。
+# 2026-10-15 群聊自然度迭代结论
+
+- 人设重复和实例配置内固定生活/接夸示例会同时影响表达；仅缩短公共提示不足以消除冲突。本轮统一稳定人格投影，显式修订已审实例配置，未知自定义systemContent仍完整保留且不自动写回。
+- 历史机器人发言只证明说过的话，不证明现实活动或任务进度。认真与交付互动进入现有推理升档，纯文字回复明确本次执行边界；没有调度状态支持时仍可能生成未来投递承诺。
+- 最终20轮与发布后4轮结构均通过，但发布前未知交付仍出现“有了我第一时间发你”，焦糊场景仍把无可见烧痕误当可通电条件。后续成功样本不抵消失败；自然度和安全步骤稳定性尚未全面达标。
+- 真实回放复用编译主链、内存发送与存储适配器并禁用工具副作用，不能证明真实QQ发图、视觉工具或完整生产记忆集成。最终判断由当前代理和独立子代理完成，没有外部人类评审。
+- 运行版本89650bd已发布，配置另有独立备份与回滚。代码安装器不覆盖config，不能只回滚代码却声称配置已恢复；报告保留两类恢复路径。
+
+# 2026-10-16 控制台群管理
+
+- 旧 groupGuard/groupModeration 为全局策略加 enabledGroups；groupNotice.groupRules 支持单群文案且隐式启用群通知。
+- 现有群列表仅收集 allowedGroups 和今日活动；需并入群管名单、旧通知／通知人规则和新覆盖。
+- 三个群管 manager 通过 readUserSettings 每次读文件；接入同一解析器即可让保存对后续事件生效。待处理验证超时也必须重读本群覆盖。
+- 默认策略及本群策略共用 schema 字段和配置仓库，避免复制配置与跨群覆盖。API 需保留原生管理员保护、总开关和通知名单语义。
+- 起始工作区有大量既有人设／记忆变更；只改群管理相关文件，共享文件最小补丁，原规划文件仅追加本轮记录。
+- 默认和单群 schema 由共享声明构建；单群保存只patch目标YAML序列节点，兄弟群、未改字段注释和未知字段保留。其他群保存不会使本群revision过期；本群/默认变更会409。
+- 新群级覆盖显式false/空串/空名单有效，未自定义字段仍跟随后续默认变更；原模块enabled作为总开关，本群不能绕过。
+- 旧通知模板隐式开启welcome/leave标志。单独恢复标志时需将保留的旧文本移入稀疏覆盖并移除旧隐式开关来源；整群恢复同时清掉文本。旧群号trim及groupAdmins的group_id/group/users/userIds别名也要参与显示、覆盖、reset和YAML定位。
+
+# 2026-10-15 真实任务依据初查
+
+- 既有taskStatus.ts持久化任务状态，chatTurn当前仅在历史消息渲染时追加格式化摘要；TurnInteractionContext只有素材与上句线索，没有权威行动状态。
+- 现有执行边界提示仍不能稳定阻止未来投递承诺；需沿真实任务与回执链路核对状态语义、bot/会话/用户作用域、过期及调度证据。
+- 初次搜索使用不存在的src/modules/delivery目录，实际投递回执位于src/modules/messaging/domain/deliveryReceipt.ts；后续按真实模块边界搜索。
+
+- 工具成功只表示调用未报错，生图排队也会写成功；已增加按bot/会话/用户/原请求隔离的事实投影，执行、产物、回执和后续登记独立。旧无来源记录不迁移。
+- Reminder只有detail与pending索引同时有效才确认登记，投递回执独立保留；未知发送不自动重试，completed不能替代message_id。
+- 已接入窄诊断前提：用户历史能保留焦糊事件，自己的断电建议不等于用户已执行，无烧痕/味散不能解除电气损坏未知。
+- 审计发现outboundArbiter原先丢发送返回值并吞异常，生产e.reply可能拿不到确认回执；必须修仲裁返回传播才可闭合真实投递证据。
+- 本次只读核验生产release-manifest为89650bd、两服务active；安装目录git HEAD69d5b3a是历史元数据，不据此判运行版本。
+
+## 2026-10-15 事实接线验收发现
+- 当前“发送/生成/登记后续”分离，缺少或未知回执不允许自动重发；生产生图完成通知机制未证明，followUp保持unknown。
+- 提醒部分查询失败不能抹除已确认图片结果；同源单条坏记录也应局部降级，整次事实读取设2秒预算。
+- 排障的断电/冷却是瞬时条件，历史需要时间来源；真实焦糊事件不能仅因时间过去而自动解除。
+- 服务器目录Git HEAD与release-manifest不一致，部署前需审计并发源代码，不能将目录HEAD当运行版本。
+
+- 最终c74b691完整门禁：后端2007项（2005pass/2宿主音乐skip/0fail）、前端34pass；独立打包校验通过。基线135轮已完成（134结构通过，1主模型超时转flash），保留全部数据。
+- 基线独立语义审阅：任务25会话3pass/11fail/11inconclusive；社交硬断言未见明确fail但固定台词、责怪、防御和少用已知文字仍在。排障额外风险与冻结判据分开，82℃未知型号保证正常不能算可靠；候选同口径审阅尚待结果。
+
+- 最后诊断独立审阅完成：c74真实故障冻结15pass，但明确专业检修的结构化放行5/5漏识别，另有拆接未隔离与开侧板凑近观察风险；无事故组温度证据不足两版均5/5。不能将冻结通过解释为完整诊断验收；先修接线和操作范围后独立补跑原两组。
+
+- Final a00fdd3 supplemental review confirms professional-clearance trace 5/5 updated and fault rubric 15/15 passed; no hardware reconnection exercised. No definite new severe fault advice observed, but temperature guarantee failure remains 5/5 and fictional advice has 1 ambiguous joke. Release scope is a local improvement, not broad safety/naturalness acceptance.
+
+- 最终发布验证以release-manifest与全部受管hash为准：线上a00fdd3的编译JS树和55模块依赖均等于独立补充回放；两服务与页面健康，配置未改变。发布范围及未解决温度/承诺/自然度缺口已保留于docs/ai-conversation-stability-2026-10-15.md。
+
+# Latest forwarded sample, 2026-10-15
+- Latest group forward is 11:48:32, message269173264, forward7696736494952455350. Archive contains3 text nodes: impossible restaurant booking and third-party wallet charge, followed by two short contextual refusals from another model. Current production remainsa00fdd3. This is a positive competitor sample, not evidence of our bot failing the same request.
+- get_forward_msg succeeded through the existing NapCat WebUI read action; full original response retained only under0700 /tmp/bl-latest-forward-fix-20261015, no credentials exported. No QQ messages sent or account initialization performed.
+
+- 工具边界离线复现：语义chat可能丢失为null，后续正则候选/补召可重新开放工具；补召甚至能把明确拒绝的第三方订餐请求变成搜索。该纯函数复现不代表生产真实模型曾误选。规划契约将区分不可用与明确no-tool，并保留实际会话能力与来源。
+
+- 基线65轮完整收齐、0QQ/0生产写入。引用吐槽续轮预期kind写为conversation、既有分类实际为banter，五次结构kind检查失败，保留冻结fixture与退出码，不把该标签差异算自然度/语义失败。一个订餐续轮反向断言“群主没说过这话”，尚无依据；主公共事实原则补未确认不等于未发生，不改输出或重采样。
+
+- 范围竞态不限于首次模型返回：工具执行与续轮中也有await，后续请求、runToolCall及识图后搜索均须读取本轮稳定范围；只在processToolCalls入口恢复session.tools不足以覆盖整个执行周期。
+
+- 候选仍出现无依据“群主没在这群里说过这话”，以及能力问答中重复索取已有时间/人数、过多建议；公共提示未稳定解决这些生成缺陷。输出guard确定性语病修复与整体自然度评价分开，候选全量保留且未重采样。
+
+- 最终自然度评审为基线14pass／3fail／13不确定、候选12pass／4fail／14不确定，未证明整体提升。确定fail→pass与pass→fail各1，其余不确定状态变化单列；不能把0guard改写当作生成质量达标。前置分类器两臂各27次8秒超时，是可用性缺口，不是54个语义误判。
+- c62ad84到发布900a5cb只改一个验收测试；Vite注入修订与构建时间，前端chunk／index会变，backend manifest只变commit。40个清单比较路径差异含旧新生成文件名；全部470个后端JS及其他非生成受管内容与候选相同，线上1919文件与最终清单一致。这不等于候选与发布包所有字节相同。
+- 本轮执行契约、工具刷新隔离、旧guard改写问题已修复并发布；重复追问、多余索图、无依据群历史、前轮温度与未登记后续承诺及Reminder附加动作边界仍有缺口。报告与完整脱敏证据已交付docs/ai-conversation-boundaries-2026-10-15.md，不作整体更聪明／更自然已达标声明。
+
+## 前置模型超时复核（14:37开始）
+
+- 旧54次是固定合成schema的分类器影子请求，调用编译后的实际semanticToolIntent与modelFetch，3并发，不是54次线上群请求。另两次最小诊断也超时，但旧记录没有区分响应头和响应体阶段。
+- fetchWithTimeout的8秒覆盖fetch加完整arrayBuffer读取；报“请求超过8秒没有返回”不能直接证明连接从未成功，也不能判断模型服务整体不可用。需新增独立分阶段观测；不覆盖旧回放结果。
+- 当前路由地址、密钥、模型与冻结快照全部相同，三份runtime的modelFetch／兼容入口／URL解析哈希相同，未见代理环境差异。最小两请求完整返回735ms／650ms；旧最小诊断原参数1001ms、完整分类默认thinking1671ms、关thinking1244ms，全部HTTP200且低于8秒。单次推理开关对照不支持因果性能结论。
+- 原样旧harness＋c62候选runtime＋冻结配置＋3并发，后续27次全部HTTP200、27次匹配原合成预期、0警告；script／schema／scenario／config／runtime等元数据与旧候选全相同。发布后现存日志还有1条真实分类1401ms成功。模型当前可用，原54次超时不能证明模型本身或当前可用性有故障。
+- 旧status:null只因wrapper未完成而记空，noHttpResponse字段是推导命名，不能证明HTTP头未到。历史两次45秒超时也无阶段观测，具体网络／排队／正文原因无法事后确定。原54次及旧证据哈希保持不变，新增32次诊断独立留存，已更正报告，不替换原正式A/B或自然度评审。
+
+## 原优化清单完成度复核
+
+- 当前personProfile仍不属于闲聊层，但稳定人设字段已移到buildPersonaStyleOverride，在主system prompt单独注入；不能再把排除personProfile等同于闲聊丢tone／speechStyle／notes。尚需区分稳定字段必达与整轮不可变PersonaSnapshot。
+- 已有TurnInteractionContext包含正文、说话人、对象、证据和有bot来源的上句，但kind仍由正则保守分类；personaTonePolicy仍先用“为什么”等事实问词进入precise。“你为什么不理我呀”这一原缺口需按实际组合复核，不因已有共享类型就宣称完整社交状态已实现。
+- 当前编译主链复现“你为什么不理我呀”：interaction.kind=conversation、allowPlayfulness=true，但resolvePersonaReplyMode仍返回precise，社交语义问题未闭合。timingGate没有消费同一TurnInteractionContext，尚未共享梗／上句态度／未接完内容。
+- 两条原误改经实际compiled manager＋outputGuardPipeline复测（polish true／false）保持原句；输出仍保留其他替换与语气删改，不能宣称所有出口语义风险均消除。
+- finalReply.ts:152已改成rawUserText做情节摘要，interactionReplay:309的长元数据／引用回归也验证guards、episode和enhanced均取当前正文。extractor.ts:162仍只传at而resolveEventAt读ctx.now；异常:159返回[]并被memoryManager:1005记成功。groupContextResolver仍默认80且pipelineForwardContext显式80，尚未补节点完整性状态。
+- 目前已有真实chatTurn／composer／finalReply／实际上一回复驱动的多轮回放，超出禁语／字数检查；但episodic和增强记忆写入／召回在runner里仍为capture／stub，未完成真实记忆存储到下一轮召回、切bot／人格版本和端到端延迟验收。此前自然度对照仍未整体提升。
+- 本轮只读定向验证共73项全过（systemContentSource、personaFeedbackManager、personaTonePolicy合计30；interactionReplay、sessionContinuity、turnPromptComposer合计43），无真实模型或线上调用，不能用这些局部通过代替原清单全部完成。
+- 独立只读缓存审计用真实composer纯内存先后请求人格A／B，第二次personaFeedback仍得到A且loader只运行1次；该层固定全局key会串人格标题与配置结果。personProfile目前只承载群／对方而不承载自身人设，不能把共享profile缓存直接认作自我串人格；主要残余是变更陈旧和缺少版本失效。episodic写入不传bot／persona，按群文件和群+用户召回，:151／167仍第一人称投成“你回了／你当时回”，归属路径未修。
+
+## 人设快照与来源实施设计
+
+- 快照在主回合首次异步前生成，记录库内稳定id、bot、已解析完整人设及systemContent／guard配置的内容版本，深复制冻结；同名条目、同id编辑和在途热切换均有明确作用域。session与ConversationContext保存同一来源，后续生成、出口、归档、学习沿用该快照。
+- 续聊采用独立版本命名空间，不从无来源旧摘要推断人格；反馈缓存和已投递回复／持久反馈按bot／personaId／version分区。情节继续按群共享公开原话，但只有完整来源一致的回复可投影为第一人称；旧无来源回复保留磁盘、不冒认当前人格。
+- 初次apply_patch含压缩接口行的部分匹配失败且未生效，改用精确整行替换；两次假定源码／辅助文件路径不存在均为只读读取错误，后续按rg定位实际文件。
+
+- 实际outbound wrapper通过Object.create继承event身份，后续finalReply/feedback不能用对象spread复制；包装器必须own-pin快照。Gate在history await前捕获人格，并在真正continue/debounce成功后单次交给主回合，wait/no_action不保留旧快照。
+- 显式master_feedback语义召回已按scope隔离；auto_evolution公共节奏与entity facts的heardFrom名字来源仍是后续范围，不将本轮称为全类型记忆或所有自学习隔离。
+
+- 最终覆盖本轮全部guard调用点：普通文字、实际TextImage adapter、VoiceTool、三种进度出口；卡面异步加载前捕获，finalReply取session优先。2个Chromium卡面截图测试按既有环境跳过，未证明真实模型自然度。独立档案和跨重启draw/edit恢复未存完整快照，进度prompt仅消费部分人格字段；报告保留这些限制及事件时间/失败/转发/社交未做范围。
+
+# 2026-10-15 剩余清单实施
+
+- 当前隔离HEAD6668bd3干净，原目录HEADde03521且有其他会话未提交内容；不能在原目录整体git add/commit。复用隔离分支提交交付，写回前逐项核对原始哈希。
+
+# 2026-10-15 记忆与社交状态最终边界
+- 日期/来源/转发与故障规划连续性改善，生成HTTP200、结构分或单评审14:5:5不等于全面自然度通过。900ms是群知识裁决，和主意图及20s抽取不同。实模pending只观察attempt1，未来重试/恢复由单测覆盖；跨午夜fixture有双时钟，eventAt仅锚日期而非精确上午。
+- 一次大段中文stdin解析失败，未写文件；改用ASCII JSON载荷完成规划追加与保全审计。
 
 
-# 2026-10-14 提示质量根因
-- buildPersonaStyleOverride/PersonaTonePrompt都向所有人格灌入软、慵懒、善意必须回同一句；persona.tone/speechStyle在闲聊档没有必达投影。system默认又有相互矛盾的被夸要嘴硬，约束重复。
-- 模板把问题/解释等动词一概推成强制工具，把对具体图梗的参与易转成任务；需要以目标是否需要外部证据为准保留执行契约。
-- 接梗回复缺时长不必强迫复述数字，应验证变化是否被使用以及是否引入不存在的真实风险。
+## 2026-10-15 Low reasoning budget evidence
+All 26 candidate/final/postdeploy live requests sent low. Baseline tool/adaptive probes omitted effort. Low still sometimes consumes reasoning tokens and had a 27.415s reply; no confirmed provider-specific thinking-off mapping. Unregistered conditional delivery promises remain despite prompt reinforcement. Production startup adds the blank toolsReasoningEffort default, so first CAS rejection required semantic diff verification before rebase.
 
-## 2026-10-15 续轮确认
-- 实际 release-manifest 仍 d398a4a，服务均 active。发布目录无 .git，git -C 会读到宿主 TRSS 仓库，不能用其 HEAD 判断插件发布。
-- 已完成代码候选全门禁与 code-only 实模对照，私有配置的固定生活活动示例和接夸台词仍压过通用事实要求。精简配置副本及三条已知人设项修改仅存服务器临时目录，尚未应用生产。
-- TurnInteractionContext 已判 serious_answer，但 TurnPlan 未接收该语义，部分故障询问被选 casual，实际 outgoing reasoning_effort 仍 low；先闭合此断点再评估最终配置。
-- 最终第一轮20回放结构全过、均glm-5.3/HTTP200/无重试，但人工发现未知交付仍承诺再跑一次，原始散热场景仍在断电后查风扇运行并建议未查清就通电。已在TurnPlan派生现有请求中传递实际仅文字执行边界，公共排障协议要求状态可执行/真实电气损坏排除前不再通电；不是改写模型输出。
-- 最终配置修订严格只改变systemContent和speechStyle[2]/preferences[1]/preferences[5]；保留身份、备注、全部边界及实时信息规则，原值比对生产仍相等，未修改生产。
+# 2026-10-16 控制台群管理
 
-## 2026-10-15 episodic/persona ownership 本轮补齐
-- 抽取 outcome 区分 success（包括显式空数组）、failed transport/invalid-output、skipped unconfigured；反思不改抽取状态。
-- Pending 原文、原发言时间、完整 PersonaScope、attempt/backoff/exhausted 写既有 Redis 每群 pending-extractions 文档；已知群在读取或入队时恢复，未新增全 Redis 扫描。单进程同批 running 防并发；持久 ack 失败可至少一次重放，事实按来源和事件时间去重。
-- 用户输入不再在 pending 截到500字；用户 buffer 按 bot+人格+版本+中国日期隔离。sourceIndex 选原发言时间，未知/多条无来源不猜相对日期；eventDate 校验真实日历日期。
-- 来源不同/版本不同/同名bot/legacy来源均不当作自身亲历；公开事实仍共享。反思与去重保留来源和事件时间，不混跨来源/跨事件事实。
-- forward/quote 有提示来源声明与解析边界，不把第三方“我”归为转发人的自述或本群共识。
-- 禁用/opt-out/清空会清持久pending并失效正在执行的抽取，避免延后写回。
-- 定向初轮92/92、全memory186/186（临时TS import hook，无build、真实模型或线上访问）；后续新增ack失败回归仍待最终重跑。
+- 群管共用原模块默认值和总开关，本群稀疏覆盖通过统一策略解析接入实际管理器；旧启用名单与锅巴模板/通知名单保持兼容。
+- 旧非空通知模板隐式开启对应通知；恢复开关时需迁移保留文案并移除旧隐式来源，才能持续继承未来默认值。
+- 旧GSubForm可含重复群号与别名，定点YAML写入必须逐行patch并倒序删除全部移除项；首条findIndex会让已恢复的旧名单重新生效。已用隔离真实HTTP验证。
+- 本地新策略/HTTP13项、既有相关48项、前端48项、浏览器48项全部通过；生产/公网验收未执行。说明见docs/console-group-admin-2026-10-16.md。
 
-## 2026-10-15 耗尽批次可靠性补修
-- 原scope唯一buffer让exhausted批次挡住同日用户消息及后续群事实；现拆成独立持久batch身份和同人格scope，耗尽记录保留，不进入自动重试，新消息从独立预算开始。同scope已有请求时新批先持久化后等待，避免并发新增原文未经尝试继承耗尽次数。
-- 群history对该scope全部pending原文去重，耗尽行不会作为新输入重置预算；pending总上限统计user/group/live/exhausted所有批次，独立拆批不绕过cap。耗尽记录仍需显式清理，达到总cap后明确拒绝新批。
-- 冷恢复尊重每份持久key与attempts；重复legacy key稳定派生身份，恢复cleanup失败后重入不复制。文档occurrence在隐私过滤前计数，后续opt-out不能改变保留batch身份；timer在隐私cleanup持久完成后才启动。
-- 最终源码hook全memory219/219、0跳过，tsc --noEmit退出0，diffcheck通过；独立只读feedback复核无新增阻断。这是本地契约证据，统一构建与真实模型/线上验收由父代理继续。
+# 2026-10-16 控制台已覆盖入口去锅巴化
 
-- 完整门禁失败定位：未读视频正文实际请求“视频里的吃法是什么”，应保留factual_question/serious_answer且局部承认不可见；两个compiled测试的host不完整，生产host已有resolveUnderstandingPrompt。歧义闲聊复用理解简报，原无条件跳过字符串断言已过时。后续仅修验收并核对运行产物等价。
+- 审计确认basic10/10、permission8/8、aiModels10组、persona53/53、messagePipeline20/20和群管全部已有实际控制台编辑保存；aiCore39/40覆盖，独留systemContent；tracking仅chatTriggerMode有覆盖。
+- Commands骰子只改文案/检定表等资产，EmojiManager只管素材和补充入库标准，SemanticPage只管检索与单条记忆操作，均不能替代各模块运行设置；其余12类配置继续保留。
+- 单删聚合注册不足：旧configPanel会返回完整配置并接受任意flat字段，模型normalizer还会把旧渠道载荷中缺省key/priority归一化后覆盖。已按剩余schema精确字段限制读写，移除模型探测action且不改控制台共享normalizer。
+- 已将persona/messagePipeline/riskControl声明原样移到shared、删除9组锅巴声明/旧导出，并登记显式退役和独立路径；backend构建与边界通过。
 
-- 最终实模改善边界：来源与绝对日期、部分转发处理改善；盲评14:5:5但仍有两处语言硬错，不能以48/48主生成HTTP200或30/48结构通过冒充自然度通过。900ms群共享知识裁决全超时，与20秒正文抽取/主意图模型是不同调用；最终pending只证明失败可见和原文保留，timer未来恢复由单测覆盖。跨午夜场景存在真实与模拟双时钟，eventAt仅日期锚而非上午精确时段。
 
-## 2026-10-15 默认推理预算审计
-- complexReasoningEffort 默认 high，serious_answer/delivery 均自动应用；关闭此覆盖只继承全局，不等于发送 none 或关闭模型思考。
-- 工具初始请求、工具回复转文字、自适应长上下文切工具后端有漏 effort 路径；生产 useTools=true，不能只修改复杂档配置或仅测试 useTools=false。
-- 本轮将复杂默认改 low，独立工具预算留空继承当轮/全局，保留管理员显式 high；不随机分配思考档，不声称 GLM 已支持 none。
+## 2026-10-16 三块策略迁移
 
-- 实模确认：旧版工具/自适应三条均provider_default；候选及部署后26条全部显式low。两个低档网关样本reasoning_tokens为0，另有少量推理token，低档不等于关闭思考。
-- 低档有27.415秒长尾，不能保证每条提速。未知交付的条件式未来承诺在补提示后仍会复现；结构kind与HTTP成功不评价该语义正确性。预算目标完成，剩余承诺判断应另行低档验收。
-- 配置load会补写新增默认字段，因此发布后配置CAS需先核对真实语义差异再基于新哈希施加单字段改动。首轮CAS正确拒绝，不能绕开CAS覆盖私有现场配置。
+既有 DiceSettings 仅文案/判定，SemanticPage 仅运营，conversation 仅 strict/smart 模式；待迁 11/55/35 个顶层字段。tracking 的子表单 group/value/range 不计主字段；memory 有12条重复声明，迁移应去重。继续复用 SchemaPage 的 revision、草稿和脏字段保存机制，API 独立 tracking/dice/memory，跟踪嵌入对话页、骰子嵌入命令页、记忆嵌入语义页。
 
-## 2026-10-16 P0 / P1-3 事实和社交接续
-- 生产重新核验仍为5a8a630，1942受管文件逐项与manifest一致，message94e66739/persona01f5ace9保持，全局/复杂/闲聊low、工具继承。当前运行与私有配置已冻结到服务器/tmp/bl-p0-social-20261016，原始配置未离开服务器。
-- actionFacts原有提示已足够明确但模型仍违背；新增窄事实冲突检查，一次无工具/low重生成与基于证据的独立兜底。普通候选不增加模型调用，不在句中删词；仅实际发送回复写入历史与续聊。
-- 社交续接原先只认固定短句；现在依据同bot/人格已确认上句的具体内容、数量/单位和当前指代接续，第三方点评请求独立于引用中的被叫到者；安静陪伴保留用户不想听建议的当前诉求。
-- 首批105项定向全过；实模和最终出口发送闭环尚待继续，不以结构标签通过代表自然度通过。
-- compiled出口补验发现“没有有效的自动补发安排”的否定前缀未覆盖，导致正常纠正再次兜底；修复必须按动作局部否定，不能一句否定放过后续承诺。只有提醒的facts也不能替图任务回答排队；fallback需与当前请求语境同样收窄。
-- 实模首候选揭示不能只检验新守卫是否触发：安全的“通电风险大”“排除损坏之前不要通电”也曾误报；修复以完整原话和相邻危险建议的正反例共同约束。“有准信再发”属于完成触发的后续承诺；failed投递状态不包含用户拒收/关闭接收的因果证据。
+运行核对：DiceManager每次操作读配置，baseDir会立即切目录且不迁数据，timeZone只影响后续日期。追踪后续判断和新调度热读，既有计时器不重排；平均延迟仅无样本时用初始值。记忆配置热更新会重装单例、重置未摘要缓冲，旧任务可能继续；注入缓存约60秒，演化清扫首次约1分钟后每日，中期清扫约12小时。旧groupTalkValues对象map必须投影为可编辑表格并进入revision，无关保存保持原map。旧talkValue的0.05步长不接受默认0.07/0.034，修至0.001；maxDiceSides改1以接受D6/D20。
 
-## 2026-10-16 最终盲评揭盲与补修
-- A/B在每组随机，匿名总分不可直接归版本；按映射聚合后旧候选硬错误3、基线12，自然度候选4胜12负12平。优势主要是证据忠实度，社交效果仍有弱点。
-- 三处漏判来自语句边界/条件语法：省略号连接状态与说明、“实际产出”未归完成条件、“你要的话我现在”未归自身即时动作。以原话、有效登记、否定、引用、问句、第三方共同回归，最终实际发送只持久化纠正后正文。
-- 系统代理为127.0.0.1:7897；GitHub直连不通时只对该次git命令设置http.proxy，已成功推送。
-- 后端manifest含commit。仅文档commit会改变manifest整体hash，JS与sources/files逐项相同才是运行代码等价证据。
-- 7548294安装产物完整60轮仍见限定语状态越界、可用产物被否认、已登记运行任务被否认及过强诊断反推，记录在最终报告。窄语法守卫改善部分已知错误，无法提供任意表述的事实保证；本轮工程交付与效果未全达标明确分开。
-- 原工作区51目标/379非目标安全写回，186项实际产物回归通过；14业务目标编译结果与发布分支一致。源树同时含并发配置与群管变更，整体manifest不能与生产直接等同。
+
+## 2026-10-16 控制台密度审查（进行中）
+
+全局使用 22px 纵向 page-stack、22px panel padding、20x24px 双列表单；配置页与 AI 页局部 max-width1120px，需验证多层页头与字段跨列带来的空白。前序浏览器只覆盖溢出，不能证明密度合理。
+
+首次1440px截图复核：AI页首屏全被嵌套思考程度表单占用，未见渠道；单群页前900px全被页头/选群/本群标题/摘要/警告/tab占用，首个策略控件仍在下方；追踪参与频率页表单从约527px开始，长help/生效说明使同行短字段下出现空白。已确认不是截图溢出测试可覆盖的问题。
+
+完成228状态几何后确认：1440x900 AI能力tab在y1008、首渠道卡y1191；单群选择器高173，本群摘要117，警告76，策略卡y887（开关更低）。390px截图中同样问题加剧。生图初始右侧空引导卡高304，下面仍有约203px待左栏结束的空区，然后历史才出现。
+
+变体复核完成：QR让同排正常账号卡增加158px空高；8意图+无失败时右卡多出约321px空高；14人设在390px时编辑器y1581。群表格实际table宽1215、容器1100，证实普通1440桌面也需内部横滚115px，页面无外溢不等于内容可见。空素材场景首轮1440在组件预加载后改fixture，未切到空数据；已改为首次加载前置空并补跑。嵌入iframe在720px高视口仍700px，顶部189导致底部889超过视口。
+
+审查结论已定稿：6类优先问题（共享骨架、AI思考区、单群层级、账号/观测等高、生图内容流、手机人设列表）及7类后续优化（表单尺寸/帮助、命令默认编辑、骰子模板/素材间距、宽屏限宽、群表格、记忆运行布局、iframe高度）。合理预览/创作/触控空间保留；报告给出逐页覆盖和实施验收口径。
 
 ## 2026-10-16 剩余修复初始取证
 - 运行7548294的已保留失败：限定语第一张蓝底图的未知被说成未完成；可用产物被否认；已登记运行任务被否认；无烟无味被反推未烧毁；社交自然度未证明提升。
@@ -1262,3 +1337,5 @@ TS6A审查：独立记忆命令缺失replyMemoryForward已补；清空成功但�
 - 916盲评50:51自然度仍无改善证明；无工具执行环境已明确进入本轮匿名输入。四条未来重做/重发能力承诺的评审需区分本轮能力与未来新请求路由；按原评保留，不新增普通社交调用、日期禁词或一概拒绝用户再次请求。
 
 - 810项固定产物复核保留两份期望差异：一份旧孤立专业代词控制；一份新完整row59控制只装图片none却仍声称考试提醒已登记，实际提醒归属拦截正确。810份source/dist输出一致、旧766实测不漂移；不为缺失fixture事实改生产规则。
+
+- 续接核验：生产已01a4856，merge保留已上线群管/控制台及8529最新聊天源码。冻结配置与生产仅groupModeration.overlongMessage/burstMessage、emojiSystem.admissionExtraReject、groupAdmin四根不同；这些不参与隔离聊天入口，但新默认值仍改变完整effectiveConfigHash，不能隐藏该差异。8529回放仍有“有消息就告诉你”无登记承诺及“没查到记录所以没有成品”未知推否定，属于现有P0契约；独立评审与窄修继续，不把60结构全过当语义全对。

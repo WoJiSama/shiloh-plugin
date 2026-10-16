@@ -16,21 +16,21 @@ const schema: ConfigSchemaItem[] = [
     label: "每群最大实体数",
     component: "InputNumber",
     bottomHelpMessage: "每个群最多记录多少个实体(人/物),超过会按权重淘汰",
-    componentProps: { min: 10, max: 2000, placeholder: "200" }
+    componentProps: { min: 10, max: 2000, step: 1, placeholder: "200" }
   },
   {
     field: "memorySystem.maxFactsPerGroup",
     label: "每群最大记忆条数",
     component: "InputNumber",
     bottomHelpMessage: "每个群的全局共识记忆最多保存多少条(所有类别总计)",
-    componentProps: { min: 10, max: 1000, placeholder: "50" }
+    componentProps: { min: 10, max: 1000, step: 1, placeholder: "50" }
   },
   {
     field: "memorySystem.maxFactsPerEntity",
     label: "每实体最大记忆条数",
     component: "InputNumber",
     bottomHelpMessage: "每个实体最多保存多少条记忆,超过会按重要性淘汰",
-    componentProps: { min: 1, max: 200, placeholder: "20" }
+    componentProps: { min: 1, max: 200, step: 1, placeholder: "20" }
   },
   {
     field: 'memorySystem.saveStrictness',
@@ -49,28 +49,28 @@ const schema: ConfigSchemaItem[] = [
     label: "用户记忆提取防抖（秒）",
     component: "InputNumber",
     bottomHelpMessage: "用户发言后等待 N 秒(期间无新消息)再抽取,把连续发言合并为一次;0=不防抖即时抽取",
-    componentProps: { min: 0, max: 600, placeholder: "90" }
+    componentProps: { min: 0, max: 600, step: 1, placeholder: "90" }
   },
   {
     field: "memorySystem.userExtractMaxBatchMessages",
     label: "用户记忆批量大小",
     component: "InputNumber",
     bottomHelpMessage: "缓冲攒满 N 条用户消息时立即抽取一次(防抖未到也会触发)",
-    componentProps: { min: 1, max: 50, placeholder: "6" }
+    componentProps: { min: 1, max: 50, step: 1, placeholder: "6" }
   },
   {
     field: "memorySystem.groupExtractMinIntervalMinutes",
     label: "群记忆最小整理间隔（分钟）",
     component: "InputNumber",
     bottomHelpMessage: "同一群两次记忆整理至少间隔 N 分钟,间隔内的触发会被跳过",
-    componentProps: { min: 1, max: 120, placeholder: "10" }
+    componentProps: { min: 1, max: 120, step: 1, placeholder: "10" }
   },
   {
     field: "memorySystem.groupExtractMaxBatchMessages",
     label: "群记忆触发条数",
     component: "InputNumber",
     bottomHelpMessage: "每次群整理最多取最近 N 条候选消息分析",
-    componentProps: { min: 1, max: 100, placeholder: "12" }
+    componentProps: { min: 1, max: 100, step: 1, placeholder: "12" }
   },
   { component: "Divider", label: "注入控制" },
   {
@@ -78,28 +78,28 @@ const schema: ConfigSchemaItem[] = [
     label: "注入群记忆最大条数",
     component: "InputNumber",
     bottomHelpMessage: "每次对话时注入 prompt 的群共识记忆条数上限",
-    componentProps: { min: 0, max: 50, placeholder: "6" }
+    componentProps: { min: 0, max: 50, step: 1, placeholder: "6" }
   },
   {
     field: "memorySystem.promptMaxEntityFacts",
     label: "注入个人记忆最大条数",
     component: "InputNumber",
     bottomHelpMessage: "每个人（说话人/被提及人）注入 prompt 的个人事实条数上限，按与当前问题的相关度排序后截取",
-    componentProps: { min: 0, max: 50, placeholder: "6" }
+    componentProps: { min: 0, max: 50, step: 1, placeholder: "6" }
   },
   {
     field: "memorySystem.promptMaxChars",
     label: "记忆 prompt 字符上限",
     component: "InputNumber",
     bottomHelpMessage: "记忆部分注入 system prompt 的总字符上限，控制 token 消耗",
-    componentProps: { min: 100, max: 8000, placeholder: "1200" }
+    componentProps: { min: 100, max: 8000, step: 1, placeholder: "1200" }
   },
   {
     field: "memorySystem.recallMaxMentionedEntities",
     label: "最大被提及实体数",
     component: "InputNumber",
     bottomHelpMessage: "一条消息中最多解析并注入多少个被提及的人的记忆",
-    componentProps: { min: 0, max: 20, placeholder: "3" }
+    componentProps: { min: 0, max: 20, step: 1, placeholder: "3" }
   },
   { component: "Divider", label: "语义召回（需 embeddingAiConfig）" },
   {
@@ -143,14 +143,14 @@ const schema: ConfigSchemaItem[] = [
     label: "实体反思触发条数",
     component: "InputNumber",
     bottomHelpMessage: "单个实体活跃记忆超过该条数后触发反思巩固(合并去冗余)",
-    componentProps: { min: 1, max: 200, placeholder: "15" }
+    componentProps: { min: 1, max: 200, step: 1, placeholder: "15" }
   },
   {
     field: "memorySystem.reflectGroupThreshold",
     label: "群反思触发条数",
     component: "InputNumber",
     bottomHelpMessage: "群共识记忆超过该条数后触发反思,产出高层洞察",
-    componentProps: { min: 1, max: 500, placeholder: "30" }
+    componentProps: { min: 1, max: 500, step: 1, placeholder: "30" }
   },
   { component: "Divider", label: "时间回扣（仅回复内自然提起，不主动发消息）" },
   {
@@ -164,98 +164,14 @@ const schema: ConfigSchemaItem[] = [
     label: "回扣窗口(未来天数)",
     component: "InputNumber",
     bottomHelpMessage: "事件时间落在未来 N 天内时可自然回扣(如临近的考试)",
-    componentProps: { min: 0, max: 90, placeholder: "3" }
+    componentProps: { min: 0, max: 90, step: 1, placeholder: "3" }
   },
   {
     field: "memorySystem.proactiveWindowDaysAfter",
     label: "回扣窗口(过去天数)",
     component: "InputNumber",
     bottomHelpMessage: "事件时间落在过去 N 天内时可自然回扣(如'考得咋样')",
-    componentProps: { min: 0, max: 90, placeholder: "7" }
-  }
-,
-  { component: "Divider", label: "语义记忆强度演化" },
-  {
-    field: "semanticMemory.memoryEvolution.enabled",
-    label: "启用强度演化",
-    component: "Switch",
-    bottomHelpMessage: "记忆随时间衰减、被召回即强化;关闭后回到纯相似度排序"
-  },
-  {
-    field: "semanticMemory.memoryEvolution.halfLifeDays",
-    label: "半衰期(天)",
-    component: "InputNumber",
-    bottomHelpMessage: "N 天没人想起强度减半",
-    componentProps: { min: 1, max: 90, step: 1, placeholder: "7" }
-  },
-  {
-    field: "semanticMemory.memoryEvolution.reinforceBoost",
-    label: "召回强化幅度",
-    component: "InputNumber",
-    bottomHelpMessage: "每次被召回注入提升的强度",
-    componentProps: { min: 0.05, max: 1, step: 0.05, placeholder: "0.35" }
-  },
-  {
-    field: "semanticMemory.memoryEvolution.freezeThreshold",
-    label: "淡忘阈值",
-    component: "InputNumber",
-    bottomHelpMessage: "强度低于此值每日清扫时删除;0=只用保留期不按强度遗忘",
-    componentProps: { min: 0, max: 0.5, step: 0.01, placeholder: "0.06" }
-  },
-  { component: "Divider", label: "记忆自纠错" },
-  {
-    field: "semanticMemory.selfCorrection.enabled",
-    label: "启用自纠错",
-    component: "Switch",
-    bottomHelpMessage: "群友说\"你记错了\"且指向机器人时,自动降权上一轮引用的记忆(降权非删除,重复纠错自然淡忘)"
-  },
-  {
-    field: "semanticMemory.selfCorrection.penalty",
-    label: "每次降权幅度",
-    component: "InputNumber",
-    bottomHelpMessage: "1=一次纠错直接打到冻结线",
-    componentProps: { min: 0.05, max: 1, step: 0.05, placeholder: "0.5" }
-  },
-  {
-    field: "semanticMemory.selfCorrection.ttlMinutes",
-    label: "纠错有效窗口(分)",
-    component: "InputNumber",
-    bottomHelpMessage: "机器人引用记忆后多久内的纠错才算数",
-    componentProps: { min: 1, max: 60, step: 1, placeholder: "10" }
-  },
-  { component: "Divider", label: "中期记忆(主线摘要)" },
-  {
-    field: "midtermMemory.enabled",
-    label: "启用中期记忆",
-    component: "Switch",
-    bottomHelpMessage: "每群滚动维护\"最近在聊什么主线\"摘要,补 60 分钟窗口与长期记忆之间的空档;依赖记忆模型配置"
-  },
-  {
-    field: "midtermMemory.minMessages",
-    label: "触发消息数",
-    component: "InputNumber",
-    bottomHelpMessage: "攒够多少条新消息更新一次摘要",
-    componentProps: { min: 4, max: 100, step: 1, placeholder: "15" }
-  },
-  {
-    field: "midtermMemory.maxSummaryChars",
-    label: "摘要长度上限",
-    component: "InputNumber",
-    componentProps: { min: 120, max: 2000, step: 20, placeholder: "500" }
-  },
-  {
-    field: "midtermMemory.retentionDays",
-    label: "主线保留天数",
-    component: "InputNumber",
-    bottomHelpMessage: "过期的主线自然淡忘",
-    componentProps: { min: 1, max: 14, step: 1, placeholder: "3" }
-  },
-  {
-    field: "midtermMemory.model",
-    label: "摘要模型",
-    component: "Input",
-    bottomHelpMessage: "留空用记忆模型(memoryAiModel)",
-    componentProps: { placeholder: "如 glm-5.3-flash" }
+    componentProps: { min: 0, max: 90, step: 1, placeholder: "7" }
   }
 ,
   { component: "Divider", label: "语义记忆强度演化" },

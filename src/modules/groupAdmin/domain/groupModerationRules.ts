@@ -22,6 +22,18 @@ export const DEFAULT_GROUP_MODERATION_CONFIG:ModerationConfig = {
   floodWindowSeconds: 10,
   floodMaxMessages: 8,
   floodConfidence: 0.9,
+  overlongMessage: {
+    enabled: false,
+    maxLength: 1500,
+    forwardEnabled: true
+  },
+  burstMessage: {
+    enabled: false,
+    windowSeconds: 5,
+    maxMessages: 6,
+    muteSeconds: 30,
+    forwardEnabled: true
+  },
   adTemplates: [
     "AI 培训公司 需要 软件工程师 线上培训讲课 要求 6年以上代码经验 前端 后端 晚上时间 在家即可上课 无需外出 保障收益 加创始人微信",
     "扫码进群 加群二维码 群聊邀请 长按识别二维码 进群领取福利",
@@ -228,6 +240,20 @@ export function normalizeGroupModerationConfig(input:unknown = {}):ModerationCon
   config.floodWindowSeconds = Math.floor(normalizeNumber(config.floodWindowSeconds, DEFAULT_GROUP_MODERATION_CONFIG.floodWindowSeconds, 3, 600))
   config.floodMaxMessages = Math.floor(normalizeNumber(config.floodMaxMessages, DEFAULT_GROUP_MODERATION_CONFIG.floodMaxMessages, 3, 100))
   config.floodConfidence = normalizeNumber(config.floodConfidence, DEFAULT_GROUP_MODERATION_CONFIG.floodConfidence, 0, 1)
+  const rawOverlong = adminRecord(raw.overlongMessage)
+  config.overlongMessage = {
+    enabled: rawOverlong.enabled === true,
+    maxLength: Math.floor(normalizeNumber(rawOverlong.maxLength, DEFAULT_GROUP_MODERATION_CONFIG.overlongMessage.maxLength, 100, 20000)),
+    forwardEnabled: rawOverlong.forwardEnabled !== false
+  }
+  const rawBurst = adminRecord(raw.burstMessage)
+  config.burstMessage = {
+    enabled: rawBurst.enabled === true,
+    windowSeconds: Math.floor(normalizeNumber(rawBurst.windowSeconds, DEFAULT_GROUP_MODERATION_CONFIG.burstMessage.windowSeconds, 2, 600)),
+    maxMessages: Math.floor(normalizeNumber(rawBurst.maxMessages, DEFAULT_GROUP_MODERATION_CONFIG.burstMessage.maxMessages, 3, 100)),
+    muteSeconds: Math.floor(normalizeNumber(rawBurst.muteSeconds, DEFAULT_GROUP_MODERATION_CONFIG.burstMessage.muteSeconds, 0, 2592000)),
+    forwardEnabled: rawBurst.forwardEnabled !== false
+  }
   config.adTemplates = normalizeStringList(config.adTemplates)
   config.thresholds.report = normalizeNumber(config.thresholds.report, 0.7, 0, 1)
   config.thresholds.recall = normalizeNumber(config.thresholds.recall, 0.85, 0, 1)

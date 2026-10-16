@@ -270,6 +270,66 @@ const schema: ConfigSchemaItem[] = [
     label: "群内提醒模板",
     component: "InputTextArea",
     bottomHelpMessage: "支持变量：{rules}、{confidence}、{action}、{actionText}、{evidenceText}"
+  },
+  {
+    component: "Divider",
+    label: "超长消息折叠"
+  },
+  {
+    field: "groupModeration.overlongMessage.enabled",
+    label: "超长消息折叠开关",
+    component: "Switch",
+    bottomHelpMessage: "开启后，未命中广告风控的超长消息会被自动撤回，并把原内容转成一条合并聊天记录发出"
+  },
+  {
+    field: "groupModeration.overlongMessage.maxLength",
+    label: "超长判定字数",
+    component: "InputNumber",
+    bottomHelpMessage: "消息可见文本超过该字数即视为超长。默认 1500 字",
+    componentProps: { min: 100, max: 20000, step: 50, placeholder: "1500" }
+  },
+  {
+    field: "groupModeration.overlongMessage.forwardEnabled",
+    label: "撤回后转发聊天记录",
+    component: "Switch",
+    bottomHelpMessage: "默认开启。关闭后只撤回超长消息不再转发；命中广告/刷屏规则的消息始终不会被转发"
+  },
+  {
+    component: "Divider",
+    label: "连发消息折叠"
+  },
+  {
+    field: "groupModeration.burstMessage.enabled",
+    label: "连发消息折叠开关",
+    component: "Switch",
+    bottomHelpMessage: "开启后，同一成员在时间窗内连发达到条数上限，这批消息会被全部撤回并合并成一条聊天记录，可附带禁言"
+  },
+  {
+    field: "groupModeration.burstMessage.maxMessages",
+    label: "连发条数上限",
+    component: "InputNumber",
+    bottomHelpMessage: "时间窗内发送达到该条数即触发折叠。默认 6 条",
+    componentProps: { min: 3, max: 100, placeholder: "6" }
+  },
+  {
+    field: "groupModeration.burstMessage.windowSeconds",
+    label: "连发时间窗(秒)",
+    component: "InputNumber",
+    bottomHelpMessage: "统计连发的滑动窗口长度。默认 5 秒",
+    componentProps: { min: 2, max: 600, placeholder: "5" }
+  },
+  {
+    field: "groupModeration.burstMessage.muteSeconds",
+    label: "禁言秒数",
+    component: "InputNumber",
+    bottomHelpMessage: "触发连发折叠后对发送者的禁言时长，默认 30 秒；填 0 表示只折叠不禁言",
+    componentProps: { min: 0, max: 2592000, step: 30, placeholder: "30" }
+  },
+  {
+    field: "groupModeration.burstMessage.forwardEnabled",
+    label: "折叠后转发聊天记录",
+    component: "Switch",
+    bottomHelpMessage: "默认开启。关闭后只撤回连发消息并禁言，不再合并转发"
   }
 ]
 

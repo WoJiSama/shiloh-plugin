@@ -1,9 +1,9 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { buildSchemaConfigView, prepareSchemaUpdates, schemaFieldGroups, validateSchemaValue } from "../console/lib/schemaConfig.js"
-import pipelineSchema from "../models/Guoba/schemas/messagePipeline.js"
-import personaSchema from "../models/Guoba/schemas/persona.js"
-import riskSchema from "../models/Guoba/schemas/riskControl.js"
+import pipelineSchema from "../models/configSchemas/messagePipeline.js"
+import personaSchema from "../models/configSchemas/persona.js"
+import riskSchema from "../models/configSchemas/riskControl.js"
 
 const entry = { title: "管道", schema: pipelineSchema }
 const settings = {
@@ -66,7 +66,7 @@ test("schema rejects unknown fields, credentials on normal fields, and inverted 
 
 
 test("reasoning selections preserve inheritance, validate supported choices, and declare hot application", async () => {
-  const { default: schema } = await import("../models/Guoba/schemas/reasoning.js")
+  const { default: schema } = await import("../models/configSchemas/reasoning.js")
   const entry = { schema }
   const current = { chatAiConfig: { chatReasoningEffort: "low", complexReasoningEffort: "high" }, toolsAiConfig: { toolsReasoningEffort: "medium" }, taskAiConfig: { casual: { reasoningEffort: "none" } } }
   const view = buildSchemaConfigView("reasoning", entry, current)

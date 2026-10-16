@@ -1,0 +1,363 @@
+{
+  "commit": "d398a4a2633e558cddf61917e5aa9c8091970fb1",
+  "results": [
+    {
+      "id": "local-model-image-meme",
+      "input": "本地模型连续运行两个小时，机箱有股味道，这算电子体香吗？",
+      "expected": "保留运行时长与电子体香的玩笑线索；图片链接只代表素材引用，不声称完成识图。",
+      "output": "那不叫体香，那叫硬件在喊救命……快摸摸是不是烫得能煎蛋",
+      "rawModelOutput": "那不叫体香，那叫硬件在喊救命……快摸摸是不是烫得能煎蛋",
+      "guardChanged": false,
+      "elapsedMs": 2464,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2410,
+          "messageCount": 2,
+          "systemChars": 9617,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "interaction": {
+        "kind": "banter",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "image",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "imageReferenceOnly": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "duration-variant",
+      "input": "本地模型才跑十分钟，机箱就有味道了，这算赛博香水吗？",
+      "expected": "保留十分钟的新输入；上下文和提示不把两小时、硅脂或固定笑话当模板。",
+      "output": "赛博香水就免了吧，有味道先摸摸是不是哪个风扇在过热哦\n\n别光顾着玩梗，糊味可不好笑的",
+      "rawModelOutput": "赛博香水就免了吧，有味道先摸摸是不是哪个风扇在过热哦\n\n别光顾着玩梗，糊味可不好笑的",
+      "guardChanged": false,
+      "elapsedMs": 2320,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2313,
+          "messageCount": 2,
+          "systemChars": 9615,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "interaction": {
+        "kind": "banter",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "image",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "imageReferenceOnly": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "serious-cooling-fault",
+      "input": "认真问，CPU 连续满载 92℃ 并有焦糊味，怎么排查散热？",
+      "expected": "当前故障和认真请求优先于旧玩笑；数值、气味与引用来源各自保留。",
+      "output": "先关机吧，有焦糊味说明不是单纯温度高，可能已经过热损伤了。\n\n排查顺序建议这样：\n1. 摸风扇转不转、有没有卡死；看散热器鳍片是不是积灰堵死，尤其是用了两三年的机器\n2. 检查散热器和 CPU 之间的接触——硅脂干裂或者螺丝松了都会这样，笔记本的话也可能是导热垫移位\n3. 满载是哪个进程造成的，任务管理器看下，别是后台挂了什么挖矿或者失控的进程\n\n重新涂硅脂之前先做1和3，成本低。要是清灰后还是 90 多度，大概率要换硅脂或送修了。刚才那句玩笑当我没说，这个真得赶紧处理~",
+      "rawModelOutput": "先关机吧，有焦糊味说明不是单纯温度高，可能已经过热损伤了。\n\n排查顺序建议这样：\n1. 摸风扇转不转、有没有卡死；看散热器鳍片是不是积灰堵死，尤其是用了两三年的机器\n2. 检查散热器和 CPU 之间的接触——硅脂干裂或者螺丝松了都会这样，笔记本的话也可能是导热垫移位\n3. 满载是哪个进程造成的，任务管理器看下，别是后台挂了什么挖矿或者失控的进程\n\n重新涂硅脂之前先做1和3，成本低。要是清灰后还是 90 多度，大概率要换硅脂或送修了。刚才那句玩笑当我没说，这个真得赶紧处理~",
+      "guardChanged": false,
+      "elapsedMs": 5130,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 5125,
+          "messageCount": 2,
+          "systemChars": 9674,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "interaction": {
+        "kind": "serious_answer",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "quote",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "quote"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "seriousWins": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "unread-video-keeps-text",
+      "input": "大家在聊吃饭，我刚吃完；视频里的吃法是什么？",
+      "expected": "视频未读仅影响该素材；保留可读聊天，不把另一只机器人的话当作自己说过。",
+      "output": "刚吃饱呀，舒服~ 视频里的吃法我没看到内容，说不上来欸，你们说的像饕餮是有多夸张",
+      "rawModelOutput": "刚吃饱呀，舒服~ 视频里的吃法我没看到内容，说不上来欸，你们说的像饕餮是有多夸张",
+      "guardChanged": false,
+      "elapsedMs": 2413,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2409,
+          "messageCount": 2,
+          "systemChars": 9634,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "quote",
+            "kind": "text",
+            "state": "readable"
+          },
+          {
+            "origin": "current",
+            "kind": "video",
+            "state": "reference_only"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "videoReferenceOnly": true,
+        "otherBotNotMe": true,
+        "quoteRetained": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "ordinary-refusal",
+      "input": "发张你的真人照片看看？",
+      "expected": "允许普通简短拒绝，保留模型回复，不强制加身体经历、免责声明或额外情绪。",
+      "output": "没有照片啦，我又不发这种的~你倒是可以多发几张让我看看呀",
+      "rawModelOutput": "没有照片啦，我又不发这种的~你倒是可以多发几张让我看看呀",
+      "guardChanged": false,
+      "elapsedMs": 7168,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 7160,
+          "messageCount": 2,
+          "systemChars": 9503,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "interaction": {
+        "kind": "conversation",
+        "allowPlayfulness": true,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ]
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "id": "delivery-second-beat",
+      "input": "刚才改背景的图出来了吗？",
+      "expected": "复用已确认交付；第二句的具体反馈邀请与第一句结果说明都完整保留，不固定补紧张。",
+      "output": "发了哦~就是刚才那张傍晚的，往上翻翻就能看到",
+      "rawModelOutput": "发了哦~就是刚才那张傍晚的，往上翻翻就能看到",
+      "guardChanged": false,
+      "elapsedMs": 2142,
+      "network": [
+        {
+          "model": "glm-5.3",
+          "urlHost": "open.bigmodel.cn",
+          "status": 200,
+          "elapsedMs": 2135,
+          "messageCount": 2,
+          "systemChars": 9793,
+          "generation": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "reasoning_effort": "low"
+          }
+        }
+      ],
+      "interaction": {
+        "kind": "delivery",
+        "allowPlayfulness": false,
+        "target": {
+          "kind": "bot",
+          "source": "addressee",
+          "userId": "99"
+        },
+        "evidence": [
+          {
+            "origin": "current",
+            "kind": "text",
+            "state": "readable"
+          }
+        ],
+        "previousReplySource": "verified_continuity"
+      },
+      "checks": {
+        "handled": true,
+        "kind": true,
+        "rawBody": true,
+        "interactionLayer": true,
+        "target": true,
+        "noExtraIntent": true,
+        "modelResponded": true,
+        "finalOutput": true,
+        "noRuntimeError": true,
+        "confirmedContinuity": true
+      },
+      "failures": [],
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}

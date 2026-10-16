@@ -18,6 +18,7 @@ import IdentityLabel from '../components/IdentityLabel.vue'
 import { botLabel } from '../lib/identities'
 import { api } from '../lib/api'
 import { count, useOpsResource, type Group } from '../lib/operations'
+import { groupAdminModules } from '../lib/groupAdminState'
 
 const groups = useOpsResource(
   (signal) => api<{ groups: Group[] }>('/api/groups', { signal }),
@@ -54,6 +55,11 @@ const activeCount = computed(
   () => all.value.filter((group) => group.today.recv + group.today.send > 0).length
 )
 const allowedCount = computed(() => all.value.filter((group) => group.whitelisted).length)
+function adminLabels(group: Group) {
+  return groupAdminModules
+    .filter((module) => group.groupAdmin?.[module.id])
+    .map((module) => module.label)
+}
 const columns: DataTableColumns<Group> = [
   {
     title: '群聊',
@@ -86,6 +92,20 @@ const columns: DataTableColumns<Group> = [
         { type: group.whitelisted ? 'success' : 'warning', size: 'small', bordered: false },
         { default: () => (group.whitelisted ? '已允许' : '白名单外') }
       )
+  },
+  {
+    title: '群管理',
+    key: 'groupAdmin',
+    width: 190,
+    render: (group) =>
+      h('div', { class: 'group-admin-status' }, [
+        h(
+          'span',
+          { class: adminLabels(group).length ? '' : 'muted' },
+          adminLabels(group).join(' / ') || '未启用'
+        ),
+        group.groupAdmin?.customized ? h('small', { class: 'muted' }, '本群自定义') : null
+      ])
   },
   {
     title: '今日收信',
@@ -123,13 +143,16 @@ const columns: DataTableColumns<Group> = [
   {
     title: '',
     key: 'actions',
-    width: 90,
+    width: 160,
     render: (group) =>
-      h(
-        NButton,
-        { text: true, size: 'small', onClick: () => openDetail(group) },
-        { default: () => '详情 →' }
-      )
+      h('div', { class: 'group-row-actions' }, [
+        h(RouterLink, { to: `/group-admin?group=${group.id}` }, { default: () => '群管理' }),
+        h(
+          NButton,
+          { text: true, size: 'small', onClick: () => openDetail(group) },
+          { default: () => '详情 →' }
+        )
+      ])
   }
 ]
 function groupName(group: Group) {
@@ -139,6 +162,24 @@ function openDetail(group: Group) {
   detailId.value = group.id
   drawerOpen.value = true
 }
+let openedRouteGroup = ''
+watch(
+  [() => route.query.group, all],
+  ([id]) => {
+    const requested = String(id || '')
+    if (!requested) {
+      openedRouteGroup = ''
+      return
+    }
+    if (openedRouteGroup === requested) return
+    const group = all.value.find((item) => item.id === requested)
+    if (group) {
+      openDetail(group)
+      openedRouteGroup = requested
+    }
+  },
+  { immediate: true }
+)
 const filterOptions = [
   { label: '全部群聊', value: 'all' },
   { label: '白名单内', value: 'allowed' },
@@ -155,7 +196,10 @@ const filterOptions = [
       description="检查服务范围与今日活跃情况，沿群聊找到正在工作的机器人。"
       ><template #actions
         ><NButton :loading="groups.loading.value" @click="groups.refresh">刷新群聊</NButton
-        ><RouterLink to="/risk"><NButton secondary>管理服务范围</NButton></RouterLink></template
+        ><RouterLink to="/group-admin"><NButton secondary>群管理</NButton></RouterLink
+        ><RouterLink to="/conversation"
+          ><NButton secondary>管理服务范围</NButton></RouterLink
+        ></template
       ></PageHeader
     >
     <div class="group-overview">
@@ -169,7 +213,7 @@ const filterOptions = [
         <span>今日活跃</span><strong>{{ groups.data.value ? count(activeCount) : '—' }}</strong>
       </div>
       <p class="field-help">
-        列表来自白名单配置与今日消息活动。活跃机器人仅代表今日有收发记录的账号。
+        列表来自白名单、群管理配置与今日消息活动。活跃机器人仅代表今日有收发记录的账号。
       </p>
     </div>
     <section class="panel groups-panel">
@@ -197,7 +241,7 @@ const filterOptions = [
         :empty-text="
           all.length
             ? '没有匹配的群聊，试试其他搜索词或筛选。'
-            : '暂无白名单配置或今日群聊活动记录。'
+            : '暂无白名单、群管理配置或今日群聊活动记录。'
         "
         @retry="groups.refresh"
         ><NDataTable
@@ -206,7 +250,7 @@ const filterOptions = [
           :row-key="(group: Group) => group.id"
           :bordered="false"
           :single-line="false"
-          :scroll-x="955"
+          :scroll-x="1215"
           :pagination="filtered.length > 20 ? { pageSize: 20 } : false"
       /></PageState>
     </section>
@@ -248,9 +292,25 @@ const filterOptions = [
           </section>
           <section class="drawer-section">
             <h3 class="section-title">群聊配置</h3>
-            <p class="field-help">服务范围在风控管理设置。群级人设覆盖在人设库管理。</p>
+            <p class="field-help">入群验证、广告与刷屏、欢迎通知均可在本群管理中配置。</p>
+            <div class="drawer-admin-status">
+              <NTag
+                v-for="module in groupAdminModules"
+                :key="module.id"
+                :type="detail.groupAdmin?.[module.id] ? 'success' : 'default'"
+                size="small"
+                :bordered="false"
+                >{{ module.label }} ·
+                {{ detail.groupAdmin?.[module.id] ? '已启用' : '未启用' }}</NTag
+              ><NTag v-if="detail.groupAdmin?.customized" size="small" :bordered="false" type="info"
+                >本群自定义</NTag
+              >
+            </div>
             <div class="drawer-links">
-              <RouterLink to="/risk" @click="drawerOpen = false">管理服务范围 →</RouterLink
+              <RouterLink :to="`/group-admin?group=${detail.id}`" @click="drawerOpen = false"
+                >配置本群管理 →</RouterLink
+              >
+              <RouterLink to="/conversation" @click="drawerOpen = false">管理服务范围 →</RouterLink
               ><RouterLink to="/persona" @click="drawerOpen = false">管理人设覆盖 →</RouterLink>
             </div>
           </section>
@@ -262,6 +322,23 @@ const filterOptions = [
 </template>
 
 <style scoped>
+.group-admin-status {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+}
+.group-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+}
+.drawer-admin-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
 .group-overview {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(220px, 1.5fr);

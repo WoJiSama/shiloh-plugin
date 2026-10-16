@@ -52,7 +52,7 @@ test('generates subtraction question with non-negative answer', () => {
 })
 
 test('group guard schema exposes join audit question settings', async () => {
-  const { default: groupGuardSchema } = await import('../models/Guoba/schemas/groupGuard.js')
+  const { default: groupGuardSchema } = await import('../models/configSchemas/groupGuard.js')
   const fields = groupGuardSchema.map(item => item.field).filter(Boolean)
   const labels = groupGuardSchema.map(item => item.label).filter(Boolean)
 

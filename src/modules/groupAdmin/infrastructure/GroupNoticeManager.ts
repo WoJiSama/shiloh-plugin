@@ -1,3 +1,4 @@
+import { resolveGroupAdminSettings } from '../domain/groupAdminPolicy.js'
 import {adminRecord,adminError,requireAdminBot} from '../../../contracts/groupAdmin.js'
 import type {AdminPorts,AdminEvent,GroupId,NoticeConfig,PendingGuard} from '../../../contracts/groupAdmin.js'
 
@@ -12,7 +13,7 @@ const DEFAULT_GROUP_NOTICE_CONFIG:NoticeConfig = {
   leaveMessage: "用户 {userId} 退出了群聊"
 }
 
-function normalizeConfig(input:unknown = {}):NoticeConfig {
+export function normalizeGroupNoticeConfig(input:unknown = {}):NoticeConfig {
   const raw=adminRecord(input)
   const config = { ...DEFAULT_GROUP_NOTICE_CONFIG, ...(raw || {}) }
   for(const key of ['enabled','welcomeEnabled','leaveEnabled','suppressWelcomeWhenGroupGuardEnabled'] as const)config[key]=typeof raw[key]==='boolean'?raw[key]:DEFAULT_GROUP_NOTICE_CONFIG[key]
@@ -42,12 +43,12 @@ function renderTemplate(template:unknown, data:Record<string,unknown>) {
 
 export class GroupNoticeManager {
   constructor(private readonly ports:AdminPorts) {}
-  getConfig() {
-    return normalizeConfig(this.ports.readSettings().groupNotice)
+  getConfig(groupId?:GroupId) {
+    return normalizeGroupNoticeConfig(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupNotice)
   }
 
-  getGroupGuardConfig() {
-    const raw = adminRecord(this.ports.readSettings().groupGuard)
+  getGroupGuardConfig(groupId?:GroupId) {
+    const raw = adminRecord(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupGuard)
     return {
       enabled: Boolean(raw.enabled),
       enabledGroups: Array.isArray(raw.enabledGroups)
@@ -85,7 +86,7 @@ export class GroupNoticeManager {
   }
 
   isGroupGuardEnabled(groupId:GroupId) {
-    const config = this.getGroupGuardConfig()
+    const config = this.getGroupGuardConfig(groupId)
     return Boolean(config.enabled && config.enabledGroups.some(id => id === String(groupId)))
   }
 
@@ -157,7 +158,7 @@ export class GroupNoticeManager {
     if (!groupId || !userId) return false
     if (String(userId) === String(e?.self_id || this.ports.getBot()?.uin)) return false
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (!this.isGroupEnabled(config, groupId)) return false
     const groupConfig = this.resolveGroupConfig(config, groupId)
     if (!groupConfig.welcomeEnabled) return false
@@ -178,7 +179,7 @@ export class GroupNoticeManager {
     if (!groupId || !userId) return false
     if (String(userId) === String(e?.self_id || this.ports.getBot()?.uin)) return false
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (!this.isGroupEnabled(config, groupId)) return false
     const groupConfig = this.resolveGroupConfig(config, groupId)
     if (!groupConfig.leaveEnabled) return false

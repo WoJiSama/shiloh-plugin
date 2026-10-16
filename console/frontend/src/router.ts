@@ -10,12 +10,9 @@ export const router = createRouter({
       props: true
     },
     { path: '/groups', component: () => import('./pages/GroupsPage.vue') },
+    { path: '/group-admin', component: () => import('./pages/GroupAdminPage.vue') },
     { path: '/persona', component: () => import('./pages/PersonaPage.vue') },
-    {
-      path: '/conversation',
-      component: () => import('./pages/SchemaPage.vue'),
-      props: { kind: 'conversation' }
-    },
+    { path: '/conversation', component: () => import('./pages/ConversationPage.vue') },
     { path: '/ai', component: () => import('./pages/AiPage.vue') },
     { path: '/pipeline', component: () => import('./pages/PipelinePage.vue') },
     {

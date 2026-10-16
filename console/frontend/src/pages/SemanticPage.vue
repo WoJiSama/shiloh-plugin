@@ -17,6 +17,14 @@ import IdentityLabel from '../components/IdentityLabel.vue'
 import { groupLabel } from '../lib/identities'
 import PageHeader from '../components/PageHeader.vue'
 import PageState from '../components/PageState.vue'
+import SchemaPage from './SchemaPage.vue'
+const section = ref('operations')
+const policyVisited = ref(false)
+const policy = ref<InstanceType<typeof SchemaPage> | null>(null)
+function selectSection(value: string) {
+  if (value === 'policy') policyVisited.value = true
+  section.value = value
+}
 const base = '/bl-chat/semantic-memory/api/',
   stats = ref<any>(null),
   loading = ref(true),
@@ -224,195 +232,224 @@ onBeforeUnmount(() => {
     <PageHeader
       title="语义记忆"
       eyebrow="机器人能力"
-      description="查看索引状态，测试检索效果，管理群聊中的长期记忆。"
+      description="设置记忆策略，查看索引状态、检索效果并管理群聊中的长期记忆。"
       ><template #actions
-        ><NButton :loading="loading" @click="load"
+        ><NButton v-if="section === 'operations'" :loading="loading" @click="load"
           ><template #icon><RefreshCw :size="16" /></template>刷新</NButton
+        ><NButton v-else :disabled="policy?.loading || policy?.saving" @click="policy?.reload()"
+          >刷新配置</NButton
         ></template
       ></PageHeader
-    ><PageState :loading="loading" :error="error" @retry="load"
-      ><NAlert v-if="!stats?.enabled" type="info" title="语义记忆尚未启用"
-        >启用后可查看群索引、检索结果和评估历史。</NAlert
-      ><template v-else
-        ><div class="stat-grid">
-          <section class="panel">
-            <span class="muted">已索引群</span>
-            <div class="stat-value">{{ stats.store?.groups ?? '—' }}</div>
-          </section>
-          <section class="panel">
-            <span class="muted">记忆分块</span>
-            <div class="stat-value">{{ stats.store?.chunks ?? '—' }}</div>
-          </section>
-          <section class="panel">
-            <span class="muted">索引磁盘</span>
-            <div class="stat-value">{{ stats.store?.diskMb ?? '—' }} <small>MB</small></div>
-          </section>
-        </div>
-        <div class="task-tabs" role="tablist" aria-label="语义记忆工具">
-          <button role="tab" :aria-selected="tab === 'search'" @click="tab = 'search'">
-            检索测试</button
-          ><button role="tab" :aria-selected="tab === 'browse'" @click="tab = 'browse'">
-            分块管理</button
-          ><button role="tab" :aria-selected="tab === 'evaluation'" @click="tab = 'evaluation'">
-            评估历史</button
-          ><button role="tab" :aria-selected="tab === 'runtime'" @click="tab = 'runtime'">
-            运行信息
-          </button>
-        </div>
-        <section v-if="tab === 'search' || tab === 'browse'" class="panel page-stack">
-          <form class="semantic-form" @submit.prevent="tab === 'search' ? search() : browse()">
-            <label class="form-field"
-              ><span>群号</span
-              ><NInput v-model:value="group" placeholder="输入完整群号" /><IdentityLabel
-                v-if="group.trim()"
-                kind="group"
-                :id="group.trim()" /></label
-            ><label v-if="tab === 'search'" class="form-field query-field"
-              ><span>检索内容</span
-              ><NInput v-model:value="query" placeholder="想找回什么记忆？" /></label
-            ><NButton attr-type="submit" type="primary" :loading="searching"
-              ><template #icon><Search :size="16" /></template
-              >{{ tab === 'search' ? '检索' : '浏览' }}</NButton
-            ><label v-if="tab === 'search' && stats.config?.rerankEnabled" class="rerank-label"
-              ><NSwitch v-model:value="rerank" size="small" />启用重排</label
-            >
-          </form>
-          <p v-if="tab === 'search' && result" class="field-help">
-            群 <IdentityLabel kind="group" :id="resultGroup" /> ·
-            {{ result.candidates ?? '—' }} 个候选 · {{ result.items?.length || 0 }} 条结果 ·
-            {{ result.elapsedMs }} ms · 向量 {{ result.vectorMs }} ms / BM25
-            {{ result.bm25Ms }} ms{{ result.reranked ? ` / 重排 ${result.rerankMs} ms` : '' }}
-          </p>
-          <p v-if="tab === 'browse' && chunks" class="field-help">
-            当前结果来自群 <IdentityLabel kind="group" :id="chunksGroup" /> · 共
-            {{ chunks.total }} 条
-          </p>
-          <NEmpty
-            v-if="!items.length"
-            :description="result || chunks ? '没有匹配的记忆' : '填写群号，开始查看记忆'"
-          />
-          <article v-for="item in items" :key="item.id" class="memory-item">
-            <div class="memory-heading">
-              <span>{{ item.timeRange }}</span
-              ><small>{{ item.messages }} 条消息 · {{ item.speakers || '未知发言者' }}</small>
-            </div>
-            <p>{{ item.text || item.preview }}</p>
-            <div class="memory-footer">
-              <span class="field-help"
-                >召回 {{ item.recallCount || 0 }} 次 · 强度
-                {{ pct(item.effectiveStrength ?? item.effStrength)
-                }}<template v-if="item.vectorScore !== undefined">
-                  · 向量 {{ Number(item.vectorScore).toFixed(3) }} · 向量排名
-                  {{ item.vectorRank ?? '—' }} / BM25 {{ item.bm25Rank ?? '—'
-                  }}<template v-if="item.rerankScore != null">
-                    · 重排 {{ Number(item.rerankScore).toFixed(3) }}</template
-                  ></template
-                ></span
-              >
-              <div class="toolbar">
-                <NButton
-                  size="small"
-                  :loading="actionBusy === item.id"
-                  @click="action(item, 'reinforce')"
-                  ><template #icon><Sparkles :size="14" /></template>强化</NButton
-                ><NButton
-                  size="small"
-                  quaternary
-                  type="error"
-                  :disabled="Boolean(actionBusy)"
-                  @click="forget(item)"
-                  ><template #icon><Trash2 :size="14" /></template>忘记</NButton
-                >
-              </div>
-            </div>
-          </article>
-          <NPagination
-            v-if="tab === 'browse' && chunks?.total"
-            v-model:page="page"
-            :item-count="chunks.total"
-            :page-size="20"
-            @update:page="browse({ group: chunksGroup, page: $event })"
-          />
-        </section>
-        <section v-if="tab === 'evaluation'" class="panel">
-          <NEmpty v-if="!history.length" description="暂无评估历史" />
-          <template v-else>
-            <h2 class="section-title">检索效果</h2>
-            <p class="field-help">比较向量、混合检索和重排在评估样本上的召回率。</p>
-            <div class="table-scroll">
-              <table class="evaluation-table">
-                <thead>
-                  <tr>
-                    <th>评估时间</th>
-                    <th>样本</th>
-                    <th>向量 Recall@5</th>
-                    <th>混合 Recall@5</th>
-                    <th>重排 Recall@5</th>
-                    <th>混合 Recall@10</th>
-                    <th>耗时 P50</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, index) in history" :key="index">
-                    <td>
-                      {{
-                        item.generatedAt ||
-                        item.at ||
-                        item.timestamp ||
-                        item.date ||
-                        `评估 ${index + 1}`
-                      }}
-                    </td>
-                    <td>{{ item.samples ?? item.count ?? '—' }}</td>
-                    <td>{{ pct(item.recallAt5Vector) }}</td>
-                    <td>{{ pct(item.recallAt5Hybrid) }}</td>
-                    <td>{{ pct(item.recallAt5Rerank) }}</td>
-                    <td>{{ pct(item.recallAt10Hybrid) }}</td>
-                    <td>{{ item.latencyP50Ms == null ? '—' : `${item.latencyP50Ms} ms` }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <details class="evaluation-source">
-              <summary>完整评估记录</summary>
-              <pre>{{ JSON.stringify(history, null, 2) }}</pre>
-            </details>
-          </template>
-        </section>
-        <section v-if="tab === 'runtime'" class="panel">
-          <div class="field-grid">
-            <article
-              v-for="key in ['config', 'embedding', 'reranker', 'retriever', 'indexer']"
-              :key="key"
-            >
-              <h3 class="section-title">
-                {{
-                  (
-                    {
-                      config: '索引配置',
-                      embedding: '向量模型',
-                      reranker: '重排模型',
-                      retriever: '检索器',
-                      indexer: '索引器'
-                    } as any
-                  )[key]
-                }}
-              </h3>
-              <dl class="detail-list">
-                <template v-for="(value, label) in stats[key]" :key="label"
-                  ><dt>{{ label }}</dt>
-                  <dd>{{ value }}</dd></template
-                >
-              </dl>
-              <p v-if="!stats[key]" class="muted">未启用</p>
-            </article>
-          </div>
-        </section></template
-      ></PageState
     >
+    <nav class="task-tabs memory-sections" role="tablist" aria-label="记忆任务分区">
+      <button
+        role="tab"
+        :aria-selected="section === 'operations'"
+        @click="selectSection('operations')"
+      >
+        记忆运营
+      </button>
+      <button role="tab" :aria-selected="section === 'policy'" @click="selectSection('policy')">
+        记忆策略<NTag v-if="policy?.dirty" type="warning" size="small">{{ policy.dirty }}</NTag>
+      </button>
+    </nav>
+    <SchemaPage
+      v-if="policyVisited"
+      v-show="section === 'policy'"
+      ref="policy"
+      kind="memory"
+      embedded
+    />
+    <div v-show="section === 'operations'" class="page-stack">
+      <PageState :loading="loading" :error="error" @retry="load"
+        ><NAlert v-if="!stats?.enabled" type="info" title="语义记忆尚未启用"
+          >启用后可查看群索引、检索结果和评估历史。</NAlert
+        ><template v-else
+          ><div class="stat-grid">
+            <section class="panel">
+              <span class="muted">已索引群</span>
+              <div class="stat-value">{{ stats.store?.groups ?? '—' }}</div>
+            </section>
+            <section class="panel">
+              <span class="muted">记忆分块</span>
+              <div class="stat-value">{{ stats.store?.chunks ?? '—' }}</div>
+            </section>
+            <section class="panel">
+              <span class="muted">索引磁盘</span>
+              <div class="stat-value">{{ stats.store?.diskMb ?? '—' }} <small>MB</small></div>
+            </section>
+          </div>
+          <div class="task-tabs" role="tablist" aria-label="语义记忆工具">
+            <button role="tab" :aria-selected="tab === 'search'" @click="tab = 'search'">
+              检索测试</button
+            ><button role="tab" :aria-selected="tab === 'browse'" @click="tab = 'browse'">
+              分块管理</button
+            ><button role="tab" :aria-selected="tab === 'evaluation'" @click="tab = 'evaluation'">
+              评估历史</button
+            ><button role="tab" :aria-selected="tab === 'runtime'" @click="tab = 'runtime'">
+              运行信息
+            </button>
+          </div>
+          <section v-if="tab === 'search' || tab === 'browse'" class="panel page-stack">
+            <form class="semantic-form" @submit.prevent="tab === 'search' ? search() : browse()">
+              <label class="form-field"
+                ><span>群号</span
+                ><NInput v-model:value="group" placeholder="输入完整群号" /><IdentityLabel
+                  v-if="group.trim()"
+                  kind="group"
+                  :id="group.trim()" /></label
+              ><label v-if="tab === 'search'" class="form-field query-field"
+                ><span>检索内容</span
+                ><NInput v-model:value="query" placeholder="想找回什么记忆？" /></label
+              ><NButton attr-type="submit" type="primary" :loading="searching"
+                ><template #icon><Search :size="16" /></template
+                >{{ tab === 'search' ? '检索' : '浏览' }}</NButton
+              ><label v-if="tab === 'search' && stats.config?.rerankEnabled" class="rerank-label"
+                ><NSwitch v-model:value="rerank" size="small" />启用重排</label
+              >
+            </form>
+            <p v-if="tab === 'search' && result" class="field-help">
+              群 <IdentityLabel kind="group" :id="resultGroup" /> ·
+              {{ result.candidates ?? '—' }} 个候选 · {{ result.items?.length || 0 }} 条结果 ·
+              {{ result.elapsedMs }} ms · 向量 {{ result.vectorMs }} ms / BM25
+              {{ result.bm25Ms }} ms{{ result.reranked ? ` / 重排 ${result.rerankMs} ms` : '' }}
+            </p>
+            <p v-if="tab === 'browse' && chunks" class="field-help">
+              当前结果来自群 <IdentityLabel kind="group" :id="chunksGroup" /> · 共
+              {{ chunks.total }} 条
+            </p>
+            <NEmpty
+              v-if="!items.length"
+              :description="result || chunks ? '没有匹配的记忆' : '填写群号，开始查看记忆'"
+            />
+            <article v-for="item in items" :key="item.id" class="memory-item">
+              <div class="memory-heading">
+                <span>{{ item.timeRange }}</span
+                ><small>{{ item.messages }} 条消息 · {{ item.speakers || '未知发言者' }}</small>
+              </div>
+              <p>{{ item.text || item.preview }}</p>
+              <div class="memory-footer">
+                <span class="field-help"
+                  >召回 {{ item.recallCount || 0 }} 次 · 强度
+                  {{ pct(item.effectiveStrength ?? item.effStrength)
+                  }}<template v-if="item.vectorScore !== undefined">
+                    · 向量 {{ Number(item.vectorScore).toFixed(3) }} · 向量排名
+                    {{ item.vectorRank ?? '—' }} / BM25 {{ item.bm25Rank ?? '—'
+                    }}<template v-if="item.rerankScore != null">
+                      · 重排 {{ Number(item.rerankScore).toFixed(3) }}</template
+                    ></template
+                  ></span
+                >
+                <div class="toolbar">
+                  <NButton
+                    size="small"
+                    :loading="actionBusy === item.id"
+                    @click="action(item, 'reinforce')"
+                    ><template #icon><Sparkles :size="14" /></template>强化</NButton
+                  ><NButton
+                    size="small"
+                    quaternary
+                    type="error"
+                    :disabled="Boolean(actionBusy)"
+                    @click="forget(item)"
+                    ><template #icon><Trash2 :size="14" /></template>忘记</NButton
+                  >
+                </div>
+              </div>
+            </article>
+            <NPagination
+              v-if="tab === 'browse' && chunks?.total"
+              v-model:page="page"
+              :item-count="chunks.total"
+              :page-size="20"
+              @update:page="browse({ group: chunksGroup, page: $event })"
+            />
+          </section>
+          <section v-if="tab === 'evaluation'" class="panel">
+            <NEmpty v-if="!history.length" description="暂无评估历史" />
+            <template v-else>
+              <h2 class="section-title">检索效果</h2>
+              <p class="field-help">比较向量、混合检索和重排在评估样本上的召回率。</p>
+              <div class="table-scroll">
+                <table class="evaluation-table">
+                  <thead>
+                    <tr>
+                      <th>评估时间</th>
+                      <th>样本</th>
+                      <th>向量 Recall@5</th>
+                      <th>混合 Recall@5</th>
+                      <th>重排 Recall@5</th>
+                      <th>混合 Recall@10</th>
+                      <th>耗时 P50</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, index) in history" :key="index">
+                      <td>
+                        {{
+                          item.generatedAt ||
+                          item.at ||
+                          item.timestamp ||
+                          item.date ||
+                          `评估 ${index + 1}`
+                        }}
+                      </td>
+                      <td>{{ item.samples ?? item.count ?? '—' }}</td>
+                      <td>{{ pct(item.recallAt5Vector) }}</td>
+                      <td>{{ pct(item.recallAt5Hybrid) }}</td>
+                      <td>{{ pct(item.recallAt5Rerank) }}</td>
+                      <td>{{ pct(item.recallAt10Hybrid) }}</td>
+                      <td>{{ item.latencyP50Ms == null ? '—' : `${item.latencyP50Ms} ms` }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <details class="evaluation-source">
+                <summary>完整评估记录</summary>
+                <pre>{{ JSON.stringify(history, null, 2) }}</pre>
+              </details>
+            </template>
+          </section>
+          <section v-if="tab === 'runtime'" class="panel">
+            <div class="field-grid">
+              <article
+                v-for="key in ['config', 'embedding', 'reranker', 'retriever', 'indexer']"
+                :key="key"
+              >
+                <h3 class="section-title">
+                  {{
+                    (
+                      {
+                        config: '索引配置',
+                        embedding: '向量模型',
+                        reranker: '重排模型',
+                        retriever: '检索器',
+                        indexer: '索引器'
+                      } as any
+                    )[key]
+                  }}
+                </h3>
+                <dl class="detail-list">
+                  <template v-for="(value, label) in stats[key]" :key="label"
+                    ><dt>{{ label }}</dt>
+                    <dd>{{ value }}</dd></template
+                  >
+                </dl>
+                <p v-if="!stats[key]" class="muted">未启用</p>
+              </article>
+            </div>
+          </section></template
+        ></PageState
+      >
+    </div>
   </div>
 </template>
 <style scoped>
+.memory-sections button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
 .evaluation-table {
   width: 100%;
   border-collapse: collapse;

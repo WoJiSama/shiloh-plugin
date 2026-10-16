@@ -1,5 +1,4 @@
 import type { ConfigSchemaItem } from '../../../../../contracts/configSchema.js'
-import triggerSchema from "../shared/triggers.js"
 
 const schema: ConfigSchemaItem[] = [
   // 整组配置都在"对话追踪"这一个 tab 内；内部用 Divider 做小节分隔
@@ -21,26 +20,22 @@ const schema: ConfigSchemaItem[] = [
     label: "追踪超时（分钟）",
     component: "InputNumber",
     bottomHelpMessage: "strict 模式: 用户触发对话后，追踪其后续消息的时间窗口",
-    componentProps: { min: 1, max: 30, placeholder: "2" }
+    componentProps: { min: 1, max: 30, step: 1, placeholder: "2" }
   },
   {
     field: "conversationTrackingThrottle",
     label: "节流时间（秒）",
     component: "InputNumber",
     bottomHelpMessage: "strict 模式: 同一用户连续发消息时，间隔多少秒才调用 AI 判断",
-    componentProps: { min: 1, max: 60, placeholder: "3" }
+    componentProps: { min: 1, max: 60, step: 1, placeholder: "3" }
   },
   {
     field: "batchJudgmentDelay",
     label: "批量判断延迟（秒）",
     component: "InputNumber",
     bottomHelpMessage: "strict 模式: 收集多少秒内的消息后批量判断，减少 API 调用次数",
-    componentProps: { min: 1, max: 60, placeholder: "10" }
+    componentProps: { min: 1, max: 60, step: 1, placeholder: "10" }
   },
-
-  // ===== 触发模式切换 =====
-  { component: "Divider", label: "对话触发模式切换" },
-  ...triggerSchema,
 
   // ===== 智能模式 - 频率与阈值 =====
   { component: "Divider", label: "智能模式 - 频率与阈值 (smart)  ⚠ 依赖 trackAiConfig" },
@@ -49,7 +44,7 @@ const schema: ConfigSchemaItem[] = [
     label: "talkValue（频率）",
     component: "InputNumber",
     bottomHelpMessage: "⚠️ smart 模式依赖 trackAiConfig 作为 Gate 子代理；未配置时 Gate 永远 no_action，bot 不会主动接话。仅 smart 模式生效。1=每条消息都跑 Gate（token 消耗大），0.15=约 7 条触发一次（推荐折中），0.1=10 条触发一次。取值 0.01-1.0",
-    componentProps: { min: 0.01, max: 1, step: 0.05, placeholder: "0.15" }
+    componentProps: { min: 0.01, max: 1, step: 0.001, placeholder: "0.15" }
   },
   {
     field: "smartTrigger.attentionDrift.enabled",
@@ -86,7 +81,7 @@ const schema: ConfigSchemaItem[] = [
       modalProps: { title: "按群话痨覆盖" },
       schemas: [
         { field: "group", label: "群号", component: "Input", required: true },
-        { field: "value", label: "话痨值(0.01~1)", component: "InputNumber", componentProps: { min: 0.01, max: 1, step: 0.01, placeholder: "0.15" } }
+        { field: "value", label: "话痨值(0.01~1)", component: "InputNumber", required: true, componentProps: { min: 0.01, max: 1, step: 0.001, placeholder: "0.15" } }
       ]
     },
     bottomHelpMessage: "某些群话痨某些群安静;优先级高于时段规则"
@@ -109,14 +104,14 @@ const schema: ConfigSchemaItem[] = [
     label: "Gate 冷却（秒）",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: Gate 判 no_action 后多久内不再请求 Gate（默认 5 秒，活跃群更频繁评估）",
-    componentProps: { min: 1, max: 60, placeholder: "5" }
+    componentProps: { min: 1, max: 60, step: 1, placeholder: "5" }
   },
   {
     field: "smartTrigger.gateContextSize",
     label: "Gate 上下文条数",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 喂给 Timing Gate 的群历史条数（越大决策越准但 token 越贵）",
-    componentProps: { min: 5, max: 100, placeholder: "10" }
+    componentProps: { min: 5, max: 100, step: 1, placeholder: "10" }
   },
 
   // ===== 智能模式 - 强制触发 =====
@@ -151,7 +146,7 @@ const schema: ConfigSchemaItem[] = [
       modalProps: { title: "时段频率规则" },
       schemas: [
         { field: "range", label: "时段", component: "Input", componentProps: { placeholder: "00:00-08:59" }, required: true },
-        { field: "value", label: "talkValue", component: "InputNumber", componentProps: { min: 0.01, max: 1, step: 0.05 }, required: true }
+        { field: "value", label: "talkValue", component: "InputNumber", componentProps: { min: 0.01, max: 1, step: 0.001 }, required: true }
       ]
     },
     bottomHelpMessage: "smart 模式: 每条规则一个时段，HH:MM-HH:MM 格式（支持跨夜如 23:00-06:59）；命中第一条匹配的为准；都不命中用全局 talkValue"
@@ -185,21 +180,21 @@ const schema: ConfigSchemaItem[] = [
     label: "触发合并保留条数",
     component: "InputNumber",
     bottomHelpMessage: "同人连续触发时最多保留最后 N 条，较早消息只计入日志，避免刷屏把提示词撑爆",
-    componentProps: { min: 2, max: 20, placeholder: "8" }
+    componentProps: { min: 2, max: 20, step: 1, placeholder: "8" }
   },
   {
     field: "smartTrigger.maxConsecutiveInterrupts",
     label: "连续打断上限 (次)",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 同一群被新消息连续打断的最大次数，超过后强制走完不再让步；0=每次都让步",
-    componentProps: { min: 0, max: 10, placeholder: "3" }
+    componentProps: { min: 0, max: 10, step: 1, placeholder: "3" }
   },
   {
     field: "smartTrigger.activeChatTtlHours",
     label: "群活跃 TTL (小时)",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 群超过这么多小时没新消息就从内存状态淘汰",
-    componentProps: { min: 1, max: 168, placeholder: "24" }
+    componentProps: { min: 1, max: 168, step: 1, placeholder: "24" }
   },
   {
     field: "smartTrigger.proactiveReplyNoQuote",
@@ -212,7 +207,7 @@ const schema: ConfigSchemaItem[] = [
     label: "拟人化打字速度 (字符/秒)",
     component: "InputNumber",
     bottomHelpMessage: "调节分段回复的段间延迟（两种模式都生效）；0=默认公式（1s起步+字符延展），>0=按字符/秒计算延迟，建议 8-25",
-    componentProps: { min: 0, max: 100, placeholder: "0" }
+    componentProps: { min: 0, max: 100, step: 1, placeholder: "0" }
   },
   {
     field: "smartTrigger.waitToolEnabled",
@@ -234,7 +229,7 @@ const schema: ConfigSchemaItem[] = [
     field: "smartTrigger.fadingDurationMs",
     label: "FADING 余热时长 (ms)",
     component: "InputNumber",
-    bottomHelpMessage: "smart 模式: FOCUS 降级后 FADING 余热持续时间，期间触发阈值减半（默认 90000 = 1.5 分钟）",
+    bottomHelpMessage: "smart 模式: FOCUS 降级后 FADING 余热持续时间，期间触发阈值减半（默认 90000 = 1.5 分钟；0 使用默认时长）",
     componentProps: { min: 0, max: 600000, step: 30000, placeholder: "90000" }
   },
   {
@@ -242,14 +237,14 @@ const schema: ConfigSchemaItem[] = [
     label: "FOCUS 内最大回复次数",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 一轮 FOCUS 内 bot 最多主动回复次数，超过强制降级 FADING 防连刷（默认 4）。force 路径不计入",
-    componentProps: { min: 1, max: 10, placeholder: "4" }
+    componentProps: { min: 1, max: 10, step: 1, placeholder: "4" }
   },
   {
     field: "smartTrigger.focusMaxNoAction",
     label: "FOCUS 内连续 no_action 上限",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: FOCUS 期内 Gate 连续判 no_action 多少次后降级 FADING（保守默认 2）",
-    componentProps: { min: 1, max: 10, placeholder: "2" }
+    componentProps: { min: 1, max: 10, step: 1, placeholder: "2" }
   },
   {
     field: "smartTrigger.fadingForceGate",
@@ -297,7 +292,7 @@ const schema: ConfigSchemaItem[] = [
     label: "关键词数量上限",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 每次从 bot 上次发言提取保留的关键词数量上限（给 R2 用）",
-    componentProps: { min: 1, max: 20, placeholder: "5" }
+    componentProps: { min: 1, max: 20, step: 1, placeholder: "5" }
   },
 
   // ===== 智能模式 - 速率硬上限（防刷屏）=====
@@ -307,7 +302,7 @@ const schema: ConfigSchemaItem[] = [
     label: "10 分钟内最多回复次数",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 10 分钟滑动窗口内 bot 最多主动回复次数（默认 8）。force 路径（@/前缀）不受限，确保被点名一定能回",
-    componentProps: { min: 1, max: 30, placeholder: "8" }
+    componentProps: { min: 1, max: 30, step: 1, placeholder: "8" }
   },
   {
     field: "smartTrigger.rateLimitCooldownMs",
@@ -362,14 +357,14 @@ const schema: ConfigSchemaItem[] = [
     label: "群热闹消息数阈值",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 群最近 5min 消息数 ≥ 此值时，Gate prompt 提示「群里热闹倾向沉默」（默认 30，正常活跃群聊不会触发；调低则 bot 在热闹群更克制）",
-    componentProps: { min: 1, max: 100, placeholder: "30" }
+    componentProps: { min: 1, max: 100, step: 1, placeholder: "30" }
   },
   {
     field: "smartTrigger.promptHintRateLimitWarn",
     label: "刷屏警告阈值 (次/10min)",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: bot 最近 10min 已回复 ≥ 此值时，Gate prompt 强烈提示「避免刷屏」（默认 5）",
-    componentProps: { min: 1, max: 30, placeholder: "5" }
+    componentProps: { min: 1, max: 30, step: 1, placeholder: "5" }
   },
 
   // ===== 智能模式 - 复读跟读 =====
@@ -385,14 +380,14 @@ const schema: ConfigSchemaItem[] = [
     label: "复读检测窗口",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 看最近 N 条群消息判断是否在复读",
-    componentProps: { min: 2, max: 20, placeholder: "5" }
+    componentProps: { min: 2, max: 20, step: 1, placeholder: "5" }
   },
   {
     field: "smartTrigger.repeatMinCount",
     label: "复读最少人数",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 至少 N 个不同用户发了相同内容才算复读（含当前发言者）。3 较准确，2 偏松易把偶发同词误判",
-    componentProps: { min: 2, max: 10, placeholder: "3" }
+    componentProps: { min: 2, max: 10, step: 1, placeholder: "3" }
   },
   {
     field: "smartTrigger.repeatJoinProbability",
@@ -405,7 +400,7 @@ const schema: ConfigSchemaItem[] = [
     field: "smartTrigger.repeatJoinCooldownMs",
     label: "跟读后冷却 (ms)",
     component: "InputNumber",
-    bottomHelpMessage: "smart 模式: bot 参与复读后多久内不再跟读，防同一波内反复跟（默认 180000 = 3 分钟；总量靠 maxRepliesPer10Min 兜底）",
+    bottomHelpMessage: "smart 模式: bot 参与复读后多久内不再跟读，防同一波内反复跟（默认 180000 = 3 分钟；0 使用默认冷却；总量靠 maxRepliesPer10Min 兜底）",
     componentProps: { min: 0, max: 3600000, step: 60000, placeholder: "180000" }
   },
   {
@@ -413,7 +408,7 @@ const schema: ConfigSchemaItem[] = [
     label: "复读文本最大长度",
     component: "InputNumber",
     bottomHelpMessage: "smart 模式: 单条复读文本超过此长度（字符数）则不参与，避免跟长发言",
-    componentProps: { min: 1, max: 200, placeholder: "30" }
+    componentProps: { min: 1, max: 200, step: 1, placeholder: "30" }
   },
 
   // ===== 对方画像注入 =====
@@ -428,14 +423,14 @@ const schema: ConfigSchemaItem[] = [
     field: "personProfileInjection.maxRecentMessages",
     label: "注入近期发言条数上限",
     component: "InputNumber",
-    componentProps: { min: 0, max: 20, placeholder: "3" }
+    componentProps: { min: 0, max: 20, step: 1, placeholder: "3" }
   },
   {
     field: "personProfileInjection.maxChars",
     label: "画像注入字符上限",
     component: "InputNumber",
     bottomHelpMessage: "固定人设、群画像、用户画像、近期发言合计上限，避免画像信息挤占主 prompt",
-    componentProps: { min: 200, max: 3000, placeholder: "900" }
+    componentProps: { min: 200, max: 3000, step: 1, placeholder: "900" }
   }
 ]
 

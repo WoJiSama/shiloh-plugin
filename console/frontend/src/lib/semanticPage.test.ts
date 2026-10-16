@@ -50,7 +50,7 @@ describe('semantic result ownership', () => {
     await search()
     await button('忘记').trigger('click')
     expect(warning.mock.calls[0][0].content).toContain('100001')
-    await wrapper.findAll('[role="tab"]')[1]!.trigger('click')
+    await wrapper.findAll('[aria-label="语义记忆工具"] [role="tab"]')[1]!.trigger('click')
     await setGroup('200002')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -73,7 +73,7 @@ describe('semantic result ownership', () => {
   })
   it('paginates the displayed group and resets a new browse to page one', async () => {
     await flushPromises()
-    await wrapper.findAll('[role="tab"]')[1]!.trigger('click')
+    await wrapper.findAll('[aria-label="语义记忆工具"] [role="tab"]')[1]!.trigger('click')
     await setGroup('100001')
     await wrapper.find('form').trigger('submit')
     await flushPromises()

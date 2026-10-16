@@ -109,6 +109,80 @@ export function validateField(field: SchemaFieldDefinition, value: any): string[
     errors.push(`${field.label}：暂不支持组件 ${field.component}`)
   return errors
 }
+
+export function validatePolicyFields(
+  kind: string,
+  draft: Record<string, any>,
+  changedFields: SchemaFieldDefinition[]
+): string[] {
+  if (!['dice', 'tracking', 'memory'].includes(kind)) return []
+  const changed = new Set(changedFields.map((field) => field.field))
+  const errors: string[] = []
+  if (changed.has('diceSystem.timeZone')) {
+    const timeZone = String(draft['diceSystem.timeZone'] ?? '').trim()
+    try {
+      new Intl.DateTimeFormat('en', { timeZone }).format()
+    } catch {
+      errors.push('骰娘日期时区无效，请填写 Asia/Shanghai 或 UTC 等有效时区')
+    }
+  }
+  if (changed.has('diceSystem.baseDir')) {
+    const directory = String(draft['diceSystem.baseDir'] ?? '').trim()
+    if (!directory || directory.includes('\0')) errors.push('骰娘数据目录不能为空或包含空字符')
+  }
+  if (changed.has('smartTrigger.groupTalkValues')) {
+    const seen = new Set<string>()
+    for (const row of Array.isArray(draft['smartTrigger.groupTalkValues'])
+      ? draft['smartTrigger.groupTalkValues']
+      : []) {
+      const group = String(row?.group ?? '').trim()
+      if (!/^\d{4,12}$/.test(group)) errors.push('按群话痨覆盖需填写 4 至 12 位数字群号')
+      if (seen.has(group)) errors.push(`按群话痨覆盖的群号 ${group} 重复`)
+      seen.add(group)
+    }
+  }
+  if (changed.has('smartTrigger.talkValueRules')) {
+    for (const row of Array.isArray(draft['smartTrigger.talkValueRules'])
+      ? draft['smartTrigger.talkValueRules']
+      : []) {
+      if (
+        !/^(?:[01]\d|2[0-3]):[0-5]\d\s*-\s*(?:[01]\d|2[0-3]):[0-5]\d$/.test(
+          String(row?.range ?? '').trim()
+        )
+      )
+        errors.push('时段频率规则需填写 HH:MM-HH:MM，可使用跨夜时段')
+    }
+  }
+  const intervals = [
+    [
+      'smartTrigger.minDeferredMs',
+      'smartTrigger.maxDeferredMs',
+      120000,
+      900000,
+      '主动唤醒的最长延迟不能小于最短延迟'
+    ],
+    [
+      'smartTrigger.repeatMinCount',
+      'smartTrigger.repeatDetectionWindow',
+      3,
+      5,
+      '复读最少人数不能大于复读检测窗口'
+    ],
+    [
+      'memorySystem.knowledgeDecisionInlineWaitMs',
+      'memorySystem.knowledgeDecisionTimeoutMs',
+      180,
+      900,
+      '回复内确认等待不能大于群知识裁决总超时'
+    ]
+  ] as const
+  for (const [lower, upper, defaultLower, defaultUpper, message] of intervals) {
+    if (!changed.has(lower) && !changed.has(upper)) continue
+    if (Number(draft[lower] ?? defaultLower) > Number(draft[upper] ?? defaultUpper))
+      errors.push(message)
+  }
+  return errors
+}
 export function describeUnit(field: SchemaFieldDefinition) {
   if (field.unit) return field.unit
   const label = field.label

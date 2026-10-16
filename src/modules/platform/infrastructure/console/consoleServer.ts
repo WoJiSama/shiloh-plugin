@@ -5,7 +5,7 @@
 //   - 读哨兵(bot-sentinel)的状态与告警文件
 //   - 生图直接复用插件内纯逻辑模块(utils/imageGenerationFallback.js 等,均零 import),
 //     渠道与密钥仍以 config/message.yaml 为唯一来源,与 bot 走同一套 fallback 顺序
-//   - AI 配置复用锅巴同源模块(utils/guobaAiProviderConfig.js 的 definitions 与归一化),
+//   - AI 配置复用独立模型渠道定义及归一化模块,
 //     写入用 YAML 定点更新(不改排整份文件),保存前自动备份,各配置按初始化/热读/调度周期读取，保存不执行重启
 //   - 登录:账密(scrypt 哈希,Cookie 会话)+ 原令牌并存(令牌供 curl/脚本自动化)
 // yaml 包复用插件自身 node_modules,不新增安装项。
@@ -42,9 +42,14 @@ import { createProviderProbe } from "../../../models/application/aiProviderProbe
 import { createPersonaLibrary } from "../../../conversation/infrastructure/personaLibrary.js"
 import reasoningSchema from "../../../config/domain/schemas/shared/reasoning.js"
 import conversationSchema from "../../../config/domain/schemas/shared/conversation.js"
-import personaSchema from "../../../config/domain/schemas/guoba/persona.js"
-import messagePipelineSchema from "../../../config/domain/schemas/guoba/messagePipeline.js"
-import riskControlSchema from "../../../config/domain/schemas/guoba/riskControl.js"
+import personaSchema from "../../../config/domain/schemas/shared/persona.js"
+import messagePipelineSchema from "../../../config/domain/schemas/shared/messagePipeline.js"
+import riskControlSchema from "../../../config/domain/schemas/shared/riskControl.js"
+import diceSchema from "../../../config/domain/schemas/shared/dice.js"
+import trackingSchema from "../../../config/domain/schemas/shared/tracking.js"
+import memorySchema from "../../../config/domain/schemas/shared/memory.js"
+import { buildGroupAdminDefaultsView, prepareGroupAdminDefaultUpdates, buildGroupAdminView, prepareGroupAdminUpdates } from "../../../../adapters/config/groupAdminConfig.js"
+import { configuredGroupAdminIds, groupAdminRowId, groupAdminStatus } from "../../../groupAdmin/domain/groupAdminPolicy.js"
 
 import { resolveTurnTraceArchiveDir } from "../../../conversation/infrastructure/turnTrace.js"
 import { readCachedGroupNames, mergeGroupNames } from "../groupNames.js"
@@ -475,6 +480,7 @@ async function collectGroups() {
     return entry
   }
   for (const id of allowed) ensure(id)
+  for (const id of configuredGroupAdminIds(settings)) ensure(id)
   // 直接读今日 hash,拿到"每号×每群"的活跃拆分
   try {
     const redis = await new MiniRedis().connect()
@@ -493,7 +499,7 @@ async function collectGroups() {
   const names = new Map(directory.groups.map(group => [group.id, group.name]))
   return {
     groups: [...groups.values()]
-      .map(entry => ({ ...entry, name: names.get(entry.id) || "", bots: [...entry.bots] }))
+      .map(entry => ({ ...entry, name: names.get(entry.id) || "", bots: [...entry.bots], groupAdmin: groupAdminStatus(settings, entry.id) }))
       .sort((a, b) => (b.today.recv + b.today.send) - (a.today.recv + a.today.send))
   }
 }
@@ -1038,7 +1044,7 @@ function saveAiProviders(configKeyValue:unknown, providers:unknown = [], revisio
   const valid = restored.filter(item => normalizeProviderForPanel(item, def))
   if (!valid.length) throw Object.assign(new Error("渠道列表没有有效配置，未写入"), { status: 400 })
   const updates = normalizeAiProviderUpdates({ [`${configKey}.providers`]: restored })
-  // Guoba's pure normalizer intentionally drops UI metadata. Store only the stable, non-secret ID afterward.
+  // The shared normalizer drops UI metadata. Store only the stable, non-secret ID afterward.
   updates[`${configKey}.providers`] = records(updates[`${configKey}.providers`]).map((item, index) => ({ ...item, _consoleId: valid[index]?._consoleId }))
   const backup = backupMessageYaml()
   applyConsoleFlatUpdates(updates, snapshot.revision)
@@ -1230,18 +1236,21 @@ function handleAppPageProxy(req:http.IncomingMessage, res:http.ServerResponse, u
 }
 
 
-// ---------- 通用配置表单引擎(锅巴 schema 同源渲染) ----------
-// schema 是纯声明式数据(字段/组件/帮助文案),控制台按组件词汇表渲染;
-// 写入只提交变更字段,与锅巴共用同一份 schema 即同一份真相源。
+// ---------- 通用配置表单引擎 ----------
+// 独立 schema 声明字段、组件与帮助文案；写入只提交变更字段。
 const CONFIG_SCHEMAS:Record<string,import("../../../../adapters/config/schemaConfig.js").SchemaEntry> = {
   conversation: { title: "对话与权限", schema: conversationSchema },
   reasoning: { title: "思考程度", schema: reasoningSchema },
   persona: { title: "默认人设与画像", schema: personaSchema },
   pipeline: { title: "消息管道与搬运", schema: messagePipelineSchema },
-  riskControl: { title: "风控管理", schema: riskControlSchema }
+  riskControl: { title: "风控管理", schema: riskControlSchema },
+  dice: { title: "骰子基础设置", schema: diceSchema },
+  tracking: { title: "对话追踪", schema: trackingSchema },
+  memory: { title: "记忆策略", schema: memorySchema }
 }
 
 function schemaConfigView(key:string) {
+  if (key === "groupAdmin") return buildGroupAdminDefaultsView(loadPluginSettings())
   const entry = CONFIG_SCHEMAS[key]
   if (!entry) throw new Error(`未注册的配置页: ${key}`)
   return buildSchemaConfigView(key, entry, loadPluginSettings())
@@ -1249,9 +1258,9 @@ function schemaConfigView(key:string) {
 
 function saveSchemaConfig(key:string, payload:Data = {}) {
   const entry = CONFIG_SCHEMAS[key]
-  if (!entry) throw new Error(`未注册的配置页: ${key}`)
+  if (!entry && key !== "groupAdmin") throw new Error(`未注册的配置页: ${key}`)
   const snapshot = configRepository.read()
-  const prepared = prepareSchemaUpdates(key, entry, snapshot.settings, payload)
+  const prepared = key === "groupAdmin" ? prepareGroupAdminDefaultUpdates(snapshot.settings, payload) : prepareSchemaUpdates(key, entry!, snapshot.settings, payload)
   const backup = prepared.changed ? backupMessageYaml() : null
   if (prepared.changed) applyConsoleFlatUpdates(prepared.updates, snapshot.revision)
   const revision = schemaConfigView(key).revision
@@ -1259,6 +1268,51 @@ function saveSchemaConfig(key:string, payload:Data = {}) {
   return { ok: true, changed: prepared.changed, backup, revision, apply: prepared.apply,
     applyMode: modes.length > 1 ? "mixed" : (modes[0] || "none"),
     applyHint: prepared.changed ? "配置已持久化；具体生效时机请查看字段说明。本次保存不重启机器人服务。" : "配置未发生变化" }
+}
+
+function saveGroupAdminConfig(groupId:string, payload:Data) {
+  const snapshot = configRepository.read()
+  const prepared = prepareGroupAdminUpdates(groupId, snapshot.settings, payload)
+  const backup = prepared.changed ? backupMessageYaml() : null
+  if (prepared.changed) {
+    try {
+      configRepository.update(document => {
+        // Patch only this group's node, preserving sibling groups and their YAML comments.
+        const patch = (keys:(string|number)[], before:unknown, after:unknown) => {
+          if (before !== null && after !== null && typeof before === 'object' && typeof after === 'object' && !Array.isArray(before) && !Array.isArray(after)) {
+            const old = record(before), next = record(after)
+            for (const key of new Set([...Object.keys(old), ...Object.keys(next)])) {
+              if (!Object.prototype.hasOwnProperty.call(next, key)) document.deleteIn([...keys, key])
+              else patch([...keys, key], old[key], next[key])
+            }
+          } else if (JSON.stringify(before) !== JSON.stringify(after)) document.setIn(keys, after)
+        }
+        for (const [name, value] of Object.entries(prepared.updates)) {
+          const keys = ['pluginSettings', ...name.split('.')]
+          const sequence = document.getIn(keys, true)
+          if (YAML.isSeq(sequence) && Array.isArray(value)) {
+            const beforeRows = sequence.toJSON() as unknown[]
+            const indices = beforeRows.flatMap((row, index) => groupAdminRowId(row) === groupId ? [index] : [])
+            const nextRows = value.filter(row => groupAdminRowId(row) === groupId)
+            const retained = Math.min(indices.length, nextRows.length)
+            for (let i = 0; i < retained; i++) {
+              const index = indices[i]!
+              patch([...keys, index], beforeRows[index], nextRows[i])
+            }
+            // Old Guoba tables can repeat a group (including group_id/group aliases).
+            // Delete every removed row backwards, leaving sibling nodes and comments intact.
+            for (let i = indices.length - 1; i >= retained; i--) document.deleteIn([...keys, indices[i]!])
+            for (const row of nextRows.slice(retained)) sequence.add(document.createNode(row))
+          } else document.setIn(keys, value)
+        }
+      }, { expectedRevision: snapshot.revision })
+    } catch (error) {
+      if (error instanceof ConfigConflictError) throw Object.assign(new Error("配置已被其他进程修改，请重新加载并核对本群草稿后保存"), { status: 409 })
+      throw error
+    }
+  }
+  return { ...buildGroupAdminView(groupId, loadPluginSettings()), changed: prepared.changed, backup,
+    applyHint: prepared.changed ? "本群配置已保存；后续群事件读取新配置。已有验证题目和到期时间保持，关闭验证后不再执行超时处理。" : "配置未发生变化" }
 }
 
 async function pipelineJobsView(query:Data) {
@@ -1491,6 +1545,25 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/apps") {
       return sendJson(res, 200, { apps: appPageEntryList() })
+    }
+    if (url.pathname === "/api/config/groupAdmin") {
+      if (req.method === "GET") return sendJson(res, 200, schemaConfigView("groupAdmin"))
+      if (req.method === "PUT") return sendJson(res, 200, saveSchemaConfig("groupAdmin", await readJsonBody(req, 2 * 1024 * 1024)))
+      return sendJson(res, 405, { error: "method not allowed" })
+    }
+    const groupAdminRoute = url.pathname.match(/^\/api\/groups\/([^/]+)\/admin$/)
+    if (groupAdminRoute) {
+      const groupId = groupAdminRoute[1]!
+      if (req.method === "GET") return sendJson(res, 200, buildGroupAdminView(groupId, loadPluginSettings()))
+      if (req.method === "PUT") return sendJson(res, 200, saveGroupAdminConfig(groupId, await readJsonBody(req, 2 * 1024 * 1024)))
+      return sendJson(res, 405, { error: "method not allowed" })
+    }
+    const policyRoute = url.pathname.match(/^\/api\/config\/(dice|tracking|memory)$/)
+    if (policyRoute) {
+      const key = policyRoute[1]!
+      if (req.method === "GET") return sendJson(res, 200, schemaConfigView(key))
+      if (req.method === "PUT") return sendJson(res, 200, saveSchemaConfig(key, await readJsonBody(req, 2 * 1024 * 1024)))
+      return sendJson(res, 405, { error: "method not allowed" })
     }
     if (url.pathname === "/api/config/conversation") {
       if (req.method === "GET") return sendJson(res, 200, schemaConfigView("conversation"))

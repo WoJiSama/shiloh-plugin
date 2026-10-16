@@ -6,6 +6,7 @@ import {
   BrainCircuit,
   Workflow,
   ShieldCheck,
+  UserRoundCog,
   Terminal,
   Activity,
   Database,
@@ -16,7 +17,8 @@ export const navigation = [
     label: '日常运营',
     items: [
       { path: '/', label: '机器人', icon: Bot, hint: '账号与运行状态' },
-      { path: '/groups', label: '群聊', icon: Users, hint: '服务群与收发统计' }
+      { path: '/groups', label: '群聊', icon: Users, hint: '服务群与收发统计' },
+      { path: '/group-admin', label: '群管理', icon: UserRoundCog, hint: '入群验证、广告与群通知' }
     ]
   },
   {

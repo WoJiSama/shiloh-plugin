@@ -1,3 +1,4 @@
+import { resolveGroupAdminSettings } from '../domain/groupAdminPolicy.js'
 import {adminRecord,adminError,requireAdminBot,decodeAdminEvent} from '../../../contracts/groupAdmin.js'
 import type {AdminPorts,AdminEvent,GroupId,ModerationConfig,ModerationResult,GroupMember} from '../../../contracts/groupAdmin.js'
 
@@ -11,7 +12,7 @@ import {
   normalizeStringList
 } from "../domain/groupModerationRules.js"
 import { getMentionTargetId } from "../../conversation/domain/mentionTargets.js"
-import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
+import { safeTruncateUnicode, splitUnicodeText } from "../../models/domain/unicodeText.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
 
 // QQ 群里能发 markdown/json 卡片的基本只有机器人；卡片里的 mqqapi://、图片 URL
@@ -65,6 +66,9 @@ function extractJsonObject(text:unknown = ""):Record<string,unknown>|null {
 // 官方 Q群管家两个账号：入群须知/公告自带二维码和"加微信"字样，会误触规则，内置豁免
 const OFFICIAL_BOT_IDS = new Set(["2854196310", "3858854713"])
 
+// 超长消息折叠为合并聊天记录时，每个转发节点承载的字数
+const OVERLONG_FORWARD_CHUNK_CHARS = 1000
+
 export function isIgnoredBotUser(userId:unknown, config:Partial<ModerationConfig>) {
   const id = String(userId || "").trim()
   if (!id) return false
@@ -74,9 +78,10 @@ export function isIgnoredBotUser(userId:unknown, config:Partial<ModerationConfig
 
 export class GroupModerationManager {
   floodTrackers = new Map<string,number[]>()
+  burstTrackers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
   constructor(private readonly ports:AdminPorts,private readonly corpus:AdCorpusStore) {}
-  getConfig() {
-    return normalizeGroupModerationConfig(this.ports.readSettings().groupModeration)
+  getConfig(groupId?:GroupId) {
+    return normalizeGroupModerationConfig(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupModeration)
   }
 
   isGroupEnabled(config:ModerationConfig, groupId:GroupId|undefined) {
@@ -296,6 +301,176 @@ export class GroupModerationManager {
     return null
   }
 
+  getSenderName(e:AdminEvent) {
+    const name = String(e?.card || e?.nickname || e?.sender?.card || e?.sender?.nickname || e?.user_id || "").trim()
+    return name || "群成员"
+  }
+
+  // 消息自身的可见文本：只取消息段渲染结果，不与 e.msg 重复拼接，
+  // 也不把合并转发内部的内容算进来（那部分属于"低活跃合并转发"规则管辖）
+  extractVisibleText(e:AdminEvent) {
+    if (Array.isArray(e?.message)) {
+      const text = e.message.map(item => getSegmentText(adminRecord(item))).join("").trim()
+      if (text) return text
+    }
+    return String(e?.msg || e?.raw_message || "").trim()
+  }
+
+  // 超长判定按码点计数（emoji 不重复计 2 个字符）
+  checkOverlongMessage(text:string, config:ModerationConfig) {
+    const overlong = config.overlongMessage
+    if (!overlong?.enabled) return null
+    const length = Array.from(String(text || "").trim()).length
+    const maxLength = Math.floor(Number(overlong.maxLength) || 1500)
+    if (length < maxLength) return null
+    return { length, maxLength }
+  }
+
+  buildOverlongForwardNodes(e:AdminEvent, text:string, overlong:{length:number}) {
+    const senderName = this.getSenderName(e)
+    const botId = e?.self_id || e?.bot?.uin || this.ports.getBot()?.uin || 80000000
+    return [
+      {
+        user_id: botId,
+        nickname: "群管助手",
+        message: `已撤回 ${senderName} 的超长消息（约 ${overlong.length} 字），原内容如下：`
+      },
+      ...splitUnicodeText(text, OVERLONG_FORWARD_CHUNK_CHARS).map(chunk => ({
+        user_id: e.user_id,
+        nickname: senderName,
+        message: chunk
+      }))
+    ]
+  }
+
+  // 合并转发优先走适配器 makeForwardMsg，缺失或失败时退回 OneBot 的 send_group_forward_msg 直发
+  async sendForwardNodes(e:AdminEvent, nodes:{user_id:GroupId|undefined;nickname:string;message:string}[]) {
+    try {
+      const group = await this.getGroup(e, e.group_id!)
+      if (typeof group?.makeForwardMsg === "function") {
+        const forward = await group.makeForwardMsg(nodes)
+        await group.sendMsg(forward)
+        return true
+      }
+    } catch (error) {
+      this.ports.logger?.warn?.(`[GroupModeration] 合并转发失败，尝试 OneBot 直发 group=${e.group_id}: ${adminError(error)}`)
+    }
+    try {
+      await (requireAdminBot(this.ports,e)).sendApi("send_group_forward_msg", {
+        group_id: Number(e.group_id),
+        messages: nodes.map(node => ({
+          type: "node",
+          data: { name: String(node.nickname || ""), uin: String(node.user_id || 80000000), content: node.message }
+        }))
+      })
+      return true
+    } catch (error) {
+      this.ports.logger?.warn?.(`[GroupModeration] OneBot 直发合并转发失败 group=${e.group_id}: ${adminError(error)}`)
+      return false
+    }
+  }
+
+  async sendOverlongForward(e:AdminEvent, text:string, overlong:{length:number}) {
+    return await this.sendForwardNodes(e, this.buildOverlongForwardNodes(e, text, overlong))
+  }
+
+  // 超长消息折叠：撤回原消息后把内容转成一条合并聊天记录发出。
+  // 撤回失败就不转发，避免原消息和转发卡片内容重复刷屏。
+  async handleOverlongMessage(e:AdminEvent, config:ModerationConfig, text:string, overlong:{length:number;maxLength:number}) {
+    this.ports.logger?.info?.(`[GroupModeration] 超长消息折叠 group=${e.group_id} user=${e.user_id} chars=${overlong.length}/${overlong.maxLength}`)
+    const recalled = await this.applyAction(e, config, "recall")
+    if (!recalled) return false
+    if (!config.overlongMessage.forwardEnabled) return true
+    if (await this.sendOverlongForward(e, text, overlong)) return true
+    try {
+      await e.reply?.(`已撤回 ${this.getSenderName(e)} 的超长消息（约 ${overlong.length} 字），但转发聊天记录失败。`)
+    } catch (error) {
+      this.ports.logger?.warn?.(`[GroupModeration] 发送超长撤回提示失败 group=${e.group_id}: ${adminError(error)}`)
+    }
+    return true
+  }
+
+  // 连发折叠：记录窗口内每条消息的 id 和文本，达到条数阈值返回全部待折叠消息并清空窗口。
+  // 命中后由连发分支统一撤回/转发/禁言，避免与刷屏风控重复处理同一批消息
+  trackBurstMessage(e:AdminEvent, config:ModerationConfig, now = Date.now()) {
+    const burst = config.burstMessage
+    if (!burst?.enabled) return null
+    const windowMs = Math.max(2, Number(burst.windowSeconds) || 5) * 1000
+    const maxMessages = Math.max(3, Math.floor(Number(burst.maxMessages) || 6))
+    const key = `${e.group_id}:${e.user_id}`
+    this.burstTrackers ||= new Map()
+    const entries = (this.burstTrackers.get(key) || []).filter(item => now - item.at < windowMs)
+    entries.push({ messageId: e?.message_id || e?.seq, text: this.extractVisibleText(e), at: now })
+    if (entries.length < maxMessages) {
+      if (this.burstTrackers.size > 10000) this.burstTrackers.clear()
+      this.burstTrackers.set(key, entries)
+      return null
+    }
+    this.burstTrackers.delete(key)
+    return { messages: entries, windowSeconds: Math.round(windowMs / 1000) }
+  }
+
+  // 连发折叠处理：撤回窗口内全部消息 → 禁言 → 把这批消息合并成一条聊天记录发出。
+  // 一条都没撤回成功时不禁言不转发，避免原消息与转发卡片内容重复刷屏
+  async handleBurstMessage(e:AdminEvent, config:ModerationConfig, burst:{messages:{messageId:GroupId|undefined;text:string;at:number}[];windowSeconds:number}) {
+    const senderName = this.getSenderName(e)
+    const count = burst.messages.length
+    this.ports.logger?.info?.(`[GroupModeration] 连发折叠 group=${e.group_id} user=${e.user_id} count=${count}/${burst.windowSeconds}s`)
+    const bot = requireAdminBot(this.ports,e)
+    const seen = new Set<GroupId>()
+    let recalled = 0
+    for (const item of burst.messages) {
+      const messageId = item.messageId
+      if (!messageId || seen.has(messageId)) continue
+      seen.add(messageId)
+      try {
+        await bot.sendApi("delete_msg", { message_id: messageId })
+        recalled++
+      } catch (error) {
+        this.ports.logger?.warn?.(`[GroupModeration] 连发撤回失败 msg=${messageId}: ${adminError(error)}`)
+      }
+    }
+    if (!recalled) return false
+
+    const muteSeconds = Math.max(0, Math.floor(Number(config.burstMessage.muteSeconds) || 0))
+    if (muteSeconds > 0) {
+      try {
+        await bot.sendApi("set_group_ban", {
+          group_id: Number(e.group_id),
+          user_id: Number(e.user_id),
+          duration: muteSeconds
+        })
+      } catch (error) {
+        this.ports.logger?.warn?.(`[GroupModeration] 连发禁言失败 group=${e.group_id} user=${e.user_id}: ${adminError(error)}`)
+      }
+    }
+    // 这批消息已经处理完，清掉刷屏窗口避免随后再触发一次风控禁言
+    this.floodTrackers.delete(`${e.group_id}:${e.user_id}`)
+
+    if (config.burstMessage.forwardEnabled !== false) {
+      const botId = e?.self_id || e?.bot?.uin || this.ports.getBot()?.uin || 80000000
+      const nodes = [
+        {
+          user_id: botId,
+          nickname: "群管助手",
+          message: `${senderName} 在 ${burst.windowSeconds} 秒内连发 ${count} 条消息，已全部撤回并折叠${muteSeconds > 0 ? `，禁言 ${muteSeconds} 秒` : ""}：`
+        },
+        ...burst.messages.map(item => ({
+          user_id: e.user_id,
+          nickname: senderName,
+          message: item.text || " "
+        }))
+      ]
+      if (await this.sendForwardNodes(e, nodes)) return true
+      try {
+        await e.reply?.(`已撤回 ${senderName} ${burst.windowSeconds} 秒内发送的 ${count} 条消息${muteSeconds > 0 ? `并禁言 ${muteSeconds} 秒` : ""}（转发聊天记录失败）`)
+      } catch (error) {
+        this.ports.logger?.warn?.(`[GroupModeration] 发送连发折叠提示失败 group=${e.group_id}: ${adminError(error)}`)
+      }
+    }
+    return true
+  }
+
   decideAction(config:ModerationConfig, confidence:number) {
     if (config.actions.kickEnabled && confidence >= config.thresholds.kick) return "kick"
     if (config.actions.muteEnabled && confidence >= config.thresholds.mute) return "mute"
@@ -403,7 +578,7 @@ export class GroupModerationManager {
     if (!groupId || !userId) return false
     if (String(userId) === String(e?.self_id || this.ports.getBot()?.uin || "")) return false
 
-    const config = this.getConfig()
+    const config = this.getConfig(groupId)
     if (isIgnoredBotUser(userId, config)) {
       this.ports.logger?.debug?.(`[GroupModer] 跳过白名单机器人 user=${userId}`)
       return false
@@ -417,11 +592,17 @@ export class GroupModerationManager {
     const level = Number(member?.level)
     if (config.inspectLowLevelOnly && Number.isFinite(level) && level > config.minActiveLevel) return false
 
+    // 连发折叠检测：独立于广告规则；触发后优先于刷屏/超长处理，避免同一批消息被处理两次
+    const burst = this.trackBurstMessage(e, config)
     // 刷屏检测：独立等级门槛，与广告规则无关（纯表情/短消息刷屏也算）
-    const flood = this.checkFlood(groupId, userId, member?.level, config)
+    const flood = burst ? null : this.checkFlood(groupId, userId, member?.level, config)
 
     const content = await this.extractContent(e, config)
-    if (!content.text && !content.imageCount && !content.forwardCount && !flood) return false
+    if (!content.text && !content.imageCount && !content.forwardCount && !flood && !burst) return false
+
+    // 超长折叠与广告风控并行判定：命中风控的消息优先按风控处理（不把广告内容再转发一遍）
+    const visibleText = this.extractVisibleText(e)
+    const overlong = this.checkOverlongMessage(visibleText, config)
 
       const base = analyzeModerationRules({
         text: content.text,
@@ -447,7 +628,13 @@ export class GroupModerationManager {
     }
 
     const action = this.decideAction(config, confidence)
-    if (action === "ignore") return false
+    if (action === "ignore") {
+      // 连发折叠优先：整批撤回 + 合并转发 + 可选禁言
+      if (burst) return await this.handleBurstMessage(e, config, burst)
+      // 未命中风控但超长的普通消息：撤回后把内容转成合并聊天记录
+      if (overlong) return await this.handleOverlongMessage(e, config, visibleText, overlong)
+      return false
+    }
     this.ports.logger?.info?.(`[GroupModeration] 命中 group=${groupId} user=${userId} rules=${rules.join("、")} confidence=${confidence.toFixed(2)} action=${action}${flood ? ` flood=${flood.count}条/${flood.windowSeconds}s` : ""}`)
 
     // 命中即入库：确认是广告的消息自动进样本库，之后同类变体也能命中；

@@ -42,7 +42,7 @@ const schema: ConfigSchemaItem[] = [
     field: "diceSystem.maxDiceSides",
     label: "最大骰面",
     component: "InputNumber",
-    componentProps: { min: 2, max: 100000000, step: 100, placeholder: "100000" }
+    componentProps: { min: 2, max: 100000000, step: 1, placeholder: "100000" }
   },
   {
     field: "diceSystem.maxRounds",
@@ -65,9 +65,10 @@ const schema: ConfigSchemaItem[] = [
   },
   {
     field: "diceSystem.timeZone",
+    required: true,
     label: "骰娘日期时区",
     component: "Input",
-    bottomHelpMessage: "用于 SAN 每日累计和今日人品日期，例如 Asia/Shanghai；无效值会安全回退到 UTC 日期"
+    bottomHelpMessage: "用于 SAN 每日累计和今日人品日期，例如 Asia/Shanghai 或 UTC；保存后用于下次日期计算，不修改已有记录"
   },
   {
     field: "diceSystem.logExportMaxMb",
@@ -78,14 +79,11 @@ const schema: ConfigSchemaItem[] = [
   },
   {
     field: "diceSystem.baseDir",
+    required: true,
     label: "骰娘数据目录",
     component: "Input",
-    bottomHelpMessage: "相对插件目录或绝对路径；存储人物卡、昵称和群规则"
+    bottomHelpMessage: "相对插件目录或绝对路径；存储人物卡、昵称和群规则。保存后下次读写切换目录，已有数据不会自动迁移"
   },
-  {
-    component: "Divider",
-    label: "回复文案请到命令管理页骰子面板修改：按命令（含 .st）编辑发送，失败/大失败可改整句"
-  }
 ]
 
 export default schema

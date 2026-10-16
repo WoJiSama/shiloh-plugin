@@ -12,24 +12,43 @@ import aiCore from "../models/configSchemas/aiCore.js"
 import reasoning from "../models/configSchemas/reasoning.js"
 import triggers from "../models/configSchemas/triggers.js"
 import conversation from "../models/configSchemas/conversation.js"
+import persona from "../models/configSchemas/persona.js"
+import pipeline from "../models/configSchemas/messagePipeline.js"
+import riskControl from "../models/configSchemas/riskControl.js"
+import groupGuard from "../models/configSchemas/groupGuard.js"
+import groupNotice from "../models/configSchemas/groupNotice.js"
+import dice from "../models/configSchemas/dice.js"
+import tracking from "../models/configSchemas/tracking.js"
+import memory from "../models/configSchemas/memory.js"
+import { AI_PROVIDER_DEFINITIONS } from "../utils/guobaAiProviderConfig.js"
 import { buildSchemaConfigView, getIn, prepareSchemaUpdates, schemaFieldGroups, validateSchemaValue } from "../console/lib/schemaConfig.js"
 
 const entry = { title: "对话与权限", schema: conversation }
 const defaults = YAML.parse(fs.readFileSync(new URL("../config_default/message.yaml", import.meta.url), "utf8")).pluginSettings
 const fields = schemaFieldGroups(conversation).flatMap(group => group.fields)
 
-test("conversation migration covers the source modules once and retains Guoba compatibility", async () => {
+test("conversation composes shared controls once and leaves dedicated page fields separate", () => {
   const excluded = new Set(["systemContent", ...reasoning.filter(item => item.field).map(item => item.field)])
   const expected = [...basic, ...permission, ...aiCore, ...triggers].filter(item => item.field && !excluded.has(item.field)).map(item => item.field)
   assert.deepEqual(fields.map(item => item.field).sort(), expected.sort())
   assert.equal(new Set(fields.map(item => item.field)).size, fields.length)
   assert.equal(conversation.every(Boolean), true)
-  for (const [name, schema] of [["basic", basic], ["permission", permission], ["aiCore", aiCore], ["reasoning", reasoning]]) {
-    assert.equal((await import(`../models/Guoba/schemas/${name}.js`)).default, schema)
+})
+
+test("Guoba aggregate excludes migrated console controls while retaining remaining settings", async () => {
+  const { schemas: guoba } = await import("../models/Guoba/schemas/index.js")
+  const { default: remainingAiCore } = await import("../models/Guoba/schemas/aiCore.js")
+  const migrated = new Set([
+    ...conversation, ...reasoning, ...persona, ...pipeline, ...riskControl, ...groupGuard, ...groupNotice,
+    ...dice, ...tracking, ...memory
+  ].filter(item => item.field).map(item => item.field))
+  for (const definition of AI_PROVIDER_DEFINITIONS) migrated.add(`${definition.configKey}.providers`)
+  const guobaFields = new Set(guoba.filter(item => item.field).map(item => item.field))
+  assert.deepEqual([...guobaFields].filter(name => migrated.has(name)), [])
+  assert.deepEqual(remainingAiCore.filter(item => item.field).map(item => item.field), ["systemContent"])
+  for (const name of ["systemContent", "messageArchive.enabled", "emojiSystem.enabled", "knowledgeSystem.enabled", "oneapi_tools"]) {
+    assert.ok(guobaFields.has(name), `${name} must remain available`)
   }
-  const legacyTracking = (await import("../models/Guoba/schemas/tracking.js")).default
-  assert.equal(legacyTracking.find(item => item.field === "chatTriggerMode"), triggers[0])
-  assert.equal(legacyTracking.filter(item => item.field === "chatTriggerMode").length, 1)
 })
 
 test("conversation fields accept their configured defaults, including thinking token budgets", () => {

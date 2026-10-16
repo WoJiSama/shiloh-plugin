@@ -39,11 +39,13 @@ sudo systemctl restart bl-console
 
 ## 页面和地址
 
-继续使用 hash 路由，原 `#/`、`#/persona`、`#/ai`、`#/draw`、`#/commands`、`#/observe`、`#/semantic` 地址保持可用。新增 `#/conversation`（对话设置）、`#/groups`、`#/pipeline`、`#/risk` 和 `#/bot/<QQ>` 等页面。
+继续使用 hash 路由，原 `#/`、`#/persona`、`#/ai`、`#/draw`、`#/commands`、`#/observe`、`#/semantic` 地址保持可用。新增 `#/conversation`（对话设置）、`#/groups`、`#/group-admin`（群管理）、`#/pipeline`、`#/risk` 和 `#/bot/<QQ>` 等页面。
 
-命令 / 骰子与语义记忆已经使用原生 Vue 页面，通过现有 `/bl-chat/*` API 代理访问 Yunzai；命令表、骰子设置、牌堆规则和表情包等能力沿用已有后端。运行观测 `#/observe` 展示聚合概览，`#/observe/details` 保留原工具的完整运行明细入口，可在嵌入页查看或在新窗口打开。
+命令 / 骰子与语义记忆已经使用原生 Vue 页面，通过现有 `/bl-chat/*` API 代理访问 Yunzai；命令表、骰子回复、牌堆规则和表情包等能力沿用已有后端。骰子基础设置、对话追踪和记忆策略使用独立控制台配置 API，不依赖这些运营 API。运行观测 `#/observe` 展示聚合概览，`#/observe/details` 保留原工具的完整运行明细入口，可在嵌入页查看或在新窗口打开。
 
-群聊页在群号旁显示群名，并支持按群名搜索。名称优先读取 Yunzai 各机器人已有群列表；上游不可用时回退插件与 Yunzai 主目录的 `data/group_names.json` 缓存，仍未知的名称显示“群名未获取”。名称补齐不会改变白名单及今日活动组成的群聊列表。
+群聊页在群号旁显示群名，并支持按群名搜索。名称优先读取 Yunzai 各机器人已有群列表；上游不可用时回退插件与 Yunzai 主目录的 `data/group_names.json` 缓存，仍未知的名称显示“群名未获取”。群聊列表汇总白名单、今日活动和已配置群管的群；未启用的群管配置也可被发现。
+
+群管理支持入群验证、广告与刷屏处理、欢迎与退群通知三个页签。`#/group-admin?scope=defaults` 设置默认策略和各模块总开关，`#/group-admin?group=<群号>` 配置单群覆盖；可从群聊列表或详情进入，再返回对应群聊。支持直接输入群号，提前配置尚无活动的群。
 
 ## 认证和配置保存
 
@@ -51,13 +53,23 @@ sudo systemctl restart bl-console
 
 已认证的 `/bl-chat/*` 请求由控制台在服务端装配对应 Yunzai 页面凭据，不需要前端读取 `commands-web.json`。向 Yunzai 转发时剔除控制台令牌头、会话 Cookie 和 referer；`/api/apps` 返回不含页面令牌的路径。独立原工具使用自身页面令牌的访问方式仍兼容。
 
-通用配置页以独立配置 schema 为字段声明源，`message.yaml` 为持久化配置源。第一批对话设置与思考程度来自 `models/configSchemas/`，锅巴旧路径保留兼容导出；其他已迁移页面的声明逐批迁出，台账见 `docs/console-guoba-migration.md`：
+通用配置页以 `src/modules/config/domain/schemas/shared/` 为字段声明源，`models/configSchemas/` 提供独立导出，`message.yaml` 为持久化配置源。控制台已完整覆盖的对话、权限、模型、人设、管道、群管、骰子基础、追踪和记忆策略配置已从锅巴移除，清理台账见 `docs/console-guoba-migration.md`。锅巴只保留尚无控制台编辑入口的设置；其读取和保存也限定于剩余字段，旧页面提交已迁移字段时会拒绝保存并提示刷新。
+
+控制台配置保存约定：
 
 - GET 返回字段分组、组件约束、`revision`、`applyMode` 和 `applyHint`。明确的密码字段返回 `value: ''`、`secret: true` 和 `configured`，不返回原凭据。
 - PUT 提交 `{ values, secrets, revision }`，`values` 仅包含变更字段。凭据使用 `{ action: 'keep' }`、`{ action: 'replace', value: '...' }` 或 `{ action: 'clear' }`；脱敏占位符不能写成真实凭据。
 - 服务端校验数字必填、范围和步长、子表组件与必填约束。校验失败返回 400；当前配置与提交 revision 不同返回 409，前端保留草稿供核对。
 - 仅在有变化时备份，再通过 YAML 定点更新写入；保留无关字段和注释，最多保留 10 份控制台备份。
 - 保存成功表示已持久化。消息管道初始化参数与搬运授权初始化项需要重启机器人服务；健康报告配置在下一调度周期读取；风控约 10 秒内读取更新。字段说明给出具体生效时机，保存不会自动重启机器人。
+
+骰子基础位于 `#/commands` 的“骰子基础”，对话追踪位于 `#/conversation` 的“对话追踪”，记忆策略位于 `#/semantic` 的“记忆策略”。对应 `GET/PUT /api/config/dice`、`/api/config/tracking`、`/api/config/memory`，PUT 必须携带 revision。任务页签间切换保留各自草稿，离开页面提醒未保存修改。骰子目录保存后切到新目录且不自动迁移文件；追踪已有计时器沿用原计划；记忆运行时重装会让尚未摘要的中期缓冲重新累积，已落盘摘要和归档保留。详见 `../docs/console-policy-config-2026-10-16.md`。
+
+群管理默认策略使用 `GET/PUT /api/config/groupAdmin`，单群配置使用 `GET/PUT /api/groups/:id/admin`。单群 PUT 提交 `{ revision, values, resets }`：`values` 为变更字段，`resets` 为恢复默认的字段名。新接口必须携带 revision；本群或默认策略变化返回 409，修改其他群不会使当前群的版本失效。前端保留冲突草稿，刷新后可核对再保存。
+
+单群覆盖保存在 `pluginSettings.groupAdmin.overrides`，未覆盖字段继承默认策略，支持明确关闭开关、清空文案和清空本群通知名单。原模块 `enabled` 保留为全局总开关，单群还需启用对应能力；单群“恢复默认”保留这三个启用状态。旧锅巴启用名单、欢迎/退群模板与通知名单继续生效，恢复相关字段时会同步清理本群旧值。通知接收人是全局通知 QQ 与本群通知 QQ 的并集。
+
+保存仅更新本群节点及其变更字段，保留其他群、未知扩展字段和未改动注释。后续群事件读取新配置；进行中的入群验证保留原题目和截止时间，关闭验证后不再执行其超时处理。入群验证和广告处理仍受机器人群权限限制。
 
 AI 渠道提供不含凭据的稳定 `_consoleId`，按 ID 保留各行原 API Key，重排不会把其他行凭据套进当前行。API Key 支持 `apiKeyAction: 'keep' | 'replace' | 'clear'`，脱敏行探测由服务端恢复原 key。AI 配置各组与人设库也返回 revision，保存可携带 revision 防止旧页面覆盖新配置。旧客户端未携带 revision 的提交仍兼容。
 
@@ -79,7 +91,7 @@ AI 渠道提供不含凭据的稳定 `_consoleId`，按 ID 保留各行原 API K
 以下测试使用纯模块、本地临时 fixture 和 localhost 假上游，不读取真实 `config` 或访问生产：
 
 ```sh
-node --test tests/consoleSchemaConfig.test.js tests/consoleProviderCredentials.test.js tests/consoleRuntimeRead.test.js tests/consoleFrontendStatic.test.js tests/consoleServerIntegration.test.js tests/guobaAiProviderConfig.test.js tests/aiProviderProbe.test.js tests/personaLibrary.test.js tests/diceRulePackManager.test.js tests/commandsWebApp.test.js
+node --test tests/consolePolicyConfig.test.js tests/consoleConversationConfig.test.js tests/groupAdminPolicy.test.js tests/groupAdminConsole.test.js tests/consoleSchemaConfig.test.js tests/consoleProviderCredentials.test.js tests/consoleRuntimeRead.test.js tests/consoleFrontendStatic.test.js tests/consoleServerIntegration.test.js tests/guobaAiProviderConfig.test.js tests/aiProviderProbe.test.js tests/personaLibrary.test.js tests/diceRulePackManager.test.js tests/commandsWebApp.test.js
 ```
 
 浏览器回归先执行 `npm run console:build`，再运行 `npm run console:smoke`。默认使用系统 Google Chrome（macOS 路径），其他环境可通过 `CHROME_PATH` 指定可执行文件；输出报告与截图写入 `/tmp/bl-console-vue-review`，可通过 `CONSOLE_SMOKE_OUTPUT` 覆盖。夹具只读取默认 schema 与非密默认配置，不连接真实控制台、Redis、Docker 或外部模型。测试覆盖的界面行为不能代替实际服务联调。

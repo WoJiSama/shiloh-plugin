@@ -1,24 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  AI_PROVIDER_DEFINITIONS,
   normalizeAiProviderUpdates,
   withAiProviderPanelDefaults
 } from '../utils/guobaAiProviderConfig.js'
 
-test('Guoba AI model panel exposes provider lists for every AI config', async () => {
-  const { default: aiModels } = await import('../models/Guoba/schemas/aiModels.js')
-  const fields = aiModels.map(item => item.field).filter(Boolean)
-
-  for (const definition of AI_PROVIDER_DEFINITIONS) {
-    assert.ok(fields.includes(`${definition.configKey}.providers`), `${definition.configKey} providers missing`)
-    assert.ok(!fields.includes(`${definition.configKey}.${definition.urlField}`), `${definition.configKey} legacy url should be hidden`)
-    assert.ok(!fields.includes(`${definition.configKey}.${definition.modelField}`), `${definition.configKey} legacy model should be hidden`)
-    assert.ok(!fields.includes(`${definition.configKey}.${definition.keyField}`), `${definition.configKey} legacy key should be hidden`)
-  }
-})
-
-test('Guoba getConfigData converts legacy AI config fields into provider lists', () => {
+test('AI provider defaults convert legacy config fields into provider lists', () => {
   const settings = withAiProviderPanelDefaults({
     chatAiConfig: {
       chatApiUrl: 'https://api.example.com/v1/chat/completions',
@@ -72,7 +59,7 @@ test('Guoba getConfigData converts legacy AI config fields into provider lists',
   ])
 })
 
-test('Guoba save updates sync first-priority provider back to each legacy config', () => {
+test('AI provider updates sync the first-priority provider back to each legacy config', () => {
   const updates = normalizeAiProviderUpdates({
     'chatAiConfig.providers': [
       {
