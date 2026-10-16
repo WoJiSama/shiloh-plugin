@@ -1782,3 +1782,7 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - Evidence report append via stdin Python hit invalid UTF-8 before execution; no file writes occurred. Retried using apply_patch; source bytes remain frozen.
 
 - 4f最终28组fresh盲评已校验并封存：综合5胜6负17平、209:213，自然度1胜5负22平、50:54，候选1/基线3硬错。候选“产物没确认，所以暂时不会自动发你”原评保持，不改分数或冻结业务；残留观察并列披露。本轮验收流程完成不等于自然度或全部P0语义达标，继续最终提交与完整部署。
+
+- 完整deploy.sh首轮全门禁通过：后端2533通过/2跳过、前端60通过；发行包与暂存依赖成功。安装前保护发现线上已03395dc，退出1，未停服务或安装。8个文档历史副本冲突已备份并保持最新4f回放/评分与本轮suffix；新群管面板4文件与03395dc逐字一致，聊天源码和定向测试保持。继续独立闭包/完整产物差异审计后再执行全门禁，不跳过。
+
+- Independent group-page applicability passed: 67 chat modules/default config unchanged; exactly three backend additions identified. Updated deployment audit retains full differences; live read-only preflight rejects without evidence and accepts only exact source/artifact hashes. Original 4f replay identity and residual semantic findings are retained.
