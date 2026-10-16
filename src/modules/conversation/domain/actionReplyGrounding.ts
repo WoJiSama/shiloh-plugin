@@ -112,12 +112,14 @@ const STATE_PREDICATES: StatePredicate[] = [
   predicate('artifact', 'available', '(?:还|仍然|仍|也)?(?:在|有)(?:着|的)?', 'artifact', false),
   predicate('existence', 'absent', '(?:本来|本来也|本来就|原本|原来也|还|也|一直)*(?:没(?:有)?(?:挂着|存在)?|不存在|不在)(?:了)?', 'task', false),
   predicate('existence', 'present', '(?:还|仍然|仍|一直)?(?:在|存在|挂着)(?:的)?', 'task', false),
-  predicate('existence', 'present', '(?:(?:确实|的确|本来|早就)(?:是)?)?(?:已经|已)?登记(?:了|好)?(?:的)?', 'task', false),
+  predicate('existence', 'present', '(?:(?:确实|的确|本来|早就)(?:是)?)?(?:已经|已)?登记(?:了|好)?(?:的)?', 'either', false),
+  predicate('existence', 'absent', '(?:当时|原来|一开始)?(?:没有|没|未|尚未)(?:成功)?登记(?:上|好|成|成功)?(?:了)?', 'either', false),
   predicate('follow_up', 'none', `${PAST}(?:取消|撤销)(?:了)?`, 'either', false),
   predicate('follow_up', 'registered', '(?:仍|还|依然)?(?:有效|生效)(?:的)?', 'either', false)
 ]
 const SELF_LOCATION = '(?:我(?:这边|这里|这儿|手里|手上)?|这边|这里|这儿|手头)'
 const IMAGE_REFERENCE = '(?:第[一二三四五六七八九十0-9]+张|这张|那张)'
+const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景(?:的)?${IMAGE_REFERENCE}(?:图(?:片)?)?$`, 'u')
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
@@ -139,6 +141,7 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     const topic = evidenceTopic(subject)
     return {kind: 'task', topic: topic === 'unknown' || topic === 'generic' ? rawTopic : topic, surface: rawSubject}
   }
+  if (context && rawTopic === 'image' && QUALIFIED_IMAGE_REFERENCE.test(subject)) return {kind: 'artifact', topic: 'image', surface: rawSubject}
   const nominal = NOMINAL_HEAD.exec(subject)
   if (nominal) {
     const qualifier = nominal[1] || ''
@@ -210,12 +213,12 @@ const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:�
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
 const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持续|定时|自动|继续)(?:查|查询|检查)/u
-const IMMEDIATE_ACTION = /^(?:那)?(?:我(?:这边)?|这边)?(?:现在|这就|马上|立刻|立即)(?:先|就|会|再|来|帮你|给你|为你|把[^，,]{1,20})*$/u
-const PRESENT_SELF_ACTION = /^(?:那)?(?:我(?:这边)?|这边)(?:先|就|再|来|帮你|给你|为你|把[^，,]{1,20})*$/u
+const IMMEDIATE_ACTION = /^(?:那)?(?:我(?:这边)?|这边)?(?:现在|这就|马上|立刻|立即)(?:先|就|会|再|来|手动|直接|帮你|给你|为你|把[^，,]{1,20})*$/u
+const PRESENT_SELF_ACTION = /^(?:那)?(?:我(?:这边)?|这边)(?:先|就|再|来|手动|直接|帮你|给你|为你|把[^，,]{1,20})*$/u
 const USER_TRIGGER = /(?:你|您).{0,12}(?:再(?:来)?问|再(?:来)?找|再叫我|再发(?:消息|一句)|发来|发给我|告诉我|确认(?:后|了)|发(?:来|给我)之后).{0,18}(?:我再|再帮你|再给你)/gu
 const USER_REQUEST_CONDITION = /(?:你|您)[^，,]{0,28}(?:再(?:来)?(?:问|找|叫)|回来[^，,]{0,12}(?:问|找|叫)|再发(?:消息|一句)|(?:确认|发来|发给我|告诉我)(?:后|了))/gu
 const ON_DEMAND_LOOKUP = /我(?:到时候|届时|那时|回来后)?(?:现|当场|再)(?:查|查询|核实)(?:一下)?(?:状态|进度|结果)?/u
-const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:确认|核实|查到|查清|弄清)(?:到|出|了)?/gu
+const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:确认|核实|查到|查清|弄清)(?:到|出|了)?|(?:^|[，,])(?:确认|核实|查到|查清|弄清)(?:了|到)(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
 const ELLIPTICAL_RESULT = /有了(?=我|就|再|会|直接|第一时间|[，,])/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
 
@@ -292,8 +295,12 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const clauseStart = Math.max(before.lastIndexOf('，'), before.lastIndexOf(',')) + 1
     const clause = sentence.text.slice(clauseStart).split(/[，,]/u)[0] || ''
     const actionPrefix = sentence.text.slice(clauseStart, match.index)
+    // Bare consent followed by our own present action is not reported speech
+    // (“你说一声我现在发你”). Keep actual quotations and later requests intact.
+    const selfActionPrefix = actionPrefix.replace(/^(?:你|您)(?:(?:要|需要|想要)(?:的话)?|说一声(?:的话)?)(?=我(?:这边)?(?:现在|这就|马上|立刻|立即|先|就|再|来))/u, '')
+    const assertionClause = selfActionPrefix + clause.slice(actionPrefix.length)
     const lastClause = !/[，,]/u.test(sentence.text.slice(match.index))
-    if (unasserted(clause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix + match[0])
+    if (unasserted(assertionClause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix + match[0])
       || deniedAction(actionPrefix) || pastAction(actionPrefix)
       || OTHER_SUBJECT.test(actionPrefix) && !/我(?:会|来|再|就|到时|稍后)/u.test(actionPrefix)
       || /(?:他|她|别人)(?:会|来|再|到时)/u.test(actionPrefix)) continue
@@ -309,7 +316,7 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     // A negative or wording cue before the condition applies across its
     // comma (“不能承诺图好了，我会发你”). An unrelated earlier clause does not.
     const conditionEnd = Math.max(completion, verificationEnd)
-    const conditionPrefix = conditionEnd >= 0 ? before.slice(0, conditionEnd).split(/[，,]/u).at(-1) || '' : actionPrefix
+    const conditionPrefix = conditionEnd >= 0 ? before.slice(0, conditionEnd).split(/[，,]/u).at(-1) || '' : selfActionPrefix
     if (NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
     const tail = sentence.text.slice(match.index! + match[0].length)
     if (SPOKEN_UPDATE.test(match[0]) && /^(?:答案|解释|说明|步骤|建议|示例|做法|思路|文字)(?:[：:]|[，,](?:先|首先|第一步))/u.test(tail)) continue
@@ -317,7 +324,6 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     // Consent to an offered action does not provide execution evidence.
     // Strip only a condition followed by our own explicit present action;
     // third-party actions and user-triggered future requests stay separate.
-    const selfActionPrefix = actionPrefix.replace(/^(?:你|您)(?:要|需要|想要)(?:的话)?(?=我(?:这边)?(?:现在|这就|马上|立刻|立即|先|就|再|来))/u, '')
     if ((delivery || RERUN_OR_POLL.test(match[0]))
       && (IMMEDIATE_ACTION.test(selfActionPrefix) || completion < 0 && PRESENT_SELF_ACTION.test(selfActionPrefix))) {
       // Text supplied in this very reply needs no separate tool execution.

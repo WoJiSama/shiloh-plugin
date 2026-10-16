@@ -1,0 +1,22 @@
+{
+  "steps": {
+    "typecheck": 0,
+    "build": 0,
+    "test-compile": 0,
+    "targeted": 0
+  },
+  "targetedTests": {
+    "tests": 240,
+    "pass": 240,
+    "fail": 0,
+    "skipped": 0
+  },
+  "parentCommit": "f0e721d338bbe1d10a9a66b3e984a772d03a2cc8",
+  "sourceHook": {
+    "tests": 68,
+    "pass": 68,
+    "fail": 0,
+    "skipped": 0
+  },
+  "scope": "Deferred verification, modified present delivery, qualified image registration. Unified build with all source owners stopped; new frozen replay follows."
+}

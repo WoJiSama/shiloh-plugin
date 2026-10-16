@@ -829,3 +829,61 @@ test('a direct request for a different new artifact may require generation witho
     '我朋友说我要新的蓝底图。', '如果我要新的蓝底图。', '我要新的别人画的图。'
   ]) assert.ok(validateActionReply(reply,facts(),query).some(item=>item.code==='unsupported_task_state'),query)
 })
+
+test('an omitted wait word still makes verification followed by notification an unregistered follow-up', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'callback'}})])
+  for (const reply of [
+    '第一张图这边还没查到确认的产出记录，进度我也说不好，不敢瞎答。确认了马上告诉你。',
+    '确认了就告诉你。', '核实了马上告诉你。', '确认到，第一时间通知你。'
+  ]) {
+    assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unregistered_followup'),reply)
+    assert.ok(validateActionReply(reply,live,raw).some(item=>item.code==='unregistered_followup'),reply)
+  }
+  for (const reply of [
+    '确认了也不能马上告诉你。', '不能承诺确认了马上告诉你。', '确认了马上告诉你吗？',
+    '“确认了马上告诉你”只是个例子。', '她确认了马上告诉你。', '她确认了，马上告诉你。',
+    '确认了我告诉你答案：先把两边同时乘二。',
+    '你回来再问我，我再查，再告诉你。', '你确认了再来问我，我再告诉你。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})
+
+test('present delivery modifiers and bare consent cannot replace an actual new send', () => {
+  const raw = '所以我现在没收到，是还没做好吗？'
+  const failed = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  for (const reply of [
+    '图早做好啦，就是那次发送没成功，不是还没做好。你要的话我现在手动发你。',
+    '你说一声我现在再发一次试试。', '你说一声我现在手动发给你。',
+    '我现在手动发给你。', '我现在直接再发一次。'
+  ]) assert.ok(validateActionReply(reply,failed,raw).some(item=>item.code==='unsupported_delivery'),reply)
+  for (const reply of [
+    '你要的话我现在不能手动发你。', '你说一声我现在再发一次吗？',
+    '“你说一声我现在再发一次”只是个例子。', '例如我现在手动发给你。',
+    '你要的话她现在手动发你。', '你现在手动再发一次试试。',
+    '你回来再问我，我再手动发给你。', '你回来再问我，我再查，有结果直接发你。',
+    '你要的话我现在解释一下：图片好了，但发送失败。'
+  ]) assert.deepEqual(validateActionReply(reply,failed,raw),[],reply)
+  assert.ok(validateActionReply('你回来再问我，我现在手动发给你。',failed,raw).some(item=>item.code==='unsupported_delivery'))
+})
+
+test('a local image reference cannot turn missing registration records into a confirmed registration failure', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reminder = fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})
+  const image = fact({execution:'queued'})
+  for (const reply of [
+    '图这边没查到处理记录哦，改背景那张没登记上，所以也不会自动发你。你登记的只有考试提醒，2100年1月1号早上八点那个。要改背景的话，把图再发一次说一声，我看看这轮能不能接。',
+    '改背景那张没登记上。', '改背景的那张没登记上。', '换背景那张没有登记成功。',
+    '这张图没登记上。', '改背景那个任务没登记上。'
+  ]) {
+    assert.ok(validateActionReply(reply,facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.ok(validateActionReply(reply,facts([reminder,image]),raw).some(item=>item.code==='unsupported_task_state'),reply)
+  }
+  for (const reply of [
+    '改背景那张没查到登记记录。', '改背景那张有没有登记上尚未确认。',
+    '改背景那张可能没登记上。', '不能确认改背景那张没登记上。', '改背景那张没登记上吗？',
+    '“改背景那张没登记上”只是个例子。', '她改背景那张没登记上。',
+    '妹妹的图没登记上。', '图里的妹妹没登记上。', '你下次再发来原图并提出要求，我再按要求处理。'
+  ]) assert.deepEqual(validateActionReply(reply,facts([reminder]),raw),[],reply)
+  assert.ok(validateActionReply('改背景那张已登记。',facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'))
+  assert.deepEqual(validateActionReply('改背景那张已登记。',facts([reminder,image]),raw),[])
+})
