@@ -10,7 +10,7 @@ return class GroupModerationMessage extends Plugin {
   constructor() {
     super({
       name: "群管理-复合风控",
-      dsc: "检测低活跃成员广告、外链和招募话术",
+      dsc: "检测低活跃成员广告、外链和招募话术，超长消息自动撤回并折叠为合并聊天记录",
       event: "message.group",
       priority: 9990,
       rule: [
