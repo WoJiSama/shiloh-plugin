@@ -115,6 +115,12 @@ const schema: ConfigSchemaItem[] = [
     componentProps: { allowAdd: true, allowDel: true }
   },
   {
+    field: "groupModeration.adScan.enabled",
+    label: "广告与刷屏检测",
+    component: "Switch",
+    bottomHelpMessage: "默认开启。关闭后不再做广告/刷屏检测与处置，只保留超长和连发消息折叠（两者另有独立开关）"
+  },
+  {
     field: "groupModeration.globalAdmins",
     label: "全局通知 QQ",
     component: "GTags",
