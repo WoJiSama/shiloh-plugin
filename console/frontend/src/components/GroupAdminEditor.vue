@@ -83,6 +83,18 @@ const current = computed(
 const currentEnabled = computed(() =>
   current.value ? draft.value[`${current.value.id}.enabled`]?.value === true : false
 )
+// 模块内二级分组 tab：分组多于一个时用 tab 切换，避免长页面来回滚动
+const activeGroup = ref('')
+const currentGroups = computed(() => current.value?.groups || [])
+const visibleGroup = computed(
+  () =>
+    currentGroups.value.find((group) => group.label === activeGroup.value) ||
+    currentGroups.value[0]
+)
+function selectModule(id: string) {
+  activeTab.value = id
+  activeGroup.value = ''
+}
 const paused = computed(() =>
   sections.value.filter(
     (section) =>
@@ -106,12 +118,19 @@ useSchemaSaveShortcut(
 function sectionDirty(id: string) {
   return changedFields.value.filter((field) => field.field.startsWith(`${id}.`)).length
 }
+function groupDirty(group: { fields: GroupAdminField[] }) {
+  return group.fields.filter(
+    (field) => !sameGroupAdminEntry(draft.value[field.field], baseline.value[field.field])
+  ).length
+}
 function applyView(next: GroupAdminView, preserve = false, comparison = baseline.value) {
   draft.value = preserve
     ? rebaseGroupAdminDraft(next, draft.value, comparison)
     : groupAdminInitial(next)
   baseline.value = groupAdminInitial(next)
   view.value = next
+  if (!currentGroups.value.some((group) => group.label === activeGroup.value))
+    activeGroup.value = currentGroups.value[0]?.label || ''
   if (!sections.value.some((section) => section.id === activeTab.value))
     activeTab.value = sections.value[0]?.id || ''
 }
@@ -306,7 +325,7 @@ onBeforeUnmount(() => {
           {{ paused.map((module) => module.label).join('、') }}已在本群启用，但对应总开关关闭。
           <RouterLink to="/group-admin?scope=defaults">前往默认策略开启总开关 →</RouterLink>
         </NAlert>
-        <NTabs :value="activeTab" type="line" @update:value="activeTab = $event">
+        <NTabs :value="activeTab" type="line" @update:value="selectModule">
           <NTab v-for="section in sections" :key="section.id" :name="section.id">
             {{ section.label
             }}<span v-if="sectionDirty(section.id)"> · {{ sectionDirty(section.id) }}</span>
@@ -350,19 +369,29 @@ onBeforeUnmount(() => {
           </div>
         </section>
         <div class="module-settings" :class="{ 'module-off': !currentEnabled }">
-          <section
-            v-for="group in current?.groups || []"
-            :key="group.label"
-            class="panel group-config-panel"
-          >
+          <div v-if="currentGroups.length > 1" class="group-tabs" role="tablist">
+            <button
+              v-for="group in currentGroups"
+              :key="group.label"
+              type="button"
+              role="tab"
+              class="group-tab"
+              :class="{ active: group.label === visibleGroup?.label }"
+              @click="activeGroup = group.label"
+            >
+              {{ group.label
+              }}<span v-if="groupDirty(group)"> · {{ groupDirty(group) }}</span>
+            </button>
+          </div>
+          <section v-if="visibleGroup" class="panel group-config-panel">
             <div class="panel-heading">
               <div>
-                <h2>{{ group.label }}</h2>
+                <h2>{{ visibleGroup.label }}</h2>
               </div>
             </div>
             <div class="field-grid">
               <div
-                v-for="field in group.fields"
+                v-for="field in visibleGroup.fields"
                 :key="field.field"
                 class="group-admin-field"
                 :class="{
@@ -509,6 +538,32 @@ onBeforeUnmount(() => {
 }
 .module-settings.module-off {
   opacity: 0.55;
+}
+.group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 5px;
+  background: var(--c-soft);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  width: fit-content;
+}
+.group-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--c-muted);
+  font-size: 13px;
+  padding: 7px 18px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.group-tab.active {
+  background: var(--c-panel);
+  color: var(--c-text);
+  box-shadow: 0 1px 4px #0001;
 }
 .panel-heading h2 {
   font-size: 15px;

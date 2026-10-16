@@ -92,6 +92,21 @@ const fixture: GroupAdminView = {
       ]
     },
     {
+      label: '超长消息折叠',
+      fields: [
+        {
+          field: 'groupModeration.overlongMessage.maxLength',
+          label: '超长判定字数',
+          component: 'InputNumber',
+          props: { min: 100, max: 20000, step: 50 },
+          value: 1500,
+          inheritance: 'default',
+          defaultValue: 1500,
+          inheritedValue: 1500
+        }
+      ]
+    },
+    {
       label: '群通知',
       fields: [
         {
@@ -265,6 +280,34 @@ describe('group administration draft lifecycle', () => {
     })
   })
 
+  it('switches sub-tabs inside a module and keeps hidden group drafts', async () => {
+    await createPage()
+    await switchTab('groupModeration')
+    expect(wrapper!.findAll('.group-tab').map((tab) => tab.text())).toEqual([
+      '广告扫描',
+      '超长消息折叠'
+    ])
+    expect(
+      wrapper!.findAllComponents(SchemaField).some((item) => item.props('field').field === 'groupModeration.overlongMessage.maxLength')
+    ).toBe(false)
+    await wrapper!.findAll('.group-tab')[1]!.trigger('click')
+    expect(
+      field('groupModeration.overlongMessage.maxLength').props('modelValue')
+    ).toBe(1500)
+    field('groupModeration.overlongMessage.maxLength').vm.$emit('update:modelValue', 800)
+    await flushPromises()
+    expect(wrapper!.findComponent(SaveBar).props('dirty')).toBe(1)
+    expect(wrapper!.findAll('.group-tab')[1]!.text()).toContain('· 1')
+    await wrapper!.findAll('.group-tab')[0]!.trigger('click')
+    expect(
+      wrapper!.findAllComponents(SchemaField).some((item) => item.props('field').field === 'groupModeration.overlongMessage.maxLength')
+    ).toBe(false)
+    await wrapper!.findAll('.group-tab')[1]!.trigger('click')
+    expect(
+      field('groupModeration.overlongMessage.maxLength').props('modelValue')
+    ).toBe(800)
+  })
+
   it('retains edits made during a save without resubmitting already saved values', async () => {
     await createPage()
     let complete!: (value: unknown) => void
@@ -300,7 +343,7 @@ describe('group administration draft lifecycle', () => {
     expect(wrapper!.findComponent(SaveBar).props('disabled')).toBe(true)
     const next = clone(fixture)
     next.revision = 'r3'
-    next.groups[2].fields[1].defaultValue = '新默认欢迎'
+    next.groups[3].fields[1].defaultValue = '新默认欢迎'
     vi.mocked(api).mockResolvedValueOnce(next)
     button('刷新并保留草稿').vm.$emit('click')
     await flushPromises()
