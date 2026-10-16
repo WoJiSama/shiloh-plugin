@@ -23,13 +23,17 @@ const replayBackend = json(replay, 'dist/backend/manifest.json')
 const require = createRequire(path.join(root, 'package.json'))
 const raw = require('js-yaml').load(read(root, 'config/message.yaml').toString())
 const config = raw.pluginSettings || raw
-const shell = (command, args) => execFileSync(command, args, {encoding: 'utf8'}).trim()
+const shell = (command, args) => {
+  try { return execFileSync(command, args, {encoding: 'utf8', maxBuffer: 16 * 1024 * 1024}).trim() }
+  catch (error) { throw new Error(`Audit command failed: ${command}; code=${error.code ?? error.status ?? 'unknown'}`) }
+}
 const services = Object.fromEntries(['trss-yunzai', 'bl-console'].map(name => [name, {
   state: shell('systemctl', ['is-active', name]),
   restartCount: shell('systemctl', ['show', '-p', 'NRestarts', '--value', name]),
   activeSince: shell('systemctl', ['show', '-p', 'ActiveEnterTimestamp', '--value', name])
 }]))
-const journal = shell('journalctl', ['-u', 'trss-yunzai', '--since', services['trss-yunzai'].activeSince, '--no-pager'])
+const journal = shell('journalctl', ['-u', 'trss-yunzai', '--since', services['trss-yunzai'].activeSince, '--no-pager',
+  '--grep', '载入插件错误|ReferenceError|SyntaxError|is not defined|unhandled|MessagePipeline.*已启动'])
 const sameObject = (first, second) => JSON.stringify(Object.entries(first).sort()) === JSON.stringify(Object.entries(second).sort())
 const result = {
   at: new Date().toISOString(), deployedCommit: manifest.commit, expectedCommit: expectedManifest.commit,

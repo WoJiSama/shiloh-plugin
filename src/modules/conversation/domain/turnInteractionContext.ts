@@ -479,6 +479,62 @@ export function buildSocialTurnPrompt(social?: SocialTurnState): string {
   return lines.join('\n')
 }
 
+const SIMPLE_COUNT = '(?:\\d{1,4}|[一二三四五六七八九]?十[一二三四五六七八九]?|[零〇一二两三四五六七八九])'
+const SIMPLE_UNIT = '(?:块|份|个|张|条|天|次|杯|碗|颗|枚|只|瓶)'
+
+function simpleCount(text: string): number | undefined {
+  if (/^\d{1,4}$/u.test(text)) return Number(text)
+  const digits: Record<string, number> = {零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9}
+  if (text.includes('十')) {
+    const [tens, ones] = text.split('十')
+    return (tens ? digits[tens]! : 1) * 10 + (ones ? digits[ones]! : 0)
+  }
+  return digits[text]
+}
+
+/** An adjacent-turn arithmetic cue, not a social ledger or an output verdict.
+ * Own verified speech establishes attribution, never agreement to its proposals. */
+function buildPlayfulQuantityPrompt(context: TurnInteractionContext): string {
+  const previous = context.previousBotReply
+  const continuation = context.social?.continuation
+  if (context.social?.act !== 'teasing' || context.target.kind !== 'bot' || !previous
+    || continuation?.kind !== 'bit' || continuation.previous.source !== previous.source
+    || !previous.text.includes(continuation.previous.text)) return ''
+  const before = previous.text
+  const current = context.rawUserText.trim()
+  // A proposed amount, alternative, negated amount or quoted third-party amount
+  // cannot become an accepted balance just because this persona said it.
+  if (/[“”「」『』"]/u.test(before)
+    || /(?:如果|假如|要是|不如|要不|建议|提议|打算|准备|计划|希望|想要|想拿|想领|听说|据说|他说|她说|或者|还是|能不能|可不可以|要不要|够不够|行不行|好不好|行吗|可以吗|好吗|怎么样|如何|没定|未定|不是|没有|不算|别算|给你|给我|雇你|换你|换我|报价|开价|再给|加到|涨到)/u.test(before)
+    || /(?:如果|假如|要是|能不能|可不可以|要不要|不扣|别扣|没扣|不加|别加|没加|换成|改成|给他|给她|归他|归她)/u.test(current)) return ''
+  const amounts = [...before.matchAll(new RegExp(`(?<![零〇一二两三四五六七八九十百千万亿\\d.点负-])(${SIMPLE_COUNT})\\s*(${SIMPLE_UNIT})`, 'gu'))]
+  if (amounts.length !== 1) return ''
+  const amount = amounts[0]!
+  if (!/^(?:(?:嗯|好|行|好吧|行吧|好呀|行啊|收到|那就)[，,。\s]*)*$/u.test(before.slice(0, amount.index))) return ''
+  const original = simpleCount(amount[1]!)
+  const unit = amount[2]!
+  const tail = before.slice(amount.index! + amount[0].length)
+  // The verified speaker is not necessarily the object's owner. A named
+  // recipient or another person's wage must not become this bot's balance.
+  if (/(?:归|属于|留给)(?!我(?:[，,。；;！!？?\s]|$))|(?:算|当作?|作为)(?!我的)[^，,。；;！？!?]{1,12}的(?:工资|报酬|薪水|奖品|奖励)/u.test(tail)) return ''
+  const named = /^[\p{Script=Han}]{2,12}/u.exec(tail)?.[0]
+  const object = named?.split(/(?:也|就|都|还|先|才|再|的|是|归|留|不|没|我|你|他|她|它|这|那|够|能|要|想|给|得)/u)[0]
+  if (original === undefined || !object || object.length < 2) return ''
+  // The current operation must start the turn. A new personal experience such
+  // as “我刚买了两块…” is not a transaction on the previous imaginary wage.
+  const change = new RegExp(`^(?:那(?:就)?[，,]?\\s*)?(?:给你\\s*)?(?:先|再|又|就){0,2}(扣|减|加)(?:掉|去|上)?\\s*(${SIMPLE_COUNT})\\s*(${SIMPLE_UNIT})([^。！？?!；;\\n]*)`, 'u').exec(current)
+  if (!change || change[3] !== unit || /[？?]/u.test(current)
+    || [...current.matchAll(new RegExp(`(${SIMPLE_COUNT})\\s*(${SIMPLE_UNIT})`, 'gu'))].length !== 1) return ''
+  const currentObject = change[4]!.split(/[，,]/u)[0]!.trim().replace(/[吧啊哦啦了呢嘛哈]+$/u, '')
+  if (currentObject && currentObject !== object) return ''
+  const delta = simpleCount(change[2]!)
+  if (delta === undefined) return ''
+  const adding = change[1] === '加'
+  const result = original + (adding ? delta : -delta)
+  if (result < 0 || !Number.isSafeInteger(result)) return ''
+  return `【玩笑数量锚点】仅对本轮继续沿用的同一物件“${object}”和单位“${unit}”：上句原文“${amount[0]}${object}”（${previous.source}），本轮原文“${change[0]!.split(/[，,]/u)[0]}”；数量参考 ${original} ${adding ? '+' : '-'} ${delta} = ${result}${unit}。这是相邻原话里的玩笑设定，不证明真实支付、真实经历或双方已同意旧提议。继续接梗即可，不必向用户念算式；反问、夸张和新比喻仍可自然表达，但不要无意把同一余额改成额外扣款或债务，也不更换持有人。`
+}
+
 const KIND_LABELS: Record<InteractionKind, string> = {
   conversation: '普通接话', banter: '玩笑互动', clarification: '澄清意思',
   delivery: '动作交付', comfort: '情绪回应', serious_answer: '认真回答'
@@ -501,6 +557,8 @@ export function buildTurnInteractionPrompt(context?: TurnInteractionContext): st
   if (context.previousBotReply) lines.push(`你确实说过的上句（${context.previousBotReply.source}）：${context.previousBotReply.text}。这是发言记录，不独立证明实体经历或任务当前状态。接续有依据的立场，区分自己的判断和用户的说法，不把自己的分析说成用户提出的标准；旧台词与实际证据冲突时直接澄清，用户转为认真提问时跟随当前诉求。`)
   const socialPrompt = buildSocialTurnPrompt(context.social)
   if (socialPrompt) lines.push(socialPrompt)
+  const quantityPrompt = buildPlayfulQuantityPrompt(context)
+  if (quantityPrompt) lines.push(quantityPrompt)
   const actionPrompt = buildTurnActionFactsPrompt(context.actionFacts)
   const diagnosticPrompt = buildDiagnosticContextPrompt(context.diagnosticContext)
   if (actionPrompt) lines.push(actionPrompt)

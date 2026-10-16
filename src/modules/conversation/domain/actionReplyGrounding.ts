@@ -17,7 +17,11 @@ function withoutQuotations(text: string): string {
 /** Preserve question punctuation and treat hesitation marks as clause breaks;
  * a later uncertainty disclaimer cannot erase an earlier state assertion. */
 function assertions(text: string): ReplySentence[] {
-  return [...withoutQuotations(text).replace(/\.{3,}/gu, '…').matchAll(/[^。！？!?；;…\n]+[。！？!?；;…]?/gu)]
+  // A quoted name can still be the object of an arrangement assertion. Keep
+  // that noun phrase without treating the quoted promise as an assertion.
+  const namedArrangements = text.replace(/“[^”\n]*”|「[^」\n]*」|'[^'\n]*'|"[^"\n]*"/gu, (quoted, offset: number) =>
+    /^的(?:安排|设置|登记)/u.test(text.slice(offset + quoted.length)) && /(?:好了|完成|结果).{0,12}(?:发|投递|通知)/u.test(quoted) ? '完成后发送' : quoted)
+  return [...withoutQuotations(namedArrangements).replace(/\.{3,}/gu, '…').matchAll(/[^。！？!?；;…\n]+[。！？!?；;…]?/gu)]
     .map(match => ({text: match[0].replace(/[。！？!?；;…]+$/u, '').trim(), question: /[？?]$/u.test(match[0])}))
     .filter(sentence => Boolean(sentence.text))
 }
@@ -123,7 +127,7 @@ const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
-const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|提醒|闹钟).{0,16}(?:发(?:送|图)?|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|登记|任务)?$|(?:提醒|闹钟)(?:安排|登记|任务)?$/u
+const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
 const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
 
@@ -135,7 +139,7 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     .replace(new RegExp(`^(?:${SELF_LOCATION})?(?:已经|已)?把`, 'u'), '')
     .replace(new RegExp(`(?:在${SELF_LOCATION}|${SELF_LOCATION})(?:的)?$`, 'u'), '')
   subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
-  if (OTHER_SUBJECT.test(subject)) return undefined
+  if (OTHER_SUBJECT.test(subject) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(subject)) return undefined
   if (FOLLOW_UP_OBJECT.test(subject)) return {kind: 'follow_up', topic: rawTopic, surface: rawSubject}
   if (TASK_HEAD.test(subject) || QUALIFIED_TASK_HEAD.test(subject)) {
     const topic = evidenceTopic(subject)
@@ -169,7 +173,7 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
   for (const {state, match} of predicates) {
     if (match.index !== predicateStart) continue
     const object = taskObjectReference(clause.slice(0, match.index), context, rawTopic)
-    if (!object || object.kind === 'implicit' && !state.implicit || state.dimension === 'existence' && !context
+    if (!object || object.kind === 'implicit' && !state.implicit || state.dimension === 'existence' && !context && object.kind !== 'follow_up'
       || object.kind === 'task' && state.accepts === 'artifact' || object.kind === 'artifact' && state.accepts === 'task') continue
     if (object.kind === 'follow_up') {
       if (state.dimension === 'existence') propositions.push({object, dimension: 'follow_up', value: state.value === 'absent' ? 'none' : 'registered'})
@@ -184,13 +188,13 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
   }
   // Existential speech puts the state before the object (“没有这张图” /
   // “没挂着这个任务”), rather than requiring a new whole-sentence pattern.
-  const possession = new RegExp(`^(?:${SELF_LOCATION})?(?:现在|目前|本来|原来|一直|也|本来也|本来就)*(还没(?:有)?|没(?:有)?(?:挂着)?|尚未|仍(?:然)?有|还有|有)(.+?)${PARTICLES}$`, 'u').exec(clause.replace(SUBJECT_CONNECTOR, ''))
-  if (possession) {
+  const possession = new RegExp(`^(?:${SELF_LOCATION})?(?:现在|目前|本来|原来|一直|也|本来也|本来就)*(还没(?:有)?|没(?:有)?(?:挂(?:着)?)?|尚未|仍(?:然)?有|还有|有)(.+?)${PARTICLES}$`, 'u').exec(clause.replace(SUBJECT_CONNECTOR, ''))
+  if (possession && !/^(?:查到|核实到|确认到)/u.test(possession[2]!)) {
     const object = taskObjectReference(possession[2]!, false, rawTopic)
     const absent = /没|未/u.test(possession[1]!)
     if (object?.kind === 'task' && context) propositions.push({object, dimension: 'existence', value: absent ? 'absent' : 'present'})
     else if (object?.kind === 'artifact') propositions.push({object, dimension: 'artifact', value: absent ? 'unavailable' : 'available'})
-    else if (object?.kind === 'follow_up' && context) propositions.push({object, dimension: 'follow_up', value: absent ? 'none' : 'registered'})
+    else if (object?.kind === 'follow_up') propositions.push({object, dimension: 'follow_up', value: absent ? 'none' : 'registered'})
   }
   if (context && /^(?:(?:我(?:这边)?|这边)?(?:取消(?:了)?(?:发送|投递|通知)?(?:的话)?|那|就|也|已经|已|现在|目前)*)不会(?:再)?(?:自动|主动)(?:发(?:送|图)?|投递|通知)(?:给你|发你|你)?(?:了)?[呀啊呢哦吧]*$/u.test(clause)) {
     propositions.push({object: {kind: 'follow_up', topic: rawTopic, surface: clause}, dimension: 'follow_up', value: 'none'})
@@ -221,6 +225,22 @@ const ON_DEMAND_LOOKUP = /我(?:到时候|届时|那时|回来后)?(?:现|当场
 const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:确认|核实|查到|查清|弄清)(?:到|出|了)?|(?:^|[，,])(?:确认|核实|查到|查清|弄清)(?:了|到)(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
 const ELLIPTICAL_RESULT = /有了(?=我|就|再|会|直接|第一时间|[，,])/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
+const ACQUIRED_OUTPUT = /(?:确认到|拿到|收到)(?:了)?(?:(?:实际|真正|真实)(?:的)?)?(?:产出|产物|成品|结果|图(?:片)?|文件|视频|报告)(?:了)?(?:之后|以后|后|时)?(?=我|就|再|会|直接|马上|立刻|立即|第一时间|自动|主动|给|发|通知|提醒|告诉|跟|和|对|向|[，,]|$)/gu
+
+interface OutputCondition {start: number; end: number; subject: 'self' | 'user' | 'other'}
+/** Consume the verb and its complete output object together. Confirmation of
+ * an actual artifact is not an unspecified investigation; a person obtaining
+ * their own result also cannot become the assistant's background action. */
+function outputConditions(text: string): OutputCondition[] {
+  return [...text.matchAll(ACQUIRED_OUTPUT)].flatMap(match => {
+    const prefix = (text.slice(0, match.index).split(/[，,]/u).at(-1) || '').replace(SUBJECT_CONNECTOR, '')
+    if (pastAction(prefix)) return []
+    const agent = /(?:等(?:到)?|待|一旦|如果|要是)([^，,]*)$/u.exec(prefix)?.[1] || prefix
+    const subject = OTHER_SUBJECT.test(agent) || /(?:他|她|别人|对方)(?:这边)?$/u.test(agent) ? 'other'
+      : /(?:你|您)(?:这边)?$/u.test(agent) ? 'user' : 'self'
+    return [{start: match.index!, end: match.index! + match[0].length, subject}]
+  })
+}
 
 type FollowUpKind = 'job_completion' | 'reminder' | 'unsupported' | 'immediate_delivery' | 'immediate_execution'
 interface FollowUpClaim {kind: FollowUpKind; topic: EvidenceTopic}
@@ -231,12 +251,12 @@ function supportsFollowUp(task: TurnTaskFact, kind: FollowUpKind): boolean {
 }
 
 function completionBefore(text: string): number {
-  let last = -1
+  let last = outputConditions(text).at(-1)?.end ?? -1
   for (const match of text.matchAll(COMPLETION_TRIGGER)) {
     const before = text.slice(0, match.index)
     const localPrefix = before.split(/[，,]/u).at(-1) || ''
     if (/已经|刚才|之前|刚刚|早就/u.test(localPrefix) && !/如果|要是|一旦|等(?:到)?/u.test(localPrefix)) continue
-    last = match.index! + match[0].length
+    last = Math.max(last, match.index! + match[0].length)
   }
   return last
 }
@@ -246,7 +266,7 @@ function pastAction(prefix: string): boolean {
 }
 
 function deniedAction(prefix: string): boolean {
-  return /(?:没有|没|未|尚未|并未|没(?:有)?核实到|未能核实到)(?:任何|有效的?|可用的?|可核验的?|已经?登记的?|后续|自动|主动|再|安排|登记|相关|的|一条|一个|帮你|给你|为你)*$/u.test(prefix)
+  return /(?:没有|没|未|尚未|并未|没(?:有)?核实到|未能核实到)(?:查到|核实到)?(?:任何|有效的?|可用的?|可核验的?|已经?登记的?|后续|自动|主动|再|安排|登记|相关|的|一条|一个|帮你|给你|为你)*$/u.test(prefix)
 }
 
 function hasLaterCompletionAction(clauses: string[], index: number): boolean {
@@ -279,9 +299,10 @@ function userRequestedAction(text: string, before: string, actionEnd: number, co
   const response = before.slice(request.index! + request[0].length)
   if (/自动|主动|持续|定时/u.test(response)) return false
   if (completion < 0 || completion <= request.index! + request[0].length) return true
-  const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(ELLIPTICAL_RESULT)]
+  const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(ELLIPTICAL_RESULT), ...before.matchAll(ACQUIRED_OUTPUT)]
     .sort((a, b) => a.index! - b.index!).at(-1)
-  return Boolean(condition && /^(?:有(?:了)?结果|有了)$/u.test(condition[0]) && ON_DEMAND_LOOKUP.test(response))
+  return Boolean(condition && (/^(?:有(?:了)?结果|有了)$/u.test(condition[0])
+    || new RegExp(`^(?:${ACQUIRED_OUTPUT.source})$`, 'u').test(condition[0])) && ON_DEMAND_LOOKUP.test(response))
 }
 
 function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic: EvidenceTopic): FollowUpClaim[] {
@@ -308,6 +329,9 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const completion = Math.max(completionBefore(before), implicitResult ? implicitResult.index! + implicitResult[0].length : -1)
     const verification = [...before.matchAll(DEFERRED_VERIFICATION)].at(-1)
     const verificationEnd = verification ? verification.index! + verification[0].length : -1
+    const outputCondition = outputConditions(before).at(-1)
+    if (outputCondition && outputCondition.subject !== 'self' && outputCondition.end === completion
+      && !/^(?:我(?:这边)?|这边)/u.test(selfActionPrefix)) continue
     // A bare handoff after completion still promises later delivery. Ordinary
     // gifts or an explanation supplied in this reply are outside this form.
     const implicitHandoff = /^(?:单独)?给(?:你|您)$/u.test(match[0])
@@ -342,7 +366,10 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     if (spokenUpdate && completion < 0 && verificationEnd < 0 && !speechDelay) continue
     // A job callback does not schedule a later explanation after an
     // unspecified investigation or confirmation of the failure cause.
-    if (verificationEnd > completion || spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {add('unsupported', match.index! + match[0].length); continue}
+    const independentVerification = verification && !(outputCondition
+      && outputCondition.start <= verificationEnd && verificationEnd <= outputCondition.end)
+    if (independentVerification || outputCondition && outputCondition.subject !== 'self'
+      || spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {add('unsupported', match.index! + match[0].length); continue}
     if (RERUN_OR_POLL.test(match[0])) add('unsupported', match.index! + match[0].length)
     else if (completion >= 0) add('job_completion', match.index! + match[0].length)
     else add(/提醒|通知/u.test(match[0]) && /明早|明天|晚上|一会儿|待会|等下|稍后|到时|届时/u.test(before) ? 'reminder' : 'job_completion', match.index! + match[0].length)
@@ -353,7 +380,8 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const clause = sentence.text.slice(clauseStart).split(/[，,]/u)[0] || ''
     const localPrefix = sentence.text.slice(clauseStart, match.index)
     if (unasserted(clause, sentence.question && !/[，,]/u.test(sentence.text.slice(match.index))) || OTHER_SUBJECT.test(localPrefix)) continue
-    if (deniedAction(localPrefix) || /(?:没有|没|未|尚未|并未)(?:帮你|给你|为你|成功)?(?:登记|安排|设好|设置好|定好)/u.test(clause)) continue
+    if (deniedAction(localPrefix) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(localPrefix)
+      || /(?:没有|没|未|尚未|并未)(?:帮你|给你|为你|成功)?(?:登记|安排|设好|设置好|定好)/u.test(clause)) continue
     add(completionBefore(localPrefix) >= 0 ? 'job_completion' : /提醒|闹钟/u.test(match[0]) ? 'reminder' : 'job_completion', match.index! + match[0].length)
   }
   return claims
@@ -372,7 +400,8 @@ function stateSupported(proposition: TaskStateProposition, tasks: TurnTaskFact[]
       // A validated row proves that its task exists. Neither an empty lookup,
       // cancelled callback nor any delivery state proves nonexistence.
       case 'existence': return proposition.value === 'present'
-      case 'follow_up': return proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none'
+      // Per-task registration cannot prove that the platform has no setting.
+      case 'follow_up': return !/设置/u.test(proposition.object.surface) && (proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none')
     }
   })
 }
@@ -431,14 +460,16 @@ function unsupportedRecipientCause(clause: string, rawUserText: string, adjacent
 }
 
 const RERUN_ACTION = '(?:重做|重跑|重试|(?:重新|再)(?:做|弄|跑|生成|出图|画图|改图|处理))'
+const REREQUEST_ACTION = '(?:重新|再)(?:(?:跟|和|对|向)我说(?:一声|一下)?(?:改|换)(?:图(?:片)?)?背景|(?:发起|提交)(?:改图|画图|生成|处理)?(?:请求|任务))'
 const REQUIRED_RERUN = new RegExp(`(?:必须|必需|需要|非得|得|只能|只有|要)(?:先)?${RERUN_ACTION}(?:一(?:次|遍|下))?(?:${ARTIFACT_SUBJECT}|${TASK_SUBJECT})?(?:(?:后|之后|以后)?(?:才(?:能|可以)${DELIVERY_EVENT}|才行))?${PARTICLES}$`, 'u')
-const RERUN_DELIVERY_CONDITION = new RegExp(`^(?:(${ARTIFACT_SUBJECT})?(?:要|想)${DELIVERY_EVENT}|(?:要|想)(?:发|发送|投递)(${ARTIFACT_SUBJECT}))(?:的话)?(?:就)?$`, 'u')
+const REQUIRED_REREQUEST = new RegExp(`(?:必须|必需|需要|非得|得|只能|只有|要)(?:先)?${REREQUEST_ACTION}(?:才行)?${PARTICLES}$`, 'u')
+const RERUN_DELIVERY_CONDITION = new RegExp(`^(?:(${ARTIFACT_SUBJECT})?(?:要|想)${DELIVERY_EVENT}|(?:要|想)(?:发|发送|投递)(${ARTIFACT_SUBJECT})|(?:想要|要)(${ARTIFACT_SUBJECT}))(?:的话)?(?:就)?$`, 'u')
 
 function rerunTaskSubject(prefix: string, context: boolean, topic: EvidenceTopic): boolean {
   const subject = prefix.replace(SUBJECT_CONNECTOR, '').replace(/^(?:那(?:就)?|就)/u, '').trim()
   const condition = RERUN_DELIVERY_CONDITION.exec(subject)
   if (condition) {
-    const object = condition[1] || condition[2]
+    const object = condition[1] || condition[2] || condition[3]
     return Boolean(object ? taskObjectReference(object, false, topic) : context)
   }
   const object = taskObjectReference(subject, context, topic)
@@ -485,12 +516,25 @@ function requestedRerunTopics(rawUserText: string): EvidenceTopic[] {
 /** A missing receipt is not proof that an existing artifact must be recreated.
  * Availability, failure and callback records do not encode that prerequisite. */
 function unsupportedRerunRequirement(clause: string, context: boolean, topic: EvidenceTopic): boolean {
-  const match = REQUIRED_RERUN.exec(clause)
+  const match = REQUIRED_RERUN.exec(clause) || REQUIRED_REREQUEST.exec(clause)
   if (!match || /不(?:必|需要|用|一定|认为|觉得)|未必|无需|不用|毋须/u.test(clause)) return false
   // Bare “要” can express a future choice; only its prerequisite form is an
   // asserted necessity. Optional offers and requests are not state claims.
   if (/^(?:要|只有)/u.test(match[0]) && !/才(?:能|可以|行)/u.test(match[0])) return false
   return rerunTaskSubject(clause.slice(0, match.index), context, topic)
+}
+
+const CANCELLATION_TIMING = /(?:取消|撤销)(?:是|会|将)?(?:立即|即时|马上)(?:就)?生效(?:的|了)?/u
+const RESULT_LOCATION = /(?:出来的|生成好的)?图(?:片)?(?:你|您)?(?:可以|能)(?:自己)?在(任务页)(?:拿|取|下载)(?:到)?/u
+
+/** These platform details have no field in the task projection. A current,
+ * explicit report of the platform's own instruction is a separate source;
+ * a question, example or proposed check supplies no such evidence. */
+function reportedPlatformDetail(rawUserText: string, detail: RegExp): boolean {
+  const reported = rawUserText.replace(/[“”「」『』"]/gu, '')
+  return assertions(reported).some(sentence => !unasserted(sentence.text, sentence.question)
+    && !OTHER_SUBJECT.test(sentence.text) && /(?:平台|任务页|官方)(?:的)?(?:说明|提示|文档)(?:上)?(?:写着|说|显示|是)?[：:]?/u.test(sentence.text)
+    && detail.test(sentence.text))
 }
 
 /** Narrow, evidence-backed rejection signals. This is not a general truth or
@@ -547,6 +591,17 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
       if (!['unknown', 'generic', 'artifact', 'ambiguous'].includes(explicitTopic)) currentObjectTopic = explicitTopic
       if (OTHER_SUBJECT.test(clause)) {rerunContext = false; continue}
       if (unasserted(clause, sentence.question && index === clauses.length - 1)) continue
+      if (taskContext && /^(?:这次)?(?:取消|撤销)/u.test(clause) && CANCELLATION_TIMING.test(clause)
+        && !reportedPlatformDetail(rawUserText, CANCELLATION_TIMING)) {
+        violations.push({code: 'unsupported_task_state', claim: sentence.text,
+          reason: '后续登记状态只证明当前安排是否有效，没有提供取消生效时延的证据。',
+          correctionInstruction: '只说明当前已核验的后续登记状态；取消是否即时生效尚无来源时保留未知，不从已取消推导平台生效规则。'})
+      }
+      if (taskContext && RESULT_LOCATION.test(clause) && !reportedPlatformDetail(rawUserText, RESULT_LOCATION)) {
+        violations.push({code: 'unsupported_delivery', claim: sentence.text,
+          reason: '任务记录没有提供产物的下载位置或任务页取件能力，不能据此保证用户能在指定位置取图。',
+          correctionInstruction: '撤回未经核验的取图位置，只说明已知产物和投递状态；有当前用户明确转述的平台说明时才按该来源描述。'})
+      }
       if (!requestedReruns.includes(currentObjectTopic) && unsupportedRerunRequirement(clause, rerunContext, currentObjectTopic)) {
         violations.push({code: 'unsupported_task_state', claim: sentence.text,
           reason: '当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。',
@@ -566,10 +621,8 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
         const topic = clauseTopic === 'unknown' || clauseTopic === 'generic' ? currentObjectTopic : clauseTopic
         const matchingTasks = uniqueMatchingTasks(tasks, topic)
         if (stateSupported(state, matchingTasks)) continue
-        // A denial of an automatic arrangement does not authorize one. Keep
-        // ordinary denials when there is no competing verified registration;
-        // still reject denial of a known, live callback for this task.
-        if (state.dimension === 'follow_up' && state.value === 'none' && !matchingTasks.length) continue
+        // A missing row does not establish a negative registration state;
+        // only an observed `none` for the matching task supports that denial.
         const delivery = state.dimension === 'delivery'
         violations.push({code: delivery ? 'unsupported_delivery' : 'unsupported_task_state', claim: sentence.text,
           reason: state.dimension === 'follow_up' ? '当前后续登记状态不支持这句断言；不能否认仍有效的登记，也不能把未确认说成已登记或已取消。原任务与后续发送安排必须分别按记录说明。'

@@ -1,0 +1,60 @@
+{
+  "status": "complete_stopped_writing",
+  "scope": "local_generation_prompt_only",
+  "rootCause": [
+    "Existing verified continuity gates bot and persona identity/version and reliably keeps the same playful exchange.",
+    "The quantity-continuation heuristic only checked a shared unit and textual references; it neither identified a unique object nor calculated an adjacent change.",
+    "The existing three-turn test used a predetermined correct second reply and checked continuity/prompt text, not the arithmetic of a generated candidate.",
+    "Ordinary social output has no quantity validator; this patch deliberately adds no validator, output rewrite or extra social model request."
+  ],
+  "changes": [
+    {
+      "path": "src/modules/conversation/domain/turnInteractionContext.ts",
+      "start": 467,
+      "description": "Private adjacent-turn cue derives one literal quantity/object from verified previous speech and one explicit current addition/deduction. Requires the existing verified bit continuation, same bot target, same unit and same object or an elliptical same-bit reference. Emits a local arithmetic reference only into the existing generation prompt."
+    },
+    {
+      "path": "tests/typescript/socialPragmatics.test.ts",
+      "start": 84,
+      "description": "Original case20 first reply and current deduction yield 3 - 2 = 1; generic leave-token/coffee and Arabic/Chinese counts; old proposals, changed objects/units/owners, ordinary new experiences, multi-operation, uncertain/fractional/negative-result changes and mismatched persona/bot abstain. Candidate joke text remains unchanged."
+    }
+  ],
+  "boundaries": [
+    "No contract, persistence schema, social ledger, output guard or additional model request.",
+    "Source quantities must be unique literal counts at the beginning of the previous reply, optionally after a short acknowledgement. Proposals, alternatives, quoted third-party content and uncertain ownership abstain.",
+    "Only nonnegative simple integer results are anchored; unsupported forms simply keep the existing prompt.",
+    "A cue is not a verdict that every debt question or exaggeration is an arithmetic error, and is not proof of real payment or accepted agreement.",
+    "No live model replay, server action, dist build or test-build emission was performed."
+  ],
+  "verification": [
+    {
+      "command": "node --import /tmp/bl-social-quantity-source-hook-20261016.mjs --test tests/typescript/socialPragmatics.test.ts tests/typescript/turnInteractionContext.test.ts tests/typescript/socialContinuity.test.ts",
+      "result": "32 tests passed; 0 failed"
+    },
+    {
+      "command": "node node_modules/typescript/bin/tsc -p tsconfig.backend.json --noEmit",
+      "result": "passed"
+    },
+    {
+      "command": "node node_modules/typescript/bin/tsc -p tsconfig.backend-tests.json --noEmit",
+      "result": "passed"
+    }
+  ],
+  "sourceHook": "/tmp/bl-social-quantity-source-hook-20261016.mjs",
+  "filesModified": 2,
+  "ownerVerificationRoot": "/Users/shiqi/IdeaProjects/bl-chat-plugin",
+  "directoryRecovery": {
+    "migratedOnlyExactAdditions": true,
+    "originalRestoredToSnapshot": true,
+    "backup": "/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-fact-state-start-20261016-z3pus4g5/quantity-owner-directory-recovery",
+    "isolatedVerification": {
+      "root": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin",
+      "log": "/tmp/bl-social-quantity-isolated-20261016.log",
+      "tests": 37,
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0,
+      "strictBuild": "pending unified checks"
+    }
+  }
+}

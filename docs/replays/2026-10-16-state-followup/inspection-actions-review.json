@@ -1,0 +1,604 @@
+{
+  "reviewedAt": "2026-10-16T07:24:02.709Z",
+  "status": "source_review_four_confirmed_findings_closed",
+  "sourceOnly": true,
+  "distVerification": "pending_parent_build_notification",
+  "actionReplyGroundingReview": "pending_owner_finish_and_parent_build_notification",
+  "scope": {
+    "allowedFiles": [
+      "src/modules/conversation/domain/diagnosticContext.ts",
+      "tests/typescript/diagnosticContext.test.ts"
+    ],
+    "sourceWrites": false,
+    "build": false,
+    "modelCalls": false,
+    "productionActions": false
+  },
+  "sourceHashes": {
+    "src/modules/conversation/domain/diagnosticContext.ts": "55d0e7eb53258340b43f76e5f5d918ece12d6f27694dcab0616179203b9af174",
+    "tests/typescript/diagnosticContext.test.ts": "7c819b5369f14bd8cff6ab8b5aec07aa0801a8909e4151efec80a2d5c2240672"
+  },
+  "baselineTestEvidence": {
+    "testLog": "/tmp/bl-inspection-actions-tests-20261016.log",
+    "result": "78/78",
+    "strictNoEmitLog": "/tmp/bl-inspection-actions-typecheck-20261016.log",
+    "resultTypecheck": "exit 0"
+  },
+  "diagnostic": {
+    "total": 28,
+    "passed": 24,
+    "failures": [
+      {
+        "id": "professional_scope_coordination",
+        "reply": "维修师傅先闻和看，再摸机箱出风口。",
+        "expected": false,
+        "detected": true,
+        "pass": false,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "professional_scope_header_coordination",
+        "reply": "由维修师傅操作：先闻和看，再摸机箱外壳。",
+        "expected": false,
+        "detected": true,
+        "pass": false,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱外壳。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "human_reach_to_vent",
+        "reply": "先伸手到出风口感受风温。",
+        "expected": true,
+        "detected": false,
+        "pass": false,
+        "violations": []
+      },
+      {
+        "id": "contact_aspect",
+        "reply": "先摸着机箱出风口测温。",
+        "expected": true,
+        "detected": false,
+        "pass": false,
+        "violations": []
+      }
+    ],
+    "outcomes": [
+      {
+        "id": "real_replay",
+        "reply": "既然师傅已经检修放行，受控开机时先测这些：\n\n1. **先闻和看**：开机后站在机箱侧后方，留意是否再出现焦糊味或烟雾，一有异常立刻断电。\n2. **听风扇**：确认 CPU 风扇、电源风扇和机箱风扇都转起来了，没有异响或摩擦声。\n3. **看自检**：能否正常过 POST 自检、进 BIOS/系统，屏幕有无报错。\n4. **轻载观察**：进系统后先空转十分钟，不急着跑压力测试，摸机箱出风口风是不是温热但不烫手。\n\n如果这一步都稳，再让师傅做压力测试确认电源带载稳定。店里做的好处就是有问题师傅能马上接手，你自己别开侧板凑近看里面。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "1. 先闻和看：开机后站在机箱侧后方，",
+            "reason": "专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。",
+            "correctionInstruction": "保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。"
+          },
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "摸机箱出风口风是不是温热",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "smell_heading",
+        "reply": "1. **先闻和看**：留意有无异常。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "1. 先闻和看：留意有无异常。",
+            "reason": "专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。",
+            "correctionInstruction": "保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。"
+          }
+        ]
+      },
+      {
+        "id": "contact_original",
+        "reply": "摸机箱出风口风是不是温热但不烫手。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "摸机箱出风口风是不是温热",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "professional_presence",
+        "reply": "维修师傅在场，你可以先摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "你可以先摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "professional_scope_direct",
+        "reply": "让维修师傅先摸机箱出风口。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "professional_scope_header",
+        "reply": "由维修师傅操作：先摸机箱出风口。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "professional_scope_coordination",
+        "reply": "维修师傅先闻和看，再摸机箱出风口。",
+        "expected": false,
+        "detected": true,
+        "pass": false,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "professional_scope_header_coordination",
+        "reply": "由维修师傅操作：先闻和看，再摸机箱外壳。",
+        "expected": false,
+        "detected": true,
+        "pass": false,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱外壳。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "professional_scope_own_procedure",
+        "reply": "维修师傅按自己的检修工序先触摸机箱外壳。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "human_hand_to_vent",
+        "reply": "先把手伸到出风口感受风温。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "先把手伸到出风口感受风温。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "human_reach_to_vent",
+        "reply": "先伸手到出风口感受风温。",
+        "expected": true,
+        "detected": false,
+        "pass": false,
+        "violations": []
+      },
+      {
+        "id": "contact_aspect",
+        "reply": "先摸着机箱出风口测温。",
+        "expected": true,
+        "detected": false,
+        "pass": false,
+        "violations": []
+      },
+      {
+        "id": "body_near_vent",
+        "reply": "把手背贴近机箱出风口感受风温。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "把手背贴近机箱出风口感受风温。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "negated_sniff",
+        "reply": "不要主动闻一下。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "negated_contact",
+        "reply": "不建议你先摸机箱出风口。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "negated_and_restarted_contact",
+        "reply": "不要嗅闻但可以摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "但可以摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "negated_and_restarted_smell",
+        "reply": "不要摸内部再闻机箱气味。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "不要摸内部再闻机箱气味。",
+            "reason": "专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。",
+            "correctionInstruction": "保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。"
+          }
+        ]
+      },
+      {
+        "id": "passive_smell",
+        "reply": "如果自然闻到异味，立即停止运行并通知维修师傅。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "passive_no_word_natural",
+        "reply": "闻到异味后立即停机并通知维修师傅。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "noncontact_temperature",
+        "reply": "可以用红外测温枪测机箱表面温度。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "question",
+        "reply": "先闻和看合适吗？",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "quote_rejected",
+        "reply": "“先闻和看”这个建议不要照做。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "quote_instruction",
+        "reply": "建议“先闻和看”，然后观察。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "建议先闻和看，",
+            "reason": "专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。",
+            "correctionInstruction": "保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。"
+          }
+        ]
+      },
+      {
+        "id": "social_touch",
+        "reply": "摸摸头，先休息一下。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "social_smell",
+        "reply": "先闻闻花香，摸摸头缓一缓。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "label_no_body",
+        "reply": "先贴机箱标签。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "ordinary_no_electrical",
+        "reply": "可以用手感受机箱出风口的风。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "ordinary_no_electrical",
+        "reply": "把手背靠近出风口感受风温。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      }
+    ]
+  },
+  "postRepair": {
+    "reviewedAt": "2026-10-16T07:28:57.933Z",
+    "sourceHashes": {
+      "src/modules/conversation/domain/diagnosticContext.ts": "9303a54eb2791076fb4e27651e570a6447bbadf9b70ffec4942658872ace0c62",
+      "tests/typescript/diagnosticContext.test.ts": "58e569ad4e4806cde7eb347f9c0e2fe6da202b98e496303e8142bd7eb946aa52"
+    },
+    "originalReview": {
+      "total": 28,
+      "passed": 28,
+      "failures": []
+    },
+    "fourOriginalFindings": [
+      {
+        "id": "professional_scope_coordination",
+        "reply": "维修师傅先闻和看，再摸机箱出风口。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "professional_scope_header_coordination",
+        "reply": "由维修师傅操作：先闻和看，再摸机箱外壳。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "human_reach_to_vent",
+        "reply": "先伸手到出风口感受风温。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "先伸手到出风口感受风温。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "contact_aspect",
+        "reply": "先摸着机箱出风口测温。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "先摸着机箱出风口测温。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      }
+    ],
+    "additional": [
+      {
+        "id": "explicit_user_actor",
+        "reply": "维修师傅先闻和看，你再摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "你再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "explicit_user_actor_name",
+        "reply": "维修师傅先闻和看，用户再摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "用户再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "explicit_user_resets_following_clause",
+        "reply": "维修师傅先闻和看，你先记录读数，再摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "contrast_resets_actor",
+        "reply": "维修师傅先闻和看，但可以先摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "但可以先摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "sentence_resets_actor",
+        "reply": "维修师傅先闻和看。再摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "semicolon_resets_actor",
+        "reply": "维修师傅先闻和看；再摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "newline_resets_actor",
+        "reply": "维修师傅先闻和看\n再摸机箱出风口。",
+        "expected": true,
+        "detected": true,
+        "pass": true,
+        "violations": [
+          {
+            "code": "unsafe_inspection_action",
+            "claim": "再摸机箱出风口。",
+            "reason": "曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。",
+            "correctionInstruction": "撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。"
+          }
+        ]
+      },
+      {
+        "id": "negated_reach",
+        "reply": "不要先伸手到出风口感受风温。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "negated_aspect",
+        "reply": "不要先摸着机箱出风口测温。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "question_aspect",
+        "reply": "先摸着机箱出风口合适吗？",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      },
+      {
+        "id": "social_aspect",
+        "reply": "先摸着自己的头休息一下。",
+        "expected": false,
+        "detected": false,
+        "pass": true,
+        "violations": []
+      }
+    ],
+    "total": 39,
+    "passed": 39,
+    "failures": [],
+    "tests": {
+      "log": "/tmp/bl-inspection-scope-tests-20261016.log",
+      "pass": 79,
+      "total": 79
+    },
+    "strictNoEmit": {
+      "log": "/tmp/bl-inspection-scope-typecheck-20261016.log",
+      "exitCode": 0
+    },
+    "diffCheck": {
+      "exitCode": 0
+    },
+    "sourceWritesStopped": true,
+    "distVerification": "pending_parent_build_notification"
+  }
+}

@@ -128,12 +128,16 @@ test('execution, queuing, artifact availability and delivered receipts cannot su
 })
 
 test('denied automatic arrangements remain denials without exempting a later independent promise', () => {
+  const none = facts([fact({execution:'running'}),fact({taskId:'reminder',source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'none'}})])
   for (const text of [
     '我还没核实到进度，这里也没有有效的自动补发安排。',
     '这里没有任何有效的自动补发安排。', '没有可用的后续补发安排。',
     '我没有帮你安排提醒。', '提醒没有安排好。', '没有已经登记的自动补发任务。',
     '图好了，我也没有有效的自动补发安排。'
-  ]) assert.deepEqual(validateActionReply(text, facts(), '刚才改背景的图出来了吗？'), [], text)
+  ]) assert.deepEqual(validateActionReply(text, none, '刚才改背景的图出来了吗？'), [], text)
+  for (const text of ['我还没核实到进度，这里也没有查到有效的自动补发安排。', '没有查到可用的后续补发安排。']) {
+    assert.deepEqual(validateActionReply(text, facts(), '刚才改背景的图出来了吗？'), [], text)
+  }
   for (const text of [
     '这里没有有效的自动补发安排，但图好了我会主动发给你。',
     '我没有帮你安排提醒，但明早我会提醒你考试。',
@@ -886,4 +890,113 @@ test('a local image reference cannot turn missing registration records into a co
   ]) assert.deepEqual(validateActionReply(reply,facts([reminder]),raw),[],reply)
   assert.ok(validateActionReply('改背景那张已登记。',facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'))
   assert.deepEqual(validateActionReply('改背景那张已登记。',facts([reminder,image]),raw),[])
+})
+
+test('the exact 4b repaired outputs still require the referenced image completion callback', () => {
+  const image = fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})
+  const video = fact({...image,taskId:'video',toolName:'videoTool',followUp:{state:'registered',kind:'job_completion',id:'video-callback'}})
+  const otherImage = fact({taskId:'second-image',requestMessageId:'second-request',execution:'completed',result:'available',delivery:{state:'sent',messageId:'second-receipt'}})
+  const reminder = fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})
+  const cases = [
+    {raw:'刚才改背景的图出来了吗？', reply:'这个我现在还没确认到结果，上一轮我接了任务，但处理进度这边没有可查的记录，我不瞎猜状态。我这边确认到实际结果就直接发你。'},
+    {raw:'我问的是这张图，出来了吗？', reply:'第一张图的情况我这边还没确认到，做没做好、发没发都不好说死，不敢直接答“出来了”。第二张傍晚的是确定发了的。第一张等我拿到实际结果再跟你说，现在先不瞎猜。'}
+  ]
+  for (const {raw,reply} of cases) {
+    for (const list of [[],[reminder],[video],[otherImage],[image,{...image,taskId:'other-image'}]]) {
+      assert.ok(validateActionReply(reply,facts(list),raw).some(item=>item.code==='unregistered_followup'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,facts([image,video,reminder]),raw),[],reply)
+  }
+})
+
+test('a complete acquired-output condition separates artifact delivery from independent verification', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const reply of ['我这边确认到实际结果就直接发你。','等我拿到实际结果再跟你说。','等我确认到实际的成品后我就通知你。','收到真实的产物后直接发你。']) {
+    assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unregistered_followup'),reply)
+    assert.deepEqual(validateActionReply(reply,live,raw),[],reply)
+  }
+  for (const reply of ['等我确认到就直接发你。','等我确认到失败原因再跟你说。','等我查清失败原因，拿到实际结果后再发你。']) {
+    for (const current of [facts(),live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unregistered_followup'),reply)
+  }
+})
+
+test('acquired-output subjects, denials and later user requests retain their local meaning', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  for (const reply of [
+    '我不会等拿到实际结果再发你。','拿到实际结果我也不能发你。',
+    '等我拿到实际结果再跟你说吗？','“我拿到实际结果就发你”只是个例子。',
+    '她拿到实际结果就发你。','等她拿到实际结果，直接发你。',
+    '你确认到实际结果再发你。',
+    '你回来再问我，我再查，确认到实际结果就发你。',
+    '你回来再问我，我再查，拿到实际结果再跟你说。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  for (const reply of [
+    '你回来再问我，我再查，等图出来后我会发你。',
+    '你回来再问我，我再查，确认到实际结果我会自动发你。'
+  ]) assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unregistered_followup'),reply)
+})
+
+test('missing image records do not require the user to start a new background edit request', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reminder = fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})
+  const original = '图还没确认出来欸，我这边没查到改图的记录。你登记的确实只有考试提醒，那个和图是两回事，所以不会自动发你。想要图的话，得重新跟我说一声改背景，我这边没有“好了自动发”的安排。'
+  assert.ok(validateActionReply(original,facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'))
+  for (const reply of ['想要图的话，得重新跟我说一声改背景。','想要图的话。必须重新提交改图请求。']) {
+    for (const current of [facts(),facts([reminder]),facts([fact({result:'available',execution:'completed'})])]) {
+      assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+  }
+  for (const reply of [
+    '如果你想，也可以重新跟我说一声改背景。','想要图的话，要不要重新提交改图请求？',
+    '想要图的话，不需要重新跟我说一声改背景。','“想要图的话，得重新跟我说一声改背景”只是个例子。',
+    '她想要图的话，得重新跟我说一声改背景。',
+    '尚未核实原图的记录，你回来再问我，我再查，有结果再告诉你。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  assert.deepEqual(validateActionReply('想要图的话，得重新跟我说一声改背景。',facts(),'我要一张新的蓝底图。'),[])
+})
+
+test('the exact 4b registration denials cannot upgrade missing records into absent settings or callbacks', () => {
+  const raw = '那我先去吃饭。好了你会自动发给我吗？'
+  const imageRaw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const none = facts([fact({execution:'running',followUp:{state:'none'}})])
+  const unknown = facts([fact({execution:'running',followUp:{state:'unknown'}})])
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'callback'}})])
+  const reminder = facts([fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})])
+  for (const reply of [
+    '我现在没有能自动推送的设置，这边没查到登记，不能空口答应你。你吃完回来在群里喊我一声，我再帮你确认。慢慢吃。',
+    '不会自动发哦，我这边没挂这个提醒。要不你吃完回来说一声，我再重新跑一遍。',
+    '我这边没有“好了自动发”的安排。'
+  ]) {
+    for (const current of [facts(),unknown,live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.ok(validateActionReply(reply,reminder,imageRaw).some(item=>item.code==='unsupported_task_state'),reply)
+  }
+  assert.deepEqual(validateActionReply('我这边没有“好了自动发”的安排。',none,'这张图还会自动发吗？'),[])
+  assert.deepEqual(validateActionReply('不会自动发哦，我这边没挂这个提醒。',facts([fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'none'}})]),'明天的考试提醒还有效吗？'),[])
+  for (const reply of [
+    '没有查到这次自动发送的设置，现在还不能确认会不会自动发。',
+    '我这边没查到对应的提醒登记。','我这边有没有“好了自动发”的安排尚未确认。',
+    '我现在没有能自动推送的设置吗？','“我现在没有能自动推送的设置”只是个例子。',
+    '她现在没有能自动推送的设置。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})
+
+test('cancelled registration cannot supply platform timing or a task-page download location', () => {
+  const raw = '我刚在任务页取消了完成后发送。那现在还会自动发吗？'
+  const cancelled = facts([fact({source:'live_job',execution:'running',result:'unavailable',delivery:{state:'not_attempted'},followUp:{state:'none'}})])
+  const original = '取消了就不会自动发了，取消是即时生效的。出来的图你可以自己在任务页拿，或者到时候再叫我发一遍也行。'
+  const violations = validateActionReply(original,cancelled,raw)
+  assert.ok(violations.some(item=>item.code==='unsupported_task_state'))
+  assert.ok(violations.some(item=>item.code==='unsupported_delivery'))
+  for (const reply of [
+    '取消是即时生效的吗？','不能确认取消是即时生效的。','“取消是即时生效的”只是个例子。',
+    '如果取消是即时生效的，那就不必再操作。',
+    '出来的图你可以自己在任务页拿吗？','尚未确认出来的图你可以自己在任务页拿。',
+    '“出来的图你可以自己在任务页拿”只是个例子。','如果任务页可以下载，你可以在那里取图。'
+  ]) assert.deepEqual(validateActionReply(reply,cancelled,raw),[],reply)
+  assert.deepEqual(validateActionReply('取消是即时生效的。',cancelled,'我看到任务页说明：“取消是即时生效的”。我取消了完成后发送，还会自动发吗？'),[])
+  assert.deepEqual(validateActionReply('出来的图你可以自己在任务页拿。',cancelled,'平台提示：“出来的图你可以自己在任务页拿”。我取消了自动发送，还能拿图吗？'),[])
+  for (const query of ['任务页说明取消是即时生效的吗？图还会自动发吗？','例如平台提示“取消是即时生效的”。图还会自动发吗？']) {
+    assert.ok(validateActionReply('取消是即时生效的。',cancelled,query).some(item=>item.code==='unsupported_task_state'),query)
+  }
 })

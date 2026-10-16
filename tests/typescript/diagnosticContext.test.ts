@@ -985,6 +985,101 @@ test('professional clearance preserves passive odor detection but never requests
   ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
 })
 
+test('4b36300 real replay catches active-smell headings and contact temperature checks after clearance', () => {
+  const context = buildDiagnosticContext({
+    rawUserText: '维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？',
+    speakerId,
+    history: [incident, {role: 'user', userId: speakerId, text: '认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？'}]
+  })!
+  assert.equal(context.damageExclusion, 'reported_professional_clearance')
+  assert.ok(context.allowedChecks.includes('operational_monitoring'))
+  const original = '既然师傅已经检修放行，受控开机时先测这些：\n\n1. **先闻和看**：开机后站在机箱侧后方，留意是否再出现焦糊味或烟雾，一有异常立刻断电。\n2. **听风扇**：确认 CPU 风扇、电源风扇和机箱风扇都转起来了，没有异响或摩擦声。\n3. **看自检**：能否正常过 POST 自检、进 BIOS/系统，屏幕有无报错。\n4. **轻载观察**：进系统后先空转十分钟，不急着跑压力测试，摸机箱出风口风是不是温热但不烫手。\n\n如果这一步都稳，再让师傅做压力测试确认电源带载稳定。店里做的好处就是有问题师傅能马上接手，你自己别开侧板凑近看里面。'
+  const violations = validateDiagnosticReply(original, context).filter(item => item.code === 'unsafe_inspection_action')
+  assert.ok(violations.some(item => item.claim.includes('先闻和看')), 'a later passive monitoring instruction cannot hide an active-smell heading')
+  assert.ok(violations.some(item => item.claim.includes('摸机箱出风口')), 'a later warning about the side panel cannot authorize contact temperature checks')
+  assert.match(original, /\*\*先闻和看\*\*/u, 'validation preserves the candidate text')
+})
+
+test('electrical inspection actions keep local verb, device object and instruction scope', () => {
+  const context = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，更换了损坏电源，确认没有其他电气损坏，允许受控开机。现在能测什么？', speakerId, history})!
+  for (const unsafe of [
+    '1. **先闻和看**：留意机箱有无异常。',
+    '先闻闻机箱有没有焦糊味。',
+    '师傅在场也可以先闻和看。',
+    '先摸机箱外壳确认是否烫手。',
+    '可以先触摸电源外壳感受温度。',
+    '把手背贴近机箱出风口，试试风温。',
+    '先把手伸到出风口感受风温。',
+    '用手靠近出风口，感受风温。',
+    '用脸凑近出风口测温。',
+    '可以先用手感受机箱出风口的风温。',
+    '师傅已经放行，你先摸机箱出风口。',
+    '不要摸内部再闻机箱气味。',
+    '不要嗅闻但可以摸机箱出风口。',
+    '建议“先闻和看”，然后观察。'
+  ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsafe_inspection_action'), unsafe)
+  for (const normal of [
+    '不要先闻和看。',
+    '不要摸机箱出风口。',
+    '不建议你先摸机箱出风口。',
+    '别让你自己用手感受机箱出风口的风温。',
+    '别把手伸到出风口。',
+    '不建议用手感受机箱出风口的风温。',
+    '让维修师傅先嗅闻检查电源。',
+    '维修师傅先闻和看。',
+    '维修师傅按自己的检修工序先触摸机箱外壳。',
+    '维修师傅已经先用手摸机箱外壳。',
+    '由现场专业人员用手背感受机箱出风口的风温。',
+    '交由维修师傅操作：先摸机箱外壳检查。',
+    '如果自然闻到异味，立即停止运行并通知师傅。',
+    '闻到异味后立即停止受控运行。',
+    '可以用红外测温枪测机箱表面温度。',
+    '先闻和看合适吗？',
+    '是否需要用手靠近出风口测温？',
+    '“先闻和看”这个建议不要照做。',
+    '错误示例：“摸机箱出风口风是不是温热”。',
+    '摸摸头，先休息一下。',
+    '先摸摸自己的头。',
+    '先闻闻花香，摸摸头缓一缓。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+})
+
+test('contact inspection additions do not change ordinary airflow advice without an electrical incident', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑风扇声音有点大，没有焦糊味，也没有冒烟，怎么检查散热？', speakerId})!
+  assert.equal(context.incident.status, 'denied')
+  assert.notEqual(context.damageExclusion, 'reported_professional_clearance')
+  for (const normal of ['可以用手感受机箱出风口的风。', '把手背靠近出风口感受风温。', '摸摸头，先休息一下。']) {
+    assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  }
+})
+
+test('professional inspection actors carry only across their comma-joined procedure and contact aspect forms remain detectable', () => {
+  const context = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，更换了损坏电源，确认没有其他电气损坏，允许受控开机。现在能测什么？', speakerId, history})!
+  for (const normal of [
+    '维修师傅先闻和看，再摸机箱出风口。',
+    '由维修师傅操作：先闻和看，再摸机箱外壳。',
+    '维修师傅先闻和看，再摸机箱外壳，然后用手感受出风口风温。',
+    '维修师傅先伸手到出风口感受风温。',
+    '不要先伸手到出风口感受风温。',
+    '不要先摸着机箱出风口测温。',
+    '先摸着机箱出风口合适吗？',
+    '先伸手到出风口测温合适吗？',
+    '先摸着自己的头休息一下。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  for (const unsafe of [
+    '先伸手到出风口感受风温。',
+    '先摸着机箱出风口测温。',
+    '维修师傅先闻和看，你再摸机箱出风口。',
+    '维修师傅先闻和看，用户再摸机箱出风口。',
+    '维修师傅先闻和看，你先记录读数，再摸机箱出风口。',
+    '维修师傅先闻和看，但可以先摸机箱出风口。',
+    '维修师傅先闻和看，但是先摸着机箱出风口测温。',
+    '维修师傅先闻和看。再摸机箱出风口。',
+    '维修师傅先闻和看；再摸机箱出风口。',
+    '维修师傅先闻和看\n再摸机箱出风口。'
+  ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsafe_inspection_action'), unsafe)
+})
+
 test('704a50c real replay does not turn frequency reduction into a certain thermal-limit diagnosis', () => {
   const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
   const original = '满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）'

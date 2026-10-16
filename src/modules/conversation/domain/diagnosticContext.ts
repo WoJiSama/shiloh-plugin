@@ -604,6 +604,57 @@ function diagnosticValidationProse(reply: string): string {
   }).replace(/[*_#]/gu, '')
 }
 
+const INSPECTION_MODIFIERS = '(?:(?:先|再|可以|会|应|应该|需要|主动|刻意|特意|直接|自行|自己|亲自|凑近|靠近|去|来|尝试|试着|用(?:手(?:掌|背|指)?|鼻子|脸)|(?:把|将)(?:手(?:掌|背|指)?|脸|身体)|伸手)|\\s)*'
+
+function professionalInspectionPrefix(prefix: string): boolean {
+  const professional = '(?:维修(?:师傅|人员|工程师)|专业(?:维修|检修)?人员|检修(?:师傅|人员)|师傅|现场人员)'
+  const procedure = '(?:(?:已(?:经)?|正在|刚才|当时|在现场|按(?:自己(?:的)?|其)?(?:检修)?工序)|\\s)*'
+  return new RegExp(`${professional}${procedure}${INSPECTION_MODIFIERS}$`, 'u').test(prefix)
+    || new RegExp(`(?:由|让|请|交给|交由)(?:现场)?${professional}(?:来|亲自|负责)?(?:操作|检查|检测|检修|完成|做)(?:下列|以下|这些|后续)?(?:步骤|检查|检测|工序)?\\s*[:：]${INSPECTION_MODIFIERS}$`, 'u').test(prefix)
+}
+
+function professionalInspectionStep(clause: string): boolean {
+  return [...clause.matchAll(/闻|嗅闻|触摸|触碰|触及|摸|碰|贴|靠近|凑近|伸|放|移|感受|测/gu)]
+    .some(action => professionalInspectionPrefix(clause.slice(0, action.index)))
+}
+
+function userInspectionInstruction(prefix: string, carriedProfessional: boolean): boolean {
+  const local = prefix.replace(/^\s*(?:[-+]\s*|\d+[.)、]\s*)/u, '')
+  // Only the actor and prohibition governing this action count. A technician
+  // merely being present, or "don't touch" before a later "then smell", does not.
+  if (new RegExp(`(?:不要|别|勿|避免|禁止|不能|不可|不可以|不建议|不允许|不应|不该|无需|不用|不需要|没必要|没有必要)(?:让|叫|要求)?(?:你(?:自己)?|用户)?${INSPECTION_MODIFIERS}$`, 'u').test(local)) return false
+  if (professionalInspectionPrefix(local) || carriedProfessional) return false
+  return new RegExp(`(?:^|先|再|然后|接着|可以|可|建议|请|、|就|要|应|应该|需要|试着|不妨|你(?:自己)?|用户)${INSPECTION_MODIFIERS}$`, 'u').test(local)
+}
+
+function inspectionDeviceTarget(suffix: string): boolean {
+  return /^\s*(?:(?:一下|一摸|一碰)|(?:这|那|该)(?:台|个|只|块)?的?|你(?:的)?|自己(?:的)?)*\s*(?:机箱|电源|(?:出|进|排)风口|风口|散热口|散热器|CPU|GPU|显卡|电脑|主机|机器|设备|板卡|电容|主板|线材|线缆|电线|内部|里面|外壳)/iu.test(suffix)
+}
+
+function unsafeInspectionAction(clause: string, electricalIncident: boolean, carriedProfessional: boolean): 'active_smell' | 'body_contact' | undefined {
+  for (const action of clause.matchAll(/闻(?:一闻|一下|闻)?|嗅闻/gu)) {
+    const prefix = clause.slice(0, action.index)
+    const suffix = clause.slice(action.index + action[0].length)
+    if (/^(?:到|见)/u.test(suffix) || !userInspectionInstruction(prefix, carriedProfessional)) continue
+    // Keep the existing explicit sniffing forms. New bare verbs and headings
+    // inherit a device only in an electrical-incident context, not from a social object.
+    const explicitSniffing = /^(?:闻(?:有没有|是否|一下|一闻)|嗅闻)/u.test(clause.slice(action.index))
+    const odorTarget = /^\s*(?:有没有|是否|有无)?\s*(?:异常|新的|再次出现的)?(?:气味|味道|异味|焦糊味|焦味|烟味|烧塑料味)/u.test(suffix)
+    const implicitTarget = /^\s*(?:和(?:看|听)|(?:并|再)(?:看|观察|听)|[，,。；;：:\n]|$)/u.test(suffix)
+    if (explicitSniffing || (electricalIncident && (inspectionDeviceTarget(suffix) || odorTarget || implicitTarget))) return 'active_smell'
+  }
+  if (!electricalIncident) return undefined
+  for (const action of clause.matchAll(/触摸(?:着)?|触碰(?:着)?|触及|摸(?:摸|一下|一摸|着)?|碰(?:碰|一下|一碰|着)?|贴(?:近|上|着)?|靠近|凑近|伸(?:手(?:到|向|进|近)|到|向|进|近)|放(?:在|到)|移(?:到|近)|感受|测(?:量)?/gu)) {
+    const prefix = clause.slice(0, action.index)
+    const suffix = clause.slice(action.index + action[0].length)
+    if (!inspectionDeviceTarget(suffix) || !userInspectionInstruction(prefix, carriedProfessional)) continue
+    const contactVerb = /^(?:触摸|触碰|触及|摸|碰)/u.test(action[0])
+    const body = /^伸手/u.test(action[0]) || /(?:用|把|将)?(?:手(?:掌|背|指)?|脸|身体)\s*$/u.test(prefix)
+    if (contactVerb || body) return 'body_contact'
+  }
+  return undefined
+}
+
 /**
  * High-confidence conflicts only. This function does not alter prose or claim to
  * prove an arbitrary reply correct. The caller may regenerate the whole reply
@@ -618,6 +669,21 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
   }
   // Analyse formatting-free text, preserving the actual reply for the sender.
   const prose = diagnosticValidationProse(reply)
+  const electricalIncident = context.incident.status === 'asserted' || context.damageExclusion === 'reported_professional_clearance'
+  // Keep colons with the instruction so an explicitly delegated professional
+  // procedure retains its actor, including an action appearing in a heading.
+  let carriedProfessionalInspection = false
+  for (const clause of diagnosticClauses(prose).flatMap(part => part.split(/(?=但是|不过|然而|可是|但(?!凡)|却)/u))) {
+    const actorChanged = /^\s*(?:但是|不过|然而|可是|但(?!凡)|却)/u.test(clause) || /(?:你(?:自己)?|用户)(?!的)/u.test(clause)
+    if (actorChanged || isQuestion(clause)) carriedProfessionalInspection = false
+    if (isQuestion(clause)) continue
+    const action = unsafeInspectionAction(clause, electricalIncident, carriedProfessionalInspection)
+    // A comma joins the same actor's procedure; a sentence boundary, a user
+    // subject or a contrast starts a new instruction scope.
+    carriedProfessionalInspection = !actorChanged && (carriedProfessionalInspection || professionalInspectionStep(clause)) && /[，,]\s*$/u.test(clause)
+    if (action === 'active_smell') add('unsafe_inspection_action', clause.trim(), '专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。', '保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。')
+    else if (action === 'body_contact') add('unsafe_inspection_action', clause.trim(), '曾出现电气异常的设备即使已报告专业放行，用户侧运行监测仍限于非接触观察。', '撤回触摸设备或把身体伸近风口感温的步骤；按现场放行范围做非接触监测，需要接触式检查时交现场专业人员按工序进行。')
+  }
   let carriedOperationCondition = false
   let carriedTemperatureCondition = false
   for (const clause of replyAssertions(prose)) {
@@ -627,13 +693,6 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
     const operationConditional: boolean = carriedOperationCondition || professionalOperationCondition(clause)
     carriedOperationCondition = operationConditional && !/[。！？!?；;\n]/u.test(clause)
     if (isQuestion(clause)) continue
-    for (const action of clause.matchAll(/闻(?:有没有|是否|一下|一闻)|嗅闻/gu)) {
-      const prefix = clause.slice(0, action.index)
-      if (/(?:不要|别|勿|避免|禁止|不能|不应)(?:凑近|主动|刻意|特意)?\s*$/u.test(prefix)) continue
-      if (/(?:先|再|然后|可以|建议|请|、|^)(?:凑近|主动|刻意|特意)?\s*$/u.test(prefix)) {
-        add('unsafe_inspection_action', clause.trim(), '专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。', '保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。')
-      }
-    }
     const conclusionDenied = deniesConclusion(clause)
     const possible = offersPossibility(clause)
     const conditional = conditionalInspection(clause)

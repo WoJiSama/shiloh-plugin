@@ -81,6 +81,68 @@ test('a three-turn quantity joke survives confirmed-send continuity and richer p
   assert.match(buildTurnInteractionPrompt(third), /新限制作用在同一物件上/)
 })
 
+test('a verified adjacent quantity change adds a local arithmetic cue without judging the reply joke', () => {
+  const first = buildTurnInteractionContext({...scope, rawUserText: '开个玩笑，我宣布你今天的工资是三块饼干'})
+  const firstReply = '三块饼干也想雇我，你这老板当得挺省啊'
+  const continuity = {botId: '99', persona, lastReply: firstReply, social: buildSocialContinuity(first, firstReply)}
+  const second = buildTurnInteractionContext({...scope, rawUserText: '先扣两块，刚刚溜号了，哈哈', continuity})
+  const prompt = buildTurnInteractionPrompt(second)
+  assert.match(prompt, /【玩笑数量锚点】/)
+  assert.match(prompt, /同一物件“饼干”和单位“块”/)
+  assert.match(prompt, /3 - 2 = 1块/)
+  assert.match(prompt, /不证明真实支付、真实经历或双方已同意旧提议/)
+  assert.match(prompt, /反问、夸张和新比喻仍可自然表达/)
+  assert.equal(second.rawUserText, '先扣两块，刚刚溜号了，哈哈')
+  const candidate = '扣完就剩一块了，我还倒欠你两块是吧'
+  assert.equal(buildSocialContinuity(second, candidate).activeBit, candidate,
+    'the generation cue is not an output string filter or a debt-question verdict')
+  for (const [previousReply, rawUserText, calculation] of [
+    ['五天魔法假期，先把我的工位变没。', '再加两天魔法假期', '5 + 2 = 7天'],
+    ['行吧，12张休假券也收下。', '先减2张休假券', '12 - 2 = 10张'],
+    ['二十杯咖啡也太多了。', '扣十一杯咖啡', '20 - 11 = 9杯']
+  ] as const) {
+    const prior = buildTurnInteractionContext({...scope, rawUserText: `开个玩笑，${previousReply}`})
+    const next = buildTurnInteractionContext({...scope, rawUserText, continuity: {
+      botId: '99', persona, lastReply: previousReply, social: buildSocialContinuity(prior, previousReply)
+    }})
+    assert.ok(buildTurnInteractionPrompt(next).includes(calculation), `${previousReply} -> ${rawUserText}`)
+  }
+})
+
+test('quantity cues abstain for proposals, uncertain ownership, changed objects and new personal experiences', () => {
+  const original = '三块饼干也想雇我，你这老板当得挺省啊'
+  const first = buildTurnInteractionContext({...scope, rawUserText: '开个玩笑，今天工资三块饼干'})
+  const continuity = {botId: '99', persona, lastReply: original, social: buildSocialContinuity(first, original)}
+  for (const rawUserText of [
+    '先扣两张', '先扣两块显卡', '先扣两块蛋糕', '先扣两块给小林',
+    '先扣两块，再加一块', '先扣两块可以吗？', '如果先扣两块', '别扣两块',
+    '我刚买了两块饼干，哈哈', '我今天吃了两块饼干', '小林扣了两块饼干',
+    '换个话题，先扣两块', '认真问，帮我计算三块饼干的热量',
+    '先扣五块', '先扣0.5块', '先扣半块', '先扣两百块'
+  ]) {
+    const next = buildTurnInteractionContext({...scope, rawUserText, continuity})
+    assert.doesNotMatch(buildTurnInteractionPrompt(next), /【玩笑数量锚点】/, rawUserText)
+  }
+  for (const lastReply of [
+    '要不工资改成三块饼干？', '我提议今天工资三块饼干。', '三块饼干，给你当工资。',
+    '三块饼干怎么样？', '三块饼干，还是五块饼干？', '三块饼干不是我的工资。',
+    '我今天吃了三块饼干。', '小林的工资是三块饼干。', '三块饼干和两杯咖啡也太少了。',
+    '三块饼干归他，先别扣。', '三块饼干归小王，先别扣。', '三块饼干，算老王的工资。'
+  ]) {
+    const next = buildTurnInteractionContext({...scope, rawUserText: '先扣两块，哈哈', continuity: {
+      botId: '99', persona, lastReply, social: buildSocialContinuity(first, lastReply)
+    }})
+    assert.doesNotMatch(buildTurnInteractionPrompt(next), /【玩笑数量锚点】/, lastReply)
+  }
+  for (const prior of [
+    {...continuity, botId: '100'}, {...continuity, persona: {...persona, personaId: 'other'}},
+    {...continuity, persona: {...persona, personaVersion: 'v0'}}, {...continuity, persona: undefined}
+  ]) {
+    const next = buildTurnInteractionContext({...scope, rawUserText: '先扣两块，哈哈', continuity: prior})
+    assert.doesNotMatch(buildTurnInteractionPrompt(next), /【玩笑数量锚点】/)
+  }
+})
+
 test('a confirmed attention response carries its stance into an explicit playful follow-up', async () => {
   const continuityScope = {groupId: 'attention-to-play-pragmatics', userId: '202', botId: '99', persona}
   const first = buildTurnInteractionContext({...scope, rawUserText: '你为什么不理我呀'})
