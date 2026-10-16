@@ -1,0 +1,215 @@
+{
+  "reviewedBaseCommit": "27fa7d9b7edf2d110e1c5dd1cb3b16debca8ffc5",
+  "sourceOwnerStopped": true,
+  "compiledModuleSha256": "22fbb060fea490edc7c329592bbb9f142b76e3bf4ae04b8d038637165f2eb69f",
+  "regressionsAndControls": [
+    {
+      "rawUserText": "把刚才的图重新生成一遍，背景换成蓝色。",
+      "reply": "这张图需要重新生成。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": [],
+      "finding": "required-rerun-explicit-new-request"
+    },
+    {
+      "rawUserText": "这张图背景改成蓝色，旧图不用发了，我要新的蓝底图。",
+      "reply": "这张图需要重新生成才能发你。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": [],
+      "finding": "required-rerun-explicit-new-request"
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "我妹妹刚刚做蛋糕，得重新弄一次才行。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": [],
+      "finding": "required-rerun-human-topic-sentence-reset"
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "我妹妹刚刚做蛋糕。得重新弄一次才行。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": [],
+      "finding": "required-rerun-human-topic-sentence-reset"
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "我在练厨艺，得重新弄一次才行。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": [],
+      "finding": "required-rerun-human-topic-sentence-reset"
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "我在练厨艺。得重新弄一次才行。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": [],
+      "finding": "required-rerun-human-topic-sentence-reset"
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "如果你想，也可以重新生成。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": []
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "图要发你的话，得重新弄一次才行吗？",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": []
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "图不需要重新生成。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": []
+    },
+    {
+      "rawUserText": "刚才那张图出来了吗？",
+      "reply": "“图必须重做才能发你”只是个例子。",
+      "actionFacts": {
+        "scope": {
+          "botId": "99",
+          "conversationId": "group:1",
+          "userId": "2"
+        },
+        "observedAt": 1792133220591,
+        "lookup": "ok",
+        "tasks": []
+      },
+      "before": [],
+      "after": []
+    }
+  ],
+  "originalVerbatim": {
+    "rawUserText": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+    "reply": "改背景的图我这边没查到有登记记录，可能当时没接上，啦。考试提醒是登记了的，但那只是提醒，不会带图。图要发你的话，得重新弄一次才行。",
+    "actionFacts": {
+      "scope": {
+        "botId": "99",
+        "conversationId": "group:1",
+        "userId": "2"
+      },
+      "observedAt": 1792133220591,
+      "lookup": "ok",
+      "tasks": [
+        {
+          "taskId": "exam",
+          "requestMessageId": "request",
+          "toolName": "reminderTool",
+          "source": "reminder",
+          "observedAt": 1792133220591,
+          "execution": "queued",
+          "result": "unknown",
+          "delivery": {
+            "state": "unknown"
+          },
+          "followUp": {
+            "state": "registered",
+            "kind": "reminder",
+            "id": "exam",
+            "dueAt": 1792133280591
+          }
+        }
+      ]
+    },
+    "before": [],
+    "after": [
+      {
+        "code": "unsupported_task_state",
+        "claim": "图要发你的话，得重新弄一次才行",
+        "reason": "当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。",
+        "correctionInstruction": "撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。"
+      }
+    ]
+  }
+}

@@ -777,3 +777,55 @@ test('new requested reruns stay future actions while immediate unexecuted reruns
   assert.deepEqual(validateActionReply('你下次要求我换成蓝色，那就需要重新生成。',facts(),raw),[])
   assert.ok(validateActionReply('我现在给你重跑。',facts(),raw).some(item=>item.code==='unregistered_followup'))
 })
+
+
+test('an explicit current rerun request licenses its matching necessity without inventing execution or delivery', () => {
+  for (const raw of [
+    '把刚才的图重新生成一遍，背景换成蓝色。', '请把这张图重新生成。',
+    '请重新生成这张图。', '我想把这张图重新生成一遍。', '帮我重新生成一张图。'
+  ]) {
+    assert.deepEqual(validateActionReply('这张图需要重新生成。',facts(),raw),[],raw)
+    assert.ok(validateActionReply('这张图已经生成好了。',facts(),raw).some(item=>item.code==='unsupported_task_state'),raw)
+    assert.ok(validateActionReply('图正在生成。',facts(),raw).some(item=>item.code==='unsupported_task_state'),raw)
+    assert.ok(validateActionReply('我现在给你重跑。',facts(),raw).some(item=>item.code==='unregistered_followup'),raw)
+    assert.ok(validateActionReply('图已经发给你了。',facts(),raw).some(item=>item.code==='unsupported_delivery'),raw)
+    assert.ok(validateActionReply('视频需要重新生成。',facts(),raw).some(item=>item.code==='unsupported_task_state'),raw)
+  }
+})
+
+test('quoted, queried, denied and third-party rerun requests do not license task necessity', () => {
+  for (const raw of [
+    '“把刚才的图重新生成一遍”这句话是什么意思？', '是否必须把刚才的图重新生成？',
+    '把刚才的图重新生成一遍吗？', '不要把刚才的图重新生成一遍。',
+    '我不需要把刚才的图重新生成一遍。', '别人的请求是把刚才的图重新生成一遍。',
+    '我妹妹要把刚才的图重新生成一遍。', '她说请把刚才的图重新生成一遍。'
+  ]) assert.ok(validateActionReply('这张图需要重新生成。',facts(),raw).some(item=>item.code==='unsupported_task_state'),raw)
+})
+
+test('omitted rerun subjects follow the local human activity across sentence boundaries', () => {
+  const raw = '刚才那张图出来了吗？'
+  for (const reply of [
+    '我妹妹刚刚做蛋糕。得重新弄一次才行。', '我在练厨艺。得重新弄一次才行。',
+    '她的图要发你的话。得重新弄一次才行。', '别人的图要发你的话。得重新弄一次才行。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  for (const reply of [
+    '图要发你的话，得重新弄一次才行。', '图要发你的话。得重新弄一次才行。',
+    '我妹妹刚刚做蛋糕。图要发你的话，得重新弄一次才行。',
+    '我在练厨艺。图必须重做才能发你。'
+  ]) assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unsupported_task_state'),reply)
+})
+
+
+test('a direct request for a different new artifact may require generation without a rerun verb', () => {
+  const raw = '这张图背景改成蓝色，旧图不用发了，我要新的蓝底图。'
+  const reply = '这张图需要重新生成才能发你。'
+  assert.deepEqual(validateActionReply(reply,facts(),raw),[])
+  assert.deepEqual(validateActionReply(reply,facts(),'我要一张新的蓝底图。'),[])
+  assert.ok(validateActionReply('这张图已经生成好了。',facts(),raw).some(item=>item.code==='unsupported_task_state'))
+  assert.ok(validateActionReply('图正在生成。',facts(),raw).some(item=>item.code==='unsupported_task_state'))
+  assert.ok(validateActionReply('图已经发给你了。',facts(),raw).some(item=>item.code==='unsupported_delivery'))
+  for (const query of [
+    '“我要新的蓝底图”是什么意思？', '我是不是要新的蓝底图？', '我不要新的蓝底图。',
+    '我朋友说我要新的蓝底图。', '如果我要新的蓝底图。', '我要新的别人画的图。'
+  ]) assert.ok(validateActionReply(reply,facts(),query).some(item=>item.code==='unsupported_task_state'),query)
+})

@@ -122,6 +122,25 @@ test('an explicit later user request can lead to another reply without a backgro
  assert.equal(archived[0].message[0].text,candidate)
  assert.equal(messages.at(-1).content,candidate)
 })
+test('requested recreation and human activity keep their original final reply without a repair',async()=>{
+ for(const [raw,candidate] of [
+  ['把刚才的图重新生成一遍，背景换成蓝色。','这张图需要重新生成。'],
+  ['刚才那张图出来了吗？','我妹妹刚刚做蛋糕。得重新弄一次才行。'],
+  ['刚才那张图出来了吗？','我在练厨艺。得重新弄一次才行。']
+ ]){
+  const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+  session.interactionContext.rawUserText=raw
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;throw Error('supported request or human activity must not regenerate')}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'original-reply'}
+  await api.handleTextResponse(host,candidate,event,session,messages)
+  assert.equal(repairs,0,candidate)
+  assert.deepEqual(sent,[candidate])
+  assert.equal(archived[0].message[0].text,candidate)
+  assert.equal(messages.at(-1).content,candidate)
+  assert.equal(enhanced[0][2],candidate)
+ }
+})
 test('diagnostic certainty and active sniffing are corrected before sending or learning',async()=>{
  const cases=[
   {raw:'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。',candidate:'82℃满载这个数本身不算危险信号，一般CPU规格里Tjunction上限在100℃左右，82℃还留有余量。',corrected:'当前型号和测点尚未确认，82℃本身是否危险还不能确定，需要对照对应型号的规格。'},

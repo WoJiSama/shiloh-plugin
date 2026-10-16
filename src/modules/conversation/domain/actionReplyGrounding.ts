@@ -439,6 +439,43 @@ function rerunTaskSubject(prefix: string, context: boolean, topic: EvidenceTopic
   return Boolean(object && object.kind !== 'follow_up')
 }
 
+/** A direct request can require a new rendition. Questions, reported requests
+ * and quoted or negated wording do not authorize that new task. Keep this
+ * permission local to the necessity check, never to execution or result claims. */
+function requestedRerunTopics(rawUserText: string): EvidenceTopic[] {
+  const topics: EvidenceTopic[] = []
+  for (const sentence of assertions(rawUserText)) {
+    for (const clause of sentence.text.split(/[，,]/u).map(value => value.trim())) {
+      if (unasserted(clause, sentence.question) || OTHER_SUBJECT.test(clause)
+        || /不要|别|不(?:想|要|需要|用|必|希望|要求)|无需|不用|未必/u.test(clause)) continue
+      const direct = clause.replace(/^(?:(?:请(?:你)?|麻烦(?:你)?|帮我|给我|你(?:帮我)?|现在|直接|那|这次|还是|我(?:想(?:要)?|要|需要|希望)(?:你)?))*/u, '')
+        .replace(/^把/u, '')
+      // Asking for a new rendition is an explicit new task even without a
+      // rerun verb (“我要新的蓝底图”). A status question about the old output is not.
+      const requestsNewArtifact = /^(?:我(?:想(?:要)?|要|需要|希望)|请(?:你)?(?:给我)?|给我|帮我)/u.test(clause)
+        && new RegExp(`^(?:一(?:张|份|个))?新(?:的)?[^，,。！？!?]{0,16}${ARTIFACT}[吧呀啊啦哦]*$`, 'u').test(direct)
+        && !/别人|他|她|(?:我|你)(?:妈|爸|姐姐|妹妹|哥哥|弟弟|朋友|同事)/u.test(direct)
+      if (requestsNewArtifact) {
+        const topic = evidenceTopic(clause)
+        if (!['unknown', 'ambiguous', 'reminder'].includes(topic)) topics.push(topic)
+        continue
+      }
+      const action = new RegExp(RERUN_ACTION, 'u').exec(direct)
+      if (!action) continue
+      const before = direct.slice(0, action.index).replace(/^(刚才|之前)的/u, '$1')
+      const after = direct.slice(action.index + action[0].length)
+        .replace(/^(?:一(?:次|遍|下)|一(?:张|份|个))/u, '').replace(/(?:一(?:次|遍|下))?[吧呀啊啦哦]*$/u, '')
+      // Only an ordinary task noun may surround the imperative. A possessor,
+      // reported speaker or conditional clause cannot become authorization.
+      const object = taskObjectReference(before || after, false, evidenceTopic(clause))
+      if (before && after || !object && (before || after)) continue
+      const topic = object?.topic || evidenceTopic(clause)
+      if (topic !== 'unknown' && topic !== 'ambiguous' && topic !== 'reminder') topics.push(topic)
+    }
+  }
+  return topics
+}
+
 /** A missing receipt is not proof that an existing artifact must be recreated.
  * Availability, failure and callback records do not encode that prerequisite. */
 function unsupportedRerunRequirement(clause: string, context: boolean, topic: EvidenceTopic): boolean {
@@ -461,6 +498,8 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
   const rawTopic = evidenceTopic(rawUserText)
   const resultQuestionContext = taskContext && asksArtifactResult(rawUserText)
   let currentObjectTopic = rawTopic
+  let rerunContext = taskContext
+  const requestedReruns = requestedRerunTopics(rawUserText)
   for (const sentence of assertions(reply)) {
     const followUps = followUpClaims(sentence, taskContext, currentObjectTopic)
     if (followUps.some(claim => claim.kind === 'immediate_delivery')) {
@@ -497,13 +536,12 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
     }
     const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
     let sentenceTaskContext = taskContext
-    let rerunContext = taskContext
     for (const [index, clause] of clauses.entries()) {
       const explicitTopic = evidenceTopic(clause)
       if (!['unknown', 'generic', 'artifact', 'ambiguous'].includes(explicitTopic)) currentObjectTopic = explicitTopic
       if (OTHER_SUBJECT.test(clause)) {rerunContext = false; continue}
       if (unasserted(clause, sentence.question && index === clauses.length - 1)) continue
-      if (unsupportedRerunRequirement(clause, rerunContext, currentObjectTopic)) {
+      if (!requestedReruns.includes(currentObjectTopic) && unsupportedRerunRequirement(clause, rerunContext, currentObjectTopic)) {
         violations.push({code: 'unsupported_task_state', claim: sentence.text,
           reason: '当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。',
           correctionInstruction: '撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。'})
