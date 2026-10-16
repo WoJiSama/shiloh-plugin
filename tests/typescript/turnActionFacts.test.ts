@@ -37,6 +37,26 @@ test('an available image and completed call do not imply delivery or a future ta
   assert.match(buildTurnActionFactsPrompt(actual), /没有核验到仍有效的后续投递登记/)
 })
 
+test('a failed delivery prompt states the observed failure without inventing rejection or interception', () => {
+  const actual = validateTurnActionFacts(facts([task({delivery:{state:'failed'}})]), event, now)
+  const prompt = buildTurnActionFactsPrompt(actual)
+  assert.equal(prompt.split('\n').find(line=>line.startsWith('原请求 ')), '原请求 request：执行已结束；已有产物；投递失败，具体原因未确认。')
+  assert.match(prompt, /投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因/)
+  assert.match(prompt, /没有原因证据时，不自行补写失败原因/)
+  assert.doesNotMatch(prompt, /投递被明确拒绝|有消息回执确认送达|回执消息/)
+  assert.match(prompt, /没有核验到仍有效的后续投递登记/)
+})
+
+test('a verified sent receipt remains delivery evidence rather than an unknown failure cause', () => {
+  const actual = validateTurnActionFacts(facts([task({delivery:{state:'sent',messageId:'receipt'}})]), event, now)
+  const prompt = buildTurnActionFactsPrompt(actual)
+  assert.equal(prompt.split('\n').find(line=>line.startsWith('原请求 ')), '原请求 request：执行已结束；已有产物；有消息回执确认送达（回执消息 receipt）。')
+  assert.doesNotMatch(prompt, /投递失败|投递被明确拒绝|投递结果未确认/)
+  const withoutReceipt = validateTurnActionFacts(facts([task({delivery:{state:'sent'}})]), event, now)
+  assert.match(buildTurnActionFactsPrompt(withoutReceipt), /已有产物；投递结果未确认/)
+  assert.doesNotMatch(buildTurnActionFactsPrompt(withoutReceipt), /有消息回执确认送达|回执消息/)
+})
+
 test('a partial lookup preserves independently verified facts and names the remaining evidence gap',()=>{
  const actual=validateTurnActionFacts({...facts(),lookup:'unavailable'},event,now)
  assert.equal(actual.tasks[0]?.result,'available')

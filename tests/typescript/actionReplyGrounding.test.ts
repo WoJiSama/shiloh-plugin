@@ -414,6 +414,36 @@ test('artifact status grammar includes colloquial completion verbs and a topic c
   assert.ok(validateActionReply('图的还没弄好。', unrelatedVideo, raw).some(item=>item.code==='unsupported_task_state'))
 })
 
+test('local delivery cause assertions include confidence, requested delivery and dash-separated attributions', () => {
+  const failedDelivery = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  const raw = '刚才那张图怎么没发来？'
+  for (const text of [
+    '不过上次你要发的时候被拒了。', '不过之前你要投递的时候被明确拒绝过。',
+    '做好了，就是还没发——之前你那边拒绝收，就一直搁着。',
+    '图不是没做好——之前你那边明确拒绝收了。',
+    '你让我发的图片被明确地拒收了。', '你想让我投递的时候被系统明确拦截了。',
+    '图被明确拒绝接收了。', '图被明确拒绝收了。'
+  ]) assert.ok(validateActionReply(text, failedDelivery, raw).some(item=>item.code==='unsupported_delivery'), text)
+  for (const text of [
+    '不过之前你要投递的时候可能被明确拒绝过。',
+    '如果之前你要投递的时候被明确拒绝过，可以检查一下。',
+    '不能断定之前你要投递的时候被明确拒绝过。',
+    '之前你那边没有拒绝收。', '不是你那边拒绝收——是发送原因还没确认。',
+    '图做好了——之前你那边可能拒绝收。', '不过上次你要发的时候被拒了吗？',
+    '图做好了——你那边拒绝收了吗？', '“之前你那边拒绝收”只是个假设。',
+    '例如之前你要投递的时候被明确拒绝过。',
+    '不过上次你要发邀请的时候被拒了。', '之前你要投递包裹的时候被明确拒绝过。',
+    '我妹妹的包裹被明确拒收了。', '图做好了——你妹妹的包裹被明确拒收了。',
+    '之前你那边拒绝收我的邀请也没关系。'
+  ]) assert.deepEqual(validateActionReply(text, failedDelivery, raw), [], text)
+  for (const [text, report] of [
+    ['之前你那边拒绝收了。', '我刚才拒绝收了你的图片。'],
+    ['之前你那边明确拒绝收了。', '我刚才明确拒绝收了你的图片。'],
+    ['不过之前你要投递的时候被明确拒绝过。', '我刚才明确拒收了你发的图。'],
+    ['图做好了——之前你那边拒绝收了。', '我刚才拒绝收了你的图片。']
+  ]) assert.deepEqual(validateActionReply(text!, failedDelivery, report!), [], text)
+})
+
 
 test('an omitted send verb after artifact completion still needs a matching callback', () => {
   const reminder = facts([fact({source:'reminder',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam'}})])

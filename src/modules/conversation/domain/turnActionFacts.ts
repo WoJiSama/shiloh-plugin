@@ -48,7 +48,7 @@ export function validateTurnActionFacts(value: TurnActionFacts | undefined, even
 
 const executionLabels: Record<TurnTaskFact['execution'], string> = {queued: '已登记排队', running: '记录为执行中', completed: '执行已结束', failed: '执行失败', unknown: '执行进度未确认'}
 const resultLabels: Record<TurnTaskFact['result'], string> = {available: '已有产物', unavailable: '没有可用产物', unknown: '产物未确认'}
-const deliveryLabels: Record<TurnTaskFact['delivery']['state'], string> = {not_attempted: '尚未尝试投递', sent: '有消息回执确认送达', failed: '投递被明确拒绝', unknown: '投递结果未确认'}
+const deliveryLabels: Record<TurnTaskFact['delivery']['state'], string> = {not_attempted: '尚未尝试投递', sent: '有消息回执确认送达', failed: '投递失败，具体原因未确认', unknown: '投递结果未确认'}
 
 export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
   if (!facts) return ''
@@ -57,6 +57,7 @@ export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
   if (!facts.tasks.length) lines.push(facts.lookup === 'unavailable' ? '本次未能核验相关任务记录；不能推断任务不存在、仍在执行或已经完成。' : '当前查询没有匹配的可核验任务记录；进度、产物与投递保持未确认。')
   for (const task of facts.tasks) {
     lines.push(`原请求 ${task.requestMessageId}：${executionLabels[task.execution]}；${resultLabels[task.result]}；${deliveryLabels[task.delivery.state]}${task.delivery.state === 'sent' ? `（回执消息 ${task.delivery.messageId}）` : ''}。`)
+    if (task.delivery.state === 'failed') lines.push('投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因。没有原因证据时，不自行补写失败原因。')
     if (task.followUp.state === 'registered') {
       lines.push(task.followUp.kind === 'reminder'
         ? `已核验提醒登记 ${task.followUp.id}，北京时间 ${new Date(task.followUp.dueAt!).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})} 触发。这只证明该提醒已登记，不证明原图会完成、已安排重跑或稍后交付原结果。`

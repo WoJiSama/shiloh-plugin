@@ -231,11 +231,13 @@ function stateSupported(dimension: StateClaim['dimension'], tasks: TurnTaskFact[
 // Delivery records expose receipt state, not the recipient's settings or the
 // transport's rejection cause. Only flag a direct attribution of these narrow
 // states; conditional troubleshooting suggestions remain ordinary speech.
-const RECIPIENT_DELIVERY_CAUSE = /(?:你(?:那边|这边)?|接收方|收件方)(?:的)?(?:接收(?:设置|权限)?|收图(?:设置|权限)?|陌生人消息(?:设置|权限)?)[^，,。；;!?！？]{0,10}(?:拦住|拦在|拦截|挡住|拒收|屏蔽)|(?:你(?:那边|这边)?|接收方|收件方)(?:已经|已|把)?(?:图片|图|文件|消息|视频|我发的图)?(?:给)?(?:拒收|拒绝接收|屏蔽|拦截)(?:了)?|你(?:那边|这边)?(?:的)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|你(?:那边|这边)?(?:把)?(?:陌生人)?(?:图片|文件|消息|视频)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了|屏蔽了)|你(?:那边|这边)?(?:的)?(?:接收(?:开关|权限)?|收图)(?:是)?(?:关闭|关着|没开|未开|禁用)(?:的|了)?/u
+const RECIPIENT_DELIVERY_CAUSE = /(?:你(?:那边|这边)?|接收方|收件方)(?:的)?(?:接收(?:设置|权限)?|收图(?:设置|权限)?|陌生人消息(?:设置|权限)?)[^，,。；;!?！？]{0,10}(?:拦住|拦在|拦截|挡住|拒收|屏蔽)|(?:你(?:那边|这边)?|接收方|收件方)(?:已经|已|把)?(?:图片|图|文件|消息|视频|我发的图)?(?:给)?(?:明确(?:地)?|直接)*(?:拒收|拒绝(?:接)?收|屏蔽|拦截)(?:了)?|你(?:那边|这边)?(?:的)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|你(?:那边|这边)?(?:把)?(?:陌生人)?(?:图片|文件|消息|视频)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了|屏蔽了)|你(?:那边|这边)?(?:的)?(?:接收(?:开关|权限)?|收图)(?:是)?(?:关闭|关着|没开|未开|禁用)(?:的|了)?/u
 const DELIVERY_EVENT = '(?:(?:发|发送|投递|送达|送)(?:给(?:你|您)|(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出(?:来|去)?)?|给(?:你|您)(?:发|发送))'
-const DELIVERY_CAUSE_WORDS = '(?:拒收|拒绝(?:接收)?|拒|拦截|拦(?:下(?:来)?|住)|屏蔽)'
-const PASSIVE_DELIVERY_CAUSE = new RegExp(`(?:被|遭(?:到)?)(?:(?:你|您|对方|接收方|收件方|平台|系统)(?:给)?)?(${DELIVERY_CAUSE_WORDS})`, 'gu')
-const DELIVERY_PREFIX_PART = new RegExp(`^(?:只是|就是|不过|但是|但|其实|也|我(?:这边)?|这边|(?:上次|这次|那次|之前(?:那次)?|刚才(?:那次)?)(?:的)?|${ARTIFACT_SUBJECT}|消息|${DELIVERY_EVENT}|的?时候|的|时|已经|已|又|还|仍然|就|直接)`, 'u')
+const REQUESTED_DELIVERY_EVENT = `(?:你|您)(?:要(?:我)?|让我|想让我|想要(?:我)?)${DELIVERY_EVENT}`
+const DELIVERY_CAUSE_WORDS = '(?:拒收|拒绝(?:接?收)?|拒|拦截|拦(?:下(?:来)?|住)|屏蔽)'
+const DELIVERY_CAUSE_QUALIFIER = '(?:明确(?:地)?|直接)*'
+const PASSIVE_DELIVERY_CAUSE = new RegExp(`(?:被|遭(?:到)?)(?:(?:你|您|对方|接收方|收件方|平台|系统)(?:给)?)?${DELIVERY_CAUSE_QUALIFIER}(${DELIVERY_CAUSE_WORDS})`, 'gu')
+const DELIVERY_PREFIX_PART = new RegExp(`^(?:只是|就是|不过|但是|但|其实|也|我(?:这边)?|这边|(?:上次|这次|那次|之前(?:那次)?|刚才(?:那次)?)(?:的)?|${ARTIFACT_SUBJECT}|消息|${REQUESTED_DELIVERY_EVENT}|${DELIVERY_EVENT}|的?时候|的|时|已经|已|又|还|仍然|就|直接)`, 'u')
 
 function passiveDeliveryCause(clause: string): string | undefined {
   for (const match of clause.matchAll(PASSIVE_DELIVERY_CAUSE)) {
@@ -257,7 +259,7 @@ function deliveryCauseKind(cause: string): string {
 }
 
 function reportedPassiveCause(rawUserText: string, cause: string): boolean {
-  const activeReport = new RegExp(`我(?:这边|那边)?(?:已经|刚才|之前|上次|这次)?(?:把(?:你(?:刚才)?发的)?(?:${ARTIFACT_SUBJECT}|消息))?(?:给)?(${DELIVERY_CAUSE_WORDS})`, 'u')
+  const activeReport = new RegExp(`我(?:这边|那边)?(?:已经|刚才|之前|上次|这次)?(?:把(?:你(?:刚才)?发的)?(?:${ARTIFACT_SUBJECT}|消息))?(?:给)?${DELIVERY_CAUSE_QUALIFIER}(${DELIVERY_CAUSE_WORDS})`, 'u')
   return assertions(rawUserText).some(sentence => sentence.text.split(/[，,]/u).some(clause => {
     if (unasserted(clause, sentence.question) || /如果|假如|要是|倘若|若是/u.test(clause) || OTHER_SUBJECT.test(clause)) return false
     const reported = activeReport.exec(clause)?.[1] || passiveDeliveryCause(clause)
@@ -267,13 +269,15 @@ function reportedPassiveCause(rawUserText: string, cause: string): boolean {
 
 function unsupportedRecipientCause(clause: string, rawUserText: string, adjacentCause = false): boolean {
   const passive = passiveDeliveryCause(clause)
-  if (!(RECIPIENT_DELIVERY_CAUSE.test(clause) || passive) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
+  const recipient = RECIPIENT_DELIVERY_CAUSE.exec(clause)
+  const otherObject = recipient && /^(?:了|过)?(?:(?:我|你|他|她)(?:们)?的|这(?:个|份)?|那(?:个|份)?)?(?:邀请|包裹|快递)/u.test(clause.slice(recipient.index + recipient[0].length))
+  if (!(recipient && !otherObject || passive) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
     || /不能(?:归因|认定|断定)|无法(?:说明|断定)|没法(?:确认|核实)|没(?:有)?核实/u.test(clause)) return false
   // A user can report their own setting. Restating that report is allowed;
   // attributing this particular failure to it still requires causal evidence.
   const reported = passive
     ? reportedPassiveCause(rawUserText, passive)
-    : /我(?:这边|那边)?(?:把)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|我(?:这边|那边)?(?:把)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了)|我(?:已经|刚才)?(?:拒收|拒绝接收|屏蔽)(?:了)?/u.test(withoutQuotations(rawUserText))
+    : /我(?:这边|那边)?(?:把)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|我(?:这边|那边)?(?:把)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了)|我(?:已经|刚才)?(?:明确(?:地)?|直接)*(?:拒收|拒绝(?:接)?收|屏蔽)(?:了)?/u.test(withoutQuotations(rawUserText))
   return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
 }
 
@@ -310,14 +314,15 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
         reason: '没有仍有效且与该动作对应的后续登记；完成触发的通知或投递和普通定时提醒不能互相证明。',
         correctionInstruction: '撤回自动跟进、通知、重试或已登记的说法。只说当前已知情况；如需用户再次发起请求，明确由用户再来询问，不承诺届时自己主动行动。'})
     }
-    const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
-    let sentenceTaskContext = taskContext
-    for (const [index, clause] of clauses.entries()) {
-      if (unasserted(clause, sentence.question && index === clauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
-      const nextClause = clauses[index + 1] || ''
-      const previousClause = clauses[index - 1] || ''
+    // A dash can introduce an independent cause claim. Keep that local to
+    // delivery attribution so an earlier denial cannot exempt a later claim.
+    const deliveryClauses = sentence.text.split(/[，,]|—+|–+|--+/u).map(value => value.trim()).filter(Boolean)
+    for (const [index, clause] of deliveryClauses.entries()) {
+      if (unasserted(clause, sentence.question && index === deliveryClauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
+      const nextClause = deliveryClauses[index + 1] || ''
+      const previousClause = deliveryClauses[index - 1] || ''
       const deliveryFailure = /(?:发送|投递|送达)(?:失败|没(?:有)?成功)|(?:图(?:片)?|消息|文件|视频)?(?:没(?:有)?(?:发|送)(?:给|到|出|过)|发不(?:出|过)|送不(?:到|出))/u
-      const adjacentCause = !unasserted(nextClause, sentence.question && index + 1 === clauses.length - 1)
+      const adjacentCause = !unasserted(nextClause, sentence.question && index + 1 === deliveryClauses.length - 1)
         && /^(?:所以|因此|因而|才)/u.test(nextClause) && deliveryFailure.test(nextClause)
         || !unasserted(previousClause) && deliveryFailure.test(previousClause) && /(?:因为|由于)[呀啊呢]?$/u.test(previousClause)
       if (taskContext && unsupportedRecipientCause(clause, rawUserText, adjacentCause)) {
@@ -325,6 +330,11 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
           reason: '当前投递记录只证明发送状态，没有证明拒收、拦截、屏蔽或关闭接收等具体失败原因。',
           correctionInstruction: '只说明已核验的发送状态，缺少原因就说原因尚未确认。不要把失败归因于拒收、被拦截、屏蔽或没开接收，也不要据此要求用户修改设置；条件性的排查建议需明确仍是假设。'})
       }
+    }
+    const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
+    let sentenceTaskContext = taskContext
+    for (const [index, clause] of clauses.entries()) {
+      if (unasserted(clause, sentence.question && index === clauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
       // “好了我会发你” is a future condition, not a claim that it is ready.
       if (/^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
         || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))) continue
