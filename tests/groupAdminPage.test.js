@@ -138,3 +138,43 @@ test("覆盖写入：模块级启用为新群创建 override 行", () => {
   const resolved = resolveGroupAdminSettings({ ...settings, groupAdmin: { overrides: rows } }, "123456789")
   assert.ok(resolved.groupNotice.enabledGroups.includes("123456789"))
 })
+
+test("扩展命令：刷屏/处置/阈值/文案全覆盖", () => {
+  // 刷屏检测（flood）
+  const floodToggle = parseGroupAdminCommand(".群管 开启 刷屏检测")
+  assert.equal(floodToggle.ok && floodToggle.feature.path, "floodEnabled")
+  const floodCount = parseGroupAdminCommand(".群管 设置 刷屏条数 5")
+  assert.equal(floodCount.ok && floodCount.value, 5)
+  assert.equal(floodCount.ok && floodCount.rule.path, "floodMaxMessages")
+  assert.equal(parseGroupAdminCommand(".群管 设置 刷屏窗口 15").rule?.path, "floodWindowSeconds")
+  assert.equal(parseGroupAdminCommand(".群管 设置 刷屏等级 10").rule?.path, "floodMaxLevel")
+  // 处置动作与阈值
+  assert.equal(parseGroupAdminCommand(".群管 开启 自动禁言").feature?.path, "actions.muteEnabled")
+  assert.equal(parseGroupAdminCommand(".群管 关闭 自动踢出").feature?.path, "actions.kickEnabled")
+  assert.equal(parseGroupAdminCommand(".群管 设置 广告禁言秒数 120").rule?.path, "actions.muteSeconds")
+  const threshold = parseGroupAdminCommand(".群管 设置 撤回阈值 0.8")
+  assert.equal(threshold.ok, true, "阈值允许小数")
+  assert.equal(threshold.value, 0.8)
+  assert.equal(parseGroupAdminCommand(".群管 设置 撤回阈值 0.85 0.9").ok, false, "数值规则只收一个值")
+  // 入群验证细节与通知文案
+  assert.equal(parseGroupAdminCommand(".群管 设置 错误次数 2").rule?.path, "maxWrongTimes")
+  assert.equal(parseGroupAdminCommand(".群管 开启 答错踢出").feature?.path, "kickOnWrongAnswer")
+  const text = parseGroupAdminCommand(".群管 设置 欢迎语 {at} 欢迎加入本群，先看群公告！")
+  assert.equal(text.ok, true)
+  assert.equal(text.value, "{at} 欢迎加入本群，先看群公告！", "文本规则支持整行含空格")
+  const tooLong = parseGroupAdminCommand(`.群管 设置 欢迎语 ${"好".repeat(201)}`)
+  assert.equal(tooLong.ok, false)
+  assert.ok(tooLong.message.includes("最多 200 字"))
+})
+
+test("面板展示扩展：刷屏/处置/验证细节/文案行", () => {
+  const data = buildGroupAdminPageData(serverLikeSettings(), GROUP_ID)
+  const moderation = data.sections.find(section => section.label === "广告与刷屏")
+  const labels = moderation.rows.map(row => row.label)
+  for (const expected of ["广告与刷屏检测", "刷屏检测", "检测范围", "自动处置", "超长消息折叠", "连发消息折叠"])
+    assert.ok(labels.includes(expected), `应有「${expected}」行`)
+  const guard = data.sections.find(section => section.label === "入群验证")
+  assert.ok(guard.rows.some(row => row.label === "超时踢出"))
+  const notice = data.sections.find(section => section.label === "群通知")
+  assert.ok(notice.rows.some(row => row.label === "入群欢迎"))
+})

@@ -18,14 +18,23 @@ const enabledInGroups = (source:unknown, id:string) => {
 // ---------- 命令表：功能开关与规则设置 ----------
 
 interface ToggleFeature {names:string[];module:string;path:string;label:string}
-interface SetRule {names:string[];module:string;path:string;label:string;kind:"number"|"boolean";min?:number;max?:number}
+interface SetRule {names:string[];module:string;path:string;label:string;kind:"number"|"boolean"|"text";min?:number;max?:number;decimal?:boolean;textMax?:number}
 
 const TOGGLE_FEATURES:ToggleFeature[] = [
   {names:["广告检测","广告扫描","广告与刷屏检测","风控检测"],module:"groupModeration",path:"adScan.enabled",label:"广告与刷屏检测"},
+  {names:["刷屏检测","刷屏"],module:"groupModeration",path:"floodEnabled",label:"刷屏检测"},
   {names:["超长折叠","超长消息折叠","长消息折叠"],module:"groupModeration",path:"overlongMessage.enabled",label:"超长消息折叠"},
   {names:["连发折叠","连发消息折叠","刷屏折叠"],module:"groupModeration",path:"burstMessage.enabled",label:"连发消息折叠"},
+  {names:["自动撤回","允许撤回"],module:"groupModeration",path:"actions.recallEnabled",label:"广告自动撤回"},
+  {names:["自动禁言","允许禁言"],module:"groupModeration",path:"actions.muteEnabled",label:"广告自动禁言"},
+  {names:["自动踢出","允许踢出"],module:"groupModeration",path:"actions.kickEnabled",label:"广告自动踢出"},
+  {names:["低活跃检测","只测低活跃"],module:"groupModeration",path:"inspectLowLevelOnly",label:"只检测低活跃成员"},
   {names:["入群验证","入群审核","进群验证"],module:"groupGuard",path:"enabled",label:"入群验证"},
+  {names:["超时踢出"],module:"groupGuard",path:"kickOnTimeout",label:"验证超时踢出"},
+  {names:["答错踢出"],module:"groupGuard",path:"kickOnWrongAnswer",label:"验证答错踢出"},
   {names:["群通知","欢迎退群","退群通知"],module:"groupNotice",path:"enabled",label:"群通知"},
+  {names:["欢迎通知","入群欢迎"],module:"groupNotice",path:"welcomeEnabled",label:"入群欢迎"},
+  {names:["退群提示"],module:"groupNotice",path:"leaveEnabled",label:"退群提示"},
   {names:["广告与刷屏","群管模块"],module:"groupModeration",path:"enabled",label:"广告与刷屏模块"}
 ]
 
@@ -33,20 +42,37 @@ const SET_RULES:SetRule[] = [
   {names:["超长字数","超长判定字数"],module:"groupModeration",path:"overlongMessage.maxLength",label:"超长判定字数",kind:"number",min:100,max:20000},
   {names:["连发条数","连发条数上限"],module:"groupModeration",path:"burstMessage.maxMessages",label:"连发条数上限",kind:"number",min:3,max:100},
   {names:["连发窗口","连发时间窗","连发秒数"],module:"groupModeration",path:"burstMessage.windowSeconds",label:"连发时间窗(秒)",kind:"number",min:2,max:600},
-  {names:["禁言秒数","禁言时长"],module:"groupModeration",path:"burstMessage.muteSeconds",label:"禁言秒数",kind:"number",min:0,max:2592000},
-  {names:["答题超时","验证超时"],module:"groupGuard",path:"timeoutSeconds",label:"答题超时(秒)",kind:"number",min:30,max:3600},
+  {names:["禁言秒数","禁言时长"],module:"groupModeration",path:"burstMessage.muteSeconds",label:"连发禁言秒数",kind:"number",min:0,max:2592000},
   {names:["超长转发"],module:"groupModeration",path:"overlongMessage.forwardEnabled",label:"超长折叠后转发",kind:"boolean"},
-  {names:["连发转发"],module:"groupModeration",path:"burstMessage.forwardEnabled",label:"连发折叠后转发",kind:"boolean"}
+  {names:["连发转发"],module:"groupModeration",path:"burstMessage.forwardEnabled",label:"连发折叠后转发",kind:"boolean"},
+  {names:["刷屏条数","刷屏条数上限"],module:"groupModeration",path:"floodMaxMessages",label:"刷屏条数上限",kind:"number",min:3,max:100},
+  {names:["刷屏窗口","刷屏时间窗","刷屏秒数"],module:"groupModeration",path:"floodWindowSeconds",label:"刷屏时间窗(秒)",kind:"number",min:3,max:600},
+  {names:["刷屏等级","刷屏检测等级"],module:"groupModeration",path:"floodMaxLevel",label:"刷屏检测等级上限",kind:"number",min:0,max:100},
+  {names:["等级阈值","低活跃等级"],module:"groupModeration",path:"minActiveLevel",label:"低活跃等级阈值",kind:"number",min:0,max:100},
+  {names:["广告禁言秒数","广告禁言时长"],module:"groupModeration",path:"actions.muteSeconds",label:"广告禁言秒数",kind:"number",min:60,max:2592000},
+  {names:["提醒阈值"],module:"groupModeration",path:"thresholds.report",label:"提醒阈值",kind:"number",min:0,max:1,decimal:true},
+  {names:["撤回阈值"],module:"groupModeration",path:"thresholds.recall",label:"撤回阈值",kind:"number",min:0,max:1,decimal:true},
+  {names:["禁言阈值"],module:"groupModeration",path:"thresholds.mute",label:"禁言阈值",kind:"number",min:0,max:1,decimal:true},
+  {names:["踢出阈值"],module:"groupModeration",path:"thresholds.kick",label:"踢出阈值",kind:"number",min:0,max:1,decimal:true},
+  {names:["题目范围","数字范围"],module:"groupGuard",path:"questionMaxNumber",label:"题目数字范围",kind:"number",min:1,max:100},
+  {names:["答题超时","验证超时"],module:"groupGuard",path:"timeoutSeconds",label:"答题超时(秒)",kind:"number",min:30,max:3600},
+  {names:["错误次数","允许错误"],module:"groupGuard",path:"maxWrongTimes",label:"允许答错次数",kind:"number",min:1,max:5},
+  {names:["欢迎语","欢迎文案"],module:"groupNotice",path:"welcomeMessage",label:"欢迎文案",kind:"text",textMax:200},
+  {names:["退群语","退群文案"],module:"groupNotice",path:"leaveMessage",label:"退群文案",kind:"text",textMax:200}
 ]
 
 export type GroupAdminCommand =
   | {ok:true;type:"view"}
   | {ok:true;type:"toggle";feature:ToggleFeature;enable:boolean}
-  | {ok:true;type:"set";rule:SetRule;value:number|boolean}
+  | {ok:true;type:"set";rule:SetRule;value:number|boolean|string}
   | {ok:false;type:"toggle"|"set";message:string}
 
 const TRUE_WORDS = new Set(["开","开启","打开","true","on","yes","是"])
 const FALSE_WORDS = new Set(["关","关闭","关掉","false","off","no","否"])
+
+function ruleNamesText(rules:{names:string[]}[]) {
+  return rules.map(item => item.names[0]).join("、")
+}
 
 /** 解析 `.群管` 系列命令；非群管命令返回 null */
 export function parseGroupAdminCommand(msg:unknown):GroupAdminCommand|null {
@@ -56,22 +82,30 @@ export function parseGroupAdminCommand(msg:unknown):GroupAdminCommand|null {
   if (toggle) {
     const name = toggle[2]!.trim()
     const feature = TOGGLE_FEATURES.find(item => item.names.includes(name))
-    if (!feature) return {ok:false,type:"toggle",message:`没有叫「${name}」的功能。可开关：${TOGGLE_FEATURES.map(item => item.names[0]).join("、")}`}
+    if (!feature) return {ok:false,type:"toggle",message:`没有叫「${name}」的功能。可开关：${ruleNamesText(TOGGLE_FEATURES)}`}
     return {ok:true,type:"toggle",feature,enable:toggle[1] === "开启"}
   }
-  const set = text.match(/^[#＃.。]\s*群管\s+设置\s+(\S+?)\s+(\S+)\s*$/)
+  const set = text.match(/^[#＃.。]\s*群管\s+设置\s+(\S+)\s+([\s\S]+?)\s*$/)
   if (set) {
     const name = set[1]!.trim()
     const rawValue = set[2]!.trim()
     const rule = SET_RULES.find(item => item.names.includes(name))
-    if (!rule) return {ok:false,type:"set",message:`没有叫「${name}」的规则。可设置：${SET_RULES.map(item => item.names[0]).join("、")}`}
+    if (!rule) return {ok:false,type:"set",message:`没有叫「${name}」的规则。可设置：${ruleNamesText(SET_RULES)}`}
+    if (rule.kind === "text") {
+      const singleLine = rawValue.replace(/\s+/g, " ")
+      if (!singleLine) return {ok:false,type:"set",message:`「${rule.label}」内容不能为空`}
+      if ([...singleLine].length > (rule.textMax ?? 200)) return {ok:false,type:"set",message:`「${rule.label}」最多 ${rule.textMax ?? 200} 字`}
+      return {ok:true,type:"set",rule,value:singleLine}
+    }
     if (rule.kind === "boolean") {
       if (TRUE_WORDS.has(rawValue.toLowerCase())) return {ok:true,type:"set",rule,value:true}
       if (FALSE_WORDS.has(rawValue.toLowerCase())) return {ok:true,type:"set",rule,value:false}
       return {ok:false,type:"set",message:`「${rule.label}」只能填 开 或 关`}
     }
+    if (/\s/.test(rawValue)) return {ok:false,type:"set",message:`「${rule.label}」只需填一个数字`}
     const value = Number(rawValue)
-    if (!Number.isFinite(value) || !Number.isInteger(value)) return {ok:false,type:"set",message:`「${rule.label}」需要填整数`}
+    if (!Number.isFinite(value)) return {ok:false,type:"set",message:`「${rule.label}」需要填${rule.decimal ? "数字" : "整数"}`}
+    if (!rule.decimal && !Number.isInteger(value)) return {ok:false,type:"set",message:`「${rule.label}」需要填整数`}
     if (value < (rule.min ?? -Infinity) || value > (rule.max ?? Infinity)) return {ok:false,type:"set",message:`「${rule.label}」需在 ${rule.min} 到 ${rule.max} 之间`}
     return {ok:true,type:"set",rule,value}
   }
@@ -92,6 +126,11 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
   const notice = normalizeGroupNoticeConfig(resolved.groupNotice)
   const masterOk = (key:string) => adminRecord(settings[key]).enabled === true
   const on = (key:string) => enabledInGroups(resolved[key], id)
+  const actionText = [
+    moderation.actions.recallEnabled ? "撤回" : "",
+    moderation.actions.muteEnabled ? `禁言${moderation.actions.muteSeconds}秒` : "",
+    moderation.actions.kickEnabled ? "踢出" : ""
+  ].filter(Boolean).join(" · ")
   return {
     groupId: id,
     sections: [
@@ -100,7 +139,22 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
         enabled: on("groupModeration"),
         masterOk: masterOk("groupModeration"),
         rows: [
-          {label: "广告与刷屏检测", on: moderation.adScan.enabled, detail: "广告/刷屏判定、撤回禁言踢人处置"},
+          {label: "广告与刷屏检测", on: moderation.adScan.enabled, detail: "广告/引流话术判定，命中按阈值处置"},
+          {
+            label: "刷屏检测",
+            on: moderation.floodEnabled,
+            detail: `${moderation.floodWindowSeconds} 秒内发满 ${moderation.floodMaxMessages} 条命中（检测等级≤${moderation.floodMaxLevel}）`
+          },
+          {
+            label: "检测范围",
+            on: true,
+            detail: moderation.inspectLowLevelOnly ? `只检测活跃等级≤${moderation.minActiveLevel} 的成员` : "检测全部成员"
+          },
+          {
+            label: "自动处置",
+            on: moderation.actions.recallEnabled || moderation.actions.muteEnabled || moderation.actions.kickEnabled,
+            detail: actionText ? `${actionText}（提醒${moderation.thresholds.report} / 撤回${moderation.thresholds.recall} / 禁言${moderation.thresholds.mute} / 踢出${moderation.thresholds.kick}）` : "全部关闭，仅提醒和私发证据"
+          },
           {
             label: "超长消息折叠",
             on: moderation.overlongMessage.enabled,
@@ -118,13 +172,20 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
         label: "入群验证",
         enabled: on("groupGuard"),
         masterOk: masterOk("groupGuard"),
-        rows: [{label: "入群答题验证", on: on("groupGuard"), detail: `新成员需在 ${guard.timeoutSeconds} 秒内答对题目`}]
+        rows: [
+          {label: "入群答题验证", on: on("groupGuard"), detail: `${guard.timeoutSeconds} 秒内答对 0-${guard.questionMaxNumber} 加减法，允许错 ${guard.maxWrongTimes} 次`},
+          {label: "超时踢出", on: guard.kickOnTimeout, detail: guard.kickOnTimeout ? "超时未答对即移出群聊" : "超时仅取消验证，不踢人"},
+          {label: "答错踢出", on: guard.kickOnWrongAnswer, detail: guard.kickOnWrongAnswer ? "答错次数用尽即移出群聊" : "答错次数用尽仅提示失败"}
+        ]
       },
       {
         label: "群通知",
         enabled: on("groupNotice"),
         masterOk: masterOk("groupNotice"),
-        rows: [{label: "入群欢迎 / 退群提示", on: on("groupNotice"), detail: notice.welcomeEnabled || notice.leaveEnabled ? "按下方文案发送" : "文案开关均已关闭"}]
+        rows: [
+          {label: "入群欢迎", on: notice.welcomeEnabled, detail: notice.welcomeMessage || "（未设置文案）"},
+          {label: "退群提示", on: notice.leaveEnabled, detail: notice.leaveMessage || "（未设置文案）"}
+        ]
       }
     ]
   }
@@ -206,8 +267,9 @@ export function buildGroupAdminPageHtml(data:GroupAdminPageData) {
     </div>
     ${sections}
     <div class="foot">
-      群主/群管理可命令修改：<code>.群管 开启 连发折叠</code> · <code>.群管 关闭 广告检测</code> · <code>.群管 设置 连发条数 8</code> · <code>.群管 设置 禁言秒数 60</code><br>
-      开关：广告检测、超长折叠、连发折叠、入群验证、群通知；规则：超长字数、连发条数、连发窗口、禁言秒数、答题超时、超长/连发转发
+      群主/群管理可命令修改：<code>.群管 开启 连发折叠</code> · <code>.群管 设置 连发条数 8</code> · <code>.群管 设置 刷屏条数 5</code> · <code>.群管 开启 自动禁言</code><br>
+      开关：广告检测、刷屏检测、超长折叠、连发折叠、自动撤回/禁言/踢出、低活跃检测、入群验证、超时/答错踢出、欢迎通知、退群提示<br>
+      规则：超长字数、连发条数/窗口/禁言秒数、刷屏条数/窗口/等级、等级阈值、广告禁言秒数、提醒/撤回/禁言/踢出阈值、答题超时、题目范围、错误次数、欢迎语、退群语
     </div>
   </div>
 </body>
@@ -348,7 +410,12 @@ export function createGroupAdminPageMessage(Plugin:new(options:Record<string,unk
         { module: rule.module, path: rule.path, value }
       ]))
       ports.logger?.info?.(`[GroupAdminPage] ${e.group_id} user=${e.user_id} 设置 ${rule.label}=${String(value)}`)
-      await e.reply(`已设置「${rule.label}」为 ${rule.kind === "boolean" ? (value ? "开" : "关") : value}，发送 .群管 查看最新面板。`)
+      const shown = rule.kind === "boolean"
+        ? value ? "开" : "关"
+        : rule.kind === "text"
+          ? `「${[...String(value)].slice(0, 40).join("")}${[...String(value)].length > 40 ? "…" : ""}」`
+          : String(value)
+      await e.reply(`已设置「${rule.label}」为 ${shown}，发送 .群管 查看最新面板。`)
       return true
     }
   }
