@@ -23,7 +23,25 @@ for (const run of [baseline, candidate]) {
   assert.equal(run.platformMessagesSent, 0)
   assert.equal(run.productionStoreWrites, 0)
 }
-for (const field of sameProtocolFields) assert.deepEqual(candidate.metadata[field], baseline.metadata[field], field)
+const protocolDifferences = sameProtocolFields.filter(field => candidate.metadata[field] !== baseline.metadata[field])
+let configApplicability = null
+if (protocolDifferences.length) {
+  // A merged non-chat default still changes the complete effective hash. Keep
+  // that difference visible and require separately captured applicability
+  // evidence instead of changing either historical replay or its fingerprint.
+  assert.deepEqual(protocolDifferences, ['effectiveConfigHash'])
+  assert.ok(process.argv[3], 'Provide the effective configuration applicability audit')
+  configApplicability = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'))
+  assert.equal(configApplicability.finalCommit, candidate.commit)
+  assert.equal(configApplicability.runtimeComparison.firstHash, baseline.metadata.effectiveConfigHash)
+  assert.equal(configApplicability.runtimeComparison.secondHash, candidate.metadata.effectiveConfigHash)
+  assert.equal(configApplicability.frozenConfigHash, candidate.metadata.configHash)
+  assert.equal(configApplicability.frozenPersonaLibraryHash, candidate.metadata.personaLibraryHash)
+  assert.equal(configApplicability.runtimeComparison.relevantEqual, true)
+  assert.ok(configApplicability.runtimeComparison.differingPaths.every(name =>
+    ['groupModeration.overlongMessage', 'groupModeration.burstMessage', 'emojiSystem.admissionExtraReject', 'groupAdmin']
+      .some(root => name === root || name.startsWith(`${root}.`))))
+}
 assert.deepEqual(candidate.results.map(key), baseline.results.map(key))
 const quantile = (values, fraction) => [...values].sort((a,b)=>a-b)[Math.ceil(values.length*fraction)-1]
 function summarize(run) {
@@ -42,7 +60,7 @@ function summarize(run) {
     semanticEvaluation:'requires_entire_conversation_review; HTTP_and_structure_are_not_quality_scores'
   }
 }
-const summary = {sameProtocolFields,baseline:summarize(baseline),candidate:summarize(candidate)}
+const summary = {sameProtocolFields:sameProtocolFields.filter(field => !protocolDifferences.includes(field)),protocolDifferences,configApplicability,baseline:summarize(baseline),candidate:summarize(candidate)}
 fs.writeFileSync(path.join(directory,'summary.json'),JSON.stringify(summary,null,2)+'\n')
 
 const grouped = run => Map.groupBy(run.results,row=>`${row.id}:${row.sampleIndex}`)

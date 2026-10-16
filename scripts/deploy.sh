@@ -8,6 +8,7 @@
 #
 # 环境变量:
 #   DEPLOY_TARGET   默认 root@124.223.95.142
+#   DEPLOY_EXPECTED_BASE_COMMIT  可选：安装前必须仍运行该 commit，避免覆盖并发部署
 #   SSHPASS         SSH 密码(密码登录时需要;配好 key 后不用)
 #
 # 健康检查全部通过才算成功:服务 active / 零载入错误 / 消息管线启动 / 命令页 200 / 控制台 active / 控制台页 200。
@@ -57,6 +58,10 @@ SSH "node '$REMOTE_STAGE/scripts/release.mjs' verify '$REMOTE_STAGE'"
 SSH "cd '$REMOTE_STAGE' && if [ -x /usr/bin/chromium ]; then PUPPETEER_SKIP_DOWNLOAD=true npm ci --omit=dev --no-audit --no-fund; else npm ci --omit=dev --no-audit --no-fund; fi"
 
 # ---------- 3. 停服务后安装；配置/data 不参与覆盖或回滚 ----------
+if [ -n "${DEPLOY_EXPECTED_BASE_COMMIT:-}" ]; then
+  CURRENT_COMMIT=$(SSH "node -p \"JSON.parse(require('fs').readFileSync('$REMOTE_DIR/release-manifest.json','utf8')).commit\"")
+  [ "$CURRENT_COMMIT" = "$DEPLOY_EXPECTED_BASE_COMMIT" ] || fail "线上版本已从预期基线变化，未停止服务或安装产物：$CURRENT_COMMIT"
+fi
 log "停止入口并安装已验证产物…"
 SSH "systemctl stop bl-console trss-yunzai"
 if ! SSH "node '$REMOTE_STAGE/scripts/release.mjs' install '$REMOTE_STAGE' '$REMOTE_DIR' '$BACKUP'"; then

@@ -479,3 +479,143 @@ test('professional permission and operation explanations reach final history int
   assert.equal(enhanced[0][2],item.candidate)
  }
 })
+
+test('8529c94 message outcomes require their own task evidence before sending and learning',async()=>{
+ const cases=[
+  {
+    "row": 0,
+    "candidate": "这个我这边还没确认到结果，图有没有出来不好说。我再看看，有消息就告诉你。",
+    "raw": "刚才改背景的图出来了吗？",
+    "tasks": [],
+    "corrected": "图片处理结果和后续通知安排尚未核实。你之后再问一声，我再查当前状态。"
+  },
+  {
+    "row": 9,
+    "candidate": "做好了，之前那次是发送失败，不是没做完。你没收到就是这个原因。想要的话我现在再试发一次。",
+    "raw": "所以我现在没收到，是还没做好吗？",
+    "tasks": [
+      {
+        "taskId": "synthetic-task-001",
+        "requestMessageId": "synthetic-request-001",
+        "toolName": "imageEdit",
+        "source": "task_record",
+        "execution": "completed",
+        "result": "available",
+        "delivery": {
+          "state": "failed"
+        },
+        "followUp": {
+          "state": "none"
+        },
+        "observedAt": 1792163398905
+      }
+    ],
+    "corrected": "图已经做好了，上次发送没有成功，具体原因尚未确认。"
+  },
+  {
+    "row": 58,
+    "candidate": "没有查到改背景那单的记录，可能当时没登记上。你登记的只有考试提醒那个。\n\n图不会自动发的。要弄的话现在再发一次图，我看看这次能不能处理。",
+    "raw": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+    "tasks": [
+      {
+        "taskId": "exam-reminder",
+        "requestMessageId": "exam-request",
+        "toolName": "reminderTool",
+        "source": "reminder",
+        "execution": "queued",
+        "result": "unknown",
+        "delivery": {
+          "state": "not_attempted"
+        },
+        "followUp": {
+          "state": "registered",
+          "kind": "reminder",
+          "id": "exam-reminder",
+          "dueAt": 4102444800000
+        },
+        "observedAt": 1792163610828
+      }
+    ],
+    "corrected": "图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"
+  },
+  {
+    "row": 59,
+    "candidate": "图这边我没查到对应的处理记录，所以现在没有能发的成品，也说不好它会不会自己好。\n\n你登记的只有考试提醒，那个不会带着发图。想要的话，把改背景这事再正式跟我说一声，我看看能不能重新跑一次。",
+    "raw": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+    "tasks": [
+      {
+        "taskId": "exam-reminder",
+        "requestMessageId": "exam-request",
+        "toolName": "reminderTool",
+        "source": "reminder",
+        "execution": "queued",
+        "result": "unknown",
+        "delivery": {
+          "state": "not_attempted"
+        },
+        "followUp": {
+          "state": "registered",
+          "kind": "reminder",
+          "id": "exam-reminder",
+          "dueAt": 4102444800000
+        },
+        "observedAt": 1792163613926
+      }
+    ],
+    "corrected": "图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"
+  }
+]
+ for(const item of cases){
+  const {api,event,host,archived,saved,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+  session.interactionContext.rawUserText=item.raw
+  session.interactionContext.actionFacts.tasks=item.tasks.map(task=>({...task,observedAt:Date.now()}))
+  session.actionFactsQuery={recentRequestMessageIds:item.tasks.map(task=>task.requestMessageId)}
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:item.corrected}}]}}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'outcome-corrected'}
+  await api.handleTextResponse(host,item.candidate,event,session,messages)
+  assert.equal(repairs,1,`row ${item.row}: ${item.candidate}`)
+  assert.equal(session.replyGrounding.fallback,false,item.candidate)
+  assert.deepEqual(sent,[item.corrected])
+  assert.equal(messages.at(-1).content,item.corrected)
+  assert.equal(archived[0].message[0].text,item.corrected)
+  assert.equal(saved.length,1)
+  assert.equal(enhanced[0][2],item.corrected)
+ }
+})
+test('8529c94 unsupported message updates cannot enter history through a repair',async()=>{
+ const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+ let repairs=0
+ host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:'我再看看，有消息就告诉你。'}}]}}
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'outcome-fallback'}
+ await api.handleTextResponse(host,'图还没出来。',event,session,messages)
+ assert.equal(repairs,1)
+ assert.equal(session.replyGrounding.fallback,true)
+ assert.ok(session.replyGrounding.remaining.length)
+ assert.doesNotMatch(sent[0],/有消息就告诉你/u)
+ assert.equal(messages.at(-1).content,sent[0])
+ assert.equal(archived[0].message[0].text,sent[0])
+ assert.equal(enhanced[0][2],sent[0])
+})
+
+test('8529c94 operating temperature assurance is corrected before final history',async()=>{
+ const item={
+  "raw": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+  "candidate": "82℃满载这个数单看不能直接下结论。大部分桌面CPU满载在70~95℃之间都算常见区间，82℃偏中游，但判断得看几个前提：CPU型号（Tjunction上限多少，一般90~105℃）、监控软件读的是哪个传感器、散热器和环境温度。无烟无味只说明没观察到异常，不代表一定没问题，也别据此反向判断。\n\n最实际的验证：满载时看频率有没有掉。如果频率稳在标称值附近没降频，说明还没撞温度墙，82℃对这颗U就是正常工作温度；如果一满载就掉频，才需要考虑改善散热。方便的话说下型号，我可以帮你对着规格看。",
+  "corrected": "单凭82℃还不能判断是否正常，需要确认部件型号、测点和规格，再结合功耗及限频原因判断。"
+}
+ const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[]
+ const interactionContext=buildTurnInteractionContext({rawUserText:item.raw,botId:'99',speaker:{userId:'2'}})
+ interactionContext.diagnosticContext=buildDiagnosticContext({rawUserText:item.raw,speakerId:'2'})
+ let repairs=0
+ host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:item.corrected}}]}}
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'temperature-corrected'}
+ const session={interactionContext}
+ await api.handleTextResponse(host,item.candidate,event,session,messages)
+ assert.equal(repairs,1)
+ assert.equal(session.replyGrounding.fallback,false)
+ assert.deepEqual(sent,[item.corrected])
+ assert.equal(messages.at(-1).content,item.corrected)
+ assert.equal(archived[0].message[0].text,item.corrected)
+ assert.equal(enhanced[0][2],item.corrected)
+})

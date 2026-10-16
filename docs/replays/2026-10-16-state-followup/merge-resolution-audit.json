@@ -1,0 +1,100 @@
+[
+  {
+    "file": "docs/ai-state-followup-2026-10-16.md",
+    "strategy": "ours-latest-owned",
+    "ours": "19650057c9ae71631eda51b31a6f3a9ee9bbc9d465880819db232c8164f2769e",
+    "theirs": "b24f34a8afcbf3d5c894b8944312bbd8173c7017f7630bde23725fa09beb0ced",
+    "resolved": "19650057c9ae71631eda51b31a6f3a9ee9bbc9d465880819db232c8164f2769e"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/blind-conversations.json",
+    "strategy": "ours-latest-owned",
+    "ours": "04f2ef5608e26c01d473f3a9867fcac90a66db1e5b758db8293e8de7f3f26dbc",
+    "theirs": "06e234dc6be5a378b8ff0d67669a175834ba67b6cc8ca43e1744c7edfa14d0a0",
+    "resolved": "04f2ef5608e26c01d473f3a9867fcac90a66db1e5b758db8293e8de7f3f26dbc"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/blind-revealed.json",
+    "strategy": "ours-latest-owned",
+    "ours": "26f70406635d56f84885c855db41177871e2e4d0fe34027ec0c2538a88a1595f",
+    "theirs": "de2f99b1c140a61ec83f1ef6a2488cb6eb681653a6aa770e14cc8e0fb2c2f16e",
+    "resolved": "26f70406635d56f84885c855db41177871e2e4d0fe34027ec0c2538a88a1595f"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/blind-review.json",
+    "strategy": "ours-latest-owned",
+    "ours": "f62e59a6150b44f99a538a3925f0fc506149d63e2e31a352656262019f913152",
+    "theirs": "dca5eadfb1869480e723ee590d4216cdbf56b73075c07d51921f67d24c9a12d8",
+    "resolved": "f62e59a6150b44f99a538a3925f0fc506149d63e2e31a352656262019f913152"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/candidate.json",
+    "strategy": "ours-latest-owned",
+    "ours": "1cf541ac4c5ddbd7ef13054e21fc5ad231a12815a5507ee6a2cefc688fcc2b60",
+    "theirs": "5b5ccbbd925ff8069203092b98e42f50896d4c6613610d81a4446fa52f57ea4a",
+    "resolved": "1cf541ac4c5ddbd7ef13054e21fc5ad231a12815a5507ee6a2cefc688fcc2b60"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/summary.json",
+    "strategy": "ours-latest-owned",
+    "ours": "12a06ad2013dd116fd3c7172e9c0cb60b91ff7853392c42653e7bb7f03221f7c",
+    "theirs": "a4fe96cab2b8209a414c6751049e1199f9cad31e1de5ce5929512da28241b859",
+    "resolved": "12a06ad2013dd116fd3c7172e9c0cb60b91ff7853392c42653e7bb7f03221f7c"
+  },
+  {
+    "file": "findings.md",
+    "strategy": "theirs-prefix-ours-current-section",
+    "ours": "10d79350afd56f7764574a25d681038fec601ab117b1eddf5d487608b7cf864f",
+    "theirs": "520b5b8c73f5cac6da815e863595bb5ef6685a0126378a276276d48737df3365",
+    "resolved": "1db0279757fc882a03e6fa1c1586899caf9b4ffc431e9e14332f4cfa9faa58c0"
+  },
+  {
+    "file": "progress.md",
+    "strategy": "theirs-prefix-ours-current-section",
+    "ours": "bed54dcbd2e96d3267e3a335756437a2c9eb5b315a909b0dc3c28aa2d568dbb1",
+    "theirs": "68083e9ce102b070d1361dc4398442586a3639b70669cfa263027766af4a8fa6",
+    "resolved": "d0a23a0d49e46251c17548649d4156f4088d7934e16b1384c258fb9485f46551"
+  },
+  {
+    "file": "src/modules/conversation/domain/actionReplyGrounding.ts",
+    "strategy": "ours-latest-owned",
+    "ours": "c5d94f3897b07b4af7df30c0c7d424584ee7c6e403f1ce1c975aa8e247c7c1e6",
+    "theirs": "0fe1a8ba211e0a281033962f83385ef4872ebc2f108b8dff6f97a50748267e0f",
+    "resolved": "c5d94f3897b07b4af7df30c0c7d424584ee7c6e403f1ce1c975aa8e247c7c1e6"
+  },
+  {
+    "file": "src/modules/conversation/domain/diagnosticContext.ts",
+    "strategy": "ours-latest-owned",
+    "ours": "85be114598a03e5039b6cc598f87e60dca66e3a192b299440670c365ae2760a7",
+    "theirs": "56e9fc0e19220b0fae0fafc8ed41f07dc67ca4c9780990c27d0a855a8fb12557",
+    "resolved": "85be114598a03e5039b6cc598f87e60dca66e3a192b299440670c365ae2760a7"
+  },
+  {
+    "file": "task_plan.md",
+    "strategy": "theirs-prefix-ours-current-section",
+    "ours": "0c9c66c61163c4e6ed0844a17c4a787a7799ac1b925fe055476e20d5935cecd6",
+    "theirs": "7fce2b9e4a09f58e0d5b137a833bf32ea75fff1a05e7e9a75f3502c6a61eb065",
+    "resolved": "a0949a31f13a4cd2e20f7e5eeb87643bbf5b545fdda33a5b14e05ba06e583eb7"
+  },
+  {
+    "file": "tests/finalReplyBehavior.test.js",
+    "strategy": "ours-latest-owned",
+    "ours": "9e9b60f7d221f91d0a0ba0b2436e63617bc3dcc713f67ac3bcf4f456cbdd6696",
+    "theirs": "56f88b616ed02cf505b7a39ecbe61ed71dbcf3cf2f82be59358d6d8eea89b518",
+    "resolved": "9e9b60f7d221f91d0a0ba0b2436e63617bc3dcc713f67ac3bcf4f456cbdd6696"
+  },
+  {
+    "file": "tests/typescript/actionReplyGrounding.test.ts",
+    "strategy": "ours-latest-owned",
+    "ours": "ec215f34a24da3b0da43f14d5252c7bcd84fea4efb699609ae71d8e4232fd325",
+    "theirs": "3c715353b78e5f4c3d25c2690495ed2b3d99f622027641dd13ecdf4e3cd9505b",
+    "resolved": "ec215f34a24da3b0da43f14d5252c7bcd84fea4efb699609ae71d8e4232fd325"
+  },
+  {
+    "file": "tests/typescript/diagnosticContext.test.ts",
+    "strategy": "ours-latest-owned",
+    "ours": "286ed84c6b53ed321c471f5b88b4df27f55dcdac2691f0aac7836be86bc30095",
+    "theirs": "5c0c1c800fa3721fa37d91346c8c4be079816bf4b2ea2969c2e2e8e42e003220",
+    "resolved": "286ed84c6b53ed321c471f5b88b4df27f55dcdac2691f0aac7836be86bc30095"
+  }
+]

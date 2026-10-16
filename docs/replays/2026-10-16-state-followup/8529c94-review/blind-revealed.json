@@ -1,0 +1,104 @@
+{
+  "evaluatedCandidate": "8529c94d8032d3ad8156afa1f07c6bd9131963b7",
+  "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
+  "sourceHashes": {
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-conversations.json": "9f7dc147e8933f3779aca246e798d4e2f7152d0c3b740398fcf97f074e8691f7",
+    "blind-review.json": "34d0fca45027fe4f5bcfac5a70ae6749b35fe877064fe780eb991382161c6a73"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 9,
+    "baseline": 8,
+    "tie": 11
+  },
+  "scoreTotals": {
+    "candidate": 210,
+    "baseline": 212
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 5,
+        "baseline": 3,
+        "tie": 20
+      },
+      "scoreTotals": {
+        "candidate": 51,
+        "baseline": 49
+      }
+    },
+    "continuity": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 1,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 55,
+        "baseline": 55
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 0,
+        "baseline": 1,
+        "tie": 27
+      },
+      "scoreTotals": {
+        "candidate": 55,
+        "baseline": 56
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 4,
+        "baseline": 7,
+        "tie": 17
+      },
+      "scoreTotals": {
+        "candidate": 49,
+        "baseline": 52
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 0,
+    "baseline": 2
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 0,
+    "baseline": 2
+  },
+  "hardErrors": [
+    {
+      "id": "b852first-001",
+      "caseId": "case-03",
+      "candidate": "baseline",
+      "category": "temporal_fidelity",
+      "reason": "同一已送达任务通过delivery.messageId指向recentContext的synthetic-delivery-001，时间为2026-01-01T11:59:30+08:00。当前用户轮次为2026-10-16，故这次已知旧送达不能说成刚才发出。用户说刚才不能覆盖明确历史时钟。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才就发在群里了"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "b852first-002",
+      "caseId": "case-10",
+      "candidate": "baseline",
+      "category": "temporal_execution_fidelity",
+      "reason": "第二张已知送达消息synthetic-delivery-other时间为2026-01-01T11:59:30+08:00，当前为2026-10-16。说刚才自己把图发好了错置已知交付时间，亦无本轮真实发送证据。这是已执行断言，不是条件性的未来请求。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才只把第二张的傍晚背景发好了"
+        }
+      ],
+      "anonymousCandidate": "B"
+    }
+  ]
+}

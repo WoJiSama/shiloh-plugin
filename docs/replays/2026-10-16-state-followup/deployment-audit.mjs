@@ -7,10 +7,16 @@ import {execFileSync} from 'node:child_process'
 const root = '/opt/trss-yunzai/plugins/shiloh-plugin'
 const expected = process.argv[2]
 const replay = process.argv[3]
-if (!expected || !replay) throw new Error('Provide expected release and frozen replay runtime directories')
+const configSnapshot = process.argv[4]
+if (!expected || !replay || !configSnapshot) throw new Error('Provide expected release, frozen replay runtime and pre-deployment config hash snapshot paths')
 const read = (base, name) => fs.readFileSync(path.join(base, name))
 const hash = buffer => createHash('sha256').update(buffer).digest('hex')
 const json = (base, name) => JSON.parse(read(base, name))
+const expectedConfigs = JSON.parse(fs.readFileSync(configSnapshot, 'utf8'))
+if (Object.keys(expectedConfigs).sort().join(',') !== 'config/message.yaml,config/persona-library.yaml'
+  || Object.values(expectedConfigs).some(digest => typeof digest !== 'string' || !/^[a-f0-9]{64}$/.test(digest))) {
+  throw new Error('Config snapshot must contain exactly the two protected configuration file hashes')
+}
 const manifest = json(root, 'release-manifest.json')
 const expectedManifest = json(expected, 'release-manifest.json')
 const replayManifest = json(replay, 'release-manifest.json')
@@ -47,6 +53,8 @@ const result = {
   sameReplayBackendSources: sameObject(backend.sources, replayBackend.sources),
   sameReplayBackendFiles: sameObject(backend.files, replayBackend.files),
   configHashes: Object.fromEntries(['config/message.yaml', 'config/persona-library.yaml'].map(name => [name, hash(read(root, name))])),
+  expectedConfigHashes: expectedConfigs,
+  configSnapshotHash: hash(fs.readFileSync(configSnapshot)),
   reasoning: {global: config.chatAiConfig?.chatReasoningEffort, complex: config.chatAiConfig?.complexReasoningEffort,
     casual: config.taskAiConfig?.casual?.reasoningEffort, tools: config.toolsAiConfig?.toolsReasoningEffort ?? '', useTools: config.useTools},
   services,
@@ -56,7 +64,6 @@ const result = {
     [name, shell('curl', ['-s', '-o', '/dev/null', '-m', '5', '-w', '%{http_code}', url])]))
 }
 console.log(JSON.stringify(result, null, 2))
-const expectedConfigs = {'config/message.yaml': '94e667393df864e61f030822bc19a72ef7d59e39446907799a45280ecbcd301b', 'config/persona-library.yaml': '01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f'}
 if (manifest.commit !== expectedManifest.commit || result.managedMismatches.length || result.expectedReleaseMismatches.length || !result.sameBackendManifest ||
     result.replayRuntimeMismatches.length || !result.sameReplayBackendSources || !result.sameReplayBackendFiles ||
     result.loadErrors || !result.pipelineStarted || Object.values(result.pages).some(code => code !== '200') ||

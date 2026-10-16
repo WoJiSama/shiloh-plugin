@@ -515,11 +515,14 @@ function isDamageDiscussion(clause: string, proposition: DamageProposition, prof
 }
 
 function temperatureAssurance(clause: string): boolean {
-  if (/(?:是否|是不是|正常与否)|(?:正常|安全)(?:范围|区间).{0,8}(?:要|需|取决于)|(?:查看|观察|检查|监测).{0,12}(?:状态|情况|表现)/u.test(clause)) return false
+  if (/(?:是否|是不是|正常与否)|(?:正常|安全)(?:(?:运行|工作|使用)?温度|范围|区间).{0,8}(?:要|需|取决于)|(?:查看|观察|检查|监测).{0,12}(?:状态|情况|表现)/u.test(clause)) return false
   if (/(?:可以|能够|能|可|放心)(?:继续|照常)?(?:正常|安全)(?:运行|工作|使用)|(?:正常|安全)(?:运行|工作|使用)(?:没问题|就行|即可)/u.test(clause)) return true
   // Reporting that a machine has run does not itself assert that its temperature
   // is normal. A permission to keep using it is a separate positive conclusion.
-  if (/(?:正常|安全)(?:运行|工作|使用)/u.test(clause)) return false
+  // “正常工作温度” classifies the reading, rather than reporting that the
+  // machine has kept running. Keep this nominal temperature conclusion in
+  // the evidence check even when its modifier contains an operation verb.
+  if (/(?:正常|安全)(?:运行|工作|使用)(?!温度|读数|范围|区间)/u.test(clause)) return false
   // Health and reassurance are still positive conclusions when their subject
   // is this reading. Keep unrelated personal well-being outside this scope.
   const reading = /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)/iu.test(clause)
@@ -806,7 +809,7 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
       && !supportsThermalConclusion(clause, thermalClaim.kind, context)) {
       add('unsupported_temperature_diagnosis', clause.trim(), '频率下降不能独立确定温度限频；型号、测点和规格未明时，也不能把当前读数判为温度临界。', '区分频率现象与原因：还可能存在功耗等限制，先结合温度规格及限频原因记录判断；保留待确认的可能性，不把降频写成确定触发温度墙。已有专业结论只按同一部件和确认范围复述。')
     }
-    if (assessment.temperature?.missing.length && !conclusionDenied && !possible && !conditional
+    if (assessment.temperature?.missing.length && !conclusionDenied && !possible && !conditional && !temperatureConditional
       && !/(?:有些|某些|部分)(?:型号|部件|处理器|设备)|对.{0,12}(?:型号|部件).{0,6}来说/u.test(clause)
       && temperatureAssurance(clause)) {
       add('unsupported_temperature_assurance', clause.trim(), `温度判断仍缺少：${assessment.temperature.missing.join('、')}。`, '先说明当前读数无法单独判断正常与否，补齐部件型号、测点和负载并对照规格；末尾补问不能抵消前面的正常或安全保证。')
