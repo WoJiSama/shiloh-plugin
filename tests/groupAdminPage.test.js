@@ -42,7 +42,7 @@ test("parseGroupAdminCommand：查看/开关/设置与错误提示", () => {
   assert.deepEqual(parseGroupAdminCommand(".群管"), { ok: true, type: "view" })
   assert.deepEqual(parseGroupAdminCommand("。群管页面"), { ok: true, type: "view" })
   assert.deepEqual(parseGroupAdminCommand("#群管面板"), { ok: true, type: "view" })
-  assert.equal(parseGroupAdminCommand(".群管 面板"), null, "带空格的面板词不属于查看命令")
+  assert.deepEqual(parseGroupAdminCommand(".群管 面板"), { ok: true, type: "view" })
   const toggle = parseGroupAdminCommand(".群管 开启 连发折叠")
   assert.equal(toggle.ok, true)
   assert.equal(toggle.type, "toggle")
@@ -95,7 +95,7 @@ test("面板文本与 HTML：包含模块与命令提示，HTML 转义", () => {
   const text = buildGroupAdminPageText(data)
   assert.ok(text.includes("群 609235590"))
   assert.ok(text.includes("【广告与刷屏】本群已开启"))
-  assert.ok(text.includes(".群管 设置"))
+  assert.ok(text.includes("　.群管 ") || text.includes(".群管 "), "文本版带命令")
   const html = buildGroupAdminPageHtml(data)
   assert.ok(html.includes("群管面板"))
   assert.ok(html.includes("连发消息折叠"))
@@ -183,19 +183,74 @@ test("面板每行附带自己的配置命令，开关命令给可操作方向",
   const data = buildGroupAdminPageData(serverLikeSettings(), GROUP_ID)
   const moderation = data.sections.find(section => section.label === "广告与刷屏")
   const burst = moderation.rows.find(row => row.label === "连发消息折叠")
-  assert.ok(burst.commands.some(cmd => cmd.includes("连发折叠")), "连发行带开关命令")
-  assert.ok(burst.commands.some(cmd => cmd.includes("连发条数 6")), "示例值即当前值")
+  assert.ok(burst.commands.includes(".群管 连发折叠 开"), "连发行带开关命令(新语法，当前关→展示开)")
+  assert.ok(burst.commands.includes(".群管 连发折叠 条数 6"), "示例值即当前值")
   const overlong = moderation.rows.find(row => row.label === "超长消息折叠")
-  assert.ok(overlong.commands.some(cmd => cmd === ".群管 设置 超长字数 200"), "按群覆盖的 200 出现在命令示例中")
-  assert.ok(overlong.commands.includes(".群管 关闭 超长折叠"), "已开启的功能展示关闭命令")
+  assert.ok(overlong.commands.includes(".群管 超长折叠 字数 200"), "按群覆盖的 200 出现在命令示例中")
+  assert.ok(overlong.commands.includes(".群管 超长折叠 关"), "已开启的功能展示关闭命令")
   const flood = moderation.rows.find(row => row.label === "刷屏检测")
-  assert.ok(flood.commands.some(cmd => cmd.includes("刷屏条数")))
+  assert.ok(flood.commands.includes(".群管 刷屏检测 条数 8"))
   const guard = data.sections.find(section => section.label === "入群验证")
   const verify = guard.rows.find(row => row.label === "入群答题验证")
-  assert.ok(verify.commands.includes(".群管 开启 入群验证"), "未启用的功能展示开启命令")
+  assert.ok(verify.commands.includes(".群管 入群验证 开"), "未启用的功能展示开启命令")
   const html = buildGroupAdminPageHtml(data)
   assert.ok(html.includes("f-cmds"), "命令以独立行渲染在功能下方")
   assert.ok((html.match(/<code>/g) || []).length > 20, "整页命令示例数量充足")
   const text = buildGroupAdminPageText(data)
-  assert.ok(text.includes("　.群管 设置 连发条数 6"), "文本版也带缩进命令")
+  assert.ok(text.includes("　.群管 连发折叠"), "文本版也带缩进命令")
+})
+
+test("功能语法：.群管 <功能> 帮助/开关/参数串", () => {
+  // 单发功能名 → help
+  const help = parseGroupAdminCommand(".群管 刷屏检测")
+  assert.equal(help.ok && help.type, "feature")
+  assert.equal(help.ok && help.action, "help")
+  // 开/关
+  const off = parseGroupAdminCommand(".群管 刷屏检测 关")
+  assert.equal(off.ok && off.action, "toggle")
+  assert.equal(off.enable, false)
+  // 参数序列（可多组）
+  const multi = parseGroupAdminCommand(".群管 刷屏检测 条数 5 窗口 8")
+  assert.equal(multi.ok && multi.action, "set")
+  assert.deepEqual(multi.changes, [
+    { path: "floodMaxMessages", value: 5 },
+    { path: "floodWindowSeconds", value: 8 }
+  ])
+  // 布尔参数
+  const bool = parseGroupAdminCommand(".群管 广告检测 自动禁言 开")
+  assert.deepEqual(bool.ok && bool.changes, [{ path: "actions.muteEnabled", value: true }])
+  // 小数
+  const decimal = parseGroupAdminCommand(".群管 广告检测 撤回阈值 0.8")
+  assert.deepEqual(decimal.ok && decimal.changes, [{ path: "thresholds.recall", value: 0.8 }])
+  // 文本参数吃掉剩余整行
+  const text = parseGroupAdminCommand(".群管 群通知 欢迎语 {at} 欢迎加入本群！")
+  assert.deepEqual(text.ok && text.changes, [{ path: "welcomeMessage", value: "{at} 欢迎加入本群！" }])
+  // 错误：未知参数/缺值/越界
+  const badParam = parseGroupAdminCommand(".群管 刷屏检测 高度 99")
+  assert.equal(badParam.ok, false)
+  assert.ok(badParam.message.includes("没有参数「高度」") && badParam.message.includes(".群管 刷屏检测"))
+  const missingValue = parseGroupAdminCommand(".群管 刷屏检测 条数")
+  assert.equal(missingValue.ok, false)
+  assert.ok(missingValue.message.includes("缺少值"))
+  const outOfRange = parseGroupAdminCommand(".群管 刷屏检测 条数 2")
+  assert.equal(outOfRange.ok, false)
+  assert.ok(outOfRange.message.includes("3 到 100"))
+  // 未知功能
+  const unknown = parseGroupAdminCommand(".群管 飞行模式")
+  assert.equal(unknown.ok, false)
+  assert.ok(unknown.message.includes("可用：") && unknown.message.includes("刷屏检测"))
+})
+
+test("功能帮助：展示当前状态与当前值示例", async () => {
+  const { buildFeatureHelp } = await import("../dist/backend/modules/groupAdmin/infrastructure/groupAdminPage.js")
+  const settings = serverLikeSettings()
+  const help = buildFeatureHelp(
+    (await import("../dist/backend/modules/groupAdmin/infrastructure/groupAdminPage.js")).FEATURE_DEFS.find(def => def.label === "刷屏检测"),
+    settings,
+    GROUP_ID
+  )
+  assert.ok(help.includes("【刷屏检测】"))
+  assert.ok(help.includes("当前状态"), "帮助含开关当前状态")
+  assert.ok(help.includes(".群管 刷屏检测 条数 "), "帮助含参数用法")
+  assert.ok(help.includes("窗口"), "帮助含全部参数")
 })

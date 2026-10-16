@@ -56,7 +56,19 @@
     "indexUnchanged": true,
     "nonTargetsUnchanged": true,
     "remainingOriginalChanges": "Task reports/evidence writeback and subsequently modified groupAdminPage source/test from another session; preserved without overwrite.",
-    "finalScope": "Final evidence only after full-scope CAS rejected a concurrent group page source change; accepted file hashes and planning suffixes remain protected."
+    "finalScope": "Final evidence only after full-scope CAS rejected a concurrent group page source change; accepted file hashes and planning suffixes remain protected.",
+    "finalEvidenceAudit": "final-evidence-only-writeback-audit.json",
+    "preservedConcurrentPaths": [
+      "src/modules/groupAdmin/infrastructure/groupAdminPage.ts",
+      "tests/groupAdminPage.test.js"
+    ],
+    "finalProtectionBaseline": {
+      "audit": "final-evidence-baseline-refresh.json",
+      "head": "ad18bc969c89c90419ce1714ffa73036cf37603e",
+      "indexSha256": "391129a36338f56c737261173c62e50b7894653bfc18232c7bef2fcafa3e1209",
+      "previouslyAcceptedEvidenceAndPlanningSuffixesVerified": true,
+      "headAdvancedByAnotherSession": true
+    }
   },
   "archiveValidation": "final-archive-validation.json"
 }

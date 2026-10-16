@@ -1795,3 +1795,5 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 最终归档检查曾将交接摘要raw哈希与本地导出JSON比较而断言失败；未提交或更改回放。已保留原期望与失败，按d8dec328冻结提交逐字核验candidate两份导出及输入完整性文件完全相同，新日志压缩前后哈希与线上审计均核验通过，见final-archive-validation.json。
 
 - 最后一轮全目标CAS因另一会话新改groupAdminPage.ts正确拒绝，未写入；只读进一步确认同模块test也在并发修改。原HEAD/index保持，最终同步范围收敛为本轮报告/证据，仍按已接受哈希及本轮规划后缀CAS，不覆盖新群管源码/测试或其他会话规划前缀。
+
+- 原目录另一会话提交ad18bc9并带入49份已接受交付记录，证据限定CAS因HEAD/index变化拒绝；初查只预期业务变化，也先拒绝。逐项确认所有已接受内容和本轮后缀保持，仅两份群管业务/测试变化后，保存新快照刷新保护基线，旧快照和失败均保留。本任务未修改原HEAD/index。后续一次Python stdin编码失败发生在执行前、无文件写入，改用apply_patch和ASCII脚本。

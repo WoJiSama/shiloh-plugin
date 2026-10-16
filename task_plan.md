@@ -2540,3 +2540,5 @@ Report: docs/ai-low-reasoning-2026-10-15.md. Conditional future promises and low
 归档核验记录：摘要raw哈希与导出文件比较失败已保留，改按既有d8dec328冻结证据逐字核验通过；不改原回放或期望。
 
 末次同步全范围CAS遇到并发groupAdminPage源码变化而拒绝，未写入；原HEAD/index保持，另有同模块测试新改动。只同步最终报告/证据并保护已接受哈希、本轮规划后缀和所有非目标字节，保留这些并发群管改动，不合入未发布的新业务。
+
+最后保护基线刷新为另一会话的ad18bc9：其同时纳入49份已接受证据路径，所有已接受哈希和本轮后缀保持，仅两份群管业务/测试变化。已备份新HEAD/index及全文件hash，继续证据限定CAS；前置拒绝均保留。一次Python stdin编码失败发生在执行前，无文件写入，改用apply_patch与ASCII脚本。

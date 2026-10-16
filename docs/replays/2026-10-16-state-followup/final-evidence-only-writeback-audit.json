@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-16T16:11:35.824444+00:00",
+  "scope": "Final task evidence only; concurrent group page edits excluded and preserved",
+  "head": "831ad3831470176e678c00b966a78d589c34ae4c",
+  "indexSha256": "42ea9d07534a8e573527f6916e6bdb8271be476a206fda75e6d897f6a7f9081b",
+  "targets": 12,
+  "writes": 5,
+  "changed": [
+    "docs/ai-state-followup-2026-10-16.md",
+    "docs/replays/2026-10-16-state-followup/final-archive-validation.json",
+    "docs/replays/2026-10-16-state-followup/final-delivery-receipt.json",
+    "progress.md",
+    "task_plan.md"
+  ],
+  "nonTargetFileCount": 2097,
+  "nonTargetsUnchanged": true,
+  "headUnchanged": true,
+  "indexUnchanged": true,
+  "planningPrefixesPreserved": true,
+  "preservedConcurrentTargetDrift": {
+    "src/modules/groupAdmin/infrastructure/groupAdminPage.ts": {
+      "previousAcceptedSha256": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603",
+      "currentSha256": "bbfce969622bbd3b963674a93dd93beeebb150d0153b1cb7ce336893fa8f5b4f"
+    },
+    "tests/groupAdminPage.test.js": {
+      "previousAcceptedSha256": "1e91d0984fc605c2414b94f6ef5ccae4be8ba6e12fe672a82de38b044cffccc0",
+      "currentSha256": "6bc729afdf6bc1eb2b3a42c389c5c463763cfae69c67b9836c5dc9dd17e36976"
+    }
+  },
+  "backup": "/private/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-fact-state-start-20261016-z3pus4g5/evidence-only-sync-20261017-001135-469401",
+  "fullScopeCasFailureRetained": "groupAdminPage.ts conflict before any writes; final scope restricted to task evidence"
+}
