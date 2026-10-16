@@ -53,6 +53,7 @@ const deliveryLabels: Record<TurnTaskFact['delivery']['state'], string> = {not_a
 export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
   if (!facts) return ''
   const lines = ['【已核验的任务事实】', '以下来自当前机器人、当前会话和当前请求者的任务记录。执行、产物和投递分别成立；历史承诺、进度消息和工具调用返回都不等于最终产物已送达。']
+  lines.push('未查到记录不代表任务没有在执行；这次未核验到有效后续登记，只限制本次自动跟进，不能据此说系统没有这个功能。')
   if (facts.lookup === 'unavailable' && facts.tasks.length) lines.push('部分记录未能核验；以下已确认的事实仍成立，未列出的任务或后续安排保持未知。')
   if (!facts.tasks.length) lines.push(facts.lookup === 'unavailable' ? '本次未能核验相关任务记录；不能推断任务不存在、仍在执行或已经完成。' : '当前查询没有匹配的可核验任务记录；进度、产物与投递保持未确认。')
   for (const task of facts.tasks) {

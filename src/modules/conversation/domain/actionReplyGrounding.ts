@@ -21,7 +21,7 @@ function assertions(text: string): ReplySentence[] {
 }
 
 const NON_ASSERTION = /不能(?:确认|说明|证明|保证|承诺|断定|说)|无法(?:确认|核实|保证)|不(?:确定|清楚|保证|承诺|代表|等于|证明)|没(?:有)?证据|未确认|没确认|尚不知|还不知道|不是|并非|是否|有没有|能否|是不是|会不会|不一定|可能|也许|似乎/u
-const WORDING_EXAMPLE = /例如|比如|举例|示例|假设|这句话|这种说法|这段话|不要(?:说|写|回复)|别(?:说|写|回复)|不能(?:说|写|回复)|(?:用户|别人|他|她|你)(?:说|问|写)(?:的|过|了)?/u
+const WORDING_EXAMPLE = /例如|比如|举例|示例|假设|这句话|这种说法|这段话|不要(?:说|写|回复)|别(?:说|写|回复)|不能(?:说|写|回复)|(?:用户|别人|他|她)(?:说|问|写)(?:的|过|了)?|(?<![跟和对向])你(?:说|问|写)(?:的|过|了)?/u
 const OTHER_SUBJECT = /^(?:(?:我|你)(?:妈|爸|姐姐|妹妹|哥哥|弟弟|朋友|同事)|姐姐|妹妹|哥哥|弟弟|妈妈|爸爸|他(?:们)?|她(?:们)?|CPU|GPU|电脑|设备|程序|服务器)/iu
 const TASK_TOPIC = /(?:任务|出图|生成|改图|画图|重跑|重试|进度|回执|投递)|(?:图(?:片)?|成品|结果|文件).{0,16}(?:出来|好了吗|做好|弄(?:好|完)|完成|发给我|发我|发送|发出|发了|怎么样)/u
 
@@ -114,7 +114,9 @@ function asksArtifactResult(rawUserText: string): boolean {
     && (sentence.question || /[吗么]|没(?:有)?$/u.test(sentence.text)) && RESULT_STATUS_QUESTION.test(sentence.text))
 }
 
-const ASYNC_ACTION = /发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)/gu
+const SPOKEN_UPDATE = /^(?:(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|(?:告诉|告知)(?:你|您))$/u
+const SPEECH_DELAY = /等(?:我)?(?:确认|核实|查清|弄清|查到)|(?:确认|核实|查清|弄清|查到).{0,12}(?:之后|以后|后)|稍后|待会|过会|明早|明天|到时候|到时|届时|之后|自动|主动/u
+const ASYNC_ACTION = /(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)/gu
 const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
@@ -193,10 +195,15 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
       claims.push(delivery ? 'immediate_delivery' : 'immediate_execution')
       continue
     }
-    if (completion < 0 && !DELAYED_PROMISE.test(before)) continue
+    const spokenUpdate = SPOKEN_UPDATE.test(match[0])
+    const speechDelay = spokenUpdate && SPEECH_DELAY.test(before)
+    if (completion < 0 && !DELAYED_PROMISE.test(before) && !speechDelay) continue
     // An explanation delivered in this reply is synchronous. “告诉你” alone
     // becomes a follow-up only with a completion or explicit delay condition.
-    if (/告诉/u.test(match[0]) && completion < 0 && !/稍后|待会|过会|明早|明天|到时|届时|之后|自动|主动/u.test(before)) continue
+    if (spokenUpdate && completion < 0 && !speechDelay) continue
+    // A job callback does not schedule a later explanation after an
+    // unspecified investigation or confirmation of the failure cause.
+    if (spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {claims.push('unsupported'); continue}
     if (RERUN_OR_POLL.test(match[0])) claims.push('unsupported')
     else if (completion >= 0) claims.push('job_completion')
     else claims.push(/提醒|通知/u.test(match[0]) && /明早|明天|晚上|一会儿|待会|等下|稍后|到时|届时/u.test(before) ? 'reminder' : 'job_completion')

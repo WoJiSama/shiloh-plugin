@@ -47,6 +47,13 @@ test('a failed delivery prompt states the observed failure without inventing rej
   assert.match(prompt, /没有核验到仍有效的后续投递登记/)
 })
 
+test('missing records and registrations describe this lookup rather than system capability', () => {
+  const prompt = buildTurnActionFactsPrompt({scope:{botId:'99',conversationId:'group:1',userId:'2'},observedAt:now,lookup:'unavailable',tasks:[]})
+  assert.match(prompt,/未查到记录不代表任务没有在执行/)
+  assert.match(prompt,/这次未核验到有效后续登记，只限制本次自动跟进/)
+  assert.match(prompt,/不能据此说系统没有这个功能/)
+})
+
 test('a verified sent receipt remains delivery evidence rather than an unknown failure cause', () => {
   const actual = validateTurnActionFacts(facts([task({delivery:{state:'sent',messageId:'receipt'}})]), event, now)
   const prompt = buildTurnActionFactsPrompt(actual)

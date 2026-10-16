@@ -457,3 +457,17 @@ test('an omitted send verb after artifact completion still needs a matching call
     assert.deepEqual(validateActionReply(text, facts(), '刚才的图出来了吗？'), [], text)
   }
 })
+
+test('deferred spoken updates need their own registration while present explanations stay intact', () => {
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const text of ['原因我还没查到，等确认了我再跟你说。','查清原因后我会和你讲一声。','等核实了我再向你说明。','我明天告知你原因。']) {
+    for (const evidence of [facts(),live]) assert.ok(validateActionReply(text,evidence,'刚才那张图出来了吗？').some(item=>item.code==='unregistered_followup'),text)
+  }
+  for (const text of ['图出来后我再跟你说。','有结果我再和你讲一声。']) {
+    assert.ok(validateActionReply(text,facts(),'刚才的图出来了吗？').some(item=>item.code==='unregistered_followup'),text)
+    assert.deepEqual(validateActionReply(text,live,'刚才的图出来了吗？'),[],text)
+  }
+  for (const text of ['我现在跟你说明一下：发送原因还没核实。','我再跟你说一遍：原因未知。','我会告诉你答案，先看题目。','等确认了我也不能跟你说。','等确认了我再跟你说吗？','她等确认了会跟你说。','你回来再问我，我再跟你说。','“等确认了我再跟你说”这句话不能保证。']) {
+    assert.deepEqual(validateActionReply(text,facts(),'刚才的图出来了吗？'),[],text)
+  }
+})
