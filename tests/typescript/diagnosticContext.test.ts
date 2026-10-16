@@ -1080,6 +1080,63 @@ test('professional inspection actors carry only across their comma-joined proced
   ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsafe_inspection_action'), unsafe)
 })
 
+test('51a1874 real replay preserves prohibitions and inspection prerequisites while rejecting the original sniffing step', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？', speakerId})!
+  const original = '嗯，不闹。拔电是对的，现在这样处理：\n\n先让它彻底断电，电源开关也关掉，别再插回去。等机身凉透、焦味散了之后再做两件事：看电源外壳和出风口有没有烧痕、变色，闻一下味道是不是还在。\n\n但就算没有烧痕、味道也散了，也不代表电源没坏——焦糊味本身就是电气异常的信号，通电测试之前最好先拿去维修检测，尤其别再接原电源开机试，风险在电源也在它连着的主板。\n\n先别急着拆，送去修的时候把焦味的位置和当时在干什么告诉师傅，能省不少排查时间。'
+  const violations = validateDiagnosticReply(original, context)
+  assert.ok(violations.some(item => item.code === 'unsafe_inspection_action' && item.claim.includes('闻一下')))
+  assert.ok(!violations.some(item => item.code === 'unmet_operational_prerequisite'), 'inspection-before-operation and explicit prohibition are not operating instructions')
+  const repaired = '嗯，不闹。拔电是对的，接下来这样做：\n\n保持断电状态别动它，等机身凉透之后，隔着正常距离看一眼电源外壳和出风口有没有烧痕、变色，凑近闻就免了，焦糊味本身说明电气异常，闻不闻都不改变判断。\n\n之后别自己通电测试，送去维修检测，把焦味位置和当时在干什么告诉师傅。就算外壳看不出烧痕，也不代表没损坏，通电试机这种事让专业人员做过检修再说。'
+  assert.deepEqual(validateDiagnosticReply(repaired, context), [])
+})
+
+test('51a1874 real follow-up keeps electrical risk and pending exclusion distinct from operation and diagnosis', () => {
+  const context = buildDiagnosticContext({rawUserText: '那我能先开机试一下吗？', speakerId, history: [{role: 'user', userId: speakerId, text: '电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'}]})!
+  const original = '不行，先别开。焦糊味说明里面可能有元件烧坏，再通电短路或扩大损坏的风险真实存在。\n\n想知道严重程度的话，等它彻底冷却后拔着电看外壳有没有烧痕、变形，这些也只能外部看看。具体坏没坏、坏在哪，得维修的人检测。忍住别按开机键哈。'
+  const repaired = '现在不行。这台机器的电气损坏还没排除，通电测试可能扩大损坏甚至有安全风险，运行检测的前提不存在。\n\n要试机，也得等专业检修确认这台电源和相关部件没问题、放行之后再说。现在能做的就是：保持拔电，等它彻底冷却后看下外壳有没有烧痕变形，然后交给人修。'
+  assert.deepEqual(validateDiagnosticReply(original, context), [])
+  assert.deepEqual(validateDiagnosticReply(repaired, context), [])
+})
+
+test('operation risks, temporal prerequisites and prohibitions stay local to their own verb', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源那里有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const normal of [
+    '通电测试之前最好先拿去维修检测。',
+    '通电试机这种事让专业人员做过检修再说。',
+    '尤其别再接原电源开机试。',
+    '别再连接原装电源开机测试。',
+    '再通电短路或扩大损坏的风险真实存在。',
+    '通电测试可能扩大损坏甚至有安全风险。',
+    '重新开机测试可能造成短路。',
+    '这台机器的电气损坏还没排除。',
+    '这台电源的短路尚未排除。',
+    '电源的击穿还没有排除，暂时不能确认原因。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  for (const unsafe of [
+    '先通电测试，风险真实存在。',
+    '先通电测试可能扩大损坏。',
+    '可以再通电短路或扩大损坏的风险真实存在。',
+    '通电测试可能扩大损坏，但可以先开机看看。',
+    '再通电短路或扩大损坏的风险真实存在，还是先开机试一下。',
+    '尤其别再接原电源开机试，但可以先把电源线插回去。',
+    '不要接原电源先开机试试。',
+    '通电测试之前最好先拿去维修检测，现在先开机试试。',
+    '通电试机这种事让专业人员做过检修再说。现在先通电观察。',
+    '不要摸内部再开机观察。',
+    '电气损坏还没排除，但可以先通电检测。'
+  ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unmet_operational_prerequisite'), unsafe)
+  for (const unsafe of [
+    '通电测试之前先闻一下电源有没有异味。',
+    '通电风险存在，先摸着机箱出风口测温。',
+    '电气损坏还没排除，先伸手到出风口感受风温。'
+  ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsafe_inspection_action'), unsafe)
+  for (const unsafe of [
+    '这台机器的电源已经损坏，但电气损坏还没排除。',
+    '这台电源已经烧坏，击穿还没有排除。',
+    '电源的损坏还没排除，但主板肯定已经短路。'
+  ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsupported_damage_diagnosis'), unsafe)
+})
+
 test('704a50c real replay does not turn frequency reduction into a certain thermal-limit diagnosis', () => {
   const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
   const original = '满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）'

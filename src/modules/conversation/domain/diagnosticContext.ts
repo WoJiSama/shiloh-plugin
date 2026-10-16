@@ -579,11 +579,19 @@ function advisesUnclearedOperation(clause: string): boolean {
     // A later "别摸内部" cannot negate an earlier "先开机". Only a
     // prohibition immediately governing this operation can do that.
     if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
+    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|不宜|避免|不该|不可)(?:再|重新|直接|自行|擅自|贸然)*(?:接|连接)(?:(?:这|那)台的?)?(?:原(?:装)?的?)?(?:电源(?:线)?|插头)\s*$/u.test(prefix)) continue
     const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
+    const operationTail = suffix.replace(/^\s*(?:测试|试机|检测|检查|试验)?/u, '')
+    // An operation named as a future boundary or deferred pending inspection
+    // is not a step to run now. Any subsequent operation is checked separately.
+    if (/^(?:之|以)?前/u.test(operationTail)
+      || /^(?:这种事|这类操作)?(?:让|交给|交由|由)(?:现场)?(?:专业(?:维修|检修)?人员|维修(?:师傅|人员|工程师)|师傅)(?:先)?(?:做过|完成|做好)(?:了)?(?:检修|检查)(?:之后|以后)?再说/u.test(operationTail)) continue
     // Nominal risk statements describe the cost of powering on; they do not
-    // instruct the user to do it. Keep affirmative "先通电试试" detectable.
-    if (/^\s*(?:的)?(?:风险(?:很|较|太|更)?(?:大|高)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|受损|烧|过热|击穿|危险|风险))/u.test(suffix)) continue
+    // instruct the user to do it. An explicit "先通电" still advises operation,
+    // even when its own risk is acknowledged afterward.
+    const directInstruction = /(?:可以|能够|能|建议|先|直接|试着|不妨|然后|接着|请|现在)(?:再次|再一次|再|重新|直接|立即|自行|擅自|贸然|去|就|尝试|试着|继续)*\s*$/u.test(prefix)
+    if (!directInstruction && /^(?:的)?(?:风险(?:很|较|太|更)?(?:大|高|真实存在|存在)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|受损|烧|过热|击穿|危险|风险)|(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)(?:(?:或(?:者)?|和|及|甚至)(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)){0,3}的?风险)/u.test(operationTail)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
   }
@@ -699,9 +707,10 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
     for (const proposition of damagePropositions(clause)) {
       const suffix = clause.slice(proposition.text.length)
       const postposedPossibility = /^\s*(?:了|的)?(?:(?:或(?:者)?|和|及|与|、)(?:过热|击穿|烧坏|烧毁|损坏|受损|短路))*(?:都|也)?(?:只是|仅是|有|存在)?(?:待查|待确认)?的?(?:可能|风险)/u.test(suffix) && offersPossibility(suffix)
+      const pendingExclusion = /^\s*(?:还|仍|尚|目前|现在)?(?:没(?:有)?|未)(?:能)?(?:完全|彻底)?排除/u.test(suffix)
       // A later disclaimer about overall health cannot retract a preceding
       // "not burned" conclusion. Only its own governing denial/uncertainty does.
-      if (deniesConclusion(proposition.text) || offersPossibility(proposition.text) || postposedPossibility || conditional || isDamageDiscussion(clause)) continue
+      if (deniesConclusion(proposition.text) || offersPossibility(proposition.text) || postposedPossibility || pendingExclusion || conditional || isDamageDiscussion(clause)) continue
       if (proposition.negated) {
         const exclusions = assessment.damage.excludedFindings || evidenceAssessment(context.sources).damage.excludedFindings || []
         if (!supportedDamage(proposition, exclusions)) add('unsupported_damage_exclusion', clause.trim(), '没有观察到烟雾、异味或烧痕，不是同一部件与机制已被专业排除的证据。', '仅复述未观察到的症状；不要据此断言没有烧毁、没有损坏或损坏较轻。若已有专业排除报告，只按报告的部件、机制与范围说明。')

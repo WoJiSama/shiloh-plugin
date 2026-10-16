@@ -81,6 +81,11 @@ test('final grounding rechecks cancellation after generation and respects explic
 })
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
+  {candidate:'这个我现在没法确认欸，我这边没查到结果记录，说不准它是好了还是还在跑。等我实际确认到了再告诉你，不瞎猜。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'图片处理的结果尚未核实，后续通知安排也尚未确认。'},
+  {candidate:'不会自动发欸，我这边没有挂着那种到点推送的机制。你吃完回来说一声，我再帮你查一次。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'这次自动发送的安排尚未确认；你吃完回来问一声就好。'},
+  {candidate:'图我这边没查到处理结果，还没法说好了没。至于自动发——你确实只登记了考试提醒，改图那个没有登记后续投递，所以图好了也不会自动发你，啦。要是有结果了我这边能确认到再说。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'图片处理的结果和后续投递安排尚未核实；考试提醒不能证明图片任务状态。'},
+  {candidate:'查了下记录，改背景那张图目前没有确认产物，我没看到已经做完的结果。会自动发的只有你登记的考试提醒，图那边没有登记投递，好了不会自动发你——而且现在也不能确定它“会好”。要不你重新发一次图，我再看看？',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'图片处理的结果和后续投递安排尚未核实；考试提醒不能证明图片任务状态。'},
+  {candidate:'不是被你拒收或者屏蔽哦，具体原因我这边也没查到。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功，具体原因尚未确认。'},
   {candidate:'第一张的蓝色背景还没出来欸，这边没查到完成记录。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
   {candidate:'第一张蓝底的还没出来，我这边没查到做完的记录。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
   {candidate:'这张我这边没查到做好的记录，还不算出来哦。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
@@ -132,6 +137,25 @@ test('an explicit later user request can lead to another reply without a backgro
  assert.equal(archived[0].message[0].text,candidate)
  assert.equal(messages.at(-1).content,candidate)
 })
+test('completed results and past delivery failures keep their original wording without a new promise',async()=>{
+ for(const candidate of [
+  '做好了，就是发你那边失败了，不是还没弄完。你再问下某熟人或者管理员吧，我这边暂时发不了。',
+  '不是没做好，图是完成了的，只是上次发给你没发成功，原因我也不确定。我这边现在没法主动重发，你要是想再要，就再跟我说一声，或者问问某熟人和管理员。'
+ ]){
+  const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+  session.interactionContext.rawUserText='所以我现在没收到，是还没做好吗？'
+  session.interactionContext.actionFacts.tasks=[{taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'completed',result:'available',delivery:{state:'failed'},followUp:{state:'none'}}]
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;throw Error('past failure is not a new promise')}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'past-failure'}
+  await api.handleTextResponse(host,candidate,event,session,messages)
+  assert.equal(repairs,0,candidate)
+  assert.deepEqual(sent,[candidate])
+  assert.equal(messages.at(-1).content,candidate)
+  assert.equal(archived[0].message[0].text,candidate)
+  assert.equal(enhanced[0][2],candidate)
+ }
+})
 test('requested recreation and human activity keep their original final reply without a repair',async()=>{
  for(const [raw,candidate] of [
   ['把刚才的图重新生成一遍，背景换成蓝色。','这张图需要重新生成。'],
@@ -174,6 +198,27 @@ test('diagnostic certainty and active sniffing are corrected before sending or l
   assert.equal(archived[0].message[0].text,item.corrected)
   assert.equal(saved.length,1)
   assert.equal(enhanced[0][2],item.corrected)
+ }
+})
+test('diagnostic prohibitions and risk descriptions reach final history without an unnecessary repair',async()=>{
+ const raw='电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'
+ for(const candidate of [
+  '通电测试之前最好先拿去维修检测，尤其别再接原电源开机试。',
+  '不行，先别开。焦糊味说明里面可能有元件烧坏，再通电短路或扩大损坏的风险真实存在。想知道严重程度的话，等它彻底冷却后拔着电看外壳有没有烧痕、变形，这些也只能外部看看。具体坏没坏、坏在哪，得维修的人检测。忍住别按开机键哈。',
+  '现在不行。这台机器的电气损坏还没排除，通电测试可能扩大损坏甚至有安全风险，运行检测的前提不存在。要试机，也得等专业检修确认这台电源和相关部件没问题、放行之后再说。'
+ ]){
+  const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[]
+  const interactionContext=buildTurnInteractionContext({rawUserText:raw,botId:'99',speaker:{userId:'2'}})
+  interactionContext.diagnosticContext=buildDiagnosticContext({rawUserText:raw,speakerId:'2'})
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;throw Error('risk descriptions and prohibitions must remain intact')}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'diagnostic-original'}
+  await api.handleTextResponse(host,candidate,event,{interactionContext},messages)
+  assert.equal(repairs,0,candidate)
+  assert.deepEqual(sent,[candidate])
+  assert.equal(messages.at(-1).content,candidate)
+  assert.equal(archived[0].message[0].text,candidate)
+  assert.equal(enhanced[0][2],candidate)
  }
 })
 test('a repaired task reply cannot contradict a different known state dimension',async()=>{

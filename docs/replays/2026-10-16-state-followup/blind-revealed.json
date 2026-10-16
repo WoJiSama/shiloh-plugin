@@ -1,46 +1,35 @@
 {
-  "evaluatedCandidate": "4b3630007eb3cbc1f30277f54137e5339a3c612d",
+  "evaluatedCandidate": "51a18740e56adbce9e0f407d5e11fe330d022c70",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "5febeb47874c243706de8eafaa416b9d2738a077944fade8591b573aedf8d4b5",
-    "blind-review.json": "a6f21f0fe65f39242750e79670539308d40bc95701238f4d86312c8af1851c2e"
+    "blind-conversations.json": "a417d987747055de61be8aeaca0a9b5a304214726605d4d3ab492719fda81d6c",
+    "blind-review.json": "91f54a4c05dc74f2dc8a1fd7947978be3fa254e3fe5cf3bd4168642798feb27b"
   },
   "cases": 28,
   "preference": {
-    "candidate": 7,
-    "baseline": 11,
-    "tie": 10
+    "candidate": 3,
+    "baseline": 10,
+    "tie": 15
   },
   "scoreTotals": {
-    "candidate": 198,
-    "baseline": 207
+    "candidate": 203,
+    "baseline": 212
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
-        "candidate": 4,
-        "baseline": 5,
-        "tie": 19
+        "candidate": 2,
+        "baseline": 3,
+        "tie": 23
       },
       "scoreTotals": {
-        "candidate": 49,
-        "baseline": 50
+        "candidate": 53,
+        "baseline": 54
       }
     },
     "continuity": {
-      "preference": {
-        "candidate": 1,
-        "baseline": 2,
-        "tie": 25
-      },
-      "scoreTotals": {
-        "candidate": 54,
-        "baseline": 55
-      }
-    },
-    "new_information": {
       "preference": {
         "candidate": 1,
         "baseline": 1,
@@ -51,89 +40,44 @@
         "baseline": 55
       }
     },
-    "naturalness": {
+    "new_information": {
       "preference": {
-        "candidate": 4,
-        "baseline": 10,
-        "tie": 14
+        "candidate": 1,
+        "baseline": 2,
+        "tie": 25
       },
       "scoreTotals": {
-        "candidate": 40,
-        "baseline": 47
+        "candidate": 54,
+        "baseline": 55
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 2,
+        "baseline": 9,
+        "tie": 17
+      },
+      "scoreTotals": {
+        "candidate": 41,
+        "baseline": 48
       }
     }
   },
   "hardErrorFindings": {
-    "candidate": 9,
-    "baseline": 5
+    "candidate": 1,
+    "baseline": 1
   },
   "hardErrorQuoteOccurrences": {
-    "candidate": 9,
-    "baseline": 5
+    "candidate": 1,
+    "baseline": 1
   },
   "hardErrors": [
     {
-      "id": "HE-01",
-      "caseId": "case-01",
-      "candidate": "candidate",
-      "category": "unregistered_followup_promise",
-      "reason": "第1轮lookup=ok、tasks=[]，旧接单台词不证明后续登记；此句承诺以后主动发送。第2轮撤回不能消除首轮问题。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "我这边确认到实际结果就直接发你。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-02",
-      "caseId": "case-01",
-      "candidate": "candidate",
-      "category": "absence_as_confirmed_no_mechanism",
-      "reason": "第2轮仍只有tasks=[]，没有设置清单或匹配任务的followUp=none。可说未查到登记、不能保证，但不能确定没有推送设置。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "我现在没有能自动推送的设置"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-03",
-      "caseId": "case-01",
-      "candidate": "baseline",
-      "category": "absence_as_confirmed_no_registration",
-      "reason": "tasks=[]只说明未查到任务或登记；此句把未知升级为确定没挂后续和确定不会自动发。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "不会自动发哦，这边没挂后续任务。"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-04",
-      "caseId": "case-02",
-      "candidate": "candidate",
-      "category": "absence_as_confirmed_no_registration",
-      "reason": "第2轮仍为tasks=[]，没有已知提醒状态；断言没挂提醒超出缺记录。用户回来再请求的可选重做不列错。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "不会自动发哦，我这边没挂这个提醒。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-05",
+      "id": "HE-001",
       "caseId": "case-02",
       "candidate": "baseline",
       "category": "unregistered_followup_promise",
-      "reason": "第1轮只有接单台词和tasks=[]，没有登记完成后投递或后续查询机制，却许诺拿图后第一时间发送。",
+      "reason": "首轮任务查询只得到空列表，未确认任何图片任务或完成后发送机制，却明确承诺拿到图就第一时间发给用户。后轮说不会主动发构成纠正，不能倒推首轮已有发送机制。",
       "occurrences": [
         {
           "turn": 1,
@@ -143,127 +87,15 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "HE-06",
-      "caseId": "case-02",
-      "candidate": "baseline",
-      "category": "absence_as_confirmed_no_registration",
-      "reason": "第2轮没有新增登记事实，仍为tasks=[]；不能确定说自动发送没登记上，且与首轮许诺主动发送相冲突。",
+      "id": "HE-002",
+      "caseId": "case-05",
+      "candidate": "candidate",
+      "category": "unsupported_failure_cause_exclusion",
+      "reason": "可用证据只有生成完成、结果可用、发送失败，没有失败原因。回答却确定排除用户拒收或屏蔽；表示未查到具体原因不能支持这一排除。",
       "occurrences": [
         {
           "turn": 2,
-          "exactQuote": "没登记上自动发送这种东西，我不会主动发的。"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-07",
-      "caseId": "case-06",
-      "candidate": "baseline",
-      "category": "unsupported_immediate_send_commitment",
-      "reason": "当前仅有completed、available、delivery.failed、followUp.none；本轮未执行也无重试发送工具。此句许诺现在发送，不是仅建议用户另行发起；首轮带条件的提议不列错。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "你要看我现在单独发一次试试。"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-08",
-      "caseId": "case-08",
-      "candidate": "candidate",
-      "category": "unsupported_platform_timing",
-      "reason": "followUp=none只支持当前没有有效自动发送安排，未提供取消传播延迟或即时生效的保证。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "取消是即时生效的。"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-09",
-      "caseId": "case-08",
-      "candidate": "candidate",
-      "category": "unsupported_result_retrieval_capability",
-      "reason": "记录仍为running、unavailable、not_attempted；用户在任务页取消过，不等于已核实该页会提供成图自取。没有结果展示或下载位置证据。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "出来的图你可以自己在任务页拿"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-10",
-      "caseId": "case-09",
-      "candidate": "candidate",
-      "category": "unregistered_followup_promise",
-      "reason": "仅有第二张synthetic-other-task的完成发送记录，第一张没有匹配任务或后续登记；此句保留未知却承诺以后主动告知。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "第一张等我拿到实际结果再跟你说，现在先不瞎猜。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-11",
-      "caseId": "case-20",
-      "candidate": "candidate",
-      "category": "quantity_continuity_contradiction",
-      "reason": "此前三块、当前扣两块，候选自己也确认剩一块；用户没有新增扣款或债务。倒欠两块与同一账目直接矛盾。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "扣完就剩一块了，我还倒欠你两块是吧"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-12",
-      "caseId": "case-27",
-      "candidate": "candidate",
-      "category": "absence_as_required_restart",
-      "reason": "只核验到exam-reminder，图片进度结果未知。缺少改图记录不能推出原任务不存在或必须重做，此句却用得设置重新发起的必要条件。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "想要图的话，得重新跟我说一声改背景"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-13",
-      "caseId": "case-27",
-      "candidate": "candidate",
-      "category": "absence_as_confirmed_no_registration",
-      "reason": "只核验到考试提醒可说明它不是图片回调；用户只登记该提醒不证明未知图片任务没有任何投递机制。没有匹配改图记录仍不足以确定排除自动发图安排。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "我这边没有“好了自动发”的安排。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-14",
-      "caseId": "case-28",
-      "candidate": "baseline",
-      "category": "absence_as_confirmed_no_registration",
-      "reason": "只有考试提醒registered/reminder事实，图片缺记录。用户只登记考试提醒与图片回调不同，不能据此核实所有未知改图机制；此句将未查到升级为没有登记和确定不自动发。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "自动发图没有对应的登记，不会自动发你"
+          "exactQuote": "不是被你拒收或者屏蔽哦，具体原因我这边也没查到。"
         }
       ],
       "anonymousCandidate": "A"

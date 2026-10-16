@@ -232,7 +232,7 @@ test('a failed delivery does not prove recipient rejection or closed receiving s
     '图已经做好了，发送没有成功，原因还没核实。',
     '可能你没开接收，可以检查一下。', '如果你没开接收，可以检查一下。',
     '不能断定你没开接收。', '我没法确认你没开接收。', '不能归因于你拒收了图片。',
-    '不是你拒收了图片，是我这边还没有回执。', '你没开接收吗？', '有没有开接收？',
+    '尚未确认是不是你拒收了图片，我这边还没有回执。', '你没开接收吗？', '有没有开接收？',
     '“你没开接收”只是个假设。', '例如你拒收了图片。', '你不接受我的道歉也没关系。'
   ]) assert.deepEqual(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？'), [], text)
   assert.deepEqual(validateActionReply('你把接收关了，可以先打开试一下。', failedDelivery, '我把接收关了，刚才的图没收到。'), [])
@@ -293,7 +293,7 @@ test('passive rejection still requires cause evidence rather than a failed deliv
     '上次发给你的时候可能被拒收了，可以检查一下。',
     '如果上次发给你的时候被拒收了，可以检查一下。',
     '不能断定上次发给你的时候被拒收了。', '不能归因于图片被拒收。',
-    '上次发给你的时候并没有被拒收。', '上次发给你的时候被拒收了吗？',
+    '上次发给你的时候有没有被拒收尚未确认。', '上次发给你的时候被拒收了吗？',
     '“图片被拒收了”只是个假设。', '例如图片被拒收了。',
     '邀请被拒收了。', '上次邀请被拒收了。', '我妹妹的包裹被拒收了。', '他上次发的图被拒收了。'
   ]) assert.deepEqual(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？'), [], text)
@@ -322,9 +322,9 @@ test('delivery rejection and interception share task scope without borrowing an 
   for (const text of [
     '只是上次发的时候可能被拦下来，可以检查一下。',
     '如果上次发的时候被拦截了，可以检查一下。', '不能认定之前投递被拒绝。',
-    '上次发的时候没有被拦截。', '之前投递并没有被拒。', '不是图片被屏蔽了。',
+    '上次发的时候有没有被拦截尚未确认。', '之前投递是否被拒尚未确认。', '尚未确认是不是图片被屏蔽了。',
     '只是上次发的时候被拦下来了吗？', '就是之前投递被拒吗？',
-    '不过之前发的时候投递没有被拒。', '不过之前发的时候投递被拦下来了？',
+    '不过之前发的时候投递是否被拒尚未确认。', '不过之前发的时候投递被拦下来了？',
     '如果之前发的时候投递被拒，可以检查一下。',
     '“之前投递被拒”只是个假设。', '例如上次发的时候被拦下来。',
     '只是上次邀请被拒了。', '我的邀请被拒绝了。', '只是她的包裹被拦截了。',
@@ -432,7 +432,7 @@ test('local delivery cause assertions include confidence, requested delivery and
     '不过之前你要投递的时候可能被明确拒绝过。',
     '如果之前你要投递的时候被明确拒绝过，可以检查一下。',
     '不能断定之前你要投递的时候被明确拒绝过。',
-    '之前你那边没有拒绝收。', '不是你那边拒绝收——是发送原因还没确认。',
+    '之前你那边是否拒绝收尚未确认。', '不能确认是不是你那边拒绝收——是发送原因还没确认。',
     '图做好了——之前你那边可能拒绝收。', '不过上次你要发的时候被拒了吗？',
     '图做好了——你那边拒绝收了吗？', '“之前你那边拒绝收”只是个假设。',
     '例如之前你要投递的时候被明确拒绝过。',
@@ -999,4 +999,110 @@ test('cancelled registration cannot supply platform timing or a task-page downlo
   for (const query of ['任务页说明取消是即时生效的吗？图还会自动发吗？','例如平台提示“取消是即时生效的”。图还会自动发吗？']) {
     assert.ok(validateActionReply('取消是即时生效的。',cancelled,query).some(item=>item.code==='unsupported_task_state'),query)
   }
+})
+
+test('the exact 51 deferred verification includes its adverb and completed predicate', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'callback'}})])
+  const original = '这个我现在没法确认欸，我这边没查到结果记录，说不准它是好了还是还在跑。等我实际确认到了再告诉你，不瞎猜。'
+  for (const reply of [original,'等我实际确认到了再告诉你。','实际确认到了再告诉你。']) {
+    for (const current of [facts(),live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unregistered_followup'),reply)
+  }
+  for (const reply of [
+    '等我实际确认到了再告诉你吗？','等我实际确认到了也不能告诉你。',
+    '“等我实际确认到了再告诉你”只是个例子。','她等实际确认到了再告诉你。',
+    '你回来再问我，我再查，实际确认到了再告诉你。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  assert.deepEqual(validateActionReply('等我实际确认到结果了再告诉你。',live,raw),[])
+})
+
+test('the exact 51 mechanism denial cannot derive a platform absence from missing registration', () => {
+  const raw = '那我先去吃饭。好了你会自动发给我吗？'
+  const original = '不会自动发欸，我这边没有挂着那种到点推送的机制。你吃完回来说一声，我再帮你查一次。'
+  for (const current of [facts(),facts([fact({execution:'running',followUp:{state:'none'}})])]) {
+    assert.ok(validateActionReply(original,current,raw).some(item=>item.code==='unsupported_task_state'))
+  }
+  for (const reply of [
+    '我这边没查到这次自动推送的登记。你吃完回来说一声，我再帮你查一次。',
+    '我这边有没有挂着那种到点推送的机制尚未确认。','我这边没有挂着那种到点推送的机制吗？',
+    '“我这边没有挂着那种到点推送的机制”只是个例子。','她那边没有挂着那种到点推送的机制。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})
+
+test('the exact 51 task-first registration assertions keep the registered action on that image', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reminder = fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})
+  const image = fact({source:'live_job',execution:'running',followUp:{state:'none'}})
+  const live = {...image,followUp:{state:'registered',kind:'job_completion',id:'image-callback'}} as TurnTaskFact
+  for (const reply of [
+    '改图那个没有登记后续投递，所以图好了也不会自动发你。',
+    '图那边没有登记投递，好了不会自动发你。'
+  ]) {
+    for (const current of [facts(),facts([reminder]),facts([reminder,live]),facts([reminder,{...image,followUp:{state:'unknown'}}])]) {
+      assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,facts([reminder,image]),raw),[],reply)
+  }
+  assert.ok(validateActionReply('改图那个已登记后续投递。',facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'))
+  assert.deepEqual(validateActionReply('改图那个已登记后续投递。',facts([reminder,live]),raw),[])
+  for (const reply of [
+    '改图那个没有查到后续投递登记。','图那边有没有登记投递尚未确认。',
+    '改图那个没有登记后续投递吗？','“改图那个没有登记后续投递”只是个例子。',
+    '她改图那个没有登记后续投递。'
+  ]) assert.deepEqual(validateActionReply(reply,facts([reminder]),raw),[],reply)
+})
+
+test('the exact 51 historical failed sends are state predicates rather than completion promises', () => {
+  const raw = '所以我现在没收到，是还没做好吗？'
+  const failed = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'},followUp:{state:'none'}})])
+  for (const reply of [
+    '做好了，就是发你那边失败了，不是还没弄完。',
+    '不是没做好，图是完成了的，只是上次发给你没发成功，原因我也不确定。',
+    '做好了，就是发你那边失败了，不是还没弄完。你再问下某熟人或者管理员吧，我这边暂时发不了。',
+    '不是没做好，图是完成了的，只是上次发给你没发成功，原因我也不确定。我这边现在没法主动重发，你要是想再要，就再跟我说一声，或者问问某熟人和管理员。'
+  ]) assert.deepEqual(validateActionReply(reply,failed,raw),[],reply)
+  for (const reply of [
+    '上次没发成功，图好了我再发你。',
+    '图做好了，只是上次发给你没发成功，图好了我再发你。',
+    '做好了，就是发你那边失败了，我稍后重新发一次。'
+  ]) assert.ok(validateActionReply(reply,failed,raw).some(item=>item.code==='unregistered_followup'),reply)
+})
+
+test('the exact 51 excluded delivery causes require evidence for the negative proposition', () => {
+  const raw = '所以我现在没收到，是还没做好吗？'
+  const failed = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'},followUp:{state:'none'}})])
+  const original = '图做好了，傍晚那张没问题。你没收到的不是没做完，是之前那次发送没成功。不是被你拒收或者屏蔽哦，具体原因我这边也没查到。'
+  for (const reply of [
+    original,'不是被你拒收或者屏蔽哦，具体原因我这边也没查到。','不是你拒收了图片，是我这边还没有回执。',
+    '上次发的时候没有被拦截。','之前投递并没有被拒。','不是图片被屏蔽了。','上次发给你的时候并没有被拒收。',
+    '不过之前发的时候投递没有被拒。','之前你那边没有拒绝收。','不是你那边拒绝收——是发送原因还没确认。'
+  ]) {
+    assert.ok(validateActionReply(reply,failed,raw).some(item=>item.code==='unsupported_delivery'),reply)
+  }
+  for (const reply of [
+    '是不是被你拒收或者屏蔽尚未确认。','不能确认不是被你拒收或者屏蔽。',
+    '不是被你拒收或者屏蔽吗？','“不是被你拒收或者屏蔽”只是个例子。',
+    '如果不是被你拒收或者屏蔽，可以再检查其他原因。','不是她的包裹被拒收。'
+  ]) assert.deepEqual(validateActionReply(reply,failed,raw),[],reply)
+  const reported = '平台提示：“这次不是被你拒收或者屏蔽”。所以图为什么没收到？'
+  assert.deepEqual(validateActionReply('不是被你拒收或者屏蔽。',failed,reported),[])
+  assert.deepEqual(validateActionReply('这次被平台拒收了。',failed,'平台提示：“这次投递被拒收了”。为什么图没收到？'),[])
+  assert.ok(validateActionReply('不是被你拒收或者屏蔽。',failed,'平台提示：“这次投递被拒收了”。为什么图没收到？').some(item=>item.code==='unsupported_delivery'))
+  assert.ok(validateActionReply('不是被你拒收或者屏蔽。',failed,'平台提示：“这次不是被你拒收”。为什么图没收到？').some(item=>item.code==='unsupported_delivery'))
+})
+
+test('a local postfix uncertainty predicate covers coordinated result and registration objects', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reminder = facts([fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})])
+  for (const reply of [
+    '图片处理的结果和后续投递安排尚未核实；考试提醒不能证明图片任务状态。',
+    '图片处理的结果尚未核实，后续投递安排也尚未确认；考试提醒不能证明图片任务状态。',
+    '后续投递安排尚未核实。'
+  ]) assert.deepEqual(validateActionReply(reply,reminder,raw),[],reply)
+  for (const reply of [
+    '后续投递安排尚未核实，但有结果我发你。',
+    '图片处理的结果和后续投递安排尚未核实，但图好了我会发你。',
+    '图好了我会发你，后续投递安排尚未核实。'
+  ]) assert.ok(validateActionReply(reply,reminder,raw).some(item=>item.code==='unregistered_followup'),reply)
+  assert.ok(validateActionReply('后续投递安排已登记。',reminder,raw).some(item=>item.code==='unregistered_followup'))
 })

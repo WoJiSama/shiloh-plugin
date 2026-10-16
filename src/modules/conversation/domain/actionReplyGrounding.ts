@@ -72,7 +72,11 @@ function hasTaskContext(facts: TurnActionFacts | undefined, rawUserText: string)
 }
 
 function unasserted(clause: string, question = false): boolean {
-  return question || /[吗么](?:[呀啊呢]*)$/u.test(clause) || NON_ASSERTION.test(clause) || WORDING_EXAMPLE.test(clause)
+  // A postfix uncertainty predicate owns the coordinated objects in this
+  // clause. It cannot exempt a separate promise in a later clause.
+  return question || /[吗么](?:[呀啊呢]*)$/u.test(clause)
+    || /(?:尚未|还未|未)(?:核实|确认)[呀啊呢哦吧]*$/u.test(clause)
+    || NON_ASSERTION.test(clause) || WORDING_EXAMPLE.test(clause)
 }
 
 // Only these grammatical subjects establish task scope by themselves. Loose
@@ -127,7 +131,7 @@ const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
-const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
+const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
 const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
 
@@ -145,6 +149,7 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     const topic = evidenceTopic(subject)
     return {kind: 'task', topic: topic === 'unknown' || topic === 'generic' ? rawTopic : topic, surface: rawSubject}
   }
+  if (context && rawTopic === 'image' && /^(?:改图|画图)(?:这|那)个$/u.test(subject)) return {kind:'task',topic:'image',surface:rawSubject}
   if (context && rawTopic === 'image' && QUALIFIED_IMAGE_REFERENCE.test(subject)) return {kind: 'artifact', topic: 'image', surface: rawSubject}
   const nominal = NOMINAL_HEAD.exec(subject)
   if (nominal) {
@@ -196,6 +201,13 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
     else if (object?.kind === 'artifact') propositions.push({object, dimension: 'artifact', value: absent ? 'unavailable' : 'available'})
     else if (object?.kind === 'follow_up') propositions.push({object, dimension: 'follow_up', value: absent ? 'none' : 'registered'})
   }
+  // “改图那个没有登记后续投递” names the task first and its
+  // registered action second. A reminder row cannot supply that task's state.
+  const registration = /(?:没有|没|未|尚未|已经|已)?登记(?:后续)?投递(?:了|好)?$/u.exec(clause)
+  if (registration) {
+    const object = taskObjectReference(clause.slice(0,registration.index),context,rawTopic)
+    if (object && object.kind !== 'follow_up') propositions.push({object:{...object,kind:'follow_up'},dimension:'follow_up',value:/没|未/u.test(registration[0])?'none':'registered'})
+  }
   if (context && /^(?:(?:我(?:这边)?|这边)?(?:取消(?:了)?(?:发送|投递|通知)?(?:的话)?|那|就|也|已经|已|现在|目前)*)不会(?:再)?(?:自动|主动)(?:发(?:送|图)?|投递|通知)(?:给你|发你|你)?(?:了)?[呀啊呢哦吧]*$/u.test(clause)) {
     propositions.push({object: {kind: 'follow_up', topic: rawTopic, surface: clause}, dimension: 'follow_up', value: 'none'})
   }
@@ -222,7 +234,7 @@ const PRESENT_SELF_ACTION = /^(?:那)?(?:我(?:这边)?|这边)(?:先|就|再|�
 const USER_TRIGGER = /(?:你|您).{0,12}(?:再(?:来)?问|再(?:来)?找|再叫我|再发(?:消息|一句)|发来|发给我|告诉我|确认(?:后|了)|发(?:来|给我)之后).{0,18}(?:我再|再帮你|再给你)/gu
 const USER_REQUEST_CONDITION = /(?:你|您)[^，,]{0,28}(?:再(?:来)?(?:问|找|叫)|回来[^，,]{0,12}(?:问|找|叫)|再发(?:消息|一句)|(?:确认|发来|发给我|告诉我)(?:后|了))/gu
 const ON_DEMAND_LOOKUP = /我(?:到时候|届时|那时|回来后)?(?:现|当场|再)(?:查|查询|核实)(?:一下)?(?:状态|进度|结果)?/u
-const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:确认|核实|查到|查清|弄清)(?:到|出|了)?|(?:^|[，,])(?:确认|核实|查到|查清|弄清)(?:了|到)(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
+const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?(?:了)?|(?:^|[，,])(?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?了(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])|(?:^|[，,])(?:确认|核实|查到|查清|弄清)到(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
 const ELLIPTICAL_RESULT = /有了(?=我|就|再|会|直接|第一时间|[，,])/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
 const ACQUIRED_OUTPUT = /(?:确认到|拿到|收到)(?:了)?(?:(?:实际|真正|真实)(?:的)?)?(?:产出|产物|成品|结果|图(?:片)?|文件|视频|报告)(?:了)?(?:之后|以后|后|时)?(?=我|就|再|会|直接|马上|立刻|立即|第一时间|自动|主动|给|发|通知|提醒|告诉|跟|和|对|向|[，,]|$)/gu
@@ -299,6 +311,9 @@ function userRequestedAction(text: string, before: string, actionEnd: number, co
   const response = before.slice(request.index! + request[0].length)
   if (/自动|主动|持续|定时/u.test(response)) return false
   if (completion < 0 || completion <= request.index! + request[0].length) return true
+  const verification = [...before.matchAll(DEFERRED_VERIFICATION)].at(-1)
+  if (verification && /^[，,](?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?了$/u.test(verification[0])
+    && ON_DEMAND_LOOKUP.test(response)) return true
   const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(ELLIPTICAL_RESULT), ...before.matchAll(ACQUIRED_OUTPUT)]
     .sort((a, b) => a.index! - b.index!).at(-1)
   return Boolean(condition && (/^(?:有(?:了)?结果|有了)$/u.test(condition[0])
@@ -345,6 +360,9 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const tail = sentence.text.slice(match.index! + match[0].length)
     if (SPOKEN_UPDATE.test(match[0]) && /^(?:答案|解释|说明|步骤|建议|示例|做法|思路|文字)(?:[：:]|[，,](?:先|首先|第一步))/u.test(tail)) continue
     const delivery = implicitHandoff || /发|投递|补给|补上/u.test(match[0])
+    // The suffix is the predicate of this send event, not a promise to send
+    // after an earlier completion clause. Inspect each action independently.
+    if (delivery && /^(?:那边|这边)?(?:失败(?:了)?|没(?:有)?发成功|没(?:有)?成功)(?:的|了)?[呀啊啦咯喽欸呢哦哈吧～~]*(?=[，,]|$)/u.test(tail)) continue
     // Consent to an offered action does not provide execution evidence.
     // Strip only a condition followed by our own explicit present action;
     // third-party actions and user-triggered future requests stay separate.
@@ -401,7 +419,7 @@ function stateSupported(proposition: TaskStateProposition, tasks: TurnTaskFact[]
       // cancelled callback nor any delivery state proves nonexistence.
       case 'existence': return proposition.value === 'present'
       // Per-task registration cannot prove that the platform has no setting.
-      case 'follow_up': return !/设置/u.test(proposition.object.surface) && (proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none')
+      case 'follow_up': return !/设置|机制/u.test(proposition.object.surface) && (proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none')
     }
   })
 }
@@ -445,12 +463,35 @@ function reportedPassiveCause(rawUserText: string, cause: string): boolean {
   }))
 }
 
+function platformReportedCause(rawUserText: string, causes: string[], excluded: boolean): boolean {
+  const reported = rawUserText.replace(/[“”「」『』"]/gu, '')
+  return assertions(reported).some(sentence => {
+    const source = /(?:平台|系统|任务页|官方)(?:的)?(?:说明|提示|文档)(?:上)?(?:写着|说|显示|是)?[：:]?/u.exec(sentence.text)
+    if (!source || unasserted(sentence.text.replace(/不是|并非/gu,''),sentence.question)
+      || /如果|假如|要是|倘若|若是/u.test(sentence.text)) return false
+    const detail = sentence.text.slice(source.index+source[0].length)
+    if (new RegExp(`不是|并非|(?:并)?(?:没有|没|未)(?=被|遭|${DELIVERY_CAUSE_WORDS})`,'u').test(detail) !== excluded) return false
+    const known = [...detail.matchAll(new RegExp(DELIVERY_CAUSE_WORDS,'gu'))].map(match=>deliveryCauseKind(match[0]))
+    return causes.every(cause=>known.includes(deliveryCauseKind(cause)))
+  })
+}
+
+function deliveryCauseAssertion(clause: string): {text:string; excluded:boolean} {
+  const text = clause.replace(/^(?:不是|并非)/u,'')
+    .replace(new RegExp(`(?:并)?(?:没有|没|未)(?=被|遭|${DELIVERY_CAUSE_WORDS})`,'u'),'')
+  return {text,excluded:text!==clause}
+}
+
 function unsupportedRecipientCause(clause: string, rawUserText: string, adjacentCause = false): boolean {
-  const passive = passiveDeliveryCause(clause)
-  const recipient = RECIPIENT_DELIVERY_CAUSE.exec(clause)
-  const otherObject = recipient && /^(?:了|过)?(?:(?:我|你|他|她)(?:们)?的|这(?:个|份)?|那(?:个|份)?)?(?:邀请|包裹|快递)/u.test(clause.slice(recipient.index + recipient[0].length))
+  const {text:assertion,excluded} = deliveryCauseAssertion(clause)
+  const passive = passiveDeliveryCause(assertion)
+  const recipient = RECIPIENT_DELIVERY_CAUSE.exec(assertion)
+  const otherObject = recipient && /^(?:了|过)?(?:(?:我|你|他|她)(?:们)?的|这(?:个|份)?|那(?:个|份)?)?(?:邀请|包裹|快递)/u.test(assertion.slice(recipient.index + recipient[0].length))
   if (!(recipient && !otherObject || passive) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
     || /不能(?:归因|认定|断定)|无法(?:说明|断定)|没法(?:确认|核实)|没(?:有)?核实/u.test(clause)) return false
+  const causes = [...assertion.matchAll(new RegExp(DELIVERY_CAUSE_WORDS,'gu'))].map(match=>match[0])
+  if (causes.length && platformReportedCause(rawUserText,causes,excluded)) return false
+  if (excluded) return true
   // A user can report their own setting. Restating that report is allowed;
   // attributing this particular failure to it still requires causal evidence.
   const reported = passive
@@ -571,7 +612,9 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
     // delivery attribution so an earlier denial cannot exempt a later claim.
     const deliveryClauses = sentence.text.split(/[，,]|—+|–+|--+/u).map(value => value.trim()).filter(Boolean)
     for (const [index, clause] of deliveryClauses.entries()) {
-      if (unasserted(clause, sentence.question && index === deliveryClauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
+      // Excluding a concrete cause is still a cause assertion. Remove only
+      // its proposition negation before checking questions and uncertainty.
+      if (unasserted(deliveryCauseAssertion(clause).text, sentence.question && index === deliveryClauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
       const nextClause = deliveryClauses[index + 1] || ''
       const previousClause = deliveryClauses[index - 1] || ''
       const deliveryFailure = /(?:发送|投递|送达)(?:失败|没(?:有)?成功)|(?:图(?:片)?|消息|文件|视频)?(?:没(?:有)?(?:发|送)(?:给|到|出|过)|发不(?:出|过)|送不(?:到|出))/u
@@ -580,8 +623,8 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
         || !unasserted(previousClause) && deliveryFailure.test(previousClause) && /(?:因为|由于)[呀啊呢]?$/u.test(previousClause)
       if (taskContext && unsupportedRecipientCause(clause, rawUserText, adjacentCause)) {
         violations.push({code: 'unsupported_delivery', claim: sentence.text,
-          reason: '当前投递记录只证明发送状态，没有证明拒收、拦截、屏蔽或关闭接收等具体失败原因。',
-          correctionInstruction: '只说明已核验的发送状态，缺少原因就说原因尚未确认。不要把失败归因于拒收、被拦截、屏蔽或没开接收，也不要据此要求用户修改设置；条件性的排查建议需明确仍是假设。'})
+          reason: '当前投递记录只证明发送状态，没有证明或排除拒收、拦截、屏蔽或关闭接收等具体失败原因。',
+          correctionInstruction: '只说明已核验的发送状态，缺少原因就说原因尚未确认。不要自行确认或排除拒收、被拦截、屏蔽或没开接收，也不要据此要求用户修改设置；条件性的排查建议需明确仍是假设。'})
       }
     }
     const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
