@@ -333,3 +333,37 @@ test("连发窗口外的不计入：分两条慢速消息不触发", async () =>
   assert.equal(calls.apis.filter(call => call.method === "delete_msg").length, 0)
   assert.equal(calls.forwards.length, 0)
 })
+
+test("回归：子功能开关按配置值展示，不再被模块启用状态覆盖", async () => {
+  const { buildGroupAdminView } = await import("../dist/backend/adapters/config/groupAdminConfig.js")
+  // 复刻线上真实状态：模块已启用 + 本群 override 里 burstMessage.enabled=false
+  const settings = {
+    groupModeration: { enabled: true, enabledGroups: ["821466122"] },
+    groupAdmin: {
+      overrides: [
+        {
+          groupId: "763694201",
+          groupModeration: {
+            enabled: true,
+            overlongMessage: { enabled: true, maxLength: 200 },
+            burstMessage: { enabled: false }
+          }
+        }
+      ]
+    }
+  }
+  const view = buildGroupAdminView("763694201", settings)
+  const pick = name => view.groups.flatMap(group => group.fields).find(field => field.field === name)
+  assert.equal(pick("groupModeration.enabled").value, true, "模块本群启用状态不变")
+  assert.equal(pick("groupModeration.overlongMessage.enabled").value, true)
+  assert.equal(pick("groupModeration.overlongMessage.maxLength").value, 200)
+  assert.equal(
+    pick("groupModeration.burstMessage.enabled").value,
+    false,
+    "连发折叠开关必须按 override 的 false 展示，而不是跟着 enabledGroups 变 true"
+  )
+  // 标签改写只作用于模块级启用字段，子功能开关保留原名
+  assert.equal(pick("groupModeration.enabled").label, "在本群启用")
+  assert.equal(pick("groupModeration.burstMessage.enabled").label, "连发消息折叠开关")
+  assert.equal(pick("groupModeration.overlongMessage.enabled").label, "超长消息折叠开关")
+})

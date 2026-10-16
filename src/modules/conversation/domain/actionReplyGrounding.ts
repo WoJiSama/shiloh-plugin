@@ -20,15 +20,24 @@ function withoutQuotations(text: string): string {
 function assertions(text: string): ReplySentence[] {
   // A quoted name can still be the object of an arrangement assertion. Keep
   // that noun phrase without treating the quoted promise as an assertion.
-  const namedArrangements = text.replace(/“[^”\n]*”|「[^」\n]*」|'[^'\n]*'|"[^"\n]*"/gu, (quoted, offset: number) => {
-    if (!/(?:好了|完成|结果).{0,12}(?:发|投递|通知)/u.test(quoted)) return quoted
+  const namedArrangements = text.replace(/(“[^”\n]*”|‘[^’\n]*’|「[^」\n]*」|『[^』\n]*』|'[^'\n]*'|"[^"\n]*")((?:这|那)(?:种|个))?/gu, (named, quoted: string, deictic: string | undefined, offset: number) => {
+    if (!/(?:好了|完成|结果).{0,12}(?:发|投递|通知)/u.test(quoted)) return named
+    if (deictic) {
+      // “好了自动发”这种 is a named arrangement, not a new promise.
+      // Retain its artifact owner but omit recipient/action wording that the
+      // promise parser would otherwise interpret as our future commitment.
+      const topic = evidenceTopic(quoted.slice(1, -1))
+      const owner = topic === 'image' ? '图片' : topic === 'video' ? '视频' : topic === 'file' ? '文件' : topic === 'reminder' ? '提醒' : ''
+      const head = /(?:设置|机制|功能|能力)$/u.exec(quoted.slice(1, -1))?.[0] || '安排'
+      return `${owner}完成后发送的${head}`
+    }
     if (/^的(?:安排|设置|登记)/u.test(text.slice(offset + quoted.length))) return '完成后发送'
     // A modal predicate can govern the quoted action itself. Its negation
     // remains asserted even though the named action is not our promise.
     if (/(?:不会|不能|无法|没法)(?:再)?$/u.test(text.slice(0, offset))) return quoted.slice(1, -1)
     // Arrangement verbs can take the quoted action as their direct object.
     // Preserve the object without treating its quoted words as our promise.
-    return /(?:安排|设置|登记)(?:了|好|过)?$/u.test(text.slice(0, offset)) ? '完成后自动发送' : quoted
+    return /(?:安排|设置|登记)(?:了|好|过)?$/u.test(text.slice(0, offset)) ? '完成后自动发送' : named
   })
   return [...withoutQuotations(namedArrangements).replace(/\.{3,}/gu, '…').matchAll(/[^。！？!?；;…\n]+[。！？!?；;…]?/gu)]
     .map(match => ({text: match[0].replace(/[。！？!?；;…]+$/u, '').trim(), question: /[？?]$/u.test(match[0])}))
@@ -165,6 +174,7 @@ const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任�
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次|件)?|的)?(?:任务|请求|事)(?:本身)?(?:的)?$/u
 const QUALIFIED_TASK_REFERENCE = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图)(?:的)?(?:这|那)(?:个|次|件)$/u
 const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|功能|能力|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
+const DEICTIC_FOLLOW_UP = /^(.*?)(?:这|那)(?:个|种)(?:自动|主动|后续)?跟进$/u
 const FOLLOW_UP_DELIVERY_OBJECT = new RegExp(`^(?:给(?:你|您))?(?:发(?:送)?|投递)(${ARTIFACT})(?:这(?:件)?事)?$`, 'u')
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
 const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|然而|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
@@ -180,6 +190,21 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     .replace(new RegExp(`(?:在${SELF_LOCATION}|${SELF_LOCATION})(?:的)?$`, 'u'), '')
   subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
   if (OTHER_SUBJECT.test(subject) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(subject)) return undefined
+  const deicticFollowUp = DEICTIC_FOLLOW_UP.exec(subject)
+  if (deicticFollowUp) {
+    const prefix = deicticFollowUp[1]!.replace(/的$/u, '')
+    if (!prefix && (context || rawTopic === 'reminder')) return {kind:'follow_up',topic:rawTopic,surface:rawSubject}
+    if (prefix) {
+      // A typed anaphor inherits a local task noun, never an arbitrary person,
+      // tool or topic. Keep an explicit reminder/image owner independent of
+      // whichever task kind was mentioned last in the surrounding reply.
+      const owner = taskObjectReference(prefix, context, rawTopic)
+      if (owner && owner.kind !== 'implicit') {
+        const topic = evidenceTopic(prefix)
+        return {kind:'follow_up',topic:topic === 'unknown' || topic === 'generic' ? owner.topic : topic,surface:rawSubject}
+      }
+    }
+  }
   const delivery = FOLLOW_UP_DELIVERY_OBJECT.exec(subject)
   if (delivery) return {kind:'follow_up', topic:evidenceTopic(delivery[1]!), surface:rawSubject}
   if (context && new RegExp(`^${DELIVERY_ASPECT_SUBJECT}$`, 'u').test(subject)) return {kind:'follow_up',topic:rawTopic,surface:rawSubject}

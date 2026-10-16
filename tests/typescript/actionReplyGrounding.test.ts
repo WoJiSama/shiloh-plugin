@@ -1834,3 +1834,117 @@ test('7d78d5a local state parsing preserves uncertain wording, other subjects an
     assert.deepEqual(validateActionReply(reply,facts(),'今晚吃什么？'),[],reply)
   }
 })
+
+const quotedFollowUpRaw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+const quotedFollowUpReply = '你那条考试提醒是登记上了，2100年1月1号早上八点触发。改背景的图这边我这轮没查到相关记录，做没做好、出来没出来都还没法确认，也就不能替你打包票。\n\n“好了自动发”这种没有哦，没这个自动跟进。你要是还想要，直接再来找我要一次就行，我到时候按当轮能做的帮你查和发。'
+const quotedFollowUpReminder = (followUp: TurnTaskFact['followUp'] = {state:'registered',kind:'reminder',id:'exam-reminder',dueAt:4102444800000}): TurnTaskFact => ({
+  taskId:'exam-reminder',requestMessageId:'exam-request',toolName:'reminderTool',source:'reminder',
+  execution:'queued',result:'unknown',delivery:{state:'not_attempted'},followUp,observedAt:1792162483918
+})
+const quotedFollowUpReplayFacts = (): TurnActionFacts => ({
+  scope:{botId:'99',conversationId:'group:900028',userId:'202'},observedAt:1792162483918,lookup:'ok',tasks:[quotedFollowUpReminder()]
+})
+
+test('916bb76 complete repaired replay 59 cannot turn an unknown image follow-up into absence', () => {
+  const violations = validateActionReply(quotedFollowUpReply,quotedFollowUpReplayFacts(),quotedFollowUpRaw)
+  assert.ok(violations.some(item=>item.code==='unsupported_task_state' && item.claim.includes('自动跟进')))
+})
+
+test('916bb76 a quoted completion action with a deictic head is a nominal arrangement, not a promise', () => {
+  const none = facts([fact({source:'live_job',execution:'running',followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const reply of [
+    '“好了自动发”这种没有哦。','“好了自动发你”这种没有。',
+    '「好了自动发给你」这个没有。',"'好了自动发你'这种没有。",'"好了自动发你"这个没有。',
+    '‘好了自动发你’这种没有。','『好了自动发你』这个没有。',
+    '“图好了自动发给你”这种没有。','“完成后通知你”那种没有。'
+  ]) {
+    for (const current of [facts(),quotedFollowUpReplayFacts(),facts([fact({followUp:{state:'unknown'}})]),live]) {
+      assert.ok(validateActionReply(reply,current,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,none,quotedFollowUpRaw),[],reply)
+  }
+})
+
+test('916bb76 deictic follow-up nouns retain both predicate orders and registration state', () => {
+  const none = facts([fact({source:'live_job',execution:'running',followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const reply of [
+    '没这个自动跟进。','这个自动跟进没有。','没有这种跟进。','这种跟进没有。',
+    '我这边没有这个自动跟进。','那个主动跟进也没有。'
+  ]) {
+    for (const current of [facts(),quotedFollowUpReplayFacts(),facts([fact({followUp:{state:'unknown'}})]),live]) {
+      assert.ok(validateActionReply(reply,current,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,none,quotedFollowUpRaw),[],reply)
+  }
+  for (const reply of ['这个自动跟进仍有效。','这种跟进还有效。']) {
+    assert.deepEqual(validateActionReply(reply,live,quotedFollowUpRaw),[],reply)
+    for (const current of [facts(),none]) assert.ok(validateActionReply(reply,current,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+  }
+})
+
+test('916bb76 explicit image and exam follow-up nouns keep independent ownership', () => {
+  const image = fact({source:'live_job',execution:'running',followUp:{state:'none'}})
+  const reminder = quotedFollowUpReminder()
+  const imageActive = {...image,followUp:{state:'registered' as const,kind:'job_completion' as const,id:'image-callback'}}
+  const reminderNone = quotedFollowUpReminder({state:'none'})
+  for (const [reply,allowed,denied] of [
+    ['这张图的这个自动跟进没有。',facts([image,reminder]),facts([imageActive,reminderNone])],
+    ['没有这张图的这种跟进。',facts([image,reminder]),facts([imageActive,reminderNone])],
+    ['考试提醒的这个自动跟进没有。',facts([imageActive,reminderNone]),facts([image,reminder])],
+    ['没有考试提醒的这种跟进。',facts([imageActive,reminderNone]),facts([image,reminder])]
+  ] as const) {
+    assert.deepEqual(validateActionReply(reply,allowed,quotedFollowUpRaw),[],reply)
+    assert.ok(validateActionReply(reply,denied,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.ok(validateActionReply(reply,facts(),quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+  }
+  assert.deepEqual(validateActionReply('考试提醒的这个自动跟进没有。',facts([reminderNone]),'考试提醒还有效吗？'),[])
+  assert.ok(validateActionReply('这张图的这个自动跟进没有。',facts([reminderNone]),quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'))
+  assert.ok(validateActionReply('考试提醒的这个自动跟进没有。',facts([image]),quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'))
+})
+
+test('916bb76 quoted nominal actions preserve their explicit artifact kind', () => {
+  const image = fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})
+  const file = fact({taskId:'file-job',toolName:'reportTool',source:'live_job',execution:'running',followUp:{state:'none'}})
+  const current = facts([image,file,quotedFollowUpReminder()])
+  assert.deepEqual(validateActionReply('“文件好了自动发给你”这种没有。',current,'刚才的图好了会自动发吗？'),[])
+  assert.ok(validateActionReply('“图好了自动发给你”这种没有。',current,'文件好了会自动发吗？').some(item=>item.code==='unsupported_task_state'))
+  assert.ok(validateActionReply('“图好了自动发给你”这种没有。',facts([quotedFollowUpReminder({state:'none'})]),'考试提醒还有效吗？').some(item=>item.code==='unsupported_task_state'))
+})
+
+test('916bb76 cancellation of a deictic follow-up requires observed none for its own task', () => {
+  const cancelled = facts([fact({source:'live_job',execution:'running',followUp:{state:'none'}}),quotedFollowUpReminder()])
+  const active = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}}),quotedFollowUpReminder({state:'none'})])
+  for (const reply of ['这个自动跟进已经取消了。','这张图的这个自动跟进取消了。','这种跟进已经撤销了。']) {
+    assert.deepEqual(validateActionReply(reply,cancelled,quotedFollowUpRaw),[],reply)
+    for (const current of [facts(),active,facts([fact({followUp:{state:'unknown'}})])]) {
+      assert.ok(validateActionReply(reply,current,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+  }
+  assert.deepEqual(validateActionReply('考试提醒的这个自动跟进取消了。',active,quotedFollowUpRaw),[])
+  assert.ok(validateActionReply('考试提醒的这个自动跟进取消了。',cancelled,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'))
+})
+
+test('916bb76 nominal follow-up parsing preserves uncertainty, reports and other subjects', () => {
+  for (const reply of [
+    '不能确认“好了自动发”这种没有。','“好了自动发”这种有没有尚未核实。','“好了自动发”这种没有吗？',
+    '她说“好了自动发”这种没有。','用户说“好了自动发”这种没有。','你说“好了自动发”这种没有。',
+    '她“好了自动发”这种没有。','我妹妹“好了自动发”这种没有。',
+    '不能确认没这个自动跟进。','这个自动跟进可能没有。','这种跟进是否有效尚未核实。',
+    '这个自动跟进没有吗？','“没这个自动跟进”只是个例子。','她的这个自动跟进没有。',
+    '这个自动跟进已经取消了吗？','“这个自动跟进已经取消了”只是个例子。',
+    '“好了自动发你”只是个例子。','“好了自动发”这种说法只是个例子。'
+  ]) assert.deepEqual(validateActionReply(reply,quotedFollowUpReplayFacts(),quotedFollowUpRaw),[],reply)
+})
+
+test('916bb76 local tool limits, ordinary follow-up wording and later user requests remain ordinary speech', () => {
+  for (const reply of [
+    '这轮没有自动跟进能力。','这轮我手上没有自动跟进工具。','这轮没有这个自动跟进工具。',
+    '这个自动跟进工具我这轮没有。','这轮没有可用的跟进工具。','我没有跟进这个话题。',
+    '这个话题没有后续跟进。','没有跟进。','没有跟进建议。',
+    '你回来再问我，我再查，有结果就发给你。','你再来找我，我再帮你看。',
+    '相关安排尚未核实，你要的话直接再来找我，我到时候按当轮能做的帮你查和发。'
+  ]) assert.deepEqual(validateActionReply(reply,quotedFollowUpReplayFacts(),quotedFollowUpRaw),[],reply)
+  assert.deepEqual(validateActionReply('这种跟进没有。',facts(),'这个销售话题需要继续吗？'),[])
+})

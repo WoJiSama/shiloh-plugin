@@ -1752,3 +1752,11 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 7d78d5a完整60轮保留59结构通过、76请求75HTTP200且全low，16轮纠正3兜底；P50/P95/最大2.851/12.148/26.818秒。唯一纠正请求10秒超时原样保留，QQ/真实工具/生产测试写入0。完整28组fresh盲评已封存7d78d5a-review，综合11胜9负8平、自然度46:50，候选4/基线3硬错；schema只规范字段与finding关联，raw、分数和精确引文保留。
 - row1局部任务对象/连续状态及发送安排否定补修，源码125/125；row54禁止通电误伤与row26标题后主动闻气味补修，源码102/102。真实RED、首轮101/102和最终GREEN均归档local-operation-*。统一strict/backend build/testcompile和10文件最终发送/实际产物356/356通过，无跳过。
 - 独立固定矩阵766项source/dist输出相等，旧643实测无漂移，新123/123通过；唯一旧孤立代词期望失败保留。报告local-operation-compiled-review.json和固定输入已归档。归档前读取不存在README及首个apply_patch上下文失败均未改源文件；核验后重新追加本轮记录。
+
+- CAS首次因其他会话提交至bf4619f而拒绝写入；已确认318个接受目标hash全未变，保留旧baseline并备份新index/dirty/全文件hash，建立baseline-head-bf4619f及新CAS脚本。第十次同步354目标、50实际写入，1631非目标、新HEAD/index保持。原目录strict/build/testcompile及356/356通过，五业务TS/JS一致，manifest自洽；证据local-operation-original-*与writeback-audit已归档。
+
+- 916bb76已commit/push并冻结完整60轮：59结构通过、71请求70HTTP200且全low，11纠正3兜底，P50/P95/最大2.499/9.278/19.323秒；8项协议指纹一致，QQ/真实工具/生产测试写入0。一次纠正请求失败原样保留。核验runner tools=[]及toolChoice=none后，匿名输入为两臂补相同executionEnvironment，canonical逐字对应，未改变模型协议。
+- 两fresh评审完成28完整组，schema/分数/胜负/精确引文一次合并通过；封存916bb76-review。综合6胜10负12平、200:207，自然度4胜5负19平、50:51，硬错候选5/基线7。四项涉及无工具回放中的未来再次请求后重做/重发能力表述，原评保留且不把本轮无工具视为下一次请求的工具路由事实；既有任务契约漏检为row59自动跟进否定。
+- 继续窄补row59引号名词主题与指示代词跟进；row57“点亮”同义启动及换电源不等于专业放行。父新最终发送三组在冻结dist上真实RED。诊断首修暴露旧完整并列假设警告误伤，已保持原期望并补局部并列能力边界；灯/手电筒明确对象不当设备启动，source103/103通过，首次失败日志保留。动作owner及独立固定矩阵准备中，尚未build新版或部署。
+
+- 任务owner已停写：source133/133、strict noEmit通过，quoted名词与typed跟进分别保留对象归属，row12合法“完成前不乱发”不扩大拒绝。父诊断补正常“确认可以点亮后再点亮”的专业许可补语；source103/103、实际RED及各次误伤均保留。全owner停写后统一strict/backend build/testcompile和10文件最终发送/实际产物365/365通过，无跳过；quoted-start-*日志及验证已归档，独立810固定source/dist复核进行中。一次zsh未匹配日志通配符返回1，未改文件，随后采用Path.glob归档。

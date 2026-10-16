@@ -12,14 +12,18 @@ const extra: ConfigSchemaItem[] = [
   { field: 'groupModeration.adTemplates', label: '广告种子模板', component: 'GTags', bottomHelpMessage: '与群内 .广告入库 维护的共享样本共同参与检测；样本库仍使用原有群内命令维护。' }
 ]
 
+// 只有模块级启用字段参与「总开关/在本群启用」的语义改写；
+// 子功能开关（超长/连发折叠等）保留自己的标签和帮助文案
+const MODULE_ENABLE_FIELDS = new Set(['groupGuard.enabled', 'groupModeration.enabled', 'groupNotice.enabled'])
+
 const scopeFields = new Set(['groupGuard.enabledGroups', 'groupModeration.enabledGroups', 'groupModeration.groupAdmins', 'groupNotice.enabledGroups', 'groupNotice.groupRules'])
 export const groupAdminDefaultSchema: ConfigSchemaItem[] = [...guard, ...extra, ...notice].filter(item => !item.field || !scopeFields.has(item.field)).map(item => {
-  if (!item.field?.endsWith('.enabled')) return item
+  if (!item.field || !MODULE_ENABLE_FIELDS.has(item.field)) return item
   return { ...item, label: `${item.label?.replace(/总开关|开关/g, '')}总开关`, bottomHelpMessage: '控制所有群的此项功能；还需在按群配置中启用对应群。关闭后，本群配置会保留。' }
 })
 
 export const groupAdminGroupSchema: ConfigSchemaItem[] = groupAdminDefaultSchema.filter(item => item.field !== 'groupModeration.globalAdmins').map(item => {
-  if (!item.field?.endsWith('.enabled')) return item
+  if (!item.field || !MODULE_ENABLE_FIELDS.has(item.field)) return item
   return { ...item, label: '在本群启用', bottomHelpMessage: '仅控制当前群。对应默认策略的总开关开启后才会生效；入群验证和广告处理仍要求机器人拥有群管理权限。' }
 }).concat({
   component: 'Divider', label: '本群通知名单'

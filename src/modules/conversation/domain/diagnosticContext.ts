@@ -457,7 +457,7 @@ function professionalOperationCondition(clause: string, professionalReference = 
     || /(?:无需|不用|不必|不需要|没必要).{0,12}(?:检修|检查|维修|放行)/u.test(clause)) return false
   // Inspection is a future gate only when its result permits operation. Merely
   // mentioning a repair shop or technician cannot authorize a user action.
-  const clearance = /放行|排除.{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没有|没|无).{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|(?:确认|明确(?:说|表示)).{0,20}(?:没问题|安全|正常|(?:可以|能够|能|允许|可)(?:安全)?(?:开机|通电|正常使用|$))/u.exec(clause)
+  const clearance = /放行|排除.{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没有|没|无).{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|(?:确认|明确(?:说|表示)).{0,20}(?:没问题|安全|正常|(?:可以|能够|能|允许|可)(?:安全)?(?:开机|点亮|通电|正常使用|$))/u.exec(clause)
   if (!clearance) return false
   const before = clause.slice(0, clearance.index)
   const after = clause.slice(clearance.index + clearance[0].length)
@@ -617,17 +617,20 @@ function independentlyCurrentOperation(text: string): boolean {
 }
 
 function advisesUnclearedOperation(clause: string, carriedCondition = false, professionalReference = false, nextClause = ''): boolean {
-  const action = /开机|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)/gu
+  const action = /开机|点亮|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)/gu
   for (const match of clause.matchAll(action)) {
     const prefix = clause.slice(0, match.index)
     const suffix = clause.slice(match.index + match[0].length)
+    // Lighting an external lamp is not starting the device under diagnosis.
+    // Bind this exception to this verb's explicit object only.
+    if (match[0] === '点亮' && /^\s*(?:一下)?(?:手电筒|(?:房间|室内|屋里|照明)(?:里)?的?灯)/u.test(suffix)) continue
     // An operation inside the professional's requested permission is a
     // complement of "confirm", not the user's instruction to run it now.
     if (professionalOperationCondition(clause, professionalReference)
       && /(?:确认|明确(?:说|表示)).{0,20}(?:可以|能够|能|允许|可)(?:安全)?$/u.test(prefix)) continue
     // A later "别摸内部" cannot negate an earlier "先开机". Only a
     // prohibition immediately governing this operation can do that.
-    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|自己|亲自|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:开机|通电|上电)|插(?:回|上)(?:去|来)?(?:电源(?:线)?|插头)?|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
+    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|自己|亲自|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:开机|点亮|通电|上电)|插(?:回|上)(?:去|来)?(?:电源(?:线)?|插头)?|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
     if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|不宜|避免|不该|不可)(?:再|重新|直接|自行|自己|擅自|贸然)*(?:接|连接)(?:(?:这|那)台的?)?(?:原(?:装)?的?)?(?:电源(?:线)?|插头)\s*$/u.test(prefix)) continue
     const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|自己|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
@@ -655,7 +658,8 @@ function advisesUnclearedOperation(clause: string, carriedCondition = false, pro
     if (!/(?:可以|建议|先|请|不妨|试着)/u.test(prefix)
       && /^(?:了|成功|正常)?(?:也|仍|还|都)?(?:不代表|不等于|不意味着|不能(?:说明|证明))/u.test(operationTail)) continue
     if (!/(?:可以|建议|先|请|不妨|试着)/u.test(prefix)
-      && /(?:就算|即使|哪怕|纵然)/u.test(prefix) && /^[，,]\s*$/u.test(operationTail)
+      && /(?:就算|即使|哪怕|纵然)/u.test(prefix)
+      && /^(?:(?:、|和|以及)(?:也)?能(?:短时|短暂|正常)?(?:点亮|开机|通电|上电))*[，,]\s*$/u.test(operationTail)
       && /^\s*(?:也|仍|还|都)?(?:不代表|不等于|不意味着|不能(?:说明|证明))/u.test(nextClause)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
