@@ -203,3 +203,5 @@
 另外保留正常专业放行补语“让他们确认可以开机了再开”及“开机本身就是通电”的解释句，明确独立当前开机指令仍拒。源码动作118/118、诊断99/99，新增最终发送回归在旧dist上真实RED保留；新版统一严格类型、构建、测试编译及10文件346/346通过，无跳过，见[验证](replays/2026-10-16-state-followup/capacity-permission-validation.json)。完整原话纠正后才进入发送、历史与学习，独立643固定source/dist复核和新版完整实模继续。
 
 独立只读复核共643项：旧497项固定契约与旧完整输出均无漂移，新矩阵145/146新增控制通过，source/dist 643项逐项相等。唯一失败是孤立句“让他们确认可以开机了再开”，没有专业人员先行词；带“专业人员/维修人员确认”的完整纠正文与邻近控制均通过。该失败原样保留，不把缺少语境的代词控制当生产误伤，见[独立复核](replays/2026-10-16-state-followup/capacity-permission-compiled-review.json)。
+
+原目录按最新 HEAD `87081b4` 重新建立 CAS 保护后完成同步：318 个目标中实际写入43个，1631个非目标文件、HEAD和index保持不变。原目录同版严格类型、后端构建、测试编译及10文件定向回归 **346/346** 通过，无跳过；五个业务源码与对应 dist、manifest逐项一致。见[原目录验证](replays/2026-10-16-state-followup/capacity-permission-original-validation.json)与[写回审计](replays/2026-10-16-state-followup/capacity-permission-writeback-audit.json)。原目录仍包含并发会话的群管提交，不能整体当作隔离发布包。
