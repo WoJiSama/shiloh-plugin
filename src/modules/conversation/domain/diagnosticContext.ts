@@ -52,7 +52,7 @@ const DAMAGE_COMPONENTS: [DiagnosticDamageComponent, RegExp][] = [
   ['power_supply', /电源/u], ['mainboard', /主板/u], ['graphics_card', /显卡/u],
   ['cable', /线材|线缆|电线/u], ['capacitor', /电容/u]
 ]
-const DAMAGE_WORDS = /烧坏|烧毁|烧了|烧掉|损坏|坏了|短路|电气故障/u
+const DAMAGE_WORDS = /烧坏|烧毁|烧了|烧掉|损坏|受损|坏了|短路|电气故障/u
 const PROFESSIONAL = /维修(?:师傅|人员|工程师|店|点)|专业(?:维修|检修|人员)|售后|检修(?:师傅|人员)/u
 const TEMPERATURE = /温度|(?:-?\d{1,3}(?:\.\d+)?)\s*(?:℃|°\s*C|摄氏度)|TjMax|Tcase/iu
 const MODEL = /\b(?:i[3579]-?\d{4,5}[a-z]{0,3}|(?:Ryzen\s*)?[Rr][3579][ -]?\d{4}[a-z]{0,4}|Ryzen\s*[3579]\s*\d{4}[a-z]{0,4}|(?:RTX|GTX)\s*\d{3,4}(?:\s*(?:Ti|SUPER))?|RX\s*\d{3,4}[a-z]{0,3}|\d{4}[xX][3D]{0,2})\b/iu
@@ -75,7 +75,7 @@ function reportedDamageFindings(text: string): DamageFinding[] {
   if (!/(?:确认|查出|检测出|发现|诊断为|认定|确定|更换了?|换掉了?|修复了?)/u.test(reported)) return []
   const findings: DamageFinding[] = []
   for (const clause of diagnosticClauses(reported)) {
-    if (!DAMAGE_WORDS.test(clause) || /没有|并无|未见|排除|不存在|不确定|可能|疑似|应该|大概|好像|似乎|估计|猜测|多半/u.test(clause)) continue
+    if (!DAMAGE_WORDS.test(clause) || /没有|并无|未见|未(?:曾|见)?受损|并未受损|排除|不存在|不确定|可能|疑似|应该|大概|好像|似乎|估计|猜测|多半/u.test(clause)) continue
     findings.push({components: componentsIn(clause), kind: damageKind(clause)})
   }
   return findings
@@ -403,16 +403,16 @@ function isQuestion(clause: string): boolean {
 }
 
 function damageClaim(clause: string): string | undefined {
-  return /(?:元件|零件|东西|部件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面)[^，,。！？!?；;\n]{0,24}(?:烧坏|烧毁|烧了|烧掉|损坏|坏了|短路|电气故障)|(?:烧坏|烧毁|损坏|烧焦)(?:了|的)?(?:元件|零件|电源|主板|显卡|电容|线材|线缆|硬件)/u.exec(clause)?.[0]
+  return /(?:元件|零件|东西|部件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面)[^，,。！？!?；;\n]{0,24}(?:烧坏|烧毁|烧了|烧掉|损坏|受损|坏了|短路|电气故障)|(?:烧坏|烧毁|损坏|受损|烧焦)(?:了|的)?(?:元件|零件|电源|主板|显卡|电容|线材|线缆|硬件)/u.exec(clause)?.[0]
 }
 
 function isDamageDiscussion(clause: string): boolean {
-  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|短路)|(?:排除|排查|检查|确认).{0,24}(?:烧坏|烧毁|损坏|短路).{0,5}(?:之前|以前|前)|(?:烧坏|烧毁|损坏|短路)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
+  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|受损|短路)|(?:排除|排查|检查|确认).{0,24}(?:烧坏|烧毁|损坏|受损|短路).{0,5}(?:之前|以前|前)|(?:烧坏|烧毁|损坏|受损|短路)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
     // A statement about the limits of external observation is not by itself a
     // claim that this device contains damage. Explicit current diagnoses remain
     // subject to evidence checking even when followed by the same limitation.
-    || (!/(?:已经|已然|确定|确认|肯定|一定|大概率|很可能|多半|就是|说明|证明).{0,14}(?:烧坏|烧毁|损坏|短路)|(?:你(?:的|这台)|这台|这只|这块|当前(?:这台)?|本机).{0,18}(?:电源|主板|内部|里面).{0,12}(?:损坏|故障)/u.test(clause)
-      && /(?:内部|里面)(?:的)?(?:损坏|故障).{0,8}(?:外面|外观|肉眼).{0,8}(?:看不出|看不到|无法(?:看|判断)|不能(?:看|判断))/u.test(clause))
+    || (!/(?:已经|已然|确定|确认|肯定|一定|大概率|很可能|多半|就是|说明|证明).{0,14}(?:烧坏|烧毁|损坏|受损|短路)|(?:你(?:的|这台)|这台|这只|这块|当前(?:这台)?|本机).{0,18}(?:电源|主板|内部|里面).{0,12}(?:损坏|受损|故障)/u.test(clause)
+      && /(?:内部|里面)(?:的)?(?:损坏|受损|故障).{0,8}(?:外面|外观|肉眼).{0,8}(?:看不出|看不到|无法(?:看|判断)|不能(?:看|判断))/u.test(clause))
 }
 
 function temperatureAssurance(clause: string): boolean {
@@ -444,7 +444,7 @@ function advisesUnclearedOperation(clause: string): boolean {
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
     // Nominal risk statements describe the cost of powering on; they do not
     // instruct the user to do it. Keep affirmative "先通电试试" detectable.
-    if (/^\s*(?:的)?(?:风险(?:很|较|太|更)?(?:大|高)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|烧|危险|风险))/u.test(suffix)) continue
+    if (/^\s*(?:的)?(?:风险(?:很|较|太|更)?(?:大|高)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|受损|烧|危险|风险))/u.test(suffix)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
   }
@@ -489,7 +489,8 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
     const possible = offersPossibility(clause)
     const conditional = conditionalInspection(clause)
     const damage = damageClaim(clause)
-    if (damage && !conclusionDenied && !possible && !conditional && !isDamageDiscussion(clause)) {
+    const damageDenied = damage !== undefined && /(?:未(?:曾|见)?|没有|并未|并无)(?:任何|明显)?受损/u.test(damage)
+    if (damage && !damageDenied && !conclusionDenied && !possible && !conditional && !isDamageDiscussion(clause)) {
       const components = componentsIn(damage)
       const kind = damageKind(damage)
       const unsupported = assessment.damage.status !== 'reported_professional_finding'

@@ -719,6 +719,32 @@ test('real-model warnings and pending exclusion remain distinct from a diagnosis
   ]) assert.ok(validateDiagnosticReply(reply, context).length > 0, reply)
 })
 
+test('damage synonym shousun cannot turn an odor report into a confirmed diagnosis', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const reply of [
+    '焦糊味基本意味着电源内部元件受损，就算看起来没事、味道散了也不能排除损坏',
+    '焦糊味说明电源内部元件已经受损。',
+    '电源内部元件基本已受损。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_damage_diagnosis'), reply)
+  for (const reply of [
+    '仅凭焦糊味不能确定电源内部元件受损。',
+    '电源内部元件可能受损，先保持断电并送检。',
+    '尚不能确认电源受损。',
+    '重新通电可能导致电源受损，先别开机试探。',
+    '排除电源内部元件受损之前，不要再通电。',
+    '需要请维修人员确认电源是否受损。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+  const reported = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认电源内部元件受损。', speakerId})!
+  assert.equal(reported.evidenceAssessment?.damage.status, 'reported_professional_finding')
+  assert.deepEqual(reported.evidenceAssessment?.damage.components, ['power_supply'])
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，电源内部元件已经受损。', reported), [])
+  assert.ok(validateDiagnosticReply('主板内部元件已经受损。', reported).some(item => item.code === 'unsupported_damage_diagnosis'))
+  assert.ok(validateDiagnosticReply('电源内部元件已经烧毁。', reported).some(item => item.code === 'unsupported_damage_diagnosis'))
+  const notDamaged = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认电源未受损。', speakerId})!
+  assert.equal(notDamaged.evidenceAssessment?.damage.status, 'unconfirmed', 'a negative finding cannot become positive damage evidence')
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，电源未受损。', notDamaged), [])
+})
+
 test('fallbacks use observed prerequisites and pass the same validation without rewriting the candidate', () => {
   const inputs = [
     {rawUserText: '电脑有焦糊味，已经拔电了，怎么办？'},

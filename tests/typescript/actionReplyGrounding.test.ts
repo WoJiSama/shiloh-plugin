@@ -123,7 +123,7 @@ test('execution, queuing, artifact availability and delivered receipts cannot su
   assert.ok(validateActionReply('图生成失败了。', completed).some(item => item.code === 'unsupported_task_state'))
   const sent = facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'receipt'}})])
   assert.deepEqual(validateActionReply('图好了，刚才已经发给你了。', sent), [])
-  assert.deepEqual(validateActionReply('图已经做好了，我现在发给你。', facts([fact({execution:'completed',result:'available'})])), [])
+  assert.ok(validateActionReply('图已经做好了，我现在发给你。', facts([fact({execution:'completed',result:'available'})])).some(item => item.code === 'unsupported_delivery'))
   assert.ok(validateActionReply('我刚才给你发过了。', facts(), '刚才的图发了吗？').some(item => item.code === 'unsupported_delivery'))
 })
 
@@ -238,4 +238,60 @@ test('a failed delivery does not prove recipient rejection or closed receiving s
   assert.ok(validateActionReply('你把接收关了，所以这次发送失败了。', failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'))
   assert.ok(validateActionReply('这次发送失败就是因为，你把接收关了。', failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'))
   assert.deepEqual(validateActionReply('你拒收了我的邀请也没关系。', facts(), '今晚想聚一聚吗？'), [])
+})
+
+test('immediate delivery and execution cannot borrow available artifacts, old receipts or completion callbacks', () => {
+  const evidence = [
+    facts(),
+    facts([fact({execution:'completed',result:'available',delivery:{state:'not_attempted'}})]),
+    facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'old-receipt'}})]),
+    facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  ]
+  for (const current of evidence) {
+    for (const text of [
+      '我现在再发一次。', '我现在发给你。', '我这就补发。',
+      '那我现在给你补发。', '我现在把那张图发给你。',
+      '我现在重发。', '我现在重新发送一次。', '我给你补发。',
+      '图好了，我现在发给你。', '我现在把图片和步骤发给你：先打开设置。'
+    ]) assert.ok(validateActionReply(text, current, '刚才那张图没收到，能再发一次吗？').some(item=>item.code==='unsupported_delivery'), text)
+    for (const text of [
+      '我现在重跑。', '马上重试。', '我这就重新生成。',
+      '我现在查询进度。', '我来给你重跑。', '我现在继续检查进度。'
+    ]) assert.ok(validateActionReply(text, current, '刚才那张图没收到，能再发一次吗？').some(item=>item.code==='unregistered_followup'), text)
+  }
+})
+
+test('inline explanations, user actions, denials, examples and third-party actions retain their meaning', () => {
+  for (const text of [
+    '我现在给你解释一下。', '我现在把步骤发给你：先打开设置。',
+    '我现在把操作步骤发给你，先打开设置。', '我现在把说明发给你：“先打开设置”。',
+    '你发我看看。', '你现在再发一次试试。', '你现在重试一下。',
+    '你把图发给我，我再帮你看看。', '你回来再问我，我再发给你。',
+    '我现在不会再发一次。', '我现在不能重跑。', '我不再重跑。', '图好了，我不再发你。',
+    '我现在重跑吗？', '我现在再发一次吗？', '例如我现在再发一次。',
+    '“我现在重跑”只是一个例子。', '我妹妹现在再发一次。', '她马上重试。',
+    '我现在提醒你，明天记得考试。',
+    '你妹妹今天不是回家了吗？', '有点不好意思啦，不过谢谢你。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), '刚才那张图没收到，能再发一次吗？'), [], text)
+  assert.ok(validateActionReply('我现在把步骤发给你：先打开设置，我这就补发。', facts()).some(item=>item.code==='unsupported_delivery'))
+})
+
+test('passive rejection still requires cause evidence rather than a failed delivery or a reported setting', () => {
+  const failedDelivery = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  for (const text of [
+    '上次发给你的时候被拒收了。', '之前那次投递被拒收。', '上次发你的时候被拒收了。',
+    '我上次发给你的时候被拒收了。', '图片被拒收了。', '那张图遭到拒收。', '被拒收了。'
+  ]) {
+    assert.ok(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？').some(item=>item.code==='unsupported_delivery'), text)
+    assert.ok(validateActionReply(text, failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'), text)
+  }
+  for (const text of [
+    '上次发给你的时候可能被拒收了，可以检查一下。',
+    '如果上次发给你的时候被拒收了，可以检查一下。',
+    '不能断定上次发给你的时候被拒收了。', '不能归因于图片被拒收。',
+    '上次发给你的时候并没有被拒收。', '上次发给你的时候被拒收了吗？',
+    '“图片被拒收了”只是个假设。', '例如图片被拒收了。',
+    '邀请被拒收了。', '上次邀请被拒收了。', '我妹妹的包裹被拒收了。', '他上次发的图被拒收了。'
+  ]) assert.deepEqual(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？'), [], text)
+  assert.deepEqual(validateActionReply('图片被拒收了。', failedDelivery, '我拒收了你刚才发的图。'), [])
 })

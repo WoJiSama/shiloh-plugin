@@ -51,6 +51,20 @@ test('tool calls and invalid repairs cannot execute or leak into sent history',a
   assert.equal(messages[0].content,sent[0]);assert.equal(archived.length,1)
  }
 })
+test('a text-only final reply cannot promise an immediate resend or rerun without execution',async()=>{
+ for(const candidate of ['我现在再发一次。','我现在发给你。','我现在重跑。']){
+  const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()};let repairs=0
+  session.interactionContext.rawUserText='刚才那张图没收到，能再发一次吗？'
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'honest-reply'}
+  host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:'我还没核实到那张图的发送记录，暂时不能确认。'}}]}}
+  await api.handleTextResponse(host,candidate,event,session,messages)
+  assert.equal(repairs,1,candidate)
+  assert.ok(session.replyGrounding.violations.length,candidate)
+  assert.deepEqual(sent,['我还没核实到那张图的发送记录，暂时不能确认。'])
+  assert.equal(messages[0].content,sent[0]);assert.equal(archived.length,1)
+  assert.notEqual(messages[0].content,candidate)
+ }
+})
 test('final grounding rechecks cancellation after generation and respects explicit request scope',async()=>{
  const {api,event,host}=fixture(),reads=[],sent=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request',recentRequestMessageIds:['other-request']}}
  const live={taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'live_job',observedAt:Date.now(),execution:'running',result:'unknown',delivery:{state:'unknown'},followUp:{state:'registered',kind:'job_completion',id:'callback'}}

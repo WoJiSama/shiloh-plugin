@@ -105,15 +105,17 @@ const STATE_CLAIMS: StateClaim[] = [
 ]
 const REFERENCED_IMAGE_STATE = /^(?:第[一二三四五六七八九十\d]+张|这张|那张)(?:图|图片)?(?:我(?:这边)?|这边)?(.+)$/u
 
-const ASYNC_ACTION = /发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度/gu
+const ASYNC_ACTION = /发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度/gu
 const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
 const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持续|定时|自动|继续)(?:查|查询|检查)/u
+const IMMEDIATE_ACTION = /^(?:那)?(?:我(?:这边)?|这边)?(?:现在|这就|马上|立刻|立即)(?:先|就|会|再|来|帮你|给你|为你|把[^，,]{1,20})*$/u
+const PRESENT_SELF_ACTION = /^(?:那)?(?:我(?:这边)?|这边)(?:先|就|再|来|帮你|给你|为你|把[^，,]{1,20})*$/u
 const USER_TRIGGER = /(?:你|您).{0,12}(?:再(?:来)?问|再(?:来)?找|再叫我|再发(?:消息|一句)|发来|发给我|告诉我|确认(?:后|了)|发(?:来|给我)之后).{0,18}(?:我再|再帮你|再给你)/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
 
-type FollowUpKind = 'job_completion' | 'reminder' | 'unsupported'
+type FollowUpKind = 'job_completion' | 'reminder' | 'unsupported' | 'immediate_delivery' | 'immediate_execution'
 function supportsFollowUp(task: TurnTaskFact, kind: FollowUpKind): boolean {
   if (task.followUp.state !== 'registered' || !task.followUp.id || !['queued', 'running'].includes(task.execution)) return false
   if (kind === 'reminder') return task.source === 'reminder' && task.followUp.kind === 'reminder'
@@ -155,22 +157,33 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
     const clause = sentence.text.slice(clauseStart)
     const actionPrefix = sentence.text.slice(clauseStart, match.index)
     const lastClause = !/[，,]/u.test(sentence.text.slice(match.index))
-    if (unasserted(clause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix)
+    if (unasserted(clause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix + match[0])
       || deniedAction(actionPrefix) || pastAction(actionPrefix)
       || OTHER_SUBJECT.test(actionPrefix) && !/我(?:会|来|再|就|到时|稍后)/u.test(actionPrefix)
       || /(?:他|她|别人)(?:会|来|再|到时)/u.test(actionPrefix)) continue
     const completion = completionBefore(before)
-    const trigger = [...before.matchAll(USER_TRIGGER)].at(-1)
+    // “再发” may itself consume the “再” in “你再来问我，我再发”.
+    const trigger = [...sentence.text.slice(0, match.index! + match[0].length).matchAll(USER_TRIGGER)].at(-1)
     if (trigger && trigger.index! + trigger[0].length >= completion) continue
     // A negative or wording cue before the condition applies across its
     // comma (“不能承诺图好了，我会发你”). An unrelated earlier clause does not.
     const conditionPrefix = completion >= 0 ? before.slice(0, completion).split(/[，,]/u).at(-1) || '' : actionPrefix
     if (NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
+    const delivery = /发|投递|补给|补上/u.test(match[0])
+    if ((delivery || RERUN_OR_POLL.test(match[0]))
+      && (IMMEDIATE_ACTION.test(actionPrefix) || completion < 0 && PRESENT_SELF_ACTION.test(actionPrefix))) {
+      // Text supplied in this very reply needs no separate tool execution.
+      // Keep this exemption limited to an explanation, never an artifact.
+      const inlineText = /(?:^|把)(?:操作)?(?:步骤|解释|说明|答案|建议|示例|做法|思路|文字)$/u.test(actionPrefix)
+        && /^(?:一下)?(?:[：:]|[，,](?:先|首先|第一步))/u.test(sentence.text.slice(match.index! + match[0].length))
+      if (delivery && inlineText) continue
+      claims.push(delivery ? 'immediate_delivery' : 'immediate_execution')
+      continue
+    }
     if (completion < 0 && !DELAYED_PROMISE.test(before)) continue
     // An explanation delivered in this reply is synchronous. “告诉你” alone
     // becomes a follow-up only with a completion or explicit delay condition.
     if (/告诉/u.test(match[0]) && completion < 0 && !/稍后|待会|过会|明早|明天|到时|届时|之后|自动|主动/u.test(before)) continue
-    if (/^(?:我(?:这边)?|这边)?(?:现在|这就|马上|立刻)(?:把[^，,]{1,12})?$/u.test(actionPrefix)) continue
     if (RERUN_OR_POLL.test(match[0])) claims.push('unsupported')
     else if (completion >= 0) claims.push('job_completion')
     else claims.push(/提醒|通知/u.test(match[0]) && /明早|明天|晚上|一会儿|待会|等下|稍后|到时|届时/u.test(before) ? 'reminder' : 'job_completion')
@@ -205,12 +218,16 @@ function stateSupported(dimension: StateClaim['dimension'], tasks: TurnTaskFact[
 // transport's rejection cause. Only flag a direct attribution of these narrow
 // states; conditional troubleshooting suggestions remain ordinary speech.
 const RECIPIENT_DELIVERY_CAUSE = /(?:你(?:那边|这边)?|接收方|收件方)(?:的)?(?:接收(?:设置|权限)?|收图(?:设置|权限)?|陌生人消息(?:设置|权限)?)[^，,。；;!?！？]{0,10}(?:拦住|拦在|拦截|挡住|拒收|屏蔽)|(?:你(?:那边|这边)?|接收方|收件方)(?:已经|已|把)?(?:图片|图|文件|消息|视频|我发的图)?(?:给)?(?:拒收|拒绝接收|屏蔽|拦截)(?:了)?|你(?:那边|这边)?(?:的)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|你(?:那边|这边)?(?:把)?(?:陌生人)?(?:图片|文件|消息|视频)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了|屏蔽了)|你(?:那边|这边)?(?:的)?(?:接收(?:开关|权限)?|收图)(?:是)?(?:关闭|关着|没开|未开|禁用)(?:的|了)?/u
+const PASSIVE_DELIVERY_CAUSE = /^(?:我(?:这边)?|这边)?(?:(?:上次|这次|那次|之前(?:那次)?|刚才(?:那次)?)(?:的)?)?(?:(?:这张|那张|这份|那份)?(?:图(?:片)?|成品|文件|结果|视频|报告|消息|投递|发送|送达)|(?:发给(?:你|您)|发(?:你|您)|给(?:你|您)发)(?:的(?:图(?:片)?|文件|结果|视频|报告))?)?(?:的?时候|时)?(?:已经|已|又|还|仍然)?(?:被(?:拒收|拒绝接收)|遭(?:到)?拒收)/u
 function unsupportedRecipientCause(clause: string, rawUserText: string, adjacentCause = false): boolean {
-  if (!RECIPIENT_DELIVERY_CAUSE.test(clause) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
+  const passive = PASSIVE_DELIVERY_CAUSE.test(clause)
+  if (!(RECIPIENT_DELIVERY_CAUSE.test(clause) || passive) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
     || /不能(?:归因|认定|断定)|无法(?:说明|断定)|没法(?:确认|核实)|没(?:有)?核实/u.test(clause)) return false
   // A user can report their own setting. Restating that report is allowed;
   // attributing this particular failure to it still requires causal evidence.
-  const reported = /我(?:这边|那边)?(?:把)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|我(?:这边|那边)?(?:把)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了)|我(?:已经|刚才)?(?:拒收|拒绝接收|屏蔽)(?:了)?/u.test(withoutQuotations(rawUserText))
+  const reported = (passive
+    ? /我(?:已经|刚才)?(?:拒收|拒绝接收)(?:了)?/u
+    : /我(?:这边|那边)?(?:把)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|我(?:这边|那边)?(?:把)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了)|我(?:已经|刚才)?(?:拒收|拒绝接收|屏蔽)(?:了)?/u).test(withoutQuotations(rawUserText))
   return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
 }
 
@@ -231,7 +248,17 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
       ? rawTopic === 'unknown' ? 'artifact' : rawTopic
       : ['unknown', 'generic', 'artifact'].includes(sentenceTopic) ? rawTopic : sentenceTopic
     const followUpTasks = uniqueMatchingTasks(tasks, followUpTopic)
-    if (followUps.some(kind => !followUpTasks.some(task => supportsFollowUp(task, kind)))) {
+    if (followUps.includes('immediate_delivery')) {
+      violations.push({code: 'unsupported_delivery', claim: sentence.text,
+        reason: '没有本轮实际发送的回执，不能承诺现在发送或再次投递；产物可用、历史发送回执和完成回调都不能证明新的发送动作。',
+        correctionInstruction: '撤回现在发送、补发或再次投递的承诺，只说明已核验的产物与发送状态。历史回执只说明那次已发；如需新动作，应由真实工具执行并获得对应回执后再说明。'})
+    }
+    if (followUps.includes('immediate_execution')) {
+      violations.push({code: 'unregistered_followup', claim: sentence.text,
+        reason: '没有本轮实际执行该动作的记录，不能承诺现在重跑、重试或查询；历史任务和完成回调不能证明新的执行。',
+        correctionInstruction: '撤回现在重跑、重试或查询的承诺，只说明已核验的当前状态。需要执行时应真实调用对应工具，不以一条文字回复代替执行。'})
+    }
+    if (followUps.some(kind => !kind.startsWith('immediate_') && !followUpTasks.some(task => supportsFollowUp(task, kind)))) {
       violations.push({code: 'unregistered_followup', claim: sentence.text,
         reason: '没有仍有效且与该动作对应的后续登记；完成触发的通知或投递和普通定时提醒不能互相证明。',
         correctionInstruction: '撤回自动跟进、通知、重试或已登记的说法。只说当前已知情况；如需用户再次发起请求，明确由用户再来询问，不承诺届时自己主动行动。'})
