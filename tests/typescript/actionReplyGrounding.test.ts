@@ -729,16 +729,3 @@ test('a later user request owns its synchronous lookup but cannot license a sepa
  ]) assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unregistered_followup'),text)
   assert.ok(validateActionReply('你回来再问我，我现在发给你。',facts(),raw).some(item=>item.code==='unsupported_delivery'))
 })
-
-test('a sent receipt cannot supply an unrecorded delivery date',()=>{
- const sent=facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'receipt'}})])
- const raw='我说的是这张，已经发过了对吧？'
- for(const text of ['对，就那张。发过了，你往上翻到年初那条就能看到~','你往上翻到昨晚那条就能看到。','图在2026年10月15日发出过了。']) {
-  assert.ok(validateActionReply(text,sent,raw).some(item=>item.code==='unsupported_delivery'),text)
- }
- for(const text of ['之前发过，往上翻就能看到。','年初那条是否发出还不能确认。','她昨晚发过这张图。','“年初那条”只是举例。']) {
-  assert.deepEqual(validateActionReply(text,sent,raw),[],text)
- }
- assert.deepEqual(validateActionReply('你往上翻到昨晚那条就能看到。',sent,'昨晚发过的这张图，确认是这张吗？'),[])
- assert.ok(validateActionReply('你往上翻到昨晚那条就能看到。',sent,'昨晚吃什么？我说的这张图已经发过了吗？').length)
-})

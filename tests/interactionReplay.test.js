@@ -455,7 +455,7 @@ test('disabling reasoning escalation preserves base low effort for a short serio
 })
 
 test('unknown delivery status uses evidence reasoning and an explicit execution contract', async () => {
-  const scenario = {rawUserText: '刚才改背景的图出来了吗？', modelReply: '还不能确认完成，我这边没有结果。', continuity: {botId: '99', route: 'tool', tools: [], lastReply: '收到，我先处理。'}}
+  const scenario = {rawUserText: '刚才改背景的图出来了吗？', modelReply: '还不能确认完成，我这边没有查到结果记录。', continuity: {botId: '99', route: 'tool', tools: [], lastReply: '收到，我先处理。'}}
   const f = fixture(scenario, {realPlanning: true, gatewayConfig: reasoningGatewayConfig(), optionalEmoji: true})
   await f.seedContinuity()
   assert.equal(await f.run(), true)
@@ -467,6 +467,8 @@ test('unknown delivery status uses evidence reasoning and an explicit execution 
   assert.equal(body.tools, undefined)
   assert.match(body.messages.at(-1).content, /不要替用户重新发起旧任务/)
   assert.ok(body.messages.some(message => String(message.content).includes('缺少结果时只说明尚未确认')))
+  assert.deepEqual(f.captures.sent, [scenario.modelReply])
+  assert.deepEqual(f.session.replyGrounding.violations, [])
 })
 
 test('runtime task facts reach the actual model request separately from historical commitments', async () => {

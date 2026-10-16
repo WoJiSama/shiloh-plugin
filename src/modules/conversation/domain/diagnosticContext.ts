@@ -422,7 +422,7 @@ export function buildDiagnosticContextPrompt(context?: DiagnosticContext): strin
     if (context.allowedChecks.includes('operational_monitoring')) lines.push('用户侧先确认外壳复原，再做非接触运行监测；不得安排开侧板凑近通电观察或主动嗅闻。')
     lines.push('症状、原因和排除结论要分别表述：烟雾或焦糊味只能支持异常与风险，不能据此断定元件过热、击穿、烧毁，也不能把电源或主板写成高概率故障源。无烟、无味、无烧痕或仍可运行只说明未观察到相应现象，不证明未烧毁、未损坏或损坏较轻；已报告专业结论仅按同一部件、机制与否定范围复述，不能扩大“没有其他损坏”的范围。')
     lines.push('任何硬件拆接、换插板卡或硬盘、重新插紧线缆，都必须先关机、拔下电源线并确认隔离；仅关机不等于断电。需要内部带电检测的步骤交现场专业人员按工序进行，用户不要触摸、凑近观察或嗅闻；初步点亮、BIOS读数或短时运行不能证明整机安全，风扇停转也须结合零转速策略判断。')
-    if (context.sources.some(source => /温度|满载|℃|°C|TjMax|Tcase/iu.test(source.text))) lines.push('温度判断需要具体部件型号、测点与负载等依据，并结合规格、功耗、环境和实际限频情况；单个温度读数本身不能保证正常或安全。型号和测点未知时先说明判断范围或补问关键条件；正常运行、无烟无味或自动降频保护都不是整机健康证明。')
+    if (context.sources.some(source => /温度|满载|℃|°C|TjMax|Tcase/iu.test(source.text))) lines.push('温度判断需要具体部件型号、测点与负载等依据，并结合规格、功耗、环境和实际限频情况；单个温度读数本身不能保证正常或安全，也不能直接判为临界。降频或频率下降还可能来自功耗等限制，不能单凭降频断定触发温度墙。型号和测点未知时先说明判断范围或补问关键条件；正常运行、无烟无味或自动降频保护都不是整机健康证明。')
   }
   for (const source of context.sources.slice(-4)) lines.push(`依据 ${source.origin}${source.messageId ? `/${source.messageId}` : ''}${source.origin !== 'current' && !source.transientFactsFresh ? '（旧状态或时间未明，不证明当前供电和冷却状态）' : ''}：${safeTruncateUnicode(source.text, 260)}`)
   return lines.join('\n')
@@ -443,7 +443,11 @@ function conditionalInspection(clause: string): boolean {
   // can make an otherwise unestablished conclusion explicitly conditional.
   return professionalOperationCondition(clause)
     || /(?:等|待|须|必须|需要).{0,25}(?:专业|维修|检修|排除电气损坏)|(?:专业|维修|检修).{0,25}(?:之后|以后|才(?:能|可))|交(?:给|由).{0,12}(?:专业|维修)|由.{0,12}(?:专业|维修).{0,12}(?:检查|检测|操作)/u.test(clause)
-    || /(?:如果|假如|只有|前提是).{0,35}(?:型号|测点|传感器|负载).{0,35}(?:规格|官方|厂家|允许|上限|范围|阈值)|(?:如果|假如|只有|前提是).{0,35}(?:官方|厂家|该型号)(?:公布|规定|给出|标定)?的?(?:温度)?(?:规格|上限|范围|阈值).{0,20}(?:允许|以内|以下|范围内)/u.test(clause)
+    || conditionalTemperatureSpecification(clause)
+}
+
+function conditionalTemperatureSpecification(clause: string): boolean {
+  return /(?:如果|假如|只有|前提是).{0,35}(?:型号|测点|传感器|负载).{0,35}(?:规格|官方|厂家|允许|上限|范围|阈值)|(?:如果|假如|只有|前提是).{0,35}(?:官方|厂家|该型号)(?:公布|规定|给出|标定)?的?(?:温度)?(?:规格|上限|范围|阈值).{0,20}(?:允许|以内|以下|范围内)/u.test(clause)
 }
 
 function professionalOperationCondition(clause: string): boolean {
@@ -481,9 +485,55 @@ function temperatureAssurance(clause: string): boolean {
   // Reporting that a machine has run does not itself assert that its temperature
   // is normal. A permission to keep using it is a separate positive conclusion.
   if (/(?:正常|安全)(?:运行|工作|使用)/u.test(clause)) return false
-  const conclusion = /(?:正常(?:范围|区间)?|不算高|不高|没问题|没事|安全)|放心(?:用|使用|运行)/u
+  const conclusion = /(?:正常(?:范围|区间)?|不算高|不高|没问题|没事|安全|不(?:算|是)危险(?:信号)?|没有(?:明显)?风险)|放心(?:用|使用|运行)/u
   if (!conclusion.test(clause)) return false
   return /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)|(?:就|很|挺|算|是|属于|在|落在|基本|完全|非常).{0,8}(?:正常|不高|没问题|没事|安全)|放心(?:用|使用|运行)|^\s*(?:正常|不算高|不高|没问题|没事|安全)/iu.test(clause)
+}
+
+type ThermalComponent = 'cpu' | 'gpu'
+type ThermalConclusion = 'thermal_limit_triggered' | 'near_temperature_limit'
+
+function thermalComponents(text: string): ThermalComponent[] {
+  const components: ThermalComponent[] = []
+  if (/CPU|处理器/iu.test(text)) components.push('cpu')
+  if (/GPU|显卡/iu.test(text)) components.push('gpu')
+  return components
+}
+
+function thermalConclusion(clause: string): ThermalConclusion | undefined {
+  // Infer neither direction from a symptom alone. Generic explanations of what
+  // thermal throttling can do, and questions about it, are not a current finding.
+  if (/(?:说明|证明|表明|意味着|就是|已经|肯定|确定|确认)[^。！？!?；;\n]{0,20}(?:触发(?:了)?|撞(?:上|到|了)?|达到(?:了)?)(?:温度墙|温度(?:上限|阈值))(?!时|后|会|的情况下)|(?:CPU|GPU|处理器|显卡).{0,8}(?:已|已经)(?:触发(?:了)?|撞(?:上|到|了)?)(?:温度墙|温度(?:上限|阈值))(?!时|后|会|的情况下)/iu.test(clause)) return 'thermal_limit_triggered'
+  if (/(?:\d{1,3}\s*(?:℃|°\s*C|度)|温度|读数)[^。！？!?；;\n]{0,12}(?:就|已经|属于|算|偏|很|接近|达到)[^。！？!?；;\n]{0,5}(?:临界|温度上限)(?!时|的情况下)/iu.test(clause)) return 'near_temperature_limit'
+  return undefined
+}
+
+function supportsThermalConclusion(clause: string, kind: ThermalConclusion, context: DiagnosticContext): boolean {
+  let claimComponents = thermalComponents(clause)
+  if (!claimComponents.length) {
+    // An omitted component can inherit one unambiguous current topic, never the
+    // diagnosis of a different CPU/GPU in the same device.
+    claimComponents = thermalComponents(context.sources.at(-1)?.text || '')
+  }
+  if (claimComponents.length !== 1) return false
+  let findings: {component: ThermalComponent; kind: ThermalConclusion}[] = []
+  for (const source of context.sources) {
+    if (REPORT_CORRECTION.test(source.text) || deniesProfessionalClearance(source.text)
+      || (source.incidentStatus === 'asserted' && !professionalClearance(source.text))) findings = []
+    if (!PROFESSIONAL.test(source.text) || deniesProfessionalClearance(source.text)) continue
+    let carriedPendingReport = false
+    for (const reported of diagnosticClauses(source.text)) {
+      const pendingReport: boolean = carriedPendingReport || /准备|打算|计划|将要|明天|稍后|尚未|还没/u.test(reported)
+      carriedPendingReport = pendingReport && /[，,]\s*$/u.test(reported)
+      if (pendingReport || HYPOTHETICAL.test(reported) || isQuestion(reported) || deniesConclusion(reported) || offersPossibility(reported)
+        || /准备|打算|计划|将要|明天|稍后|尚未|还没|没有(?:确认|查出|发现)/u.test(reported)
+        || !/(?:确认|诊断为|检测证实|检查发现)/u.test(reported)) continue
+      const components = thermalComponents(reported)
+      const reportedKind = thermalConclusion(reported)
+      if (components.length === 1 && reportedKind) findings.push({component: components[0]!, kind: reportedKind})
+    }
+  }
+  return findings.some(finding => finding.component === claimComponents[0] && finding.kind === kind)
 }
 
 function replyAssertions(text: string): string[] {
@@ -558,11 +608,21 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
   // Analyse formatting-free text, preserving the actual reply for the sender.
   const prose = diagnosticValidationProse(reply)
   let carriedOperationCondition = false
+  let carriedTemperatureCondition = false
   for (const clause of replyAssertions(prose)) {
-    if (/^\s*(?:但是|不过|然而|可是|但(?!凡)|却)/u.test(clause)) carriedOperationCondition = false
+    if (/^\s*(?:但是|不过|然而|可是|但(?!凡)|却)/u.test(clause)) {carriedOperationCondition = false; carriedTemperatureCondition = false}
+    const temperatureConditional: boolean = carriedTemperatureCondition || conditionalTemperatureSpecification(clause)
+    carriedTemperatureCondition = temperatureConditional && !/[。！？!?；;\n]/u.test(clause)
     const operationConditional: boolean = carriedOperationCondition || professionalOperationCondition(clause)
     carriedOperationCondition = operationConditional && !/[。！？!?；;\n]/u.test(clause)
     if (isQuestion(clause)) continue
+    for (const action of clause.matchAll(/闻(?:有没有|是否|一下|一闻)|嗅闻/gu)) {
+      const prefix = clause.slice(0, action.index)
+      if (/(?:不要|别|勿|避免|禁止|不能|不应)(?:凑近|主动|刻意|特意)?\s*$/u.test(prefix)) continue
+      if (/(?:先|再|然后|可以|建议|请|、|^)(?:凑近|主动|刻意|特意)?\s*$/u.test(prefix)) {
+        add('unsafe_inspection_action', clause.trim(), '专业放行不授权主动嗅闻曾出现电气异常的设备；应保持非接触观察。', '保留受控运行和非接触监测，撤回主动闻气味的步骤；若自然察觉新的异常气味，停止运行并通知现场检修人员。')
+      }
+    }
     const conclusionDenied = deniesConclusion(clause)
     const possible = offersPossibility(clause)
     const conditional = conditionalInspection(clause)
@@ -585,6 +645,12 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
     }
     if (!conclusionDenied && !possible && !conditional && /绝对安全|保证.{0,4}安全|肯定(?:没事|没有问题|没问题)|百分之百(?:正常|安全)|整机.{0,6}(?:完全正常|没有任何问题|绝对没事)/u.test(clause)) {
       add('unsupported_safety_certification', clause.trim(), '远程用户陈述和局部检查都不支持整机安全保证。', '按报告说明能确认的范围，说明检查前提与停止条件，不给整机安全保证。')
+    }
+    const thermalClaim = thermalConclusion(clause)
+    if (thermalClaim && !conclusionDenied && !possible && !conditional && !temperatureConditional
+      && (thermalClaim === 'thermal_limit_triggered' || assessment.temperature?.missing.length)
+      && !supportsThermalConclusion(clause, thermalClaim, context)) {
+      add('unsupported_temperature_diagnosis', clause.trim(), '频率下降不能独立确定温度限频；型号、测点和规格未明时，也不能把当前读数判为温度临界。', '区分频率现象与原因：还可能存在功耗等限制，先结合温度规格及限频原因记录判断；保留待确认的可能性，不把降频写成确定触发温度墙。已有专业结论只按同一部件和确认范围复述。')
     }
     if (assessment.temperature?.missing.length && !conclusionDenied && !possible && !conditional
       && !/(?:有些|某些|部分)(?:型号|部件|处理器|设备)|对.{0,12}(?:型号|部件).{0,6}来说/u.test(clause)

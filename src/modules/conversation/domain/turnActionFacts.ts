@@ -72,7 +72,6 @@ export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
     if (task.source === 'reminder') lines.push('这是一条定时提醒记录。这里的登记和排队只属于该提醒，不证明图片处理任务存在、已登记、正在排队或会在完成后发图。')
     lines.push('已核验该请求对应的任务记录存在；后续发送未登记、已取消或未确认，均不能否定原任务存在，也不能据此推断任务停止或产物不可用。')
     if (task.result === 'available') lines.push('已确认有可用产物，这一事实独立于投递状态；不能因投递状态改述为没有图、没有成品或尚未做好。')
-    if (task.delivery.state === 'sent') lines.push('发送回执只证明该次已发出，没有提供发送日期；记录的观察时间不是送达时间。除用户本轮明确给定该次发送时间外，不补写年初、昨晚或其他具体日期。')
     if (task.delivery.state === 'failed') lines.push('投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因。没有原因证据时，不自行补写失败原因。')
     if (task.followUp.state === 'registered') {
       lines.push(task.followUp.kind === 'reminder'

@@ -959,3 +959,72 @@ test('fallbacks use observed prerequisites and pass the same validation without 
   assert.deepEqual(validateDiagnosticReply('电源烧坏了。', undefined), [])
   assert.equal(buildDiagnosticFallbackReply(undefined), '')
 })
+
+test('unknown model temperature cannot be certified through a no-danger synonym', () => {
+  const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
+  const text = '82℃满载这个数本身不算危险信号，一般CPU规格里Tjunction上限在100℃左右，82℃还留有余量。'
+  assert.ok(validateDiagnosticReply(text, context).some(item => item.code === 'unsupported_temperature_assurance'))
+  for (const normal of [
+    '82℃本身是否危险还不能确定。',
+    '如果该型号官方上限为100℃，82℃就在这项上限以下；仍需核对测点和负载。',
+    '有些型号允许这个温度，当前型号尚未确认。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+})
+
+test('professional clearance preserves passive odor detection but never requests active sniffing', () => {
+  const context = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，更换了损坏电源，确认没有其他电气损坏，允许受控开机。现在能测什么？', speakerId, history})!
+  const unsafe = '师傅已经排查过并放行的话，可以让师傅在场做受控开机，先听风扇转速是否正常、闻有没有异味，看能不能点亮进系统。'
+  assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsafe_inspection_action'))
+  for (const normal of [
+    '不要主动嗅闻。',
+    '不要凑近闻有没有异味。',
+    '别主动闻一下。',
+    '如果自然闻到异味，立即停止运行，通知维修师傅。',
+    '闻到异味后立即停止受控运行，通知师傅。',
+    '观察是否再次出现异常气味，不要凑近。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+})
+
+test('704a50c real replay does not turn frequency reduction into a certain thermal-limit diagnosis', () => {
+  const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
+  const original = '满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）'
+  const violations = validateDiagnosticReply(original, context)
+  assert.ok(violations.some(item => item.code === 'unsupported_temperature_diagnosis' && item.claim.includes('说明触发了温度墙')))
+  assert.ok(violations.some(item => item.code === 'unsupported_temperature_diagnosis' && item.claim.includes('82℃就偏临界了')))
+  assert.equal(original, '满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）')
+  for (const unsafe of [
+    'CPU频率下降说明已经触发温度墙。',
+    '如果你着急，CPU频率被压就说明触发了温度墙。',
+    '82℃已经接近温度上限。'
+  ]) assert.ok(validateDiagnosticReply(unsafe, context).some(item => item.code === 'unsupported_temperature_diagnosis'), unsafe)
+  for (const normal of [
+    '频率下降可能与温度有关，也可能是功耗限制，需要结合记录判断。',
+    '频率被压下来不一定说明触发了温度墙。',
+    '满载频率下降是否说明触发了温度墙？',
+    '先确认限频原因记录，看看有没有触发温度墙。',
+    '触发温度墙时可能出现频率下降，但仅凭降频不能确定原因。',
+    '这个例子说明触发温度墙后频率会下降；仍需查日志确认当前原因。',
+    '如果该型号官方温度上限为83℃，这个测点82℃就接近温度上限；仍需核对规格。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  const known = buildDiagnosticContext({rawUserText: 'CPU型号是i7-13700K，CPU Package满载82℃，运行Cinebench时频率下降，怎么判断？', speakerId})!
+  assert.ok(validateDiagnosticReply('CPU频率下降说明触发了温度墙。', known).some(item => item.code === 'unsupported_temperature_diagnosis'), 'knowing the model and sensor still does not establish the limiting cause')
+  assert.match(buildDiagnosticContextPrompt(context), /降频或频率下降.*不能单凭降频断定触发温度墙/u)
+})
+
+test('thermal findings preserve explicit professional component, mechanism and completed-report scope', () => {
+  const inspected = '维修师傅已经检查了我的电脑，确认CPU已经触发温度墙。'
+  const context = buildDiagnosticContext({rawUserText: inspected, speakerId})!
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，CPU已经触发温度墙。', context), [])
+  assert.ok(validateDiagnosticReply('GPU已经触发温度墙。', context).some(item => item.code === 'unsupported_temperature_diagnosis'))
+  for (const rawUserText of [
+    '维修师傅明天检查我的电脑，确认CPU已经触发温度墙。',
+    '维修师傅已经检查了我的电脑，但还没有确认CPU已经触发温度墙。',
+    '维修师傅已经检查了我的电脑，确认CPU已经触发温度墙了吗？',
+    '维修师傅已经检查了朋友的电脑，确认CPU已经触发温度墙。我的电脑CPU满载82℃，怎么判断？'
+  ]) {
+    const current = buildDiagnosticContext({rawUserText, speakerId})!
+    assert.ok(validateDiagnosticReply('CPU已经触发温度墙。', current).some(item => item.code === 'unsupported_temperature_diagnosis'), rawUserText)
+  }
+  const revised = buildDiagnosticContext({rawUserText: '刚才说错了，维修师傅还没检查这台电脑，CPU温度82℃。', speakerId, history: [{role: 'user', userId: speakerId, text: inspected}]})!
+  assert.ok(validateDiagnosticReply('CPU已经触发温度墙。', revised).some(item => item.code === 'unsupported_temperature_diagnosis'))
+})

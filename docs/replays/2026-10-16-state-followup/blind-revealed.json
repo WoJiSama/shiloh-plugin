@@ -1,111 +1,83 @@
 {
-  "evaluatedCandidate": "fd5c5f9d52ad0c4ab51e0b4b8fab5e1d9982c59d",
+  "evaluatedCandidate": "704a50c54da7a34858cba2d4587169299fefb59a",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "e77facf9d7261d7d13b2c86736bb0cf96b87c2f6da2a94499b905d63e44e087e",
-    "blind-review.json": "8910917dee4641094257680d3806cab12611996e821205888ae664f0a606d51a"
+    "blind-conversations.json": "904c72bcd0058bf72ff11eefd6a6ca9e2fe986ab16411579fc1df1162839b79b",
+    "blind-review.json": "e703b7fb11288b1f50567fba45524edd44befcf9cc667d28ac7e7ff116ee02c9"
   },
   "cases": 28,
   "preference": {
-    "candidate": 2,
-    "baseline": 11,
-    "tie": 15
+    "candidate": 10,
+    "baseline": 8,
+    "tie": 10
   },
   "scoreTotals": {
-    "candidate": 191,
-    "baseline": 211
+    "candidate": 212,
+    "baseline": 208
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
-        "candidate": 1,
-        "baseline": 5,
+        "candidate": 4,
+        "baseline": 2,
         "tie": 22
       },
       "scoreTotals": {
-        "candidate": 47,
-        "baseline": 52
+        "candidate": 53,
+        "baseline": 51
       }
     },
     "continuity": {
       "preference": {
-        "candidate": 0,
-        "baseline": 5,
-        "tie": 23
+        "candidate": 1,
+        "baseline": 0,
+        "tie": 27
       },
       "scoreTotals": {
-        "candidate": 49,
+        "candidate": 56,
         "baseline": 55
       }
     },
     "new_information": {
       "preference": {
-        "candidate": 0,
-        "baseline": 4,
-        "tie": 24
+        "candidate": 3,
+        "baseline": 3,
+        "tie": 22
       },
       "scoreTotals": {
-        "candidate": 51,
-        "baseline": 55
+        "candidate": 53,
+        "baseline": 53
       }
     },
     "naturalness": {
       "preference": {
-        "candidate": 2,
-        "baseline": 7,
-        "tie": 19
+        "candidate": 7,
+        "baseline": 6,
+        "tie": 15
       },
       "scoreTotals": {
-        "candidate": 44,
+        "candidate": 50,
         "baseline": 49
       }
     }
   },
   "hardErrorFindings": {
-    "candidate": 4,
+    "candidate": 1,
     "baseline": 1
   },
   "hardErrorQuoteOccurrences": {
-    "candidate": 4,
+    "candidate": 1,
     "baseline": 1
   },
   "hardErrors": [
     {
       "id": "HE-01",
-      "caseId": "case-01",
-      "candidate": "candidate",
-      "category": "无登记的主动投递承诺",
-      "reason": "本轮没有任何任务或后续登记，旧的收到台词也不构成后台机制；A仍许诺确认到结果即主动发出。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "等我确认到就第一时间发你。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-02",
-      "caseId": "case-02",
-      "candidate": "candidate",
-      "category": "无登记的主动投递承诺",
-      "reason": "lookup成功但tasks为空，A仍表示结果一有就会发送，未保留用户再请求或另行登记的前提。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "有了我发你。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "HE-03",
       "caseId": "case-02",
       "candidate": "baseline",
-      "category": "无登记的主动投递承诺",
-      "reason": "lookup成功但tasks为空，B仍承诺实际拿到图后第一时间发送，没有已登记的主动投递机制。",
+      "category": "unregistered_followup_promise",
+      "reason": "本轮没有图片任务或后续登记，却无用户再次发起的条件地承诺拿到图即第一时间发送；后轮否认自动发不抹去首轮承诺。",
       "occurrences": [
         {
           "turn": 1,
@@ -115,29 +87,15 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "HE-04",
-      "caseId": "case-04",
+      "id": "HE-02",
+      "caseId": "case-15",
       "candidate": "candidate",
-      "category": "无依据的交付时间定位",
-      "reason": "用户询问刚才的图，并引用同一交付回执；文件没有年初时间信息。B把目标回执具体定位到年初，属于可核对的凭空时序信息。",
+      "category": "unsupported_thermal_cause",
+      "reason": "满载频率下降可能受功耗限制等因素影响，不能单凭下降便确定触发温度墙并把82℃定为临界；此句给出确定因果而非诊断可能性。",
       "occurrences": [
         {
-          "turn": 2,
-          "exactQuote": "你往上翻到年初那条就能看到~"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "HE-05",
-      "caseId": "case-27",
-      "candidate": "candidate",
-      "category": "跨任务挪用执行状态",
-      "reason": "唯一任务是考试提醒，其queued及registered不能证明图片任务存在或排队；A明确把这些执行状态转给改背景任务。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "改背景那个任务确实是登记了的，在排队中"
+          "turn": 3,
+          "exactQuote": "满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）"
         }
       ],
       "anonymousCandidate": "A"

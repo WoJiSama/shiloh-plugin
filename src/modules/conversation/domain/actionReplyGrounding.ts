@@ -424,28 +424,6 @@ function unsupportedRecipientCause(clause: string, rawUserText: string, adjacent
   return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
 }
 
-const DELIVERY_TIME = /(?:(?:今年|去年|前年)?(?:年初|年中|年末|年底)|(?:上|下|这|本)个?月(?:初|底|末)?|(?:上|下|本|这)周[一二三四五六日天]?|昨天|昨晚|昨夜|前天|大前天|今早|今晚|今天|明早|明晚|明天|\d{4}年(?:\d{1,2}月(?:\d{1,2}[日号])?)?|\d{1,2}月\d{1,2}[日号]|\d{4}[-/]\d{1,2}[-/]\d{1,2})/gu
-const DELIVERY_LOCATION = /(?:往上|向上|往前|上面).{0,8}(?:翻|找)|(?:翻|找).{0,12}(?:那条|这条|消息|回执)|发过|发出|发送|投递|送达/u
-
-/** A receipt proves delivery, not its calendar date. observedAt is the time
- * the record was checked. Only repeat a date supplied for this delivery by
- * the current speaker; ordinary "previously sent" navigation stays intact. */
-function unsupportedDeliveryTime(sentence: ReplySentence, tasks: TurnTaskFact[], rawUserText: string, rawTopic: EvidenceTopic): boolean {
-  for (const clause of sentence.text.split(/[，,]/u)) {
-    if (unasserted(clause, sentence.question) || OTHER_SUBJECT.test(clause) || !DELIVERY_LOCATION.test(clause)) continue
-    const localTopic = evidenceTopic(clause)
-    const topic = ['unknown', 'generic', 'artifact'].includes(localTopic) ? rawTopic : localTopic
-    if (!uniqueMatchingTasks(tasks, topic).some(task => task.source !== 'reminder' && task.delivery.state === 'sent' && task.delivery.messageId)) continue
-    for (const match of clause.matchAll(DELIVERY_TIME)) {
-      const supplied = assertions(rawUserText).some(source => source.text.includes(match[0]) && DELIVERY_LOCATION.test(source.text)
-        && !WORDING_EXAMPLE.test(source.text) && !OTHER_SUBJECT.test(source.text)
-        && ['unknown', 'generic', 'artifact', topic].includes(evidenceTopic(source.text)))
-      if (!supplied) return true
-    }
-  }
-  return false
-}
-
 /** Narrow, evidence-backed rejection signals. This is not a general truth or
  * naturalness score. Scope and freshness must be validated by the caller.
  * The current words, not the mere presence of an empty facts envelope, scope
@@ -458,11 +436,6 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
   const resultQuestionContext = taskContext && asksArtifactResult(rawUserText)
   let currentObjectTopic = rawTopic
   for (const sentence of assertions(reply)) {
-    if (taskContext && unsupportedDeliveryTime(sentence, tasks, rawUserText, currentObjectTopic)) {
-      violations.push({code: 'unsupported_delivery', claim: sentence.text,
-        reason: '发送回执只确认该次发送，没有提供这句新增的发送日期；记录观察时间不能当作送达时间。',
-        correctionInstruction: '保留已确认的发送事实，不自行附加年初、昨晚等具体时间。只有用户本轮明确提供该次发送时间时才能复述；否则可说已发过或请用户往上查找，不定位到某个日期。'})
-    }
     const followUps = followUpClaims(sentence, taskContext, currentObjectTopic)
     if (followUps.some(claim => claim.kind === 'immediate_delivery')) {
       violations.push({code: 'unsupported_delivery', claim: sentence.text,

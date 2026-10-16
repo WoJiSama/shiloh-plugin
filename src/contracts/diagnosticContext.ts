@@ -23,7 +23,7 @@ export interface DiagnosticEvidenceAssessment {
 }
 
 export interface DiagnosticReplyViolation {
-  code: 'unsupported_damage_diagnosis' | 'unsupported_damage_exclusion' | 'unsupported_temperature_assurance' | 'unsupported_safety_certification' | 'unmet_operational_prerequisite' | 'contradicted_professional_clearance'
+  code: 'unsupported_damage_diagnosis' | 'unsupported_damage_exclusion' | 'unsupported_temperature_assurance' | 'unsupported_temperature_diagnosis' | 'unsupported_safety_certification' | 'unmet_operational_prerequisite' | 'contradicted_professional_clearance' | 'unsafe_inspection_action'
   claim: string
   reason: string
   correctionInstruction: string

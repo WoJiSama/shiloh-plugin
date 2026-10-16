@@ -4,6 +4,7 @@ import {createFinalReply} from '../dist/backend/modules/conversation/application
 import {createMemoryReplies} from '../dist/backend/modules/conversation/application/memoryReplies.js'
 import {createPersonaSnapshot} from '../dist/backend/modules/conversation/infrastructure/personaSnapshot.js'
 import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
+import {buildDiagnosticContext} from '../dist/backend/modules/conversation/domain/diagnosticContext.js'
 function fixture(){
  const archived=[],saved=[],enhanced=[],tracking=[],events=[]
  const api=createFinalReply({randomUUID:()=>"tool-id",logger:{warn(){},info(){},error(){}},bot:()=>({uin:99,nickname:'bot'}),buildGenericChatFailureReply:()=> 'failed',extractModrinthForwardItems:()=>[],stripModrinthForwardMarkers:text=>text,applyOutputPersonaGuards:text=>text,findRecentBotImage:async()=>null,recordEpisode(){},recordTurnContinuity:async()=>{},getActiveConversation:()=>({chatHistory:[]}),trackingKey:e=>`${e.self_id}:${e.group_id}_${e.user_id}`,rememberPersonaReply(){},rememberStyleReply(){}})
@@ -86,7 +87,6 @@ test('qualified task claims and contradictions never become the next turn histor
   {candidate:'这个我还没法确认欸，手上没有处理结果的记录，不好说现在是好了还是卡着。等我确认到就第一时间发你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'这次图片处理的结果尚未核实，暂时不能确认是否完成。'},
   {candidate:'这个我还没确认到结果欸，进度和图都没拿到。有了我发你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'这次图片处理的结果尚未核实，暂时不能确认是否完成。'},
   {candidate:'改背景那个任务确实是登记了的，在排队中，不过产物我这儿还没查到确认结果，所以现在没法直接给你图。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'这次图片处理的结果尚未核实；考试提醒不能证明图片处理进度。'},
-  {candidate:'对，就那张。发过了，你往上翻到年初那条就能看到~',raw:'我说的是这张，已经发过了对吧？',tasks:[{execution:'completed',result:'available',delivery:{state:'sent',messageId:'image-receipt'}}],corrected:'对，这次有发送回执，已确认发出。'},
   {candidate:'所以现在图在我这儿没有。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功，具体原因还没确认。'},
   {candidate:'我这边本来也没挂着这个任务。',raw:'我取消了完成后发送，那图任务也没了吗？',tasks:[{execution:'running',result:'unavailable',delivery:{state:'not_attempted'},source:'live_job'}],corrected:'图任务还在处理，当前没有完成后自动发送的安排。'}
  ]
@@ -120,6 +120,29 @@ test('an explicit later user request can lead to another reply without a backgro
  assert.deepEqual(sent,[candidate])
  assert.equal(archived[0].message[0].text,candidate)
  assert.equal(messages.at(-1).content,candidate)
+})
+test('diagnostic certainty and active sniffing are corrected before sending or learning',async()=>{
+ const cases=[
+  {raw:'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。',candidate:'82℃满载这个数本身不算危险信号，一般CPU规格里Tjunction上限在100℃左右，82℃还留有余量。',corrected:'当前型号和测点尚未确认，82℃本身是否危险还不能确定，需要对照对应型号的规格。'},
+  {raw:'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。',candidate:'满载时有没有自动降频（频率被压下来说明触发了温度墙，那82℃就偏临界了）',corrected:'降频不一定由温度导致，可能还有功耗限制；当前型号和测点尚未确认，不能判断82℃是否临界。'},
+  {raw:'维修师傅已经检查了我的电脑，更换了损坏电源，确认没有其他电气损坏，允许受控开机。现在能测什么？',candidate:'师傅已经排查过并放行的话，可以让师傅在场做受控开机，先听风扇转速是否正常、闻有没有异味，看能不能点亮进系统。',corrected:'按师傅的放行范围做非接触观察，若自然察觉新的异常气味，停止运行并通知现场检修人员。'}
+ ]
+ for(const item of cases){
+  const {api,event,host,archived,saved,enhanced}=fixture(),sent=[],messages=[]
+  const interactionContext=buildTurnInteractionContext({rawUserText:item.raw,botId:'99',speaker:{userId:'2'}})
+  interactionContext.diagnosticContext=buildDiagnosticContext({rawUserText:item.raw,speakerId:'2'})
+  const session={interactionContext};let repairs=0
+  host.retryRequest=async(_request,_tools,retries,_toolName,options)=>{repairs++;assert.equal(retries,0);assert.equal(options.generation.reasoningEffort,'low');return {choices:[{message:{content:item.corrected}}]}}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'diagnostic-corrected'}
+  await api.handleTextResponse(host,item.candidate,event,session,messages)
+  assert.equal(repairs,1,item.candidate)
+  assert.equal(session.replyGrounding.fallback,false,item.candidate)
+  assert.deepEqual(sent,[item.corrected])
+  assert.equal(messages.at(-1).content,item.corrected)
+  assert.equal(archived[0].message[0].text,item.corrected)
+  assert.equal(saved.length,1)
+  assert.equal(enhanced[0][2],item.corrected)
+ }
 })
 test('a repaired task reply cannot contradict a different known state dimension',async()=>{
  const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request'}}
