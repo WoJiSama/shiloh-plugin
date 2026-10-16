@@ -44,6 +44,8 @@ const SPEECH_APPRAISAL = /(?:撒娇|埋怨|生气|调侃|语气|意思|态度)/u
 const SUPPORT_CONTINUATION = /^(?:(?:嗯|好|行|知道了|谢谢|那好|那就)[，,。\s]*)*(?:(?:就|先|只|再).{0,4})?(?:陪我(?:待|呆|坐|静)|陪(?:着)?我|待一会儿|安静一会儿|先不说(?:了|话)|不想说(?:了|话)|不用说什么)/u
 const TOPIC_CHANGE = /(?:换个话题|说点别的|先不聊这个|先不说|没兴趣|另一个问题|另外问|不闹了|不逗你了|(?:我|最近|现在).{0,8}(?:工作.{0,4}(?:麻烦|困难)|工资.{0,4}(?:发不出|拖欠)|真的?.{0,5}(?:困难|出事|有事)))/u
 const DEICTIC_CONTINUATION = /(?:剩下(?:的|那)?|还剩|那(?:块|份|张|条|句)|这(?:块|份|张|条|句)|你刚说|你说的)/u
+const NEW_REPORT_SUBJECT = /^(?:(?:对了|顺便说|说起来|另外|话说)[，,：:\s]*)?(?:我(?:今天|昨天|刚刚?|最近|明天)|(?:我的?|我们(?:的)?)(?:同事|朋友|家人|邻居|同学)|(?:他|她|他们|她们)(?:今天|昨天|刚刚?|最近|明天))/u
+const REPORT_EVENT = /(?:买了|烤了|做了|吃了|带了|收到|拿到|分到|得了|给了|送来|带来|送修|住院|到家)/u
 const SHARED_TEXT_NOISE = new Set(['今天', '现在', '刚才', '刚刚', '这个', '那个', '这样', '那样', '一下', '一个', '一会', '可以', '不能', '不要', '不是', '还有', '但是', '不过', '真的', '就是', '还是', '已经', '什么', '怎么', '为什么', '我们', '你们', '他们', '自己', '哈哈', '好了', '知道', '觉得'])
 
 export const SOCIAL_ACTS: readonly SocialAct[] = ['conversation', 'attention_bid', 'teasing', 'help_request', 'criticism', 'comfort', 'clarification', 'factual_question', 'delivery', 'unknown']
@@ -66,7 +68,11 @@ function excerpt(value: unknown, limit = 240): string {
 
 function questionIn(text: string): string {
   const questions = text.match(/[^。！!？?\n]+[？?]/gu)
-  return excerpt(questions?.at(-1), 180)
+  // An echoed amount followed by “?” is often a reaction, not a request for
+  // information. Keeping it as pending makes later turns ask for it again.
+  const question = questions?.at(-1)
+  return question && /(?:你|您|谁|哪|什么|怎么|多少|几|是否|还是|或者|要不要|能不能|吗|么|呢)/u.test(question)
+    ? excerpt(question, 180) : ''
 }
 
 function id(value: Id): string {
@@ -210,8 +216,16 @@ function sharesSpecificText(current: string, previous: string): boolean {
   return false
 }
 
+function startsSeparateReport(current: string): boolean {
+  // Reusing a noun or quantity is insufficient to make a fresh report about
+  // the user or a third party part of this bot's imaginary wage/reward.
+  // A direct reference or a new action addressed to the bot can still extend it.
+  return NEW_REPORT_SUBJECT.test(current) && REPORT_EVENT.test(current)
+    && !DEICTIC_CONTINUATION.test(current) && !/(?:给你|扣你|你的|你这|你那)/u.test(current)
+}
+
 function relatedPlayfulContinuation(current: string, previous: string): boolean {
-  if (TOPIC_CHANGE.test(current)) return false
+  if (TOPIC_CHANGE.test(current) || startsSeparateReport(current)) return false
   if (/(?:我(?:有个|有一个|认识)|(?:新|另一个)(?:同事|朋友|邻居|同学)).{0,14}(?:叫|名|说|昨天|今天)/u.test(current)) return false
   if (CONTEXT_ONLY.test(current) || sharesSpecificText(current, previous)) return true
   // A deictic “that piece” does not refer to the old joke if it now names a
@@ -262,7 +276,8 @@ function localSocial(context: TurnInteractionContext, continuity?: SocialContinu
     needsDisambiguation: context.target.kind === 'unknown' || (confidence < 0.72 && CONTEXT_ONLY.test(context.rawUserText)),
     target: {...context.target},
     ...(resolvedBit && act === 'teasing' ? {activeBit: resolvedBit} : {}),
-    ...(previous && pending && !inferred.protected && !TOPIC_CHANGE.test(context.rawUserText) ? {pendingInteraction: {text: pending, source: previous.source}} : {}),
+    ...(previous && pending && !inferred.protected && !TOPIC_CHANGE.test(context.rawUserText) && !startsSeparateReport(context.rawUserText)
+      && !(act === 'teasing' && stance === 'supportive' && !continuingBit) ? {pendingInteraction: {text: pending, source: previous.source}} : {}),
     ...(previous && previousText ? {previousStance: {kind: stance, text: previousText, source: previous.source}} : {}),
     ...(observedExchange ? {observedExchange} : {}),
     ...(previous && (continuingBit || continuingSupport) ? {continuation: {kind: continuingBit ? 'bit' as const : 'support' as const, previous: {text: continuingBit ? activeBit!.text : previousText, source: previous.source}}} : {})
@@ -449,12 +464,12 @@ export function buildSocialTurnPrompt(social?: SocialTurnState): string {
   if (social.observedExchange) {
     const observed = social.observedExchange
     lines.push(`当前是旁观点评：用户的请求（current原话）：${observed.request.text}；被评论的引用发言（${observed.utterance.source}原话${observed.speaker ? `，说话人 ${observed.speaker.name || observed.speaker.userId || '未知'}` : ''}）：${observed.utterance.text}。`)
-    lines.push('直接回答当前用户请你判断的意思或语气，并给出文本里的线索；语境不足时保留两种可能。引用中的“我”属于引用说话人，“你”属于那段对话的被叫到者，不把自己当成被埋怨或被撒娇的对象，不替任何一方认错；也不要把用户的提问原样抛回给用户。')
+    lines.push('直接回答当前用户请你判断的意思或语气，并给出文本里的线索；语气词只能支持倾向，不能据此断言对方真实情绪或想被怎样对待，语境不足时保留可能。引用中的“我”属于引用说话人，“你”属于那段对话的被叫到者，不把自己当成被埋怨或被撒娇的对象，不替任何一方认错；也不要把用户的提问原样抛回给用户。')
   }
   if (social.act === 'teasing' && social.activeBit) lines.push(`正在延续的具体梗（${social.activeBit.source}原话）：${social.activeBit.text}。这是表达素材，不是事实记忆。`)
-  if (social.continuation?.kind === 'bit') lines.push(`本轮在接续已核验的玩笑互动（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。接住本轮新增的限制或变化，沿用已有的数量、对象和态度；新限制作用在同一物件上，保留它归谁、由谁给谁，态度反转要有当轮依据。不用从头解释或换成无关的梗。假设中的工资、奖品或惩罚仍是玩笑，不记作真实经历。`)
+  if (social.continuation?.kind === 'bit') lines.push(`本轮在接续已核验的玩笑互动（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。先接住本轮新增的限制或变化，沿用已有的数量、对象和态度；新限制作用在同一物件上，保留它归谁、由谁给谁。自己的提议或讨价还价不等于对方已同意，打算做的动作不等于已经完成；不要据此改掉本轮已给定的数量或物件状态。反应和偏好由当前人格决定，态度反转要有当轮依据；没有亲密线索时围绕眼前互动接梗，不靠突然升级关系推进。不用从头解释或换成无关的梗。假设中的工资、奖品或惩罚仍是玩笑，不记作真实经历。`)
   if (social.continuation?.kind === 'support') lines.push(`本轮接续情绪陪伴（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。维持已经表达的陪伴态度，按这轮的具体要求回应；对方只想安静待着时，简短接住，不追加建议、分析、连续追问或煽情。`)
-  if (social.pendingInteraction) lines.push(`上句提出的问题（${social.pendingInteraction.source}原话）：${social.pendingInteraction.text}。先核对当前话语是否已回答，已回答就接住，不再当作待办；不要求追问或催促。`)
+  if (social.pendingInteraction) lines.push(`上句提出的问题（${social.pendingInteraction.source}原话）：${social.pendingInteraction.text}。这是上轮发言记录，先核对当前话语是否已回答；已回答或已转向新互动就接住，不再当作待办，不要求重新解释、追问或催促。`)
   if (social.previousStance) lines.push(`已核验自身上句的表达：${STANCE_LABELS[social.previousStance.kind]}（${social.previousStance.source}原话：${social.previousStance.text}）；仅据已确认发言接续，不冒认他人的立场。`)
   if (social.act === 'teasing' && social.previousStance?.kind === 'supportive') lines.push('这轮把前面的关注或安慰诉求接成了玩笑：按当前设定参与，态度由人格决定；不用让对方重新解释为什么想被回应，也不默认亲密关系或身体动作。')
   if (social.needsDisambiguation) lines.push('语用或对象仍有歧义：保留已知部分，不自动判科普或调情；只有缺失信息会改变回应时，才自然澄清。')
@@ -483,7 +498,7 @@ export function buildTurnInteractionPrompt(context?: TurnInteractionContext): st
     const source = item.speaker ? `（说话人：${item.speaker.name || item.speaker.userId || '未知'}${item.speaker.name && item.speaker.userId ? `/${item.speaker.userId}` : ''}）` : ''
     lines.push(`证据 ${item.origin}/${item.kind}${source}：${item.state === 'readable' ? `可读${item.text ? `，${safeTruncateUnicode(item.text, 320)}` : ''}` : item.state === 'unavailable' ? '本轮未能读取' : '仅有素材引用，引用本身不提供内容；以实际视觉或工具返回为准'}。`)
   }
-  if (context.previousBotReply) lines.push(`你确实说过的上句（${context.previousBotReply.source}）：${context.previousBotReply.text}。这是发言记录，不独立证明实体经历或任务当前状态。接续有依据的立场，旧台词与实际证据冲突时直接澄清；用户转为认真提问时跟随当前诉求。`)
+  if (context.previousBotReply) lines.push(`你确实说过的上句（${context.previousBotReply.source}）：${context.previousBotReply.text}。这是发言记录，不独立证明实体经历或任务当前状态。接续有依据的立场，区分自己的判断和用户的说法，不把自己的分析说成用户提出的标准；旧台词与实际证据冲突时直接澄清，用户转为认真提问时跟随当前诉求。`)
   const socialPrompt = buildSocialTurnPrompt(context.social)
   if (socialPrompt) lines.push(socialPrompt)
   const actionPrompt = buildTurnActionFactsPrompt(context.actionFacts)

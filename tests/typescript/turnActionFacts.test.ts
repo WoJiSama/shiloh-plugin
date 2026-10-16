@@ -34,7 +34,7 @@ test('an available image and completed call do not imply delivery or a future ta
   assert.equal(actual.tasks[0]?.delivery.state, 'unknown')
   assert.equal(actual.tasks[0]?.followUp.state, 'none')
   assert.match(buildTurnActionFactsPrompt(actual), /已有产物；投递结果未确认/)
-  assert.match(buildTurnActionFactsPrompt(actual), /没有核验到仍有效的后续投递登记/)
+  assert.match(buildTurnActionFactsPrompt(actual), /已核验该任务当前没有仍有效的后续投递登记/)
 })
 
 test('a failed delivery prompt states the observed failure without inventing rejection or interception', () => {
@@ -44,7 +44,7 @@ test('a failed delivery prompt states the observed failure without inventing rej
   assert.match(prompt, /投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因/)
   assert.match(prompt, /没有原因证据时，不自行补写失败原因/)
   assert.doesNotMatch(prompt, /投递被明确拒绝|有消息回执确认送达|回执消息/)
-  assert.match(prompt, /没有核验到仍有效的后续投递登记/)
+  assert.match(prompt, /已核验该任务当前没有仍有效的后续投递登记/)
 })
 
 test('missing records and registrations describe this lookup rather than system capability', () => {
@@ -86,4 +86,23 @@ test('only future registered reminders can support the corresponding reminder co
   const expired = {...pending, followUp: {...pending.followUp, dueAt: now - 1}}
   assert.equal(validateTurnActionFacts(facts([expired]), event, now).tasks[0]?.followUp.state, 'unknown')
   assert.equal(validateTurnActionFacts(facts([{...pending, source: 'task_record'}]), event, now).tasks[0]?.followUp.state, 'unknown')
+})
+
+test('task existence, a usable result and a cancelled callback are projected as independent positive facts',()=>{
+ const value=facts([task({source:'live_job',execution:'running',result:'available',delivery:{state:'failed'},followUp:{state:'none'}})])
+ const prompt=buildTurnActionFactsPrompt(validateTurnActionFacts(value,event,now))
+ assert.match(prompt,/任务存在、执行、产物、投递和后续登记分别成立/)
+ assert.match(prompt,/已核验该请求对应的任务记录存在/)
+ assert.match(prompt,/记录为执行中；已有产物；投递失败/)
+ assert.match(prompt,/已确认有可用产物，这一事实独立于投递状态/)
+ assert.match(prompt,/后续发送未登记、已取消或未确认，均不能否定原任务存在/)
+ assert.match(prompt,/原任务及其执行状态仍按上面的记录成立/)
+})
+
+test('an unknown callback remains unknown rather than being projected as an explicit cancellation',()=>{
+ const prompt=buildTurnActionFactsPrompt(facts([task({followUp:{state:'unknown'}})]))
+ assert.match(prompt,/后续投递登记尚未确认/)
+ assert.doesNotMatch(prompt,/已核验该任务当前没有仍有效的后续投递登记/)
+ assert.match(prompt,/未确认不等于没有、失败或未完成/)
+ assert.match(prompt,/颜色、背景、版本等限定语，不改变该任务的证据归属/)
 })

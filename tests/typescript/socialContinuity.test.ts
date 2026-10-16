@@ -1,7 +1,7 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {recordTurnContinuity, loadTurnContinuity} from '../../src/modules/conversation/application/turnContinuity.js'
-import {buildSocialContinuity, buildTurnInteractionContext} from '../../src/modules/conversation/domain/turnInteractionContext.js'
+import {buildSocialContinuity, buildTurnInteractionContext, buildTurnInteractionPrompt, withTurnInteractionEvidence, withTurnSocialInterpretation} from '../../src/modules/conversation/domain/turnInteractionContext.js'
 
 const persona = {personaId: 'first', personaVersion: 'v2', personaName: '安序'}
 function redisFixture() {
@@ -73,4 +73,57 @@ test('excerpts tolerate actual whitespace normalization and Unicode without spli
     social: {activeBit: '🫧'.repeat(20), pendingInteraction: '你给它 选哪个？', stance: 'playful'}})
   assert.ok(row.lastReply.includes('选哪个？'))
   assert.deepEqual((await loadTurnContinuity(scope))?.social, {activeBit: '🫧'.repeat(20), pendingInteraction: '你给它 选哪个？', stance: 'playful'})
+})
+
+test('a sent three-turn object change keeps the current restriction rather than a rhetorical question', async () => {
+  const {redis} = redisFixture()
+  const scope = {redis, groupId: 'social-object-change', userId: '7', botId: '99', persona}
+  const addressing = {botId: '99', persona, addressee: {targetKind: 'bot'}}
+  const first = buildTurnInteractionContext({...addressing, rawUserText: '开个玩笑，我宣布你今天的工资是三块饼干'})
+  const firstReply = '三块饼干？行吧，我先把它们存着。'
+  const firstSocial = buildSocialContinuity(first, firstReply)
+  assert.equal(firstSocial.pendingInteraction, undefined, 'echoing the offered quantity does not ask the user for more information')
+  await recordTurnContinuity({...scope, lastReply: firstReply, social: firstSocial})
+
+  const second = buildTurnInteractionContext({...addressing, rawUserText: '先扣两块，刚刚溜号了，哈哈', continuity: await loadTurnContinuity(scope)})
+  assert.equal(second.social?.continuation?.previous.text, firstReply)
+  assert.equal(second.social?.pendingInteraction, undefined)
+  const relabeled = withTurnSocialInterpretation(second, {act: 'teasing', confidence: 0.99}, 'understanding_model')
+  assert.equal(relabeled.kind, 'banter')
+  assert.equal(relabeled.social?.activeBit?.text, second.rawUserText)
+  const enriched = withTurnInteractionEvidence(relabeled, [{origin: 'tool', kind: 'image', state: 'unavailable'}])
+  assert.equal(enriched.social?.continuation?.previous.text, firstReply)
+  const secondReply = '那就剩一块，先留着。'
+  await recordTurnContinuity({...scope, lastReply: secondReply, social: buildSocialContinuity(enriched, secondReply)})
+
+  const third = buildTurnInteractionContext({...addressing, rawUserText: '剩下那块也不能吃，是年终奖', continuity: await loadTurnContinuity(scope)})
+  assert.equal(third.social?.act, 'teasing')
+  assert.equal(third.social?.continuation?.previous.text, secondReply)
+  assert.equal(third.social?.activeBit?.text, third.rawUserText)
+  const prompt = buildTurnInteractionPrompt(third)
+  assert.match(prompt, /保留它归谁、由谁给谁/)
+  assert.match(prompt, /自己的提议或讨价还价不等于对方已同意/)
+  assert.match(prompt, /打算做的动作不等于已经完成/)
+  assert.match(prompt, /不靠突然升级关系推进/)
+})
+
+test('a concrete playful response ends an old invitation to explain the attention bid', async () => {
+  const {redis} = redisFixture()
+  const scope = {redis, groupId: 'social-attention-purpose-change', userId: '7', botId: '99', persona}
+  const addressing = {botId: '99', persona, addressee: {targetKind: 'bot'}}
+  const first = buildTurnInteractionContext({...addressing, rawUserText: '你为什么不理我呀'})
+  const firstReply = '在呢，我听着。你想聊什么？'
+  await recordTurnContinuity({...scope, lastReply: firstReply, social: buildSocialContinuity(first, firstReply)})
+  const second = buildTurnInteractionContext({...addressing, rawUserText: '给你三秒把我哄好，开玩笑的', continuity: await loadTurnContinuity(scope)})
+  assert.equal(second.social?.act, 'teasing')
+  assert.equal(second.social?.previousStance?.kind, 'supportive')
+  assert.equal(second.social?.pendingInteraction, undefined, 'the new playful instruction supplies the current conversational purpose')
+  assert.match(buildTurnInteractionPrompt(second), /不用让对方重新解释为什么想被回应/)
+
+  const secondReply = '那这三秒就认真听你说。'
+  await recordTurnContinuity({...scope, lastReply: secondReply, social: buildSocialContinuity(second, secondReply)})
+  const task = buildTurnInteractionContext({...addressing, rawUserText: '认真问，帮我分析一下这份报错', continuity: await loadTurnContinuity(scope)})
+  assert.equal(task.kind, 'serious_answer')
+  assert.equal(task.social?.continuation, undefined)
+  assert.equal(task.social?.activeBit, undefined)
 })

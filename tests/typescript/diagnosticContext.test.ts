@@ -764,6 +764,180 @@ test('a completed denial cannot exempt a later explanatory damage assertion', ()
   ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
 })
 
+test('installed 7548294 full fault conversation rejects unverified mechanisms and component ranking', () => {
+  // Exact user turns and surviving replies in installed-7548294.json, results 24 and 28.
+  const inputs = [
+    '认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？',
+    '认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？',
+    '维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？'
+  ]
+  const now = Date.parse('2026-10-16T12:30:00+08:00')
+  const prior: DiagnosticHistoryMessage[] = []
+  const contexts = inputs.map((rawUserText, index) => {
+    const context = buildDiagnosticContext({rawUserText, speakerId, now: now + index * 1000, history: prior})!
+    prior.push({role: 'user', userId: speakerId, text: rawUserText, at: now + index * 1000})
+    return context
+  })
+  const replies = [
+    '这个要认真处理：现在先直接断电——关机后把电源线拔掉，别只按关机键，拔线才算隔离。然后别开机箱，等它完全冷却再说。\n\n冒烟加焦糊味基本是电气件出问题了，电源或主板可能性大。冷却之后也别自己通电试，拿去维修检测比较稳。就近看着它，别凑近闻或者摸里面。',
+    '不建议开机测。冒烟说明曾有元件过热或击穿，外部没烧痕、味道散了都不代表内部损坏排除，再通电可能把小坏烧成大坏。\n\n保持拔线状态，交维修检测比较好。真想自己先做点什么，就断电下侧开侧板做静态观察，看电容有没有鼓包、有没有渗液变色，仅此而已。'
+  ]
+  for (const [index, reply] of replies.entries()) {
+    assert.ok(validateDiagnosticReply(reply, contexts[index]).some(item => item.code === 'unsupported_damage_diagnosis'), reply)
+  }
+  assert.ok(validateDiagnosticReply('电源或主板可能性大。', contexts[0]).some(item => item.code === 'unsupported_damage_diagnosis'))
+  assert.deepEqual(validateDiagnosticReply('仅凭烟雾不能确定故障原因，元件过热或击穿都只是待查的可能性；先隔离电源，冷却后交专业人员检修。', contexts[1]), [])
+  assert.equal(contexts[2]!.damageExclusion, 'reported_professional_clearance')
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，损坏电源已更换。外壳复原后按现场放行范围做非接触运行监测。', contexts[2]), [])
+  assert.ok(validateDiagnosticReply('既然电源损坏，说明它曾经过热或击穿。', contexts[2]).some(item => item.code === 'unsupported_damage_diagnosis'), 'generic damage is not evidence of a specific mechanism')
+})
+
+test('installed 7548294 negative symptoms do not prove that the machine never burned', () => {
+  // Complete user sequence for installed-7548294.json, results 33..35.
+  const context = buildDiagnosticContext({
+    rawUserText: '认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId,
+    history: [
+      {role: 'user', userId: speakerId, text: '群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？'},
+      {role: 'user', userId: speakerId, text: '群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。'}
+    ]
+  })!
+  const reply = '光凭「满载82℃」这一个读数，还没法直接下正常或安全的结论——得看是哪颗CPU、温度从哪个测点读出来的、跑的是什么负载，再对照这颗U的规格才能判断。\n\n大致的思路是：\n- **先确认型号**：查这颗CPU的TjMax（温度上限），比如常见Intel是100℃、AMD锐龙是95℃，读数离上限越远余量越大\n- **确认测点**：软件读的核心温度传感器、封装温度和表面红外测的不是一个东西，82℃在不同测点上含义差很多\n- **看负载下的表现**：持续满载时频率有没有被压、性能有没有掉，这是散热扛不扛得住的直接信号；温度随时间一直往上爬也算要查的迹象\n\n没有焦糊味、没冒烟只能说明没有到烧毁的程度，不等于整机健康。你这台是什么CPU、用什么软件读的温度？说一下我帮你对着规格看。'
+  assert.equal(context.incident.status, 'denied')
+  assert.deepEqual(context.evidenceAssessment?.damage.excludedFindings, [])
+  assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_damage_exclusion'))
+  for (const unsupported of [
+    '没有焦糊味、没冒烟只能说明没有到烧毁的程度。',
+    '没烟没味就证明电源没有烧坏。',
+    '一直正常运行，说明内部没有损坏。',
+    '没有烧痕表明主板未受损。',
+    '电源没有烧坏也不代表整机健康。',
+    '没有到烧毁的程度也不意味着整机安全。'
+  ]) assert.ok(validateDiagnosticReply(unsupported, context).some(item => item.code === 'unsupported_damage_exclusion'), unsupported)
+  for (const supported of [
+    '你目前没有观察到烟雾和焦糊味，这不能证明没有烧毁或内部没有损坏。',
+    '没有焦糊味、没冒烟，只能说明没有观察到这些现象。',
+    '正常运行、无烟无味都不等于整机健康，不能据此确定内部是否损坏。',
+    '没有证据能证明电源没有烧坏，不能远程排除故障。',
+    '电源也有可能并未损坏，需要结合检查结果判断。',
+    '“无烟无味证明电源没有烧坏”这个结论现在还不能下。'
+  ]) assert.deepEqual(validateDiagnosticReply(supported, context), [], supported)
+  assert.match(buildDiagnosticContextPrompt(context), /无烟、无味、无烧痕.*不证明未烧毁/u)
+})
+
+test('mechanism certainty remains scoped to professional source, component and mechanism', () => {
+  const smoke = buildDiagnosticContext({rawUserText: '我的电脑有焦糊味和烟雾，已拔电，怎么办？', speakerId})!
+  for (const unsupported of [
+    '冒烟说明曾有元件过热或击穿。',
+    '焦糊味基本是电气件出问题了。',
+    '烟雾证明电容已经击穿。',
+    '电源可能性很大。',
+    '主板故障的概率很高。',
+    '不能确定整机健康，但电源或主板可能性大。'
+  ]) assert.ok(validateDiagnosticReply(unsupported, smoke).some(item => item.code === 'unsupported_damage_diagnosis'), unsupported)
+  for (const supported of [
+    '可能是元件过热或击穿，需要现场检查。',
+    '元件过热也有可能，先保持隔离并送检。',
+    '不能仅凭烟雾确定电源或主板击穿。',
+    '先请维修师傅确认电容是否过热或击穿。',
+    '电源、主板或线材都有可能，需要检查定位。',
+    '重新通电可能使电容过热或击穿，先别开机试探。',
+    '元件击穿时可能出现烟雾，但烟雾本身不能确定原因。'
+  ]) assert.deepEqual(validateDiagnosticReply(supported, smoke), [], supported)
+  for (const [reported, allowed, rejected] of [
+    ['维修师傅已经检查了我的电脑，确认电源过热。', '按你报告的检修结果，电源曾经过热。', '电源曾经击穿。'],
+    ['维修师傅已经检查了我的电脑，确认电容击穿。', '按你报告的检修结果，电容已经击穿。', '主板已经击穿。']
+  ]) {
+    const context = buildDiagnosticContext({rawUserText: reported!, speakerId, history})!
+    assert.deepEqual(validateDiagnosticReply(allowed!, context), [])
+    assert.ok(validateDiagnosticReply(rejected!, context).some(item => item.code === 'unsupported_damage_diagnosis'), rejected)
+  }
+})
+
+test('professional exclusions retain negative scope and are invalidated by corrections or new incidents', () => {
+  const inspected = '维修师傅已经检查了我的电脑，确认电源没有烧坏，确认主板未受损。'
+  const context = buildDiagnosticContext({rawUserText: inspected, speakerId, history})!
+  assert.deepEqual(context.evidenceAssessment?.damage.excludedFindings, [
+    {components: ['power_supply'], kind: 'burned'}, {components: ['mainboard'], kind: 'damaged'}
+  ])
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，电源没有烧坏，主板未受损。', context), [])
+  for (const reply of ['所以电源没有任何损坏。', '整机没有到烧毁的程度。', '电容没有击穿。']) {
+    assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_damage_exclusion'), reply)
+  }
+  const whole = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认没有电气损坏。现在能测什么？', speakerId, history})!
+  assert.deepEqual(validateDiagnosticReply('按你报告的检查结果，未发生元件烧毁。', whole), [])
+  const other = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，更换了烧坏的电源，确认没有其他电气损坏。', speakerId, history})!
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，烧坏的电源已更换。', other), [])
+  assert.ok(validateDiagnosticReply('因此电源没有烧毁。', other).some(item => item.code === 'unsupported_damage_exclusion'), 'no other damage cannot retract the known burned part')
+  for (const rawUserText of ['刚才说错了，维修师傅还没检查我的电脑。', '现在又冒烟了，我的电脑怎么办？']) {
+    const revised = buildDiagnosticContext({rawUserText, speakerId, history: [...history, {role: 'user', userId: speakerId, text: inspected}]})!
+    assert.deepEqual(revised.evidenceAssessment?.damage.excludedFindings, [])
+    assert.ok(validateDiagnosticReply('电源没有烧坏。', revised).some(item => item.code === 'unsupported_damage_exclusion'), rawUserText)
+  }
+  const compatible = {...context}
+  delete compatible.evidenceAssessment
+  assert.deepEqual(validateDiagnosticReply('按你报告的检查结果，电源没有烧坏。', compatible), [])
+})
+
+test('uncompleted and other-device negative findings cannot become exclusions', () => {
+  for (const rawUserText of [
+    '我看我的电脑电源没有烧坏，怎么检查？',
+    '维修师傅明天检查我的电脑，确认有没有烧毁。',
+    '维修师傅检查了我的电脑，猜测电源没有烧毁。',
+    '维修师傅检查了我的电脑，但还没确认电源没有烧毁。',
+    '维修师傅检查了我的电脑，确认电源没有烧毁了吗？',
+    '维修师傅已经检查了朋友的电脑，确认电源没有烧毁。我的电脑有焦糊味，怎么办？',
+    '[回复 朋友：维修师傅已经检查了电脑，确认电源没有烧毁] 我的电脑有焦糊味，怎么办？'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.deepEqual(context.evidenceAssessment?.damage.excludedFindings, [], rawUserText)
+    assert.ok(validateDiagnosticReply('所以你的电源没有烧毁。', context).some(item => item.code === 'unsupported_damage_exclusion'), rawUserText)
+  }
+})
+
+test('parallel omitted subjects keep professional exclusions on the same component', () => {
+  for (const [report, mechanism, initialKind, finalKind] of [
+    ['确认电源没有烧坏也没有短路', '短路', 'burned', 'short_circuit'],
+    ['确认电源没有烧坏，也没有短路', '短路', 'burned', 'short_circuit'],
+    ['确认电源没有损坏也没有过热', '过热', 'damaged', 'overheated'],
+    ['确认电源没有损坏，也没有过热', '过热', 'damaged', 'overheated']
+  ] as const) {
+    const rawUserText = `维修师傅已经检查了我的电脑，${report}。现在怎么办？`
+    const context = buildDiagnosticContext({rawUserText, speakerId})!
+    assert.deepEqual(context.evidenceAssessment?.damage.excludedFindings, [
+      {components: ['power_supply'], kind: initialKind}, {components: ['power_supply'], kind: finalKind}
+    ], rawUserText)
+    assert.deepEqual(validateDiagnosticReply(`按你报告的检修结果，电源没有${mechanism}。`, context), [], rawUserText)
+    for (const component of ['主板', '显卡', '电容']) {
+      assert.ok(validateDiagnosticReply(`按你报告的检修结果，${component}没有${mechanism}。`, context).some(item => item.code === 'unsupported_damage_exclusion'), `${rawUserText} -> ${component}`)
+    }
+    const compatible = {...context}
+    delete compatible.evidenceAssessment
+    assert.ok(validateDiagnosticReply(`主板没有${mechanism}。`, compatible).some(item => item.code === 'unsupported_damage_exclusion'), 'source fallback preserves the same component scope')
+  }
+})
+
+test('an explicit new component and explicit whole-device clearance have different exclusion scopes', () => {
+  const changed = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认电源没有烧坏，主板也没有短路。现在怎么办？', speakerId})!
+  assert.deepEqual(changed.evidenceAssessment?.damage.excludedFindings, [
+    {components: ['power_supply'], kind: 'burned'}, {components: ['mainboard'], kind: 'short_circuit'}
+  ])
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，主板没有短路。', changed), [])
+  for (const claim of ['电源没有短路。', '显卡没有短路。']) {
+    assert.ok(validateDiagnosticReply(claim, changed).some(item => item.code === 'unsupported_damage_exclusion'), claim)
+  }
+  for (const report of ['确认整机没有烧坏也没有短路', '确认整机没有烧坏，也没有短路', '确认没有电气损坏']) {
+    const context = buildDiagnosticContext({rawUserText: `维修师傅已经检查了我的电脑，${report}。现在怎么办？`, speakerId})!
+    assert.ok(context.evidenceAssessment?.damage.excludedFindings?.every(finding => finding.scope === 'whole_device'), report)
+    assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，主板没有短路。', context), [], report)
+  }
+  for (const report of ['确认电源没有烧坏。也没有短路', '确认电源没有烧坏，线材也检查完了，没有短路']) {
+    const context = buildDiagnosticContext({rawUserText: `维修师傅已经检查了我的电脑，${report}。现在怎么办？`, speakerId})!
+    assert.ok(validateDiagnosticReply('主板没有短路。', context).some(item => item.code === 'unsupported_damage_exclusion'), 'an unresolved omitted subject cannot become universal clearance')
+  }
+  const legacy = {...changed, evidenceAssessment: {damage: {status: 'unconfirmed' as const, components: [], findings: [], excludedFindings: [{components: ['unspecified_component' as const], kind: 'short_circuit' as const}]}}}
+  assert.ok(validateDiagnosticReply('主板没有短路。', legacy).some(item => item.code === 'unsupported_damage_exclusion'), 'legacy unspecified scope is not whole-device evidence')
+})
+
 test('fallbacks use observed prerequisites and pass the same validation without rewriting the candidate', () => {
   const inputs = [
     {rawUserText: '电脑有焦糊味，已经拔电了，怎么办？'},

@@ -514,3 +514,156 @@ test('conditional consent does not establish the ability to perform a present re
     '你要的话我现在解释一下：图片好了，但发送失败。'
   ]) assert.deepEqual(validateActionReply(text, facts(), '刚才那张图做好了吗？'), [], text)
 })
+
+test('task noun qualifiers retain the artifact owner while each predicate keeps its own evidence dimension', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const missing = [facts(), facts([fact()])]
+  const unavailable = facts([fact({result:'unavailable'})])
+  const available = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  for (const text of [
+    '第一张的蓝色背景还没出来欸，这边没查到完成记录。',
+    '第一张蓝底的还没出来，我这边没查到做完的记录。',
+    '第一张的横版还没弄好。', '这张改成晴天背景的图还没出来。'
+  ]) {
+    for (const current of [...missing, available]) assert.ok(validateActionReply(text,current,raw).some(item=>item.code==='unsupported_task_state'),text)
+    assert.deepEqual(validateActionReply(text,unavailable,raw),[],text)
+  }
+  for (const text of ['第一张蓝底的已经弄好了。','这张改成晴天背景的图已经做好了。']) {
+    assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unsupported_task_state'),text)
+    assert.deepEqual(validateActionReply(text,available,raw),[],text)
+  }
+  assert.ok(validateActionReply('第一张蓝底图已经发给你了。',available,raw).some(item=>item.code==='unsupported_delivery'))
+  assert.deepEqual(validateActionReply('第一张的横版还在生成。',facts([fact({execution:'running'})]),raw),[])
+})
+
+test('failed delivery never negates an available artifact through a location or possession statement', () => {
+  const raw = '刚才那张图怎么没发来？'
+  const available = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  for (const text of [
+    '不是没做好，是做好之后发不过去，卡在发送那一步了。所以现在图在我这儿没有，你那边也收不到。',
+    '图在我这里没有。', '所以现在图在我这边没有。', '我这边没有图。', '我这里没有第一张蓝底图。'
+  ]) {
+    assert.ok(validateActionReply(text,available,raw).some(item=>item.code==='unsupported_task_state'),text)
+    assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unsupported_task_state'),text)
+  }
+  for (const text of ['图在我这里没有。','我这边没有图。']) assert.deepEqual(validateActionReply(text,facts([fact({result:'unavailable'})]),raw),[],text)
+  assert.deepEqual(validateActionReply('图已经做好了，发送没有成功，原因还没核实。',available,raw),[])
+})
+
+test('task presence survives a cancelled callback, and a failed lookup never proves nonexistence', () => {
+  const raw = '我取消了完成后发送，那图任务也没了吗？'
+  const running = facts([fact({source:'live_job',execution:'running',result:'unavailable',delivery:{state:'not_attempted'},followUp:{state:'none'}})])
+  for (const current of [running,facts(),{...facts(),lookup:'unavailable' as const}]) {
+    for (const text of ['我这边本来也没挂着这个任务。','这个任务不存在。','这边没有这个任务。','这个任务本来就不存在。','图任务没了。']) {
+      assert.ok(validateActionReply(text,current,raw).some(item=>item.code==='unsupported_task_state'),text)
+    }
+  }
+  for (const text of ['这个任务还在。','我这边有这个任务。','图任务还在处理，当前没有完成后自动发送的安排。']) {
+    assert.deepEqual(validateActionReply(text,running,raw),[],text)
+  }
+  assert.ok(validateActionReply('这个任务还在。',facts(),raw).some(item=>item.code==='unsupported_task_state'))
+  assert.ok(validateActionReply('任务没在运行了。',running,raw).some(item=>item.code==='unsupported_task_state'))
+  assert.deepEqual(validateActionReply('任务没在运行了。',facts([fact({execution:'completed'})]),raw),[])
+  assert.deepEqual(validateActionReply('我没有这个任务。',facts(),'你今天忙吗？'),[])
+})
+
+test('a denial of callback registration is checked separately from the task execution', () => {
+  const raw = '这张图还会自动发吗？'
+  const active = fact({source:'live_job',execution:'running',result:'unavailable',followUp:{state:'registered',kind:'job_completion',id:'callback'}})
+  for (const text of ['现在不会自动发了。','我这边没有完成后自动发送的安排。','完成后发送安排已经取消了。']) {
+    assert.ok(validateActionReply(text,facts([active]),raw).some(item=>item.code==='unsupported_task_state'),text)
+    assert.deepEqual(validateActionReply(text,facts([{...active,followUp:{state:'none'}}]),raw),[],text)
+    assert.ok(validateActionReply(text,facts([{...active,followUp:{state:'unknown'}}]),raw).some(item=>item.code==='unsupported_task_state'),text)
+  }
+  assert.deepEqual(validateActionReply('完成后发送安排还在。',facts([active]),raw),[])
+  assert.deepEqual(validateActionReply('完成后发送安排仍有效。',facts([active]),raw),[])
+  assert.ok(validateActionReply('完成后发送安排仍有效。',facts([{...active,followUp:{state:'none'}}]),raw).length)
+})
+
+test('fallback answers the current automatic-delivery question and preserves all known dimensions', () => {
+  const raw = '我取消了完成后发送，现在图出来了吗？还会自动发吗？'
+  const cancelled = facts([fact({source:'live_job',execution:'running',result:'unavailable',delivery:{state:'not_attempted'},followUp:{state:'none'}})])
+  const fallback = buildActionReplyFallback(cancelled,raw)
+  assert.match(fallback,/没有.*自动|不.*自动/u)
+  assert.match(fallback,/任务记录.*正在处理.*没有可用结果.*没有尝试发送/u)
+  assert.deepEqual(validateActionReply(fallback,cancelled,raw),[])
+  const available = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  assert.match(buildActionReplyFallback(available,raw),/处理已结束.*已有可用结果.*发送没有成功/u)
+  assert.match(buildActionReplyFallback(facts(),raw),/不能确认还会不会自动发送/u)
+  assert.doesNotMatch(buildActionReplyFallback(facts(),raw),/没有这个任务|还没做好/u)
+})
+
+test('qualified task objects do not absorb human subjects, quotation, uncertainty or user-triggered actions', () => {
+  const raw = '第一张图出来了吗？'
+  for (const text of [
+    '第一张里的人还没出来。','第一张图里的女孩还没出来。','图里的猫还没出来。',
+    '第一张妹妹画的图还没出来。','我妹妹的第一张图已经画好了。',
+    '第一张蓝底的还没出来吗？','第一张蓝底的可能还没出来。',
+    '不是第一张蓝底的还没出来，是还没核实。',
+    '“第一张蓝底的还没出来”只是举例。','例如：我这边没有这个任务。',
+    '我不确定我这边有没有这个任务。','你再问我，我再看。',
+    'CPU正在处理指令。','我妹妹还没出来。'
+  ]) assert.deepEqual(validateActionReply(text,facts(),raw),[],text)
+})
+
+test('complete negative execution and queue predicates do not also assert their positive suffix', () => {
+  const raw = '刚才那张图现在怎么样？'
+  for (const execution of ['unknown','queued','running','completed','failed'] as const) {
+    const current = facts([fact({execution,result:'unavailable',delivery:{state:'not_attempted'}})])
+    for (const text of [
+      '图没在处理。','图不在生成。','图没有在处理。','这张蓝底的图没在运行。',
+      '任务没在处理。','图没在处理中。','图现在没在处理。','图已经不在处理了。'
+    ]) assert.equal(validateActionReply(text,current,raw).length > 0,execution === 'unknown' || execution === 'running',`${execution}: ${text}`)
+    for (const text of [
+      '图没在排队。','图不在排队。','任务没在排队。','这张图没有在排队。',
+      '图没有排队中。','图已经不在排队了。'
+    ]) assert.equal(validateActionReply(text,current,raw).length > 0,execution === 'unknown' || execution === 'queued',`${execution}: ${text}`)
+    assert.equal(validateActionReply('图在处理。',current,raw).length > 0,execution !== 'running',execution)
+    assert.equal(validateActionReply('图在排队。',current,raw).length > 0,execution !== 'queued',execution)
+  }
+})
+
+test('artifact absence uses the whole negative predicate without borrowing an inner positive availability claim', () => {
+  const raw = '刚才那张图现在怎么样？'
+  for (const result of ['unknown','available','unavailable'] as const) {
+    const current = facts([fact({execution:'completed',result,delivery:{state:'not_attempted'}})])
+    for (const text of ['图没有。','这张图没有。','图没了。','图没有了。','第一张蓝底的没了。']) {
+      assert.equal(validateActionReply(text,current,raw).length > 0,result !== 'unavailable',`${result}: ${text}`)
+    }
+    for (const text of ['图有。','图还在。']) assert.equal(validateActionReply(text,current,raw).length > 0,result !== 'available',`${result}: ${text}`)
+  }
+})
+
+test('predicate polarity preserves unconfirmed evidence, nonassertions and ordinary nominal qualifiers', () => {
+  const raw = '刚才那张图现在怎么样？'
+  for (const text of [
+    '图还没确认。','图没确认是否在处理。','图是否在排队还没确认。','没确认图还在处理。',
+    '图没在处理吗？','图可能没在排队。','不是图没在处理。','“图没在处理”只是例子。',
+    'CPU没在处理指令。','我妹妹没在排队。'
+  ]) assert.deepEqual(validateActionReply(text,facts([fact()]),raw),[],text)
+  for (const text of ['第一张不规则蓝底的还在生成。','第一张无字版还在生成。']) {
+    assert.deepEqual(validateActionReply(text,facts([fact({execution:'running'})]),raw),[],text)
+    assert.ok(validateActionReply(text,facts([fact()]),raw).some(item=>item.code==='unsupported_task_state'),text)
+  }
+})
+
+test('reminder fallback answers its own registration and trigger time without borrowing a completion callback', () => {
+  const raw = '明天的考试提醒还会自动发吗？'
+  const dueAt = Date.now() + 60_000
+  const reminder = fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'r-exam',dueAt}})
+  const active = buildActionReplyFallback(facts([reminder]),raw)
+  assert.match(active,/提醒安排仍有效/u)
+  assert.ok(active.includes(new Date(dueAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})))
+  assert.doesNotMatch(active,/完成后发送|不能确认.*安排/u)
+  assert.deepEqual(validateActionReply(active,facts([reminder]),raw),[])
+  const cancelled = buildActionReplyFallback(facts([{...reminder,followUp:{state:'none'}}]),raw)
+  assert.match(cancelled,/没有.*提醒安排.*不会.*自动提醒/u)
+  assert.doesNotMatch(cancelled,/完成后发送|安排仍有效/u)
+  const unknown = buildActionReplyFallback(facts([{...reminder,followUp:{state:'unknown'}}]),raw)
+  assert.match(unknown,/提醒是否仍会自动发还不能确认/u)
+  assert.doesNotMatch(unknown,/完成后发送|安排仍有效/u)
+  const wrongKind = buildActionReplyFallback(facts([{...reminder,followUp:{state:'registered',kind:'job_completion',id:'wrong'}}]),raw)
+  assert.match(wrongKind,/提醒是否仍会自动发还不能确认/u)
+  assert.doesNotMatch(buildActionReplyFallback(facts([reminder]),'这张图还会自动发吗？'),/提醒安排仍有效|r-exam|北京时间/u)
+  assert.match(buildActionReplyFallback(facts([reminder]),'这张图还会自动发吗？'),/不能确认还会不会自动发送/u)
+})

@@ -72,11 +72,54 @@ test('final grounding rechecks cancellation after generation and respects explic
  const live={taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'live_job',observedAt:Date.now(),execution:'running',result:'unknown',delivery:{state:'unknown'},followUp:{state:'registered',kind:'job_completion',id:'callback'}}
  session.interactionContext.actionFacts.tasks=[live]
  host.getTurnActionFacts=async(_e,query)=>{reads.push(query);return {...session.interactionContext.actionFacts,observedAt:Date.now(),tasks:[{...live,execution:'unknown',followUp:{state:'unknown'}}]}}
- host.retryRequest=async()=>({choices:[{message:{content:'我还没核实到进度，这里也没有有效的自动补发安排。'}}]})
+ host.retryRequest=async()=>({choices:[{message:{content:'我还没核实到进度，自动补发安排也尚未确认。'}}]})
  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'r'}
  await api.handleTextResponse(host,'好了我第一时间发你。',event,session,[])
  assert.equal(reads.length,2);assert.ok(reads.every(query=>query.referenceMessageId==='original-request'))
- assert.equal(sent[0],'我还没核实到进度，这里也没有有效的自动补发安排。')
+ assert.equal(sent[0],'我还没核实到进度，自动补发安排也尚未确认。')
+})
+test('qualified task claims and contradictions never become the next turn history',async()=>{
+ const cases=[
+  {candidate:'第一张的蓝色背景还没出来欸，这边没查到完成记录。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
+  {candidate:'第一张蓝底的还没出来，我这边没查到做完的记录。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
+  {candidate:'所以现在图在我这儿没有。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功，具体原因还没确认。'},
+  {candidate:'我这边本来也没挂着这个任务。',raw:'我取消了完成后发送，那图任务也没了吗？',tasks:[{execution:'running',result:'unavailable',delivery:{state:'not_attempted'},source:'live_job'}],corrected:'图任务还在处理，当前没有完成后自动发送的安排。'}
+ ]
+ for(const item of cases){
+  const {api,event,host,archived,saved,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request'}}
+  session.interactionContext.rawUserText=item.raw
+  session.interactionContext.actionFacts.tasks=item.tasks.map(change=>({taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'unknown',result:'unknown',delivery:{state:'unknown'},followUp:{state:'none'},...change}))
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:item.corrected}}]}}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'state-corrected'}
+  await api.handleTextResponse(host,item.candidate,event,session,messages)
+  assert.equal(repairs,1,item.candidate)
+  assert.equal(session.replyGrounding.fallback,false,item.candidate)
+  assert.deepEqual(sent,[item.corrected],item.candidate)
+  assert.equal(messages.at(-1).content,item.corrected)
+  assert.equal(archived.length,1)
+  assert.equal(archived[0].message[0].text,item.corrected)
+  assert.equal(saved.length,1)
+  assert.equal(enhanced[0][2],item.corrected)
+  assert.doesNotMatch(JSON.stringify(messages),new RegExp(item.candidate.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))
+ }
+})
+test('a repaired task reply cannot contradict a different known state dimension',async()=>{
+ const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request'}}
+ session.interactionContext.rawUserText='图出来了吗？还会自动发吗？'
+ session.interactionContext.actionFacts.tasks=[{taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'completed',result:'available',delivery:{state:'failed'},followUp:{state:'none'}}]
+ let repairs=0
+ host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:'图已经做好了，不过我这边本来也没挂着这个任务。'}}]}}
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'state-fallback'}
+ await api.handleTextResponse(host,'图在我这儿没有。',event,session,messages)
+ assert.equal(repairs,1)
+ assert.equal(session.replyGrounding.fallback,true)
+ assert.ok(session.replyGrounding.remaining.length)
+ assert.match(sent[0],/已有可用结果|图已经做好/u)
+ assert.match(sent[0],/发送没有成功/u)
+ assert.match(sent[0],/没有.*自动|不.*自动/u)
+ assert.equal(messages.at(-1).content,sent[0])
+ assert.equal(archived[0].message[0].text,sent[0])
 })
 test('final card returns actual receipt and never falls back after a transport attempt',async()=>{
  const {api,event,host}=fixture();let fallbacks=0;const observed=[]

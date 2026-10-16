@@ -92,21 +92,107 @@ const COMPLETED = `${PAST}(?:(?:执行|处理|生成)?(?:完成|结束)|处理�
 const SENT = '(?:(?:已经|已|刚才|刚刚|早就)(?:给你发|发给你|发你|发出|发过|发送|送达|投递)(?:了|过(?:了)?)?|(?:给你发|发给你|发你|发出|发送|送达|投递|发到(?:群里|这里|上面))(?:了|过了)|发过了|在上面了)'
 const UNSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:给你)?(?:发|发送|投递|送)(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出(?:来|去)?|达)?(?:过(?:了)?|了)?)'
 const IMPLICIT_PREFIX = '(?:(?:我这边|这边|我|目前|现在|刚才那步)(?:已经|已)?(?:把)?|刚才|刚刚)?'
-const explicitState = (subject: string, state: string) => new RegExp(`^${subject}(?:的)?(?:这边)?${state}${PARTICLES}$`, 'u')
-const implicitState = (state: string) => new RegExp(`^${IMPLICIT_PREFIX}${state}${PARTICLES}$`, 'u')
+type TaskStateDimension = 'artifact' | 'execution' | 'delivery' | 'existence' | 'follow_up'
+type TaskStateValue = 'available' | 'unavailable' | 'running' | 'not_running' | 'queued' | 'not_queued' | 'failed' | 'completed' | 'sent' | 'unsent' | 'present' | 'absent' | 'registered' | 'none'
+interface TaskObjectReference {kind: 'artifact' | 'task' | 'follow_up' | 'implicit'; topic: EvidenceTopic; surface: string}
+interface TaskStateProposition {object: TaskObjectReference; dimension: TaskStateDimension; value: TaskStateValue}
+interface StatePredicate {dimension: TaskStateDimension; value: TaskStateValue; suffix: RegExp; accepts: 'artifact' | 'task' | 'either'; implicit: boolean}
 
-interface StateClaim {dimension: 'ready' | 'absent' | 'running' | 'queued' | 'failed' | 'completed' | 'sent' | 'unsent'; explicit: RegExp[]; implicit: RegExp}
-const STATE_CLAIMS: StateClaim[] = [
-  {dimension: 'ready', explicit: [explicitState(ARTIFACT_SUBJECT, READY)], implicit: implicitState(`${PAST}(?:出来|做好|弄好|弄完|生成好|生成完|改好|画好|画完|做完)(?:了|啦)?`)},
-  {dimension: 'absent', explicit: [explicitState(ARTIFACT_SUBJECT, ABSENT)], implicit: implicitState(ABSENT)},
-  {dimension: 'running', explicit: [explicitState(ARTIFACT_SUBJECT, RUNNING), explicitState(TASK_SUBJECT, RUNNING)], implicit: implicitState(RUNNING)},
-  {dimension: 'queued', explicit: [explicitState(ARTIFACT_SUBJECT, QUEUED), explicitState(TASK_SUBJECT, QUEUED)], implicit: implicitState(QUEUED)},
-  {dimension: 'failed', explicit: [explicitState(TASK_SUBJECT, FAILED), explicitState(ARTIFACT_SUBJECT, `(?:生成|处理|制作)?${FAILED}`)], implicit: implicitState(FAILED)},
-  {dimension: 'completed', explicit: [explicitState(TASK_SUBJECT, COMPLETED)], implicit: implicitState(COMPLETED)},
-  {dimension: 'sent', explicit: [explicitState(ARTIFACT_SUBJECT, SENT), new RegExp(`^(?:我(?:这边)?|这边)?${PAST}把${ARTIFACT_SUBJECT}(?:发给你|发出|发送|送达|投递)了${PARTICLES}$`, 'u')], implicit: implicitState(SENT)},
-  {dimension: 'unsent', explicit: [explicitState(ARTIFACT_SUBJECT, UNSENT)], implicit: implicitState(UNSENT)}
+const predicate = (dimension: TaskStateDimension, value: TaskStateValue, state: string, accepts: StatePredicate['accepts'], implicit = true): StatePredicate =>
+  ({dimension, value, suffix: new RegExp(`(?:${state})${PARTICLES}$`, 'u'), accepts, implicit})
+const STATE_PREDICATES: StatePredicate[] = [
+  predicate('artifact', 'available', READY, 'artifact'),
+  predicate('artifact', 'unavailable', ABSENT, 'artifact'),
+  predicate('execution', 'running', RUNNING, 'either'),
+  predicate('execution', 'not_running', '(?:已经|现在|目前|还|也)?(?:没有|没|不|未)(?:在|正在)?(?:生成|处理|制作|画图|改图|运行|跑|执行)(?:中|着)?(?:了)?', 'either'),
+  predicate('execution', 'queued', QUEUED, 'either'),
+  predicate('execution', 'not_queued', '(?:已经|现在|目前|还|也)?(?:没有|没|不|未)(?:(?:在|正在)?排队|排队中)(?:了)?', 'either'),
+  predicate('execution', 'failed', `(?:生成|处理|制作)?${FAILED}`, 'either'),
+  predicate('execution', 'completed', COMPLETED, 'task'),
+  predicate('delivery', 'sent', SENT, 'artifact'),
+  predicate('delivery', 'unsent', UNSENT, 'artifact'),
+  predicate('artifact', 'unavailable', '(?:还|也|本来|本来也|本来就)*(?:没(?:有)?|不存在)(?:了)?', 'artifact', false),
+  predicate('artifact', 'available', '(?:还|仍然|仍|也)?(?:在|有)(?:着|的)?', 'artifact', false),
+  predicate('existence', 'absent', '(?:本来|本来也|本来就|原本|原来也|还|也|一直)*(?:没(?:有)?(?:挂着|存在)?|不存在|不在)(?:了)?', 'task', false),
+  predicate('existence', 'present', '(?:还|仍然|仍|一直)?(?:在|存在|挂着)(?:的)?', 'task', false),
+  predicate('follow_up', 'none', `${PAST}(?:取消|撤销)(?:了)?`, 'either', false),
+  predicate('follow_up', 'registered', '(?:仍|还|依然)?(?:有效|生效)(?:的)?', 'either', false)
 ]
-const REFERENCED_IMAGE_STATE = /^(?:第[一二三四五六七八九十\d]+张|这张|那张)(?:图|图片)?(?:的)?(?:我(?:这边)?|这边)?(.+)$/u
+const SELF_LOCATION = '(?:我(?:这边|这里|这儿|手里|手上)?|这边|这里|这儿|手头)'
+const IMAGE_REFERENCE = '(?:第[一二三四五六七八九十0-9]+张|这张|那张)'
+const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
+const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
+const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|提醒|闹钟).{0,16}(?:发(?:送|图)?|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|登记|任务)?$|(?:提醒|闹钟)(?:安排|登记|任务)?$/u
+const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
+const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
+
+/** Resolve the noun phrase independently of its predicate. A descriptor such
+ * as background/color does not create another task; a person inside an image
+ * or another person's artifact is not the runtime-owned task object. */
+function taskObjectReference(rawSubject: string, context: boolean, rawTopic: EvidenceTopic): TaskObjectReference | undefined {
+  let subject = rawSubject.replace(SUBJECT_CONNECTOR, '').trim()
+    .replace(new RegExp(`^(?:${SELF_LOCATION})?(?:已经|已)?把`, 'u'), '')
+    .replace(new RegExp(`(?:在${SELF_LOCATION}|${SELF_LOCATION})(?:的)?$`, 'u'), '')
+  subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
+  if (OTHER_SUBJECT.test(subject)) return undefined
+  if (FOLLOW_UP_OBJECT.test(subject)) return {kind: 'follow_up', topic: rawTopic, surface: rawSubject}
+  if (TASK_HEAD.test(subject)) return {kind: 'task', topic: evidenceTopic(subject) === 'image' ? 'image' : rawTopic, surface: rawSubject}
+  const nominal = NOMINAL_HEAD.exec(subject)
+  if (nominal) {
+    const qualifier = nominal[1] || ''
+    if (new RegExp(`^${IMAGE_REFERENCE}`, 'u').test(subject) && !/图/u.test(subject) && !(context && rawTopic === 'image')) return undefined
+    // Locative contents, possessors and separate actions change the subject;
+    // keep these outside the task boundary instead of swallowing free text.
+    if (qualifier.length > 36 || /(?:里|中|内|上|下)(?:面|边)?(?:的)?[^的]*$|(?:我|你|他|她|它|别人|姐姐|妹妹|哥哥|弟弟|朋友|同事|CPU|GPU)|[：:]|(?:正在|已经|还没|没有|没在|出来|处理|生成|画完|完成|发给)/iu.test(qualifier)) return undefined
+    const topic = new RegExp(`^${IMAGE_REFERENCE}`, 'u').test(subject) ? 'image' : evidenceTopic(subject)
+    return {kind: 'artifact', topic, surface: rawSubject}
+  }
+  if (context && IMPLICIT_SUBJECT.test(subject)) return {kind: 'implicit', topic: rawTopic, surface: rawSubject}
+  return undefined
+}
+
+function taskStatePropositions(clause: string, context: boolean, rawTopic: EvidenceTopic, resultQuestion: boolean): TaskStateProposition[] {
+  const propositions: TaskStateProposition[] = []
+  const predicates = STATE_PREDICATES.flatMap(state => {
+    const match = state.suffix.exec(clause)
+    return match ? [{state, match}] : []
+  })
+  // Parse one complete predicate boundary before resolving the noun phrase.
+  // Its inner suffix is not a second assertion: “没有” contains “有”, and
+  // “没在处理” contains “在处理”. Negation must never become a descriptor.
+  const predicateStart = Math.min(...predicates.map(({match}) => match.index))
+  for (const {state, match} of predicates) {
+    if (match.index !== predicateStart) continue
+    const object = taskObjectReference(clause.slice(0, match.index), context, rawTopic)
+    if (!object || object.kind === 'implicit' && !state.implicit || state.dimension === 'existence' && !context
+      || object.kind === 'task' && state.accepts === 'artifact' || object.kind === 'artifact' && state.accepts === 'task') continue
+    if (object.kind === 'follow_up') {
+      if (state.dimension === 'existence') propositions.push({object, dimension: 'follow_up', value: state.value === 'absent' ? 'none' : 'registered'})
+      else if (state.dimension === 'follow_up') propositions.push({object, dimension: state.dimension, value: state.value})
+      continue
+    }
+    if (state.dimension === 'follow_up') continue
+    // Bare “好了” is a completion condition in ordinary speech. The explicit
+    // artifact noun, or the less ambiguous omitted-subject verbs, supply scope.
+    if (object.kind === 'implicit' && state.value === 'available' && !new RegExp(`^${IMPLICIT_PREFIX}${PAST}(?:出来|做好|弄好|弄完|生成好|生成完|改好|画好|画完|做完)(?:了|啦)?${PARTICLES}$`, 'u').test(clause)) continue
+    propositions.push({object, dimension: state.dimension, value: state.value})
+  }
+  // Existential speech puts the state before the object (“没有这张图” /
+  // “没挂着这个任务”), rather than requiring a new whole-sentence pattern.
+  const possession = new RegExp(`^(?:${SELF_LOCATION})?(?:现在|目前|本来|原来|一直|也|本来也|本来就)*(还没(?:有)?|没(?:有)?(?:挂着)?|尚未|仍(?:然)?有|还有|有)(.+?)${PARTICLES}$`, 'u').exec(clause.replace(SUBJECT_CONNECTOR, ''))
+  if (possession) {
+    const object = taskObjectReference(possession[2]!, false, rawTopic)
+    const absent = /没|未/u.test(possession[1]!)
+    if (object?.kind === 'task' && context) propositions.push({object, dimension: 'existence', value: absent ? 'absent' : 'present'})
+    else if (object?.kind === 'artifact') propositions.push({object, dimension: 'artifact', value: absent ? 'unavailable' : 'available'})
+    else if (object?.kind === 'follow_up' && context) propositions.push({object, dimension: 'follow_up', value: absent ? 'none' : 'registered'})
+  }
+  if (context && /^(?:(?:我(?:这边)?|这边)?(?:取消(?:了)?(?:发送|投递|通知)?(?:的话)?|那|就|也|已经|已|现在|目前)*)不会(?:再)?(?:自动|主动)(?:发(?:送|图)?|投递|通知)(?:给你|发你|你)?(?:了)?[呀啊呢哦吧]*$/u.test(clause)) {
+    propositions.push({object: {kind: 'follow_up', topic: rawTopic, surface: clause}, dimension: 'follow_up', value: 'none'})
+  }
+  if (resultQuestion && BARE_ABSENT_ANSWER.test(clause)) propositions.push({object: {kind: 'implicit', topic: rawTopic, surface: ''}, dimension: 'artifact', value: 'unavailable'})
+  return propositions
+}
 const BARE_ABSENT_ANSWER = new RegExp(`^还没(?:有)?${PARTICLES}$`, 'u')
 const RESULT_STATUS_QUESTION = new RegExp(`(?:${ARTIFACT_SUBJECT}|第[一二三四五六七八九十\\d]+张(?:图|图片)?)(?:[，,]\\s*)?(?:现在|目前|已经|还|到底)?(?:出来|做好|完成|生成(?:好|完)|改好|画(?:好|完)|弄(?:好|完)|做完|好)(?:了|啦)?(?:没(?:有)?|[吗么])?${PARTICLES}$`, 'u')
 
@@ -225,17 +311,20 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
   return claims
 }
 
-function stateSupported(dimension: StateClaim['dimension'], tasks: TurnTaskFact[]): boolean {
+function stateSupported(proposition: TaskStateProposition, tasks: TurnTaskFact[]): boolean {
   return tasks.some(task => {
-    switch (dimension) {
-      case 'ready': return task.result === 'available'
-      case 'absent': return task.result === 'unavailable'
-      case 'running': return task.execution === 'running'
-      case 'queued': return task.execution === 'queued'
-      case 'failed': return task.execution === 'failed'
-      case 'completed': return task.execution === 'completed'
-      case 'sent': return task.delivery.state === 'sent' && Boolean(task.delivery.messageId)
-      case 'unsent': return task.delivery.state === 'failed' || task.delivery.state === 'not_attempted'
+    switch (proposition.dimension) {
+      case 'artifact': return task.result === proposition.value
+      case 'execution': return proposition.value === 'not_running' || proposition.value === 'not_queued'
+        ? task.execution !== 'unknown' && task.execution !== (proposition.value === 'not_running' ? 'running' : 'queued')
+        : task.execution === proposition.value
+      case 'delivery': return proposition.value === 'sent'
+        ? task.delivery.state === 'sent' && Boolean(task.delivery.messageId)
+        : task.delivery.state === 'failed' || task.delivery.state === 'not_attempted'
+      // A validated row proves that its task exists. Neither an empty lookup,
+      // cancelled callback nor any delivery state proves nonexistence.
+      case 'existence': return proposition.value === 'present'
+      case 'follow_up': return proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none'
     }
   })
 }
@@ -350,23 +439,27 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
       // “好了我会发你” is a future condition, not a claim that it is ready.
       if (/^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
         || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))) continue
-      for (const state of STATE_CLAIMS) {
-        const explicit = state.explicit.some(pattern => pattern.test(clause))
-        const referencedImage = taskContext && rawTopic === 'image' ? REFERENCED_IMAGE_STATE.exec(clause) : null
-        const implicit = sentenceTaskContext && state.implicit.test(referencedImage?.[1] || clause)
-        const bareAbsent = state.dimension === 'absent' && resultQuestionContext && BARE_ABSENT_ANSWER.test(clause)
-        if (!explicit && !implicit && !bareAbsent) continue
-        if (explicit) sentenceTaskContext = true
-        const clauseTopic = referencedImage ? 'image' : evidenceTopic(clause)
+      for (const state of taskStatePropositions(clause, sentenceTaskContext, rawTopic, resultQuestionContext)) {
+        if (state.object.kind !== 'implicit') sentenceTaskContext = true
+        const clauseTopic = state.object.topic
         const topic = clauseTopic === 'unknown' || clauseTopic === 'generic' ? rawTopic : clauseTopic
-        if (stateSupported(state.dimension, uniqueMatchingTasks(tasks, topic))) continue
-        const delivery = state.dimension === 'sent' || state.dimension === 'unsent'
+        const matchingTasks = uniqueMatchingTasks(tasks, topic)
+        if (stateSupported(state, matchingTasks)) continue
+        // A denial of an automatic arrangement does not authorize one. Keep
+        // ordinary denials when there is no competing verified registration;
+        // still reject denial of a known, live callback for this task.
+        if (state.dimension === 'follow_up' && state.value === 'none' && !matchingTasks.length) continue
+        const delivery = state.dimension === 'delivery'
         violations.push({code: delivery ? 'unsupported_delivery' : 'unsupported_task_state', claim: sentence.text,
-          reason: state.dimension === 'unsent' ? '当前记录没有证明该任务未发出；未确认不能升级成从未发送或发送失败。'
-            : delivery ? '没有该任务最终投递的消息回执。' : '当前记录没有证明这句所断言的进度或产物状态；未确认不能升级成尚未产出。',
-          correctionInstruction: state.dimension === 'unsent' ? '缺少对应发送状态证据时，只能说明是否发出尚未确认。不要把没有记录或没确认到写成没发出来、没送出去或发送失败。'
+          reason: state.dimension === 'follow_up' ? '当前后续登记状态不支持这句断言；不能否认仍有效的登记，也不能把未确认说成已登记或已取消。原任务与后续发送安排必须分别按记录说明。'
+            : state.dimension === 'existence' ? '任务存在与执行、产物、投递及后续登记分别成立；查询没有命中或取消后续发送不能证明任务不存在。'
+            : state.value === 'unsent' ? '当前记录没有证明该任务未发出；未确认不能升级成从未发送或发送失败。'
+            : delivery ? '没有该任务最终投递的消息回执。' : '当前记录没有证明这句所断言的进度或产物状态；未确认不能升级成尚未产出，投递失败也不能否定已有产物。',
+          correctionInstruction: state.dimension === 'follow_up' ? '分别回答原任务是否仍在执行及完成后发送是否仍有有效登记，不把取消通知等同取消原任务，也不抹掉仍有效的发送安排。'
+            : state.dimension === 'existence' ? '有任务记录就保留任务存在及其已知执行状态。未查到记录时只说任务状态未核实；取消或缺少完成后发送登记只影响该次后续安排，不能否定原任务。'
+            : state.value === 'unsent' ? '缺少对应发送状态证据时，只能说明是否发出尚未确认。不要把没有记录或没确认到写成没发出来、没送出去或发送失败。'
             : delivery ? '不能确认已经发送或让用户往上找图。产物可用与投递已确认是两回事，分别说明。'
-            : '按已核验记录分别说明进度、产物与投递。无证据的维度明确尚未确认，不说还没出来、仍在执行、已经完成或执行失败。'})
+            : '按已核验记录分别说明任务存在、执行、产物、投递及后续登记。限定语不改变同一任务对象，已有产物不能因发送失败被说成没有；无证据的维度明确尚未确认。'})
       }
     }
   }
@@ -376,19 +469,40 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
 /** Used only when a contradictory candidate could not be regenerated safely. */
 export function buildActionReplyFallback(facts?: TurnActionFacts, rawUserText = ''): string {
   const task = uniqueMatchingTasks(facts?.tasks || [], evidenceTopic(rawUserText))[0]
-  if (!task) return '这次还没核实到那条请求的处理结果，进度和是否发出都不能确认。你可以把原请求回复给我，方便对上是哪一次。'
+  const automaticDeliveryQuestion = /(?:自动|主动|完成后|好了(?:后)?|出来(?:后)?).{0,12}(?:发|投递|通知|提醒)|(?:发|投递).{0,8}(?:自动|主动)/u.test(withoutQuotations(rawUserText))
+  if (!task) return automaticDeliveryQuestion
+    ? '现在不能确认还会不会自动发送，相关安排尚未核实；这次处理结果和是否已发出也没核实。'
+    : '你问的这次处理结果还没核实，是否做好、是否发出都不能确认。'
+  if (task.source === 'reminder') {
+    if (supportsFollowUp(task, 'reminder')) {
+      const dueAt = task.followUp.dueAt
+      return typeof dueAt === 'number' && Number.isFinite(dueAt)
+        ? `这条提醒安排仍有效，预定在北京时间 ${new Date(dueAt).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})} 触发；是否成功发出仍以届时的发送结果为准。`
+        : '这条提醒安排仍有效，具体触发时间还没核实；是否成功发出仍以届时的发送结果为准。'
+    }
+    return task.followUp.state === 'none'
+      ? '当前没有仍有效的这条提醒安排，不会按这条安排自动提醒。'
+      : '这条提醒是否仍会自动发还不能确认，当前登记情况尚未核实。'
+  }
   const lines: string[] = []
-  if (task.result === 'available') lines.push('已有可用结果。')
-  else if (task.execution === 'failed') lines.push('记录显示这次处理失败了。')
+  if (automaticDeliveryQuestion) {
+    if (supportsFollowUp(task, 'job_completion')) lines.push('这次完成后发送的安排仍有效，会在任务完成后尝试发送；完成时间和发送是否成功还不能保证。')
+    else if (task.followUp.state === 'none') lines.push('这次没有仍有效的完成后发送安排，不会按这次安排自动发。')
+    else lines.push('现在不能确认还会不会自动发送，完成后发送的安排尚未核实。')
+  }
+  lines.push('已查到这次任务记录。')
+  if (task.execution === 'failed') lines.push('记录显示这次处理失败了。')
   else if (task.execution === 'queued') lines.push('记录显示还在排队。')
   else if (task.execution === 'running') lines.push('记录显示正在处理。')
-  else if (task.execution === 'completed') lines.push('处理已结束，但可用结果还没有核实。')
+  else if (task.execution === 'completed') lines.push('这次处理已结束。')
   else lines.push('当前处理进度还没有核实。')
+  if (task.result === 'available') lines.push('已有可用结果。')
+  else if (task.result === 'unavailable') lines.push('当前还没有可用结果。')
+  else lines.push('是否已有可用结果还没有核实。')
   if (task.delivery.state === 'sent' && task.delivery.messageId) lines.push('那次发送有消息回执，已确认发出。')
   else if (task.delivery.state === 'failed') lines.push('发送没有成功。')
   else if (task.delivery.state === 'not_attempted') lines.push('还没有尝试发送。')
   else lines.push('是否发出还不能确认。')
-  if (supportsFollowUp(task, 'job_completion')) lines.push('完成后发送的任务仍有效，完成时间还不能保证。')
-  else if (supportsFollowUp(task, 'reminder')) lines.push('只核实到一条提醒安排，这不代表结果会自动补发。')
+  if (!automaticDeliveryQuestion && supportsFollowUp(task, 'job_completion')) lines.push('完成后发送的任务仍有效，完成时间还不能保证。')
   return lines.join('')
 }

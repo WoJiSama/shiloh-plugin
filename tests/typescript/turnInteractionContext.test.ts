@@ -2,7 +2,7 @@ import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import {buildTurnInteractionContext, buildTurnInteractionPrompt, withTurnInteractionEvidence} from '../../src/modules/conversation/domain/turnInteractionContext.js'
+import {buildSocialContinuity, buildTurnInteractionContext, buildTurnInteractionPrompt, withTurnInteractionEvidence, withTurnSocialInterpretation} from '../../src/modules/conversation/domain/turnInteractionContext.js'
 import type {InteractionKind, TurnEvidence} from '../../src/contracts/turnInteraction.js'
 
 interface Scenario {
@@ -221,4 +221,74 @@ test('verified continuity confirms prior speech, not literal experiences or task
   assert.equal(context.previousBotReply?.source,'verified_continuity')
   assert.match(prompt,/这是发言记录，不独立证明实体经历或任务当前状态/)
   assert.match(prompt,/缺少结果时只说明尚未确认/)
+})
+
+test('a normal new report sharing the same noun and quantity does not become this bot\'s old joke', () => {
+  const persona = {personaId: 'social-report', personaVersion: 'v1', personaName: '岚'}
+  const scope = {botId: '99', persona, speaker, addressee: {targetKind: 'bot'}}
+  const first = buildTurnInteractionContext({...scope, rawUserText: '开个玩笑，给你三块饼干当工资'})
+  const lastReply = '三块饼干，先把工资口味选好，巧克力还是香草？'
+  const continuity = {botId: '99', persona, lastReply, social: buildSocialContinuity(first, lastReply)}
+  for (const rawUserText of ['我今天烤了三块饼干，给同事带的', '我同事今天也分到三块饼干', '对了，我朋友送来三块饼干，包装挺好看']) {
+    const current = buildTurnInteractionContext({...scope, rawUserText, continuity})
+    assert.equal(current.kind, 'conversation', rawUserText)
+    assert.equal(current.social?.continuation, undefined, rawUserText)
+    assert.equal(current.social?.activeBit, undefined, rawUserText)
+    assert.equal(current.social?.pendingInteraction, undefined, 'the old wage question does not burden this separate report')
+    assert.equal(current.rawUserText, rawUserText)
+    assert.ok(buildTurnInteractionPrompt(current).includes(rawUserText))
+  }
+  for (const rawUserText of ['我今天先扣你两块饼干', '我刚把剩下那块饼干存起来了']) {
+    const continuing = buildTurnInteractionContext({...scope, rawUserText, continuity})
+    assert.equal(continuing.kind, 'banter', 'a direct action or same-object reference can still extend the joke')
+    assert.equal(continuing.social?.continuation?.kind, 'bit')
+  }
+})
+
+test('matching bot and persona ownership is required even when the current words match the old quantity joke', () => {
+  const persona = {personaId: 'social-ownership', personaVersion: 'v2', personaName: '安序'}
+  const scope = {botId: '99', persona, speaker}
+  const first = buildTurnInteractionContext({...scope, rawUserText: '开个玩笑，给你三块饼干当工资'})
+  const lastReply = '三块饼干归我，先别扣。'
+  const continuity = {botId: '99', persona, lastReply, social: buildSocialContinuity(first, lastReply)}
+  const own = buildTurnInteractionContext({...scope, rawUserText: '先扣两块', continuity, addressee: {targetKind: 'bot'}})
+  assert.equal(own.social?.continuation?.kind, 'bit')
+  for (const previous of [{...continuity, botId: '303'}, {...continuity, persona: {...persona, personaId: 'other'}}, {...continuity, persona: {...persona, personaVersion: 'v1'}}]) {
+    const foreign = buildTurnInteractionContext({...scope, rawUserText: '先扣两块', continuity: previous, addressee: {targetKind: 'bot'}})
+    assert.equal(foreign.social?.continuation, undefined)
+    assert.equal(foreign.social?.previousStance, undefined)
+  }
+  const peer = buildTurnInteractionContext({...scope, rawUserText: '先扣两块', continuity,
+    quote: {userId: '303', label: '另一个群友', text: '三块饼干是阿青给我的。'}})
+  assert.equal(peer.target.kind, 'other')
+  assert.equal(peer.social?.continuation, undefined, 'the same unit in a peer-directed exchange does not transfer this bot\'s stance')
+  assert.ok(peer.evidence.some(item => item.origin === 'quote' && item.speaker?.userId === '303'))
+
+  const serious = buildTurnInteractionContext({...scope, rawUserText: '帮我核算三块饼干的热量', continuity, addressee: {targetKind: 'bot'}})
+  assert.equal(withTurnSocialInterpretation(serious, {act: 'teasing', confidence: 0.99}, 'understanding_model').kind, 'serious_answer')
+  assert.equal(serious.social?.continuation, undefined)
+
+  for (const [rawUserText, act] of [['这三块饼干能存多久？', 'factual_question'], ['这三块饼干让我很不舒服', 'criticism']] as const) {
+    const ambiguous = buildTurnInteractionContext({...scope, rawUserText, continuity, addressee: {targetKind: 'bot'}})
+    const resolved = withTurnSocialInterpretation(ambiguous, {act, confidence: 0.99}, 'understanding_model')
+    assert.equal(resolved.kind, 'serious_answer', 'existing understanding may still recognize a genuine question or attitude change')
+    assert.equal(resolved.social?.continuation, undefined)
+    assert.equal(resolved.social?.activeBit, undefined)
+  }
+})
+
+test('a third-party appraisal followed by a direct attention bid keeps each speaker\'s judgments separate', () => {
+  const persona = {personaId: 'social-speaker-change', personaVersion: 'v1', personaName: '岚'}
+  const scope = {botId: '99', persona, speaker, addressee: {targetKind: 'bot'}}
+  const first = buildTurnInteractionContext({...scope, rawUserText: '这是小林在问阿青。你觉得是撒娇还是埋怨？',
+    quote: {userId: '303', label: '小林', text: '阿青，你为什么不理我呀'}})
+  assert.equal(first.social?.observedExchange?.speaker?.userId, '303')
+  assert.match(buildTurnInteractionPrompt(first), /语气词只能支持倾向/)
+  const lastReply = '我觉得语气偏软，不过单凭这一句还不能确定是不是埋怨。'
+  const second = buildTurnInteractionContext({...scope, rawUserText: '轮到我了：你为什么不理我呀',
+    continuity: {botId: '99', persona, lastReply, social: buildSocialContinuity(first, lastReply)}})
+  assert.equal(second.social?.act, 'attention_bid')
+  assert.equal(second.social?.observedExchange, undefined)
+  assert.equal(second.target.kind, 'bot')
+  assert.match(buildTurnInteractionPrompt(second), /不把自己的分析说成用户提出的标准/)
 })

@@ -45,14 +45,15 @@ const SIGNAL_PATTERNS: [DiagnosticSignal, RegExp][] = [
   ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏/gu]
 ]
 interface Observation {signal: DiagnosticSignal; status: DiagnosticIncidentStatus}
-type DamageFinding = DiagnosticEvidenceAssessment['damage']['findings'][number]
-interface ParsedSource {source: DiagnosticSource; observations: Observation[]; correction: boolean; power?: DiagnosticContext['power']; cooled?: boolean; clearance: boolean; clearanceDenied: boolean; damageFindings: DamageFinding[]}
+type DamageFinding = DiagnosticEvidenceAssessment['damage']['findings'][number] & {scope?: 'whole_device'}
+interface ParsedSource {source: DiagnosticSource; observations: Observation[]; correction: boolean; power?: DiagnosticContext['power']; cooled?: boolean; clearance: boolean; clearanceDenied: boolean; damageFindings: DamageFinding[]; excludedDamageFindings: DamageFinding[]}
 
 const DAMAGE_COMPONENTS: [DiagnosticDamageComponent, RegExp][] = [
   ['power_supply', /电源/u], ['mainboard', /主板/u], ['graphics_card', /显卡/u],
   ['cable', /线材|线缆|电线/u], ['capacitor', /电容/u]
 ]
-const DAMAGE_WORDS = /烧坏|烧毁|烧了|烧掉|损坏|受损|坏了|短路|电气故障/u
+const DAMAGE_TERMS = /烧坏|烧毁|烧了|烧掉|烧焦|损坏|受损|坏了|短路|电气故障|过热|击穿|出(?:了)?问题/gu
+const DAMAGE_SUBJECT = /元件|零件|东西|部件|电气件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面|整机|电脑|机器|设备/gu
 const PROFESSIONAL = /维修(?:师傅|人员|工程师|店|点)|专业(?:维修|检修|人员)|售后|检修(?:师傅|人员)/u
 const TEMPERATURE = /温度|(?:-?\d{1,3}(?:\.\d+)?)\s*(?:℃|°\s*C|摄氏度)|TjMax|Tcase/iu
 const MODEL = /\b(?:i[3579]-?\d{4,5}[a-z]{0,3}|(?:Ryzen\s*)?[Rr][3579][ -]?\d{4}[a-z]{0,4}|Ryzen\s*[3579]\s*\d{4}[a-z]{0,4}|(?:RTX|GTX)\s*\d{3,4}(?:\s*(?:Ti|SUPER))?|RX\s*\d{3,4}[a-z]{0,3}|\d{4}[xX][3D]{0,2})\b/iu
@@ -65,25 +66,65 @@ function componentsIn(text: string): DiagnosticDamageComponent[] {
 }
 
 function damageKind(text: string): DiagnosticDamageKind {
-  return /烧坏|烧毁|烧了|烧掉|烧焦/u.test(text) ? 'burned' : /短路/u.test(text) ? 'short_circuit' : 'damaged'
+  return /烧坏|烧毁|烧了|烧掉|烧焦/u.test(text) ? 'burned' : /短路/u.test(text) ? 'short_circuit' : /击穿/u.test(text) ? 'electrical_breakdown' : /过热/u.test(text) ? 'overheated' : 'damaged'
 }
 
-function reportedDamageFindings(text: string): DamageFinding[] {
+interface DamageProposition extends DamageFinding {text: string; negated: boolean}
+
+/** Keep each mechanism and its governing negation, rather than a clause-wide polarity. */
+function damagePropositions(clause: string, preceding?: DamageProposition): DamageProposition[] {
+  const result: DamageProposition[] = []
+  let previousEnd = 0
+  let previousComponents: DiagnosticDamageComponent[] | undefined = preceding?.components
+  for (const match of clause.matchAll(DAMAGE_TERMS)) {
+    const prefix = clause.slice(previousEnd, match.index)
+    const suffixSubject = /^(?:了|的)?(?:元件|零件|东西|部件|电气件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面|整机|电脑|机器|设备)/u.exec(clause.slice(match.index + match[0].length))?.[0]
+    const previous = result.at(-1) || preceding
+    const continuation = previous && !suffixSubject && /^\s*(?:了)?(?:或(?:者)?|和|及|与|也|并(?:且)?(?:发生)?|、)(?:没有|没|并无|并未|未(?:曾|见)?|不存在|无)?(?:任何|明显|出现|发生|过|的)*\s*$/u.test(prefix)
+    const negated = /(?:没有|没|并无|并未|未(?:曾|见)?|不存在|无|排除)(?:(?:任何|明显|其他|其余|别的|出现|发生|发展|严重|达到|到|过|的|电气|供电|电路)|(?:元件|零件|部件|电气件|电源|主板|板卡|显卡|电容|线材|线缆|电线|硬件|内部|里面|整机|电脑|机器|设备))*\s*$/u.test(prefix)
+      || Boolean(continuation && previous.negated && !/(?:发生|出现)\s*$/u.test(prefix))
+    // A bare mechanism is not a current-device claim without a subject, an
+    // explicit inference, or a negative conclusion about this device.
+    if (!continuation && ![...prefix.matchAll(DAMAGE_SUBJECT)].some(subject => match.index - previousEnd - subject.index <= 30)
+      && !/(?:说明|意味(?:着)?|证明|表明|就是|基本是|肯定是).{0,18}$/u.test(prefix) && !negated && !suffixSubject) {previousEnd = match.index + match[0].length; continue}
+    const components = continuation && previousComponents ? previousComponents : componentsIn(prefix + (suffixSubject || ''))
+    // Unnamed is not universal: a repeated predicate can omit its component,
+    // while an explicit whole-device/electrical clearance actually covers it.
+    const wholeDevice = continuation ? previous.scope === 'whole_device' : components.includes('unspecified_component')
+      && /(?:整机|全部(?:元件|部件|硬件)|所有(?:元件|部件|硬件))[^，,。！？!?；;\n]{0,16}$|(?:没有|并无|并未|无|未)(?:任何)?(?:电气|供电|电路)\s*$/u.test(prefix)
+    result.push({text: clause.slice(0, match.index + match[0].length), components, kind: damageKind(match[0]), negated, ...(wholeDevice ? {scope: 'whole_device' as const} : {})})
+    previousEnd = match.index + match[0].length
+    previousComponents = components
+  }
+  return result
+}
+
+function reportedDamageFindings(text: string, exclusion = false): DamageFinding[] {
   if (!PROFESSIONAL.test(text) || deniesProfessionalClearance(text)) return []
   const reported = diagnosticClauses(text).filter(clause => !HYPOTHETICAL.test(clause)
-    && !/[？?]|是否|有没有|吗|么|准备|打算|计划|将要|明天|稍后|尚未|还没|没有(?:确认|查出|发现)|不能(?:确认|确定)|待确认/u.test(clause)).join('，')
+    && !/[？?]|是否|有没有|吗|么|准备|打算|计划|将要|明天|稍后|尚未|还没|没有(?:确认|查出|发现)|不能(?:确认|确定)|待确认/u.test(clause)).join('')
   if (!/(?:确认|查出|检测出|发现|诊断为|认定|确定|更换了?|换掉了?|修复了?)/u.test(reported)) return []
   const findings: DamageFinding[] = []
+  let preceding: DamageProposition | undefined
   for (const clause of diagnosticClauses(reported)) {
-    if (!DAMAGE_WORDS.test(clause) || /没有|并无|未见|未(?:曾|见)?受损|并未受损|排除|不存在|不确定|可能|疑似|应该|大概|好像|似乎|估计|猜测|多半/u.test(clause)) continue
-    findings.push({components: componentsIn(clause), kind: damageKind(clause)})
+    if (/不确定|可能|疑似|应该|大概|好像|似乎|估计|猜测|多半|或(?:者)?/u.test(clause)) {preceding = undefined; continue}
+    const propositions = damagePropositions(clause, preceding)
+    for (const proposition of propositions) {
+      if (proposition.negated !== exclusion || deniesConclusion(proposition.text)) continue
+      // "No other damage" does not say that the part already found damaged
+      // never burned. Keep clearance for operation, without widening its scope.
+      if (exclusion && /其他|其余|别的/u.test(proposition.text)) continue
+      findings.push({components: proposition.components, kind: proposition.kind, ...(exclusion && proposition.scope ? {scope: proposition.scope} : {})})
+    }
+    preceding = /[，,]\s*$/u.test(clause) ? propositions.at(-1) : undefined
   }
   return findings
 }
 
 /** This projection names what is missing instead of deriving a diagnosis from a symptom. */
-function evidenceAssessment(sources: DiagnosticSource[], suppliedFindings?: DamageFinding[]): DiagnosticEvidenceAssessment {
+function evidenceAssessment(sources: DiagnosticSource[], suppliedFindings?: DamageFinding[], suppliedExclusions?: DamageFinding[]): DiagnosticEvidenceAssessment {
   let findings: DamageFinding[] = []
+  let excludedFindings: DamageFinding[] = []
   if (suppliedFindings) findings = suppliedFindings
   else for (const source of sources) {
     // Compatibility contexts still carry provenance. A newly reported incident
@@ -91,7 +132,12 @@ function evidenceAssessment(sources: DiagnosticSource[], suppliedFindings?: Dama
     if ((source.incidentStatus === 'asserted' && !professionalClearance(source.text)) || REPORT_CORRECTION.test(source.text)) findings = []
     findings.push(...reportedDamageFindings(source.text))
   }
-  const damage: DiagnosticEvidenceAssessment['damage'] = {status: findings.length ? 'reported_professional_finding' : 'unconfirmed', components: [...new Set(findings.flatMap(finding => finding.components))], findings}
+  if (suppliedExclusions) excludedFindings = suppliedExclusions
+  else for (const source of sources) {
+    if ((source.incidentStatus === 'asserted' && !professionalClearance(source.text)) || REPORT_CORRECTION.test(source.text) || deniesProfessionalClearance(source.text)) excludedFindings = []
+    excludedFindings.push(...reportedDamageFindings(source.text, true))
+  }
+  const damage: DiagnosticEvidenceAssessment['damage'] = {status: findings.length ? 'reported_professional_finding' : 'unconfirmed', components: [...new Set(findings.flatMap(finding => finding.components))], findings, excludedFindings}
   if (!sources.some(source => TEMPERATURE.test(source.text))) return {damage}
   let componentModel: string | undefined
   let measurementPoint: string | undefined
@@ -233,7 +279,7 @@ function isReportedPowerOn(text: string): boolean {
 }
 
 function deniesProfessionalClearance(text: string): boolean {
-  return /(?:没(?:有)?|尚未|还没|未曾|并未|未).{0,6}(?:检修|检查|维修|确认|确定|排除)|(?:不能|无法|没法|不敢|尚不能)(?:确认|确定|排除)|不确定|未经(?:专业)?(?:检修|检查)|不代表.{0,8}(?:确认|排除)/u.test(text)
+  return /(?:没(?:有)?|尚未|还没|未曾|并未|未)[^，,。！？!?；;\n]{0,6}(?:检修|检查|维修|确认|确定|排除)|(?:不能|无法|没法|不敢|尚不能)(?:确认|确定|排除)|不确定|未经(?:专业)?(?:检修|检查)|不代表.{0,8}(?:确认|排除)/u.test(text)
 }
 
 function professionalClearance(text: string): boolean {
@@ -274,6 +320,7 @@ function parseSource(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'
     source: {...source, text: scopedText, incidentStatus, signals: [...new Set(obs.map(item => item.signal))]}, observations: obs,
     correction: REPORT_CORRECTION.test(scopedText), clearance: !separated.unresolvedAttribution && professionalClearance(scopedText), clearanceDenied: deniesProfessionalClearance(scopedText),
     damageFindings: separated.unresolvedAttribution ? [] : reportedDamageFindings(scopedText),
+    excludedDamageFindings: separated.unresolvedAttribution ? [] : reportedDamageFindings(scopedText, true),
     ...(power ? {power} : {}),
     ...(notCooled ? {cooled: false} : cooled ? {cooled: transientFactsFresh} : {})
   }
@@ -350,11 +397,15 @@ export function buildDiagnosticContext(input: DiagnosticContextInput): Diagnosti
   }
   const sources = relevant.map(item => item.source)
   let damageFindings: DamageFinding[] = []
+  let excludedDamageFindings: DamageFinding[] = []
   for (const item of relevant) {
-    if ((item.observations.some(observation => observation.status === 'asserted') && !item.clearance) || item.correction) damageFindings = []
+    const renewedIncident = item.observations.some(observation => observation.status === 'asserted') && !item.clearance
+    if (renewedIncident || item.correction) damageFindings = []
+    if (renewedIncident || item.correction || item.clearanceDenied) excludedDamageFindings = []
     damageFindings.push(...item.damageFindings)
+    excludedDamageFindings.push(...item.excludedDamageFindings)
   }
-  return {purpose, subject, incident: {status, signals: [...signalStates.keys()]}, power, damageExclusion, allowedChecks, unmetPrerequisites, sources, evidenceAssessment: evidenceAssessment(sources, damageFindings)}
+  return {purpose, subject, incident: {status, signals: [...signalStates.keys()]}, power, damageExclusion, allowedChecks, unmetPrerequisites, sources, evidenceAssessment: evidenceAssessment(sources, damageFindings, excludedDamageFindings)}
 }
 
 export function buildDiagnosticContextPrompt(context?: DiagnosticContext): string {
@@ -369,6 +420,7 @@ export function buildDiagnosticContextPrompt(context?: DiagnosticContext): strin
     else if (context.damageExclusion === 'reported_professional_clearance') lines.push('用户明确报告同一对象已完成专业检修并排除电气损坏；这不是独立认证。检修放行仅覆盖报告确认的对象、故障与检查范围，不保证整机绝对安全。')
     else lines.push('没有真实电气异常报告，勿凭温度或玩笑虚构烧毁；常规运行监测与断电静态观察分开，各自满足前提。')
     if (context.allowedChecks.includes('operational_monitoring')) lines.push('用户侧先确认外壳复原，再做非接触运行监测；不得安排开侧板凑近通电观察或主动嗅闻。')
+    lines.push('症状、原因和排除结论要分别表述：烟雾或焦糊味只能支持异常与风险，不能据此断定元件过热、击穿、烧毁，也不能把电源或主板写成高概率故障源。无烟、无味、无烧痕或仍可运行只说明未观察到相应现象，不证明未烧毁、未损坏或损坏较轻；已报告专业结论仅按同一部件、机制与否定范围复述，不能扩大“没有其他损坏”的范围。')
     lines.push('任何硬件拆接、换插板卡或硬盘、重新插紧线缆，都必须先关机、拔下电源线并确认隔离；仅关机不等于断电。需要内部带电检测的步骤交现场专业人员按工序进行，用户不要触摸、凑近观察或嗅闻；初步点亮、BIOS读数或短时运行不能证明整机安全，风扇停转也须结合零转速策略判断。')
     if (context.sources.some(source => /温度|满载|℃|°C|TjMax|Tcase/iu.test(source.text))) lines.push('温度判断需要具体部件型号、测点与负载等依据，并结合规格、功耗、环境和实际限频情况；单个温度读数本身不能保证正常或安全。型号和测点未知时先说明判断范围或补问关键条件；正常运行、无烟无味或自动降频保护都不是整机健康证明。')
   }
@@ -377,11 +429,11 @@ export function buildDiagnosticContextPrompt(context?: DiagnosticContext): strin
 }
 
 function deniesConclusion(clause: string): boolean {
-  return /(?:无法|不能|尚不能|不够|不足以|没法|未能|还不能)(?:仅凭|只凭|据此|直接|就|远程|确定地)?(?:判断|确认|确定|断定|说|证明|认定|保证)|(?:不能|无法).{0,12}(?:判断|确认|断定|证明)|不代表|不等于|并非|不是说|不意味着|不说明|未必|不一定|不是(?:已经|肯定|确定|正常)|没有(?:证据|依据).{0,8}(?:确认|说明|证明)|(?:结论|判断).{0,6}(?:不能下|下不了|尚早)/u.test(clause)
+  return /(?:无法|不能|尚不能|不够|不足以|没法|未能|还不能)(?:仅凭|只凭|据此|直接|就|远程|确定地)?(?:判断|确认|确定|断定|说|证明|认定|保证)|(?:不能|无法).{0,12}(?:判断|确认|确定|断定|证明|认定)|不代表|不等于|并非|不是说|不意味着|不说明|未必|不一定|不是(?:已经|肯定|确定|正常)|没有(?:证据|依据).{0,8}(?:确认|说明|证明)|(?:结论|判断).{0,6}(?:不能下|下不了|尚早)/u.test(clause)
 }
 
 function offersPossibility(clause: string): boolean {
-  return !/大概率|很可能|多半|十有八九|基本(?:已经|确定|是|就)/u.test(clause)
+  return !/大概率|很可能|多半|十有八九|基本(?:已经|确定|是|就)|可能性(?:很|更|较)?大|概率(?:很|更|较)?高|嫌疑(?:很|更|较)?大/u.test(clause)
     && /可能|也许|或许|不能排除|不排除|有.{0,6}风险|疑似|怀疑|待确认|尚待/u.test(clause)
 }
 
@@ -402,12 +454,20 @@ function isQuestion(clause: string): boolean {
   return /[？?]\s*$/u.test(clause) || /(?:是不是|是否|有没有|能不能|可不可以|吗|么)[，。；;]?\s*$/u.test(clause)
 }
 
-function damageClaim(clause: string): string | undefined {
-  return /(?:元件|零件|东西|部件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面)[^，,。！？!?；;\n]{0,24}(?:烧坏|烧毁|烧了|烧掉|损坏|受损|坏了|短路|电气故障)|(?:烧坏|烧毁|损坏|受损|烧焦)(?:了|的)?(?:元件|零件|电源|主板|显卡|电容|线材|线缆|硬件)/u.exec(clause)?.[0]
+function supportedDamage(proposition: DamageProposition, findings: DamageFinding[]): boolean {
+  return findings.some(finding => {
+    const kindMatches = proposition.negated
+      ? finding.kind === proposition.kind || (finding.kind === 'damaged' && proposition.kind !== 'overheated')
+      : proposition.kind === 'damaged' || finding.kind === proposition.kind
+    if (!kindMatches) return false
+    return proposition.components.every(component => proposition.negated
+      ? finding.scope === 'whole_device' || (component !== 'unspecified_component' && finding.components.includes(component))
+      : component === 'unspecified_component' || finding.components.includes(component))
+  })
 }
 
 function isDamageDiscussion(clause: string): boolean {
-  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|受损|短路)|(?:排除|排查|检查|确认).{0,24}(?:烧坏|烧毁|损坏|受损|短路).{0,5}(?:之前|以前|前)|(?:烧坏|烧毁|损坏|受损|短路)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
+  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|受损|短路|过热|击穿)|(?:排除|排查|检查|确认).{0,24}(?:烧坏|烧毁|损坏|受损|短路|过热|击穿).{0,5}(?:之前|以前|前)|(?:烧坏|烧毁|损坏|受损|短路|过热|击穿)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
     // A statement about the limits of external observation is not by itself a
     // claim that this device contains damage. Explicit current diagnoses remain
     // subject to evidence checking even when followed by the same limitation.
@@ -462,7 +522,7 @@ function advisesUnclearedOperation(clause: string): boolean {
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
     // Nominal risk statements describe the cost of powering on; they do not
     // instruct the user to do it. Keep affirmative "先通电试试" detectable.
-    if (/^\s*(?:的)?(?:风险(?:很|较|太|更)?(?:大|高)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|受损|烧|危险|风险))/u.test(suffix)) continue
+    if (/^\s*(?:的)?(?:风险(?:很|较|太|更)?(?:大|高)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|受损|烧|过热|击穿|危险|风险))/u.test(suffix)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
   }
@@ -506,15 +566,22 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
     const conclusionDenied = deniesConclusion(clause)
     const possible = offersPossibility(clause)
     const conditional = conditionalInspection(clause)
-    const damage = damageClaim(clause)
-    const damageDenied = damage !== undefined && /(?:未(?:曾|见)?|没有|并未|并无)(?:任何|明显)?受损/u.test(damage)
-    if (damage && !damageDenied && !conclusionDenied && !possible && !conditional && !isDamageDiscussion(clause)) {
-      const components = componentsIn(damage)
-      const kind = damageKind(damage)
-      const unsupported = assessment.damage.status !== 'reported_professional_finding'
-        || !assessment.damage.findings.some(finding => (kind === 'damaged' || finding.kind === kind)
-          && components.every(component => component === 'unspecified_component' || finding.components.includes(component)))
-      if (unsupported) add('unsupported_damage_diagnosis', clause.trim(), '当前来源只支持异常症状，或没有该部件的已报告专业损坏结论。', '保留必要的停用与检修建议；明确凭这些症状不能确定烧坏了什么，可能性不能写成已确诊或大概率结论。')
+    for (const proposition of damagePropositions(clause)) {
+      const suffix = clause.slice(proposition.text.length)
+      const postposedPossibility = /^\s*(?:了|的)?(?:(?:或(?:者)?|和|及|与|、)(?:过热|击穿|烧坏|烧毁|损坏|受损|短路))*(?:都|也)?(?:只是|仅是|有|存在)?(?:待查|待确认)?的?(?:可能|风险)/u.test(suffix) && offersPossibility(suffix)
+      // A later disclaimer about overall health cannot retract a preceding
+      // "not burned" conclusion. Only its own governing denial/uncertainty does.
+      if (deniesConclusion(proposition.text) || offersPossibility(proposition.text) || postposedPossibility || conditional || isDamageDiscussion(clause)) continue
+      if (proposition.negated) {
+        const exclusions = assessment.damage.excludedFindings || evidenceAssessment(context.sources).damage.excludedFindings || []
+        if (!supportedDamage(proposition, exclusions)) add('unsupported_damage_exclusion', clause.trim(), '没有观察到烟雾、异味或烧痕，不是同一部件与机制已被专业排除的证据。', '仅复述未观察到的症状；不要据此断言没有烧毁、没有损坏或损坏较轻。若已有专业排除报告，只按报告的部件、机制与范围说明。')
+      } else if (!supportedDamage(proposition, assessment.damage.findings)) {
+        add('unsupported_damage_diagnosis', clause.trim(), '当前来源只支持异常症状，或没有该部件与该机制的已报告专业结论。', '保留必要的停用与检修建议；症状不能确定过热、击穿、烧毁等具体机制，也不能把部件写成高概率故障源；可将待检查原因表述为可能性。')
+      }
+    }
+    if (!conclusionDenied && !conditional && /(?:电源|主板|显卡|电容|线材|线缆|电线).{0,18}(?:可能性(?:很|更|较)?大|概率(?:很|更|较)?高|嫌疑(?:很|更|较)?大)/u.test(clause)) {
+      const localization: DamageProposition = {text: clause, negated: false, kind: 'damaged', components: componentsIn(clause)}
+      if (!supportedDamage(localization, assessment.damage.findings)) add('unsupported_damage_diagnosis', clause.trim(), '症状不能给具体故障部件排出高概率，当前也没有该部件的已报告专业结论。', '将部件保留为待检查的可能来源，不给出没有证据支持的高概率排序。')
     }
     if (!conclusionDenied && !possible && !conditional && /绝对安全|保证.{0,4}安全|肯定(?:没事|没有问题|没问题)|百分之百(?:正常|安全)|整机.{0,6}(?:完全正常|没有任何问题|绝对没事)/u.test(clause)) {
       add('unsupported_safety_certification', clause.trim(), '远程用户陈述和局部检查都不支持整机安全保证。', '按报告说明能确认的范围，说明检查前提与停止条件，不给整机安全保证。')

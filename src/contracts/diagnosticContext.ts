@@ -1,7 +1,7 @@
 export type DiagnosticIncidentStatus = 'asserted' | 'denied' | 'figurative' | 'unknown'
 export type DiagnosticSignal = 'burning_odor' | 'smoke' | 'fire' | 'electrical_fault'
 export type DiagnosticDamageComponent = 'power_supply' | 'mainboard' | 'graphics_card' | 'cable' | 'capacitor' | 'unspecified_component'
-export type DiagnosticDamageKind = 'damaged' | 'burned' | 'short_circuit'
+export type DiagnosticDamageKind = 'damaged' | 'burned' | 'short_circuit' | 'overheated' | 'electrical_breakdown'
 export type DiagnosticTemperaturePrerequisite = 'component_model' | 'measurement_point' | 'workload'
 
 /** Evidence supports observations or reported findings, never a remote safety certificate. */
@@ -10,6 +10,8 @@ export interface DiagnosticEvidenceAssessment {
     status: 'unconfirmed' | 'reported_professional_finding'
     components: DiagnosticDamageComponent[]
     findings: {components: DiagnosticDamageComponent[]; kind: DiagnosticDamageKind}[]
+    /** Explicit same-device professional exclusions; absent symptoms are not exclusions. */
+    excludedFindings?: {components: DiagnosticDamageComponent[]; kind: DiagnosticDamageKind; scope?: 'whole_device'}[]
   }
   temperature?: {
     readings: string[]
@@ -21,7 +23,7 @@ export interface DiagnosticEvidenceAssessment {
 }
 
 export interface DiagnosticReplyViolation {
-  code: 'unsupported_damage_diagnosis' | 'unsupported_temperature_assurance' | 'unsupported_safety_certification' | 'unmet_operational_prerequisite' | 'contradicted_professional_clearance'
+  code: 'unsupported_damage_diagnosis' | 'unsupported_damage_exclusion' | 'unsupported_temperature_assurance' | 'unsupported_safety_certification' | 'unmet_operational_prerequisite' | 'contradicted_professional_clearance'
   claim: string
   reason: string
   correctionInstruction: string
