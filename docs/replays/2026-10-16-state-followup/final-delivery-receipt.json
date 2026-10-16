@@ -1,0 +1,74 @@
+{
+  "at": "2026-10-16T16:07:39.259537+00:00",
+  "workspaceCommit": "6b45791071fac56593146ff6e8033e1a8ddfe2f0",
+  "liveCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+  "replayCommit": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+  "auditExitCode": 0,
+  "auditCommand": "node /tmp/bl-fact-state-20261016/final-audit-831ad38/deployment-audit.mjs /tmp/bl-fact-state-20261016/final-audit-831ad38/expected /tmp/bl-fact-state-20261016/candidate-4f7f8f7-runtime /tmp/bl-fact-state-20261016/final-audit-831ad38/config-hashes.json /tmp/bl-fact-state-20261016/final-audit-831ad38/replay-additions.json",
+  "expectedSource": "Independent locally verified .release/831ad3831470176e678c00b966a78d589c34ae4c; expected manifests not copied from live",
+  "expectedManifestSha256": "8f6a9c7e67f8c8329fb93e819758aa7ea10444f6ab825a61018e8c33cefe6058",
+  "expectedBackendManifestSha256": "59b912f555bbd3e6e0f7f6b6dc093d2f5b8735f26c87312ed5bd775c139121ad",
+  "logs": {
+    "final-831ad38-full-gate.log.gz": {
+      "rawSha256": "4703ad1e4bd94000d88cabb65d1b922d9d272df8fb08c0d1e4a4ff0e31780ea1",
+      "gzipSha256": "c08f875837c1962130f5f39f3e3390acde00040367269ad8e385da479d5f66c6",
+      "rawBytes": 432131
+    },
+    "deployment-attempt2-cancelled.log.gz": {
+      "rawSha256": "ab38dfd8a522c1271be9a7baf7c01150e5586a3ec45cac2f6ac0db3807d18933",
+      "gzipSha256": "969846323218cc9999bedc88055fdb4a5e08414deb5c2e23f6709b37475b7bdb",
+      "rawBytes": 203
+    }
+  },
+  "gate": {
+    "command": "npm run verify:phase",
+    "execSession": 27649,
+    "exitCode": 0,
+    "backend": {
+      "total": 2542,
+      "passed": 2540,
+      "failed": 0,
+      "skipped": 2
+    },
+    "frontend": {
+      "passed": 60,
+      "failed": 0
+    },
+    "log": "final-831ad38-full-gate.log.gz"
+  },
+  "deploymentAttempt2": {
+    "execSession": 40634,
+    "exitCode": 143,
+    "cancelledBeforeServerInstallation": true,
+    "reason": "Another user session was publishing 831ad38 including the same chat fixes",
+    "sharedDeployTestsLogNotAttributed": true
+  },
+  "deploymentOutcome": "Existing live 831ad38 strictly verified to contain this task fixes; task did not reinstall c015e8b or 6b45791",
+  "replayIdentityPreserved": true,
+  "writeback": {
+    "audit": "final-writeback-audit.json",
+    "head": "831ad3831470176e678c00b966a78d589c34ae4c",
+    "indexSha256": "42ea9d07534a8e573527f6916e6bdb8271be476a206fda75e6d897f6a7f9081b",
+    "targets": 572,
+    "writes": 47,
+    "nonTargetFileCount": 1552,
+    "headUnchanged": true,
+    "indexUnchanged": true,
+    "nonTargetsUnchanged": true,
+    "remainingOriginalChanges": "Task reports/evidence writeback and subsequently modified groupAdminPage source/test from another session; preserved without overwrite.",
+    "finalScope": "Final evidence only after full-scope CAS rejected a concurrent group page source change; accepted file hashes and planning suffixes remain protected.",
+    "finalEvidenceAudit": "final-evidence-only-writeback-audit.json",
+    "preservedConcurrentPaths": [
+      "src/modules/groupAdmin/infrastructure/groupAdminPage.ts",
+      "tests/groupAdminPage.test.js"
+    ],
+    "finalProtectionBaseline": {
+      "audit": "final-evidence-baseline-refresh.json",
+      "head": "ad18bc969c89c90419ce1714ffa73036cf37603e",
+      "indexSha256": "391129a36338f56c737261173c62e50b7894653bfc18232c7bef2fcafa3e1209",
+      "previouslyAcceptedEvidenceAndPlanningSuffixesVerified": true,
+      "headAdvancedByAnotherSession": true
+    }
+  },
+  "archiveValidation": "final-archive-validation.json"
+}

@@ -1,0 +1,80 @@
+{
+  "at": "2026-10-16T16:07:39.137Z",
+  "deployedCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+  "expectedCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+  "managedFileCount": 1950,
+  "managedMismatches": [],
+  "expectedReleaseMismatches": [],
+  "backendJsCount": 479,
+  "sameBackendManifest": true,
+  "replayCommit": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+  "replayRuntimeMismatches": [],
+  "sameReplayBackendSources": false,
+  "sameReplayBackendFiles": false,
+  "replayBackendDifferences": {
+    "sources": {
+      "added": {
+        "src/modules/groupAdmin/infrastructure/groupAdminPage.ts": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603"
+      },
+      "removed": [],
+      "changed": []
+    },
+    "files": {
+      "added": {
+        "modules/groupAdmin/infrastructure/groupAdminPage.d.ts": "5a4b6d926e26369c2b94bc1f38bcd054016cd9e72f32ee7d05b46203256db1e4",
+        "modules/groupAdmin/infrastructure/groupAdminPage.js": "72af0559057dee7cf1cebaa1b4e2d9fc8f35a370f85e701843764a469bc16f30",
+        "modules/groupAdmin/infrastructure/groupAdminPage.js.map": "d437fb8a1a409ac6e13dd17646137b8a0c886b7b121b4b66d56c14a7d784daa1"
+      },
+      "removed": [],
+      "changed": []
+    }
+  },
+  "replayAdditions": {
+    "sourceBasisCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+    "snapshotHash": "2ad9aa2507dfe932039f0cd191d3ce7b51a5830e3e76be2bf0fcab6fae9a4122",
+    "expectedSources": {
+      "src/modules/groupAdmin/infrastructure/groupAdminPage.ts": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603"
+    },
+    "expectedFiles": {
+      "modules/groupAdmin/infrastructure/groupAdminPage.d.ts": "5a4b6d926e26369c2b94bc1f38bcd054016cd9e72f32ee7d05b46203256db1e4",
+      "modules/groupAdmin/infrastructure/groupAdminPage.js": "72af0559057dee7cf1cebaa1b4e2d9fc8f35a370f85e701843764a469bc16f30",
+      "modules/groupAdmin/infrastructure/groupAdminPage.js.map": "d437fb8a1a409ac6e13dd17646137b8a0c886b7b121b4b66d56c14a7d784daa1"
+    },
+    "matches": true
+  },
+  "replayScopeMatches": true,
+  "configHashes": {
+    "config/message.yaml": "90d3a064d7f8c9da31590f838b478c39ebd2bf8c14a50816e615243b5d07ad8a",
+    "config/persona-library.yaml": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+  },
+  "expectedConfigHashes": {
+    "config/message.yaml": "90d3a064d7f8c9da31590f838b478c39ebd2bf8c14a50816e615243b5d07ad8a",
+    "config/persona-library.yaml": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+  },
+  "configSnapshotHash": "103c5db15db349bb2e9bde75d37b08f1787f9f71cb39bbe1f94af9cb8428cf9d",
+  "reasoning": {
+    "global": "low",
+    "complex": "low",
+    "casual": "low",
+    "tools": "",
+    "useTools": true
+  },
+  "services": {
+    "trss-yunzai": {
+      "state": "active",
+      "restartCount": "0",
+      "activeSince": "Sat 2026-10-17 00:03:01 CST"
+    },
+    "bl-console": {
+      "state": "active",
+      "restartCount": "0",
+      "activeSince": "Sat 2026-10-17 00:03:01 CST"
+    }
+  },
+  "loadErrors": 0,
+  "pipelineStarted": 1,
+  "pages": {
+    "commands": "200",
+    "console": "200"
+  }
+}

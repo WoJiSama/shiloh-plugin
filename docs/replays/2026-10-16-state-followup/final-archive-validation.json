@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-16T16:10:14.785197+00:00",
+  "retainedInitialFailure": {
+    "check": "Handoff raw hash compared with archived exported candidate JSON",
+    "expectedFromHandoff": "0fd379951d7f3ec0695996f905bc45bf1df0f924f34f0a3cd17a3870fa6f4c69",
+    "observedArchivedFile": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+    "matched": false,
+    "outcome": "AssertionError before commit; no replay artifacts changed"
+  },
+  "resolution": "Compare archived exports byte-for-byte with the already committed frozen evidence; handoff raw hash is retained separately and is not relabelled as the exported file hash.",
+  "frozenEvidenceChecks": [
+    {
+      "file": "docs/replays/2026-10-16-state-followup/candidate-4f7f8f7.json",
+      "currentSha256": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+      "frozenCommit": "d8dec32896184f9fc2bbdd19d9f95bc2a0a578cb",
+      "frozenSha256": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+      "bytesUnchanged": true
+    },
+    {
+      "file": "docs/replays/2026-10-16-state-followup/candidate.json",
+      "currentSha256": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+      "frozenCommit": "d8dec32896184f9fc2bbdd19d9f95bc2a0a578cb",
+      "frozenSha256": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+      "bytesUnchanged": true
+    },
+    {
+      "file": "docs/replays/2026-10-16-state-followup/4f7f8f7-review/input-integrity.json",
+      "currentSha256": "69c08e9f68b6d75dec1f25d2810a4e7e162c26fb8a210538ac5368fd02e58b7a",
+      "frozenCommit": "d8dec32896184f9fc2bbdd19d9f95bc2a0a578cb",
+      "frozenSha256": "69c08e9f68b6d75dec1f25d2810a4e7e162c26fb8a210538ac5368fd02e58b7a",
+      "bytesUnchanged": true
+    }
+  ],
+  "allFrozenEvidenceBytesUnchanged": true,
+  "newAuditAndCompressedLogsVerified": true,
+  "businessChanges": 0,
+  "modelRequests": 0
+}

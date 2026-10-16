@@ -1,0 +1,708 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-16T16:06:30.375540+00:00",
+  "scope": "final live 831 release actual-byte integrity and unchanged 4f chat coverage; read only",
+  "referenceModelReplayCommit": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+  "liveReleaseCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+  "workspaceHeadAtReport": "6b45791071fac56593146ff6e8033e1a8ddfe2f0",
+  "referenceIntegrityReport": {
+    "path": "/tmp/bl-final-release-integrity-20261016.json",
+    "sha256": "57e8171fa4857e44f83d1f662fc0744be144bb5b82785680c95c5d1942feebb3"
+  },
+  "previous033PageReport": {
+    "path": "/tmp/bl-group-page-merge-applicability-20261016.json",
+    "sha256": "18f07594f7bf0479c4450a66ade1487a4585ca0adfaf84947ed2575e74d91fc5"
+  },
+  "observation": {
+    "checkedAt": "2026-10-16T16:05:40.056825+00:00",
+    "productionCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+    "backendManifestCommit": "831ad3831470176e678c00b966a78d589c34ae4c",
+    "referenceCommit": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+    "backendActualByteComparison": {
+      "sharedFilesCount": 1434,
+      "addedFiles": {
+        "modules/groupAdmin/infrastructure/groupAdminPage.d.ts": "5a4b6d926e26369c2b94bc1f38bcd054016cd9e72f32ee7d05b46203256db1e4",
+        "modules/groupAdmin/infrastructure/groupAdminPage.js": "72af0559057dee7cf1cebaa1b4e2d9fc8f35a370f85e701843764a469bc16f30",
+        "modules/groupAdmin/infrastructure/groupAdminPage.js.map": "d437fb8a1a409ac6e13dd17646137b8a0c886b7b121b4b66d56c14a7d784daa1"
+      },
+      "removedFiles": [],
+      "changedSharedFiles": [],
+      "allSharedActualByteHashesEqual": true,
+      "referenceActualFileCount": 1434,
+      "productionActualFileCount": 1437,
+      "referenceActualMatchesManifest": true,
+      "productionActualMatchesManifest": true,
+      "referenceSharedMapHash": "cb0aa5fc5aac16807ce9881d617ad8374f6606d885ab31931eca2cdf3bdcb282",
+      "productionSharedMapHash": "cb0aa5fc5aac16807ce9881d617ad8374f6606d885ab31931eca2cdf3bdcb282"
+    },
+    "sourceManifestComparison": {
+      "referenceCount": 483,
+      "productionCount": 484,
+      "addedSources": {
+        "src/modules/groupAdmin/infrastructure/groupAdminPage.ts": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603"
+      },
+      "removedSources": [],
+      "changedSharedSources": [],
+      "allSharedSourcesEqual": true
+    },
+    "backendManifestHashes": {
+      "reference": "35305a0100bf64775748bcbfddabf695ec12371960860446c389ad84386e298b",
+      "production": "59b912f555bbd3e6e0f7f6b6dc093d2f5b8735f26c87312ed5bd775c139121ad"
+    },
+    "wrapperHashes": {
+      "domains/group-admin/groupAdminPage.js": "f9ed471ea5b07db35a958857c226485d3bba185cdbe7c98751389975585d1eac",
+      "standalone/bl-group-admin-plugin/apps/GroupAdminPageMessage.js": "308a4a921265d5bd46512e1a492747e3309bc70bfd42c8d4557cfc77c8a0a11b"
+    },
+    "defaultConfigurationComparison": {
+      "path": "config_default/message.yaml",
+      "referenceHash": "b2409793e5a39deadcce7d181264a13ca11d57d625ea232f33703194f6d25d56",
+      "productionHash": "b2409793e5a39deadcce7d181264a13ca11d57d625ea232f33703194f6d25d56",
+      "equal": true
+    },
+    "productionConfigHashes": {
+      "config/message.yaml": "90d3a064d7f8c9da31590f838b478c39ebd2bf8c14a50816e615243b5d07ad8a",
+      "config/persona-library.yaml": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+    },
+    "stagingCandidates": [
+      {
+        "path": "/opt/trss-yunzai-backups/staged-831ad3831470176e678c00b966a78d589c34ae4c-20261017-000049",
+        "commit": "831ad3831470176e678c00b966a78d589c34ae4c",
+        "backendManifestHash": "59b912f555bbd3e6e0f7f6b6dc093d2f5b8735f26c87312ed5bd775c139121ad",
+        "backendFilesCount": 1437,
+        "backendActualHashesMatchProduction": true,
+        "releaseManifestHash": "8f6a9c7e67f8c8329fb93e819758aa7ea10444f6ab825a61018e8c33cefe6058",
+        "releaseManifestMatchesProduction": true,
+        "nodeModulesPresent": false
+      }
+    ],
+    "releaseManagedFilesCount": 1950,
+    "releaseActualByteMismatches": [],
+    "services": {
+      "trss-yunzai": "active",
+      "bl-console": "active"
+    },
+    "httpStatus": {
+      "commands": 200,
+      "console": 200
+    }
+  },
+  "actualReleaseStagingDirectory": "/opt/trss-yunzai-backups/staged-831ad3831470176e678c00b966a78d589c34ae4c-20261017-000049",
+  "runtimeSourceDelta4fTo831": [
+    "domains/group-admin/groupAdminPage.js",
+    "src/modules/groupAdmin/infrastructure/groupAdminPage.ts",
+    "standalone/bl-group-admin-plugin/apps/GroupAdminPageMessage.js"
+  ],
+  "chatClosure": {
+    "count": 67,
+    "allHashesEqual": true,
+    "sources": [
+      {
+        "path": "src/adapters/modelFetch.ts",
+        "referenceGitHash": "06b3464f064003057fd9b0c04b34b165aa8ce47a0a81e70fc4c7dbc4aea1ec9b",
+        "productionGitHash": "06b3464f064003057fd9b0c04b34b165aa8ce47a0a81e70fc4c7dbc4aea1ec9b",
+        "workspaceHash": "06b3464f064003057fd9b0c04b34b165aa8ce47a0a81e70fc4c7dbc4aea1ec9b",
+        "productionSourceManifestHash": "06b3464f064003057fd9b0c04b34b165aa8ce47a0a81e70fc4c7dbc4aea1ec9b",
+        "equal": true
+      },
+      {
+        "path": "src/contracts/chatEvent.ts",
+        "referenceGitHash": "d4e5ea1b1c8a57e2d645b81c9041ca9496ecca5271f5a1166601cd87bbddb205",
+        "productionGitHash": "d4e5ea1b1c8a57e2d645b81c9041ca9496ecca5271f5a1166601cd87bbddb205",
+        "workspaceHash": "d4e5ea1b1c8a57e2d645b81c9041ca9496ecca5271f5a1166601cd87bbddb205",
+        "productionSourceManifestHash": "d4e5ea1b1c8a57e2d645b81c9041ca9496ecca5271f5a1166601cd87bbddb205",
+        "equal": true
+      },
+      {
+        "path": "src/contracts/forwardContext.ts",
+        "referenceGitHash": "4c50546c2d91d31ba7720380a3ab0b85f9e8461e553c9de45c2670d2812c0926",
+        "productionGitHash": "4c50546c2d91d31ba7720380a3ab0b85f9e8461e553c9de45c2670d2812c0926",
+        "workspaceHash": "4c50546c2d91d31ba7720380a3ab0b85f9e8461e553c9de45c2670d2812c0926",
+        "productionSourceManifestHash": "4c50546c2d91d31ba7720380a3ab0b85f9e8461e553c9de45c2670d2812c0926",
+        "equal": true
+      },
+      {
+        "path": "src/contracts/recentMessages.ts",
+        "referenceGitHash": "00e0b7e29a55669370b3f7d2bac68107f1379b29df2cd4e250fa83b4ff76982e",
+        "productionGitHash": "00e0b7e29a55669370b3f7d2bac68107f1379b29df2cd4e250fa83b4ff76982e",
+        "workspaceHash": "00e0b7e29a55669370b3f7d2bac68107f1379b29df2cd4e250fa83b4ff76982e",
+        "productionSourceManifestHash": "00e0b7e29a55669370b3f7d2bac68107f1379b29df2cd4e250fa83b4ff76982e",
+        "equal": true
+      },
+      {
+        "path": "src/modules/config/infrastructure/configRepository.ts",
+        "referenceGitHash": "0898a5929a7301aa804b036d8266f1f4915be985e07f7cc6b63d7f5f4ae57f3a",
+        "productionGitHash": "0898a5929a7301aa804b036d8266f1f4915be985e07f7cc6b63d7f5f4ae57f3a",
+        "workspaceHash": "0898a5929a7301aa804b036d8266f1f4915be985e07f7cc6b63d7f5f4ae57f3a",
+        "productionSourceManifestHash": "0898a5929a7301aa804b036d8266f1f4915be985e07f7cc6b63d7f5f4ae57f3a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/config/infrastructure/configStore.ts",
+        "referenceGitHash": "87fadc694be0a57b99ae00edaf19b8260f126de34283608e91659d1bb3ddca5a",
+        "productionGitHash": "87fadc694be0a57b99ae00edaf19b8260f126de34283608e91659d1bb3ddca5a",
+        "workspaceHash": "87fadc694be0a57b99ae00edaf19b8260f126de34283608e91659d1bb3ddca5a",
+        "productionSourceManifestHash": "87fadc694be0a57b99ae00edaf19b8260f126de34283608e91659d1bb3ddca5a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/config/infrastructure/filePersistence.ts",
+        "referenceGitHash": "81ea6cc14606bce3dac28a8232bcc7072ab2cedd71cbde4a966a4f0e57e9cf9f",
+        "productionGitHash": "81ea6cc14606bce3dac28a8232bcc7072ab2cedd71cbde4a966a4f0e57e9cf9f",
+        "workspaceHash": "81ea6cc14606bce3dac28a8232bcc7072ab2cedd71cbde4a966a4f0e57e9cf9f",
+        "productionSourceManifestHash": "81ea6cc14606bce3dac28a8232bcc7072ab2cedd71cbde4a966a4f0e57e9cf9f",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/chatFailureReply.ts",
+        "referenceGitHash": "b0cbecd54e4e4fba79a27355fd41f06d3b330e5daeb4c09d2fef58c9b48ada6d",
+        "productionGitHash": "b0cbecd54e4e4fba79a27355fd41f06d3b330e5daeb4c09d2fef58c9b48ada6d",
+        "workspaceHash": "b0cbecd54e4e4fba79a27355fd41f06d3b330e5daeb4c09d2fef58c9b48ada6d",
+        "productionSourceManifestHash": "b0cbecd54e4e4fba79a27355fd41f06d3b330e5daeb4c09d2fef58c9b48ada6d",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/finalReply.ts",
+        "referenceGitHash": "dfa4307866fd2be44def82626d3773f13b46a9e7eae086a6aeba37ad2ed0b964",
+        "productionGitHash": "dfa4307866fd2be44def82626d3773f13b46a9e7eae086a6aeba37ad2ed0b964",
+        "workspaceHash": "dfa4307866fd2be44def82626d3773f13b46a9e7eae086a6aeba37ad2ed0b964",
+        "productionSourceManifestHash": "dfa4307866fd2be44def82626d3773f13b46a9e7eae086a6aeba37ad2ed0b964",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/groundedReply.ts",
+        "referenceGitHash": "46555d3b95f2a0146d36d9ca30bcd700da6aeb34c38fa30409798755a666635a",
+        "productionGitHash": "46555d3b95f2a0146d36d9ca30bcd700da6aeb34c38fa30409798755a666635a",
+        "workspaceHash": "46555d3b95f2a0146d36d9ca30bcd700da6aeb34c38fa30409798755a666635a",
+        "productionSourceManifestHash": "46555d3b95f2a0146d36d9ca30bcd700da6aeb34c38fa30409798755a666635a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/messageFormatting.ts",
+        "referenceGitHash": "5e1aac5f4369576228e62fcf688383326d089035126ef50a62942f5f0068b6a3",
+        "productionGitHash": "5e1aac5f4369576228e62fcf688383326d089035126ef50a62942f5f0068b6a3",
+        "workspaceHash": "5e1aac5f4369576228e62fcf688383326d089035126ef50a62942f5f0068b6a3",
+        "productionSourceManifestHash": "5e1aac5f4369576228e62fcf688383326d089035126ef50a62942f5f0068b6a3",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/outputGuardPipeline.ts",
+        "referenceGitHash": "55dc5cc164df8af2071c16c198d0f343970a33993c11f9cd8755fdea029d2899",
+        "productionGitHash": "55dc5cc164df8af2071c16c198d0f343970a33993c11f9cd8755fdea029d2899",
+        "workspaceHash": "55dc5cc164df8af2071c16c198d0f343970a33993c11f9cd8755fdea029d2899",
+        "productionSourceManifestHash": "55dc5cc164df8af2071c16c198d0f343970a33993c11f9cd8755fdea029d2899",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/promptLayerCache.ts",
+        "referenceGitHash": "335674f663b9cb72da399ef8aae70303710bd60bb2d3438cc369a9f5e7bd55d4",
+        "productionGitHash": "335674f663b9cb72da399ef8aae70303710bd60bb2d3438cc369a9f5e7bd55d4",
+        "workspaceHash": "335674f663b9cb72da399ef8aae70303710bd60bb2d3438cc369a9f5e7bd55d4",
+        "productionSourceManifestHash": "335674f663b9cb72da399ef8aae70303710bd60bb2d3438cc369a9f5e7bd55d4",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/application/turnContinuity.ts",
+        "referenceGitHash": "505901ac1855d27c913053ea7c067b9f2c5e533a66fcccad3bd47051a3e0dc21",
+        "productionGitHash": "505901ac1855d27c913053ea7c067b9f2c5e533a66fcccad3bd47051a3e0dc21",
+        "workspaceHash": "505901ac1855d27c913053ea7c067b9f2c5e533a66fcccad3bd47051a3e0dc21",
+        "productionSourceManifestHash": "505901ac1855d27c913053ea7c067b9f2c5e533a66fcccad3bd47051a3e0dc21",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/actionOutcomes.ts",
+        "referenceGitHash": "b5f930d15018506f9299664cf0066fa1c1253deec356e73cad4331f9d191a370",
+        "productionGitHash": "b5f930d15018506f9299664cf0066fa1c1253deec356e73cad4331f9d191a370",
+        "workspaceHash": "b5f930d15018506f9299664cf0066fa1c1253deec356e73cad4331f9d191a370",
+        "productionSourceManifestHash": "b5f930d15018506f9299664cf0066fa1c1253deec356e73cad4331f9d191a370",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/actionReplyGrounding.ts",
+        "referenceGitHash": "34906a185e2f0b448f8c08ae35e1d5f76823550cff74301d5bdac231b85c3a76",
+        "productionGitHash": "34906a185e2f0b448f8c08ae35e1d5f76823550cff74301d5bdac231b85c3a76",
+        "workspaceHash": "34906a185e2f0b448f8c08ae35e1d5f76823550cff74301d5bdac231b85c3a76",
+        "productionSourceManifestHash": "34906a185e2f0b448f8c08ae35e1d5f76823550cff74301d5bdac231b85c3a76",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/agentIntelligence.ts",
+        "referenceGitHash": "7b000a957b0f209d6ef89e27138a9439267f666c911b30c81cdd542bc283c3b9",
+        "productionGitHash": "7b000a957b0f209d6ef89e27138a9439267f666c911b30c81cdd542bc283c3b9",
+        "workspaceHash": "7b000a957b0f209d6ef89e27138a9439267f666c911b30c81cdd542bc283c3b9",
+        "productionSourceManifestHash": "7b000a957b0f209d6ef89e27138a9439267f666c911b30c81cdd542bc283c3b9",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/diagnosticContext.ts",
+        "referenceGitHash": "56a8cc1b6886911ed8dcafc3fb783c3d87a8bbcef0a92ed18ba707a2694058ff",
+        "productionGitHash": "56a8cc1b6886911ed8dcafc3fb783c3d87a8bbcef0a92ed18ba707a2694058ff",
+        "workspaceHash": "56a8cc1b6886911ed8dcafc3fb783c3d87a8bbcef0a92ed18ba707a2694058ff",
+        "productionSourceManifestHash": "56a8cc1b6886911ed8dcafc3fb783c3d87a8bbcef0a92ed18ba707a2694058ff",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/drawFailureNote.ts",
+        "referenceGitHash": "0117d8766e486de86b0fa2b9ce14a571c0ec721fbfb890a57c8da8246bd20515",
+        "productionGitHash": "0117d8766e486de86b0fa2b9ce14a571c0ec721fbfb890a57c8da8246bd20515",
+        "workspaceHash": "0117d8766e486de86b0fa2b9ce14a571c0ec721fbfb890a57c8da8246bd20515",
+        "productionSourceManifestHash": "0117d8766e486de86b0fa2b9ce14a571c0ec721fbfb890a57c8da8246bd20515",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/forwardCompleteness.ts",
+        "referenceGitHash": "ff51b253d683b4bd6e39e0afe440907cd6be870962825e8086f0bd642b4be9a1",
+        "productionGitHash": "ff51b253d683b4bd6e39e0afe440907cd6be870962825e8086f0bd642b4be9a1",
+        "workspaceHash": "ff51b253d683b4bd6e39e0afe440907cd6be870962825e8086f0bd642b4be9a1",
+        "productionSourceManifestHash": "ff51b253d683b4bd6e39e0afe440907cd6be870962825e8086f0bd642b4be9a1",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/internalStatusLeak.ts",
+        "referenceGitHash": "bce9c28bc1201827316c0b3bac07f34424505ea55f76ac770cd889f8d92a0b45",
+        "productionGitHash": "bce9c28bc1201827316c0b3bac07f34424505ea55f76ac770cd889f8d92a0b45",
+        "workspaceHash": "bce9c28bc1201827316c0b3bac07f34424505ea55f76ac770cd889f8d92a0b45",
+        "productionSourceManifestHash": "bce9c28bc1201827316c0b3bac07f34424505ea55f76ac770cd889f8d92a0b45",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/mentionFailureReply.ts",
+        "referenceGitHash": "aef4c98c886f6341a87209caa82d81bffabbe2cfbe14512d4e340de3e20b92d8",
+        "productionGitHash": "aef4c98c886f6341a87209caa82d81bffabbe2cfbe14512d4e340de3e20b92d8",
+        "workspaceHash": "aef4c98c886f6341a87209caa82d81bffabbe2cfbe14512d4e340de3e20b92d8",
+        "productionSourceManifestHash": "aef4c98c886f6341a87209caa82d81bffabbe2cfbe14512d4e340de3e20b92d8",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/mentionTargets.ts",
+        "referenceGitHash": "2afd7978c7275a60de7546768c2b563bd2ae1f66e4abb4a941c296bff3cd32bf",
+        "productionGitHash": "2afd7978c7275a60de7546768c2b563bd2ae1f66e4abb4a941c296bff3cd32bf",
+        "workspaceHash": "2afd7978c7275a60de7546768c2b563bd2ae1f66e4abb4a941c296bff3cd32bf",
+        "productionSourceManifestHash": "2afd7978c7275a60de7546768c2b563bd2ae1f66e4abb4a941c296bff3cd32bf",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/messageContext.ts",
+        "referenceGitHash": "c6cc53f670af0e1cc70af96fc9cd1bb61095204f87b3d625ee28fcc325701982",
+        "productionGitHash": "c6cc53f670af0e1cc70af96fc9cd1bb61095204f87b3d625ee28fcc325701982",
+        "workspaceHash": "c6cc53f670af0e1cc70af96fc9cd1bb61095204f87b3d625ee28fcc325701982",
+        "productionSourceManifestHash": "c6cc53f670af0e1cc70af96fc9cd1bb61095204f87b3d625ee28fcc325701982",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/messageIntent.ts",
+        "referenceGitHash": "ed9f963c09aa2a4acd61b5b883caa959b11ac58eb8fd66542947eabc72685c68",
+        "productionGitHash": "ed9f963c09aa2a4acd61b5b883caa959b11ac58eb8fd66542947eabc72685c68",
+        "workspaceHash": "ed9f963c09aa2a4acd61b5b883caa959b11ac58eb8fd66542947eabc72685c68",
+        "productionSourceManifestHash": "ed9f963c09aa2a4acd61b5b883caa959b11ac58eb8fd66542947eabc72685c68",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/messageSegments.ts",
+        "referenceGitHash": "547f805a1a53e3c14111f9585c829dcef4ada8bc5dd11075c11f76d313e9e3e3",
+        "productionGitHash": "547f805a1a53e3c14111f9585c829dcef4ada8bc5dd11075c11f76d313e9e3e3",
+        "workspaceHash": "547f805a1a53e3c14111f9585c829dcef4ada8bc5dd11075c11f76d313e9e3e3",
+        "productionSourceManifestHash": "547f805a1a53e3c14111f9585c829dcef4ada8bc5dd11075c11f76d313e9e3e3",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/narrativeReply.ts",
+        "referenceGitHash": "a4e8b71d13c3c5cd3dab85488ab6ba5e843f18730b9fe79c8984c908d5c5277a",
+        "productionGitHash": "a4e8b71d13c3c5cd3dab85488ab6ba5e843f18730b9fe79c8984c908d5c5277a",
+        "workspaceHash": "a4e8b71d13c3c5cd3dab85488ab6ba5e843f18730b9fe79c8984c908d5c5277a",
+        "productionSourceManifestHash": "a4e8b71d13c3c5cd3dab85488ab6ba5e843f18730b9fe79c8984c908d5c5277a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/personaMoods.ts",
+        "referenceGitHash": "6b1aaad5b590fb9d749fd84b92100c2cfedb29d285b06eb28a44f74add96b577",
+        "productionGitHash": "6b1aaad5b590fb9d749fd84b92100c2cfedb29d285b06eb28a44f74add96b577",
+        "workspaceHash": "6b1aaad5b590fb9d749fd84b92100c2cfedb29d285b06eb28a44f74add96b577",
+        "productionSourceManifestHash": "6b1aaad5b590fb9d749fd84b92100c2cfedb29d285b06eb28a44f74add96b577",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/personaSource.ts",
+        "referenceGitHash": "0f90db7a5ba225df84284865f2b6bbd5ab82331384bf8b7703f8cf60647bb776",
+        "productionGitHash": "0f90db7a5ba225df84284865f2b6bbd5ab82331384bf8b7703f8cf60647bb776",
+        "workspaceHash": "0f90db7a5ba225df84284865f2b6bbd5ab82331384bf8b7703f8cf60647bb776",
+        "productionSourceManifestHash": "0f90db7a5ba225df84284865f2b6bbd5ab82331384bf8b7703f8cf60647bb776",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/personaTonePolicy.ts",
+        "referenceGitHash": "5305d2ebcba0ee356ba77dd2d01a760abd7f2ef912cd0f6265f0399e3b95fba5",
+        "productionGitHash": "5305d2ebcba0ee356ba77dd2d01a760abd7f2ef912cd0f6265f0399e3b95fba5",
+        "workspaceHash": "5305d2ebcba0ee356ba77dd2d01a760abd7f2ef912cd0f6265f0399e3b95fba5",
+        "productionSourceManifestHash": "5305d2ebcba0ee356ba77dd2d01a760abd7f2ef912cd0f6265f0399e3b95fba5",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/promptCompiler.ts",
+        "referenceGitHash": "17d0849ed994018a34489d16f5f745f82dd08e89db9190949cc59f281c007ff7",
+        "productionGitHash": "17d0849ed994018a34489d16f5f745f82dd08e89db9190949cc59f281c007ff7",
+        "workspaceHash": "17d0849ed994018a34489d16f5f745f82dd08e89db9190949cc59f281c007ff7",
+        "productionSourceManifestHash": "17d0849ed994018a34489d16f5f745f82dd08e89db9190949cc59f281c007ff7",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/promptLayers.ts",
+        "referenceGitHash": "a6b499e4f56e080e484e1fdae1397738c8586ab8c5ac03cbf0f40e3d062a66dc",
+        "productionGitHash": "a6b499e4f56e080e484e1fdae1397738c8586ab8c5ac03cbf0f40e3d062a66dc",
+        "workspaceHash": "a6b499e4f56e080e484e1fdae1397738c8586ab8c5ac03cbf0f40e3d062a66dc",
+        "productionSourceManifestHash": "a6b499e4f56e080e484e1fdae1397738c8586ab8c5ac03cbf0f40e3d062a66dc",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/replyRhythm.ts",
+        "referenceGitHash": "49874f840634ec26b84d9fdaef69e0be3b377598bb7cabe9f252c9eb98c46889",
+        "productionGitHash": "49874f840634ec26b84d9fdaef69e0be3b377598bb7cabe9f252c9eb98c46889",
+        "workspaceHash": "49874f840634ec26b84d9fdaef69e0be3b377598bb7cabe9f252c9eb98c46889",
+        "productionSourceManifestHash": "49874f840634ec26b84d9fdaef69e0be3b377598bb7cabe9f252c9eb98c46889",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/replySanitizer.ts",
+        "referenceGitHash": "9b2cd0e51cdb0806fc00b13caa834500c1f2ddab3a0c62c3e5ecfedb5d6ebb26",
+        "productionGitHash": "9b2cd0e51cdb0806fc00b13caa834500c1f2ddab3a0c62c3e5ecfedb5d6ebb26",
+        "workspaceHash": "9b2cd0e51cdb0806fc00b13caa834500c1f2ddab3a0c62c3e5ecfedb5d6ebb26",
+        "productionSourceManifestHash": "9b2cd0e51cdb0806fc00b13caa834500c1f2ddab3a0c62c3e5ecfedb5d6ebb26",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/solutionExplanationStyle.ts",
+        "referenceGitHash": "661621d577b2636575e30d86280cac3b1bea14b9d4765000fe9f403742ba54dd",
+        "productionGitHash": "661621d577b2636575e30d86280cac3b1bea14b9d4765000fe9f403742ba54dd",
+        "workspaceHash": "661621d577b2636575e30d86280cac3b1bea14b9d4765000fe9f403742ba54dd",
+        "productionSourceManifestHash": "661621d577b2636575e30d86280cac3b1bea14b9d4765000fe9f403742ba54dd",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/systemContentSource.ts",
+        "referenceGitHash": "5edf85c70052c85111750fea4859ec9e1d9f262b777eda4cce5faf97c1b0cfd6",
+        "productionGitHash": "5edf85c70052c85111750fea4859ec9e1d9f262b777eda4cce5faf97c1b0cfd6",
+        "workspaceHash": "5edf85c70052c85111750fea4859ec9e1d9f262b777eda4cce5faf97c1b0cfd6",
+        "productionSourceManifestHash": "5edf85c70052c85111750fea4859ec9e1d9f262b777eda4cce5faf97c1b0cfd6",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/systemPromptTemplate.ts",
+        "referenceGitHash": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107",
+        "productionGitHash": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107",
+        "workspaceHash": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107",
+        "productionSourceManifestHash": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/textPolicy.ts",
+        "referenceGitHash": "f4a809231202b9ad74b00ddb38f950e03eb82d6fefa4007d43d29345284db4a1",
+        "productionGitHash": "f4a809231202b9ad74b00ddb38f950e03eb82d6fefa4007d43d29345284db4a1",
+        "workspaceHash": "f4a809231202b9ad74b00ddb38f950e03eb82d6fefa4007d43d29345284db4a1",
+        "productionSourceManifestHash": "f4a809231202b9ad74b00ddb38f950e03eb82d6fefa4007d43d29345284db4a1",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/turnActionFacts.ts",
+        "referenceGitHash": "33c8fa73c02d5fcd46f4c2d0189c8fe3ab40fc98db7759804a7e076928b4242e",
+        "productionGitHash": "33c8fa73c02d5fcd46f4c2d0189c8fe3ab40fc98db7759804a7e076928b4242e",
+        "workspaceHash": "33c8fa73c02d5fcd46f4c2d0189c8fe3ab40fc98db7759804a7e076928b4242e",
+        "productionSourceManifestHash": "33c8fa73c02d5fcd46f4c2d0189c8fe3ab40fc98db7759804a7e076928b4242e",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/turnInteractionContext.ts",
+        "referenceGitHash": "fc6f82a9ed8663587ad59074b83643cc0069125f994bd5a0c23c955751b0b5b6",
+        "productionGitHash": "fc6f82a9ed8663587ad59074b83643cc0069125f994bd5a0c23c955751b0b5b6",
+        "workspaceHash": "fc6f82a9ed8663587ad59074b83643cc0069125f994bd5a0c23c955751b0b5b6",
+        "productionSourceManifestHash": "fc6f82a9ed8663587ad59074b83643cc0069125f994bd5a0c23c955751b0b5b6",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/turnPlanPolicy.ts",
+        "referenceGitHash": "b56557ecf45951b477f2ac7184058d1b67fdc3d9dc2854b9fdbf42c3064c3fde",
+        "productionGitHash": "b56557ecf45951b477f2ac7184058d1b67fdc3d9dc2854b9fdbf42c3064c3fde",
+        "workspaceHash": "b56557ecf45951b477f2ac7184058d1b67fdc3d9dc2854b9fdbf42c3064c3fde",
+        "productionSourceManifestHash": "b56557ecf45951b477f2ac7184058d1b67fdc3d9dc2854b9fdbf42c3064c3fde",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/domain/turnPresentation.ts",
+        "referenceGitHash": "b8b9abd76c607d9736da14535100157b99a79f89314da955f52ff9349d1973cc",
+        "productionGitHash": "b8b9abd76c607d9736da14535100157b99a79f89314da955f52ff9349d1973cc",
+        "workspaceHash": "b8b9abd76c607d9736da14535100157b99a79f89314da955f52ff9349d1973cc",
+        "productionSourceManifestHash": "b8b9abd76c607d9736da14535100157b99a79f89314da955f52ff9349d1973cc",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/groupContextResolver.ts",
+        "referenceGitHash": "7f3aaf1bb92b59f90c982e49f055bb8180f76701fbe0b6da46c37857e46b661d",
+        "productionGitHash": "7f3aaf1bb92b59f90c982e49f055bb8180f76701fbe0b6da46c37857e46b661d",
+        "workspaceHash": "7f3aaf1bb92b59f90c982e49f055bb8180f76701fbe0b6da46c37857e46b661d",
+        "productionSourceManifestHash": "7f3aaf1bb92b59f90c982e49f055bb8180f76701fbe0b6da46c37857e46b661d",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/personaLibrary.ts",
+        "referenceGitHash": "c15424959eb83b7c337949e87ca5895b6299ddbb6fa53edfcf0c846c2c22089d",
+        "productionGitHash": "c15424959eb83b7c337949e87ca5895b6299ddbb6fa53edfcf0c846c2c22089d",
+        "workspaceHash": "c15424959eb83b7c337949e87ca5895b6299ddbb6fa53edfcf0c846c2c22089d",
+        "productionSourceManifestHash": "c15424959eb83b7c337949e87ca5895b6299ddbb6fa53edfcf0c846c2c22089d",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/personaSnapshot.ts",
+        "referenceGitHash": "d688a6e02f9293953ba1d952b38f437880de8b6a822b631b6527a1a8611048fe",
+        "productionGitHash": "d688a6e02f9293953ba1d952b38f437880de8b6a822b631b6527a1a8611048fe",
+        "workspaceHash": "d688a6e02f9293953ba1d952b38f437880de8b6a822b631b6527a1a8611048fe",
+        "productionSourceManifestHash": "d688a6e02f9293953ba1d952b38f437880de8b6a822b631b6527a1a8611048fe",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/promptContext.ts",
+        "referenceGitHash": "06f22f268285ac0c038af8305d62d087a51c588fe7104ed4f513ea776f4d850a",
+        "productionGitHash": "06f22f268285ac0c038af8305d62d087a51c588fe7104ed4f513ea776f4d850a",
+        "workspaceHash": "06f22f268285ac0c038af8305d62d087a51c588fe7104ed4f513ea776f4d850a",
+        "productionSourceManifestHash": "06f22f268285ac0c038af8305d62d087a51c588fe7104ed4f513ea776f4d850a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/turnPlan.ts",
+        "referenceGitHash": "268da2d960389af118c64c07cc8fc7125dd2994de8b691c14e03d895fa9bf30f",
+        "productionGitHash": "268da2d960389af118c64c07cc8fc7125dd2994de8b691c14e03d895fa9bf30f",
+        "workspaceHash": "268da2d960389af118c64c07cc8fc7125dd2994de8b691c14e03d895fa9bf30f",
+        "productionSourceManifestHash": "268da2d960389af118c64c07cc8fc7125dd2994de8b691c14e03d895fa9bf30f",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/turnPromptComposer.ts",
+        "referenceGitHash": "77998cba207daad84373704e5f61d83044dc9d5f3842cba229db6852526cbf6c",
+        "productionGitHash": "77998cba207daad84373704e5f61d83044dc9d5f3842cba229db6852526cbf6c",
+        "workspaceHash": "77998cba207daad84373704e5f61d83044dc9d5f3842cba229db6852526cbf6c",
+        "productionSourceManifestHash": "77998cba207daad84373704e5f61d83044dc9d5f3842cba229db6852526cbf6c",
+        "equal": true
+      },
+      {
+        "path": "src/modules/conversation/infrastructure/understandingBrief.ts",
+        "referenceGitHash": "96d99478ee0a4a0b3189c6f80dd49d6bdc686bb6635de9753fec193499f87252",
+        "productionGitHash": "96d99478ee0a4a0b3189c6f80dd49d6bdc686bb6635de9753fec193499f87252",
+        "workspaceHash": "96d99478ee0a4a0b3189c6f80dd49d6bdc686bb6635de9753fec193499f87252",
+        "productionSourceManifestHash": "96d99478ee0a4a0b3189c6f80dd49d6bdc686bb6635de9753fec193499f87252",
+        "equal": true
+      },
+      {
+        "path": "src/modules/foundation/domain/textUtils.ts",
+        "referenceGitHash": "03efb432fb4109950e212e5a35eabb43687aa7325039debd5b0ba838034a92cd",
+        "productionGitHash": "03efb432fb4109950e212e5a35eabb43687aa7325039debd5b0ba838034a92cd",
+        "workspaceHash": "03efb432fb4109950e212e5a35eabb43687aa7325039debd5b0ba838034a92cd",
+        "productionSourceManifestHash": "03efb432fb4109950e212e5a35eabb43687aa7325039debd5b0ba838034a92cd",
+        "equal": true
+      },
+      {
+        "path": "src/modules/host/infrastructure/hostConfig.ts",
+        "referenceGitHash": "3f502f4c927c8a3328f59e0be4af08f4e4141e7f7ad6a3701c6fb4e5ffa5aa89",
+        "productionGitHash": "3f502f4c927c8a3328f59e0be4af08f4e4141e7f7ad6a3701c6fb4e5ffa5aa89",
+        "workspaceHash": "3f502f4c927c8a3328f59e0be4af08f4e4141e7f7ad6a3701c6fb4e5ffa5aa89",
+        "productionSourceManifestHash": "3f502f4c927c8a3328f59e0be4af08f4e4141e7f7ad6a3701c6fb4e5ffa5aa89",
+        "equal": true
+      },
+      {
+        "path": "src/modules/image/domain/imageFailurePolicy.ts",
+        "referenceGitHash": "49d2c1fca596459e5d440912688179fd655cfb8e64144b652eb74c9b0382843f",
+        "productionGitHash": "49d2c1fca596459e5d440912688179fd655cfb8e64144b652eb74c9b0382843f",
+        "workspaceHash": "49d2c1fca596459e5d440912688179fd655cfb8e64144b652eb74c9b0382843f",
+        "productionSourceManifestHash": "49d2c1fca596459e5d440912688179fd655cfb8e64144b652eb74c9b0382843f",
+        "equal": true
+      },
+      {
+        "path": "src/modules/image/domain/imageRequestGuard.ts",
+        "referenceGitHash": "b76186792400491f5824ead223009d9f0cba702e3b12248d8004a64fc07091ce",
+        "productionGitHash": "b76186792400491f5824ead223009d9f0cba702e3b12248d8004a64fc07091ce",
+        "workspaceHash": "b76186792400491f5824ead223009d9f0cba702e3b12248d8004a64fc07091ce",
+        "productionSourceManifestHash": "b76186792400491f5824ead223009d9f0cba702e3b12248d8004a64fc07091ce",
+        "equal": true
+      },
+      {
+        "path": "src/modules/image/domain/imageTaskPolicy.ts",
+        "referenceGitHash": "8a7d2f1b6c6d330d16b3ebdea95e7c2f8cce7a32ff386de059d2c6c06c2935a4",
+        "productionGitHash": "8a7d2f1b6c6d330d16b3ebdea95e7c2f8cce7a32ff386de059d2c6c06c2935a4",
+        "workspaceHash": "8a7d2f1b6c6d330d16b3ebdea95e7c2f8cce7a32ff386de059d2c6c06c2935a4",
+        "productionSourceManifestHash": "8a7d2f1b6c6d330d16b3ebdea95e7c2f8cce7a32ff386de059d2c6c06c2935a4",
+        "equal": true
+      },
+      {
+        "path": "src/modules/memory/infrastructure/episodicMemory.ts",
+        "referenceGitHash": "47c921b0179cf13e60043282d9006f20f8a8479c8b35bcd6abf50af95245e7a1",
+        "productionGitHash": "47c921b0179cf13e60043282d9006f20f8a8479c8b35bcd6abf50af95245e7a1",
+        "workspaceHash": "47c921b0179cf13e60043282d9006f20f8a8479c8b35bcd6abf50af95245e7a1",
+        "productionSourceManifestHash": "47c921b0179cf13e60043282d9006f20f8a8479c8b35bcd6abf50af95245e7a1",
+        "equal": true
+      },
+      {
+        "path": "src/modules/memory/infrastructure/personaFeedbackManager.ts",
+        "referenceGitHash": "43706e4041c049c2eaf7f93271b4736f067726e71ff90553a791e84a16b2bc7a",
+        "productionGitHash": "43706e4041c049c2eaf7f93271b4736f067726e71ff90553a791e84a16b2bc7a",
+        "workspaceHash": "43706e4041c049c2eaf7f93271b4736f067726e71ff90553a791e84a16b2bc7a",
+        "productionSourceManifestHash": "43706e4041c049c2eaf7f93271b4736f067726e71ff90553a791e84a16b2bc7a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/messaging/domain/deliveryObservability.ts",
+        "referenceGitHash": "699cedc22577efaf874301565b561a4b32523134c810da2f10902965c3e827f1",
+        "productionGitHash": "699cedc22577efaf874301565b561a4b32523134c810da2f10902965c3e827f1",
+        "workspaceHash": "699cedc22577efaf874301565b561a4b32523134c810da2f10902965c3e827f1",
+        "productionSourceManifestHash": "699cedc22577efaf874301565b561a4b32523134c810da2f10902965c3e827f1",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/application/chatRequestRecovery.ts",
+        "referenceGitHash": "c8c5f93c6cdda364ecac1573b56ada5187fb11137fbbf07a20f78322f7a30a4f",
+        "productionGitHash": "c8c5f93c6cdda364ecac1573b56ada5187fb11137fbbf07a20f78322f7a30a4f",
+        "workspaceHash": "c8c5f93c6cdda364ecac1573b56ada5187fb11137fbbf07a20f78322f7a30a4f",
+        "productionSourceManifestHash": "c8c5f93c6cdda364ecac1573b56ada5187fb11137fbbf07a20f78322f7a30a4f",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/application/modelExecution.ts",
+        "referenceGitHash": "e618a810a7de02a1e07b320ff13432cd93672cbc2f7ecbbc571ea09358dad2d1",
+        "productionGitHash": "e618a810a7de02a1e07b320ff13432cd93672cbc2f7ecbbc571ea09358dad2d1",
+        "workspaceHash": "e618a810a7de02a1e07b320ff13432cd93672cbc2f7ecbbc571ea09358dad2d1",
+        "productionSourceManifestHash": "e618a810a7de02a1e07b320ff13432cd93672cbc2f7ecbbc571ea09358dad2d1",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/domain/chatCompletionUrl.ts",
+        "referenceGitHash": "3bca60413803efb616f1ba0f6999665096270747f0e35e57cd3692147e2767c0",
+        "productionGitHash": "3bca60413803efb616f1ba0f6999665096270747f0e35e57cd3692147e2767c0",
+        "workspaceHash": "3bca60413803efb616f1ba0f6999665096270747f0e35e57cd3692147e2767c0",
+        "productionSourceManifestHash": "3bca60413803efb616f1ba0f6999665096270747f0e35e57cd3692147e2767c0",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/domain/chatResponse.ts",
+        "referenceGitHash": "16daaac8c1416f5a66dbfaea1753621ef02ba6fb8367a348d83a676eb9af99c8",
+        "productionGitHash": "16daaac8c1416f5a66dbfaea1753621ef02ba6fb8367a348d83a676eb9af99c8",
+        "workspaceHash": "16daaac8c1416f5a66dbfaea1753621ef02ba6fb8367a348d83a676eb9af99c8",
+        "productionSourceManifestHash": "16daaac8c1416f5a66dbfaea1753621ef02ba6fb8367a348d83a676eb9af99c8",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/domain/modelGateway.ts",
+        "referenceGitHash": "4f62dc3bafa938e30b0adb7d524be18c245f35417a28c63cb19b2ba1f52e2ab5",
+        "productionGitHash": "4f62dc3bafa938e30b0adb7d524be18c245f35417a28c63cb19b2ba1f52e2ab5",
+        "workspaceHash": "4f62dc3bafa938e30b0adb7d524be18c245f35417a28c63cb19b2ba1f52e2ab5",
+        "productionSourceManifestHash": "4f62dc3bafa938e30b0adb7d524be18c245f35417a28c63cb19b2ba1f52e2ab5",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/domain/thinkingProcessor.ts",
+        "referenceGitHash": "4125db858747b5400519e87a228d13bd8d03b8b0dea9c0c88300352ae5d8cace",
+        "productionGitHash": "4125db858747b5400519e87a228d13bd8d03b8b0dea9c0c88300352ae5d8cace",
+        "workspaceHash": "4125db858747b5400519e87a228d13bd8d03b8b0dea9c0c88300352ae5d8cace",
+        "productionSourceManifestHash": "4125db858747b5400519e87a228d13bd8d03b8b0dea9c0c88300352ae5d8cace",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/domain/unicodeText.ts",
+        "referenceGitHash": "0f8f5b63a4f0ab452e9b9a56dc71ce44de193db4059488573ce14fb6cb60e92a",
+        "productionGitHash": "0f8f5b63a4f0ab452e9b9a56dc71ce44de193db4059488573ce14fb6cb60e92a",
+        "workspaceHash": "0f8f5b63a4f0ab452e9b9a56dc71ce44de193db4059488573ce14fb6cb60e92a",
+        "productionSourceManifestHash": "0f8f5b63a4f0ab452e9b9a56dc71ce44de193db4059488573ce14fb6cb60e92a",
+        "equal": true
+      },
+      {
+        "path": "src/modules/models/domain/visibleFailure.ts",
+        "referenceGitHash": "51f5fdda20c2b75ec4c52bbf3dc5398cdde0cf4b0296d8e38dfd9378a9f14152",
+        "productionGitHash": "51f5fdda20c2b75ec4c52bbf3dc5398cdde0cf4b0296d8e38dfd9378a9f14152",
+        "workspaceHash": "51f5fdda20c2b75ec4c52bbf3dc5398cdde0cf4b0296d8e38dfd9378a9f14152",
+        "productionSourceManifestHash": "51f5fdda20c2b75ec4c52bbf3dc5398cdde0cf4b0296d8e38dfd9378a9f14152",
+        "equal": true
+      },
+      {
+        "path": "src/modules/tools/domain/toolManifestRegistry.ts",
+        "referenceGitHash": "ba3c6e873fd362fb628bf3d294f43cf9b5685fbdf70ebf672c511a2865744237",
+        "productionGitHash": "ba3c6e873fd362fb628bf3d294f43cf9b5685fbdf70ebf672c511a2865744237",
+        "workspaceHash": "ba3c6e873fd362fb628bf3d294f43cf9b5685fbdf70ebf672c511a2865744237",
+        "productionSourceManifestHash": "ba3c6e873fd362fb628bf3d294f43cf9b5685fbdf70ebf672c511a2865744237",
+        "equal": true
+      },
+      {
+        "path": "src/modules/tools/infrastructure/chatTurn.ts",
+        "referenceGitHash": "de18eb5bd4484a0fdecf95272c22b0b66c32f4bec7aa6219305bebb10baedafc",
+        "productionGitHash": "de18eb5bd4484a0fdecf95272c22b0b66c32f4bec7aa6219305bebb10baedafc",
+        "workspaceHash": "de18eb5bd4484a0fdecf95272c22b0b66c32f4bec7aa6219305bebb10baedafc",
+        "productionSourceManifestHash": "de18eb5bd4484a0fdecf95272c22b0b66c32f4bec7aa6219305bebb10baedafc",
+        "equal": true
+      }
+    ],
+    "compiledByteEvidence": "All 1434 original backend emitted files were independently read and SHA256-rehashed in both frozen4f and live831 trees, so every original 67-module chat-closure .js is included in this stronger whole-shared-tree check.",
+    "method": "Source Git objects at both commits, workspace bytes and live source-manifest hashes compared. No model requests or builds.",
+    "unchangedClosureDoesNotMeanUnchangedWholeRuntime": true
+  },
+  "addedPageSource": {
+    "path": "src/modules/groupAdmin/infrastructure/groupAdminPage.ts",
+    "productionGitHash": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603",
+    "workspaceHash": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603",
+    "productionSourceManifestHash": "5974344d28e8e73cede8078b425a6768688b703c333632ef2ef1fc5bc71f6603",
+    "equal": true
+  },
+  "defaultConfigurationSourceComparison": {
+    "path": "config_default/message.yaml",
+    "referenceGitHash": "b2409793e5a39deadcce7d181264a13ca11d57d625ea232f33703194f6d25d56",
+    "productionGitHash": "b2409793e5a39deadcce7d181264a13ca11d57d625ea232f33703194f6d25d56",
+    "workspaceHash": "b2409793e5a39deadcce7d181264a13ca11d57d625ea232f33703194f6d25d56",
+    "equal": true
+  },
+  "newPageArtifactComparisonWith033": {
+    "modules/groupAdmin/infrastructure/groupAdminPage.d.ts": {
+      "previous033Hash": "53de34411e7ee2b5b9e6fd2ebd11057578b815b54613027585a16f56f365d404",
+      "live831Hash": "5a4b6d926e26369c2b94bc1f38bcd054016cd9e72f32ee7d05b46203256db1e4",
+      "changedSince033": true
+    },
+    "modules/groupAdmin/infrastructure/groupAdminPage.js": {
+      "previous033Hash": "de6dad7c700ff8d83e2ba82ed4d2e66d7d3be57999392a3d41941bae442eec1d",
+      "live831Hash": "72af0559057dee7cf1cebaa1b4e2d9fc8f35a370f85e701843764a469bc16f30",
+      "changedSince033": true
+    },
+    "modules/groupAdmin/infrastructure/groupAdminPage.js.map": {
+      "previous033Hash": "37ae4a5f3685dcfbc4270800c35daf293fe48234605eeb148a11bbc587b5370b",
+      "live831Hash": "d437fb8a1a409ac6e13dd17646137b8a0c886b7b121b4b66d56c14a7d784daa1",
+      "changedSince033": true
+    }
+  },
+  "checks": {
+    "productionCommitCorrect": true,
+    "backendCommitCorrect": true,
+    "shared1434ActualBytesUnchanged": true,
+    "noBackendRemovals": true,
+    "exactThreeBackendAdditions": true,
+    "bothActualTreesMatchTheirManifests": true,
+    "onlyExpectedSourceAddition": true,
+    "source483SharedHashesUnchanged": true,
+    "all67ClosureSourceHashesEqual": true,
+    "newPageSourceHashesEqual": true,
+    "defaultConfigUnchanged": true,
+    "oneMatchingStagingDirectory": true,
+    "all1950ReleaseManagedByteHashesMatch": true,
+    "servicesActive": true,
+    "bothPages200": true
+  },
+  "passed": true,
+  "releaseCoverageStatement": {
+    "deployment": "831ad3831470176e678c00b966a78d589c34ae4c is live; all 1950 managed artifact bytes match its manifest and both services/pages are healthy at the observed time.",
+    "conversation": "831 contains the exact original 4f chat backend bytes and source manifest entries, plus the separately changed groupAdminPage artifacts.",
+    "modelReplayIdentity": "Complete 60-turn model replay and blind evaluation remain evidence for 4f7f8f70e0729c1790927f85a22c55d974eccfd5; no new 831 model replay was run or claimed.",
+    "wholeTree": "Live backend has 1437 emitted files versus 1434 in4f. New groupAdminPage files and backend manifest differ, so full backend tree hashes cannot be called identical.",
+    "limitations": "This read-only report proves release bytes, source applicability, staging identity and current health; it does not replace the parent final verify:phase log or exercise new group panel commands against production."
+  },
+  "mutations": {
+    "repository": 0,
+    "production": 0,
+    "models": 0,
+    "builds": 0,
+    "blindMappingReads": 0,
+    "writtenFiles": [
+      "/tmp/bl-final-live-831ad38-integrity-20261017.json"
+    ]
+  },
+  "complete": true,
+  "writesStoppedAfterReport": true
+}

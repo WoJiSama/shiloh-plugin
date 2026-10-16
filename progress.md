@@ -1786,3 +1786,14 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 完整deploy.sh首轮全门禁通过：后端2533通过/2跳过、前端60通过；发行包与暂存依赖成功。安装前保护发现线上已03395dc，退出1，未停服务或安装。8个文档历史副本冲突已备份并保持最新4f回放/评分与本轮suffix；新群管面板4文件与03395dc逐字一致，聊天源码和定向测试保持。继续独立闭包/完整产物差异审计后再执行全门禁，不跳过。
 
 - Independent group-page applicability passed: 67 chat modules/default config unchanged; exactly three backend additions identified. Updated deployment audit retains full differences; live read-only preflight rejects without evidence and accepts only exact source/artifact hashes. Original 4f replay identity and residual semantic findings are retained.
+
+- 第二次部署session40634在本地release:pack阶段取消，退出143，未安装；仅停止自己的进程，避免覆盖另一会话831发布。共用/tmp/deploy-tests.log不作本轮归因，原取消日志归档。合入831为6b45791后，独立verify:phase session27649退出0：后端2540通过/2跳过/0失败、前端60，日志单独封存。
+- 最终线上831严格审计退出0，独立本地发行包期望下1950受管文件均匹配；与4f原1434产物实际字节及483source项、67聊天模块相同，仅新增面板三产物。831新增hash另存，未沿用033旧值。双配置hash保持，global/complex/casual low，两服务active且NRestarts0，两页200、零加载错误、管线已启动；未执行QQ消息/真实工具或生产测试写入。原4f实模及自然度50:54、候选1硬错和正常表达误拒原样保留。继续最后CAS和提交推送。
+
+- 最后CAS首轮检查572目标、写入47份文档/证据，1552非目标及原目录831 HEAD/index保持。报告、全门禁、线上清单/精确新增hash、取消日志及写回审计已归档；业务源码此前已包含，未修改其他会话规划前缀。审计文件本身再做同保护证据同步，提交推送于隔离分支。
+
+- 最终归档检查曾将交接摘要raw哈希与本地导出JSON比较而断言失败；未提交或更改回放。已保留原期望与失败，按d8dec328冻结提交逐字核验candidate两份导出及输入完整性文件完全相同，新日志压缩前后哈希与线上审计均核验通过，见final-archive-validation.json。
+
+- 最后一轮全目标CAS因另一会话新改groupAdminPage.ts正确拒绝，未写入；只读进一步确认同模块test也在并发修改。原HEAD/index保持，最终同步范围收敛为本轮报告/证据，仍按已接受哈希及本轮规划后缀CAS，不覆盖新群管源码/测试或其他会话规划前缀。
+
+- 原目录另一会话提交ad18bc9并带入49份已接受交付记录，证据限定CAS因HEAD/index变化拒绝；初查只预期业务变化，也先拒绝。逐项确认所有已接受内容和本轮后缀保持，仅两份群管业务/测试变化后，保存新快照刷新保护基线，旧快照和失败均保留。本任务未修改原HEAD/index。后续一次Python stdin编码失败发生在执行前、无文件写入，改用apply_patch和ASCII脚本。
