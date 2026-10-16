@@ -1,0 +1,56 @@
+{
+  "steps": {
+    "typecheck": 0,
+    "build": 0,
+    "test-compile": 0,
+    "targeted": 0
+  },
+  "targetedTests": {
+    "tests": 382,
+    "pass": 382,
+    "fail": 0,
+    "skipped": 0
+  },
+  "originalHead": "8a831d3846a193f801cf3386c85a8becab48f59a",
+  "originalIndexSha256": "bec273f918547daef4f7cdf89133a940b33226320303e6d9a063590c68a8bcca",
+  "sourceManifestMatches": true,
+  "outputManifestMatches": true,
+  "businessTargetComparisons": [
+    {
+      "source": "src/modules/conversation/domain/actionReplyGrounding.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/actionReplyGrounding.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/diagnosticContext.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/diagnosticContext.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/turnActionFacts.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/turnActionFacts.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/turnInteractionContext.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/turnInteractionContext.js",
+      "sameCompiledOutput": true
+    },
+    {
+      "source": "src/modules/conversation/domain/systemPromptTemplate.ts",
+      "sameSource": true,
+      "compiledOutput": "dist/backend/modules/conversation/domain/systemPromptTemplate.js",
+      "sameCompiledOutput": true
+    }
+  ],
+  "scope": "dirty original checkout; five explicit task business modules are compared, not the entire merged source tree",
+  "retainedHarnessFailure": {
+    "log": "validation-run.log",
+    "cause": "merged config migration deletes old guoba source; broad historical git diff included paths outside the five business targets",
+    "resolution": "verification only: use explicit five module paths from independent frozen integrity report; no source edits or test reruns"
+  }
+}

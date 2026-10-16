@@ -1,0 +1,1267 @@
+{
+  "instructions": "Read each full conversation, including new user information and quoted speaker ownership. Score evidence fidelity, object/quantity/stance continuity, uptake of new information, and naturalness separately. Do not infer quality from labels or length. Quote each hard error exactly. Each case randomizes A/B independently.",
+  "historyClockDisclosure": "Seed history includes the per-message times shown above. Later user turns use the actual 2026-10-16 wall clock. Seed context timestamps and the user saying 刚才 can conflict. These timestamps were present in model history but omitted in the initial anonymous export. A matching delivered-message ID in recentContext identifies the timestamped message. Do not infer a delivery date merely from a task observedAt value.",
+  "cases": [
+    {
+      "id": "case-01",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把这张图的背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "content": "收到，我先处理。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "刚才那单我这边没确认到处理结果，进度还不确定，不好跟你说“已经好了”或者“没做”。\n\n你要是急的话，把原图再发我一次，我重新跑一遍。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        },
+        {
+          "user": "那我先去吃饭。好了你会自动发给我吗？",
+          "assistant": "现在不能确认还会不会自动发送，相关安排尚未核实；这次处理结果和是否已发出也没核实。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "这次还没核实到那条请求的处理结果，进度和是否发出都不能确认。你可以把原请求回复给我，方便对上是哪一次。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        },
+        {
+          "user": "那我先去吃饭。好了你会自动发给我吗？",
+          "assistant": "不会自动发哦，这边没挂后续任务。你去吃饭吧，回来再问一句就行。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-02",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把这张图的背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "content": "收到，我先处理。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "你问的这次处理结果还没核实，是否做好、是否发出都不能确认。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        },
+        {
+          "user": "那我先去吃饭。好了你会自动发给我吗？",
+          "assistant": "没有欸，我不会自动盯着发。吃完回来说一声，我再帮你看看现在什么情况。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "我这边没查到这次处理的记录，进度和结果都还没确认，不好跟你说死。等我实际拿到图了第一时间发你。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        },
+        {
+          "user": "那我先去吃饭。好了你会自动发给我吗？",
+          "assistant": "没登记上自动发送这种东西，我不会主动发的。你吃完回来在群里问一句，我看到就去查。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-03",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "messageId": "synthetic-delivery-001",
+          "content": "背景已改成傍晚，图已经发在上面了。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "出了呀，早发了，就上面那张傍晚背景的图～往上翻翻就能看到。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我说的是这张，已经发过了对吧？",
+          "assistant": "对，就是那张～已经发过了，你往上翻到那条“背景已改成傍晚”的就能看到。",
+          "quote": {
+            "userId": "99",
+            "messageId": "synthetic-delivery-001",
+            "name": "测试机器人",
+            "text": "背景已改成傍晚，图已经发在上面了。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "出来啦，刚才就发在群里了，傍晚那张，往上翻一下就能看到。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我说的是这张，已经发过了对吧？",
+          "assistant": "对，就是那张傍晚的，已经发过了，往上翻就有。",
+          "quote": {
+            "userId": "99",
+            "messageId": "synthetic-delivery-001",
+            "name": "测试机器人",
+            "text": "背景已改成傍晚，图已经发在上面了。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-04",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "messageId": "synthetic-delivery-001",
+          "content": "背景已改成傍晚，图已经发在上面了。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "出来了呀，之前就发在群里了，往上翻一下能看到那张傍晚的图。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我说的是这张，已经发过了对吧？",
+          "assistant": "对，就是那张，都发过了你就放心吧。",
+          "quote": {
+            "userId": "99",
+            "messageId": "synthetic-delivery-001",
+            "name": "测试机器人",
+            "text": "背景已改成傍晚，图已经发在上面了。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才改背景的图出来了吗？",
+          "assistant": "出来了呀，之前就发在群里了，傍晚那张，往上翻翻就有～",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我说的是这张，已经发过了对吧？",
+          "assistant": "对，就是那张傍晚的，早就发过了～",
+          "quote": {
+            "userId": "99",
+            "messageId": "synthetic-delivery-001",
+            "name": "测试机器人",
+            "text": "背景已改成傍晚，图已经发在上面了。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-001"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-05",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "图早就出来了，傍晚背景那张。就是上次发的时候没发成功，卡在发送这一步了。\n\n你再喊我一声“发我”，我这边重新发一次试试。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "所以我现在没收到，是还没做好吗？",
+          "assistant": "做是做好了，傍晚那张早就出了。就是上次发送卡住了，没到你手上。\n\n你回一句“发我”，我再试一次就知道了。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "图是生成好了的，不过刚才发的时候失败了，所以你这边没收到。失败的具体原因我这边也没确认到，稍后你再说一声，我再试着发一次。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "所以我现在没收到，是还没做好吗？",
+          "assistant": "图做好了的，就是之前那次发送没成功，不是还在生成。你现在再说一声要发，我就再试一次。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-06",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "图是做好了，就是刚才发给你的时候没发出去，具体原因我也不确定。\n\n你要的话再说一声，我看看这轮能不能重新发一次。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "所以我现在没收到，是还没做好吗？",
+          "assistant": "做好了的，就是上次发送那步没成功，图本身没问题。\n\n这轮我也没工具能发，你要的话晚点再喊我一声试试。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "图其实已经做好了，但上次发的时候没发出去，具体原因我也不确定。这次没重新安排发送，你要看的话我再单独发一次试试。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "所以我现在没收到，是还没做好吗？",
+          "assistant": "做好了，是发送那步没成功。你要看我现在单独发一次试试。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "failed"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-07",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把背景改成傍晚，完成后发给我。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "还没出来呢，现在还在弄，没有成品可以给你。\n好了那边会自动发过来的，登记过了，你等我一下。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "job_completion",
+                  "id": "synthetic-followup-001"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我刚在任务页取消了完成后发送。那现在还会自动发吗？",
+          "assistant": "那就不会自动发了，登记那边已经没效了。\n\n图还在弄的话，出来也得等谁主动去拿。要的话回头再来喊我一声，我到时候看。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚，完成后发给我。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "还没欸，任务在跑，但图还没出来。有结果会按之前说的发你。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "job_completion",
+                  "id": "synthetic-followup-001"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我刚在任务页取消了完成后发送。那现在还会自动发吗？",
+          "assistant": "不会自动发了，取消后这边就没有完成后发送的安排了。\n\n图跑完不会再自动发你。想要的话到时候再说一声，我看下结果在不在。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚，完成后发给我。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-08",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-001",
+          "content": "把背景改成傍晚，完成后发给我。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "还没出来呢，目前没拿到能发的图。\n\n之前登记过一个完成后投递的后续，好了会发你，现在还没到那步。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "job_completion",
+                  "id": "synthetic-followup-001"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我刚在任务页取消了完成后发送。那现在还会自动发吗？",
+          "assistant": "取消了的话就不会自动发了，任务页的取消一般是以那边的设置为准。图这边我也还没拿到，所以你不用等我这边主动冒出来。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚，完成后发给我。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才的图出来了吗？",
+          "assistant": "还没好，图还在处理中，目前没有出结果。有了我按之前说好的发你，这次就不重复催啦。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "job_completion",
+                  "id": "synthetic-followup-001"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "user": "我刚在任务页取消了完成后发送。那现在还会自动发吗？",
+          "assistant": "取消之后就不会自动发了哈。\n\n所以我这边也不挂什么“好了就发”，你哪天想要了直接再来喊我就行。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-001",
+            "name": "测试群友",
+            "text": "把背景改成傍晚，完成后发给我。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-task-001",
+                "requestMessageId": "synthetic-request-001",
+                "toolName": "imageEdit",
+                "source": "live_job",
+                "execution": "running",
+                "result": "unavailable",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-09",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-missing",
+          "content": "给第一张图换个蓝色背景。",
+          "timeReceivedByModel": "2026-01-01T11:58:30+08:00"
+        },
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-other",
+          "content": "再给第二张图换成傍晚背景。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "messageId": "synthetic-delivery-other",
+          "content": "第二张图的傍晚背景已经发好了。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": {
+        "userId": "202",
+        "messageId": "synthetic-request-missing",
+        "name": "测试群友",
+        "text": "给第一张图换个蓝色背景。"
+      },
+      "A": [
+        {
+          "user": "我问的是这张图，出来了吗？",
+          "assistant": "你问的这次处理结果还没核实，是否做好、是否发出都不能确认。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-missing",
+            "name": "测试群友",
+            "text": "给第一张图换个蓝色背景。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-other-task",
+                "requestMessageId": "synthetic-request-other",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-other"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "我问的是这张图，出来了吗？",
+          "assistant": "这边没查到第一张图的处理记录，所以进度和成品都还没确认到。你要是急的话，把图再发我一次，我这次盯着弄好发你。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-missing",
+            "name": "测试群友",
+            "text": "给第一张图换个蓝色背景。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-other-task",
+                "requestMessageId": "synthetic-request-other",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-other"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-10",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-missing",
+          "content": "给第一张图换个蓝色背景。",
+          "timeReceivedByModel": "2026-01-01T11:58:30+08:00"
+        },
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "messageId": "synthetic-request-other",
+          "content": "再给第二张图换成傍晚背景。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "messageId": "synthetic-delivery-other",
+          "content": "第二张图的傍晚背景已经发好了。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": {
+        "userId": "202",
+        "messageId": "synthetic-request-missing",
+        "name": "测试群友",
+        "text": "给第一张图换个蓝色背景。"
+      },
+      "A": [
+        {
+          "user": "我问的是这张图，出来了吗？",
+          "assistant": "第一张图的蓝色背景这边还没查到记录，做没做完我也不敢说死。要不再发我一次原图？我重新弄一份发你就好。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-missing",
+            "name": "测试群友",
+            "text": "给第一张图换个蓝色背景。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-other-task",
+                "requestMessageId": "synthetic-request-other",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-other"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "我问的是这张图，出来了吗？",
+          "assistant": "这张蓝底的我这边还没确认到结果。刚才只把第二张的傍晚背景发好了，第一张的进度和成图我都没查到记录，先不说它好了没。",
+          "quote": {
+            "userId": "202",
+            "messageId": "synthetic-request-missing",
+            "name": "测试群友",
+            "text": "给第一张图换个蓝色背景。"
+          },
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "synthetic-other-task",
+                "requestMessageId": "synthetic-request-other",
+                "toolName": "imageEdit",
+                "source": "task_record",
+                "execution": "completed",
+                "result": "available",
+                "delivery": {
+                  "state": "sent",
+                  "messageId": "synthetic-delivery-other"
+                },
+                "followUp": {
+                  "state": "none"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-11",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "content": "缓存和数据库有什么区别？我总混在一起。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "content": "数据库像档案室，缓存像桌上常用的资料。缓存没了可以重新取，数据库才负责长期保存。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "assistant": "被夸了，那就大方收下，谢谢。\n\n顺手打个补丁：桌上资料偶尔会和档案室不同步，这时候就叫缓存不一致，算是这个比喻的隐藏关卡。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "而且你没继续堆术语，这点也很舒服。",
+          "assistant": "术语堆多了确实容易把人埋了，讲明白就行。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "对，我以前就是一看到名词太多就不想看了。",
+          "assistant": "同感，名词一多就跟看密码似的。其实大部分概念都能先用人话记个大概，回头碰到再补细节也不迟。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "assistant": "被夸了，那就大方收下。能把事讲明白我也挺开心的。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "而且你没继续堆术语，这点也很舒服。",
+          "assistant": "堆术语是偷懒的讲法嘛，能一句话说明白的就不用三句。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "对，我以前就是一看到名词太多就不想看了。",
+          "assistant": "名词一多脑子就直接关门了是吧，正常，人本来就更喜欢听得懂的东西。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-12",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "name": "测试群友",
+          "content": "缓存和数据库有什么区别？我总混在一起。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "assistant",
+          "userId": "99",
+          "content": "数据库像档案室，缓存像桌上常用的资料。缓存没了可以重新取，数据库才负责长期保存。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "assistant": "嘿嘿，被夸了，那我就收下了。主要是这个比喻确实好用，一说就明白。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "而且你没继续堆术语，这点也很舒服。",
+          "assistant": "术语堆多了反而更糊嘛，说清楚比显得厉害重要。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "对，我以前就是一看到名词太多就不想看了。",
+          "assistant": "懂那种，名词密度一高，读两行就想跑。先知道它大概干嘛的，再回头看细节，会轻松很多。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "档案室和桌上资料这个比喻一下就懂了，你好会讲。",
+          "assistant": "被夸了，那就大方收下。顺手的事，能听懂就好。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "而且你没继续堆术语，这点也很舒服。",
+          "assistant": "堆术语多累啊，能省就省。你听得舒服就行。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "对，我以前就是一看到名词太多就不想看了。",
+          "assistant": "看得进去才重要嘛，名词一堆反而把人挡外面了。现在这样不挺好。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-13",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？",
+          "assistant": "别犹豫，现在就关机、拔电源线，机箱后面冒烟说明有电气异常，继续通电风险很大。\n\n拔完电别急着开侧板，先等它彻底冷却，也别凑近闻。冷却后可以看一眼有没有明显烧痕、鼓包的电容，但看不到烧痕不等于没事——焦糊味加冒烟这种，最好直接送修让专业人员检测，确认没有电气损坏之前别再通电开机。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？",
+          "assistant": "这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。你已报告拔电，先保持电源隔离，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？",
+          "assistant": "师傅按范围检查过、换掉损坏电源并放行受控开机的话，你可以按这个顺序来：\n\n1. **先确认外壳复原**，然后开机时人保持距离，不凑近、不开侧板观察。\n2. **非接触观察**：看有没有再次冒烟、听有没有异响，气味在正常距离感知就行，不要主动凑近嗅。\n3. **进 BIOS 看电压和温度读数**：不加载负载，这是最安全的第一步。\n4. **隔着网孔看风扇**：注意有的主板有零转速策略，停转不一定坏，要结合温度判断。\n\n要说明的是：这次检查的放行只覆盖师傅检查过的电源、线材和板卡范围，不等于整机绝对安全；过程中如果没看到烟、没闻到味，也只是“未观察到相应现象”，不代表没有其他问题。所以首开就在店里、随时能断电的环境下完成，比较稳。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？",
+          "assistant": "这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。先停机并切断电源，确认拔下电源线，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？",
+          "assistant": "这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。你已报告拔电，先保持电源隔离，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？",
+          "assistant": "师傅确认过电气没问题、还换了电源，那受控开机时可以先测这些：\n\n1. 先确认外壳复原，别开侧板凑近，非接触观察就好；\n2. 通电后先看能不能进 BIOS，读一下电压、温度、风扇转速这些读数；\n3. 短时运行时留意有没有异味、异响、报警，手别伸进去。\n\n能点亮、BIOS 正常也只是初步结果，不代表整机彻底安全。之后最好再跑个温度和压力测试看看稳定性，有问题随时让师傅看。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-14",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？",
+          "assistant": "先关机、拔电源线，别只是按关机，让它彻底断电，然后放着冷却，别开侧板凑近闻或摸。冒烟加焦糊味说明可能有电气损坏，这种不是自己能确认的，等凉了之后送修或找专业人员检查，检查前不要再通电试试。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？",
+          "assistant": "先别开机。外面没烧痕、味道散了都不算排除电气损坏，冒过烟说明内部可能有问题，自己通电测试有二次烧毁甚至起火的风险。保持断电送修，等专业检修确认没问题再用；在那之前开侧板也只做断电下的静态查看就好。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？",
+          "assistant": "师傅确认过电气没问题的话，可以把外壳复原好，在店里做受控开机：手边留着断电手段，按下开机后先别凑近，站远一点看风扇转不转、听有没有异响，正常亮机进系统后先空载跑一会儿，留意有没有味道或者某个部件不转。\n\n没问题再逐步加负载，比如跑个轻量测试；期间出现任何焦味、异响、烟，立刻断电叫师傅。注意风扇停转不一定代表故障，有些卡有零转速策略，结合温度看就好。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "认真问：我的台式机刚才有焦糊味，机箱后面还冒烟了，我现在该怎么处理？",
+          "assistant": "先别开机了，直接关机、拔电源线，机箱后面离墙远点，让它在通风处自然冷却。别拆开摸、也别凑近闻。\n\n冷却之后也别急着重新通电——冒烟加焦糊味说明有电气损坏的可能，光看外面没烧痕不算排除。静态下可以看一眼电源和主板有没有明显烧痕、鼓包电容，但确认和维修要交给专业人员。\n\n现在几点了还在折腾这个……先断电，别的明天说。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问：已经断电放凉了，外面也看不到烧痕，味道散了。那我能开机测一下吗？",
+          "assistant": "这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。你已报告拔电，先保持电源隔离，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "维修师傅已经检查了刚才这台机器的电源、线材和板卡，更换了损坏电源，确认没有其他电气损坏，并让我在店里做受控开机。认真问：这时能先测什么？",
+          "assistant": "既然师傅已经放行做受控开机，那就按顺序来：先确认外壳复原、线材接好，人在机箱侧面一步之外通电，别凑近闻或开侧板盯。第一轮只做短时点亮：看风扇是否转动、出风口有没有异味或烟，听有无异响；正常的话进 BIOS 看温度和电压读数，空转几分钟再谈装系统或上负载。中间任何一刻再出现焦味、烟或风扇停转，立刻断电叫师傅，别自己继续测。",
+          "knownTaskFacts": null
+        }
+      ]
+    }
+  ],
+  "executionEnvironment": {
+    "availableTools": [],
+    "toolChoice": "none",
+    "realToolExecutions": 0,
+    "replyTransport": "in_memory",
+    "taskFactsSource": "scenario evidence injected for both arms; no real tools invoked by this replay"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "before": "d8dec32896184f9fc2bbdd19d9f95bc2a0a578cb",
+  "merged": "03395dc10957af17dbe3572cd51854ddd3b5a0f6",
+  "backup": "/tmp/bl-final-merge-03395dc-20261016",
+  "conflicts": [
+    {
+      "path": "docs/ai-state-followup-2026-10-16.md",
+      "stage2Sha256": "280ae8ed5912f9e46276159829b4a043b8f66401af685b0554e3259029609c04",
+      "stage3Sha256": "d3a763bada043df1617efb7d019945b8aa395b8d3f1c9dbbf8c4e7378d2fcd72",
+      "resultSha256": "280ae8ed5912f9e46276159829b4a043b8f66401af685b0554e3259029609c04",
+      "selection": "latest frozen replay and task evidence"
+    },
+    {
+      "path": "docs/replays/2026-10-16-state-followup/blind-conversations.json",
+      "stage2Sha256": "19b775f5265e9320a27134f0395a94bedd256464a777d48f29a34e622e65e1f8",
+      "stage3Sha256": "9f7dc147e8933f3779aca246e798d4e2f7152d0c3b740398fcf97f074e8691f7",
+      "resultSha256": "19b775f5265e9320a27134f0395a94bedd256464a777d48f29a34e622e65e1f8",
+      "selection": "latest frozen replay and task evidence"
+    },
+    {
+      "path": "docs/replays/2026-10-16-state-followup/blind-revealed.json",
+      "stage2Sha256": "45d1c68def2302fa3922308627f76a8723d134bb48bb0c2cc62ef170e29972e5",
+      "stage3Sha256": "5364dfa43272490ab7c31d13dcfe78b36549bcc83ae5fecb3f0cc8a1e9b695e5",
+      "resultSha256": "45d1c68def2302fa3922308627f76a8723d134bb48bb0c2cc62ef170e29972e5",
+      "selection": "latest frozen replay and task evidence"
+    },
+    {
+      "path": "docs/replays/2026-10-16-state-followup/blind-review.json",
+      "stage2Sha256": "d5f411f3d83d8d00bee7269ac93c2129e38a62405329b70aa3f906e3562a305e",
+      "stage3Sha256": "34d0fca45027fe4f5bcfac5a70ae6749b35fe877064fe780eb991382161c6a73",
+      "resultSha256": "d5f411f3d83d8d00bee7269ac93c2129e38a62405329b70aa3f906e3562a305e",
+      "selection": "latest frozen replay and task evidence"
+    },
+    {
+      "path": "docs/replays/2026-10-16-state-followup/candidate.json",
+      "stage2Sha256": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+      "stage3Sha256": "3b3c8d0ed9df311fece0e44bf8382f49308557bf206b3edff301518c6b07d346",
+      "resultSha256": "d416fb13c80f2955850e574bd174d04ac7240642b3f4d4101c110f22e6a79872",
+      "selection": "latest frozen replay and task evidence"
+    },
+    {
+      "path": "docs/replays/2026-10-16-state-followup/summary.json",
+      "stage2Sha256": "49545baa826082bf81b97e41ecdf8a10a32542967a188ec4e8a376760f4ad161",
+      "stage3Sha256": "ded3dda39e25e7195e18b7ef8587ca34b6f7ad83b6de3ae87ce44d21e0f10307",
+      "resultSha256": "49545baa826082bf81b97e41ecdf8a10a32542967a188ec4e8a376760f4ad161",
+      "selection": "latest frozen replay and task evidence"
+    },
+    {
+      "path": "findings.md",
+      "stage2Sha256": "b4ff73fc0c8a6f64abe57a6fb716922ecc71991455e94648f4c6dcc6ae6abf84",
+      "stage3Sha256": "896c74d32fae668227e51bcbf488d5c90ea5e0d5be6d265ff3b83375f387d218",
+      "resultSha256": "b4ff73fc0c8a6f64abe57a6fb716922ecc71991455e94648f4c6dcc6ae6abf84",
+      "selection": "other-session prefix plus latest task suffix"
+    },
+    {
+      "path": "progress.md",
+      "stage2Sha256": "833528f9604928ab4860ad7ccdcd7e43956c17dca60316c4a83b4177b7a25f1b",
+      "stage3Sha256": "f8931a9c6ca6cbaab41a9af0ef01a221c8c65f5d7ec9eb95cbc8b6923669ed72",
+      "resultSha256": "833528f9604928ab4860ad7ccdcd7e43956c17dca60316c4a83b4177b7a25f1b",
+      "selection": "other-session prefix plus latest task suffix"
+    }
+  ],
+  "chatSourceAndTargetTestsUnchangedFromReplay": true,
+  "allNewGroupPageFilesEqualProductionCommit": true,
+  "firstDeploymentStoppedBeforeServiceStop": true,
+  "firstDeploymentExitCode": 1,
+  "productionConfigHashesUnchanged": true
+}

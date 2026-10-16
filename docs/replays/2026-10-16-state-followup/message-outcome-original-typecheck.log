@@ -1,0 +1,4 @@
+
+> shiloh-plugin@0.0.1 backend:typecheck
+> tsc -p tsconfig.backend.json --noEmit && tsc -p tsconfig.backend-tests.json --noEmit
+

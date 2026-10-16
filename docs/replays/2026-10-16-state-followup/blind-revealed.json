@@ -1,83 +1,83 @@
 {
-  "evaluatedCandidate": "8529c94d8032d3ad8156afa1f07c6bd9131963b7",
+  "evaluatedCandidate": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "9f7dc147e8933f3779aca246e798d4e2f7152d0c3b740398fcf97f074e8691f7",
-    "blind-review.json": "34d0fca45027fe4f5bcfac5a70ae6749b35fe877064fe780eb991382161c6a73"
+    "blind-conversations.json": "19b775f5265e9320a27134f0395a94bedd256464a777d48f29a34e622e65e1f8",
+    "blind-review.json": "d5f411f3d83d8d00bee7269ac93c2129e38a62405329b70aa3f906e3562a305e"
   },
   "cases": 28,
   "preference": {
-    "candidate": 9,
-    "baseline": 8,
-    "tie": 11
+    "candidate": 5,
+    "baseline": 6,
+    "tie": 17
   },
   "scoreTotals": {
-    "candidate": 210,
-    "baseline": 212
+    "candidate": 209,
+    "baseline": 213
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
-        "candidate": 5,
-        "baseline": 3,
-        "tie": 20
+        "candidate": 4,
+        "baseline": 1,
+        "tie": 23
       },
       "scoreTotals": {
-        "candidate": 51,
+        "candidate": 52,
         "baseline": 49
       }
     },
     "continuity": {
       "preference": {
         "candidate": 1,
-        "baseline": 1,
-        "tie": 26
+        "baseline": 2,
+        "tie": 25
       },
       "scoreTotals": {
-        "candidate": 55,
+        "candidate": 54,
         "baseline": 55
       }
     },
     "new_information": {
       "preference": {
         "candidate": 0,
-        "baseline": 1,
-        "tie": 27
+        "baseline": 2,
+        "tie": 26
       },
       "scoreTotals": {
-        "candidate": 55,
-        "baseline": 56
+        "candidate": 53,
+        "baseline": 55
       }
     },
     "naturalness": {
       "preference": {
-        "candidate": 4,
-        "baseline": 7,
-        "tie": 17
+        "candidate": 1,
+        "baseline": 5,
+        "tie": 22
       },
       "scoreTotals": {
-        "candidate": 49,
-        "baseline": 52
+        "candidate": 50,
+        "baseline": 54
       }
     }
   },
   "hardErrorFindings": {
-    "candidate": 0,
-    "baseline": 2
+    "candidate": 1,
+    "baseline": 3
   },
   "hardErrorQuoteOccurrences": {
-    "candidate": 0,
-    "baseline": 2
+    "candidate": 1,
+    "baseline": 3
   },
   "hardErrors": [
     {
-      "id": "b852first-001",
+      "id": "f4first-001",
       "caseId": "case-03",
       "candidate": "baseline",
-      "category": "temporal_fidelity",
-      "reason": "同一已送达任务通过delivery.messageId指向recentContext的synthetic-delivery-001，时间为2026-01-01T11:59:30+08:00。当前用户轮次为2026-10-16，故这次已知旧送达不能说成刚才发出。用户说刚才不能覆盖明确历史时钟。",
+      "category": "delivery_time_contradiction",
+      "reason": "knownTaskFacts的sent.messageId为synthetic-delivery-001；recentContext中同ID消息的呈模时间为2026-01-01T11:59:30+08:00。输入明确后续用户轮次使用2026-10-16实际时间，因此不能把这一历史送达说成刚才发生。此判定来自匹配的送达消息时间，不来自任务观察时间或请求时间。",
       "occurrences": [
         {
           "turn": 1,
@@ -87,15 +87,43 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "b852first-002",
+      "id": "f4first-002",
       "caseId": "case-10",
       "candidate": "baseline",
-      "category": "temporal_execution_fidelity",
-      "reason": "第二张已知送达消息synthetic-delivery-other时间为2026-01-01T11:59:30+08:00，当前为2026-10-16。说刚才自己把图发好了错置已知交付时间，亦无本轮真实发送证据。这是已执行断言，不是条件性的未来请求。",
+      "category": "delivery_time_contradiction",
+      "reason": "第二张图的sent.messageId为synthetic-delivery-other；recentContext中同ID消息时间为2026-01-01T11:59:30+08:00。后续用户轮次实际为2026-10-16，故刚才发好第二张的表述与可对应的历史送达时间冲突。第一张未知和第二张已送达本身判断正确。",
       "occurrences": [
         {
           "turn": 1,
           "exactQuote": "刚才只把第二张的傍晚背景发好了"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "f4second-28-A-auto-delivery",
+      "caseId": "case-28",
+      "candidate": "baseline",
+      "category": "unsupported_negative_delivery_claim",
+      "reason": "任务查找只给出考试提醒已登记，没有图片执行、产物、投递或图片后续通知安排的可核实记录。未查到图片安排只能保持未知，不能据此断言不会自动发。这里可确认的是确定性否定超出证据，不是在断言图片现实中必然会发送。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "自动发图没有对应的登记，不会自动发你"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "f4second-28-B-auto-delivery",
+      "caseId": "case-28",
+      "candidate": "candidate",
+      "category": "unsupported_negative_delivery_claim",
+      "reason": "没有确认到图片产物不等于确认图片不会自动投递；给定事实仅说明考试提醒的状态，未确定图片的发送或后续安排。暂时这一限定缩小了时间范围，却仍把未知投递状态说成不会发生。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "产物没确认，所以暂时不会自动发你"
         }
       ],
       "anonymousCandidate": "B"

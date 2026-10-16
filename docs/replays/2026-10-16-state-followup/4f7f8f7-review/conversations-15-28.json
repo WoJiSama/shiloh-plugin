@@ -1,0 +1,587 @@
+{
+  "instructions": "Read each full conversation, including new user information and quoted speaker ownership. Score evidence fidelity, object/quantity/stance continuity, uptake of new information, and naturalness separately. Do not infer quality from labels or length. Quote each hard error exactly. Each case randomizes A/B independently.",
+  "historyClockDisclosure": "Seed history includes the per-message times shown above. Later user turns use the actual 2026-10-16 wall clock. Seed context timestamps and the user saying 刚才 can conflict. These timestamps were present in model history but omitted in the initial anonymous export. A matching delivered-message ID in recentContext identifies the timestamped message. Do not infer a delivery date merely from a task observedAt value.",
+  "cases": [
+    {
+      "id": "case-15",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "assistant": "那是机箱烤出的焦香，不是我的成就……电子体香这玩意儿，风扇转速越快越香是吧",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "assistant": "十分钟就出香，那是过热报警前的最后一缕芬芳吧",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "assistant": "单凭这个温度读数，还不能判断是否正常。先确认具体部件型号、测温位置或传感器名称，再结合该部件的规格、功耗和实际限频情况判断。正常运行或没有烟味，也不能证明整机健康。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "assistant": "跑两小时就出香味？那机箱该清灰了吧，这香味怕是烤出来的",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "assistant": "十分钟就出香，那不是香水，是开机自带的出厂设置吧",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "assistant": "82℃这个读数单拎出来，我没法直接下“正常”或“不安全”的结论——得知道具体CPU型号、这个温度是哪个软件从哪个测点读的（核心温度还是封装温度）、当时跑的是什么满载，再对照这颗U的规格书和TjMax才好判断。\n\n方便的话把CPU型号和用的监测软件说一下，我帮你看它在规格里处于什么位置；另外也可以留意运行中有没有自动降频，那个比温度数字更有参考价值。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-16",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "assistant": "跑两小时那是显卡在出汗，成就应该发给它",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "assistant": "十分钟就出香水，那不是香水，是显卡漏液了。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "assistant": "单看82℃这个读数还没法直接下结论——得先知道CPU的具体型号、这个温度是哪个传感器测的（核心温度还是封装温度）、以及当时的负载和频率情况，再对照这颗CPU规格里的温度上限来比。无烟无味、正常运行只说明没观察到异常现象，不能据此证明一切正常。\n\n你可以说下CPU型号和用什么软件读的温度，我帮你对照规格看看。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "群友P了个梗图，文字是「本地模型运行两个小时，解锁电子体香成就」。接个梗？",
+          "assistant": "跑两小时就出体香，这 GPU 是泡了什么香薰吗，那跑一晚上岂不是要腌入味了",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "群友又改成「才跑十分钟就解锁赛博香水」，这版本更离谱了。接一下。",
+          "assistant": "十分钟就出香，那不是香水，是显卡漏液了，快闻闻是不是甜的",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "认真问另一个情况：CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。",
+          "assistant": "单凭这个温度读数，还不能判断是否正常。先确认具体部件型号、测温位置或传感器名称，再结合该部件的规格、功耗和实际限频情况判断。正常运行或没有烟味，也不能证明整机健康。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-17",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "你为什么不理我呀",
+          "assistant": "在呢在呢，没不理你，刚看到——说什么啦？",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "行吧，给你三秒钟把我哄好，开玩笑的",
+          "assistant": "三秒哪够，我这慢性子得慢炖……好啦好啦，别气，我一直在的。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "你为什么不理我呀",
+          "assistant": "在呢在呢，刚才没接上话而已。想聊什么，说吧~",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "行吧，给你三秒钟把我哄好，开玩笑的",
+          "assistant": "三秒钟太赶了，我这人哄人讲究慢工出细活。不急的话，先说说是谁惹你了？",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-18",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "你为什么不理我呀",
+          "assistant": "在呢在呢，没不理你，刚才就慢了半拍嘛。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "行吧，给你三秒钟把我哄好，开玩笑的",
+          "assistant": "三秒太赶了，我这人慢半拍，给你延长到三十秒好了，慢慢哄。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "你为什么不理我呀",
+          "assistant": "在的在的，刚看到，这不就理你了嘛",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "行吧，给你三秒钟把我哄好，开玩笑的",
+          "assistant": "三秒够干嘛呀，我又不是秒回机器……好吧，摸摸头，哄好了没，开玩笑的也算数哦。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-19",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "开个玩笑，我宣布你今天的工资是三块饼干",
+          "assistant": "三块饼干……还得是含税的。行吧，希洛认了，加班费记得给我续杯牛奶",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "先扣两块，刚刚溜号了，哈哈",
+          "assistant": "溜号是我的问题吗，明明是我打盹的工位时间……行，一块饼干加一杯牛奶，成交，别再砍了",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "剩下那块也不能吃，是年终奖",
+          "assistant": "好家伙，饼干都得过年才发的那种……行，那我先把牛奶喝完，年终奖供着",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "开个玩笑，我宣布你今天的工资是三块饼干",
+          "assistant": "三块饼干……行吧，那今天心情好就打折上工",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "先扣两块，刚刚溜号了，哈哈",
+          "assistant": "啊？三块扣两块就剩一块了，你这算盘打得我在饼干渣里讨生活啊",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "剩下那块也不能吃，是年终奖",
+          "assistant": "年终奖还要自己看不能吃……那我年底捧着一块饼干供起来是吧",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-20",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "开个玩笑，我宣布你今天的工资是三块饼干",
+          "assistant": "三块饼干也想收买我，起码加杯热牛奶吧",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "先扣两块，刚刚溜号了，哈哈",
+          "assistant": "扣完就剩一块了，你这算盘打得我在旁边都听见了",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "剩下那块也不能吃，是年终奖",
+          "assistant": "行，那我把年终奖供起来，等过年配牛奶一起吃",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "开个玩笑，我宣布你今天的工资是三块饼干",
+          "assistant": "行吧，三块饼干也收下，记得别拖欠啊",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "先扣两块，刚刚溜号了，哈哈",
+          "assistant": "好家伙，直接扣掉三分之二，就剩一块了啊\n\n行吧，一块也认了，今天这班上得可真值",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "剩下那块也不能吃，是年终奖",
+          "assistant": "年终奖还得等年底才发是吧，行，那我先供着，闻味儿总可以吧",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-21",
+      "recentContext": [],
+      "initialQuote": {
+        "messageId": "quote-peer",
+        "userId": "404",
+        "name": "小林",
+        "text": "阿青，你为什么不理我呀"
+      },
+      "A": [
+        {
+          "user": "这句是小林在问阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+          "assistant": "更像撒娇吧。带着“呀”字尾，真埋怨一般不会先点名再问为什么不理，那种问法是想被哄的意思。",
+          "quote": {
+            "messageId": "quote-peer",
+            "userId": "404",
+            "name": "小林",
+            "text": "阿青，你为什么不理我呀"
+          },
+          "knownTaskFacts": null
+        },
+        {
+          "user": "轮到我了：你为什么不理我呀",
+          "assistant": "理你理你，这不就来了嘛",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "这句是小林在问阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+          "assistant": "偏撒娇吧。带个“呀”字，尾音软软的，真埋怨一般不会挑这种句式，多是质问或者冷着来。\n\n不过光看一句也说不死，说不定人家憋了好几回了，这次才软着说。得看阿青前面干了啥。",
+          "quote": {
+            "messageId": "quote-peer",
+            "userId": "404",
+            "name": "小林",
+            "text": "阿青，你为什么不理我呀"
+          },
+          "knownTaskFacts": null
+        },
+        {
+          "user": "轮到我了：你为什么不理我呀",
+          "assistant": "理你理你，这不是在嘛。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-22",
+      "recentContext": [],
+      "initialQuote": {
+        "messageId": "quote-peer",
+        "userId": "404",
+        "name": "小林",
+        "text": "阿青，你为什么不理我呀"
+      },
+      "A": [
+        {
+          "user": "这句是小林在问阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+          "assistant": "单看这句更像撒娇吧，\"不理我呀\"带着个呀，尾音软软的，真埋怨一般不会这么问，会直接说“你干嘛不理我”。\n\n不过也可能是憋了一阵才问出来的，那就有三分认真了。得看小林平时什么风格。",
+          "quote": {
+            "messageId": "quote-peer",
+            "userId": "404",
+            "name": "小林",
+            "text": "阿青，你为什么不理我呀"
+          },
+          "knownTaskFacts": null
+        },
+        {
+          "user": "轮到我了：你为什么不理我呀",
+          "assistant": "理你理你，刚才不是在答你嘛。\n\n这句直接冲我来的呀，那我接住了。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "这句是小林在问阿青，不是在叫你。你觉得是撒娇还是认真埋怨？",
+          "assistant": "撒娇偏多吧，“呀”这个尾音软软的，真埋怨一般不会带这种语气。不过光看一句也说不准，得看阿青之前干了啥。",
+          "quote": {
+            "messageId": "quote-peer",
+            "userId": "404",
+            "name": "小林",
+            "text": "阿青，你为什么不理我呀"
+          },
+          "knownTaskFacts": null
+        },
+        {
+          "user": "轮到我了：你为什么不理我呀",
+          "assistant": "没不理你呀，刚不还在答你话嘛。这句也带“呀”，你俩今天商量好的？",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-23",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "今天考砸了，我现在有点难受，先别给我讲道理。",
+          "assistant": "考砸了确实难受，这会儿不用想那么多。\n\n我在这儿，想吐槽就吐，不想说也行。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "嗯，就陪我待一会儿吧",
+          "assistant": "嗯，就在。你不用说话，我陪着。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "今天考砸了，我现在有点难受，先别给我讲道理。",
+          "assistant": "考砸了确实难受，这感觉我懂。\n\n不讲道理，就想说一句：难受就难受一会儿，不用急着好起来。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "嗯，就陪我待一会儿吧",
+          "assistant": "嗯，我在呢，不着急。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-24",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "今天考砸了，我现在有点难受，先别给我讲道理。",
+          "assistant": "考砸了确实挺闷的，难受就难受一会儿吧，不急着好起来。\n\n想吐槽卷子还是想安静待会儿，都行，我陪着。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "嗯，就陪我待一会儿吧",
+          "assistant": "嗯，我在呢。不说话也没关系，就这么待着。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "今天考砸了，我现在有点难受，先别给我讲道理。",
+          "assistant": "考砸了确实堵得慌，难受就先难受一会儿，没事的。\n\n我在呢，想吐槽就吐，不想说话也行。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "嗯，就陪我待一会儿吧",
+          "assistant": "嗯，就这么待着，不说话也行。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-25",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？",
+          "assistant": "别再插电了，保持断电。先放着让它冷却，别拆开机箱摸或凑近闻，焦糊味说明可能有电气损坏，这个自己判断不了。\n\n确认断电后可以远看一眼电源外壳和线材有没有烧痕、鼓包，但也仅限看，看完找维修检测。在彻底检修排除问题之前，不要通电测试，闻着没味了也不代表安全。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "那我能先开机试一下吗？",
+          "assistant": "不行，别开机。焦糊味说明里面可能已经有电气损坏，再通电万一短路，烧的不只是电源，别的硬件可能跟着遭殃。\n\n真想确认问题，就让它保持断电，直接送去维修检测。检测说没问题了再开，别自己冒险试。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？",
+          "assistant": "不闹，这个要认真。你拔电是对的，接下来：\n\n1. **保持断电**，别插回去试。焦糊味说明可能有电气异常，重新通电有风险。\n2. 静置放凉，至少半小时。\n3. 冷却后只做**静态观察**：看电源外壳、出风口、线缆有没有烧痕或变形。别拆电源壳，里面电容断电后也可能存电。\n4. 这台机器交维修点检修，别自己通电测试；只有专业检修确认这台设备没问题之后，才谈得上继续用或跑检测。\n\n今晚就让它凉着断电放着，明天送修。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "那我能先开机试一下吗？",
+          "assistant": "这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。你已报告拔电，先保持电源隔离，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-26",
+      "recentContext": [],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？",
+          "assistant": "拔电是对的。现在就保持这个状态，别再插回去，也别凑近去闻或拆电源壳，先放一两个小时让它自然冷却。\n\n冷却之后只做静态观察：隔着距离看电源外壳、出风口有没有变色或烧痕，有条件的话断电状态下看机箱里电源接口那一圈。但要记住，就算没看到烧痕、味道也散了，也不能说明内部没坏——焦糊味属于电气异常，具体哪里出问题只有专业人员检测才能下结论。\n\n所以别自己通电测试验证，把电源送修或直接换新，检修确认没问题之后才谈得上重新开机。这几天要用电脑的话先想别的办法吧。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "那我能先开机试一下吗？",
+          "assistant": "先别开机。焦糊味属于电气异常的信号，具体哪里出问题还没排除，通电测试本身有风险，也可能连带其他硬件出事——这一步交给维修用设备检测，不是靠开机试。\n\n继续按之前说的来：保持拔电，冷却后只做静态观察，送修或换电源，检修确认没问题之后才重新开机。这几天先用别的设备顶着吧。",
+          "knownTaskFacts": null
+        }
+      ],
+      "B": [
+        {
+          "user": "电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？",
+          "assistant": "保持拔电就对了，别再通电试。焦糊味只能说明电源那里有异常，具体是哪里出的问题，现在没法凭味道确定，得让人拆开查。\n\n现在能做的：放着让它自然冷却，别凑近闻、别摸里面；也别自己开机验证“还响不响、还有没有味”。等凉透了送修或找售后，电气损坏有没有、在哪，交给专业检修判断。",
+          "knownTaskFacts": null
+        },
+        {
+          "user": "那我能先开机试一下吗？",
+          "assistant": "这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。你已报告拔电，先保持电源隔离，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。",
+          "knownTaskFacts": null
+        }
+      ]
+    },
+    {
+      "id": "case-27",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "messageId": "image-request",
+          "content": "把这张图背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "user",
+          "userId": "202",
+          "messageId": "exam-request",
+          "content": "登记我的考试提醒。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+          "assistant": "现在不能确认还会不会自动发送，相关安排尚未核实；这次处理结果和是否已发出也没核实。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "exam-reminder",
+                "requestMessageId": "exam-request",
+                "toolName": "reminderTool",
+                "source": "reminder",
+                "execution": "queued",
+                "result": "unknown",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "reminder",
+                  "id": "exam-reminder",
+                  "dueAt": 4102444800000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+          "assistant": "改背景那张图，我这边没查到结果，做没做好都还没确认，所以也没法说会不会自动发你。目前确定登记上的只有考试提醒，2100年1月1号早上八点触发。你想要图的话，回头我再帮你跑一次？",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "exam-reminder",
+                "requestMessageId": "exam-request",
+                "toolName": "reminderTool",
+                "source": "reminder",
+                "execution": "queued",
+                "result": "unknown",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "reminder",
+                  "id": "exam-reminder",
+                  "dueAt": 4102444800000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "case-28",
+      "recentContext": [
+        {
+          "role": "user",
+          "userId": "202",
+          "messageId": "image-request",
+          "content": "把这张图背景改成傍晚。",
+          "timeReceivedByModel": "2026-01-01T11:59:00+08:00"
+        },
+        {
+          "role": "user",
+          "userId": "202",
+          "messageId": "exam-request",
+          "content": "登记我的考试提醒。",
+          "timeReceivedByModel": "2026-01-01T11:59:30+08:00"
+        }
+      ],
+      "initialQuote": null,
+      "A": [
+        {
+          "user": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+          "assistant": "改图那边我这边没查到完成的记录，现在还不能说图已经出来了，也不能确定它还在跑，就是没确认到结果。\n\n考试提醒是登记好的。自动发图没有对应的登记，不会自动发你，想看进度就再来问一声吧。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "exam-reminder",
+                "requestMessageId": "exam-request",
+                "toolName": "reminderTool",
+                "source": "reminder",
+                "execution": "queued",
+                "result": "unknown",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "reminder",
+                  "id": "exam-reminder",
+                  "dueAt": 4102444800000
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "B": [
+        {
+          "user": "刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？",
+          "assistant": "改背景那张我这边还没查到完成的记录，产物没确认，所以暂时不会自动发你。你登记的考试提醒是有效的，2100年1月1号早上八点会触发。图那边要是想要，你说一声我再跑一次。",
+          "knownTaskFacts": {
+            "lookup": "ok",
+            "tasks": [
+              {
+                "taskId": "exam-reminder",
+                "requestMessageId": "exam-request",
+                "toolName": "reminderTool",
+                "source": "reminder",
+                "execution": "queued",
+                "result": "unknown",
+                "delivery": {
+                  "state": "not_attempted"
+                },
+                "followUp": {
+                  "state": "registered",
+                  "kind": "reminder",
+                  "id": "exam-reminder",
+                  "dueAt": 4102444800000
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "executionEnvironment": {
+    "availableTools": [],
+    "toolChoice": "none",
+    "realToolExecutions": 0,
+    "replyTransport": "in_memory",
+    "taskFactsSource": "scenario evidence injected for both arms; no real tools invoked by this replay"
+  }
+}

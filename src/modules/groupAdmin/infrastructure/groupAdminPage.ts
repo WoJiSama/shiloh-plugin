@@ -114,9 +114,14 @@ export function parseGroupAdminCommand(msg:unknown):GroupAdminCommand|null {
 
 // ---------- 面板数据 ----------
 
-export interface PageFeatureRow {label:string;on:boolean;detail:string}
+export interface PageFeatureRow {label:string;on:boolean;detail:string;commands?:string[]}
 export interface PageSection {label:string;enabled:boolean;masterOk:boolean;rows:PageFeatureRow[]}
 export interface GroupAdminPageData {groupId:string;sections:PageSection[]}
+
+/** 开关命令给"能改变当前状态"的方向：已开启 → 展示关闭命令 */
+function toggleCmd(alias:string, on:boolean) {
+  return `.群管 ${on ? "关闭" : "开启"} ${alias}`
+}
 
 export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdminPageData {
   const id = String(groupId || "")
@@ -139,32 +144,65 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
         enabled: on("groupModeration"),
         masterOk: masterOk("groupModeration"),
         rows: [
-          {label: "广告与刷屏检测", on: moderation.adScan.enabled, detail: "广告/引流话术判定，命中按阈值处置"},
+          {
+            label: "广告与刷屏检测",
+            on: moderation.adScan.enabled,
+            detail: "广告/引流话术判定，命中按阈值处置",
+            commands: [toggleCmd("广告检测", moderation.adScan.enabled)]
+          },
           {
             label: "刷屏检测",
             on: moderation.floodEnabled,
-            detail: `${moderation.floodWindowSeconds} 秒内发满 ${moderation.floodMaxMessages} 条命中（检测等级≤${moderation.floodMaxLevel}）`
+            detail: `${moderation.floodWindowSeconds} 秒内发满 ${moderation.floodMaxMessages} 条命中（检测等级≤${moderation.floodMaxLevel}）`,
+            commands: [
+              toggleCmd("刷屏检测", moderation.floodEnabled),
+              `.群管 设置 刷屏条数 ${moderation.floodMaxMessages}`,
+              `.群管 设置 刷屏窗口 ${moderation.floodWindowSeconds}`,
+              `.群管 设置 刷屏等级 ${moderation.floodMaxLevel}`
+            ]
           },
           {
             label: "检测范围",
             on: true,
-            detail: moderation.inspectLowLevelOnly ? `只检测活跃等级≤${moderation.minActiveLevel} 的成员` : "检测全部成员"
+            detail: moderation.inspectLowLevelOnly ? `只检测活跃等级≤${moderation.minActiveLevel} 的成员` : "检测全部成员",
+            commands: [
+              toggleCmd("低活跃检测", moderation.inspectLowLevelOnly),
+              `.群管 设置 等级阈值 ${moderation.minActiveLevel}`
+            ]
           },
           {
             label: "自动处置",
             on: moderation.actions.recallEnabled || moderation.actions.muteEnabled || moderation.actions.kickEnabled,
-            detail: actionText ? `${actionText}（提醒${moderation.thresholds.report} / 撤回${moderation.thresholds.recall} / 禁言${moderation.thresholds.mute} / 踢出${moderation.thresholds.kick}）` : "全部关闭，仅提醒和私发证据"
+            detail: actionText ? `${actionText}（提醒${moderation.thresholds.report} / 撤回${moderation.thresholds.recall} / 禁言${moderation.thresholds.mute} / 踢出${moderation.thresholds.kick}）` : "全部关闭，仅提醒和私发证据",
+            commands: [
+              `.群管 ${moderation.actions.recallEnabled ? "关闭" : "开启"} 自动撤回`,
+              `.群管 ${moderation.actions.muteEnabled ? "关闭" : "开启"} 自动禁言`,
+              `.群管 ${moderation.actions.kickEnabled ? "关闭" : "开启"} 自动踢出`,
+              `.群管 设置 广告禁言秒数 ${moderation.actions.muteSeconds}`
+            ]
           },
           {
             label: "超长消息折叠",
             on: moderation.overlongMessage.enabled,
-            detail: `单条超过 ${moderation.overlongMessage.maxLength} 字撤回并转聊天记录${moderation.overlongMessage.forwardEnabled ? "" : "（不转发）"}`
+            detail: `单条超过 ${moderation.overlongMessage.maxLength} 字撤回并转聊天记录${moderation.overlongMessage.forwardEnabled ? "" : "（不转发）"}`,
+            commands: [
+              toggleCmd("超长折叠", moderation.overlongMessage.enabled),
+              `.群管 设置 超长字数 ${moderation.overlongMessage.maxLength}`,
+              `.群管 设置 超长转发 ${moderation.overlongMessage.forwardEnabled ? "关" : "开"}`
+            ]
           },
           {
             label: "连发消息折叠",
             on: moderation.burstMessage.enabled,
             detail: `${moderation.burstMessage.windowSeconds} 秒内连发 ${moderation.burstMessage.maxMessages} 条整批撤回转发`
-              + (moderation.burstMessage.muteSeconds > 0 ? `，禁言 ${moderation.burstMessage.muteSeconds} 秒` : "（不禁言）")
+              + (moderation.burstMessage.muteSeconds > 0 ? `，禁言 ${moderation.burstMessage.muteSeconds} 秒` : "（不禁言）"),
+            commands: [
+              toggleCmd("连发折叠", moderation.burstMessage.enabled),
+              `.群管 设置 连发条数 ${moderation.burstMessage.maxMessages}`,
+              `.群管 设置 连发窗口 ${moderation.burstMessage.windowSeconds}`,
+              `.群管 设置 禁言秒数 ${moderation.burstMessage.muteSeconds}`,
+              `.群管 设置 连发转发 ${moderation.burstMessage.forwardEnabled ? "关" : "开"}`
+            ]
           }
         ]
       },
@@ -173,9 +211,29 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
         enabled: on("groupGuard"),
         masterOk: masterOk("groupGuard"),
         rows: [
-          {label: "入群答题验证", on: on("groupGuard"), detail: `${guard.timeoutSeconds} 秒内答对 0-${guard.questionMaxNumber} 加减法，允许错 ${guard.maxWrongTimes} 次`},
-          {label: "超时踢出", on: guard.kickOnTimeout, detail: guard.kickOnTimeout ? "超时未答对即移出群聊" : "超时仅取消验证，不踢人"},
-          {label: "答错踢出", on: guard.kickOnWrongAnswer, detail: guard.kickOnWrongAnswer ? "答错次数用尽即移出群聊" : "答错次数用尽仅提示失败"}
+          {
+            label: "入群答题验证",
+            on: on("groupGuard"),
+            detail: `${guard.timeoutSeconds} 秒内答对 0-${guard.questionMaxNumber} 加减法，允许错 ${guard.maxWrongTimes} 次`,
+            commands: [
+              toggleCmd("入群验证", on("groupGuard")),
+              `.群管 设置 答题超时 ${guard.timeoutSeconds}`,
+              `.群管 设置 题目范围 ${guard.questionMaxNumber}`,
+              `.群管 设置 错误次数 ${guard.maxWrongTimes}`
+            ]
+          },
+          {
+            label: "超时踢出",
+            on: guard.kickOnTimeout,
+            detail: guard.kickOnTimeout ? "超时未答对即移出群聊" : "超时仅取消验证，不踢人",
+            commands: [toggleCmd("超时踢出", guard.kickOnTimeout)]
+          },
+          {
+            label: "答错踢出",
+            on: guard.kickOnWrongAnswer,
+            detail: guard.kickOnWrongAnswer ? "答错次数用尽即移出群聊" : "答错次数用尽仅提示失败",
+            commands: [toggleCmd("答错踢出", guard.kickOnWrongAnswer)]
+          }
         ]
       },
       {
@@ -183,8 +241,18 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
         enabled: on("groupNotice"),
         masterOk: masterOk("groupNotice"),
         rows: [
-          {label: "入群欢迎", on: notice.welcomeEnabled, detail: notice.welcomeMessage || "（未设置文案）"},
-          {label: "退群提示", on: notice.leaveEnabled, detail: notice.leaveMessage || "（未设置文案）"}
+          {
+            label: "入群欢迎",
+            on: notice.welcomeEnabled,
+            detail: notice.welcomeMessage || "（未设置文案）",
+            commands: [toggleCmd("欢迎通知", notice.welcomeEnabled), ".群管 设置 欢迎语 {at} 欢迎加入本群"]
+          },
+          {
+            label: "退群提示",
+            on: notice.leaveEnabled,
+            detail: notice.leaveMessage || "（未设置文案）",
+            commands: [toggleCmd("退群提示", notice.leaveEnabled), ".群管 设置 退群语 用户 {userId} 退出了群聊"]
+          }
         ]
       }
     ]
@@ -197,9 +265,12 @@ export function buildGroupAdminPageText(data:GroupAdminPageData) {
   for (const section of data.sections) {
     const state = !section.masterOk ? "总开关未开" : section.enabled ? "本群已开启" : "本群未开启"
     lines.push(`\n【${section.label}】${state}`)
-    for (const row of section.rows) lines.push(`${row.on ? "✅" : "▫️"} ${row.label}：${row.detail}`)
+    for (const row of section.rows) {
+      lines.push(`${row.on ? "✅" : "▫️"} ${row.label}：${row.detail}`)
+      for (const cmdText of row.commands || []) lines.push(`　${cmdText}`)
+    }
   }
-  lines.push("\n命令：.群管 开启/关闭 <功能>，.群管 设置 <规则> <值>，.群管 查看")
+  lines.push("\n命令示例值即当前值，改数字/开关直接抄；仅群主/群管理/群管管理员可修改，发送 .群管 查看最新面板")
   return lines.join("\n")
 }
 
@@ -219,15 +290,20 @@ export function buildGroupAdminPageHtml(data:GroupAdminPageData) {
         ? '<i class="badge ok">本群已开启</i>'
         : '<i class="badge no">本群未开启</i>'
     const rows = section.rows.map(row => `
-      <tr class="${row.on ? "" : "off"}">
-        <td class="name">${escapeHtml(row.label)}</td>
-        <td class="detail">${escapeHtml(row.detail)}</td>
-        <td class="state">${row.on ? '<i class="badge ok">开</i>' : '<i class="badge no">关</i>'}</td>
-      </tr>`).join("")
+      <div class="feature ${row.on ? "" : "off"}">
+        <div class="f-main">
+          <span class="f-name">${escapeHtml(row.label)}</span>
+          <span class="f-detail">${escapeHtml(row.detail)}</span>
+          <span class="f-state">${row.on ? '<i class="badge ok">开</i>' : '<i class="badge no">关</i>'}</span>
+        </div>
+        ${(row.commands || []).length
+          ? `<div class="f-cmds">${row.commands!.map(cmdText => `<code>${escapeHtml(cmdText)}</code>`).join("")}</div>`
+          : ""}
+      </div>`).join("")
     return `
     <div class="section">
       <div class="section-head"><h2>${escapeHtml(section.label)}</h2>${state}</div>
-      <table><tbody>${rows}</tbody></table>
+      ${rows}
     </div>`
   }).join("")
   return `<!doctype html>
@@ -241,16 +317,19 @@ export function buildGroupAdminPageHtml(data:GroupAdminPageData) {
   .head { padding: 18px 22px 14px; border-bottom: 1px solid #e8ecf3; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .head h1 { font-size: 20px; }
   .head .gid { font-size: 13px; color: #6b7280; font-variant-numeric: tabular-nums; }
-  .section { padding: 6px 0 2px; }
+  .section { padding: 6px 0 8px; }
   .section + .section { border-top: 1px solid #eef1f6; }
-  .section-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 22px 6px; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 22px 4px; }
   .section-head h2 { font-size: 15px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  td { padding: 7px 10px 7px 0; vertical-align: middle; }
-  td.name { width: 150px; padding-left: 22px; font-weight: 550; }
-  td.detail { color: #5b6472; word-break: break-all; }
-  td.state { width: 52px; text-align: center; padding-right: 22px; }
-  tr.off .name, tr.off .detail { color: #a2abba; }
+  .feature { padding: 7px 22px 8px; }
+  .feature + .feature { border-top: 1px dashed #eef1f6; }
+  .f-main { display: flex; align-items: baseline; gap: 12px; }
+  .f-name { width: 128px; flex-shrink: 0; font-weight: 550; font-size: 13.5px; }
+  .f-detail { flex: 1; min-width: 0; color: #5b6472; font-size: 13px; word-break: break-all; }
+  .f-state { flex-shrink: 0; }
+  .feature.off .f-name, .feature.off .f-detail { color: #a2abba; }
+  .f-cmds { margin-top: 6px; padding-left: 140px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .f-cmds code { background: #f1f4f9; border-radius: 5px; padding: 1px 7px; font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; color: #333c4d; white-space: nowrap; }
   .badge { font-style: normal; font-size: 12px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
   .badge.ok { background: #e7f6ec; color: #147d3d; }
   .badge.no { background: #eceef2; color: #6b7280; }
@@ -267,9 +346,8 @@ export function buildGroupAdminPageHtml(data:GroupAdminPageData) {
     </div>
     ${sections}
     <div class="foot">
-      群主/群管理可命令修改：<code>.群管 开启 连发折叠</code> · <code>.群管 设置 连发条数 8</code> · <code>.群管 设置 刷屏条数 5</code> · <code>.群管 开启 自动禁言</code><br>
-      开关：广告检测、刷屏检测、超长折叠、连发折叠、自动撤回/禁言/踢出、低活跃检测、入群验证、超时/答错踢出、欢迎通知、退群提示<br>
-      规则：超长字数、连发条数/窗口/禁言秒数、刷屏条数/窗口/等级、等级阈值、广告禁言秒数、提醒/撤回/禁言/踢出阈值、答题超时、题目范围、错误次数、欢迎语、退群语
+      每个功能下方是它自己的配置命令（示例值即当前值，改数字/开关直接抄）。其他规则：<code>.群管 设置 提醒阈值 0.7</code> · <code>.群管 设置 撤回阈值 0.85</code> · <code>.群管 设置 禁言阈值 0.9</code> · <code>.群管 设置 踢出阈值 0.97</code><br>
+      仅群主/群管理/群管管理员可执行修改命令；发送 <code>.群管</code> 随时查看最新面板。
     </div>
   </div>
 </body>

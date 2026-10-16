@@ -1,0 +1,16 @@
+typecheck 0
+build 0
+test-compile 0
+targeted 0
+Traceback (most recent call last):
+  File "/tmp/bl-state-message-outcome-original-checks-20261016/run.py", line 21, in <module>
+    comparisons.append({'source':name,'sameSource':sha(root/name)==sha(wt/name),'compiledOutput':output,'sameCompiledOutput':sha(root/output)==sha(wt/output)})
+  File "/tmp/bl-state-message-outcome-original-checks-20261016/run.py", line 13, in <lambda>
+    sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1249, in read_bytes
+    with self.open(mode='rb') as f:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1242, in open
+    return io.open(self, mode, buffering, encoding, errors, newline,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1110, in _opener
+    return self._accessor.open(self, flags, mode)
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/shiqi/IdeaProjects/bl-chat-plugin/src/modules/config/domain/schemas/guoba/aiModels.ts'

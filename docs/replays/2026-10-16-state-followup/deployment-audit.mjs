@@ -8,6 +8,7 @@ const root = '/opt/trss-yunzai/plugins/shiloh-plugin'
 const expected = process.argv[2]
 const replay = process.argv[3]
 const configSnapshot = process.argv[4]
+const replayAdditionsSnapshot = process.argv[5]
 if (!expected || !replay || !configSnapshot) throw new Error('Provide expected release, frozen replay runtime and pre-deployment config hash snapshot paths')
 const read = (base, name) => fs.readFileSync(path.join(base, name))
 const hash = buffer => createHash('sha256').update(buffer).digest('hex')
@@ -41,6 +42,36 @@ const services = Object.fromEntries(['trss-yunzai', 'bl-console'].map(name => [n
 const journal = shell('journalctl', ['-u', 'trss-yunzai', '--since', services['trss-yunzai'].activeSince, '--no-pager',
   '--grep', '载入插件错误|ReferenceError|SyntaxError|is not defined|unhandled|MessagePipeline.*已启动'])
 const sameObject = (first, second) => JSON.stringify(Object.entries(first).sort()) === JSON.stringify(Object.entries(second).sort())
+const differences = (first, second) => ({
+  added: Object.fromEntries(Object.entries(second).filter(([name]) => !Object.hasOwn(first, name))),
+  removed: Object.keys(first).filter(name => !Object.hasOwn(second, name)),
+  changed: Object.keys(first).filter(name => Object.hasOwn(second, name) && first[name] !== second[name])
+})
+const replayBackendDifferences = {
+  sources: differences(replayBackend.sources, backend.sources),
+  files: differences(replayBackend.files, backend.files)
+}
+let replayAdditions = null
+if (replayAdditionsSnapshot) {
+  const additions = JSON.parse(fs.readFileSync(replayAdditionsSnapshot, 'utf8'))
+  const sourceNames = ['src/modules/groupAdmin/infrastructure/groupAdminPage.ts']
+  const fileNames = ['modules/groupAdmin/infrastructure/groupAdminPage.d.ts', 'modules/groupAdmin/infrastructure/groupAdminPage.js', 'modules/groupAdmin/infrastructure/groupAdminPage.js.map']
+  if (additions.replayCommit !== replayManifest.commit || !/^[a-f0-9]{40}$/.test(additions.sourceBasisCommit ?? '')
+    || Object.keys(additions.sources ?? {}).sort().join(',') !== sourceNames.join(',')
+    || Object.keys(additions.files ?? {}).sort().join(',') !== fileNames.join(',')
+    || [...Object.values(additions.sources), ...Object.values(additions.files)].some(digest => !/^[a-f0-9]{64}$/.test(digest))) {
+    throw new Error('Replay additions must identify the independently reviewed group page source and its three exact generated files')
+  }
+  replayAdditions = {
+    sourceBasisCommit: additions.sourceBasisCommit,
+    snapshotHash: hash(fs.readFileSync(replayAdditionsSnapshot)),
+    expectedSources: additions.sources, expectedFiles: additions.files,
+    matches: sameObject(replayBackendDifferences.sources.added, additions.sources)
+      && sameObject(replayBackendDifferences.files.added, additions.files)
+      && !replayBackendDifferences.sources.removed.length && !replayBackendDifferences.sources.changed.length
+      && !replayBackendDifferences.files.removed.length && !replayBackendDifferences.files.changed.length
+  }
+}
 const result = {
   at: new Date().toISOString(), deployedCommit: manifest.commit, expectedCommit: expectedManifest.commit,
   managedFileCount: Object.keys(manifest.files).length,
@@ -52,6 +83,8 @@ const result = {
   replayRuntimeMismatches: mismatches(root, backendFiles(replayManifest.files)),
   sameReplayBackendSources: sameObject(backend.sources, replayBackend.sources),
   sameReplayBackendFiles: sameObject(backend.files, replayBackend.files),
+  replayBackendDifferences, replayAdditions,
+  replayScopeMatches: (sameObject(backend.sources, replayBackend.sources) && sameObject(backend.files, replayBackend.files)) || replayAdditions?.matches === true,
   configHashes: Object.fromEntries(['config/message.yaml', 'config/persona-library.yaml'].map(name => [name, hash(read(root, name))])),
   expectedConfigHashes: expectedConfigs,
   configSnapshotHash: hash(fs.readFileSync(configSnapshot)),
@@ -65,7 +98,7 @@ const result = {
 }
 console.log(JSON.stringify(result, null, 2))
 if (manifest.commit !== expectedManifest.commit || result.managedMismatches.length || result.expectedReleaseMismatches.length || !result.sameBackendManifest ||
-    result.replayRuntimeMismatches.length || !result.sameReplayBackendSources || !result.sameReplayBackendFiles ||
+    result.replayRuntimeMismatches.length || !result.replayScopeMatches ||
     result.loadErrors || !result.pipelineStarted || Object.values(result.pages).some(code => code !== '200') ||
     Object.values(services).some(service => service.state !== 'active' || service.restartCount !== '0') ||
     Object.entries(expectedConfigs).some(([name, digest]) => result.configHashes[name] !== digest) ||

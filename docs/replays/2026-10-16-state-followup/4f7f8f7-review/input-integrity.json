@@ -1,0 +1,21 @@
+{
+  "candidate": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+  "canonicalMatchesReviewerFullInput": true,
+  "sha256": {
+    "blind-conversations.json": "19b775f5265e9320a27134f0395a94bedd256464a777d48f29a34e622e65e1f8",
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-revealed.json": "45d1c68def2302fa3922308627f76a8723d134bb48bb0c2cc62ef170e29972e5",
+    "blind-review.json": "d5f411f3d83d8d00bee7269ac93c2129e38a62405329b70aa3f906e3562a305e",
+    "conversations-01-14.json": "daf4c6e1a88dbae6319ccf365a7cfc0962efa8ffc1938f086fcdaebab620d757",
+    "conversations-15-28.json": "6abf038d3b98c3a2e8f2e3a826f9ef449fd11aaae768e7eb06eb8743568814c8",
+    "review-01-14.json": "15c3d6f791fc67565e82e38dff2dc1db5c44691824b68f994a4c061eaa13a1fb",
+    "review-15-28.json": "22b946db5430e08bfb9baa3d5900e1c85dd39d05d486c1b50c3ff773b90e7d8d",
+    "summary.json": "49545baa826082bf81b97e41ecdf8a10a32542967a188ec4e8a376760f4ad161"
+  },
+  "reviewers": [
+    "/root/blind_4f_01_14",
+    "/root/blind_4f_15_28"
+  ],
+  "readScope": "complete anonymous 14 plus 14 conversations; no mapping, source or previous findings supplied",
+  "scoreChanges": 0
+}

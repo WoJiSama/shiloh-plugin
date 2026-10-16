@@ -1,0 +1,5 @@
+
+> shiloh-plugin@0.0.1 backend:build
+> node scripts/backend-build.mjs
+
+Backend built: 1434 files, TypeScript 5.9.3
