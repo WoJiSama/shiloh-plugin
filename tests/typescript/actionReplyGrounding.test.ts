@@ -1106,3 +1106,129 @@ test('a local postfix uncertainty predicate covers coordinated result and regist
   ]) assert.ok(validateActionReply(reply,reminder,raw).some(item=>item.code==='unregistered_followup'),reply)
   assert.ok(validateActionReply('后续投递安排已登记。',reminder,raw).some(item=>item.code==='unregistered_followup'))
 })
+
+const d10ReplayClaims: Array<{index: number; raw: string; reply: string; current: TurnActionFacts; code: string}> = [
+  {
+    index: 1, raw: '那我先去吃饭。好了你会自动发给我吗？',
+    reply: '不会自动发哦，我这边没那个功能。你吃完回来再喊我一声，我当场查，有就直接给你。',
+    current: facts(), code: 'unsupported_task_state'
+  },
+  {
+    index: 3, raw: '那我先去吃饭。好了你会自动发给我吗？',
+    reply: '原任务还在跑没我不敢说死，但现在这个自动发送我这边没查到有效登记，所以好了不会自动发你。\n\n你吃完回来问我要结果，或者让我重新跑一次都行。',
+    current: facts(), code: 'unsupported_task_state'
+  },
+  {
+    index: 11, raw: '所以我现在没收到，是还没做好吗？',
+    reply: '不是没做好哦，傍晚那张已经做出来了。是发送那一步没成功，所以你没收到。\n\n原因我不确定，现在也没法替你自动补发。图还在，等能发的时候我给你发。',
+    current: facts([fact({execution:'completed', result:'available', delivery:{state:'failed'}, followUp:{state:'none'}})]),
+    code: 'unregistered_followup'
+  },
+  {
+    index: 15, raw: '我刚在任务页取消了完成后发送。那现在还会自动发吗？',
+    reply: '不会啦。取消之后就没有完成后自动发的安排了。\n\n图要是之后真出了，就得你自己去任务页看，或者到时候再喊我。',
+    current: facts([fact({source:'live_job', execution:'running', result:'unavailable', delivery:{state:'not_attempted'}, followUp:{state:'none'}})]),
+    code: 'unsupported_delivery'
+  },
+  {
+    index: 17, raw: '我问的是这张图，出来了吗？',
+    reply: '第一张图这边我还没查到结果的记录，进度我这边确认不了。有实际产出我会直接发出来。',
+    current: facts(), code: 'unregistered_followup'
+  },
+  {
+    index: 59, raw: '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',
+    reply: '查了下记录，这边只登记了你的考试提醒，没查到改背景那个图的任务记录，所以也不会自动发你。\n\n要改的话把图再发一遍，我看看这轮能不能直接给你弄。',
+    current: facts([fact({taskId:'exam-reminder', requestMessageId:'exam-request', toolName:'reminderTool', source:'reminder', execution:'queued', result:'unknown', delivery:{state:'not_attempted'}, followUp:{state:'registered', kind:'reminder', id:'exam-reminder', dueAt:4102444800000}})]),
+    code: 'unsupported_task_state'
+  }
+]
+
+for (const replay of d10ReplayClaims) test(`d10 complete replay ${replay.index} rejects its unsupported local claim`, () => {
+  assert.ok(validateActionReply(replay.reply, replay.current, replay.raw).some(item => item.code === replay.code), replay.reply)
+})
+
+test('an automatic-delivery question scopes its negative answer without supplying a task or platform capability', () => {
+  const raw = '好了你会自动发给我吗？'
+  const none = facts([fact({execution:'running', followUp:{state:'none'}})])
+  const unknown = facts([fact({execution:'running', followUp:{state:'unknown'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['不会自动发哦。', '所以好了不会自动发你。', '好了也不会自动发你。']) {
+    for (const current of [facts(), unknown, live]) {
+      assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unsupported_task_state'), reply)
+    }
+    assert.deepEqual(validateActionReply(reply, none, raw), [], reply)
+  }
+  for (const current of [facts(), none, unknown, live]) {
+    assert.ok(validateActionReply('我这边没那个功能。', current, raw).some(item=>item.code==='unsupported_task_state'))
+  }
+  for (const reply of [
+    '我没查到这次自动发送的登记，是否会自动发尚未核实。',
+    '不会自动发吗？', '我这边没那个功能吗？', '我这边有没有那个功能尚未核实。',
+    '“我这边没那个功能”只是个例子。', '她那边没那个功能。',
+    '你吃完回来再喊我一声，我当场查，有就直接给你。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
+
+test('a causal or contrast clause owns its assertion after an independent uncertainty statement', () => {
+  const raw = '刚才的图好了会自动发我吗？'
+  for (const reply of [
+    '完成后发送的登记尚未核实，所以好了不会自动发你。',
+    '完成后发送的登记尚未核实所以好了不会自动发你。',
+    '我不能确认登记，因此也不会自动发你。',
+    '我不能确认登记但有实际产出我会直接发出来。',
+    '我不能确认图好了，所以我会发给你。',
+    '我不能确认图好了但我会发给你。',
+    '图片处理的结果尚未核实所以已经做好了。',
+    '我没确认图做好了但已经发出来了。',
+    '完成后发送的登记尚未核实，不过图好了我会自动发你。'
+  ]) assert.ok(validateActionReply(reply, facts(), raw).length, reply)
+  for (const reply of [
+    '完成后发送的登记尚未核实，所以还不能确认会不会自动发你。',
+    '完成后发送的登记尚未核实，所以好了不会自动发你吗？',
+    '我不能确认图好了，所以我会发给你吗？',
+    '例如图好了，所以我会发你。',
+    '“登记尚未核实所以好了不会自动发你”只是个例子。',
+    '图好了也不代表我会自动发给你。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
+
+test('outward artifact delivery needs its matching callback while waiting for send capability needs another arrangement', () => {
+  const raw = '刚才那张图出来了吗？'
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  const failed = facts([fact({execution:'completed', result:'available', delivery:{state:'failed'}})])
+  for (const reply of ['有实际产出我会直接发出来。', '图好了我会发出去。', '有产出就直接发出来。']) {
+    for (const current of [facts(), failed]) assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unregistered_followup'), reply)
+    assert.deepEqual(validateActionReply(reply, live, raw), [], reply)
+  }
+  for (const reply of ['图还在，等能发的时候我给你发。', '等图片能发的时候，我就发给你。']) {
+    for (const current of [failed, live]) assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unregistered_followup'), reply)
+  }
+  for (const reply of [
+    '等能发的时候我也不会给你发。', '等能发的时候我给你发吗？',
+    '“等能发的时候我给你发”只是个例子。', '等她能发的时候她给你发。',
+    '有实际产出我也不会直接发出来。', '有实际产出我会直接发出来吗？',
+    '“有实际产出我会直接发出来”只是个例子。', '她有实际产出就发出来。',
+    '你回来再问我，我当场查，有就直接发出来。',
+    '图做好了，只是上次发出来没成功。', '上次发给你没成功，具体原因我还不清楚。'
+  ]) assert.deepEqual(validateActionReply(reply, failed, raw), [], reply)
+})
+
+test('a future result condition cannot supply an asserted task-page pickup location', () => {
+  const raw = '我刚在任务页取消了完成后发送。那现在还会自动发吗？'
+  const current = facts([fact({source:'live_job', execution:'running', result:'unavailable', delivery:{state:'not_attempted'}, followUp:{state:'none'}})])
+  for (const reply of [
+    '图要是之后真出了，就得你自己去任务页看。',
+    '图之后出来的话，你可以自己去任务页下载。',
+    '图好了之后，得你自己到任务页取图。'
+  ]) assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unsupported_delivery'), reply)
+  for (const reply of [
+    '图要是之后真出了，就得你自己去任务页看吗？',
+    '是否能去任务页取图尚未核实。', '不能确认你可以自己去任务页下载。',
+    '“图出来后你可以去任务页下载”只是个例子。',
+    '她的图要是之后真出了，就得她自己去任务页看。',
+    '如果图能在任务页下载，你可以先确认那里是否有结果。',
+    '你可以去任务页看进度。', '图之后有结果的话，你回来再问我，我再查。'
+  ]) assert.deepEqual(validateActionReply(reply, current, raw), [], reply)
+  assert.deepEqual(validateActionReply('图出来后，你可以自己去任务页下载。', current,
+    '平台说明：“你可以自己去任务页下载”。我刚取消了完成后发送，图好了怎么办？'), [])
+})

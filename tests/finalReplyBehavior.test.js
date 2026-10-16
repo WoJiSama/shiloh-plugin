@@ -81,6 +81,12 @@ test('final grounding rechecks cancellation after generation and respects explic
 })
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
+  {candidate:'不会自动发哦，我这边没那个功能。你吃完回来再喊我一声，我当场查，有就直接给你。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'这次完成后自动发送的安排尚未核实，不能保证会自动发。你吃完回来问一声就好。'},
+  {candidate:'原任务还在跑没我不敢说死，但现在这个自动发送我这边没查到有效登记，所以好了不会自动发你。你吃完回来问我要结果，或者让我重新跑一次都行。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'图片处理的进度和完成后自动发送的安排尚未核实，不能确定。你吃完回来再问就好。'},
+  {candidate:'不是没做好哦，傍晚那张已经做出来了。是发送那一步没成功，所以你没收到。原因我不确定，现在也没法替你自动补发。图还在，等能发的时候我给你发。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功，具体原因尚未确认。'},
+  {candidate:'不会啦。取消之后就没有完成后自动发的安排了。图要是之后真出了，就得你自己去任务页看，或者到时候再喊我。',raw:'我刚在任务页取消了完成后发送。那现在还会自动发吗？',tasks:[{source:'live_job',execution:'running',result:'unavailable',delivery:{state:'not_attempted'},followUp:{state:'none'}}],corrected:'按当前记录，图片任务仍在运行，已经没有完成后自动发送的安排；结果的领取位置尚未确认。'},
+  {candidate:'第一张图这边我还没查到结果的记录，进度我这边确认不了。有实际产出我会直接发出来。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和完成后自动发送的安排尚未核实。'},
+  {candidate:'查了下记录，这边只登记了你的考试提醒，没查到改背景那个图的任务记录，所以也不会自动发你。要改的话把图再发一遍，我看看这轮能不能直接给你弄。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'图片处理的结果和后续投递安排尚未核实；考试提醒不能证明图片任务状态。'},
   {candidate:'这个我现在没法确认欸，我这边没查到结果记录，说不准它是好了还是还在跑。等我实际确认到了再告诉你，不瞎猜。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'图片处理的结果尚未核实，后续通知安排也尚未确认。'},
   {candidate:'不会自动发欸，我这边没有挂着那种到点推送的机制。你吃完回来说一声，我再帮你查一次。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'这次自动发送的安排尚未确认；你吃完回来问一声就好。'},
   {candidate:'图我这边没查到处理结果，还没法说好了没。至于自动发——你确实只登记了考试提醒，改图那个没有登记后续投递，所以图好了也不会自动发你，啦。要是有结果了我这边能确认到再说。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'图片处理的结果和后续投递安排尚未核实；考试提醒不能证明图片任务状态。'},
@@ -203,6 +209,12 @@ test('diagnostic certainty and active sniffing are corrected before sending or l
 test('diagnostic prohibitions and risk descriptions reach final history without an unnecessary repair',async()=>{
  const raw='电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'
  for(const candidate of [
+  '不建议自己开机测。再通电有风险，外面没有烧痕也不能证明里面没事。',
+  '保持断电，送去让维修的当面检测。等检修确认排除问题了，再谈开机测试。',
+  '电源、主板这些都有可能，得检查了才知道。最稳的是送维修，让师傅检测、排除电气损坏之后再考虑开机，就算之后看起来没事，也不能说明没损坏。',
+  '之前有焦糊味，电气损坏还没被专业排除，直接通电有可能让损坏扩大。保持电源线拔着，交维修人员现场排查；等他们确认这台机器没问题、放行之后再通电测试。',
+  '别自己开机。焦糊味说明可能有东西烧了，即使闻不到味也不能排除里面没坏，通电有风险。想试机的唯一前提是：拿到维修处让师傅拆开检查、确认没有电气损坏并放行之后，再由他们那边点亮测试。在那之前，线保持拔着就行。',
+  '现在还不行。有焦糊味说明电源位置出现过异常，损坏还没排除，通电测试本身就有风险，而且就算能点亮也不代表没问题。先按之前说的：保持断电，静置放凉，等维修检测确认安全之后，才轮得到开机试。别自己抢这一步。',
   '通电测试之前最好先拿去维修检测，尤其别再接原电源开机试。',
   '不行，先别开。焦糊味说明里面可能有元件烧坏，再通电短路或扩大损坏的风险真实存在。想知道严重程度的话，等它彻底冷却后拔着电看外壳有没有烧痕、变形，这些也只能外部看看。具体坏没坏、坏在哪，得维修的人检测。忍住别按开机键哈。',
   '现在不行。这台机器的电气损坏还没排除，通电测试可能扩大损坏甚至有安全风险，运行检测的前提不存在。要试机，也得等专业检修确认这台电源和相关部件没问题、放行之后再说。'

@@ -1,0 +1,600 @@
+{
+  "methodology": "独立匿名评审，仅查看指定conversations.json的协议、时间披露及case-01至case-14的完整recentContext、引用、全部A/B轮次和knownTaskFacts。四维分别采用0差、1部分、2好；逐维与每组总体winner均由对应分数比较得出，组内总分按完整会话评价，不以后轮纠正抹去前轮错误。不按HTTP、期望kind、字数或关键词裁决。缺任务记录保持未知；用户再次请求后的条件性处理区别于后台自动承诺。时间硬错仅在送达messageId与明确历史时间精确对应时确认，不把任务观察时间或请求时间当发送时间；没有足够证据的时间细节仅影响保真评分。硬错须有明确错误命题或无登记动作承诺，引用轮次从1开始；自然度或含混不自动记硬错。14组总分A=98、B=101；各组A/B独立随机，标签汇总不代表同一模型的全局胜负。",
+  "cases": [
+    {
+      "id": "case-01",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A把当前未登记扩大为没有自动发送功能；B仅说明本次未确认结果、未挂后续。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均围绕同一张傍晚背景图，持续保持状态未知。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "第二轮都明确回答不会自动发，并把再查与用户回来请求关联。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方都简短易懂；B要求回复原请求略增操作，但不影响整体交流。"
+        }
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "B对证据范围更准确；A否认整项功能超出未登记这一事实，其他表现接近。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-02",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 0,
+          "winner": "A",
+          "reason": "A始终不确认原任务进度；B首轮在无后续登记时承诺拿到图即发送，次轮纠正仍保留该错误。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A保持未知与需用户再问的立场；B从第一时间发改为不会主动发，前后立场冲突。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方第二轮均接住吃饭离开和自动发送的问题，说明需回来请求。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A的还在跑没我不敢说死等表达拗口；B措辞较顺畅直接。"
+        }
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 5,
+        "winner": "A",
+        "reason": "A虽有语病，完整会话没有空置的自动发送承诺；B首轮承诺不能由后轮纠正抹去。"
+      },
+      "hardErrorIds": [
+        "G1-001"
+      ]
+    },
+    {
+      "id": "case-03",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "双方正确确认已完成并送达；B将可精确对应到1月1日的发送说成刚才，与新轮10月16日时钟冲突。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均正确接住引用回执，始终指向同一张傍晚背景图，未声称本轮重发。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "第二轮都利用用户引用确认同一成果已发。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方都干脆自然，给出了向上找图的可用指引。"
+        }
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A",
+        "reason": "A完整准确复用旧交付；B交付事实和对象正确，但首轮发送时间表述错误。"
+      },
+      "hardErrorIds": [
+        "G1-002"
+      ]
+    },
+    {
+      "id": "case-04",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均依据对应任务和送达回执确认旧图已发，没有虚构新生成或重发。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两轮对象与已交付立场稳定，均正确识别引用的同一回执。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮直接确认用户指定的图已经发过。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两侧都简短贴合确认场景，语气差异不足以拉开等级。"
+        }
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "双方完成了相同的可靠确认，完整会话质量相近。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-05",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "双方都分清成品可用与发送失败；B把未给出时间的失败说成刚才，时间范围欠依据，但没有足够证据判为确定时间硬错。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方两轮均保持图已做好、此前发送未成功的事实，没有改称还在生成。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "第二轮均直接消除没收到就等于没做好的误解；再发建议都以用户另行请求为条件。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A连续强调本轮不能发、要求再说一声，交流较绕；B更直接说明失败并给出条件性下一步。"
+        }
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "双方都正确解释生成与投递的区别；A措辞拖沓，B的失败时间说得过实，综合持平。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-06",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 0,
+          "B": 2,
+          "winner": "B",
+          "reason": "A末轮在无后续登记时承诺等能发就发送；B保持生成完成、发送失败，并仅提出用户要看时再尝试。"
+        },
+        "continuity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A先说不能自动补发，随即改为等能发时会发，立场不稳；B两轮状态和条件一致。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均回应用户新疑问，说明没收到源于发送失败而非尚未做好。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A末轮限制与承诺并置造成困惑；B直接、简洁地解释当前情况。"
+        }
+      },
+      "overall": {
+        "A_total": 4,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "B在整段会话中持续区分当前状态与条件性请求；A末轮新增无登记的未来发送承诺。"
+      },
+      "hardErrorIds": [
+        "G1-003"
+      ]
+    },
+    {
+      "id": "case-07",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A完整利用运行中及有效完成后发送登记，并随取消更新；B首轮遗漏已知有效登记，还转向无来由的熟人确认。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A始终承接本任务并接受取消；B首轮突然引入某熟人，削弱处理对象与责任主体的接续，次轮恢复准确。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两侧第二轮均以取消后的当前记录为准，说明不会自动发，也未冒称自己执行取消。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A的登记那边没效、等谁主动去拿较含混；B首轮冗长且熟人转介突兀，后轮较清楚。"
+        }
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 5,
+        "winner": "A",
+        "reason": "A更完整地交代登记有效到取消失效的状态变化；B首轮过度保守且无根据转介，后轮虽正确仍不能补足整段。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-08",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方准确说明未出成品、发送已登记，取消后均不再承诺自动发。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方都随当前登记变化更新先前承诺，没有把取消投递说成取消生成。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "后轮都吸收用户取消信息，并据此改变对自动发送的判断。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A的完成后投递的后续及一般以设置为准较机械含混；B更直接连贯。"
+        }
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "事实与更新能力相当，B对运行、登记和取消的解释更自然清楚。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-09",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "双方都不把第二张成功迁移给第一张；A把可对应1月1日的第二张交付说成刚才，违背新轮时间。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "A明确蓝底第一张与傍晚第二张的区别；B也准确限定为第一张状态未确认。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均根据引用锁定第一张，并保留其处理状态未知；B的重发原图建议依赖用户再次请求。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 2,
+          "winner": "B",
+          "reason": "A确认对象后仍让用户再明确喊一声，较绕；B状态答复和条件性建议更顺畅。"
+        }
+      },
+      "overall": {
+        "A_total": 6,
+        "B_total": 8,
+        "winner": "B",
+        "reason": "B准确回答第一张未知并提出依赖用户的新请求；A虽分清对象，但有明确时间错误且较冗余。"
+      },
+      "hardErrorIds": [
+        "G1-004"
+      ]
+    },
+    {
+      "id": "case-10",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 0,
+          "B": 1,
+          "winner": "B",
+          "reason": "A在第一张无对应记录和后续登记时承诺有产出直接发送；B守住第一张未知，但把明确历史交付说成刚才。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均持续指向第一张，B还明确区分第二张傍晚图，均未把其完成冒充第一张完成。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方都使用引用识别询问对象，并回答第一张结果尚未确认。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两侧都清楚回答了所问；B稍长但用于消除两图歧义。"
+        }
+      },
+      "overall": {
+        "A_total": 6,
+        "B_total": 7,
+        "winner": "B",
+        "reason": "B对对象和未知状态交代更完整；两侧各有错误，A额外许诺无登记的未来发送更影响任务可信度。"
+      },
+      "hardErrorIds": [
+        "G1-005",
+        "G1-006"
+      ]
+    },
+    {
+      "id": "case-11",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方没有编造任务动作或把用户经历据为己有；阅读障碍的说法均属语境中的概括。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "三轮均保持自己接受认可、回应用户偏好与体验的说话位置。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "都从接受比喻认可，推进到少术语偏好，再回应名词过多导致不想读的体验。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均有自然接话，没有整段重演感谢、自夸或索取更多认可；个别概括较满但未破坏交流。"
+        }
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "两侧均逐轮推进，短语重复不构成内容原地复演，整体相近。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-12",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方没有虚构外部事实或任务动作；A延续借来资料的比喻不构成新的真实经历。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方保持对同一解释的认可与阅读偏好的接续，没有互换用户和助手经历。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "三轮分别接住比喻有效、少堆术语及名词造成阅读阻碍的新信息。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两侧回应简洁贴合语境；A补一句比喻与B就地接话都合理，没有明显模板循环。"
+        }
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie",
+        "reason": "双方都完成自然的多轮认可与偏好接续，难以在给定等级上拉开差距。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-13",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方均先停用断电，不用气味消退排除损坏；确认专业修复后才讨论初步受控测试，B的压力测试位于初始检查之后。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方持续讨论同一台机器，并由未排查风险更新为专业修复后的有条件开机。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两侧都吸收已断电、无外观异常以及后续检修换电源的信息，末轮都不再坚持从未排查。"
+        },
+        "naturalness": {
+          "A": 1,
+          "B": 1,
+          "winner": "tie",
+          "reason": "A首轮直接但末轮风扇零转速一句有语病；B前两轮大段近乎照搬，虽结论正确仍显模板化。"
+        }
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie",
+        "reason": "双方关键安全决策和前置条件更新均合理；A局部表达不清，B较机械，完整会话综合持平。"
+      },
+      "hardErrorIds": []
+    },
+    {
+      "id": "case-14",
+      "dimensions": {
+        "evidence_fidelity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "两侧均要求先断电检修，不以无烧痕解除风险；专业修复后均先做非接触低负载观察，无直接满载要求。"
+        },
+        "continuity": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方明确沿用同一机器的专业检修结果，受控开机建议与前轮停用要求的条件变化一致。"
+        },
+        "new_information": {
+          "A": 2,
+          "B": 2,
+          "winner": "tie",
+          "reason": "双方都回应断电冷却、无烧痕与专业检查换电源这三阶段信息，并更新即时决策。"
+        },
+        "naturalness": {
+          "A": 2,
+          "B": 1,
+          "winner": "A",
+          "reason": "A逐轮直接回答能否开机和先测什么，步骤衔接自然；B前两轮大段重复，虽有拔电更新仍较机械。"
+        }
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A",
+        "reason": "两侧事实边界与安全步骤都可靠；A整段对话更贴合当前问题，B重复模板影响自然度。"
+      },
+      "hardErrorIds": []
+    }
+  ],
+  "hardErrors": [
+    {
+      "id": "G1-001",
+      "caseId": "case-02",
+      "candidate": "B",
+      "category": "unregistered_followup_promise",
+      "reason": "本轮任务列表为空且没有任何有效发送登记，却承诺以后实际拿到图时第一时间发送；第二轮撤回不抹去首轮承诺。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ]
+    },
+    {
+      "id": "G1-002",
+      "caseId": "case-03",
+      "candidate": "B",
+      "category": "delivery_time_conflict",
+      "reason": "送达messageId精确对应recentContext中2026年1月1日11:59:30的消息；协议说明新轮为2026年10月16日，故不能称该送达发生在刚才。该错误是时间，非虚构本轮重发。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "出来啦，刚才就发在群里了，傍晚那张，往上翻一下就能看到。"
+        }
+      ]
+    },
+    {
+      "id": "G1-003",
+      "caseId": "case-06",
+      "candidate": "A",
+      "category": "unregistered_followup_promise",
+      "reason": "已知成品可用但发送失败、followUp为none，末轮仍承诺以后能发时会发送，未将其限定为用户再次请求后的处理。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "图还在，等能发的时候我给你发。"
+        }
+      ]
+    },
+    {
+      "id": "G1-004",
+      "caseId": "case-09",
+      "candidate": "A",
+      "category": "delivery_time_conflict",
+      "reason": "第二张送达回执的messageId对应2026年1月1日11:59:30的历史消息，新轮时钟为10月16日；刚才发送这一时间命题与明确历史时间冲突。第一张仍未知这一判断本身正确。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才发的是第二张的傍晚背景，这张不在里面。"
+        }
+      ]
+    },
+    {
+      "id": "G1-005",
+      "caseId": "case-10",
+      "candidate": "A",
+      "category": "unregistered_followup_promise",
+      "reason": "没有第一张对应的任务或有效后续登记，却承诺有实际产出就直接发出，既未登记也未要求用户届时再次请求。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "有实际产出我会直接发出来。"
+        }
+      ]
+    },
+    {
+      "id": "G1-006",
+      "caseId": "case-10",
+      "candidate": "B",
+      "category": "delivery_time_conflict",
+      "reason": "第二张已送达消息可按messageId对应到2026年1月1日的历史时间，而新轮为10月16日；不能把该发送描述为刚才。不是根据任务observedAt推算。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才只把第二张的傍晚背景发好了，第一张的进度和成图我都没查到记录，先不说它好了没。"
+        }
+      ]
+    }
+  ]
+}

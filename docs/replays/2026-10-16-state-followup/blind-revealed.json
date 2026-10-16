@@ -1,46 +1,35 @@
 {
-  "evaluatedCandidate": "51a18740e56adbce9e0f407d5e11fe330d022c70",
+  "evaluatedCandidate": "d10ece44edc2905b6171d027f17a0060b6dc057f",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "a417d987747055de61be8aeaca0a9b5a304214726605d4d3ab492719fda81d6c",
-    "blind-review.json": "91f54a4c05dc74f2dc8a1fd7947978be3fa254e3fe5cf3bd4168642798feb27b"
+    "blind-conversations.json": "aa8f06070c348582b5f9587e55018d2320cd7c87f71f4a4b363fa7d348ee0390",
+    "blind-review.json": "196ad1a855c6e96159417e5e001593c579b5606f721c6fc67c04261daedabc99"
   },
   "cases": 28,
   "preference": {
-    "candidate": 3,
-    "baseline": 10,
-    "tie": 15
+    "candidate": 5,
+    "baseline": 11,
+    "tie": 12
   },
   "scoreTotals": {
-    "candidate": 203,
-    "baseline": 212
+    "candidate": 199,
+    "baseline": 210
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
-        "candidate": 2,
-        "baseline": 3,
-        "tie": 23
+        "candidate": 4,
+        "baseline": 5,
+        "tie": 19
       },
       "scoreTotals": {
-        "candidate": 53,
-        "baseline": 54
+        "candidate": 47,
+        "baseline": 48
       }
     },
     "continuity": {
-      "preference": {
-        "candidate": 1,
-        "baseline": 1,
-        "tie": 26
-      },
-      "scoreTotals": {
-        "candidate": 55,
-        "baseline": 55
-      }
-    },
-    "new_information": {
       "preference": {
         "candidate": 1,
         "baseline": 2,
@@ -51,6 +40,17 @@
         "baseline": 55
       }
     },
+    "new_information": {
+      "preference": {
+        "candidate": 0,
+        "baseline": 2,
+        "tie": 26
+      },
+      "scoreTotals": {
+        "candidate": 54,
+        "baseline": 56
+      }
+    },
     "naturalness": {
       "preference": {
         "candidate": 2,
@@ -58,26 +58,26 @@
         "tie": 17
       },
       "scoreTotals": {
-        "candidate": 41,
-        "baseline": 48
+        "candidate": 44,
+        "baseline": 51
       }
     }
   },
   "hardErrorFindings": {
-    "candidate": 1,
-    "baseline": 1
+    "candidate": 4,
+    "baseline": 4
   },
   "hardErrorQuoteOccurrences": {
-    "candidate": 1,
-    "baseline": 1
+    "candidate": 4,
+    "baseline": 4
   },
   "hardErrors": [
     {
-      "id": "HE-001",
+      "id": "G1-001",
       "caseId": "case-02",
       "candidate": "baseline",
       "category": "unregistered_followup_promise",
-      "reason": "首轮任务查询只得到空列表，未确认任何图片任务或完成后发送机制，却明确承诺拿到图就第一时间发给用户。后轮说不会主动发构成纠正，不能倒推首轮已有发送机制。",
+      "reason": "本轮任务列表为空且没有任何有效发送登记，却承诺以后实际拿到图时第一时间发送；第二轮撤回不抹去首轮承诺。",
       "occurrences": [
         {
           "turn": 1,
@@ -87,18 +87,102 @@
       "anonymousCandidate": "B"
     },
     {
-      "id": "HE-002",
-      "caseId": "case-05",
+      "id": "G1-002",
+      "caseId": "case-03",
+      "candidate": "baseline",
+      "category": "delivery_time_conflict",
+      "reason": "送达messageId精确对应recentContext中2026年1月1日11:59:30的消息；协议说明新轮为2026年10月16日，故不能称该送达发生在刚才。该错误是时间，非虚构本轮重发。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "出来啦，刚才就发在群里了，傍晚那张，往上翻一下就能看到。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "G1-003",
+      "caseId": "case-06",
       "candidate": "candidate",
-      "category": "unsupported_failure_cause_exclusion",
-      "reason": "可用证据只有生成完成、结果可用、发送失败，没有失败原因。回答却确定排除用户拒收或屏蔽；表示未查到具体原因不能支持这一排除。",
+      "category": "unregistered_followup_promise",
+      "reason": "已知成品可用但发送失败、followUp为none，末轮仍承诺以后能发时会发送，未将其限定为用户再次请求后的处理。",
       "occurrences": [
         {
           "turn": 2,
-          "exactQuote": "不是被你拒收或者屏蔽哦，具体原因我这边也没查到。"
+          "exactQuote": "图还在，等能发的时候我给你发。"
         }
       ],
       "anonymousCandidate": "A"
+    },
+    {
+      "id": "G1-004",
+      "caseId": "case-09",
+      "candidate": "candidate",
+      "category": "delivery_time_conflict",
+      "reason": "第二张送达回执的messageId对应2026年1月1日11:59:30的历史消息，新轮时钟为10月16日；刚才发送这一时间命题与明确历史时间冲突。第一张仍未知这一判断本身正确。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才发的是第二张的傍晚背景，这张不在里面。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "G1-005",
+      "caseId": "case-10",
+      "candidate": "candidate",
+      "category": "unregistered_followup_promise",
+      "reason": "没有第一张对应的任务或有效后续登记，却承诺有实际产出就直接发出，既未登记也未要求用户届时再次请求。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "有实际产出我会直接发出来。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "G1-006",
+      "caseId": "case-10",
+      "candidate": "baseline",
+      "category": "delivery_time_conflict",
+      "reason": "第二张已送达消息可按messageId对应到2026年1月1日的历史时间，而新轮为10月16日；不能把该发送描述为刚才。不是根据任务observedAt推算。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才只把第二张的傍晚背景发好了，第一张的进度和成图我都没查到记录，先不说它好了没。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "G2-001",
+      "caseId": "case-28",
+      "candidate": "baseline",
+      "category": "缺失记录被推成确定无自动投递",
+      "reason": "已知事实只核验到考试提醒，没有图片任务或其后续登记的明确否定证据；不能据此断言自动发图登记不存在且不会自动发出。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "自动发图没有对应的登记，不会自动发你，想看进度就再来问一声吧。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "G2-002",
+      "caseId": "case-28",
+      "candidate": "candidate",
+      "category": "缺失记录被推成确定无自动投递",
+      "reason": "没有查到图片任务记录只能保留图片和自动投递状态未知，不能推出所以不会自动发图。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "没查到改背景那个图的任务记录，所以也不会自动发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
     }
   ]
 }

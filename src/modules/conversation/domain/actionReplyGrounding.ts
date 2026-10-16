@@ -9,6 +9,7 @@ export interface ActionReplyViolation {
 }
 
 interface ReplySentence {text: string; question: boolean}
+interface ReplyClause {text: string; start: number; end: number}
 
 function withoutQuotations(text: string): string {
   return text.replace(/```[\s\S]*?```|`[^`\n]*`|“[^”\n]*”|‘[^’\n]*’|「[^」\n]*」|『[^』\n]*』|"[^"\n]*"|'[^'\n]*'/gu, '')
@@ -26,10 +27,30 @@ function assertions(text: string): ReplySentence[] {
     .filter(sentence => Boolean(sentence.text))
 }
 
+/** Causal and contrast connectives introduce another proposition even without
+ * a comma. Its certainty is independent of an earlier evidence disclaimer. */
+function localClauses(text: string): ReplyClause[] {
+  const clauses: ReplyClause[] = []
+  let start = 0
+  const add = (end: number): void => {
+    const raw = text.slice(start, end)
+    const leading = raw.length - raw.trimStart().length
+    const value = raw.trim()
+    if (value) clauses.push({text: value, start: start + leading, end: start + leading + value.length})
+  }
+  for (const boundary of text.matchAll(/[，,]|(?<!不)(?=(?:所以|因此|因而|于是|但是|然而|不过|但))/gu)) {
+    add(boundary.index!)
+    start = boundary.index! + boundary[0].length
+  }
+  add(text.length)
+  return clauses
+}
+
 const NON_ASSERTION = /不能(?:确认|说明|证明|保证|承诺|断定|说)|无法(?:确认|核实|保证)|不(?:确定|清楚|保证|承诺|代表|等于|证明)|没(?:有)?证据|未确认|没确认|尚不知|还不知道|不是|并非|是否|有没有|能否|是不是|会不会|不一定|可能|也许|似乎/u
 const WORDING_EXAMPLE = /例如|比如|举例|示例|假设|这句话|这种说法|这段话|不要(?:说|写|回复)|别(?:说|写|回复)|不能(?:说|写|回复)|(?:用户|别人|他|她)(?:说|问|写)(?:的|过|了)?|(?<![跟和对向])你(?:说|问|写)(?:的|过|了)?/u
 const OTHER_SUBJECT = /^(?:(?:我|你)(?:妈|爸|姐姐|妹妹|哥哥|弟弟|朋友|同事)|姐姐|妹妹|哥哥|弟弟|妈妈|爸爸|他(?:们)?|她(?:们)?|CPU|GPU|电脑|设备|程序|服务器)/iu
 const TASK_TOPIC = /(?:任务|出图|生成|改图|画图|重跑|重试|进度|回执|投递)|(?:图(?:片)?|成品|结果|文件).{0,16}(?:出来|好了吗|做好|弄(?:好|完)|完成|发给我|发我|发送|发出|发了|怎么样)/u
+const AUTOMATIC_FOLLOW_UP_TOPIC = /(?:自动|主动)(?:发(?:送|图)?|投递|推送|补发|通知|提醒)(?:给我|我|到(?:群里|这里|私聊))?/u
 
 type EvidenceTopic = 'image' | 'video' | 'file' | 'artifact' | 'reminder' | 'generic' | 'unknown' | 'ambiguous'
 function evidenceTopic(rawText: string): EvidenceTopic {
@@ -49,7 +70,7 @@ function evidenceTopic(rawText: string): EvidenceTopic {
   if (kinds.length > 1) return 'ambiguous'
   if (kinds[0]) return kinds[0]
   if (/成品|产物|结果/u.test(text)) return 'artifact'
-  return TASK_TOPIC.test(text) ? 'generic' : 'unknown'
+  return TASK_TOPIC.test(text) || AUTOMATIC_FOLLOW_UP_TOPIC.test(text) ? 'generic' : 'unknown'
 }
 
 /** The caller validates ownership and request references; this boundary must
@@ -68,7 +89,7 @@ function uniqueMatchingTasks(tasks: TurnTaskFact[], topic: EvidenceTopic): TurnT
 function hasTaskContext(facts: TurnActionFacts | undefined, rawUserText: string): boolean {
   if (facts?.tasks.some(task => task.source !== 'reminder')) return true
   const text = withoutQuotations(rawUserText)
-  return !WORDING_EXAMPLE.test(text) && TASK_TOPIC.test(text)
+  return !WORDING_EXAMPLE.test(text) && (TASK_TOPIC.test(text) || AUTOMATIC_FOLLOW_UP_TOPIC.test(text))
 }
 
 function unasserted(clause: string, question = false): boolean {
@@ -93,7 +114,7 @@ const RUNNING = '(?:(?:还(?:在)?|仍(?:然)?(?:在)?|正在|目前(?:还)?在|
 const QUEUED = '(?:(?:还|仍|正在|目前|现在)?在排队(?:中)?|排队中)'
 const FAILED = `${PAST}(?:失败|没跑成|中断|出错)(?:了|啦)?`
 const COMPLETED = `${PAST}(?:(?:执行|处理|生成)?(?:完成|结束)|处理完|执行完|跑完)(?:了|啦)?`
-const SENT = '(?:(?:已经|已|刚才|刚刚|早就)(?:给你发|发给你|发你|发出|发过|发送|送达|投递)(?:了|过(?:了)?)?|(?:给你发|发给你|发你|发出|发送|送达|投递|发到(?:群里|这里|上面))(?:了|过了)|发过了|在上面了)'
+const SENT = '(?:(?:已经|已|刚才|刚刚|早就)(?:给你发|发给你|发你|发出(?:来|去)?|发过|发送|送达|投递)(?:了|过(?:了)?)?|(?:给你发|发给你|发你|发出(?:来|去)?|发送|送达|投递|发到(?:群里|这里|上面))(?:了|过了)|发过了|在上面了)'
 const UNSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:给你)?(?:发|发送|投递|送)(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出(?:来|去)?|达)?(?:过(?:了)?|了)?)'
 const IMPLICIT_PREFIX = '(?:(?:我这边|这边|我|目前|现在|刚才那步)(?:已经|已)?(?:把)?|刚才|刚刚)?'
 type TaskStateDimension = 'artifact' | 'execution' | 'delivery' | 'existence' | 'follow_up'
@@ -131,9 +152,9 @@ const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
-const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
+const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|功能|能力|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
-const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
+const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|然而|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
 
 /** Resolve the noun phrase independently of its predicate. A descriptor such
  * as background/color does not create another task; a person inside an image
@@ -144,6 +165,7 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     .replace(new RegExp(`(?:在${SELF_LOCATION}|${SELF_LOCATION})(?:的)?$`, 'u'), '')
   subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
   if (OTHER_SUBJECT.test(subject) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(subject)) return undefined
+  if (context && /^(?:这|那)(?:个|种)?(?:功能|能力)$/u.test(subject)) return {kind:'follow_up', topic:rawTopic, surface:rawSubject}
   if (FOLLOW_UP_OBJECT.test(subject)) return {kind: 'follow_up', topic: rawTopic, surface: rawSubject}
   if (TASK_HEAD.test(subject) || QUALIFIED_TASK_HEAD.test(subject)) {
     const topic = evidenceTopic(subject)
@@ -188,14 +210,14 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
     if (state.dimension === 'follow_up') continue
     // Bare “好了” is a completion condition in ordinary speech. The explicit
     // artifact noun, or the less ambiguous omitted-subject verbs, supply scope.
-    if (object.kind === 'implicit' && state.value === 'available' && !new RegExp(`^${IMPLICIT_PREFIX}${PAST}(?:出来|做好|弄好|弄完|生成好|生成完|改好|画好|画完|做完)(?:了|啦)?${PARTICLES}$`, 'u').test(clause)) continue
+    if (object.kind === 'implicit' && state.value === 'available' && !new RegExp(`^${IMPLICIT_PREFIX}${PAST}(?:出来|做好|弄好|弄完|生成好|生成完|改好|画好|画完|做完)(?:了|啦)?${PARTICLES}$`, 'u').test(clause.replace(SUBJECT_CONNECTOR, ''))) continue
     propositions.push({object, dimension: state.dimension, value: state.value})
   }
   // Existential speech puts the state before the object (“没有这张图” /
   // “没挂着这个任务”), rather than requiring a new whole-sentence pattern.
   const possession = new RegExp(`^(?:${SELF_LOCATION})?(?:现在|目前|本来|原来|一直|也|本来也|本来就)*(还没(?:有)?|没(?:有)?(?:挂(?:着)?)?|尚未|仍(?:然)?有|还有|有)(.+?)${PARTICLES}$`, 'u').exec(clause.replace(SUBJECT_CONNECTOR, ''))
   if (possession && !/^(?:查到|核实到|确认到)/u.test(possession[2]!)) {
-    const object = taskObjectReference(possession[2]!, false, rawTopic)
+    const object = taskObjectReference(possession[2]!, context, rawTopic)
     const absent = /没|未/u.test(possession[1]!)
     if (object?.kind === 'task' && context) propositions.push({object, dimension: 'existence', value: absent ? 'absent' : 'present'})
     else if (object?.kind === 'artifact') propositions.push({object, dimension: 'artifact', value: absent ? 'unavailable' : 'available'})
@@ -208,11 +230,23 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
     const object = taskObjectReference(clause.slice(0,registration.index),context,rawTopic)
     if (object && object.kind !== 'follow_up') propositions.push({object:{...object,kind:'follow_up'},dimension:'follow_up',value:/没|未/u.test(registration[0])?'none':'registered'})
   }
-  if (context && /^(?:(?:我(?:这边)?|这边)?(?:取消(?:了)?(?:发送|投递|通知)?(?:的话)?|那|就|也|已经|已|现在|目前)*)不会(?:再)?(?:自动|主动)(?:发(?:送|图)?|投递|通知)(?:给你|发你|你)?(?:了)?[呀啊呢哦吧]*$/u.test(clause)) {
-    propositions.push({object: {kind: 'follow_up', topic: rawTopic, surface: clause}, dimension: 'follow_up', value: 'none'})
-  }
+  const automaticDenial = context && automaticDenialObject(clause, rawTopic)
+  if (automaticDenial) propositions.push({object:automaticDenial, dimension:'follow_up', value:'none'})
   if (resultQuestion && BARE_ABSENT_ANSWER.test(clause)) propositions.push({object: {kind: 'implicit', topic: rawTopic, surface: ''}, dimension: 'artifact', value: 'unavailable'})
   return propositions
+}
+
+/** Completion is the condition of an automatic-send denial, not uncertainty
+ * about its registration. Consume that condition and the full send predicate. */
+function automaticDenialObject(clause: string, topic: EvidenceTopic): TaskObjectReference | undefined {
+  const denied = new RegExp(`(?:也|就|仍然|还)*不会(?:再)?(?:自动|主动)(?:发(?:送|图)?(?:给(?:你|您)|(?:你|您)|出(?:来|去)?|到(?:群里|这里|私聊))?|投递(?:给(?:你|您))?|(?:通知|提醒)(?:你|您)?)(?:了)?${PARTICLES}$`, 'u').exec(clause)
+  if (!denied) return undefined
+  let prefix = clause.slice(0, denied.index).replace(SUBJECT_CONNECTOR, '')
+    .replace(/^(?:取消|撤销)(?:了)?(?:发送|投递|通知)?(?:之?后|以后|的话)?(?:那|就|也)*/u, '')
+  const condition = [...prefix.matchAll(COMPLETION_TRIGGER)].at(-1)
+  if (condition && condition.index! + condition[0].length === prefix.length) prefix = prefix.slice(0, condition.index)
+  const object = taskObjectReference(prefix, true, topic)
+  return object ? {...object, kind:'follow_up', surface:clause} : undefined
 }
 const BARE_ABSENT_ANSWER = new RegExp(`^还没(?:有)?${PARTICLES}$`, 'u')
 const RESULT_STATUS_QUESTION = new RegExp(`(?:${ARTIFACT_SUBJECT}|第[一二三四五六七八九十\\d]+张(?:图|图片)?)(?:[，,]\\s*)?(?:现在|目前|已经|还|到底)?(?:出来|做好|完成|生成(?:好|完)|改好|画(?:好|完)|弄(?:好|完)|做完|好)(?:了|啦)?(?:没(?:有)?|[吗么])?${PARTICLES}$`, 'u')
@@ -224,20 +258,21 @@ function asksArtifactResult(rawUserText: string): boolean {
 
 const SPOKEN_UPDATE = /^(?:(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|(?:告诉|告知)(?:你|您))$/u
 const SPEECH_DELAY = /等(?:我)?(?:确认|核实|查清|弄清|查到)|(?:确认|核实|查清|弄清|查到).{0,12}(?:之后|以后|后)|稍后|待会|过会|明早|明天|到时候|到时|届时|之后|自动|主动/u
-const ASYNC_ACTION = /(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)/gu
+const ASYNC_ACTION = /(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出来|出去)|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)/gu
 const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:实际(?:的)?|真正(?:的)?)?(?:产出|成品)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
 const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持续|定时|自动|继续)(?:查|查询|检查)/u
 const IMMEDIATE_ACTION = /^(?:那)?(?:我(?:这边)?|这边)?(?:现在|这就|马上|立刻|立即)(?:先|就|会|再|来|手动|直接|帮你|给你|为你|把[^，,]{1,20})*$/u
 const PRESENT_SELF_ACTION = /^(?:那)?(?:我(?:这边)?|这边)(?:先|就|再|来|手动|直接|帮你|给你|为你|把[^，,]{1,20})*$/u
-const USER_TRIGGER = /(?:你|您).{0,12}(?:再(?:来)?问|再(?:来)?找|再叫我|再发(?:消息|一句)|发来|发给我|告诉我|确认(?:后|了)|发(?:来|给我)之后).{0,18}(?:我再|再帮你|再给你)/gu
-const USER_REQUEST_CONDITION = /(?:你|您)[^，,]{0,28}(?:再(?:来)?(?:问|找|叫)|回来[^，,]{0,12}(?:问|找|叫)|再发(?:消息|一句)|(?:确认|发来|发给我|告诉我)(?:后|了))/gu
+const USER_TRIGGER = /(?:你|您).{0,12}(?:再(?:来)?问|再(?:来)?找|再(?:叫|喊)我|再发(?:消息|一句)|发来|发给我|告诉我|确认(?:后|了)|发(?:来|给我)之后).{0,18}(?:我再|再帮你|再给你)/gu
+const USER_REQUEST_CONDITION = /(?:你|您)[^，,]{0,28}(?:再(?:来)?(?:问|找|叫|喊)|回来[^，,]{0,12}(?:问|找|叫|喊)|再发(?:消息|一句)|(?:确认|发来|发给我|告诉我)(?:后|了))/gu
 const ON_DEMAND_LOOKUP = /我(?:到时候|届时|那时|回来后)?(?:现|当场|再)(?:查|查询|核实)(?:一下)?(?:状态|进度|结果)?/u
 const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?(?:了)?|(?:^|[，,])(?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?了(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])|(?:^|[，,])(?:确认|核实|查到|查清|弄清)到(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
-const ELLIPTICAL_RESULT = /有了(?=我|就|再|会|直接|第一时间|[，,])/gu
+const ELLIPTICAL_RESULT = /有(?:了)?(?=我|就|再|会|直接|第一时间|[，,])/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
 const ACQUIRED_OUTPUT = /(?:确认到|拿到|收到)(?:了)?(?:(?:实际|真正|真实)(?:的)?)?(?:产出|产物|成品|结果|图(?:片)?|文件|视频|报告)(?:了)?(?:之后|以后|后|时)?(?=我|就|再|会|直接|马上|立刻|立即|第一时间|自动|主动|给|发|通知|提醒|告诉|跟|和|对|向|[，,]|$)/gu
+const DEFERRED_DELIVERY_CONDITION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?|图(?:片)?|成品|结果|文件|视频)?(?:能(?:够)?|可以)(?:重新|再次|再|补)?(?:发(?:送)?|投递)(?:图(?:片)?|成品|结果|文件|视频)?(?:给(?:你|您)|到(?:群里|这里|私聊))?(?:的时候|时|之后|以后|后)/gu
 
 interface OutputCondition {start: number; end: number; subject: 'self' | 'user' | 'other'}
 /** Consume the verb and its complete output object together. Confirmation of
@@ -291,8 +326,8 @@ function hasLaterCompletionAction(clauses: string[], index: number): boolean {
 
 function topicBefore(text: string, end: number, initial: EvidenceTopic): EvidenceTopic {
   let topic = initial
-  for (const clause of text.slice(0, end).split(/[，,]/u)) {
-    const local = evidenceTopic(clause)
+  for (const clause of localClauses(text.slice(0, end))) {
+    const local = evidenceTopic(clause.text)
     if (!['unknown', 'generic', 'artifact', 'ambiguous'].includes(local)) topic = local
   }
   return topic
@@ -316,26 +351,28 @@ function userRequestedAction(text: string, before: string, actionEnd: number, co
     && ON_DEMAND_LOOKUP.test(response)) return true
   const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(ELLIPTICAL_RESULT), ...before.matchAll(ACQUIRED_OUTPUT)]
     .sort((a, b) => a.index! - b.index!).at(-1)
-  return Boolean(condition && (/^(?:有(?:了)?结果|有了)$/u.test(condition[0])
+  return Boolean(condition && (/^(?:有(?:了)?结果|有(?:了)?)$/u.test(condition[0])
     || new RegExp(`^(?:${ACQUIRED_OUTPUT.source})$`, 'u').test(condition[0])) && ON_DEMAND_LOOKUP.test(response))
 }
 
 function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic: EvidenceTopic): FollowUpClaim[] {
   const claims: FollowUpClaim[] = []
+  const clauses = localClauses(sentence.text)
   const add = (kind: FollowUpKind, end: number): void => {
     const topic = kind === 'reminder' ? 'reminder' : topicBefore(sentence.text, end, rawTopic)
     claims.push({kind, topic: kind === 'job_completion' && topic === 'reminder' ? rawTopic : topic})
   }
   for (const match of sentence.text.matchAll(ASYNC_ACTION)) {
     const before = sentence.text.slice(0, match.index)
-    const clauseStart = Math.max(before.lastIndexOf('，'), before.lastIndexOf(',')) + 1
-    const clause = sentence.text.slice(clauseStart).split(/[，,]/u)[0] || ''
+    const local = clauses.find(clause => clause.start <= match.index! && match.index! < clause.end)
+    const clauseStart = local?.start ?? 0
+    const clause = local?.text || ''
     const actionPrefix = sentence.text.slice(clauseStart, match.index)
     // Bare consent followed by our own present action is not reported speech
     // (“你说一声我现在发你”). Keep actual quotations and later requests intact.
     const selfActionPrefix = actionPrefix.replace(/^(?:你|您)(?:(?:要|需要|想要)(?:的话)?|说一声(?:的话)?)(?=我(?:这边)?(?:现在|这就|马上|立刻|立即|先|就|再|来))/u, '')
     const assertionClause = selfActionPrefix + clause.slice(actionPrefix.length)
-    const lastClause = !/[，,]/u.test(sentence.text.slice(match.index))
+    const lastClause = local?.end === sentence.text.length
     if (unasserted(assertionClause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix + match[0])
       || deniedAction(actionPrefix) || pastAction(actionPrefix)
       || OTHER_SUBJECT.test(actionPrefix) && !/我(?:会|来|再|就|到时|稍后)/u.test(actionPrefix)
@@ -344,19 +381,22 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const completion = Math.max(completionBefore(before), implicitResult ? implicitResult.index! + implicitResult[0].length : -1)
     const verification = [...before.matchAll(DEFERRED_VERIFICATION)].at(-1)
     const verificationEnd = verification ? verification.index! + verification[0].length : -1
+    const deliveryCondition = [...before.matchAll(DEFERRED_DELIVERY_CONDITION)].at(-1)
+    const deliveryConditionEnd = deliveryCondition ? deliveryCondition.index! + deliveryCondition[0].length : -1
+    const conditionEnd = Math.max(completion, verificationEnd, deliveryConditionEnd)
     const outputCondition = outputConditions(before).at(-1)
     if (outputCondition && outputCondition.subject !== 'self' && outputCondition.end === completion
       && !/^(?:我(?:这边)?|这边)/u.test(selfActionPrefix)) continue
     // A bare handoff after completion still promises later delivery. Ordinary
     // gifts or an explanation supplied in this reply are outside this form.
     const implicitHandoff = /^(?:单独)?给(?:你|您)$/u.test(match[0])
-    if (implicitHandoff && completion < 0) continue
-    if (userRequestedAction(sentence.text, before, match.index! + match[0].length, Math.max(completion, verificationEnd))) continue
+    if (implicitHandoff && conditionEnd < 0) continue
+    if (userRequestedAction(sentence.text, before, match.index! + match[0].length, conditionEnd)) continue
     // A negative or wording cue before the condition applies across its
     // comma (“不能承诺图好了，我会发你”). An unrelated earlier clause does not.
-    const conditionEnd = Math.max(completion, verificationEnd)
-    const conditionPrefix = conditionEnd >= 0 ? before.slice(0, conditionEnd).split(/[，,]/u).at(-1) || '' : selfActionPrefix
-    if (NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
+    const conditionPrefix = conditionEnd >= 0 ? localClauses(before.slice(0, conditionEnd)).at(-1)?.text || '' : selfActionPrefix
+    const independentAssertion = conditionEnd <= clauseStart && /^(?:所以|因此|因而|于是|但是|然而|不过|但)/u.test(clause)
+    if (!independentAssertion && NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
     const tail = sentence.text.slice(match.index! + match[0].length)
     if (SPOKEN_UPDATE.test(match[0]) && /^(?:答案|解释|说明|步骤|建议|示例|做法|思路|文字)(?:[：:]|[，,](?:先|首先|第一步))/u.test(tail)) continue
     const delivery = implicitHandoff || /发|投递|补给|补上/u.test(match[0])
@@ -367,7 +407,7 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     // Strip only a condition followed by our own explicit present action;
     // third-party actions and user-triggered future requests stay separate.
     if ((delivery || RERUN_OR_POLL.test(match[0]))
-      && (IMMEDIATE_ACTION.test(selfActionPrefix) || completion < 0 && PRESENT_SELF_ACTION.test(selfActionPrefix))) {
+      && (IMMEDIATE_ACTION.test(selfActionPrefix) || conditionEnd < 0 && PRESENT_SELF_ACTION.test(selfActionPrefix))) {
       // Text supplied in this very reply needs no separate tool execution.
       // Keep this exemption limited to an explanation, never an artifact.
       const inlineText = /(?:^|把)(?:操作)?(?:步骤|解释|说明|答案|建议|示例|做法|思路|文字)$/u.test(actionPrefix)
@@ -378,15 +418,15 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     }
     const spokenUpdate = SPOKEN_UPDATE.test(match[0])
     const speechDelay = spokenUpdate && SPEECH_DELAY.test(before)
-    if (completion < 0 && verificationEnd < 0 && !DELAYED_PROMISE.test(before) && !speechDelay) continue
+    if (conditionEnd < 0 && !DELAYED_PROMISE.test(before) && !speechDelay) continue
     // An explanation delivered in this reply is synchronous. “告诉你” alone
     // becomes a follow-up only with a completion or explicit delay condition.
-    if (spokenUpdate && completion < 0 && verificationEnd < 0 && !speechDelay) continue
+    if (spokenUpdate && conditionEnd < 0 && !speechDelay) continue
     // A job callback does not schedule a later explanation after an
     // unspecified investigation or confirmation of the failure cause.
     const independentVerification = verification && !(outputCondition
       && outputCondition.start <= verificationEnd && verificationEnd <= outputCondition.end)
-    if (independentVerification || outputCondition && outputCondition.subject !== 'self'
+    if (deliveryCondition || independentVerification || outputCondition && outputCondition.subject !== 'self'
       || spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {add('unsupported', match.index! + match[0].length); continue}
     if (RERUN_OR_POLL.test(match[0])) add('unsupported', match.index! + match[0].length)
     else if (completion >= 0) add('job_completion', match.index! + match[0].length)
@@ -394,10 +434,11 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
   }
   for (const match of sentence.text.matchAll(REGISTERED)) {
     const before = sentence.text.slice(0, match.index)
-    const clauseStart = Math.max(before.lastIndexOf('，'), before.lastIndexOf(',')) + 1
-    const clause = sentence.text.slice(clauseStart).split(/[，,]/u)[0] || ''
+    const local = clauses.find(clause => clause.start <= match.index! && match.index! < clause.end)
+    const clauseStart = local?.start ?? 0
+    const clause = local?.text || ''
     const localPrefix = sentence.text.slice(clauseStart, match.index)
-    if (unasserted(clause, sentence.question && !/[，,]/u.test(sentence.text.slice(match.index))) || OTHER_SUBJECT.test(localPrefix)) continue
+    if (unasserted(clause, sentence.question && local?.end === sentence.text.length) || OTHER_SUBJECT.test(localPrefix)) continue
     if (deniedAction(localPrefix) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(localPrefix)
       || /(?:没有|没|未|尚未|并未)(?:帮你|给你|为你|成功)?(?:登记|安排|设好|设置好|定好)/u.test(clause)) continue
     add(completionBefore(localPrefix) >= 0 ? 'job_completion' : /提醒|闹钟/u.test(match[0]) ? 'reminder' : 'job_completion', match.index! + match[0].length)
@@ -419,7 +460,7 @@ function stateSupported(proposition: TaskStateProposition, tasks: TurnTaskFact[]
       // cancelled callback nor any delivery state proves nonexistence.
       case 'existence': return proposition.value === 'present'
       // Per-task registration cannot prove that the platform has no setting.
-      case 'follow_up': return !/设置|机制/u.test(proposition.object.surface) && (proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none')
+      case 'follow_up': return !/设置|机制|功能|能力/u.test(proposition.object.surface) && (proposition.value === 'registered' ? supportsFollowUp(task, task.source === 'reminder' ? 'reminder' : 'job_completion') : task.followUp.state === 'none')
     }
   })
 }
@@ -566,7 +607,14 @@ function unsupportedRerunRequirement(clause: string, context: boolean, topic: Ev
 }
 
 const CANCELLATION_TIMING = /(?:取消|撤销)(?:是|会|将)?(?:立即|即时|马上)(?:就)?生效(?:的|了)?/u
-const RESULT_LOCATION = /(?:出来的|生成好的)?图(?:片)?(?:你|您)?(?:可以|能)(?:自己)?在(任务页)(?:拿|取|下载)(?:到)?/u
+const RESULT_LOCATION = new RegExp(`(?:(?:(?:出来的|生成好的)?${ARTIFACT_SUBJECT}(?:你|您)?|(?:你|您))(?:就)?(?:可以|能|需要|必须|得)(?:自己)?|(?:^|[，,：:])(?:那|就)?(?:得|需要|必须)(?:你|您)(?:自己)?)(?:在|去|到)任务页(?:上|里)?(?:拿|取|领取|下载|查看|看)(?:到)?(?:图(?:片)?|成品|结果|产物|文件)?${PARTICLES}(?=$|[，,])`, 'u')
+
+function assertedResultLocation(clause: string): boolean {
+  // A proposed place to check is not a verified pickup capability. The
+  // consequence of a prior artifact condition is still its own assertion.
+  const hypothetical = new RegExp(`^(?:(?:如果|假如|要是|倘若)|${ARTIFACT_SUBJECT}(?:如果|假如|要是|倘若))`, 'u')
+  return !hypothetical.test(clause.replace(SUBJECT_CONNECTOR, '')) && RESULT_LOCATION.test(clause)
+}
 
 /** These platform details have no field in the task projection. A current,
  * explicit report of the platform's own instruction is a separate source;
@@ -627,7 +675,7 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
           correctionInstruction: '只说明已核验的发送状态，缺少原因就说原因尚未确认。不要自行确认或排除拒收、被拦截、屏蔽或没开接收，也不要据此要求用户修改设置；条件性的排查建议需明确仍是假设。'})
       }
     }
-    const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
+    const clauses = localClauses(sentence.text).map(clause => clause.text)
     let sentenceTaskContext = taskContext
     for (const [index, clause] of clauses.entries()) {
       const explicitTopic = evidenceTopic(clause)
@@ -640,7 +688,7 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
           reason: '后续登记状态只证明当前安排是否有效，没有提供取消生效时延的证据。',
           correctionInstruction: '只说明当前已核验的后续登记状态；取消是否即时生效尚无来源时保留未知，不从已取消推导平台生效规则。'})
       }
-      if (taskContext && RESULT_LOCATION.test(clause) && !reportedPlatformDetail(rawUserText, RESULT_LOCATION)) {
+      if (taskContext && assertedResultLocation(clause) && !reportedPlatformDetail(rawUserText, RESULT_LOCATION)) {
         violations.push({code: 'unsupported_delivery', claim: sentence.text,
           reason: '任务记录没有提供产物的下载位置或任务页取件能力，不能据此保证用户能在指定位置取图。',
           correctionInstruction: '撤回未经核验的取图位置，只说明已知产物和投递状态；有当前用户明确转述的平台说明时才按该来源描述。'})
@@ -656,9 +704,10 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
         || rerunContext && explicitTopic !== 'reminder' && /(?:任务|产物|结果|回执|登记|记录)/u.test(clause)
           && !/别人|他|她|(?:我|你)(?:妈|爸|姐姐|妹妹|哥哥|弟弟|朋友|同事)/u.test(clause)
       // “好了我会发你” is a future condition, not a claim that it is ready.
-      if (/^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
-        || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))) continue
+      const completionCondition = /^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
+        || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))
       for (const state of taskStatePropositions(clause, sentenceTaskContext, currentObjectTopic, resultQuestionContext)) {
+        if (completionCondition && state.dimension !== 'follow_up') continue
         if (state.object.kind !== 'implicit') sentenceTaskContext = true
         const clauseTopic = state.object.topic
         const topic = clauseTopic === 'unknown' || clauseTopic === 'generic' ? currentObjectTopic : clauseTopic

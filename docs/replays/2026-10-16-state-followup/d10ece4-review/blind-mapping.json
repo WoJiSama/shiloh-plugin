@@ -1,0 +1,170 @@
+[
+  {
+    "id": "case-01",
+    "group": "unknown-task-no-registered-followup:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-02",
+    "group": "unknown-task-no-registered-followup:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-03",
+    "group": "confirmed-result-and-delivery:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-04",
+    "group": "confirmed-result-and-delivery:2",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-05",
+    "group": "generated-but-delivery-failed-no-auto-retry:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-06",
+    "group": "generated-but-delivery-failed-no-auto-retry:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-07",
+    "group": "registered-followup-then-cancelled:1",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-08",
+    "group": "registered-followup-then-cancelled:2",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-09",
+    "group": "referenced-missing-task-not-other-result:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-10",
+    "group": "referenced-missing-task-not-other-result:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-11",
+    "group": "successive-praise-adds-specific-information:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-12",
+    "group": "successive-praise-adds-specific-information:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-13",
+    "group": "real-burning-fault-no-visible-mark-then-inspection:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-14",
+    "group": "real-burning-fault-no-visible-mark-then-inspection:2",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-15",
+    "group": "fictional-meme-updated-duration-and-negative-fault:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-16",
+    "group": "fictional-meme-updated-duration-and-negative-fault:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-17",
+    "group": "attention-not-explanation:1",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-18",
+    "group": "attention-not-explanation:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-19",
+    "group": "biscuit-bit-continuity:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-20",
+    "group": "biscuit-bit-continuity:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-21",
+    "group": "third-person-attention:1",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-22",
+    "group": "third-person-attention:2",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-23",
+    "group": "comfort-without-lecture:1",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-24",
+    "group": "comfort-without-lecture:2",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-25",
+    "group": "real-fault-retains-condition:1",
+    "candidate": "B",
+    "baseline": "A"
+  },
+  {
+    "id": "case-26",
+    "group": "real-fault-retains-condition:2",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-27",
+    "group": "exam-reminder-is-not-image-callback:1",
+    "candidate": "A",
+    "baseline": "B"
+  },
+  {
+    "id": "case-28",
+    "group": "exam-reminder-is-not-image-callback:2",
+    "candidate": "B",
+    "baseline": "A"
+  }
+]

@@ -52,7 +52,7 @@ const DAMAGE_COMPONENTS: [DiagnosticDamageComponent, RegExp][] = [
   ['power_supply', /电源/u], ['mainboard', /主板/u], ['graphics_card', /显卡/u],
   ['cable', /线材|线缆|电线/u], ['capacitor', /电容/u]
 ]
-const DAMAGE_TERMS = /烧坏|烧毁|烧了|烧掉|烧焦|损坏|受损|坏了|短路|电气故障|过热|击穿|出(?:了)?问题/gu
+const DAMAGE_TERMS = /烧坏|烧毁|烧了|烧掉|烧焦|烧损|损坏|受损|坏了|短路|电气故障|过热|击穿|出(?:了)?问题/gu
 const DAMAGE_SUBJECT = /元件|零件|东西|部件|电气件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面|整机|电脑|机器|设备/gu
 const PROFESSIONAL = /维修(?:师傅|人员|工程师|店|点)|专业(?:维修|检修|人员)|售后|检修(?:师傅|人员)/u
 const TEMPERATURE = /温度|(?:-?\d{1,3}(?:\.\d+)?)\s*(?:℃|°\s*C|摄氏度)|TjMax|Tcase/iu
@@ -66,7 +66,7 @@ function componentsIn(text: string): DiagnosticDamageComponent[] {
 }
 
 function damageKind(text: string): DiagnosticDamageKind {
-  return /烧坏|烧毁|烧了|烧掉|烧焦/u.test(text) ? 'burned' : /短路/u.test(text) ? 'short_circuit' : /击穿/u.test(text) ? 'electrical_breakdown' : /过热/u.test(text) ? 'overheated' : 'damaged'
+  return /烧坏|烧毁|烧了|烧掉|烧焦|烧损/u.test(text) ? 'burned' : /短路/u.test(text) ? 'short_circuit' : /击穿/u.test(text) ? 'electrical_breakdown' : /过热/u.test(text) ? 'overheated' : 'damaged'
 }
 
 interface DamageProposition extends DamageFinding {text: string; negated: boolean}
@@ -450,8 +450,24 @@ function conditionalTemperatureSpecification(clause: string): boolean {
   return /(?:如果|假如|只有|前提是).{0,35}(?:型号|测点|传感器|负载).{0,35}(?:规格|官方|厂家|允许|上限|范围|阈值)|(?:如果|假如|只有|前提是).{0,35}(?:官方|厂家|该型号)(?:公布|规定|给出|标定)?的?(?:温度)?(?:规格|上限|范围|阈值).{0,20}(?:允许|以内|以下|范围内)/u.test(clause)
 }
 
-function professionalOperationCondition(clause: string): boolean {
-  return /(?:等|待|只有|如果|须|需|必须|经).{0,30}(?:专业|维修|检修).{0,35}(?:放行|排除.{0,8}电气损坏|确认.{0,8}(?:可|能|允许)(?:安全)?(?:开机|通电))|(?:交给|交由|由).{0,15}(?:专业|维修).{0,25}(?:检测|操作|检查)/u.test(clause)
+function professionalOperationCondition(clause: string, professionalReference = false): boolean {
+  const professional = /专业|维修|检修|售后|师傅/u.test(clause)
+    || (professionalReference && /他们|他|她|那边/u.test(clause))
+  if (!professional || /朋友的|同事的|室友的|另(?:一)?台|其他(?:机器|设备)/u.test(clause)
+    || /(?:无需|不用|不必|不需要|没必要).{0,12}(?:检修|检查|维修|放行)/u.test(clause)) return false
+  // Inspection is a future gate only when its result permits operation. Merely
+  // mentioning a repair shop or technician cannot authorize a user action.
+  const clearance = /放行|排除.{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没有|没|无).{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没问题|安全|正常|(?:可|能|允许)(?:安全)?(?:开机|通电|$))/u.exec(clause)
+  if (!clearance) return false
+  const before = clause.slice(0, clearance.index)
+  const after = clause.slice(clearance.index + clearance[0].length)
+  const future = /等|待|只有|如果|须|需|必须|(?<!已)经|前提/u.test(before)
+    || /^\s*(?:(?:并(?:且)?|且|和|、)(?:明确)?放行)*(?:之后|以后|后|的话|才(?:能|可))/u.test(after)
+  return future && !deniesProfessionalClearance(clause)
+}
+
+function professionalOperationActor(prefix: string): boolean {
+  return /(?:交给|交由|由|让|请)(?:现场)?(?:专业(?:维修|检修)?人员|维修(?:师傅|人员|工程师)|检修(?:师傅|人员)|师傅)(?:来|亲自|负责|在现场|按(?:自己的)?检修工序|先|再|做|进行|受控|地|安全|测试|检测|检查|操作|完成|的要求)*\s*$/u.test(prefix)
 }
 
 function isQuestion(clause: string): boolean {
@@ -470,13 +486,23 @@ function supportedDamage(proposition: DamageProposition, findings: DamageFinding
   })
 }
 
-function isDamageDiscussion(clause: string): boolean {
-  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|受损|短路|过热|击穿)|(?:排除|排查|检查|确认).{0,24}(?:烧坏|烧毁|损坏|受损|短路|过热|击穿).{0,5}(?:之前|以前|前)|(?:烧坏|烧毁|损坏|受损|短路|过热|击穿)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
-    // A statement about the limits of external observation is not by itself a
-    // claim that this device contains damage. Explicit current diagnoses remain
-    // subject to evidence checking even when followed by the same limitation.
-    || (!/(?:已经|已然|确定|确认|肯定|一定|大概率|很可能|多半|就是|说明|证明).{0,14}(?:烧坏|烧毁|损坏|受损|短路)|(?:你(?:的|这台)|这台|这只|这块|当前(?:这台)?|本机).{0,18}(?:电源|主板|内部|里面).{0,12}(?:损坏|受损|故障)/u.test(clause)
-      && /(?:内部|里面)(?:的)?(?:损坏|受损|故障).{0,8}(?:外面|外观|肉眼).{0,8}(?:看不出|看不到|无法(?:看|判断)|不能(?:看|判断))/u.test(clause))
+function isDamageDiscussion(clause: string, proposition: DamageProposition, professionalReference = false, carriedCondition = false): boolean {
+  const prefix = proposition.text
+  const suffix = clause.slice(prefix.length)
+  if (/(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|烧损|损坏|受损|短路|过热|击穿)$/u.test(prefix)) return true
+  const inspectionTarget = /(?:排除|排查|检查|确认|判断|检测)(?:(?!已经|肯定|确定|大概率|很可能|多半|说明|证明|之后|以后|烧坏|烧毁|烧损|损坏|受损|短路|过热|击穿).){0,24}(?:烧坏|烧毁|烧损|损坏|受损|短路|过热|击穿)$/u.test(prefix)
+  if (inspectionTarget && /^\s*(?:之前|以前|前)/u.test(suffix)) return true
+  if (inspectionTarget && (professionalOperationCondition(prefix + suffix, professionalReference) || carriedCondition)
+    && /(?:之后|以后|后|放行|再|才)/u.test(suffix)) return true
+  if (/^\s*(?:了)?(?:时|后|的情况下|一般|通常|会)/u.test(suffix)) return true
+  // A nominal risk predicate is about a possible future outcome, not a
+  // completed diagnosis. Explicit completion/inference after it stays checked.
+  const riskComplement = /风险(?:就|也|还|主要)?(?:是|包括|在于|指的是)([^，,。！？!?；;\n]*)$/u.exec(prefix)?.[1]
+  if (riskComplement !== undefined && !/已经|已然|确定|确认|肯定|一定|大概率|很可能|多半|说明|证明/u.test(riskComplement)) return true
+  // The external visibility of damage is general knowledge. A current-device
+  // subject or a definite diagnosis makes it an evidential claim instead.
+  const currentDiagnosis = /(?:已经|已然|确定|确认|肯定|一定|大概率|很可能|多半|就是|说明|证明).{0,18}(?:烧坏|烧毁|烧了|烧掉|烧焦|烧损|损坏|受损|短路)|(?:你(?:的|这台)|这台|这只|这块|当前(?:这台)?|本机).{0,30}(?:烧坏|烧毁|烧了|烧损|损坏|受损|故障)/u.test(prefix)
+  return !currentDiagnosis && /^(?:了|的)?(?:从)?(?:外面|外观|肉眼)(?:常常|经常|一般|通常|往往|也|并|都|根本|完全|直接)*.{0,5}(?:看不出|看不到|无法(?:看|判断)|不能(?:看|判断))/u.test(suffix)
 }
 
 function temperatureAssurance(clause: string): boolean {
@@ -571,27 +597,41 @@ function replyAssertions(text: string): string[] {
   }).filter(clause => clause.trim())
 }
 
-function advisesUnclearedOperation(clause: string): boolean {
+function independentlyCurrentOperation(text: string): boolean {
+  const present = [...text.matchAll(/现在|目前|此刻|马上|立即|不用等|无需等|不必等/gu)].at(-1)?.index ?? -1
+  const future = [...text.matchAll(/等(?!待)|待|只有|如果|前提|之后|以后|放行后/gu)].at(-1)?.index ?? -1
+  return present > future
+}
+
+function advisesUnclearedOperation(clause: string, carriedCondition = false, professionalReference = false, nextClause = ''): boolean {
   const action = /开机|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)/gu
   for (const match of clause.matchAll(action)) {
     const prefix = clause.slice(0, match.index)
     const suffix = clause.slice(match.index + match[0].length)
     // A later "别摸内部" cannot negate an earlier "先开机". Only a
     // prohibition immediately governing this operation can do that.
-    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
-    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|不宜|避免|不该|不可)(?:再|重新|直接|自行|擅自|贸然)*(?:接|连接)(?:(?:这|那)台的?)?(?:原(?:装)?的?)?(?:电源(?:线)?|插头)\s*$/u.test(prefix)) continue
-    const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
+    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|自己|亲自|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
+    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|不宜|避免|不该|不可)(?:再|重新|直接|自行|自己|擅自|贸然)*(?:接|连接)(?:(?:这|那)台的?)?(?:原(?:装)?的?)?(?:电源(?:线)?|插头)\s*$/u.test(prefix)) continue
+    const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|自己|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
-    const operationTail = suffix.replace(/^\s*(?:测试|试机|检测|检查|试验)?/u, '')
-    // An operation named as a future boundary or deferred pending inspection
-    // is not a step to run now. Any subsequent operation is checked separately.
+    const operationTail = suffix.replace(/^\s*(?:(?:再)?(?:测试|试机|检测|检查|试验|试|测)(?:一下)?)*(?:本身)?/u, '')
+    // A future boundary and an explicitly delegated professional procedure are
+    // different from instructions for the user to run the device now.
     if (/^(?:之|以)?前/u.test(operationTail)
-      || /^(?:这种事|这类操作)?(?:让|交给|交由|由)(?:现场)?(?:专业(?:维修|检修)?人员|维修(?:师傅|人员|工程师)|师傅)(?:先)?(?:做过|完成|做好)(?:了)?(?:检修|检查)(?:之后|以后)?再说/u.test(operationTail)) continue
-    // Nominal risk statements describe the cost of powering on; they do not
-    // instruct the user to do it. An explicit "先通电" still advises operation,
-    // even when its own risk is acknowledged afterward.
-    const directInstruction = /(?:可以|能够|能|建议|先|直接|试着|不妨|然后|接着|请|现在)(?:再次|再一次|再|重新|直接|立即|自行|擅自|贸然|去|就|尝试|试着|继续)*\s*$/u.test(prefix)
-    if (!directInstruction && /^(?:的)?(?:风险(?:很|较|太|更)?(?:大|高|真实存在|存在)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|受损|烧|过热|击穿|危险|风险)|(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)(?:(?:或(?:者)?|和|及|甚至)(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)){0,3}的?风险)/u.test(operationTail)) continue
+      || /^(?:这种事|这类操作)?(?:让|交给|交由|由)(?:现场)?(?:专业(?:维修|检修)?人员|维修(?:师傅|人员|工程师)|师傅)(?:先)?(?:做过|完成|做好)(?:了)?(?:检修|检查)(?:之后|以后)?再说/u.test(operationTail)
+      || professionalOperationActor(prefix)) continue
+    const independentlyNow = independentlyCurrentOperation(prefix)
+    if (!independentlyNow && (professionalOperationCondition(prefix, professionalReference) || carriedCondition)) continue
+    // Bare "directly/again power on" can name the risky event. Imperative or
+    // permission predicates still advise it even when followed by a warning.
+    const directInstruction = /(?:可以|能够|能|建议|先|试着|不妨|然后|接着|请)(?:再次|再一次|再|重新|直接|立即|自行|自己|擅自|贸然|去|就|尝试|试着|继续)*\s*$/u.test(prefix)
+    const riskPredicate = /^(?:的)?(?:就|也|同样|仍然|还是)?(?:有.{0,18}风险|存在.{0,12}风险|风险(?:(?:很|较|太|更)?(?:大|高|真实存在|存在)|(?:就|也|还|主要)?(?:是|包括|在于|指的是))|(?:很|比较|十分|非常|更)?危险|(?:会|可能|有可能|一旦|万一).{0,22}(?:短路|损坏|受损|烧|过热|击穿|起火|危险|风险)|(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)(?:(?:或(?:者)?|和|及|甚至)(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)){0,3}的?风险)/u.test(operationTail)
+      || (/^[，,]\s*$/u.test(operationTail) && /^\s*风险(?:就|也|还|主要)?(?:是|包括|在于|指的是)/u.test(nextClause))
+    if (!directInstruction && riskPredicate) continue
+    // "Can start briefly" in a denial of its diagnostic value is a capability
+    // observation, not permission. An explicit "可以先开机" remains advice.
+    if (!/(?:可以|建议|先|请|不妨|试着)/u.test(prefix)
+      && /^(?:了|成功|正常)?(?:也|仍|还|都)?(?:不代表|不等于|不意味着|不能(?:说明|证明))/u.test(operationTail)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
   }
@@ -694,11 +734,17 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
   }
   let carriedOperationCondition = false
   let carriedTemperatureCondition = false
-  for (const clause of replyAssertions(prose)) {
+  let professionalReference = false
+  const assertions = replyAssertions(prose)
+  for (let assertionIndex = 0; assertionIndex < assertions.length; assertionIndex++) {
+    const clause = assertions[assertionIndex]!
     if (/^\s*(?:但是|不过|然而|可是|但(?!凡)|却)/u.test(clause)) {carriedOperationCondition = false; carriedTemperatureCondition = false}
     const temperatureConditional: boolean = carriedTemperatureCondition || conditionalTemperatureSpecification(clause)
     carriedTemperatureCondition = temperatureConditional && !/[。！？!?；;\n]/u.test(clause)
-    const operationConditional: boolean = carriedOperationCondition || professionalOperationCondition(clause)
+    const independentlyNow = independentlyCurrentOperation(clause)
+    if (independentlyNow) carriedOperationCondition = false
+    const operationConditional: boolean = carriedOperationCondition || professionalOperationCondition(clause, professionalReference)
+    const previousOperationCondition = carriedOperationCondition
     carriedOperationCondition = operationConditional && !/[。！？!?；;\n]/u.test(clause)
     if (isQuestion(clause)) continue
     const conclusionDenied = deniesConclusion(clause)
@@ -710,7 +756,7 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
       const pendingExclusion = /^\s*(?:还|仍|尚|目前|现在)?(?:没(?:有)?|未)(?:能)?(?:完全|彻底)?排除/u.test(suffix)
       // A later disclaimer about overall health cannot retract a preceding
       // "not burned" conclusion. Only its own governing denial/uncertainty does.
-      if (deniesConclusion(proposition.text) || offersPossibility(proposition.text) || postposedPossibility || pendingExclusion || conditional || isDamageDiscussion(clause)) continue
+      if (deniesConclusion(proposition.text) || offersPossibility(proposition.text) || postposedPossibility || pendingExclusion || isDamageDiscussion(clause, proposition, professionalReference, previousOperationCondition)) continue
       if (proposition.negated) {
         const exclusions = assessment.damage.excludedFindings || evidenceAssessment(context.sources).damage.excludedFindings || []
         if (!supportedDamage(proposition, exclusions)) add('unsupported_damage_exclusion', clause.trim(), '没有观察到烟雾、异味或烧痕，不是同一部件与机制已被专业排除的证据。', '仅复述未观察到的症状；不要据此断言没有烧毁、没有损坏或损坏较轻。若已有专业排除报告，只按报告的部件、机制与范围说明。')
@@ -736,9 +782,11 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
       && temperatureAssurance(clause)) {
       add('unsupported_temperature_assurance', clause.trim(), `温度判断仍缺少：${assessment.temperature.missing.join('、')}。`, '先说明当前读数无法单独判断正常与否，补齐部件型号、测点和负载并对照规格；末尾补问不能抵消前面的正常或安全保证。')
     }
-    if (!context.allowedChecks.includes('operational_monitoring') && !operationConditional && advisesUnclearedOperation(clause)) {
+    if (!context.allowedChecks.includes('operational_monitoring') && advisesUnclearedOperation(clause, previousOperationCondition, professionalReference, assertions[assertionIndex + 1] || '')) {
       add('unmet_operational_prerequisite', clause.trim(), '同一设备的电气异常尚未获报告专业排除，运行检测前提不成立。', '保持电源隔离，冷却后只做静态观察与专业检修；如提运行检测，必须明确以同一设备完成专业检修并放行为条件。')
     }
+    if (/专业|维修|检修|售后|师傅/u.test(clause)) professionalReference = true
+    else if (/朋友的|同事的|室友的|另(?:一)?台|其他(?:机器|设备)/u.test(clause)) professionalReference = false
     if (context.damageExclusion === 'reported_professional_clearance' && !conditional
       && /电气损坏(?:仍|还|尚)(?:然)?未排除|(?:还|尚|仍)(?:没有|没)(?:完成)?(?:专业)?检修|(?:绝对|永远|一律|无论如何).{0,8}(?:不能|禁止|不可以).{0,5}(?:开机|通电)/u.test(clause)) {
       add('contradicted_professional_clearance', clause.trim(), '用户已明确报告同一设备完成专业检修和放行，不能继续把该前提写成未满足。', '采纳已报告的专业检查范围，允许外壳复原后在放行范围内的非接触运行监测；不要把它扩大为整机绝对安全。')

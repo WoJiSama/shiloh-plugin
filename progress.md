@@ -1637,3 +1637,5 @@ TS6A最终全门禁通过并提交9c2293c（后端1621/1576pass/45skip，前端3
 - 51完整60轮已保留58结构/73对75 HTTP200/全部low、15纠正9兜底，P50/P95 3.212/12.381秒，QQ/真实工具/生产写入均0。五类动作边界源码67/67与strict0、诊断82/82与strict0均停写；父统一strict/build/testcompile通过，271定向270pass/1fail暴露正常合并名词后置“尚未核实”误拦，继续同域窄修，首次失败不覆盖。原目录最新109目标CAS预检无冲突，HEAD/index未变、尚未apply。
 
 - 51独立28组已逐组揭盲并封存：候选3胜10负15平、203:212，自然度2胜9负17平、41:48，明确硬错各1。原评schema不同首次揭盲校验失败，保留raw后只规范字段重验；evaluatedCandidate已断言51，旧汇总不充作新评。postfix窄修source68/68与strict0停写，父统一strict/build/testcompile与10文件272/272全过无跳过。
+
+- d10ece4已commit/push并冻结隔离runtime，完整60轮进行中。原目录CAS正式写回120目标并立即capture，1630非目标文件逐项不变、原HEAD/index保持；原目录strict/build/testcompile及272/272回归通过，无跳过；五个业务TS源码与compiled JS均与隔离分支一致，原目录自身source/output manifest自洽，不把其他并发配置/群管改动宣称为生产相同。
