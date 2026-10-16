@@ -500,11 +500,17 @@ function thermalComponents(text: string): ThermalComponent[] {
   return components
 }
 
-function thermalConclusion(clause: string): ThermalConclusion | undefined {
-  // Infer neither direction from a symptom alone. Generic explanations of what
-  // thermal throttling can do, and questions about it, are not a current finding.
-  if (/(?:说明|证明|表明|意味着|就是|已经|肯定|确定|确认)[^。！？!?；;\n]{0,20}(?:触发(?:了)?|撞(?:上|到|了)?|达到(?:了)?)(?:温度墙|温度(?:上限|阈值))(?!时|后|会|的情况下)|(?:CPU|GPU|处理器|显卡).{0,8}(?:已|已经)(?:触发(?:了)?|撞(?:上|到|了)?)(?:温度墙|温度(?:上限|阈值))(?!时|后|会|的情况下)/iu.test(clause)) return 'thermal_limit_triggered'
-  if (/(?:\d{1,3}\s*(?:℃|°\s*C|度)|温度|读数)[^。！？!?；;\n]{0,12}(?:就|已经|属于|算|偏|很|接近|达到)[^。！？!?；;\n]{0,5}(?:临界|温度上限)(?!时|的情况下)/iu.test(clause)) return 'near_temperature_limit'
+function thermalConclusion(clause: string): {kind: ThermalConclusion; negated: boolean} | undefined {
+  // Keep the polarity on the actual thermal predicate. A professional report
+  // that confirms "没有触发" confirms a negative finding, not a positive one.
+  for (const trigger of clause.matchAll(/(?:触发(?:了)?|撞(?:上|到|了)?|达到(?:了)?)(?:温度墙|温度(?:上限|阈值))(?!时|后|会|的情况下)/giu)) {
+    const prefix = clause.slice(0, trigger.index)
+    if (!/(?:说明|证明|表明|意味着|就是|已经|肯定|确定|确认)[^。！？!?；;\n]{0,20}$|(?:CPU|GPU|处理器|显卡).{0,8}(?:已|已经)$/iu.test(prefix)) continue
+    const negated = /(?:没有|并未|从未|未曾|不曾|没|未|不)(?:已经|曾经|曾|再|也|持续|真正|直接)*\s*$/u.test(prefix)
+      && !/(?:不是|并非|并不是)(?:没有|没|未)\s*$/u.test(prefix)
+    return {kind: 'thermal_limit_triggered', negated}
+  }
+  if (/(?:\d{1,3}\s*(?:℃|°\s*C|度)|温度|读数)[^。！？!?；;\n]{0,12}(?:就|已经|属于|算|偏|很|接近|达到)[^。！？!?；;\n]{0,5}(?:临界|温度上限)(?!时|的情况下)/iu.test(clause)) return {kind: 'near_temperature_limit', negated: false}
   return undefined
 }
 
@@ -530,7 +536,12 @@ function supportsThermalConclusion(clause: string, kind: ThermalConclusion, cont
         || !/(?:确认|诊断为|检测证实|检查发现)/u.test(reported)) continue
       const components = thermalComponents(reported)
       const reportedKind = thermalConclusion(reported)
-      if (components.length === 1 && reportedKind) findings.push({component: components[0]!, kind: reportedKind})
+      if (components.length === 1 && reportedKind) {
+        // A later same-component negative finding retracts an earlier positive
+        // report of this mechanism without affecting other components.
+        findings = findings.filter(finding => finding.component !== components[0] || finding.kind !== reportedKind.kind)
+        if (!reportedKind.negated) findings.push({component: components[0]!, kind: reportedKind.kind})
+      }
     }
   }
   return findings.some(finding => finding.component === claimComponents[0] && finding.kind === kind)
@@ -647,9 +658,9 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
       add('unsupported_safety_certification', clause.trim(), '远程用户陈述和局部检查都不支持整机安全保证。', '按报告说明能确认的范围，说明检查前提与停止条件，不给整机安全保证。')
     }
     const thermalClaim = thermalConclusion(clause)
-    if (thermalClaim && !conclusionDenied && !possible && !conditional && !temperatureConditional
-      && (thermalClaim === 'thermal_limit_triggered' || assessment.temperature?.missing.length)
-      && !supportsThermalConclusion(clause, thermalClaim, context)) {
+    if (thermalClaim && !thermalClaim.negated && !conclusionDenied && !possible && !conditional && !temperatureConditional
+      && (thermalClaim.kind === 'thermal_limit_triggered' || assessment.temperature?.missing.length)
+      && !supportsThermalConclusion(clause, thermalClaim.kind, context)) {
       add('unsupported_temperature_diagnosis', clause.trim(), '频率下降不能独立确定温度限频；型号、测点和规格未明时，也不能把当前读数判为温度临界。', '区分频率现象与原因：还可能存在功耗等限制，先结合温度规格及限频原因记录判断；保留待确认的可能性，不把降频写成确定触发温度墙。已有专业结论只按同一部件和确认范围复述。')
     }
     if (assessment.temperature?.missing.length && !conclusionDenied && !possible && !conditional

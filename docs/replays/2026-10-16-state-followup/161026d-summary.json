@@ -1,0 +1,29 @@
+{
+  "commit": "161026d2b955f10c5c1014c8af5dfb39f4c0af55",
+  "complete": true,
+  "turns": 60,
+  "structuralPassed": 60,
+  "httpRequests": 72,
+  "http200": 72,
+  "explicitLow": 72,
+  "repairTurns": 12,
+  "fallbackTurns": 5,
+  "replyLatencyMs": {
+    "p50": 4143,
+    "p95": 10655,
+    "max": 20548
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "sameProtocolFields": [
+    "runnerHash",
+    "scenariosHash",
+    "memoryHelperHash",
+    "configHash",
+    "effectiveConfigHash",
+    "personaHash",
+    "personaLibraryHash",
+    "repetitions"
+  ],
+  "disposition": "superseded_before_deployment_after_independent_negative_professional_report_polarity_bug_was_confirmed; not_final_semantic_proof"
+}

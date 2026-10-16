@@ -1028,3 +1028,21 @@ test('thermal findings preserve explicit professional component, mechanism and c
   const revised = buildDiagnosticContext({rawUserText: '刚才说错了，维修师傅还没检查这台电脑，CPU温度82℃。', speakerId, history: [{role: 'user', userId: speakerId, text: inspected}]})!
   assert.ok(validateDiagnosticReply('CPU已经触发温度墙。', revised).some(item => item.code === 'unsupported_temperature_diagnosis'))
 })
+
+
+test('a professional negative thermal predicate never supports a positive diagnosis', () => {
+  for (const negative of ['没有', '未']) {
+    const rawUserText = `维修师傅已经检查了我的电脑，确认CPU${negative}触发温度墙。CPU满载82℃。`
+    const context = buildDiagnosticContext({rawUserText, speakerId})!
+    assert.ok(validateDiagnosticReply('CPU已经触发温度墙。', context).some(item => item.code === 'unsupported_temperature_diagnosis'), rawUserText)
+    assert.deepEqual(validateDiagnosticReply(`按你报告的检查结果，确认CPU${negative}触发温度墙。`, context), [], 'a negative predicate is not itself an unsupported positive diagnosis')
+  }
+  const positive = '维修师傅已经检查了我的电脑，确认CPU已经触发温度墙。'
+  const revised = buildDiagnosticContext({rawUserText: '维修师傅再次检查了我的电脑，确认CPU没有触发温度墙。CPU满载82℃。', speakerId, history: [{role: 'user', userId: speakerId, text: positive}]})!
+  assert.ok(validateDiagnosticReply('CPU已经触发温度墙。', revised).some(item => item.code === 'unsupported_temperature_diagnosis'), 'a newer negative finding retracts an older positive finding of the same component and mechanism')
+  const local = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认CPU没有触发温度墙，确认GPU已经触发温度墙。CPU满载82℃。', speakerId})!
+  assert.ok(validateDiagnosticReply('CPU已经触发温度墙。', local).some(item => item.code === 'unsupported_temperature_diagnosis'))
+  assert.deepEqual(validateDiagnosticReply('GPU已经触发温度墙。', local), [], 'CPU negation does not retract the GPU finding')
+  const otherPredicate = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认CPU没有损坏但已经触发温度墙。CPU满载82℃。', speakerId})!
+  assert.deepEqual(validateDiagnosticReply('CPU已经触发温度墙。', otherPredicate), [], 'negation of damage does not govern the later thermal predicate')
+})
