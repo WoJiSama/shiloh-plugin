@@ -627,7 +627,7 @@ function advisesUnclearedOperation(clause: string, carriedCondition = false, pro
       && /(?:确认|明确(?:说|表示)).{0,20}(?:可以|能够|能|允许|可)(?:安全)?$/u.test(prefix)) continue
     // A later "别摸内部" cannot negate an earlier "先开机". Only a
     // prohibition immediately governing this operation can do that.
-    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|自己|亲自|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
+    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|自己|亲自|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:开机|通电|上电)|插(?:回|上)(?:去|来)?(?:电源(?:线)?|插头)?|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
     if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|不宜|避免|不该|不可)(?:再|重新|直接|自行|自己|擅自|贸然)*(?:接|连接)(?:(?:这|那)台的?)?(?:原(?:装)?的?)?(?:电源(?:线)?|插头)\s*$/u.test(prefix)) continue
     const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|自己|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
@@ -654,6 +654,9 @@ function advisesUnclearedOperation(clause: string, carriedCondition = false, pro
     // observation, not permission. An explicit "可以先开机" remains advice.
     if (!/(?:可以|建议|先|请|不妨|试着)/u.test(prefix)
       && /^(?:了|成功|正常)?(?:也|仍|还|都)?(?:不代表|不等于|不意味着|不能(?:说明|证明))/u.test(operationTail)) continue
+    if (!/(?:可以|建议|先|请|不妨|试着)/u.test(prefix)
+      && /(?:就算|即使|哪怕|纵然)/u.test(prefix) && /^[，,]\s*$/u.test(operationTail)
+      && /^\s*(?:也|仍|还|都)?(?:不代表|不等于|不意味着|不能(?:说明|证明))/u.test(nextClause)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
   }
@@ -674,7 +677,7 @@ function diagnosticValidationProse(reply: string): string {
   }).replace(/[*_#]/gu, '')
 }
 
-const INSPECTION_MODIFIERS = '(?:(?:先|再|可以|会|应|应该|需要|主动|刻意|特意|直接|自行|自己|亲自|凑近|靠近|去|来|尝试|试着|用(?:手(?:掌|背|指)?|鼻子|脸)|(?:把|将)(?:手(?:掌|背|指)?|脸|身体)|伸手)|\\s)*'
+const INSPECTION_MODIFIERS = '(?:(?:先|再|可以|会|应|应该|需要|主动|刻意|特意|直接|自行|自己|亲自|凑近|靠近|去|来|尝试|试着|(?:开机|通电|上电)(?:之后|以后|后)|用(?:手(?:掌|背|指)?|鼻子|脸)|(?:把|将)(?:手(?:掌|背|指)?|脸|身体)|伸手)|\\s)*'
 
 function professionalInspectionPrefix(prefix: string): boolean {
   const professional = '(?:维修(?:师傅|人员|工程师)|专业(?:维修|检修)?人员|检修(?:师傅|人员)|师傅|现场人员)'
@@ -694,7 +697,7 @@ function userInspectionInstruction(prefix: string, carriedProfessional: boolean)
   // merely being present, or "don't touch" before a later "then smell", does not.
   if (new RegExp(`(?:不要|别|勿|避免|禁止|不能|不可|不可以|不建议|不允许|不应|不该|无需|不用|不需要|没必要|没有必要)(?:让|叫|要求)?(?:你(?:自己)?|用户)?${INSPECTION_MODIFIERS}$`, 'u').test(local)) return false
   if (professionalInspectionPrefix(local) || carriedProfessional) return false
-  return new RegExp(`(?:^|先|再|然后|接着|可以|可|建议|请|、|就|要|应|应该|需要|试着|不妨|你(?:自己)?|用户)${INSPECTION_MODIFIERS}$`, 'u').test(local)
+  return new RegExp(`(?:^|[:：]|先|再|然后|接着|可以|可|建议|请|、|就|要|应|应该|需要|试着|不妨|你(?:自己)?|用户)${INSPECTION_MODIFIERS}$`, 'u').test(local)
 }
 
 function inspectionDeviceTarget(suffix: string): boolean {

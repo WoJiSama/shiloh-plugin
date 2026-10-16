@@ -1,0 +1,4 @@
+{
+  "operation": "schema normalization only; caseId to id, four dimension fields nested, hardErrorIds derived from original caseId; raw scores and exact quotations unchanged",
+  "rawReportsRetained": true
+}

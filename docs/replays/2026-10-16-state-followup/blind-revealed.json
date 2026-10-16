@@ -1,31 +1,31 @@
 {
-  "evaluatedCandidate": "3a72b39b70efb398447a968f3a01b6af9f526483",
+  "evaluatedCandidate": "7d78d5a5c42d50eb584084ce84bc1f52c5cd96f7",
   "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
   "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
   "sourceHashes": {
     "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
-    "blind-conversations.json": "2fa3d5452e1f177205524716ca29f65dccddaf66390c1389155859c1d17676e2",
-    "blind-review.json": "346a2a821397f1c4f570d94d8787271a8238f5c9a13351bb06eb6ede006ba04d"
+    "blind-conversations.json": "06e234dc6be5a378b8ff0d67669a175834ba67b6cc8ca43e1744c7edfa14d0a0",
+    "blind-review.json": "dca5eadfb1869480e723ee590d4216cdbf56b73075c07d51921f67d24c9a12d8"
   },
   "cases": 28,
   "preference": {
-    "candidate": 4,
-    "baseline": 7,
-    "tie": 17
+    "candidate": 11,
+    "baseline": 9,
+    "tie": 8
   },
   "scoreTotals": {
-    "candidate": 208,
-    "baseline": 213
+    "candidate": 200,
+    "baseline": 208
   },
   "dimensions": {
     "evidence_fidelity": {
       "preference": {
-        "candidate": 4,
-        "baseline": 1,
-        "tie": 23
+        "candidate": 5,
+        "baseline": 4,
+        "tie": 19
       },
       "scoreTotals": {
-        "candidate": 53,
+        "candidate": 51,
         "baseline": 50
       }
     },
@@ -36,192 +36,135 @@
         "tie": 24
       },
       "scoreTotals": {
-        "candidate": 53,
-        "baseline": 55
+        "candidate": 52,
+        "baseline": 54
       }
     },
     "new_information": {
       "preference": {
-        "candidate": 0,
-        "baseline": 2,
-        "tie": 26
+        "candidate": 2,
+        "baseline": 5,
+        "tie": 21
       },
       "scoreTotals": {
-        "candidate": 54,
-        "baseline": 56
+        "candidate": 51,
+        "baseline": 54
       }
     },
     "naturalness": {
       "preference": {
-        "candidate": 3,
-        "baseline": 7,
-        "tie": 18
+        "candidate": 5,
+        "baseline": 9,
+        "tie": 14
       },
       "scoreTotals": {
-        "candidate": 48,
-        "baseline": 52
+        "candidate": 46,
+        "baseline": 50
       }
     }
   },
   "hardErrorFindings": {
-    "candidate": 3,
-    "baseline": 7
+    "candidate": 4,
+    "baseline": 3
   },
   "hardErrorQuoteOccurrences": {
     "candidate": 5,
-    "baseline": 8
+    "baseline": 3
   },
   "hardErrors": [
     {
-      "id": "F1-001",
+      "id": "HE-01-A-01",
+      "candidate": "candidate",
       "caseId": "case-01",
-      "candidate": "baseline",
-      "category": "unsupported_followup_absence",
-      "explanation": "第二轮只有lookup=ok、tasks=[]，表示未取得匹配任务及登记状态，不能推出不存在后续任务或不会自动发送。候选把未核实说成确定没有登记。",
       "occurrences": [
         {
           "turn": 2,
-          "exactQuote": "不会自动发哦，这边没挂后续任务。"
+          "exactQuote": "改背景那个还在处理中没出结果"
         }
       ],
-      "anonymousCandidate": "B"
+      "reason": "该轮任务查询成功但tasks为空，上下文也只有1月的收到请求；没有当前运行状态或未产出结果的证据，不能由未查到记录断言仍在处理。",
+      "anonymousCandidate": "A"
     },
     {
-      "id": "F1-002",
-      "caseId": "case-02",
+      "id": "HE-02-B-01",
       "candidate": "baseline",
-      "category": "inconsistent_proactive_delivery_commitment",
-      "explanation": "两轮已知任务同为tasks=[]，没有新增登记或取消事实。第一轮承诺拿到图就第一时间发，第二轮却明确不会主动发，同一主动发送安排前后冲突。",
+      "caseId": "case-02",
       "occurrences": [
         {
           "turn": 1,
           "exactQuote": "等我实际拿到图了第一时间发你。"
-        },
-        {
-          "turn": 2,
-          "exactQuote": "没登记上自动发送这种东西，我不会主动发的。"
         }
       ],
+      "reason": "输入没有匹配任务或已登记后续投递，此句对现有未确认请求作出日后主动发送承诺；下一轮又明确不会主动发。",
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-003",
-      "caseId": "case-02",
+      "id": "HE-03-B-01",
       "candidate": "baseline",
-      "category": "unsupported_followup_absence",
-      "explanation": "第二轮lookup=ok、tasks=[]没有给出匹配任务的followUp.none，无法确认没有登记；候选明确断言没登记上自动发送，把未知误作不存在。",
-      "occurrences": [
-        {
-          "turn": 2,
-          "exactQuote": "没登记上自动发送这种东西，我不会主动发的。"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "F1-004",
       "caseId": "case-03",
-      "candidate": "baseline",
-      "category": "delivery_time_conflict",
-      "explanation": "任务delivery.sent的messageId为synthetic-delivery-001，匹配recentContext中2026-01-01T11:59:30+08:00的机器人投递消息；后轮时钟为2026-10-16。已发属实，但刚才就发与披露时间冲突。",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "出来啦，刚才就发在群里了，傍晚那张，往上翻一下就能看到。"
+          "exactQuote": "刚才就发在群里了"
         }
       ],
+      "reason": "sent记录的messageId精确匹配recentContext中的synthetic-delivery-001，交付消息时间为2026-01-01T11:59:30+08:00；后续用户对话采用2026-10-16实际时钟，不能随用户刚才一词把1月交付说成刚才。",
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-005",
-      "caseId": "case-05",
+      "id": "HE-05-A-01",
       "candidate": "candidate",
-      "category": "unsupported_deferred_delivery_commitment",
-      "explanation": "两轮匹配任务均为completed、available、delivery.failed、followUp.none；候选还明确本轮不能发送，却保证以后取得发送能力就补上。这超出用户届时再请求后尝试的意愿，证据未支持能继续执行并补发的后续安排。",
+      "caseId": "case-05",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "你现在再要一次的话，我下次拿到发送能力就给你补上。"
+          "exactQuote": "这次手上没有能重发的通道"
         },
         {
           "turn": 2,
-          "exactQuote": "这轮我还是发不出去，等我有发送能力了再给你补。"
+          "exactQuote": "刚才试了下没有能重发的通道"
         }
       ],
+      "reason": "提供的任务事实只证明成品可用及发送失败，没有当前重发通道缺失的证据，更没有刚才已尝试检查或重发的动作记录；A把未知的能力限制及已执行动作说成事实。",
       "anonymousCandidate": "A"
     },
     {
-      "id": "F1-006",
-      "caseId": "case-05",
-      "candidate": "baseline",
-      "category": "unsupported_delivery_failure_time",
-      "explanation": "任务仅给出delivery.failed，没有尝试时间、已投递消息ID或其他可核对时钟；种子只有2026-01-01请求，后轮为2026-10-16。可以确认失败，不能根据用户称刚才的图就补成发送刚才失败；也不能反向断言失败发生在一月份。",
+      "id": "HE-06-A-01",
+      "candidate": "candidate",
+      "caseId": "case-06",
       "occurrences": [
         {
           "turn": 1,
-          "exactQuote": "图是生成好了的，不过刚才发的时候失败了，所以你这边没收到。"
+          "exactQuote": "现在手头没法直接重发"
         }
       ],
+      "reason": "任务记录只说明此前发送失败、当前成品可用且无后续登记；这些事实不能推出现在缺乏直接重发能力，输入未提供该能力限制。",
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-10-B-01",
+      "candidate": "baseline",
+      "caseId": "case-10",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才只把第二张的傍晚背景发好了"
+        }
+      ],
+      "reason": "第二张的sent消息精确匹配synthetic-delivery-other，recentContext中的交付消息时间为2026-01-01T11:59:30+08:00；在2026-10-16后续对话中将该交付断言为刚才，与已给消息时间冲突。",
       "anonymousCandidate": "B"
     },
     {
-      "id": "F1-007",
-      "caseId": "case-10",
+      "id": "hard-case-20-A-001",
       "candidate": "candidate",
-      "category": "unsupported_delivery_absence",
-      "explanation": "用户引用synthetic-request-missing，已知任务只匹配synthetic-request-other。第一张的完成、产物与投递均未核实；没有匹配记录不能证明第一张从未发过。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "第一张图那张我这儿没查到完成的记录，之前也没发过欸。"
-        }
-      ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "F1-008",
-      "caseId": "case-10",
-      "candidate": "baseline",
-      "category": "delivery_time_conflict",
-      "explanation": "第二张delivery.sent消息ID synthetic-delivery-other匹配recentContext中2026-01-01T11:59:30+08:00的投递消息，后续轮时钟为2026-10-16。第二张已发有依据，说成刚才发好与匹配时钟冲突。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "刚才只把第二张的傍晚背景发好了，第一张的进度和成图我都没查到记录，先不说它好了没。"
-        }
-      ],
-      "anonymousCandidate": "B"
-    },
-    {
-      "id": "F2-001",
-      "caseId": "case-15",
-      "candidate": "candidate",
-      "category": "unsupported_temperature_safety_conclusion",
-      "explanation": "第三轮已知信息只有CPU满载82℃、无焦糊味、无烟、运行正常；输入未给CPU型号、温度测点、该型号的规格上限或实际限频情况。A据此直接称温度挺健康、离降频有距离，并最终说不用担心，超出了可由这些信息推出的结论。后文建议查Tjunction和频率有帮助，但并未将前后确定结论改为条件判断。此处仅记录严肃第三轮的无依据确定性，不将前两轮梗当作故障事实。",
+      "caseId": "case-20",
       "occurrences": [
         {
           "turn": 3,
-          "exactQuote": "82℃满载这数其实挺健康的，大多数CPU的温度墙在95~105℃，82℃离降频还有段距离。"
-        },
-        {
-          "turn": 3,
-          "exactQuote": "无烟无味加上运行正常，这个温度本身不用担心。"
+          "exactQuote": "年终奖还能锁定到明年发放"
         }
       ],
-      "anonymousCandidate": "A"
-    },
-    {
-      "id": "F2-002",
-      "caseId": "case-28",
-      "candidate": "baseline",
-      "category": "unknown_image_followup_asserted_absent",
-      "explanation": "本轮knownTaskFacts.lookup为ok，但tasks中唯一任务是requestMessageId=exam-request的exam-reminder，followUp.state=registered。没有匹配image-request的任务，也没有匹配改图任务的followUp.state=none。用户说只登记了考试提醒也不能证明改图系统没有另行安排自动发送。现有证据只能支持改图结果和发送安排未知；A却把未查到匹配信息升级为明确无登记，进而保证不会自动发。考试提醒的存在不能证明或否定改图的执行、产物、投递或后续登记。",
-      "occurrences": [
-        {
-          "turn": 1,
-          "exactQuote": "自动发图没有对应的登记，不会自动发你，想看进度就再来问一声吧。"
-        }
-      ],
+      "reason": "用户只把剩余一块饼干设为不能吃的年终奖，没有给出明年发放的时间条件；该句把新增的具体延期时间作为已定设定来回应。",
       "anonymousCandidate": "A"
     }
   ]

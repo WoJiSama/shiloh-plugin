@@ -1,0 +1,171 @@
+{
+  "evaluatedCandidate": "7d78d5a5c42d50eb584084ce84bc1f52c5cd96f7",
+  "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
+  "sourceHashes": {
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-conversations.json": "06e234dc6be5a378b8ff0d67669a175834ba67b6cc8ca43e1744c7edfa14d0a0",
+    "blind-review.json": "dca5eadfb1869480e723ee590d4216cdbf56b73075c07d51921f67d24c9a12d8"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 11,
+    "baseline": 9,
+    "tie": 8
+  },
+  "scoreTotals": {
+    "candidate": 200,
+    "baseline": 208
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 5,
+        "baseline": 4,
+        "tie": 19
+      },
+      "scoreTotals": {
+        "candidate": 51,
+        "baseline": 50
+      }
+    },
+    "continuity": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 3,
+        "tie": 24
+      },
+      "scoreTotals": {
+        "candidate": 52,
+        "baseline": 54
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 2,
+        "baseline": 5,
+        "tie": 21
+      },
+      "scoreTotals": {
+        "candidate": 51,
+        "baseline": 54
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 5,
+        "baseline": 9,
+        "tie": 14
+      },
+      "scoreTotals": {
+        "candidate": 46,
+        "baseline": 50
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 4,
+    "baseline": 3
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 5,
+    "baseline": 3
+  },
+  "hardErrors": [
+    {
+      "id": "HE-01-A-01",
+      "candidate": "candidate",
+      "caseId": "case-01",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "改背景那个还在处理中没出结果"
+        }
+      ],
+      "reason": "该轮任务查询成功但tasks为空，上下文也只有1月的收到请求；没有当前运行状态或未产出结果的证据，不能由未查到记录断言仍在处理。",
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-02-B-01",
+      "candidate": "baseline",
+      "caseId": "case-02",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ],
+      "reason": "输入没有匹配任务或已登记后续投递，此句对现有未确认请求作出日后主动发送承诺；下一轮又明确不会主动发。",
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-03-B-01",
+      "candidate": "baseline",
+      "caseId": "case-03",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才就发在群里了"
+        }
+      ],
+      "reason": "sent记录的messageId精确匹配recentContext中的synthetic-delivery-001，交付消息时间为2026-01-01T11:59:30+08:00；后续用户对话采用2026-10-16实际时钟，不能随用户刚才一词把1月交付说成刚才。",
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-05-A-01",
+      "candidate": "candidate",
+      "caseId": "case-05",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "这次手上没有能重发的通道"
+        },
+        {
+          "turn": 2,
+          "exactQuote": "刚才试了下没有能重发的通道"
+        }
+      ],
+      "reason": "提供的任务事实只证明成品可用及发送失败，没有当前重发通道缺失的证据，更没有刚才已尝试检查或重发的动作记录；A把未知的能力限制及已执行动作说成事实。",
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-06-A-01",
+      "candidate": "candidate",
+      "caseId": "case-06",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "现在手头没法直接重发"
+        }
+      ],
+      "reason": "任务记录只说明此前发送失败、当前成品可用且无后续登记；这些事实不能推出现在缺乏直接重发能力，输入未提供该能力限制。",
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-10-B-01",
+      "candidate": "baseline",
+      "caseId": "case-10",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "刚才只把第二张的傍晚背景发好了"
+        }
+      ],
+      "reason": "第二张的sent消息精确匹配synthetic-delivery-other，recentContext中的交付消息时间为2026-01-01T11:59:30+08:00；在2026-10-16后续对话中将该交付断言为刚才，与已给消息时间冲突。",
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "hard-case-20-A-001",
+      "candidate": "candidate",
+      "caseId": "case-20",
+      "occurrences": [
+        {
+          "turn": 3,
+          "exactQuote": "年终奖还能锁定到明年发放"
+        }
+      ],
+      "reason": "用户只把剩余一块饼干设为不能吃的年终奖，没有给出明年发放的时间条件；该句把新增的具体延期时间作为已定设定来回应。",
+      "anonymousCandidate": "A"
+    }
+  ]
+}

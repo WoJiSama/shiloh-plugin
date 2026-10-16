@@ -208,3 +208,128 @@ test("按群覆盖对 overlongMessage 做浅合并，未覆盖字段沿用默认
   const config = normalizeGroupModerationConfig(resolved.groupModeration)
   assert.deepEqual(config.overlongMessage, { enabled: true, maxLength: 800, forwardEnabled: true })
 })
+
+test("burstMessage 配置归一化：默认值与范围钳制", () => {
+  assert.deepEqual(normalizeGroupModerationConfig({}).burstMessage, {
+    enabled: false,
+    windowSeconds: 5,
+    maxMessages: 6,
+    muteSeconds: 30,
+    forwardEnabled: true
+  })
+  const custom = normalizeGroupModerationConfig({
+    burstMessage: { enabled: true, windowSeconds: "10", maxMessages: 4, muteSeconds: 60, forwardEnabled: false }
+  })
+  assert.deepEqual(custom.burstMessage, {
+    enabled: true,
+    windowSeconds: 10,
+    maxMessages: 4,
+    muteSeconds: 60,
+    forwardEnabled: false
+  })
+  const clamped = normalizeGroupModerationConfig({
+    burstMessage: { enabled: true, windowSeconds: 1, maxMessages: 2, muteSeconds: -5 }
+  })
+  assert.deepEqual(
+    { windowSeconds: clamped.burstMessage.windowSeconds, maxMessages: clamped.burstMessage.maxMessages, muteSeconds: clamped.burstMessage.muteSeconds },
+    { windowSeconds: 2, maxMessages: 3, muteSeconds: 0 }
+  )
+})
+
+test("trackBurstMessage：窗口内累计触发并清空，窗口过期重新计数，开关关闭不跟踪", () => {
+  const manager = new GroupModerationManager({ readSettings: () => ({}) }, { getTemplateTexts: () => [] })
+  const config = normalizeGroupModerationConfig({
+    burstMessage: { enabled: true, windowSeconds: 5, maxMessages: 3 }
+  })
+  const event = id => ({ group_id: GROUP_ID, user_id: USER_ID, message_id: id, msg: `第${id}条` })
+  assert.equal(manager.trackBurstMessage(event(1), config, 0), null)
+  assert.equal(manager.trackBurstMessage(event(2), config, 1000), null)
+  const hit = manager.trackBurstMessage(event(3), config, 2000)
+  assert.equal(hit.messages.length, 3, "第 3 条达到阈值返回整批")
+  assert.deepEqual(hit.messages.map(item => item.text), ["第1条", "第2条", "第3条"])
+  assert.equal(hit.windowSeconds, 5)
+  assert.equal(manager.trackBurstMessage(event(4), config, 2100), null, "触发后窗口清空重新计数")
+
+  // 窗口过期：前两条过期后不计入
+  assert.equal(manager.trackBurstMessage(event(5), config, 10000), null)
+  assert.equal(manager.burstTrackers.get(`${GROUP_ID}:${USER_ID}`).length, 1, "过期的两条被清掉")
+
+  const disabled = normalizeGroupModerationConfig({ burstMessage: { enabled: false } })
+  assert.equal(manager.trackBurstMessage(event(6), disabled, 0), null)
+})
+
+function burstSettings(overrides = {}) {
+  return baseSettings({
+    overlongMessage: { enabled: false },
+    burstMessage: { enabled: true, windowSeconds: 5, maxMessages: 3, muteSeconds: 30, ...overrides }
+  })
+}
+
+async function sendBurstMessages(manager, makeEvent, count) {
+  const handled = []
+  for (let index = 1; index <= count; index++) {
+    handled.push(await manager.handleMessage(makeEvent(`第${index}条`, { message_id: 500 + index })))
+  }
+  return handled
+}
+
+test("连发达到阈值：整批撤回、合并转发、禁言 30 秒", async () => {
+  const { manager, calls, makeEvent } = createHarness({ settings: burstSettings() })
+  const handled = await sendBurstMessages(manager, makeEvent, 3)
+
+  assert.deepEqual(handled, [false, false, true], "前两条不触发，第三条触发折叠")
+  const deletions = calls.apis.filter(call => call.method === "delete_msg")
+  assert.deepEqual(deletions.map(call => call.params.message_id), [501, 502, 503], "窗口内全部撤回")
+  const ban = calls.apis.find(call => call.method === "set_group_ban")
+  assert.deepEqual(ban, { method: "set_group_ban", params: { group_id: GROUP_ID, user_id: USER_ID, duration: 30 } })
+  assert.equal(calls.forwards.length, 1)
+  const nodes = calls.forwards[0]
+  assert.equal(nodes.length, 4, "1 条说明 + 3 条原文")
+  assert.ok(nodes[0].message.includes("连发 3 条消息"), "说明节点带条数")
+  assert.ok(nodes[0].message.includes("禁言 30 秒"), "说明节点带禁言信息")
+  assert.deepEqual(nodes.slice(1).map(node => node.message), ["第1条", "第2条", "第3条"])
+  assert.equal(nodes[1].nickname, "小明", "原文节点归属原发送者")
+  assert.equal(calls.groupMsgs.length, 1)
+})
+
+test("muteSeconds 为 0 时只折叠不禁言", async () => {
+  const { manager, calls, makeEvent } = createHarness({
+    settings: burstSettings({ muteSeconds: 0 })
+  })
+  await sendBurstMessages(manager, makeEvent, 3)
+  assert.ok(!calls.apis.some(call => call.method === "set_group_ban"), "不应禁言")
+  assert.equal(calls.forwards.length, 1)
+  assert.ok(calls.forwards[0][0].message.includes("已全部撤回并折叠："), "无禁言时说明不含禁言字样")
+})
+
+test("全部撤回失败时不禁言不转发", async () => {
+  const { manager, calls, makeEvent } = createHarness({ settings: burstSettings(), failRecall: true })
+  const handled = await sendBurstMessages(manager, makeEvent, 3)
+  assert.equal(handled[2], false)
+  assert.ok(!calls.apis.some(call => call.method === "set_group_ban"))
+  assert.equal(calls.forwards.length, 0)
+})
+
+test("连发折叠优先于刷屏风控，不重复禁言", async () => {
+  // 打开刷屏检测（3 条/10 秒即命中），连发 3 条同时满足两个规则
+  const settings = burstSettings()
+  settings.groupModeration.floodEnabled = true
+  settings.groupModeration.floodMaxMessages = 3
+  settings.groupModeration.floodWindowSeconds = 10
+  const harness = createHarness({ settings })
+  const handled = await sendBurstMessages(harness.manager, harness.makeEvent, 3)
+  assert.equal(handled[2], true, "由连发折叠接管")
+  const bans = harness.calls.apis.filter(call => call.method === "set_group_ban")
+  assert.equal(bans.length, 1, "只有连发折叠的一次禁言，刷屏不再叠加")
+  assert.equal(harness.calls.forwards.length, 1)
+})
+
+test("连发窗口外的不计入：分两条慢速消息不触发", async () => {
+  const { manager, calls, makeEvent } = createHarness({ settings: burstSettings() })
+  await manager.handleMessage(makeEvent("慢速一", { message_id: 601 }))
+  await new Promise(resolve => setTimeout(resolve, 20))
+  // 窗口 5 秒内连发仍会触发，这里只验证不会因单条误触发
+  await manager.handleMessage(makeEvent("慢速二", { message_id: 602 }))
+  assert.equal(calls.apis.filter(call => call.method === "delete_msg").length, 0)
+  assert.equal(calls.forwards.length, 0)
+})

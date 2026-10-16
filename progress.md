@@ -1747,3 +1747,8 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 补修发送能力等待、句末给你补与过去发送否定，源码118/118；诊断温度健康/降频余量及正常专业许可/解释句，源码99/99。父新最终发送4组在旧dist上真实RED保留。统一strict/backend build/testcompile及10文件346/346通过，无跳过；日志归档capacity-permission-*，独立只读643固定矩阵已通知开始，不改旧497期望。
 - 只读检查发现原目录其他会话又提交1313092/87081b4且当前干净；继续写回前需另验全部289已接受目标和新HEAD/index，保留既有baseline。一次README路径读取不存在返回1，未写文件，已定位中文报告docs/ai-state-followup-2026-10-16.md。
 - 643项独立source/dist复核已封存：旧497固定契约497/497、旧完整输出497/497无漂移，新控制145/146通过，source/dist 643/643相等。唯一失败为无专业先行词的孤立“让他们确认可以开机了再开”，完整row25/55及明确维修/专业人员先行词控制均通过；不改生产规则。为原目录最新87081b4建立baseline-head-87081b4与CAS脚本，289旧目标hash已核验不变。
+- 新CAS同步318目标、43实际写入完成，1631非目标、原HEAD/index保持；原目录严格类型、构建、测试编译及346/346定向回归通过，无跳过，五业务源码/dist和manifest逐项一致。证据已归档capacity-permission-original-*与capacity-permission-writeback-audit，准备最终提交后的新60轮冻结。
+
+- 7d78d5a完整60轮保留59结构通过、76请求75HTTP200且全low，16轮纠正3兜底；P50/P95/最大2.851/12.148/26.818秒。唯一纠正请求10秒超时原样保留，QQ/真实工具/生产测试写入0。完整28组fresh盲评已封存7d78d5a-review，综合11胜9负8平、自然度46:50，候选4/基线3硬错；schema只规范字段与finding关联，raw、分数和精确引文保留。
+- row1局部任务对象/连续状态及发送安排否定补修，源码125/125；row54禁止通电误伤与row26标题后主动闻气味补修，源码102/102。真实RED、首轮101/102和最终GREEN均归档local-operation-*。统一strict/backend build/testcompile和10文件最终发送/实际产物356/356通过，无跳过。
+- 独立固定矩阵766项source/dist输出相等，旧643实测无漂移，新123/123通过；唯一旧孤立代词期望失败保留。报告local-operation-compiled-review.json和固定输入已归档。归档前读取不存在README及首个apply_patch上下文失败均未改源文件；核验后重新追加本轮记录。

@@ -1736,3 +1736,101 @@ test('3a72b39 historical delivery adjuncts still require and retain a matching o
   }
   assert.deepEqual(validateActionReply('我之前有发送能力，刚才已经发给你了。',sent,raw),[])
 })
+
+const localTaskStateRaw = '那我先去吃饭。好了你会自动发给我吗？'
+const localTaskStateReply = '改背景那个还在处理中没出结果，做好没我这会儿说不好。发送这边也没挂上自动发的安排，所以你吃完回来问我一声，我再帮你看。'
+
+test('7d78d5a complete repaired replay 1 retains its task predicates and absent delivery arrangement', () => {
+  const violations = validateActionReply(localTaskStateReply,facts(),localTaskStateRaw)
+  assert.ok(violations.some(item=>item.code==='unsupported_task_state' && item.claim.startsWith('改背景那个')))
+  assert.ok(violations.some(item=>item.code==='unsupported_task_state' && item.claim.startsWith('发送这边')))
+  const matching = fact({source:'live_job',execution:'running',result:'unavailable',followUp:{state:'none'}})
+  assert.deepEqual(validateActionReply(localTaskStateReply,facts([matching]),localTaskStateRaw),[])
+  for (const change of [
+    {execution:'completed' as const}, {result:'available' as const},
+    {followUp:{state:'registered' as const,kind:'job_completion' as const,id:'image-callback'}}
+  ]) {
+    assert.ok(validateActionReply(localTaskStateReply,facts([{...matching,...change}]),localTaskStateRaw)
+      .some(item=>item.code==='unsupported_task_state'),JSON.stringify(change))
+  }
+})
+
+test('7d78d5a a local image operation owns its omitted task noun', () => {
+  const running = facts([fact({execution:'running'})])
+  for (const reply of [
+    '改背景那个还在处理中。','换背景这个正在处理。',
+    '改图那个还在处理。','画图这个还在生成。'
+  ]) {
+    for (const current of [facts(),facts([fact()]),facts([fact({execution:'completed'})])]) {
+      assert.ok(validateActionReply(reply,current,localTaskStateRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,running,localTaskStateRaw),[],reply)
+  }
+})
+
+test('7d78d5a an explicit absent result predicate keeps its artifact dimension on the same task', () => {
+  const unavailable = facts([fact({result:'unavailable'})])
+  for (const reply of ['改背景那个没出结果。','改图这个还没出结果。','这张图没有出结果。','画图那个没产出结果。']) {
+    for (const current of [facts(),facts([fact()]),facts([fact({result:'available'})])]) {
+      assert.ok(validateActionReply(reply,current,localTaskStateRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,unavailable,localTaskStateRaw),[],reply)
+  }
+})
+
+test('7d78d5a adjacent execution and result predicates keep separate evidence requirements', () => {
+  for (const reply of [
+    '改背景那个还在处理中没出结果。','改背景那个还在处理中也没出结果。',
+    '换背景这个正在处理还没出结果。','这张图还在处理中没产出结果。',
+    '画图那个没出结果还在处理中。'
+  ]) {
+    for (const current of [
+      facts(), facts([fact({execution:'running',result:'unknown'})]),
+      facts([fact({execution:'completed',result:'unavailable'})])
+    ]) assert.ok(validateActionReply(reply,current,localTaskStateRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.deepEqual(validateActionReply(reply,facts([fact({execution:'running',result:'unavailable'})]),localTaskStateRaw),[],reply)
+  }
+})
+
+test('7d78d5a a sending-side subject keeps the postposed automatic arrangement on the task', () => {
+  const none = facts([fact({source:'live_job',execution:'running',followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  const reminder = facts([fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'none'}})])
+  for (const reply of [
+    '发送这边也没挂上自动发的安排。','投递这边没有挂上完成后发送的安排。',
+    '发送那边没挂着自动发送的安排。','发送这边没有后续安排。',
+    '我这边没挂上自动发的安排。'
+  ]) {
+    for (const current of [facts(),facts([fact({followUp:{state:'unknown'}})]),live,reminder]) {
+      assert.ok(validateActionReply(reply,current,localTaskStateRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,none,localTaskStateRaw),[],reply)
+  }
+})
+
+test('7d78d5a a later uncertainty clause cannot erase an earlier compound task assertion', () => {
+  for (const reply of [
+    '改背景那个还在处理中没出结果，具体好没好尚未核实。',
+    '改背景那个还在处理中，具体是否有产物我还没核实。',
+    '发送这边也没挂上自动发的安排，具体原因我还没核实。'
+  ]) assert.ok(validateActionReply(reply,facts(),localTaskStateRaw).some(item=>item.code==='unsupported_task_state'),reply)
+})
+
+test('7d78d5a local state parsing preserves uncertain wording, other subjects and user-triggered help', () => {
+  for (const reply of [
+    '改背景那个是否还在处理中没出结果尚未核实。','改背景那个可能还在处理中没出结果。',
+    '改背景那个还在处理中没出结果吗？','“改背景那个还在处理中没出结果”只是个例子。',
+    '她改背景那个还在处理中没出结果。','我妹妹改背景那个还在处理中没出结果。',
+    '这张图里的人还在处理中没出结果。','CPU还在处理中没出结果。',
+    '发送这边也没挂上自动发的安排吗？','不能确认发送这边也没挂上自动发的安排。',
+    '发送这边也没挂上自动发的安排这件事尚未核实。',
+    '发送这边也没查到自动发的安排。','发送这边没有核实到自动发的安排。',
+    '“发送这边也没挂上自动发的安排”只是个例子。','她发送这边也没挂上自动发的安排。',
+    '改背景那个的处理结果和完成后发送的安排尚未核实，你回来问我一声，我再查状态。',
+    '你吃完回来问我一声，我再帮你看。','你回来再问我，我再查，有结果就发给你。',
+    '这轮我手上没有能直接重发的工具。','你要的话我再想办法看看。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),localTaskStateRaw),[],reply)
+  for (const reply of ['那个还在处理中没出结果。','发送这边没有邀请。','我妈还在处理中没出结果。']) {
+    assert.deepEqual(validateActionReply(reply,facts(),'今晚吃什么？'),[],reply)
+  }
+})
