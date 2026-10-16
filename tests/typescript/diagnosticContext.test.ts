@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {buildDiagnosticContext, buildDiagnosticContextPrompt} from '../../src/modules/conversation/domain/diagnosticContext.js'
+import {buildDiagnosticContext, buildDiagnosticContextPrompt, buildDiagnosticFallbackReply, validateDiagnosticReply} from '../../src/modules/conversation/domain/diagnosticContext.js'
 import type {DiagnosticHistoryMessage} from '../../src/modules/conversation/domain/diagnosticContext.js'
 import type {TurnEvidence} from '../../src/contracts/turnInteraction.js'
 
@@ -506,4 +506,213 @@ test('temperature prompt requires the component, measurement and workload basis 
   assert.match(prompt, /单个温度读数本身不能保证正常或安全/)
   assert.match(prompt, /正常运行、无烟无味或自动降频保护都不是整机健康证明/)
   assert.doesNotMatch(prompt, /电气损坏仍未排除/)
+})
+
+test('symptom reports remain observations rather than professional damage findings', () => {
+  for (const rawUserText of ['电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？', '机箱冒烟了，看着像电源坏了，怎么办？', '电脑有烧塑料味，是不是主板烧了？']) {
+    const context = buildDiagnosticContext({rawUserText, speakerId})!
+    assert.equal(context.evidenceAssessment?.damage.status, 'unconfirmed', rawUserText)
+    assert.deepEqual(context.evidenceAssessment?.damage.findings, [], rawUserText)
+  }
+})
+
+test('reported professional findings retain the component and the strength of the finding', () => {
+  const context = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，确认电源损坏，更换了损坏电源，确认没有其他电气损坏。', speakerId, history})!
+  assert.equal(context.evidenceAssessment?.damage.status, 'reported_professional_finding')
+  assert.deepEqual(context.evidenceAssessment?.damage.components, ['power_supply'])
+  assert.equal(context.damageExclusion, 'reported_professional_clearance')
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，电源已经损坏并被更换。', context), [])
+  assert.ok(validateDiagnosticReply('所以电源已经烧坏了。', context).some(item => item.code === 'unsupported_damage_diagnosis'), 'damage is not automatically a confirmed burn')
+  assert.ok(validateDiagnosticReply('主板已经烧坏了。', context).some(item => item.code === 'unsupported_damage_diagnosis'), 'a finding about the power supply cannot diagnose the mainboard')
+  const burned = buildDiagnosticContext({rawUserText: '维修师傅检查了我的电脑，确认电源烧坏了。', speakerId, history})!
+  assert.deepEqual(validateDiagnosticReply('按你报告的检修结果，电源已经烧坏了。', burned), [])
+})
+
+test('future, speculative, quoted and other-device findings never become the current devices diagnosis', () => {
+  for (const rawUserText of [
+    '维修师傅明天来检查，怀疑电源烧坏了。我的电脑现在怎么办？',
+    '维修师傅检查了我的电脑，说可能是电源烧坏了。',
+    '维修师傅检查了我的电脑，确认还要检查，主板应该也坏了。',
+    '[回复 朋友：维修师傅检查了电脑，确认电源烧坏] 我的电脑有焦糊味，怎么办？',
+    '维修师傅检查了朋友的电脑，确认电源烧坏。我的电脑有焦糊味，怎么办？'
+  ]) {
+    const context = buildDiagnosticContext({rawUserText, speakerId, history})!
+    assert.equal(context.evidenceAssessment?.damage.status, 'unconfirmed', rawUserText)
+    assert.ok(validateDiagnosticReply('你这台电脑的电源已经烧坏了。', context).some(item => item.code === 'unsupported_damage_diagnosis'), rawUserText)
+  }
+})
+
+test('a new incident does not inherit the diagnosis of a previously replaced part', () => {
+  const repaired: DiagnosticHistoryMessage = {role: 'user', userId: speakerId, text: '维修师傅已经检查了我的电脑，确认电源烧坏，更换了损坏电源，确认没有其他电气损坏。'}
+  const context = buildDiagnosticContext({rawUserText: '换好之后现在又冒烟了，怎么办？', speakerId, history: [incident, repaired]})!
+  assert.equal(context.damageExclusion, 'unknown')
+  assert.equal(context.evidenceAssessment?.damage.status, 'unconfirmed')
+  assert.ok(validateDiagnosticReply('换上的电源已经烧坏了。', context).some(item => item.code === 'unsupported_damage_diagnosis'))
+  const compatible = buildDiagnosticContext({rawUserText: '现在怎么检查风扇？', speakerId, history: [incident, repaired]})!
+  delete compatible.evidenceAssessment
+  assert.deepEqual(validateDiagnosticReply('按你报告的维修结果，之前电源烧坏并被更换。', compatible), [])
+})
+
+test('unknown temperature prerequisites are explicit and become known only from same-device user reports', () => {
+  const unknown = buildDiagnosticContext({rawUserText: '电脑满载82℃，没有焦糊味，没有冒烟，正常吗？', speakerId})!
+  assert.deepEqual(unknown.evidenceAssessment?.temperature?.missing, ['component_model', 'measurement_point'])
+  assert.deepEqual(unknown.evidenceAssessment?.temperature?.readings, ['82℃'])
+  const knownText = '我的电脑 CPU 型号是 i7-13700K，读数是 CPU Package 温度82℃，运行 Cinebench 满载。'
+  const known = buildDiagnosticContext({rawUserText: knownText, speakerId})!
+  assert.deepEqual(known.evidenceAssessment?.temperature?.missing, [])
+  assert.equal(known.evidenceAssessment?.temperature?.componentModel, 'i7-13700K')
+  const revised = buildDiagnosticContext({rawUserText: '刚才型号说错了，我不知道型号，也不清楚测点，温度还是82℃。', speakerId, history: [{role: 'user', userId: speakerId, text: knownText}]})!
+  assert.ok(revised.evidenceAssessment?.temperature?.missing.includes('component_model'))
+  assert.ok(revised.evidenceAssessment?.temperature?.missing.includes('measurement_point'))
+  const other = buildDiagnosticContext({rawUserText: '朋友的电脑型号是i7-13700K，CPU Package 满载82℃。我的电脑温度82℃，不知道什么负载。', speakerId})!
+  assert.deepEqual(other.evidenceAssessment?.temperature?.missing, ['component_model', 'measurement_point', 'workload'])
+  const hypothetical = buildDiagnosticContext({rawUserText: '如果型号是i7-13700K，假如读的是CPU Package，假设满载82℃呢？', speakerId, history: [{role: 'user', userId: speakerId, text: '我的电脑温度82℃，型号和测点都不清楚。'}]})!
+  assert.deepEqual(hypothetical.evidenceAssessment?.temperature?.missing, ['component_model', 'measurement_point', 'workload'])
+})
+
+test('diagnostic reply validation rejects observed unjustified certainty without changing the candidate', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？', speakerId})!
+  for (const reply of [
+    '焦糊味本身就是检测结果了——里面已经有元件烧坏。',
+    '焦糊味说明里面大概率已经有东西烧了。',
+    '电源多半已经损坏，必须更换。',
+    '电源很可能已经烧毁了。'
+  ]) {
+    const before = reply
+    const violations = validateDiagnosticReply(reply, context)
+    assert.ok(violations.some(item => item.code === 'unsupported_damage_diagnosis'), reply)
+    assert.ok(violations.every(item => item.claim && item.reason && item.correctionInstruction), reply)
+    assert.equal(reply, before)
+  }
+})
+
+test('diagnostic validation preserves explicit uncertainty, quoted examples, denials and inspection questions', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const reply of [
+    '光凭焦糊味不能确定里面有元件烧坏，先保持断电并送检。',
+    '可能是电源或线材过热，也不能排除元件损坏，需要现场检查。',
+    '有焦糊味不一定是元件烧坏。',
+    '“里面已经有元件烧坏”这个结论现在还不能下。',
+    '先请维修人员检查电源是否烧坏。',
+    '电源烧坏时可能出现异味，但气味本身不能定位损坏。',
+    '等专业人员完成检修并放行之后，再按他们的要求通电检测。',
+    '不要再次通电，也不要开机试探。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
+test('asking a follow-up condition cannot undo an earlier unsupported temperature assurance', () => {
+  const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，温度正常吗？', speakerId})!
+  for (const reply of ['82℃属于正常范围，你是什么型号？', '这温度很正常，先说说测点。', '不算高，可以放心用。', '目前基本没问题。']) {
+    assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_temperature_assurance'), reply)
+  }
+  for (const reply of [
+    '还不知道型号与测点，单凭82℃不能判断正常与否。',
+    '先查型号、测点与负载，再对照该部件的规格确认是否正常。',
+    '有些型号满载82℃可能处在预期范围，你的设备还需要具体型号和测点。',
+    '正常运行或没有烟味，也不能证明整机健康。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
+test('operational checks require current professional clearance and professional clearance remains scoped', () => {
+  const fault = buildDiagnosticContext({rawUserText: '已经拔电了，能开机试一下吗？', speakerId, history})!
+  assert.ok(validateDiagnosticReply('先重新开机跑一下压力测试。', fault).some(item => item.code === 'unmet_operational_prerequisite'))
+  assert.ok(validateDiagnosticReply('如果你想确认，先开机看看。', fault).some(item => item.code === 'unmet_operational_prerequisite'), 'an arbitrary if is not professional clearance')
+  assert.ok(validateDiagnosticReply('等维修人员完成检修并放行后，再通电检测。现在先开机试试。', fault).some(item => item.code === 'unmet_operational_prerequisite'), 'a prior conditional sentence does not permit operating now')
+  assert.deepEqual(validateDiagnosticReply('等维修人员检查完成并明确放行之后，才能再通电检测。', fault), [])
+  const cleared = buildDiagnosticContext({rawUserText: '维修师傅已经检查了我的电脑，更换了损坏电源，确认没有其他电气损坏，允许在店里受控开机。', speakerId, history})!
+  assert.ok(validateDiagnosticReply('电气损坏仍未排除，所以绝对不能通电。', cleared).some(item => item.code === 'contradicted_professional_clearance'))
+  assert.ok(validateDiagnosticReply('既然师傅修过了，整机肯定没有问题，保证绝对安全。', cleared).some(item => item.code === 'unsupported_safety_certification'))
+  assert.deepEqual(validateDiagnosticReply('按现场放行范围，外壳复原后可做非接触运行监测；若出现新的烟味就停止并联系检修人员。', cleared), [])
+})
+
+test('a denial about another conclusion or action never hides an unsupported operation', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const reply of [
+    '先开机观察别摸内部。',
+    '不能确定哪个部件坏了但可以先开机看一下。',
+    '不要摸内部，先开机观察一下。',
+    '不要摸内部先开机看一下。',
+    '先把电源插回去。',
+    '先把电源线插回去，再观察。',
+    '先插回电源线看看。',
+    '别拆内部但可以先通电测一下。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unmet_operational_prerequisite'), reply)
+  for (const reply of [
+    '不要再次通电，也不要开机试探。',
+    '先别开机，别把电源插回去。',
+    '不建议重新给电脑通电。',
+    '不要把电源线插回去。',
+    '等专业人员完成检修并放行之后，再把电源线插回去做检测。',
+    '不能确定哪个部件坏了，但先不要开机试探。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
+test('a later qualified health claim cannot hide an earlier temperature assurance', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑温度82℃，型号和测点不清楚，正常吗？', speakerId})!
+  for (const reply of [
+    '温度不高但不能确认整机健康。',
+    '可以正常使用。',
+    '82℃很正常不过这不能证明整机安全。',
+    '还不能确定整机健康但温度属于正常范围。',
+    '这温度很正常，可以安全运行。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_temperature_assurance'), reply)
+  for (const reply of [
+    '还不能判断温度是否正常，不过可以先确认型号和测点。',
+    '先对照型号与测点对应的规格，再确认是否可以正常使用。',
+    '你报告一直正常运行，但这不代表温度正常或整机健康。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
+test('quoted operation advice is checked unless explicitly used as a rejected example', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const reply of [
+    '“先通电试试”，然后观察有没有烟。',
+    '"先通电试试"，然后观察有没有烟。',
+    '你可以「先通电试试」，看看情况。',
+    '建议先做这步：`把电源线插回去`。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unmet_operational_prerequisite'), reply)
+  for (const reply of [
+    '不要照着“先通电试试”去做，先保持电源隔离并送检。',
+    '“先通电试试”这个建议不能照做。',
+    '错误示例：“先通电试试”。正确做法是保持断电并找专业人员。',
+    '不能说“先通电试试”，应该先完成专业排查。',
+    '“里面已经有元件烧坏”这个结论现在还不能下。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
+test('arbitrary if clauses cannot exempt unknown-temperature assurances', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑温度82℃，型号和测点不清楚，正常吗？', speakerId})!
+  for (const reply of [
+    '如果担心也可以放心用。',
+    '假如只是闲置，这个温度很正常。',
+    '如果你想继续玩，那就可以放心使用。',
+    '如果担心就保证绝对安全。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).some(item => item.code === 'unsupported_temperature_assurance' || item.code === 'unsupported_safety_certification'), reply)
+  for (const reply of [
+    '如果该型号官方规格允许这个测点在该负载下达到82℃，那么这个读数才可能处于预期范围。',
+    '只有具体型号、测点和负载都符合官方规格允许的范围，才能判断这个温度是否正常。',
+    '如果担心，就先确认型号、测点和负载，暂时不能据此保证安全。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+})
+
+test('fallbacks use observed prerequisites and pass the same validation without rewriting the candidate', () => {
+  const inputs = [
+    {rawUserText: '电脑有焦糊味，已经拔电了，怎么办？'},
+    {rawUserText: '电脑有焦糊味，怎么办？'},
+    {rawUserText: 'CPU满载82℃，没有烟味，怎么判断温度？'},
+    {rawUserText: '维修师傅已经检查了我的电脑，更换了损坏电源，确认没有其他电气损坏。现在能测什么？', history}
+  ]
+  const fallbacks = inputs.map(input => {
+    const context = buildDiagnosticContext({...input, speakerId})!
+    const fallback = buildDiagnosticFallbackReply(context)
+    assert.ok(fallback.length > 0)
+    assert.deepEqual(validateDiagnosticReply(fallback, context), [], fallback)
+    return fallback
+  })
+  assert.match(fallbacks[0]!, /你已报告拔电/)
+  assert.match(fallbacks[1]!, /先停机并切断电源/)
+  assert.match(fallbacks[2]!, /还不能判断是否正常.*具体部件型号.*测温位置/u)
+  assert.match(fallbacks[3]!, /已完成专业检修.*非接触运行监测/u)
+  assert.deepEqual(validateDiagnosticReply('电源烧坏了。', undefined), [])
+  assert.equal(buildDiagnosticFallbackReply(undefined), '')
 })

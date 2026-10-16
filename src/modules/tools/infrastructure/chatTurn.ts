@@ -447,8 +447,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             ...(typeof reference === 'string' || typeof reference === 'number' ? {referenceMessageId: String(reference)} : {}),
             recentRequestMessageIds: ownRecentMessages.flatMap(item => typeof item.message_id === 'string' || typeof item.message_id === 'number' ? [String(item.message_id)] : [])
           }
+          session.actionFactsQuery = query
           try {
-            session.interactionContext.actionFacts = validateTurnActionFacts(await host.getTurnActionFacts?.(e, query), e)
+            session.interactionContext.actionFacts = validateTurnActionFacts(await host.getTurnActionFacts?.(e, query), e, Date.now(), query)
           } catch (error) {
             logger.warn(`[任务事实] 查询不可用 group=${groupId} user=${userId}`)
             session.interactionContext.actionFacts = unknownTurnActionFacts(e)

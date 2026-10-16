@@ -18,6 +18,13 @@ export interface SocialReference {
   source: TurnEvidence['origin'] | 'verified_continuity'
   messageId?: string
 }
+/** The current user is asking about an attributed exchange. The request and
+ * quoted utterance stay separate so quoted pronouns keep their original roles. */
+export interface ObservedSocialExchange {
+  request: SocialReference
+  utterance: SocialReference
+  speaker?: {userId?: string; name?: string}
+}
 /** Stored under the same bot/persona/version boundary as the confirmed lastReply.
  * Text fields are excerpts of that reply, not new promises or factual memories. */
 export interface SocialContinuity {
@@ -36,6 +43,8 @@ export interface SocialTurnState {
   activeBit?: SocialReference
   pendingInteraction?: {text: string; source: 'quote' | 'verified_continuity'}
   previousStance?: {kind: SocialStance; text: string; source: 'quote' | 'verified_continuity'}
+  observedExchange?: ObservedSocialExchange
+  continuation?: {kind: 'bit' | 'support'; previous: SocialReference}
 }
 
 export interface TurnEvidence {

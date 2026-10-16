@@ -2426,3 +2426,15 @@ Modrinth 工具查询完成后，使用不带群历史、人设和工具定义�
 
 证据目录：/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-low-effort-start-20261015-uekxuqcj。
 本轮错误：首次只读备份脚本括号缺失 SyntaxError，未复制文件；改为独立 changed 变量后成功。不扩展未确认的 GLM none/thinking 参数映射。
+
+# 2026-10-16 P0 事实闭环与 P1-3 社交接续
+
+用户授权做 P0、重点做 P1-3；沿用 commit/push/部署/隔离实模回放授权，继续 low，不扩展其他 P1/P2。
+
+- [x] 新原工作区 baseline 与全 dirty 备份，确认隔离分支干净
+- [x] P0：实际登记/任务状态约束和证据强度，形成发送前可验收闭环
+- [x] P1-3：对象归属、接梗、安慰与已确认上句立场接续
+- [ ] 定向契约与完整多轮实模对照，保留全部失败并独立评审
+- [ ] 完整门禁、commit/push/deploy、健康与配置/文件核对、安全写回
+
+本轮备份：/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-p0-social-start-20261016-xi7jnqgb；原 HEAD de03521、index SHA d3376d9f、333 个 dirty 文件。

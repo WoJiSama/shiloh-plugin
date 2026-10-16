@@ -69,7 +69,7 @@ export interface ExecutionMessage {role?:string;content?:string;tool_calls?:Tool
 export interface ExecutionResult {toolCall:ToolCall;toolName:string;result:string;elapsed?:number}
 export interface ExecutionAvatar {images:string[];targets?:{userId:string;label:string}[];promptHint?:string}
 export interface ExecutionSession {
- rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;toolDecision?:SemanticDecision|null;executionTools?:ToolDefinition[];userContent?:string;groupContextImagePrompt?:string;tools?:ToolDefinition[];images?:string[];
+ rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;actionFactsQuery?:ActionFactsQuery;toolDecision?:SemanticDecision|null;executionTools?:ToolDefinition[];userContent?:string;groupContextImagePrompt?:string;tools?:ToolDefinition[];images?:string[];
  imageVerificationNeedsSearch?:boolean;imageVerificationSearchDone?:boolean;imageVerificationMode?:string;imageVerificationFinalInstructionAdded?:boolean;
  taskDedupeToolTouched?:boolean;backgroundTerminalToolTouched?:boolean;toolName?:string|undefined;toolResults?:ExecutionResult[];
  groupUserMessages?:ExecutionMessage[];editAssets?:{promptHint?:string};avatarEditBase?:{promptHint?:string};avatarDrawReference?:ExecutionAvatar;

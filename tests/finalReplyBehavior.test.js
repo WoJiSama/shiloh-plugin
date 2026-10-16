@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {createFinalReply} from '../dist/backend/modules/conversation/application/finalReply.js'
 import {createMemoryReplies} from '../dist/backend/modules/conversation/application/memoryReplies.js'
 import {createPersonaSnapshot} from '../dist/backend/modules/conversation/infrastructure/personaSnapshot.js'
+import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
 function fixture(){
  const archived=[],saved=[],enhanced=[],tracking=[],events=[]
  const api=createFinalReply({randomUUID:()=>"tool-id",logger:{warn(){},info(){},error(){}},bot:()=>({uin:99,nickname:'bot'}),buildGenericChatFailureReply:()=> 'failed',extractModrinthForwardItems:()=>[],stripModrinthForwardMarkers:text=>text,applyOutputPersonaGuards:text=>text,findRecentBotImage:async()=>null,recordEpisode(){},recordTurnContinuity:async()=>{},getActiveConversation:()=>({chatHistory:[]}),trackingKey:e=>`${e.self_id}:${e.group_id}_${e.user_id}`,rememberPersonaReply(){},rememberStyleReply(){}})
@@ -20,6 +21,46 @@ test('unknown final delivery is not archived or learned as sent',async()=>{
  const {api,event,host,archived,saved,enhanced}=fixture(),session={};host.sendSegmentedMessage=async()=>null
  await api.handleTextResponse(host,'你好',event,session,[])
  assert.equal(session.responseAttempted,true);assert.equal(archived.length,0);assert.equal(saved.length,0);assert.equal(enhanced.length,0)
+})
+function taskInteraction(){
+ return {...buildTurnInteractionContext({rawUserText:'刚才改背景的图出来了吗？',botId:'99',speaker:{userId:'2'}}),actionFacts:{scope:{botId:'99',conversationId:'group:1',userId:'2'},observedAt:Date.now(),lookup:'ok',tasks:[]}}
+}
+test('fact repair is text-only low and archives only the actually sent correction',async()=>{
+ const {api,event,host,archived,saved}=fixture(),sent=[],calls=[],messages=[{role:'user',content:'刚才改背景的图出来了吗？'}],session={interactionContext:taskInteraction()}
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'corrected-id'}
+ host.retryRequest=async(request,toolContent,retries,toolName,options)=>{
+  calls.push({request,retries,options});assert.equal(request.tools,undefined);assert.equal(request.tool_choice,undefined)
+  assert.equal(retries,0);assert.equal(options.generation.reasoningEffort,'low');assert.equal(options.forceChatBackend,true)
+  assert.ok(options.signal instanceof AbortSignal)
+  assert.match(request.messages.at(-1).content,/原始|本轮互动/u)
+  return {choices:[{message:{content:'我还没核实到那次处理的结果，暂时不能确认进度。'}}]}
+ }
+ await api.handleTextResponse(host,'还没出来，好了我第一时间发你。',event,session,messages)
+ assert.equal(calls.length,1);assert.deepEqual(sent,['我还没核实到那次处理的结果，暂时不能确认进度。'])
+ assert.equal(archived.length,1);assert.equal(archived[0].message_id,'corrected-id');assert.equal(saved.length,1)
+ assert.equal(messages.at(-1).content,sent[0]);assert.doesNotMatch(JSON.stringify(messages),/第一时间发你/u)
+ assert.equal(session.replyGrounding.fallback,false)
+})
+test('tool calls and invalid repairs cannot execute or leak into sent history',async()=>{
+ for(const repair of [{tool_calls:[{function:{name:'reminderTool'}}],content:'好了发你。'},{content:'有结果我会通知你。'}]){
+  const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()};let calls=0
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'fallback-id'}
+  host.retryRequest=async()=>{calls++;return {choices:[{message:repair}]}}
+  await api.handleTextResponse(host,'好了我第一时间发你。',event,session,messages)
+  assert.equal(calls,1);assert.equal(session.replyGrounding.fallback,true);assert.match(sent[0],/不能确认/u)
+  assert.equal(messages[0].content,sent[0]);assert.equal(archived.length,1)
+ }
+})
+test('final grounding rechecks cancellation after generation and respects explicit request scope',async()=>{
+ const {api,event,host}=fixture(),reads=[],sent=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request',recentRequestMessageIds:['other-request']}}
+ const live={taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'live_job',observedAt:Date.now(),execution:'running',result:'unknown',delivery:{state:'unknown'},followUp:{state:'registered',kind:'job_completion',id:'callback'}}
+ session.interactionContext.actionFacts.tasks=[live]
+ host.getTurnActionFacts=async(_e,query)=>{reads.push(query);return {...session.interactionContext.actionFacts,observedAt:Date.now(),tasks:[{...live,execution:'unknown',followUp:{state:'unknown'}}]}}
+ host.retryRequest=async()=>({choices:[{message:{content:'我还没核实到进度，这里也没有有效的自动补发安排。'}}]})
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'r'}
+ await api.handleTextResponse(host,'好了我第一时间发你。',event,session,[])
+ assert.equal(reads.length,2);assert.ok(reads.every(query=>query.referenceMessageId==='original-request'))
+ assert.equal(sent[0],'我还没核实到进度，这里也没有有效的自动补发安排。')
 })
 test('final card returns actual receipt and never falls back after a transport attempt',async()=>{
  const {api,event,host}=fixture();let fallbacks=0;const observed=[]

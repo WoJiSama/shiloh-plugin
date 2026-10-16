@@ -1,4 +1,4 @@
-import type {ActionFactsEvent, ActionFactScope, TurnActionFacts, TurnTaskFact} from '../../../contracts/turnActionFacts.js'
+import type {ActionFactsEvent, ActionFactScope, ActionFactsQuery, TurnActionFacts, TurnTaskFact} from '../../../contracts/turnActionFacts.js'
 
 export function actionFactScope(event: ActionFactsEvent): ActionFactScope {
   const userId = String(event.user_id ?? '')
@@ -10,7 +10,7 @@ export function unknownTurnActionFacts(event: ActionFactsEvent, now = Date.now()
 }
 
 /** Fail closed at the prompt boundary, including optional host implementations. */
-export function validateTurnActionFacts(value: TurnActionFacts | undefined, event: ActionFactsEvent, now = Date.now()): TurnActionFacts {
+export function validateTurnActionFacts(value: TurnActionFacts | undefined, event: ActionFactsEvent, now = Date.now(), query?: ActionFactsQuery): TurnActionFacts {
   const scope = actionFactScope(event)
   if (!scope.botId || !scope.userId || !value || !['ok', 'unavailable'].includes(value.lookup)
     || !value.scope || value.scope.botId !== scope.botId || value.scope.conversationId !== scope.conversationId || value.scope.userId !== scope.userId
@@ -18,6 +18,8 @@ export function validateTurnActionFacts(value: TurnActionFacts | undefined, even
     return unknownTurnActionFacts(event, now)
   }
   const tasks: TurnTaskFact[] = []
+  const reference = String(query?.referenceMessageId ?? '').trim()
+  const requested = new Set(query?.recentRequestMessageIds || [])
   for (const fact of value.tasks.slice(0, 8)) {
     if (!fact || !fact.taskId || !fact.requestMessageId || !['task_record', 'live_job', 'reminder'].includes(fact.source)
       || !Number.isFinite(fact.observedAt) || fact.observedAt > now + 5000 || now - fact.observedAt > 24 * 60 * 60_000
@@ -25,6 +27,11 @@ export function validateTurnActionFacts(value: TurnActionFacts | undefined, even
       || !['available', 'unavailable', 'unknown'].includes(fact.result)
       || !fact.delivery || !['not_attempted', 'sent', 'failed', 'unknown'].includes(fact.delivery.state)
       || !fact.followUp || !['registered', 'none', 'unknown'].includes(fact.followUp.state)) continue
+    // Even an optional host must not answer an explicit old request with a
+    // different request's success or callback in the same bot/group/user scope.
+    if (query && (reference
+      ? fact.requestMessageId !== reference && !(fact.delivery.state === 'sent' && fact.delivery.messageId === reference)
+      : !requested.has(fact.requestMessageId))) continue
     const fresh = now - fact.observedAt <= 15 * 60_000
     const execution = !fresh && (fact.execution === 'queued' || fact.execution === 'running') ? 'unknown' : fact.execution
     const delivery = fact.delivery.state === 'sent' && !String(fact.delivery.messageId ?? '').trim()

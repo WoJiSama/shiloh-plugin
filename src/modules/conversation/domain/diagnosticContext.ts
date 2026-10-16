@@ -1,4 +1,4 @@
-import type {DiagnosticContext, DiagnosticIncidentStatus, DiagnosticSignal, DiagnosticSource, DiagnosticSubject} from '../../../contracts/diagnosticContext.js'
+import type {DiagnosticContext, DiagnosticDamageComponent, DiagnosticDamageKind, DiagnosticEvidenceAssessment, DiagnosticIncidentStatus, DiagnosticReplyViolation, DiagnosticSignal, DiagnosticSource, DiagnosticSubject, DiagnosticTemperaturePrerequisite} from '../../../contracts/diagnosticContext.js'
 import type {TurnEvidence} from '../../../contracts/turnInteraction.js'
 import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 
@@ -45,7 +45,81 @@ const SIGNAL_PATTERNS: [DiagnosticSignal, RegExp][] = [
   ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏/gu]
 ]
 interface Observation {signal: DiagnosticSignal; status: DiagnosticIncidentStatus}
-interface ParsedSource {source: DiagnosticSource; observations: Observation[]; correction: boolean; power?: DiagnosticContext['power']; cooled?: boolean; clearance: boolean; clearanceDenied: boolean}
+type DamageFinding = DiagnosticEvidenceAssessment['damage']['findings'][number]
+interface ParsedSource {source: DiagnosticSource; observations: Observation[]; correction: boolean; power?: DiagnosticContext['power']; cooled?: boolean; clearance: boolean; clearanceDenied: boolean; damageFindings: DamageFinding[]}
+
+const DAMAGE_COMPONENTS: [DiagnosticDamageComponent, RegExp][] = [
+  ['power_supply', /电源/u], ['mainboard', /主板/u], ['graphics_card', /显卡/u],
+  ['cable', /线材|线缆|电线/u], ['capacitor', /电容/u]
+]
+const DAMAGE_WORDS = /烧坏|烧毁|烧了|烧掉|损坏|坏了|短路|电气故障/u
+const PROFESSIONAL = /维修(?:师傅|人员|工程师|店|点)|专业(?:维修|检修|人员)|售后|检修(?:师傅|人员)/u
+const TEMPERATURE = /温度|(?:-?\d{1,3}(?:\.\d+)?)\s*(?:℃|°\s*C|摄氏度)|TjMax|Tcase/iu
+const MODEL = /\b(?:i[3579]-?\d{4,5}[a-z]{0,3}|(?:Ryzen\s*)?[Rr][3579][ -]?\d{4}[a-z]{0,4}|Ryzen\s*[3579]\s*\d{4}[a-z]{0,4}|(?:RTX|GTX)\s*\d{3,4}(?:\s*(?:Ti|SUPER))?|RX\s*\d{3,4}[a-z]{0,3}|\d{4}[xX][3D]{0,2})\b/iu
+const MEASUREMENT = /CPU\s*(?:Package|Die|核心|封装|结温)|GPU\s*(?:Hot\s*Spot|核心|热点|结温)|核心温度|封装温度|结温|热点温度|热电偶|红外(?:枪|测温)|(?:测点|读数来源|传感器)(?:是|为|[:：])\s*[^，。！？!?；;\n]{1,30}/iu
+const WORKLOAD = /满载|空闲|待机|烤机|游戏(?:中|时)|(?:跑|运行|执行)(?:了|着|中)?\s*(?:OCCT|Prime95|AIDA64|Cinebench|FurMark)|(?:CPU|GPU)?(?:使用率|占用率)\s*(?:是|为|[:：])?\s*\d{1,3}\s*%/iu
+
+function componentsIn(text: string): DiagnosticDamageComponent[] {
+  const components = DAMAGE_COMPONENTS.filter(([, pattern]) => pattern.test(text)).map(([component]) => component)
+  return components.length ? components : ['unspecified_component']
+}
+
+function damageKind(text: string): DiagnosticDamageKind {
+  return /烧坏|烧毁|烧了|烧掉|烧焦/u.test(text) ? 'burned' : /短路/u.test(text) ? 'short_circuit' : 'damaged'
+}
+
+function reportedDamageFindings(text: string): DamageFinding[] {
+  if (!PROFESSIONAL.test(text) || deniesProfessionalClearance(text)) return []
+  const reported = diagnosticClauses(text).filter(clause => !HYPOTHETICAL.test(clause)
+    && !/[？?]|是否|有没有|吗|么|准备|打算|计划|将要|明天|稍后|尚未|还没|没有(?:确认|查出|发现)|不能(?:确认|确定)|待确认/u.test(clause)).join('，')
+  if (!/(?:确认|查出|检测出|发现|诊断为|认定|确定|更换了?|换掉了?|修复了?)/u.test(reported)) return []
+  const findings: DamageFinding[] = []
+  for (const clause of diagnosticClauses(reported)) {
+    if (!DAMAGE_WORDS.test(clause) || /没有|并无|未见|排除|不存在|不确定|可能|疑似|应该|大概|好像|似乎|估计|猜测|多半/u.test(clause)) continue
+    findings.push({components: componentsIn(clause), kind: damageKind(clause)})
+  }
+  return findings
+}
+
+/** This projection names what is missing instead of deriving a diagnosis from a symptom. */
+function evidenceAssessment(sources: DiagnosticSource[], suppliedFindings?: DamageFinding[]): DiagnosticEvidenceAssessment {
+  let findings: DamageFinding[] = []
+  if (suppliedFindings) findings = suppliedFindings
+  else for (const source of sources) {
+    // Compatibility contexts still carry provenance. A newly reported incident
+    // cannot inherit the diagnosis of a part that was previously replaced.
+    if ((source.incidentStatus === 'asserted' && !professionalClearance(source.text)) || REPORT_CORRECTION.test(source.text)) findings = []
+    findings.push(...reportedDamageFindings(source.text))
+  }
+  const damage: DiagnosticEvidenceAssessment['damage'] = {status: findings.length ? 'reported_professional_finding' : 'unconfirmed', components: [...new Set(findings.flatMap(finding => finding.components))], findings}
+  if (!sources.some(source => TEMPERATURE.test(source.text))) return {damage}
+  let componentModel: string | undefined
+  let measurementPoint: string | undefined
+  let workload: string | undefined
+  const readings: string[] = []
+  for (const source of sources) {
+    for (const text of diagnosticClauses(source.text)) {
+      if (HYPOTHETICAL.test(text) || /准备|打算|计划|将要|明天|可能|大概|也许|好像|似乎|听说|据说/u.test(text)) continue
+      const modelUnknown = /(?:型号.{0,5}(?:不清楚|不知道|不明|未知|没查)|(?:不知道|不清楚|没说|没查).{0,5}型号)/u.test(text)
+      const model = MODEL.exec(text)?.[0] || /型号(?:是|为|[:：])\s*([a-z\d][a-z\d _-]{2,35})/iu.exec(text)?.[1]?.trim()
+      if (modelUnknown) componentModel = undefined
+      else if (model && !/(?:是不是|是否|型号.{0,35}(?:吗|么|[？?]))/u.test(text)) componentModel = model
+      const measurementUnknown = /(?:测点|传感器|读数来源).{0,5}(?:不清楚|不知道|不明|未知)|(?:不知道|不清楚).{0,5}(?:测点|传感器|读数来源)/u.test(text)
+      const measurement = MEASUREMENT.exec(text)?.[0]
+      if (measurementUnknown) measurementPoint = undefined
+      else if (measurement && !/(?:是不是|是否)(?:测|读)|(?:测点|传感器|读数来源).{0,35}(?:吗|么|[？?])/u.test(text)) measurementPoint = measurement
+      const load = WORKLOAD.exec(text)?.[0]
+      if (/(?:负载|使用率|占用率).{0,5}(?:不清楚|不知道|不明|未知)|(?:不知道|不清楚).{0,5}(?:负载|使用率|占用率)/u.test(text)) workload = undefined
+      else if (load && !/(?:是不是|是否).{0,8}(?:满载|空闲|待机)|(?:满载|空闲|待机)(?:了)?(?:吗|么)/u.test(text)) workload = load
+      for (const match of text.matchAll(/-?\d{1,3}(?:\.\d+)?\s*(?:℃|°\s*C|摄氏度)/giu)) readings.push(match[0])
+    }
+  }
+  const missing: DiagnosticTemperaturePrerequisite[] = []
+  if (!componentModel) missing.push('component_model')
+  if (!measurementPoint) missing.push('measurement_point')
+  if (!workload) missing.push('workload')
+  return {damage, temperature: {readings: [...new Set(readings)].slice(-8), ...(componentModel ? {componentModel} : {}), ...(measurementPoint ? {measurementPoint} : {}), ...(workload ? {workload} : {}), missing}}
+}
 
 /** Stored user messages can contain somebody else's quoted words. Keep only their own prose. */
 function separateQuotedText(text: string): {text: string; unresolvedAttribution: boolean} {
@@ -199,6 +273,7 @@ function parseSource(source: Omit<DiagnosticSource, 'incidentStatus' | 'signals'
   return {
     source: {...source, text: scopedText, incidentStatus, signals: [...new Set(obs.map(item => item.signal))]}, observations: obs,
     correction: REPORT_CORRECTION.test(scopedText), clearance: !separated.unresolvedAttribution && professionalClearance(scopedText), clearanceDenied: deniesProfessionalClearance(scopedText),
+    damageFindings: separated.unresolvedAttribution ? [] : reportedDamageFindings(scopedText),
     ...(power ? {power} : {}),
     ...(notCooled ? {cooled: false} : cooled ? {cooled: transientFactsFresh} : {})
   }
@@ -273,7 +348,13 @@ export function buildDiagnosticContext(input: DiagnosticContextInput): Diagnosti
     if (!cooled) unmetPrerequisites.push('cooled')
     if (unresolvedIncident) unmetPrerequisites.push('electrical_damage_excluded')
   }
-  return {purpose, subject, incident: {status, signals: [...signalStates.keys()]}, power, damageExclusion, allowedChecks, unmetPrerequisites, sources: relevant.map(item => item.source)}
+  const sources = relevant.map(item => item.source)
+  let damageFindings: DamageFinding[] = []
+  for (const item of relevant) {
+    if ((item.observations.some(observation => observation.status === 'asserted') && !item.clearance) || item.correction) damageFindings = []
+    damageFindings.push(...item.damageFindings)
+  }
+  return {purpose, subject, incident: {status, signals: [...signalStates.keys()]}, power, damageExclusion, allowedChecks, unmetPrerequisites, sources, evidenceAssessment: evidenceAssessment(sources, damageFindings)}
 }
 
 export function buildDiagnosticContextPrompt(context?: DiagnosticContext): string {
@@ -293,4 +374,156 @@ export function buildDiagnosticContextPrompt(context?: DiagnosticContext): strin
   }
   for (const source of context.sources.slice(-4)) lines.push(`依据 ${source.origin}${source.messageId ? `/${source.messageId}` : ''}${source.origin !== 'current' && !source.transientFactsFresh ? '（旧状态或时间未明，不证明当前供电和冷却状态）' : ''}：${safeTruncateUnicode(source.text, 260)}`)
   return lines.join('\n')
+}
+
+function deniesConclusion(clause: string): boolean {
+  return /(?:无法|不能|尚不能|不够|不足以|没法|未能|还不能)(?:仅凭|只凭|据此|直接|就|远程|确定地)?(?:判断|确认|确定|断定|说|证明|认定|保证)|(?:不能|无法).{0,12}(?:判断|确认|断定|证明)|不代表|不等于|并非|不是说|不意味着|不说明|未必|不一定|不是(?:已经|肯定|确定|正常)|没有(?:证据|依据).{0,8}(?:确认|说明|证明)|(?:结论|判断).{0,6}(?:不能下|下不了|尚早)/u.test(clause)
+}
+
+function offersPossibility(clause: string): boolean {
+  return !/大概率|很可能|多半|十有八九|基本(?:已经|确定|是|就)/u.test(clause)
+    && /可能|也许|或许|不能排除|不排除|有.{0,6}风险|疑似|怀疑|待确认|尚待/u.test(clause)
+}
+
+function conditionalInspection(clause: string): boolean {
+  // A user's worry, idleness or curiosity is not a diagnostic precondition.
+  // Only a concrete inspection or a bounded component/specification premise
+  // can make an otherwise unestablished conclusion explicitly conditional.
+  return professionalOperationCondition(clause)
+    || /(?:等|待|须|必须|需要).{0,25}(?:专业|维修|检修|排除电气损坏)|(?:专业|维修|检修).{0,25}(?:之后|以后|才(?:能|可))|交(?:给|由).{0,12}(?:专业|维修)|由.{0,12}(?:专业|维修).{0,12}(?:检查|检测|操作)/u.test(clause)
+    || /(?:如果|假如|只有|前提是).{0,35}(?:型号|测点|传感器|负载).{0,35}(?:规格|官方|厂家|允许|上限|范围|阈值)|(?:如果|假如|只有|前提是).{0,35}(?:官方|厂家|该型号)(?:公布|规定|给出|标定)?的?(?:温度)?(?:规格|上限|范围|阈值).{0,20}(?:允许|以内|以下|范围内)/u.test(clause)
+}
+
+function professionalOperationCondition(clause: string): boolean {
+  return /(?:等|待|只有|如果|须|需|必须|经).{0,30}(?:专业|维修|检修).{0,35}(?:放行|排除.{0,8}电气损坏|确认.{0,8}(?:可|能|允许)(?:安全)?(?:开机|通电))|(?:交给|交由|由).{0,15}(?:专业|维修).{0,25}(?:检测|操作|检查)/u.test(clause)
+}
+
+function isQuestion(clause: string): boolean {
+  return /[？?]\s*$/u.test(clause) || /(?:是不是|是否|有没有|能不能|可不可以|吗|么)[，。；;]?\s*$/u.test(clause)
+}
+
+function damageClaim(clause: string): string | undefined {
+  return /(?:元件|零件|东西|部件|电源|主板|板卡|显卡|电路|电容|线材|线缆|电线|硬件|内部|里面)[^，,。！？!?；;\n]{0,24}(?:烧坏|烧毁|烧了|烧掉|损坏|坏了|短路|电气故障)|(?:烧坏|烧毁|损坏|烧焦)(?:了|的)?(?:元件|零件|电源|主板|显卡|电容|线材|线缆|硬件)/u.exec(clause)?.[0]
+}
+
+function isDamageDiscussion(clause: string): boolean {
+  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|短路)|(?:烧坏|烧毁|损坏|短路)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
+}
+
+function temperatureAssurance(clause: string): boolean {
+  if (/(?:是否|是不是|正常与否)|(?:正常|安全)(?:范围|区间).{0,8}(?:要|需|取决于)|(?:查看|观察|检查|监测).{0,12}(?:状态|情况|表现)/u.test(clause)) return false
+  if (/(?:可以|能够|能|可|放心)(?:继续|照常)?(?:正常|安全)(?:运行|工作|使用)|(?:正常|安全)(?:运行|工作|使用)(?:没问题|就行|即可)/u.test(clause)) return true
+  // Reporting that a machine has run does not itself assert that its temperature
+  // is normal. A permission to keep using it is a separate positive conclusion.
+  if (/(?:正常|安全)(?:运行|工作|使用)/u.test(clause)) return false
+  const conclusion = /(?:正常(?:范围|区间)?|不算高|不高|没问题|没事|安全)|放心(?:用|使用|运行)/u
+  if (!conclusion.test(clause)) return false
+  return /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)|(?:就|很|挺|算|是|属于|在|落在|基本|完全|非常).{0,8}(?:正常|不高|没问题|没事|安全)|放心(?:用|使用|运行)|^\s*(?:正常|不算高|不高|没问题|没事|安全)/iu.test(clause)
+}
+
+function replyAssertions(text: string): string[] {
+  // Contrast joins independent assertions. Its uncertainty or denial applies to
+  // that assertion, not to a guarantee or action on the other side of the join.
+  return diagnosticClauses(text).flatMap(clause => clause.split(/(?=但是|不过|然而|可是|但(?!凡)|却)/u)).filter(clause => clause.trim())
+}
+
+function advisesUnclearedOperation(clause: string): boolean {
+  const action = /开机|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)/gu
+  for (const match of clause.matchAll(action)) {
+    const prefix = clause.slice(0, match.index)
+    // A later "别摸内部" cannot negate an earlier "先开机". Only a
+    // prohibition immediately governing this operation can do that.
+    if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
+    if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
+      || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
+  }
+  return false
+}
+
+function diagnosticValidationProse(reply: string): string {
+  const prose = reply.replace(/```[\s\S]*?```/gu, '')
+  return prose.replace(/“([^”]*)”|「([^」]*)」|『([^』]*)』|"([^"\n]*)"|`([^`\n]*)`/gu, (quote: string, ...args: unknown[]) => {
+    const offset = args[5] as number
+    const text = args.slice(0, 5).find(value => typeof value === 'string') as string | undefined
+    const before = prose.slice(Math.max(0, offset - 65), offset)
+    const after = prose.slice(offset + quote.length, offset + quote.length + 65)
+    const mentioned = /(?:例如|比如|举例|反例|示例|错误说法|错误建议|原话|引用|(?:不要|不能|不应|不该|别|勿)(?:照着|按照|照做|听信|建议|说|回复|让你说)?|不建议)\s*[:：]?\s*$/u.test(before)
+      || /^\s*(?:(?:这句(?:话)?|这个(?:说法|结论|建议)|这种(?:说法|做法|建议))\s*)?(?:只是(?:个|一个)?(?:反例|示例)|(?:是|属于)(?:个|一个)?(?:错误|反例|示例)|(?:并)?(?:不能|不应|不该|不要|别)(?:照做|照着做|这么做|这么说|这样做|这样说|下|成立)|(?:现在|目前|还|现在还){0,2}不能下)/u.test(after)
+    // Quotation marks alone do not turn an instruction into a harmless example.
+    return mentioned ? '' : text || ''
+  }).replace(/[*_#]/gu, '')
+}
+
+/**
+ * High-confidence conflicts only. This function does not alter prose or claim to
+ * prove an arbitrary reply correct. The caller may regenerate the whole reply
+ * once using the returned evidence conflict, then use a grounded fallback.
+ */
+export function validateDiagnosticReply(reply: string, context?: DiagnosticContext): DiagnosticReplyViolation[] {
+  if (!context || context.purpose !== 'troubleshooting' || !reply.trim()) return []
+  const assessment = context.evidenceAssessment || evidenceAssessment(context.sources)
+  const violations: DiagnosticReplyViolation[] = []
+  const add = (code: DiagnosticReplyViolation['code'], claim: string, reason: string, correctionInstruction: string): void => {
+    if (!violations.some(item => item.code === code && item.claim === claim)) violations.push({code, claim, reason, correctionInstruction})
+  }
+  // Analyse formatting-free text, preserving the actual reply for the sender.
+  const prose = diagnosticValidationProse(reply)
+  let carriedOperationCondition = false
+  for (const clause of replyAssertions(prose)) {
+    if (/^\s*(?:但是|不过|然而|可是|但(?!凡)|却)/u.test(clause)) carriedOperationCondition = false
+    const operationConditional: boolean = carriedOperationCondition || professionalOperationCondition(clause)
+    carriedOperationCondition = operationConditional && !/[。！？!?；;\n]/u.test(clause)
+    if (isQuestion(clause)) continue
+    const conclusionDenied = deniesConclusion(clause)
+    const possible = offersPossibility(clause)
+    const conditional = conditionalInspection(clause)
+    const damage = damageClaim(clause)
+    if (damage && !conclusionDenied && !possible && !conditional && !isDamageDiscussion(clause)) {
+      const components = componentsIn(damage)
+      const kind = damageKind(damage)
+      const unsupported = assessment.damage.status !== 'reported_professional_finding'
+        || !assessment.damage.findings.some(finding => (kind === 'damaged' || finding.kind === kind)
+          && components.every(component => component === 'unspecified_component' || finding.components.includes(component)))
+      if (unsupported) add('unsupported_damage_diagnosis', clause.trim(), '当前来源只支持异常症状，或没有该部件的已报告专业损坏结论。', '保留必要的停用与检修建议；明确凭这些症状不能确定烧坏了什么，可能性不能写成已确诊或大概率结论。')
+    }
+    if (!conclusionDenied && !possible && !conditional && /绝对安全|保证.{0,4}安全|肯定(?:没事|没有问题|没问题)|百分之百(?:正常|安全)|整机.{0,6}(?:完全正常|没有任何问题|绝对没事)/u.test(clause)) {
+      add('unsupported_safety_certification', clause.trim(), '远程用户陈述和局部检查都不支持整机安全保证。', '按报告说明能确认的范围，说明检查前提与停止条件，不给整机安全保证。')
+    }
+    if (assessment.temperature?.missing.length && !conclusionDenied && !possible && !conditional
+      && !/(?:有些|某些|部分)(?:型号|部件|处理器|设备)|对.{0,12}(?:型号|部件).{0,6}来说/u.test(clause)
+      && temperatureAssurance(clause)) {
+      add('unsupported_temperature_assurance', clause.trim(), `温度判断仍缺少：${assessment.temperature.missing.join('、')}。`, '先说明当前读数无法单独判断正常与否，补齐部件型号、测点和负载并对照规格；末尾补问不能抵消前面的正常或安全保证。')
+    }
+    if (!context.allowedChecks.includes('operational_monitoring') && !operationConditional && advisesUnclearedOperation(clause)) {
+      add('unmet_operational_prerequisite', clause.trim(), '同一设备的电气异常尚未获报告专业排除，运行检测前提不成立。', '保持电源隔离，冷却后只做静态观察与专业检修；如提运行检测，必须明确以同一设备完成专业检修并放行为条件。')
+    }
+    if (context.damageExclusion === 'reported_professional_clearance' && !conditional
+      && /电气损坏(?:仍|还|尚)(?:然)?未排除|(?:还|尚|仍)(?:没有|没)(?:完成)?(?:专业)?检修|(?:绝对|永远|一律|无论如何).{0,8}(?:不能|禁止|不可以).{0,5}(?:开机|通电)/u.test(clause)) {
+      add('contradicted_professional_clearance', clause.trim(), '用户已明确报告同一设备完成专业检修和放行，不能继续把该前提写成未满足。', '采纳已报告的专业检查范围，允许外壳复原后在放行范围内的非接触运行监测；不要把它扩大为整机绝对安全。')
+    }
+  }
+  return violations
+}
+
+/** Standalone factual reply after a bounded regeneration fails; never edits a candidate sentence. */
+export function buildDiagnosticFallbackReply(context?: DiagnosticContext): string {
+  if (!context) return ''
+  const assessment = context.evidenceAssessment || evidenceAssessment(context.sources)
+  if (context.purpose !== 'troubleshooting') return '这段是在讨论假设或比喻，还不能据此认定现实中的设备发生了故障。'
+  if (context.damageExclusion === 'reported_professional_clearance') {
+    return '按你补充的情况，这台设备已完成专业检修并获准在确认的范围内运行。外壳复原后，可按现场人员的要求做非接触运行监测，查看读数和是否再次出现异常；新出现焦糊味、烟雾或电火花就停止运行并联系检修人员。这份放行不等于整机安全保证。'
+  }
+  if (!context.allowedChecks.includes('operational_monitoring')) {
+    if (context.incident.status !== 'asserted') return '目前还没确认是否出现真实电气异常，不能据此判断哪个元件已损坏。若现场确有焦糊味、烟雾或电火花，先停机隔离电源，不要开机试探，冷却后联系专业人员排查；如果只是询问假设，先说明实际观察到的现象。'
+    const isolation = context.power === 'off' ? '你已报告拔电，先保持电源隔离' : '先停机并切断电源，确认拔下电源线'
+    return `这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。${isolation}，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。`
+  }
+  if (assessment.temperature) {
+    const labels: Record<DiagnosticTemperaturePrerequisite, string> = {component_model: '具体部件型号', measurement_point: '测温位置或传感器名称', workload: '读数时的负载'}
+    const missing = assessment.temperature.missing.map(item => labels[item])
+    return missing.length
+      ? `单凭这个温度读数，还不能判断是否正常。先确认${missing.join('、')}，再结合该部件的规格、功耗和实际限频情况判断。正常运行或没有烟味，也不能证明整机健康。`
+      : '现有型号、测点和负载可用于对照该部件规格，结合功耗及是否限频来判断温度范围；单个读数仍不能保证整机安全。'
+  }
+  return '目前这些陈述还不足以确定具体故障。先分清已观察到的现象和待检查的原因，再在满足断电、冷却等前提后进行相应检查。'
 }

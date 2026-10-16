@@ -19,6 +19,15 @@ test('task facts reject another bot, private context, requester, and stale snaps
   assert.equal(validateTurnActionFacts({...facts(), observedAt: now - 60_001}, event, now).lookup, 'unavailable')
 })
 
+test('facts returned by an optional host must match the explicit request or receipt query',()=>{
+ const rows=facts([task({requestMessageId:'old-a',delivery:{state:'unknown'}}),task({requestMessageId:'unrelated-b',delivery:{state:'sent',messageId:'receipt-b'}})])
+ assert.deepEqual(validateTurnActionFacts(rows,event,now,{referenceMessageId:'old-a',recentRequestMessageIds:['unrelated-b']}).tasks.map(t=>t.requestMessageId),['old-a'])
+ assert.deepEqual(validateTurnActionFacts(rows,event,now,{referenceMessageId:'missing',recentRequestMessageIds:['unrelated-b']}).tasks,[])
+ assert.deepEqual(validateTurnActionFacts(rows,event,now,{referenceMessageId:'receipt-b'}).tasks.map(t=>t.requestMessageId),['unrelated-b'])
+ assert.deepEqual(validateTurnActionFacts(rows,event,now,{recentRequestMessageIds:['old-a']}).tasks.map(t=>t.requestMessageId),['old-a'])
+ assert.deepEqual(validateTurnActionFacts(rows,event,now,{}).tasks,[])
+})
+
 test('an available image and completed call do not imply delivery or a future task', () => {
   const actual = validateTurnActionFacts(facts(), event, now)
   assert.equal(actual.tasks[0]?.result, 'available')

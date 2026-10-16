@@ -847,7 +847,7 @@ class ExamplePlugin extends ports.Plugin {
     const reminder=this.toolInstances?.reminderTool
     if(!reminder||typeof reminder!=='object'||!('getActionFacts' in reminder)||typeof reminder.getActionFacts!=='function')return tasks
     try {
-      const scheduled=validateTurnActionFacts(await Reflect.apply(reminder.getActionFacts,reminder,[e,query]) as TurnActionFacts,e)
+      const scheduled=validateTurnActionFacts(await Reflect.apply(reminder.getActionFacts,reminder,[e,query]) as TurnActionFacts,e,Date.now(),query)
       return {...tasks,lookup:tasks.lookup==='ok'&&scheduled.lookup==='ok'?'ok' as const:'unavailable' as const,tasks:[...tasks.tasks,...scheduled.tasks]}
     } catch {return {...tasks,lookup:'unavailable' as const}}
   }

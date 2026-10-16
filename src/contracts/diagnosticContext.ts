@@ -1,5 +1,31 @@
 export type DiagnosticIncidentStatus = 'asserted' | 'denied' | 'figurative' | 'unknown'
 export type DiagnosticSignal = 'burning_odor' | 'smoke' | 'fire' | 'electrical_fault'
+export type DiagnosticDamageComponent = 'power_supply' | 'mainboard' | 'graphics_card' | 'cable' | 'capacitor' | 'unspecified_component'
+export type DiagnosticDamageKind = 'damaged' | 'burned' | 'short_circuit'
+export type DiagnosticTemperaturePrerequisite = 'component_model' | 'measurement_point' | 'workload'
+
+/** Evidence supports observations or reported findings, never a remote safety certificate. */
+export interface DiagnosticEvidenceAssessment {
+  damage: {
+    status: 'unconfirmed' | 'reported_professional_finding'
+    components: DiagnosticDamageComponent[]
+    findings: {components: DiagnosticDamageComponent[]; kind: DiagnosticDamageKind}[]
+  }
+  temperature?: {
+    readings: string[]
+    componentModel?: string
+    measurementPoint?: string
+    workload?: string
+    missing: DiagnosticTemperaturePrerequisite[]
+  }
+}
+
+export interface DiagnosticReplyViolation {
+  code: 'unsupported_damage_diagnosis' | 'unsupported_temperature_assurance' | 'unsupported_safety_certification' | 'unmet_operational_prerequisite' | 'contradicted_professional_clearance'
+  claim: string
+  reason: string
+  correctionInstruction: string
+}
 
 export interface DiagnosticSubject {
   kind: 'speaker_device' | 'third_party_device' | 'unspecified_device'
@@ -35,4 +61,6 @@ export interface DiagnosticContext {
   allowedChecks: ('static_observation' | 'operational_monitoring')[]
   unmetPrerequisites: ('power_isolated' | 'cooled' | 'electrical_damage_excluded')[]
   sources: DiagnosticSource[]
+  /** Optional for compatibility with previously materialized conversation contexts. */
+  evidenceAssessment?: DiagnosticEvidenceAssessment
 }

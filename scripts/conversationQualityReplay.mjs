@@ -211,7 +211,7 @@ async function fixture(initialScenario, {confirmed = true, directToBot = false} 
     sender:{user_id:Number(message.userId||(message.role==='assistant'?'99':'202')),nickname:message.role==='assistant'?currentPersona.name:(message.name||'测试群友'),role:'member'}
   }));
   const groupId = 900000 + ++fixtureId
-  const captures = {compose: [], guards: [], requests: [], generation: [], actionFacts: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0, warnings: [], network: [], memoryNetwork:[], memoryRecalls:[], memoryWrites:[], understanding:[], modelOutput: ''}
+  const captures = {compose: [], guards: [], requests: [], generation: [], actionFacts: [], modelOutputs: [], loads: [], writes: [], episodes: [], archived: [], saved: [], enhanced: [], sent: [], errors: [], mainCalls: 0, intentCalls: 0, warnings: [], network: [], memoryNetwork:[], memoryRecalls:[], memoryWrites:[], understanding:[], modelOutput: ''}
   const logger = {info() {}, warn(...args) {captures.warnings.push(scrub(args.join(' ')))}, debug() {}, error(message, error) { captures.errors.push({message:scrub(String(message)), error:scrub(error instanceof Error ? error.message : String(error ?? ''))}) }}
   const trace = {id: `replay-${groupId}`, setTrigger() {}, setIntent() {}, addModelCall() {}, addTool() {}, finish: () => ({modelCalls: [], tools: []})}
   const members = new Map([[99, {user_id: 99, nickname: '测试机器人', role: 'member'}], [202, {user_id: 202, nickname: '测试群友', role: 'member'}], [303, {user_id: 303, nickname: '另一只机器人', role: 'member'}]])
@@ -271,9 +271,10 @@ async function fixture(initialScenario, {confirmed = true, directToBot = false} 
     getToolsByName: () => [], getImageGenerationReferenceImages: images => images,
     retryRequest: async (requestData,toolContent,retries=1,toolName,options={}) => {
       captures.mainCalls++;
-      if(dryRun){captures.modelOutput='这是一条离线桩回复，用于检查提示传递。\n这句检查多行回复的历史传递。';return {choices:[{message:{content:captures.modelOutput}}]}}
+      if(dryRun){captures.modelOutput='这是一条离线桩回复，用于检查提示传递。\n这句检查多行回复的历史传递。';captures.modelOutputs.push({phase:options.routeLabel||'main',output:captures.modelOutput});return {choices:[{message:{content:captures.modelOutput}}]}}
       const response=await executeChatRequestWithRecovery(req=>executor.YTapi(req,host.config,toolContent,toolName,options),requestData,{retries,onRetry:({failure})=>captures.warnings.push(`model_retry:${failure.kind}`)});
       captures.modelOutput=String(response?.choices?.[0]?.message?.content||'');
+      captures.modelOutputs.push({phase:options.routeLabel||'main',output:scrub(captures.modelOutput)});
       return response;
     },
     buildMissingToolCommitmentCall: () => null,
@@ -389,7 +390,7 @@ async function fixture(initialScenario, {confirmed = true, directToBot = false} 
 
 const attempts=new WeakMap();
 const describeTurn=({fixture:f,scenario,turn,turnIndex,previousResult},handled)=>{
-      const {startedAt,offsets,intentCalls}=attempts.get(f)||{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','errors','warnings','network','memoryNetwork','memoryRecalls','memoryWrites','understanding'].map(key=>[key,0])),intentCalls:0};
+      const {startedAt,offsets,intentCalls}=attempts.get(f)||{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','modelOutputs','errors','warnings','network','memoryNetwork','memoryRecalls','memoryWrites','understanding'].map(key=>[key,0])),intentCalls:0};
       const failures=[];
       const c=f.session.interactionContext;
       const request=f.captures.requests[offsets.requests]||[];
@@ -423,7 +424,9 @@ const describeTurn=({fixture:f,scenario,turn,turnIndex,previousResult},handled)=
       if(c?.actionFacts){checks.actionFactsScoped=c.actionFacts.scope?.botId===String(f.event.self_id)&&c.actionFacts.scope?.conversationId===`group:${f.event.group_id}`&&c.actionFacts.scope?.userId===String(f.event.user_id);}
       for(const [key,ok]of Object.entries(checks))if(!ok)failures.push(key);
       const finalOutput=f.captures.sent.slice(offsets.sent).join('\n');
-      return {expected:turn.expect||scenario.expect,semanticChecks:turn.semanticChecks||scenario.semanticChecks||[],manualReview:turn.manualReview||scenario.manualReview||[],botId:String(f.event.self_id),personaName:f.host.config.persona.name,personaHash:hashReplayValue(f.host.config.persona),scenarioHash:hashReplayValue(scenario),requestHash:hashReplayValue(request),generation:f.captures.generation.slice(offsets.generation),output:scrub(finalOutput),rawModelOutput:scrub(f.captures.modelOutput),guardChanged:finalOutput!==f.captures.modelOutput,elapsedMs:Date.now()-startedAt,network:f.captures.network.slice(offsets.network),replyElapsedMs:f.captures.lastReplyElapsedMs,memoryDrainElapsedMs:f.captures.lastMemoryElapsedMs,understanding:f.captures.understanding.slice(offsets.understanding),memory:memoryIntegration?{network:f.captures.memoryNetwork.slice(offsets.memoryNetwork),extractions:f.captures.memoryWrites.slice(offsets.memoryWrites),recalls:f.captures.memoryRecalls.slice(offsets.memoryRecalls),snapshot:f.captures.lastMemorySnapshot}:null,plan:f.session.turnPlan?.execution,actionFacts:{source:'synthetic_fixture',providerUsed:actionFactsCalls.length>0,calls:actionFactsCalls,context:c?.actionFacts||null},diagnosticContext:c?.diagnosticContext||null,interaction:{kind:c?.kind,allowPlayfulness:c?.allowPlayfulness,target:c?.target,evidence:c?.evidence?.map(e=>({origin:e.origin,kind:e.kind,state:e.state})),social:c?.social,previousReplySource:c?.previousBotReply?.source},checks,failures,errors:f.captures.errors.slice(offsets.errors),warnings:f.captures.warnings.slice(offsets.warnings)};
+      const modelCandidates=f.captures.modelOutputs.slice(offsets.modelOutputs);
+      const grounding=f.session.replyGrounding?JSON.parse(scrub(JSON.stringify(f.session.replyGrounding))):null;
+      return {expected:turn.expect||scenario.expect,semanticChecks:turn.semanticChecks||scenario.semanticChecks||[],manualReview:turn.manualReview||scenario.manualReview||[],botId:String(f.event.self_id),personaName:f.host.config.persona.name,personaHash:hashReplayValue(f.host.config.persona),scenarioHash:hashReplayValue(scenario),requestHash:hashReplayValue(request),generation:f.captures.generation.slice(offsets.generation),output:scrub(finalOutput),rawModelOutput:scrub(modelCandidates[0]?.output||f.captures.modelOutput),modelCandidates,grounding,guardChanged:finalOutput!==(modelCandidates[0]?.output||f.captures.modelOutput),elapsedMs:Date.now()-startedAt,network:f.captures.network.slice(offsets.network),replyElapsedMs:f.captures.lastReplyElapsedMs,memoryDrainElapsedMs:f.captures.lastMemoryElapsedMs,understanding:f.captures.understanding.slice(offsets.understanding),memory:memoryIntegration?{network:f.captures.memoryNetwork.slice(offsets.memoryNetwork),extractions:f.captures.memoryWrites.slice(offsets.memoryWrites),recalls:f.captures.memoryRecalls.slice(offsets.memoryRecalls),snapshot:f.captures.lastMemorySnapshot}:null,plan:f.session.turnPlan?.execution,actionFacts:{source:'synthetic_fixture',providerUsed:actionFactsCalls.length>0,calls:actionFactsCalls,context:c?.actionFacts||null},diagnosticContext:c?.diagnosticContext||null,interaction:{kind:c?.kind,allowPlayfulness:c?.allowPlayfulness,target:c?.target,evidence:c?.evidence?.map(e=>({origin:e.origin,kind:e.kind,state:e.state})),social:c?.social,previousReplySource:c?.previousBotReply?.source},checks,failures,errors:f.captures.errors.slice(offsets.errors),warnings:f.captures.warnings.slice(offsets.warnings)};
 };
 const resultFile=path.join(outputDir,dryRun?'dry-results.json':'results.json');
 const replayDocument=(results,complete=false)=>({commit,label:runLabel,metadata,complete,structuralChecksOnly:true,semanticEvaluation:'manual_required',platformMessagesSent:0,productionStoreWrites:0,results});
@@ -435,7 +438,8 @@ const results=await runReplaySamples({
     const f=context.fixture;
     f.captures.modelOutput='';
     f.captures.turnStartedAt=Date.now();
-    attempts.set(f,{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','errors','warnings','network','memoryNetwork','memoryRecalls','memoryWrites','understanding'].map(key=>[key,f.captures[key].length])),intentCalls:f.captures.intentCalls});
+    delete f.session.replyGrounding;
+    attempts.set(f,{startedAt:Date.now(),offsets:Object.fromEntries(['sent','requests','generation','actionFacts','modelOutputs','errors','warnings','network','memoryNetwork','memoryRecalls','memoryWrites','understanding'].map(key=>[key,f.captures[key].length])),intentCalls:f.captures.intentCalls});
     const handled=await f.run(context.turn);
     return describeTurn(context,handled);
   },

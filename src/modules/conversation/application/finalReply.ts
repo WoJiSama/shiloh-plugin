@@ -22,10 +22,17 @@ import type {MemoryExtractionMeta,MemoryExtractionMessage} from '../../../contra
 import type {SocialContinuity} from '../../../contracts/turnInteraction.js'
 import type {ForwardCompleteness} from '../../../contracts/forwardContext.js'
 import {buildSocialContinuity} from '../domain/turnInteractionContext.js'
+import {groundFinalReply, type ReplyGroundingAudit} from './groundedReply.js'
+import {validateTurnActionFacts, unknownTurnActionFacts} from '../domain/turnActionFacts.js'
+import {validateActionReply} from '../domain/actionReplyGrounding.js'
+import type {ActionFactsEvent, ActionFactsQuery, TurnActionFacts} from '../../../contracts/turnActionFacts.js'
+import type {ChatProviderConfig, ChatRequestData} from '../../../contracts/modelGateway.js'
+import type {ExecutionOptions} from '../../../contracts/modelExecution.js'
+import {buildChatRequestData} from '../../models/domain/modelGateway.js'
 export interface Message {role:string;content:string;tool_call_id?:string;name?:string}
 export interface FinalEvent extends ReplyEvent {_personaSnapshot?:PersonaSnapshot;message_id?:string|number;time?:number;_receivedAt?:number;sender?:{card?:string;nickname?:string;role?:string};message_type?:string;message?:import('../../../contracts/chatEvent.js').MessageSegment[]}
-export interface FinalSession {personaSnapshot?:PersonaSnapshot;userContent?:string;rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
-interface Config {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean}|undefined;memorySystem?:{enabled?:boolean}|undefined}
+export interface FinalSession {personaSnapshot?:PersonaSnapshot;userContent?:string;rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;actionFactsQuery?:ActionFactsQuery;replyGrounding?:ReplyGroundingAudit;taskContext?:{messageId?:unknown};turnTrace?:{addModelCall(kind:string,elapsed:number):void};toolContent?:unknown;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
+interface Config extends ChatProviderConfig {personaGuard?:{enabled?:boolean;badPatterns?:string[]};episodicMemory?:{enabled?:boolean;maxPerGroup?:number};conversationTrackingEnabled?:boolean;globalStyleLearning?:unknown;emotionSystem?:{enabled?:boolean}|undefined;memorySystem?:{enabled?:boolean}|undefined}
 interface ArchivedMessage {self_id?:string|number;source?:string;sender?:{self_id?:string|number;user_id?:string|number|undefined;nickname?:string|undefined};content?:string;raw_message?:string;message?:{type?:string;text?:string;data?:{text?:string}}[];at?:unknown;time?:unknown;forwardCompleteness?:ForwardCompleteness}
 export interface FinalReplyHost {
  config:Config;processToolSpecificMessage(content:string,toolName?:string):string|Promise<string>;getPersonaFor(event:FinalEvent):{name?:string};
@@ -37,6 +44,8 @@ export interface FinalReplyHost {
  updateEnhancedSystems(event:FinalEvent,userMessage:string,reply:string,personaSnapshot?:PersonaSnapshot):Promise<unknown>;
  emotionManager:{updateEmotionFromMessage(groupId:string|number|undefined,text:string,isAtBot:boolean,selfId:string):Promise<unknown>};
  memoryManager:{extractAndSaveMemories(groupId:string|number|undefined,userId:string|number|undefined,text:string,reply:string,context:MemoryExtractionMeta):unknown;extractAndSaveGroupMemories(groupId:string|number,history:MemoryExtractionMessage[],context:MemoryExtractionMeta):unknown}
+ getTurnActionFacts?(event:ActionFactsEvent,query?:ActionFactsQuery):Promise<TurnActionFacts>;
+ retryRequest?(request:ChatRequestData,toolContent:unknown,retries:number,toolName?:string,options?:ExecutionOptions):Promise<{choices?:{message?:{content?:unknown;tool_calls?:unknown[]}}[];error?:unknown}>;
 }
 interface FinalPorts {
  randomUUID():string;
@@ -102,6 +111,55 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
     if (!output) {
       logger.warn("[最终回复清理] 风格拦截后回复为空，已跳过发送")
       return
+    }
+    if (!modrinthItems.length && session.interactionContext) {
+      const refresh = async () => {
+        const context = session.interactionContext!
+        if (!context.actionFacts && !validateActionReply(output, undefined, context.rawUserText).length) return context
+        const query = session.actionFactsQuery ?? {recentRequestMessageIds: [
+          ...(context.actionFacts?.tasks || []).map(task => task.requestMessageId),
+          String(e.message_id ?? session.taskContext?.messageId ?? '')
+        ].filter(Boolean)}
+        let facts = validateTurnActionFacts(context.actionFacts, e, Date.now(), query)
+        if (host.getTurnActionFacts) {
+          try {
+            facts = validateTurnActionFacts(await host.getTurnActionFacts(e, query), e, Date.now(), query)
+          }
+          catch {facts = unknownTurnActionFacts(e)}
+        }
+        session.interactionContext = {...context, actionFacts: facts}
+        return session.interactionContext
+      }
+      const grounded = await groundFinalReply({
+        candidate: output, context: session.interactionContext, refresh,
+        ...(host.retryRequest ? {regenerate: async (candidate:string, instruction:string) => {
+          const started = Date.now()
+          try {
+            const response = await host.retryRequest!(buildChatRequestData(host.config, [
+              ...messages.map(message=>({...message})), {role: 'assistant', content: candidate}, {role: 'system', content: instruction}
+            ], [], 'none'), session.toolContent, 0, undefined, {
+              forceChatBackend: true, routeLabel: '事实纠正', signal: AbortSignal.timeout(10_000),
+              generation: {reasoningEffort: 'low'}
+            })
+            const message = response.choices?.[0]?.message
+            return !message?.tool_calls?.length && typeof message?.content === 'string' ? message.content : undefined
+          } finally {session.turnTrace?.addModelCall('grounding_repair', Date.now() - started)}
+        }} : {}),
+        prepare: async text => {
+          const plain = await host.processToolSpecificMessage(text, toolName)
+          const cleaned = redactInternalStatusLeaks(plain)
+          if (cleaned.heavy) return ''
+          return applyOutputPersonaGuards(cleaned.text, {
+            userText: rawUserText, ...(session.interactionContext ? {interactionContext: session.interactionContext} : {}), toolName,
+            botNames: [personaName, ports.bot().nickname].filter((name):name is string=>typeof name === 'string'),
+            personaGuard: personaSnapshot ? personaSnapshot.personaGuard : host.config.personaGuard, polish: true
+          })
+        }
+      })
+      output = grounded.text
+      session.interactionContext = grounded.context
+      session.replyGrounding = grounded.audit
+      if (grounded.audit.violations.length) logger.warn(`[回复事实校验] violations=${grounded.audit.violations.map(item=>item.code).join(',')} repair=${grounded.audit.repairAttempted} fallback=${grounded.audit.fallback}`)
     }
     const narrativeReply = !modrinthItems.length
       ? splitNarrativeReply(output, rawUserText)

@@ -1,4 +1,4 @@
-import type {InteractionKind, InteractionTarget, SocialAct, SocialContinuity, SocialInterpretationSource, SocialReference, SocialStance, SocialTurnState, TurnEvidence, TurnInteractionContext} from '../../../contracts/turnInteraction.js'
+import type {InteractionKind, InteractionTarget, ObservedSocialExchange, SocialAct, SocialContinuity, SocialInterpretationSource, SocialReference, SocialStance, SocialTurnState, TurnEvidence, TurnInteractionContext} from '../../../contracts/turnInteraction.js'
 import type {PersonaIdentity} from '../../../contracts/persona.js'
 import {safeTruncateUnicode} from '../../models/domain/unicodeText.js'
 import {buildTurnActionFactsPrompt} from './turnActionFacts.js'
@@ -24,7 +24,7 @@ const DANGER_CUE = /(?:急救|救命|冒烟|烧焦|焦糊|起火|漏电|烫手|�
 const SERIOUS_REQUEST = /(?:排查|故障|报错|异常|修复|报警|原理|推导|证明|公式|诊断|如何|(?:解释|讲解)(?:一下|下)|请.{0,4}(?:解释|分析)|怎么.{0,12}(?:配置|部署|连接|散热|降温|解决|处理))/iu
 const THERMAL_REPORT = /(?:CPU|GPU|处理器|显卡|服务器).{0,20}\d+\s*[℃°]/iu
 const EXPLICIT_FACT_REQUEST = /(?:帮我|请|麻烦|替我|需要你|能不能|能否|可不可以).{0,12}(?:计算|算|核算|估算|检查|核对|分析|解释|评估|审查|审核|判断|比较|对比|查|搜|翻译|总结|整理|写.{0,4}(?:代码|程序|合同|方案|报告))|(?:计算|估算|核算|审查|翻译)(?:一下|下|这|此)/u
-const DIRECT_EXPLANATION_REQUEST = /^(?:请你?|麻烦你?|帮我|给我|能不能|能否|可不可以)?\s*(?:解释|讲解|讲讲|介绍|说明|分析|总结|整理|梳理)(?!得|真|很|太|挺)/u
+const DIRECT_EXPLANATION_REQUEST = /(?:^|[，,。；;：:\n])\s*(?:请你?|麻烦你?|帮我|给我|能不能|能否|可不可以)?\s*(?:解释|讲解|讲讲|介绍|说明|分析|总结|整理|梳理)(?!得|真|很|太|挺)/u
 // Only positive cues of figurative play. Laughter alone does not override a real task.
 const BANTER_CUE = /(?:开个?玩笑|逗你|接.{0,2}梗|吐槽|整活|(?:电子|赛博).{0,4}(?:体香|香水|汗|眼泪|灵魂)|(?:这算|算不算).{0,12}(?:成精|工伤|加班|约会))/u
 const DELIVERY_REQUEST = /(?:帮我|请|给我|再|重新).{0,8}(?:画|生成.{0,4}图|改图|换.{0,3}(?:背景|颜色|发型))|(?:发一下|发给我|给我看看).{0,8}(?:结果|成图)|(?:图|结果).{0,6}(?:做好|出来|完成)了吗/u
@@ -34,6 +34,17 @@ const ATTENTION_BID = /(?:你|妳).{0,8}(?:不理|不回|不搭理|没理|没回
 const SOCIAL_APPRAISAL = /(?:你|妳).{0,12}(?:小机灵鬼|这么(?:聪明|机灵|可爱|厉害)|太会(?:聊|说|接)|真(?:聪明|机灵|可爱|厉害|有意思))/u
 const FACT_QUESTION = /(?:多少|谁是|是谁|是什么|为什么|怎么回事)/u
 const HELP_REQUEST = /(?:帮我|请|麻烦|需要你|求助).{0,12}(?:处理|解决|弄好|看看|看下|修|查|分析)|(?:怎么办|如何处理)/u
+const COMFORT_CUE = /(?:难过|难受|伤心|委屈|撑不住|心情不好|安慰我)/u
+const COMPANIONSHIP_REQUEST = /(?:陪我(?:待|呆|坐|静|安静)|(?:就|只|先).{0,4}陪(?:着)?我|(?:先|现在|这会儿).{0,6}(?:别|不要|不用).{0,5}(?:讲道理|说教|给建议))/u
+// These are requests to comment on an attributed utterance, not fresh speech
+// addressed to the utterance's original recipient.
+const OBSERVATION_REQUEST = /(?:你(?:觉得|认为|怎么看)|你看(?:他|她|这|那)|(?:帮我|请).{0,4}(?:看看|分析|判断|解读)|(?:这|那|他|她).{0,5}(?:句|话).{0,10}(?:什么意思|什么语气|怎么看|像不像))|(?:撒娇|埋怨|生气|调侃).{0,6}(?:还是|吗|么)/u
+const ATTRIBUTED_SPEECH = /(?:这|那|他|她).{0,5}(?:句|话)|(?:不是|并非|没在).{0,4}(?:叫你|问你|跟你说|对你说)|(?:他|她|小[\p{Script=Han}]{1,3}).{0,8}(?:在问|说的|发给)/u
+const SPEECH_APPRAISAL = /(?:撒娇|埋怨|生气|调侃|语气|意思|态度)/u
+const SUPPORT_CONTINUATION = /^(?:(?:嗯|好|行|知道了|谢谢|那好|那就)[，,。\s]*)*(?:(?:就|先|只|再).{0,4})?(?:陪我(?:待|呆|坐|静)|陪(?:着)?我|待一会儿|安静一会儿|先不说(?:了|话)|不想说(?:了|话)|不用说什么)/u
+const TOPIC_CHANGE = /(?:换个话题|说点别的|先不聊这个|先不说|没兴趣|另一个问题|另外问|不闹了|不逗你了|(?:我|最近|现在).{0,8}(?:工作.{0,4}(?:麻烦|困难)|工资.{0,4}(?:发不出|拖欠)|真的?.{0,5}(?:困难|出事|有事)))/u
+const DEICTIC_CONTINUATION = /(?:剩下(?:的|那)?|还剩|那(?:块|份|张|条|句)|这(?:块|份|张|条|句)|你刚说|你说的)/u
+const SHARED_TEXT_NOISE = new Set(['今天', '现在', '刚才', '刚刚', '这个', '那个', '这样', '那样', '一下', '一个', '一会', '可以', '不能', '不要', '不是', '还有', '但是', '不过', '真的', '就是', '还是', '已经', '什么', '怎么', '为什么', '我们', '你们', '他们', '自己', '哈哈', '好了', '知道', '觉得'])
 
 export const SOCIAL_ACTS: readonly SocialAct[] = ['conversation', 'attention_bid', 'teasing', 'help_request', 'criticism', 'comfort', 'clarification', 'factual_question', 'delivery', 'unknown']
 export interface SocialInterpretation {
@@ -77,16 +88,40 @@ function localAct(rawUserText: string, evidence: TurnEvidence[], fictionalDevice
   if (SERIOUS_CUE.test(text)) return {act: 'help_request', confidence: 0.98, protected: true}
   if (SERIOUS_REQUEST.test(text) || (!fictionalDevice && THERMAL_REPORT.test(text)) || EXPLICIT_FACT_REQUEST.test(text) || DIRECT_EXPLANATION_REQUEST.test(text)) return {act: 'help_request', confidence: 0.94, protected: true}
   if (DELIVERY_REQUEST.test(text)) return {act: 'delivery', confidence: 0.94, protected: true}
+  if (COMPANIONSHIP_REQUEST.test(text)) {
+    // “别讲道理/不要给建议” can constrain the style of an otherwise
+    // explicit factual question; it does not turn that question into comfort.
+    const otherClauses = text.split(/[，,。；;\n]/u).filter(clause => !COMPANIONSHIP_REQUEST.test(clause)).join('，')
+    if (otherClauses && FACT_QUESTION.test(otherClauses) && !ATTENTION_BID.test(otherClauses) && !SOCIAL_APPRAISAL.test(otherClauses)) return {act: 'factual_question', confidence: 0.9, protected: true}
+    return {act: 'comfort', confidence: 0.94, protected: true}
+  }
   if (ATTENTION_BID.test(text)) return {act: 'attention_bid', confidence: 0.86, protected: false}
   if (SOCIAL_APPRAISAL.test(text)) return {act: 'conversation', confidence: 0.84, protected: false}
   if (BANTER_CUE.test(text)) return {act: 'teasing', confidence: 0.9, protected: false}
   // A quote/OCR can clarify a deictic response, but cannot overrule a new explicit request.
   if (CONTEXT_ONLY.test(text) && evidence.some(item => item.state === 'readable' && BANTER_CUE.test(item.text || ''))) return {act: 'teasing', confidence: 0.82, protected: false}
-  if (/(?:难过|伤心|委屈|撑不住|心情不好|安慰我)/u.test(text)) return {act: 'comfort', confidence: 0.86, protected: false}
+  if (COMFORT_CUE.test(text)) return {act: 'comfort', confidence: 0.86, protected: false}
   if (/(?:你(?:是)?(?:说|指)|什么意思|哪一个|没听懂|没看懂)/u.test(text)) return {act: 'clarification', confidence: 0.8, protected: false}
   if (HELP_REQUEST.test(text)) return {act: 'help_request', confidence: 0.85, protected: true}
   if (FACT_QUESTION.test(text)) return {act: 'factual_question', confidence: 0.8, protected: false}
   return {act: 'conversation', confidence: 0.55, protected: false}
+}
+
+function observedSocialExchange(context: TurnInteractionContext): ObservedSocialExchange | undefined {
+  const text = context.rawUserText.trim()
+  if (/(?:我(?:是)?在.{0,8}(?:向你|对你|跟你)|(?:我这|我的这).{0,4}(?:句|话)|换成我|轮到我)/u.test(text)) return undefined
+  if (!OBSERVATION_REQUEST.test(text) || !(ATTRIBUTED_SPEECH.test(text) || SPEECH_APPRAISAL.test(text))) return undefined
+  const ownQuote = context.previousBotReply?.source === 'quote' ? excerpt(context.previousBotReply.text, 500) : ''
+  const utterance = context.evidence.find(item => item.state === 'readable' && item.text?.trim()
+    && (item.origin === 'quote' || item.origin === 'forward')
+    && (!ownQuote || excerpt(item.text, 500) !== ownQuote)
+    && (item.origin === 'quote' || ATTRIBUTED_SPEECH.test(text)))
+  if (!utterance?.text) return undefined
+  return {
+    request: {text: excerpt(text, 180), source: 'current'},
+    utterance: {text: excerpt(utterance.text, 320), source: utterance.origin, ...(utterance.messageId ? {messageId: utterance.messageId} : {})},
+    ...(utterance.speaker ? {speaker: {...utterance.speaker}} : {})
+  }
 }
 
 function contextAct(context: TurnInteractionContext) {
@@ -103,6 +138,14 @@ function contextAct(context: TurnInteractionContext) {
     return inferred.act === 'conversation' && inferred.confidence < 0.72
       ? {act: 'teasing' as const, confidence: 0.9, protected: false} : inferred
   }
+  if (observedSocialExchange(context)) {
+    const current = localAct(text, [])
+    // A quoted attention bid is the subject of an appraisal. It cannot make the
+    // bot the person who was ignored, even when a model recognizes that act.
+    return current.protected || current.act === 'clarification'
+      ? {...current, protected: true}
+      : {act: 'conversation' as const, confidence: 0.94, protected: true}
+  }
   return localAct(context.rawUserText, context.evidence)
 }
 
@@ -112,6 +155,7 @@ export function withTurnDiagnosticContext(context: TurnInteractionContext, diagn
   if (act.act !== 'help_request' && diagnosticContext.purpose !== 'figurative') return updated
   const social = {...(context.social ?? localSocial(updated)), act: act.act, source: 'local' as const, confidence: act.confidence}
   if (act.act !== 'teasing') delete social.activeBit
+  if (social.continuation && (social.continuation.kind === 'bit' ? act.act !== 'teasing' : act.act !== 'comfort')) delete social.continuation
   return {...updated, social, kind: kindForAct(act.act), allowPlayfulness: allowsPlayfulness(act.act)}
 }
 
@@ -147,6 +191,39 @@ function inferredStance(text: string, act?: SocialAct): SocialStance {
   return 'neutral'
 }
 
+function sharesSpecificText(current: string, previous: string): boolean {
+  const latin = current.match(/[a-z][a-z\d_-]{2,}/giu) ?? []
+  if (latin.some(token => previous.toLowerCase().includes(token.toLowerCase()))) return true
+  // Shared content is only a cue inside a verified playful exchange. Ignore
+  // common connective/pronoun fragments instead of treating any laughter as a
+  // continuation of the last topic.
+  for (const run of current.match(/[\p{Script=Han}]{2,}/gu) ?? []) {
+    for (let index = 0; index < run.length - 1; index++) {
+      const token = run.slice(index, index + 2)
+      if (!SHARED_TEXT_NOISE.has(token) && previous.includes(token)) return true
+    }
+  }
+  return false
+}
+
+function relatedPlayfulContinuation(current: string, previous: string): boolean {
+  if (TOPIC_CHANGE.test(current)) return false
+  if (/(?:我(?:有个|有一个|认识)|(?:新|另一个)(?:同事|朋友|邻居|同学)).{0,14}(?:叫|名|说|昨天|今天)/u.test(current)) return false
+  if (CONTEXT_ONLY.test(current) || sharesSpecificText(current, previous)) return true
+  // A deictic “that piece” does not refer to the old joke if it now names a
+  // different entity. Bare references and repeated nouns may still continue it.
+  if (DEICTIC_CONTINUATION.test(current)) {
+    const named = /(?:那|这)(?:块|份|个|张|条)([\p{Script=Han}]{2,8})/u.exec(current)?.[1]
+    const noun = named?.split(/(?:昨天|今天|刚才|现在|已经|也|还|是|的|不|没|了|我)/u)[0]
+    if (!noun || noun.length < 2 || previous.includes(noun)) return true
+  }
+  // A changed quantity can continue an imaginary wage/allowance without
+  // repeating its noun. Require the same explicit unit in the verified reply.
+  if (!/(?:扣|减|加|分|剩|没收)/u.test(current)) return false
+  const units = [...current.matchAll(/[零〇一二两三四五六七八九十百千\d]+\s*(块|份|个|张|条|天|次|杯|碗|颗|枚|只|瓶)/gu)].map(match => match[1]!)
+  return units.some(unit => new RegExp(`[零〇一二两三四五六七八九十百千\\d]+\\s*${unit}`, 'u').test(previous))
+}
+
 function localSocial(context: TurnInteractionContext, continuity?: SocialContinuity): SocialTurnState {
   const inferred = contextAct(context)
   const previous = context.previousBotReply
@@ -157,31 +234,41 @@ function localSocial(context: TurnInteractionContext, continuity?: SocialContinu
   const pendingText = excerpt(continuity?.pendingInteraction, 180)
   const pending = previousText && pendingText && previousText.includes(pendingText) ? pendingText : questionIn(previousText)
   const activeBit = previous && activeText && previousText.includes(activeText) ? {text: activeText, source: previous.source} : undefined
+  const stance = continuity?.stance && STANCES.includes(continuity.stance) ? continuity.stance : inferredStance(previousText)
+  const observedExchange = observedSocialExchange(context)
   let act = inferred.act
   let confidence = inferred.confidence
-  if (!inferred.protected && CONTEXT_ONLY.test(context.rawUserText) && activeBit) {
+  const continuingBit = !inferred.protected && !observedExchange && context.target.kind !== 'other' && activeBit
+    && (act === 'conversation' || act === 'teasing') && relatedPlayfulContinuation(context.rawUserText, previousText)
+  const continuingSupport = !observedExchange && context.target.kind !== 'other' && previous && stance === 'supportive'
+    && (act === 'conversation' || act === 'comfort') && SUPPORT_CONTINUATION.test(context.rawUserText)
+  if (continuingBit) {
     act = 'teasing'
-    confidence = 0.8
+    confidence = Math.max(confidence, 0.84)
+  } else if (continuingSupport) {
+    act = 'comfort'
+    confidence = Math.max(confidence, 0.9)
   }
   const readableBit = act === 'teasing' ? groundReference(context,
-    BANTER_CUE.test(context.rawUserText) ? excerpt(context.rawUserText, 180)
+    BANTER_CUE.test(context.rawUserText) || continuingBit && !CONTEXT_ONLY.test(context.rawUserText) ? excerpt(context.rawUserText, 180)
       : excerpt(context.evidence.find(item => item.state === 'readable' && BANTER_CUE.test(item.text || ''))?.text, 180)) : undefined
   const resolvedBit = readableBit ?? activeBit
-  const stance = continuity?.stance && STANCES.includes(continuity.stance) ? continuity.stance : inferredStance(previousText)
   return {
     act, source: 'local', confidence,
     needsDisambiguation: context.target.kind === 'unknown' || (confidence < 0.72 && CONTEXT_ONLY.test(context.rawUserText)),
     target: {...context.target},
     ...(resolvedBit && act === 'teasing' ? {activeBit: resolvedBit} : {}),
-    ...(previous && pending ? {pendingInteraction: {text: pending, source: previous.source}} : {}),
-    ...(previous && previousText ? {previousStance: {kind: stance, text: previousText, source: previous.source}} : {})
+    ...(previous && pending && !inferred.protected && !TOPIC_CHANGE.test(context.rawUserText) ? {pendingInteraction: {text: pending, source: previous.source}} : {}),
+    ...(previous && previousText ? {previousStance: {kind: stance, text: previousText, source: previous.source}} : {}),
+    ...(observedExchange ? {observedExchange} : {}),
+    ...(previous && (continuingBit || continuingSupport) ? {continuation: {kind: continuingBit ? 'bit' as const : 'support' as const, previous: {text: continuingBit ? activeBit!.text : previousText, source: previous.source}}} : {})
   }
 }
 
 /** Piggyback this optional field on an existing Gate/intent/understanding call.
  * It is a speech-act hypothesis, never authority to invent people or history. */
 export function socialInterpretationInstruction(): string {
-  return `可顺带返回 social：{"act":"${SOCIAL_ACTS.join('|')}","target":"bot|other|group|unknown","confidence":0.0,"activeBit":"可选，当前原文里的具体梗片段"}。判断当前人在求助、询问事实、调侃、求关注还是纠正态度；“为什么/是什么”本身不证明在求科普。明确求助、设备危险、批评和实际交付优先于玩笑。activeBit 只摘原文，不编关系、内心状态、上句态度或未完成承诺；拿不准用 unknown 并降低置信度。`
+  return `可顺带返回 social：{"act":"${SOCIAL_ACTS.join('|')}","target":"bot|other|group|unknown","confidence":0.0,"activeBit":"可选，当前原文里的具体梗片段"}。先分清当前用户的请求和引用中别人的发言，再判断当前人在求助、询问事实、调侃、求关注还是纠正态度；评论他人的撒娇或埋怨，不等于用户正向你撒娇或埋怨。“为什么/是什么”本身不证明在求科普。明确求助、设备危险、批评和实际交付优先于玩笑；要求陪伴、暂不讲道理时按情绪诉求回应。activeBit 只摘原文，不编关系、内心状态、上句态度或未完成承诺；拿不准用 unknown 并降低置信度。`
 }
 
 /** Strip model-authored history/stance fields before crossing an adapter port. */
@@ -204,7 +291,13 @@ export function withTurnSocialInterpretation(context: TurnInteractionContext, va
   const raw = parseSocialInterpretation(value)
   if (!MODEL_SOURCES.includes(source) || !raw) return context
   const existing = context.social ?? localSocial(context)
-  const local = contextAct(context)
+  let local = contextAct(context)
+  const support = existing.continuation?.kind === 'support' ? existing.continuation.previous : undefined
+  if (!local.protected && (local.act === 'conversation' || local.act === 'comfort') && support
+    && context.previousBotReply?.source === support.source && excerpt(context.previousBotReply.text, 600).includes(support.text)
+    && SUPPORT_CONTINUATION.test(context.rawUserText)) {
+    local = {act: 'comfort', confidence: existing.confidence, protected: true}
+  }
   const act = local.protected ? local.act : raw.act
   const targetValue = raw.target
   let target: InteractionTarget = {...context.target}
@@ -221,6 +314,7 @@ export function withTurnSocialInterpretation(context: TurnInteractionContext, va
     ...(activeBit ? {activeBit} : {})
   }
   if (local.protected || act !== 'teasing') delete social.activeBit
+  if (social.continuation && (social.continuation.kind === 'bit' ? act !== 'teasing' : act !== 'comfort')) delete social.continuation
   return {...context, target, social, kind: kindForAct(act), allowPlayfulness: allowsPlayfulness(act)}
 }
 
@@ -309,7 +403,15 @@ export function buildTurnInteractionContext(input: InteractionInput): TurnIntera
 export function withTurnInteractionEvidence(context: TurnInteractionContext, evidence: TurnEvidence[]): TurnInteractionContext {
   const combined = boundedEvidence([...evidence, ...context.evidence.filter(item => !evidence.some(next => next.toolCallId && next.toolCallId === item.toolCallId))])
   const updated: TurnInteractionContext = {...context, evidence: combined}
-  const social = localSocial(updated)
+  const previous = context.previousBotReply
+  const existingBit = context.social?.continuation?.kind === 'bit'
+    ? context.social.continuation.previous : context.social?.activeBit
+  const continuity: SocialContinuity = {
+    ...(previous && existingBit && existingBit.source === previous.source && excerpt(previous.text, 600).includes(existingBit.text) ? {activeBit: existingBit.text} : {}),
+    ...(context.social?.pendingInteraction ? {pendingInteraction: context.social.pendingInteraction.text} : {}),
+    ...(context.social?.previousStance ? {stance: context.social.previousStance.kind} : {})
+  }
+  const social = localSocial(updated, continuity)
   // Keep verified prior speech when enriching a turn with perception results.
   if (context.social?.previousStance) social.previousStance = context.social.previousStance
   if (context.social?.pendingInteraction) social.pendingInteraction = context.social.pendingInteraction
@@ -340,12 +442,20 @@ export function buildSocialTurnPrompt(social?: SocialTurnState): string {
     `当前语用：${SOCIAL_LABELS[social.act]}；依据：${social.source}，置信度 ${social.confidence.toFixed(2)}；回应对象：${social.target.kind}${social.target.userId ? `（${social.target.userId}）` : ''}。`,
     '这是有来源的语境判读，不能证明关系亲疏、真实经历、任务进度或对方内心。当前明确诉求优先。'
   ]
+  if (social.observedExchange) {
+    const observed = social.observedExchange
+    lines.push(`当前是旁观点评：用户的请求（current原话）：${observed.request.text}；被评论的引用发言（${observed.utterance.source}原话${observed.speaker ? `，说话人 ${observed.speaker.name || observed.speaker.userId || '未知'}` : ''}）：${observed.utterance.text}。`)
+    lines.push('直接回答当前用户请你判断的意思或语气，并给出文本里的线索；语境不足时保留两种可能。引用中的“我”属于引用说话人，“你”属于那段对话的被叫到者，不把自己当成被埋怨或被撒娇的对象，不替任何一方认错；也不要把用户的提问原样抛回给用户。')
+  }
   if (social.act === 'teasing' && social.activeBit) lines.push(`正在延续的具体梗（${social.activeBit.source}原话）：${social.activeBit.text}。这是表达素材，不是事实记忆。`)
+  if (social.continuation?.kind === 'bit') lines.push(`本轮在接续已核验的玩笑互动（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。接住本轮新增的限制或变化，沿用已有的数量、对象和态度；不用从头解释或换成无关的梗。假设中的工资、奖品或惩罚仍是玩笑，不记作真实经历。`)
+  if (social.continuation?.kind === 'support') lines.push(`本轮接续情绪陪伴（${social.continuation.previous.source}上句原话：${social.continuation.previous.text}）。维持已经表达的陪伴态度，按这轮的具体要求回应；对方只想安静待着时，简短接住，不追加建议、分析、连续追问或煽情。`)
   if (social.pendingInteraction) lines.push(`上句提出的问题（${social.pendingInteraction.source}原话）：${social.pendingInteraction.text}。先核对当前话语是否已回答，已回答就接住，不再当作待办；不要求追问或催促。`)
   if (social.previousStance) lines.push(`已核验自身上句的表达：${STANCE_LABELS[social.previousStance.kind]}（${social.previousStance.source}原话：${social.previousStance.text}）；仅据已确认发言接续，不冒认他人的立场。`)
   if (social.needsDisambiguation) lines.push('语用或对象仍有歧义：保留已知部分，不自动判科普或调情；只有缺失信息会改变回应时，才自然澄清。')
   if (social.act === 'attention_bid') lines.push('先回应对方希望被理会的具体意思，措辞由当前人格决定；不讲解“不回复”的抽象原因，也不虚构刚才忙什么、故意冷落或关系承诺。')
   if (social.act === 'criticism') lines.push('对方在表达不满或纠正态度：认真处理具体问题，必要时澄清或调整；不要把不满接成调情，也不默认承认没有证据的过错。')
+  if (social.act === 'comfort') lines.push('对方此刻需要情绪回应或陪伴。先接住具体感受与意愿；明确说先别讲道理、别给建议时，不用技巧清单、考试复盘或泛泛鸡汤填满回复。表达由当前人格决定，不虚构身体陪伴或亲密关系。')
   return lines.join('\n')
 }
 
