@@ -667,3 +667,78 @@ test('reminder fallback answers its own registration and trigger time without bo
   assert.doesNotMatch(buildActionReplyFallback(facts([reminder]),'这张图还会自动发吗？'),/提醒安排仍有效|r-exam|北京时间/u)
   assert.match(buildActionReplyFallback(facts([reminder]),'这张图还会自动发吗？'),/不能确认还会不会自动发送/u)
 })
+
+test('deferred verification and an omitted result object do not bypass follow-up registration',()=>{
+ const raw='刚才改背景的图出来了吗？'
+ const live=facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'callback'}})])
+ for(const text of [
+  '这个我还没法确认欸，手上没有处理结果的记录，不好说现在是好了还是卡着。等我确认到就第一时间发你。',
+  '等我核实了就发给你。','等确认到，我第一时间发你。'
+ ]) {
+  assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unregistered_followup'),text)
+  assert.ok(validateActionReply(text,live,raw).some(item=>item.code==='unregistered_followup'),text)
+ }
+ for(const text of ['这个我还没确认到结果欸，进度和图都没拿到。有了我发你。','有了我就发给你。']) {
+  assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unregistered_followup'),text)
+  assert.deepEqual(validateActionReply(text,live,raw),[],text)
+ }
+ for(const text of [
+  '有了我告诉你答案：先把两边同时乘二。','等我确认到就发你吗？','有了我发你吗？',
+  '我不会等确认到就发你。','有了我也不能发给你。','她有了就发给你。',
+  '她等确认到就发你。','“有了我发你”只是个例子。'
+ ]) assert.deepEqual(validateActionReply(text,facts(),raw),[],text)
+})
+
+test('a clause keeps its artifact task topic instead of borrowing a reminder mentioned later',()=>{
+ const reminder=fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'r-exam',dueAt:Date.now()+60_000}})
+ const raw='刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+ const claimed='改背景那个任务确实是登记了的，在排队中，不过产物我这儿还没查到确认结果，所以现在没法直接给你图。自动发这个就别指望啦，我没查到对应的投递登记，只有你那个考试提醒是登记好的。图好了想看的话，你到时候再来问我一声就行。'
+ assert.ok(validateActionReply(claimed,facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'))
+ for(const text of ['改背景那个任务确实是登记了的，在排队中。','改背景这个任务已登记，在排队中。']) {
+  assert.ok(validateActionReply(text,facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'),text)
+  assert.deepEqual(validateActionReply(text,facts([reminder,fact({execution:'queued'})]),raw),[],text)
+ }
+ assert.deepEqual(validateActionReply('考试提醒确实是登记了的，在排队中。',facts([reminder]),'明天的考试提醒设好了吗？'),[])
+ assert.deepEqual(validateActionReply('改背景的图片进度尚未确认，考试提醒已登记好了。',facts([reminder]),raw),[])
+ assert.match(buildActionReplyFallback(facts([reminder]),raw),/不能确认还会不会自动发送/u)
+ assert.doesNotMatch(buildActionReplyFallback(facts([reminder]),raw),/提醒安排仍有效/u)
+})
+
+test('a negative completion judgment still asserts absence after a clause with missing records',()=>{
+ const raw='我问的是这张图，出来了吗？'
+ const text='这张我这边没查到做好的记录，还不算出来哦。刚才那张是傍晚背景的第二张，第一张的蓝色背景我没确认到结果，不敢跟你说好了。'
+ assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unsupported_task_state'))
+ assert.deepEqual(validateActionReply('还不算出来哦。',facts([fact({result:'unavailable'})]),raw),[])
+ for(const normal of ['还不算出来吗？','不能确认算不算出来。','“还不算出来”只是举例。','第一张还不算出来可能只是你的猜测。']) {
+  assert.deepEqual(validateActionReply(normal,facts(),raw),[],normal)
+ }
+})
+
+test('a later user request owns its synchronous lookup but cannot license a separate background promise',()=>{
+ const raw='刚才改背景的图出来了吗？'
+ for(const text of [
+  '你吃完回来在群里问一声就行，我到时候现查状态，有结果直接发你。',
+  '你回来再问我，我再查，有结果直接发给你。',
+  '你吃完回来问我，我到时候现查状态，有了我发你。'
+ ]) assert.deepEqual(validateActionReply(text,facts(),raw),[],text)
+ for(const text of [
+  '你吃完回来在群里问一声就行，我到时候现查状态，图好了我会主动发你。',
+  '你回来再问我，我再查，有结果我会自动发给你。',
+  '你回来再问我，我再查，图好了我会发给你。',
+  '你吃完回来问我，我到时候现查状态，等我确认到就第一时间发你。'
+ ]) assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unregistered_followup'),text)
+  assert.ok(validateActionReply('你回来再问我，我现在发给你。',facts(),raw).some(item=>item.code==='unsupported_delivery'))
+})
+
+test('a sent receipt cannot supply an unrecorded delivery date',()=>{
+ const sent=facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'receipt'}})])
+ const raw='我说的是这张，已经发过了对吧？'
+ for(const text of ['对，就那张。发过了，你往上翻到年初那条就能看到~','你往上翻到昨晚那条就能看到。','图在2026年10月15日发出过了。']) {
+  assert.ok(validateActionReply(text,sent,raw).some(item=>item.code==='unsupported_delivery'),text)
+ }
+ for(const text of ['之前发过，往上翻就能看到。','年初那条是否发出还不能确认。','她昨晚发过这张图。','“年初那条”只是举例。']) {
+  assert.deepEqual(validateActionReply(text,sent,raw),[],text)
+ }
+ assert.deepEqual(validateActionReply('你往上翻到昨晚那条就能看到。',sent,'昨晚发过的这张图，确认是这张吗？'),[])
+ assert.ok(validateActionReply('你往上翻到昨晚那条就能看到。',sent,'昨晚吃什么？我说的这张图已经发过了吗？').length)
+})

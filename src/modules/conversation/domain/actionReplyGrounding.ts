@@ -1,4 +1,5 @@
 import type {TurnActionFacts, TurnTaskFact} from '../../../contracts/turnActionFacts.js'
+import {taskFactTopic} from './turnActionFacts.js'
 
 export interface ActionReplyViolation {
   code: 'unregistered_followup' | 'unsupported_task_state' | 'unsupported_delivery'
@@ -33,23 +34,18 @@ function evidenceTopic(rawText: string): EvidenceTopic {
   const reminder = /提醒|闹钟/u.test(text)
   // “图好了提醒我” describes a completion callback, not a clock alarm.
   const artifactCompletion = /(?:图(?:片)?|成品|结果|文件|出图|生成|改图|画图)/u.test(text) && completionBefore(text) >= 0
-  if (reminder && !artifactCompletion) return 'reminder'
   const kinds: EvidenceTopic[] = []
-  if (/图片|成品图|成图|出图|改图|画图|(?:第[一二三四五六七八九十\d]+张|这张|那张|原图)|图(?=已经|已|还|尚|没|未|正|在|生成|出来|好|弄|的|发|一|了|呢|吗|，|,|$)/u.test(text)) kinds.push('image')
+  if (/图片|成品图|成图|出图|改图|画图|(?:改|换)(?:图(?:片)?)?背景|(?:第[一二三四五六七八九十\d]+张|这张|那张|原图)|图(?=已经|已|还|尚|没|未|正|在|生成|出来|好|弄|的|发|一|了|呢|吗|，|,|$)/u.test(text)) kinds.push('image')
   if (/视频|影片/u.test(text)) kinds.push('video')
   if (/文件|报告|表格|工作簿|Excel|文档|PDF/iu.test(text)) kinds.push('file')
+  // A clock reminder may mention a user's later image action. A separate
+  // artifact-status clause still owns its own object in a mixed question.
+  const artifactStatus = kinds.length && /(?:任务|进度|回执|投递)|(?:图(?:片)?|成品|结果|文件).{0,12}(?:出来|好了吗|做好|弄(?:好|完)|完成|发(?:给)?我|怎么样)/u.test(text)
+  if (reminder && !artifactCompletion && !artifactStatus) return 'reminder'
   if (kinds.length > 1) return 'ambiguous'
   if (kinds[0]) return kinds[0]
   if (/成品|产物|结果/u.test(text)) return 'artifact'
   return TASK_TOPIC.test(text) ? 'generic' : 'unknown'
-}
-
-function taskTopic(task: TurnTaskFact): EvidenceTopic {
-  if (task.source === 'reminder') return 'reminder'
-  if (/image|banana|draw|paint|pixiv|dalle|flux/iu.test(task.toolName)) return 'image'
-  if (/video|media|torrent/iu.test(task.toolName)) return 'video'
-  if (/excel|workbook|file|document|report|pdf|word|sheet/iu.test(task.toolName)) return 'file'
-  return 'generic'
 }
 
 /** The caller validates ownership and request references; this boundary must
@@ -60,7 +56,7 @@ function uniqueMatchingTasks(tasks: TurnTaskFact[], topic: EvidenceTopic): TurnT
     if (topic === 'unknown') return true
     if (topic === 'reminder') return task.source === 'reminder'
     if (task.source === 'reminder') return false
-    return topic === 'artifact' || topic === 'generic' || taskTopic(task) === topic
+    return topic === 'artifact' || topic === 'generic' || taskFactTopic(task) === topic
   })
   return candidates.length === 1 ? candidates : []
 }
@@ -86,7 +82,7 @@ const PAST = '(?:已经|已|刚才|刚刚|早就)?'
 const READY = `${PAST}(?:出来|做好|弄好|弄完|完成|生成好|生成完|改好|画好|画完|做完|好)(?:了|啦)?`
 const ABSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:跑出来|出来|做好|弄(?:好|完)|完成|生成(?:好|出)?|改好|产出|画完)|没(?:有)?(?:跑到|生成出|产出)(?:结果|成品))'
 const RUNNING = '(?:(?:还(?:在)?|仍(?:然)?(?:在)?|正在|目前(?:还)?在|现在(?:还)?在|在)(?:生成|处理|制作|画图|改图|运行|跑)(?:中|着)?|(?:生成|处理|制作|运行|执行)中)'
-const QUEUED = '(?:(?:还|仍|正在|目前|现在)?在排队|排队中)'
+const QUEUED = '(?:(?:还|仍|正在|目前|现在)?在排队(?:中)?|排队中)'
 const FAILED = `${PAST}(?:失败|没跑成|中断|出错)(?:了|啦)?`
 const COMPLETED = `${PAST}(?:(?:执行|处理|生成)?(?:完成|结束)|处理完|执行完|跑完)(?:了|啦)?`
 const SENT = '(?:(?:已经|已|刚才|刚刚|早就)(?:给你发|发给你|发你|发出|发过|发送|送达|投递)(?:了|过(?:了)?)?|(?:给你发|发给你|发你|发出|发送|送达|投递|发到(?:群里|这里|上面))(?:了|过了)|发过了|在上面了)'
@@ -103,6 +99,7 @@ const predicate = (dimension: TaskStateDimension, value: TaskStateValue, state: 
 const STATE_PREDICATES: StatePredicate[] = [
   predicate('artifact', 'available', READY, 'artifact'),
   predicate('artifact', 'unavailable', ABSENT, 'artifact'),
+  predicate('artifact', 'unavailable', '(?:还|仍)?不算(?:已经|已)?(?:出来|做好|完成)(?:了)?', 'artifact'),
   predicate('execution', 'running', RUNNING, 'either'),
   predicate('execution', 'not_running', '(?:已经|现在|目前|还|也)?(?:没有|没|不|未)(?:在|正在)?(?:生成|处理|制作|画图|改图|运行|跑|执行)(?:中|着)?(?:了)?', 'either'),
   predicate('execution', 'queued', QUEUED, 'either'),
@@ -115,6 +112,7 @@ const STATE_PREDICATES: StatePredicate[] = [
   predicate('artifact', 'available', '(?:还|仍然|仍|也)?(?:在|有)(?:着|的)?', 'artifact', false),
   predicate('existence', 'absent', '(?:本来|本来也|本来就|原本|原来也|还|也|一直)*(?:没(?:有)?(?:挂着|存在)?|不存在|不在)(?:了)?', 'task', false),
   predicate('existence', 'present', '(?:还|仍然|仍|一直)?(?:在|存在|挂着)(?:的)?', 'task', false),
+  predicate('existence', 'present', '(?:(?:确实|的确|本来|早就)(?:是)?)?(?:已经|已)?登记(?:了|好)?(?:的)?', 'task', false),
   predicate('follow_up', 'none', `${PAST}(?:取消|撤销)(?:了)?`, 'either', false),
   predicate('follow_up', 'registered', '(?:仍|还|依然)?(?:有效|生效)(?:的)?', 'either', false)
 ]
@@ -122,6 +120,7 @@ const SELF_LOCATION = '(?:我(?:这边|这里|这儿|手里|手上)?|这边|这�
 const IMAGE_REFERENCE = '(?:第[一二三四五六七八九十0-9]+张|这张|那张)'
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
+const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
 const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|提醒|闹钟).{0,16}(?:发(?:送|图)?|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|登记|任务)?$|(?:提醒|闹钟)(?:安排|登记|任务)?$/u
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
 const SUBJECT_CONNECTOR = /^(?:(?:所以|因此|因而|于是|但是|不过|其实|而且|只是|至于|说到|当前|目前|现在|但|也)(?:的)?)*\s*/u
@@ -136,7 +135,10 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
   subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
   if (OTHER_SUBJECT.test(subject)) return undefined
   if (FOLLOW_UP_OBJECT.test(subject)) return {kind: 'follow_up', topic: rawTopic, surface: rawSubject}
-  if (TASK_HEAD.test(subject)) return {kind: 'task', topic: evidenceTopic(subject) === 'image' ? 'image' : rawTopic, surface: rawSubject}
+  if (TASK_HEAD.test(subject) || QUALIFIED_TASK_HEAD.test(subject)) {
+    const topic = evidenceTopic(subject)
+    return {kind: 'task', topic: topic === 'unknown' || topic === 'generic' ? rawTopic : topic, surface: rawSubject}
+  }
   const nominal = NOMINAL_HEAD.exec(subject)
   if (nominal) {
     const qualifier = nominal[1] || ''
@@ -211,9 +213,14 @@ const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持
 const IMMEDIATE_ACTION = /^(?:那)?(?:我(?:这边)?|这边)?(?:现在|这就|马上|立刻|立即)(?:先|就|会|再|来|帮你|给你|为你|把[^，,]{1,20})*$/u
 const PRESENT_SELF_ACTION = /^(?:那)?(?:我(?:这边)?|这边)(?:先|就|再|来|帮你|给你|为你|把[^，,]{1,20})*$/u
 const USER_TRIGGER = /(?:你|您).{0,12}(?:再(?:来)?问|再(?:来)?找|再叫我|再发(?:消息|一句)|发来|发给我|告诉我|确认(?:后|了)|发(?:来|给我)之后).{0,18}(?:我再|再帮你|再给你)/gu
+const USER_REQUEST_CONDITION = /(?:你|您)[^，,]{0,28}(?:再(?:来)?(?:问|找|叫)|回来[^，,]{0,12}(?:问|找|叫)|再发(?:消息|一句)|(?:确认|发来|发给我|告诉我)(?:后|了))/gu
+const ON_DEMAND_LOOKUP = /我(?:到时候|届时|那时|回来后)?(?:现|当场|再)(?:查|查询|核实)(?:一下)?(?:状态|进度|结果)?/u
+const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:确认|核实|查到|查清|弄清)(?:到|出|了)?/gu
+const ELLIPTICAL_RESULT = /有了(?=我|就|再|会|直接|第一时间|[，,])/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
 
 type FollowUpKind = 'job_completion' | 'reminder' | 'unsupported' | 'immediate_delivery' | 'immediate_execution'
+interface FollowUpClaim {kind: FollowUpKind; topic: EvidenceTopic}
 function supportsFollowUp(task: TurnTaskFact, kind: FollowUpKind): boolean {
   if (task.followUp.state !== 'registered' || !task.followUp.id || !['queued', 'running'].includes(task.execution)) return false
   if (kind === 'reminder') return task.source === 'reminder' && task.followUp.kind === 'reminder'
@@ -247,30 +254,65 @@ function hasLaterCompletionAction(clauses: string[], index: number): boolean {
   })
 }
 
-function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
-  const claims: FollowUpKind[] = []
+function topicBefore(text: string, end: number, initial: EvidenceTopic): EvidenceTopic {
+  let topic = initial
+  for (const clause of text.slice(0, end).split(/[，,]/u)) {
+    const local = evidenceTopic(clause)
+    if (!['unknown', 'generic', 'artifact', 'ambiguous'].includes(local)) topic = local
+  }
+  return topic
+}
+
+/** A later user request can own a synchronous lookup and the result of that
+ * lookup. A new completion condition or proactive action starts another
+ * commitment and cannot borrow the earlier user-triggered exemption. */
+function userRequestedAction(text: string, before: string, actionEnd: number, completion: number): boolean {
+  if (IMMEDIATE_ACTION.test(before.split(/[，,]/u).at(-1) || '')) return false
+  const direct = [...text.slice(0, actionEnd).matchAll(USER_TRIGGER)].at(-1)
+  if (direct && direct.index! + direct[0].length >= completion
+    && !/自动|主动|持续|定时/u.test(before.slice(direct.index! + direct[0].length))) return true
+  const request = [...before.matchAll(USER_REQUEST_CONDITION)].at(-1)
+  if (!request) return false
+  const response = before.slice(request.index! + request[0].length)
+  if (/自动|主动|持续|定时/u.test(response)) return false
+  if (completion < 0 || completion <= request.index! + request[0].length) return true
+  const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(ELLIPTICAL_RESULT)]
+    .sort((a, b) => a.index! - b.index!).at(-1)
+  return Boolean(condition && /^(?:有(?:了)?结果|有了)$/u.test(condition[0]) && ON_DEMAND_LOOKUP.test(response))
+}
+
+function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic: EvidenceTopic): FollowUpClaim[] {
+  const claims: FollowUpClaim[] = []
+  const add = (kind: FollowUpKind, end: number): void => {
+    const topic = kind === 'reminder' ? 'reminder' : topicBefore(sentence.text, end, rawTopic)
+    claims.push({kind, topic: kind === 'job_completion' && topic === 'reminder' ? rawTopic : topic})
+  }
   for (const match of sentence.text.matchAll(ASYNC_ACTION)) {
     const before = sentence.text.slice(0, match.index)
     const clauseStart = Math.max(before.lastIndexOf('，'), before.lastIndexOf(',')) + 1
-    const clause = sentence.text.slice(clauseStart)
+    const clause = sentence.text.slice(clauseStart).split(/[，,]/u)[0] || ''
     const actionPrefix = sentence.text.slice(clauseStart, match.index)
     const lastClause = !/[，,]/u.test(sentence.text.slice(match.index))
     if (unasserted(clause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix + match[0])
       || deniedAction(actionPrefix) || pastAction(actionPrefix)
       || OTHER_SUBJECT.test(actionPrefix) && !/我(?:会|来|再|就|到时|稍后)/u.test(actionPrefix)
       || /(?:他|她|别人)(?:会|来|再|到时)/u.test(actionPrefix)) continue
-    const completion = completionBefore(before)
+    const implicitResult = taskContext ? [...before.matchAll(ELLIPTICAL_RESULT)].at(-1) : undefined
+    const completion = Math.max(completionBefore(before), implicitResult ? implicitResult.index! + implicitResult[0].length : -1)
+    const verification = [...before.matchAll(DEFERRED_VERIFICATION)].at(-1)
+    const verificationEnd = verification ? verification.index! + verification[0].length : -1
     // A bare handoff after completion still promises later delivery. Ordinary
     // gifts or an explanation supplied in this reply are outside this form.
     const implicitHandoff = /^(?:单独)?给(?:你|您)$/u.test(match[0])
     if (implicitHandoff && completion < 0) continue
-    // “再发” may itself consume the “再” in “你再来问我，我再发”.
-    const trigger = [...sentence.text.slice(0, match.index! + match[0].length).matchAll(USER_TRIGGER)].at(-1)
-    if (trigger && trigger.index! + trigger[0].length >= completion) continue
+    if (userRequestedAction(sentence.text, before, match.index! + match[0].length, Math.max(completion, verificationEnd))) continue
     // A negative or wording cue before the condition applies across its
     // comma (“不能承诺图好了，我会发你”). An unrelated earlier clause does not.
-    const conditionPrefix = completion >= 0 ? before.slice(0, completion).split(/[，,]/u).at(-1) || '' : actionPrefix
+    const conditionEnd = Math.max(completion, verificationEnd)
+    const conditionPrefix = conditionEnd >= 0 ? before.slice(0, conditionEnd).split(/[，,]/u).at(-1) || '' : actionPrefix
     if (NON_ASSERTION.test(conditionPrefix) || WORDING_EXAMPLE.test(conditionPrefix)) continue
+    const tail = sentence.text.slice(match.index! + match[0].length)
+    if (SPOKEN_UPDATE.test(match[0]) && /^(?:答案|解释|说明|步骤|建议|示例|做法|思路|文字)(?:[：:]|[，,](?:先|首先|第一步))/u.test(tail)) continue
     const delivery = implicitHandoff || /发|投递|补给|补上/u.test(match[0])
     // Consent to an offered action does not provide execution evidence.
     // Strip only a condition followed by our own explicit present action;
@@ -283,21 +325,21 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
       const inlineText = /(?:^|把)(?:操作)?(?:步骤|解释|说明|答案|建议|示例|做法|思路|文字)$/u.test(actionPrefix)
         && /^(?:一下)?(?:[：:]|[，,](?:先|首先|第一步))/u.test(sentence.text.slice(match.index! + match[0].length))
       if (delivery && inlineText) continue
-      claims.push(delivery ? 'immediate_delivery' : 'immediate_execution')
+      add(delivery ? 'immediate_delivery' : 'immediate_execution', match.index! + match[0].length)
       continue
     }
     const spokenUpdate = SPOKEN_UPDATE.test(match[0])
     const speechDelay = spokenUpdate && SPEECH_DELAY.test(before)
-    if (completion < 0 && !DELAYED_PROMISE.test(before) && !speechDelay) continue
+    if (completion < 0 && verificationEnd < 0 && !DELAYED_PROMISE.test(before) && !speechDelay) continue
     // An explanation delivered in this reply is synchronous. “告诉你” alone
     // becomes a follow-up only with a completion or explicit delay condition.
-    if (spokenUpdate && completion < 0 && !speechDelay) continue
+    if (spokenUpdate && completion < 0 && verificationEnd < 0 && !speechDelay) continue
     // A job callback does not schedule a later explanation after an
     // unspecified investigation or confirmation of the failure cause.
-    if (spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {claims.push('unsupported'); continue}
-    if (RERUN_OR_POLL.test(match[0])) claims.push('unsupported')
-    else if (completion >= 0) claims.push('job_completion')
-    else claims.push(/提醒|通知/u.test(match[0]) && /明早|明天|晚上|一会儿|待会|等下|稍后|到时|届时/u.test(before) ? 'reminder' : 'job_completion')
+    if (verificationEnd > completion || spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {add('unsupported', match.index! + match[0].length); continue}
+    if (RERUN_OR_POLL.test(match[0])) add('unsupported', match.index! + match[0].length)
+    else if (completion >= 0) add('job_completion', match.index! + match[0].length)
+    else add(/提醒|通知/u.test(match[0]) && /明早|明天|晚上|一会儿|待会|等下|稍后|到时|届时/u.test(before) ? 'reminder' : 'job_completion', match.index! + match[0].length)
   }
   for (const match of sentence.text.matchAll(REGISTERED)) {
     const before = sentence.text.slice(0, match.index)
@@ -306,7 +348,7 @@ function followUpClaims(sentence: ReplySentence): FollowUpKind[] {
     const localPrefix = sentence.text.slice(clauseStart, match.index)
     if (unasserted(clause, sentence.question && !/[，,]/u.test(sentence.text.slice(match.index))) || OTHER_SUBJECT.test(localPrefix)) continue
     if (deniedAction(localPrefix) || /(?:没有|没|未|尚未|并未)(?:帮你|给你|为你|成功)?(?:登记|安排|设好|设置好|定好)/u.test(clause)) continue
-    claims.push(completionBefore(clause) >= 0 ? 'job_completion' : /提醒|闹钟/u.test(match[0]) ? 'reminder' : 'job_completion')
+    add(completionBefore(localPrefix) >= 0 ? 'job_completion' : /提醒|闹钟/u.test(match[0]) ? 'reminder' : 'job_completion', match.index! + match[0].length)
   }
   return claims
 }
@@ -382,6 +424,28 @@ function unsupportedRecipientCause(clause: string, rawUserText: string, adjacent
   return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
 }
 
+const DELIVERY_TIME = /(?:(?:今年|去年|前年)?(?:年初|年中|年末|年底)|(?:上|下|这|本)个?月(?:初|底|末)?|(?:上|下|本|这)周[一二三四五六日天]?|昨天|昨晚|昨夜|前天|大前天|今早|今晚|今天|明早|明晚|明天|\d{4}年(?:\d{1,2}月(?:\d{1,2}[日号])?)?|\d{1,2}月\d{1,2}[日号]|\d{4}[-/]\d{1,2}[-/]\d{1,2})/gu
+const DELIVERY_LOCATION = /(?:往上|向上|往前|上面).{0,8}(?:翻|找)|(?:翻|找).{0,12}(?:那条|这条|消息|回执)|发过|发出|发送|投递|送达/u
+
+/** A receipt proves delivery, not its calendar date. observedAt is the time
+ * the record was checked. Only repeat a date supplied for this delivery by
+ * the current speaker; ordinary "previously sent" navigation stays intact. */
+function unsupportedDeliveryTime(sentence: ReplySentence, tasks: TurnTaskFact[], rawUserText: string, rawTopic: EvidenceTopic): boolean {
+  for (const clause of sentence.text.split(/[，,]/u)) {
+    if (unasserted(clause, sentence.question) || OTHER_SUBJECT.test(clause) || !DELIVERY_LOCATION.test(clause)) continue
+    const localTopic = evidenceTopic(clause)
+    const topic = ['unknown', 'generic', 'artifact'].includes(localTopic) ? rawTopic : localTopic
+    if (!uniqueMatchingTasks(tasks, topic).some(task => task.source !== 'reminder' && task.delivery.state === 'sent' && task.delivery.messageId)) continue
+    for (const match of clause.matchAll(DELIVERY_TIME)) {
+      const supplied = assertions(rawUserText).some(source => source.text.includes(match[0]) && DELIVERY_LOCATION.test(source.text)
+        && !WORDING_EXAMPLE.test(source.text) && !OTHER_SUBJECT.test(source.text)
+        && ['unknown', 'generic', 'artifact', topic].includes(evidenceTopic(source.text)))
+      if (!supplied) return true
+    }
+  }
+  return false
+}
+
 /** Narrow, evidence-backed rejection signals. This is not a general truth or
  * naturalness score. Scope and freshness must be validated by the caller.
  * The current words, not the mere presence of an empty facts envelope, scope
@@ -392,25 +456,25 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
   const taskContext = hasTaskContext(facts, rawUserText)
   const rawTopic = evidenceTopic(rawUserText)
   const resultQuestionContext = taskContext && asksArtifactResult(rawUserText)
+  let currentObjectTopic = rawTopic
   for (const sentence of assertions(reply)) {
-    const followUps = followUpClaims(sentence)
-    const sentenceTopic = evidenceTopic(sentence.text)
-    const completionNotification = sentenceTopic === 'reminder' && followUps.includes('job_completion') && !followUps.includes('reminder')
-    const followUpTopic = completionNotification
-      ? rawTopic === 'unknown' ? 'artifact' : rawTopic
-      : ['unknown', 'generic', 'artifact'].includes(sentenceTopic) ? rawTopic : sentenceTopic
-    const followUpTasks = uniqueMatchingTasks(tasks, followUpTopic)
-    if (followUps.includes('immediate_delivery')) {
+    if (taskContext && unsupportedDeliveryTime(sentence, tasks, rawUserText, currentObjectTopic)) {
+      violations.push({code: 'unsupported_delivery', claim: sentence.text,
+        reason: '发送回执只确认该次发送，没有提供这句新增的发送日期；记录观察时间不能当作送达时间。',
+        correctionInstruction: '保留已确认的发送事实，不自行附加年初、昨晚等具体时间。只有用户本轮明确提供该次发送时间时才能复述；否则可说已发过或请用户往上查找，不定位到某个日期。'})
+    }
+    const followUps = followUpClaims(sentence, taskContext, currentObjectTopic)
+    if (followUps.some(claim => claim.kind === 'immediate_delivery')) {
       violations.push({code: 'unsupported_delivery', claim: sentence.text,
         reason: '没有本轮实际发送的回执，不能承诺现在发送或再次投递；产物可用、历史发送回执和完成回调都不能证明新的发送动作。',
         correctionInstruction: '撤回现在发送、补发或再次投递的承诺，只说明已核验的产物与发送状态。历史回执只说明那次已发；如需新动作，应由真实工具执行并获得对应回执后再说明。'})
     }
-    if (followUps.includes('immediate_execution')) {
+    if (followUps.some(claim => claim.kind === 'immediate_execution')) {
       violations.push({code: 'unregistered_followup', claim: sentence.text,
         reason: '没有本轮实际执行该动作的记录，不能承诺现在重跑、重试或查询；历史任务和完成回调不能证明新的执行。',
         correctionInstruction: '撤回现在重跑、重试或查询的承诺，只说明已核验的当前状态。需要执行时应真实调用对应工具，不以一条文字回复代替执行。'})
     }
-    if (followUps.some(kind => !kind.startsWith('immediate_') && !followUpTasks.some(task => supportsFollowUp(task, kind)))) {
+    if (followUps.some(claim => !claim.kind.startsWith('immediate_') && !uniqueMatchingTasks(tasks, claim.topic).some(task => supportsFollowUp(task, claim.kind)))) {
       violations.push({code: 'unregistered_followup', claim: sentence.text,
         reason: '没有仍有效且与该动作对应的后续登记；完成触发的通知或投递和普通定时提醒不能互相证明。',
         correctionInstruction: '撤回自动跟进、通知、重试或已登记的说法。只说当前已知情况；如需用户再次发起请求，明确由用户再来询问，不承诺届时自己主动行动。'})
@@ -435,14 +499,16 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
     const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
     let sentenceTaskContext = taskContext
     for (const [index, clause] of clauses.entries()) {
+      const explicitTopic = evidenceTopic(clause)
+      if (!['unknown', 'generic', 'artifact', 'ambiguous'].includes(explicitTopic)) currentObjectTopic = explicitTopic
       if (unasserted(clause, sentence.question && index === clauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
       // “好了我会发你” is a future condition, not a claim that it is ready.
       if (/^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
         || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))) continue
-      for (const state of taskStatePropositions(clause, sentenceTaskContext, rawTopic, resultQuestionContext)) {
+      for (const state of taskStatePropositions(clause, sentenceTaskContext, currentObjectTopic, resultQuestionContext)) {
         if (state.object.kind !== 'implicit') sentenceTaskContext = true
         const clauseTopic = state.object.topic
-        const topic = clauseTopic === 'unknown' || clauseTopic === 'generic' ? rawTopic : clauseTopic
+        const topic = clauseTopic === 'unknown' || clauseTopic === 'generic' ? currentObjectTopic : clauseTopic
         const matchingTasks = uniqueMatchingTasks(tasks, topic)
         if (stateSupported(state, matchingTasks)) continue
         // A denial of an automatic arrangement does not authorize one. Keep

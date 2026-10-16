@@ -1,0 +1,146 @@
+{
+  "evaluatedCandidate": "fd5c5f9d52ad0c4ab51e0b4b8fab5e1d9982c59d",
+  "baseline": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+  "methodology": "Independent full-conversation review; map randomized A/B labels per case before aggregation. Coarse single-reviewer scores are not a statistical quality guarantee.",
+  "sourceHashes": {
+    "blind-mapping.json": "66ecdbb05a3fd46d140a199feae83245eefeb2c7d2116bff00996d75655f1213",
+    "blind-conversations.json": "e77facf9d7261d7d13b2c86736bb0cf96b87c2f6da2a94499b905d63e44e087e",
+    "blind-review.json": "8910917dee4641094257680d3806cab12611996e821205888ae664f0a606d51a"
+  },
+  "cases": 28,
+  "preference": {
+    "candidate": 2,
+    "baseline": 11,
+    "tie": 15
+  },
+  "scoreTotals": {
+    "candidate": 191,
+    "baseline": 211
+  },
+  "dimensions": {
+    "evidence_fidelity": {
+      "preference": {
+        "candidate": 1,
+        "baseline": 5,
+        "tie": 22
+      },
+      "scoreTotals": {
+        "candidate": 47,
+        "baseline": 52
+      }
+    },
+    "continuity": {
+      "preference": {
+        "candidate": 0,
+        "baseline": 5,
+        "tie": 23
+      },
+      "scoreTotals": {
+        "candidate": 49,
+        "baseline": 55
+      }
+    },
+    "new_information": {
+      "preference": {
+        "candidate": 0,
+        "baseline": 4,
+        "tie": 24
+      },
+      "scoreTotals": {
+        "candidate": 51,
+        "baseline": 55
+      }
+    },
+    "naturalness": {
+      "preference": {
+        "candidate": 2,
+        "baseline": 7,
+        "tie": 19
+      },
+      "scoreTotals": {
+        "candidate": 44,
+        "baseline": 49
+      }
+    }
+  },
+  "hardErrorFindings": {
+    "candidate": 4,
+    "baseline": 1
+  },
+  "hardErrorQuoteOccurrences": {
+    "candidate": 4,
+    "baseline": 1
+  },
+  "hardErrors": [
+    {
+      "id": "HE-01",
+      "caseId": "case-01",
+      "candidate": "candidate",
+      "category": "无登记的主动投递承诺",
+      "reason": "本轮没有任何任务或后续登记，旧的收到台词也不构成后台机制；A仍许诺确认到结果即主动发出。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我确认到就第一时间发你。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-02",
+      "caseId": "case-02",
+      "candidate": "candidate",
+      "category": "无登记的主动投递承诺",
+      "reason": "lookup成功但tasks为空，A仍表示结果一有就会发送，未保留用户再请求或另行登记的前提。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "有了我发你。"
+        }
+      ],
+      "anonymousCandidate": "A"
+    },
+    {
+      "id": "HE-03",
+      "caseId": "case-02",
+      "candidate": "baseline",
+      "category": "无登记的主动投递承诺",
+      "reason": "lookup成功但tasks为空，B仍承诺实际拿到图后第一时间发送，没有已登记的主动投递机制。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "等我实际拿到图了第一时间发你。"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-04",
+      "caseId": "case-04",
+      "candidate": "candidate",
+      "category": "无依据的交付时间定位",
+      "reason": "用户询问刚才的图，并引用同一交付回执；文件没有年初时间信息。B把目标回执具体定位到年初，属于可核对的凭空时序信息。",
+      "occurrences": [
+        {
+          "turn": 2,
+          "exactQuote": "你往上翻到年初那条就能看到~"
+        }
+      ],
+      "anonymousCandidate": "B"
+    },
+    {
+      "id": "HE-05",
+      "caseId": "case-27",
+      "candidate": "candidate",
+      "category": "跨任务挪用执行状态",
+      "reason": "唯一任务是考试提醒，其queued及registered不能证明图片任务存在或排队；A明确把这些执行状态转给改背景任务。",
+      "occurrences": [
+        {
+          "turn": 1,
+          "exactQuote": "改背景那个任务确实是登记了的，在排队中"
+        }
+      ],
+      "anonymousCandidate": "A"
+    }
+  ]
+}

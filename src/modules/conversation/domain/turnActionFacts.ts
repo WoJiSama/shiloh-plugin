@@ -50,6 +50,15 @@ const executionLabels: Record<TurnTaskFact['execution'], string> = {queued: '已
 const resultLabels: Record<TurnTaskFact['result'], string> = {available: '已有产物', unavailable: '没有可用产物', unknown: '产物未确认'}
 const deliveryLabels: Record<TurnTaskFact['delivery']['state'], string> = {not_attempted: '尚未尝试投递', sent: '有消息回执确认送达', failed: '投递失败，具体原因未确认', unknown: '投递结果未确认'}
 
+export function taskFactTopic(task: TurnTaskFact): 'image' | 'video' | 'file' | 'reminder' | 'generic' {
+  if (task.source === 'reminder') return 'reminder'
+  if (/image|banana|draw|paint|pixiv|dalle|flux/iu.test(task.toolName)) return 'image'
+  if (/video|media|torrent/iu.test(task.toolName)) return 'video'
+  if (/excel|workbook|file|document|report|pdf|word|sheet/iu.test(task.toolName)) return 'file'
+  return 'generic'
+}
+const taskTypeLabels = {image: '图片处理', video: '视频处理', file: '文件处理', reminder: '定时提醒', generic: '工具处理'}
+
 export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
   if (!facts) return ''
   const lines = ['【已核验的任务事实】', '以下来自当前机器人、当前会话和当前请求者的任务记录。任务存在、执行、产物、投递和后续登记分别成立；历史承诺、进度消息和工具调用返回都不等于最终产物已送达。']
@@ -58,9 +67,12 @@ export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
   if (facts.lookup === 'unavailable' && facts.tasks.length) lines.push('部分记录未能核验；以下已确认的事实仍成立，未列出的任务或后续安排保持未知。')
   if (!facts.tasks.length) lines.push(facts.lookup === 'unavailable' ? '本次未能核验相关任务记录；不能推断任务不存在、仍在执行或已经完成。' : '当前查询没有匹配的可核验任务记录；进度、产物与投递保持未确认。')
   for (const task of facts.tasks) {
-    lines.push(`原请求 ${task.requestMessageId}：${executionLabels[task.execution]}；${resultLabels[task.result]}；${deliveryLabels[task.delivery.state]}${task.delivery.state === 'sent' ? `（回执消息 ${task.delivery.messageId}）` : ''}。`)
+    const type = taskTypeLabels[taskFactTopic(task)]
+    lines.push(`原请求 ${task.requestMessageId}（任务类型：${type}）：${executionLabels[task.execution]}；${resultLabels[task.result]}；${deliveryLabels[task.delivery.state]}${task.delivery.state === 'sent' ? `（回执消息 ${task.delivery.messageId}）` : ''}。`)
+    if (task.source === 'reminder') lines.push('这是一条定时提醒记录。这里的登记和排队只属于该提醒，不证明图片处理任务存在、已登记、正在排队或会在完成后发图。')
     lines.push('已核验该请求对应的任务记录存在；后续发送未登记、已取消或未确认，均不能否定原任务存在，也不能据此推断任务停止或产物不可用。')
     if (task.result === 'available') lines.push('已确认有可用产物，这一事实独立于投递状态；不能因投递状态改述为没有图、没有成品或尚未做好。')
+    if (task.delivery.state === 'sent') lines.push('发送回执只证明该次已发出，没有提供发送日期；记录的观察时间不是送达时间。除用户本轮明确给定该次发送时间外，不补写年初、昨晚或其他具体日期。')
     if (task.delivery.state === 'failed') lines.push('投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因。没有原因证据时，不自行补写失败原因。')
     if (task.followUp.state === 'registered') {
       lines.push(task.followUp.kind === 'reminder'

@@ -82,6 +82,11 @@ test('qualified task claims and contradictions never become the next turn histor
  const cases=[
   {candidate:'第一张的蓝色背景还没出来欸，这边没查到完成记录。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
   {candidate:'第一张蓝底的还没出来，我这边没查到做完的记录。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
+  {candidate:'这张我这边没查到做好的记录，还不算出来哦。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张的处理结果还没核实，不能确认是否完成。'},
+  {candidate:'这个我还没法确认欸，手上没有处理结果的记录，不好说现在是好了还是卡着。等我确认到就第一时间发你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'这次图片处理的结果尚未核实，暂时不能确认是否完成。'},
+  {candidate:'这个我还没确认到结果欸，进度和图都没拿到。有了我发你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'这次图片处理的结果尚未核实，暂时不能确认是否完成。'},
+  {candidate:'改背景那个任务确实是登记了的，在排队中，不过产物我这儿还没查到确认结果，所以现在没法直接给你图。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'这次图片处理的结果尚未核实；考试提醒不能证明图片处理进度。'},
+  {candidate:'对，就那张。发过了，你往上翻到年初那条就能看到~',raw:'我说的是这张，已经发过了对吧？',tasks:[{execution:'completed',result:'available',delivery:{state:'sent',messageId:'image-receipt'}}],corrected:'对，这次有发送回执，已确认发出。'},
   {candidate:'所以现在图在我这儿没有。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功，具体原因还没确认。'},
   {candidate:'我这边本来也没挂着这个任务。',raw:'我取消了完成后发送，那图任务也没了吗？',tasks:[{execution:'running',result:'unavailable',delivery:{state:'not_attempted'},source:'live_job'}],corrected:'图任务还在处理，当前没有完成后自动发送的安排。'}
  ]
@@ -103,6 +108,18 @@ test('qualified task claims and contradictions never become the next turn histor
   assert.equal(enhanced[0][2],item.corrected)
   assert.doesNotMatch(JSON.stringify(messages),new RegExp(item.candidate.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))
  }
+})
+test('an explicit later user request can lead to another reply without a background registration',async()=>{
+ const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+ const candidate='你吃完回来在群里问一声就行，我到时候现查状态，有结果直接发你。'
+ let repairs=0
+ host.retryRequest=async()=>{repairs++;throw Error('ordinary user-triggered response must not regenerate')}
+ host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'user-triggered'}
+ await api.handleTextResponse(host,candidate,event,session,messages)
+ assert.equal(repairs,0)
+ assert.deepEqual(sent,[candidate])
+ assert.equal(archived[0].message[0].text,candidate)
+ assert.equal(messages.at(-1).content,candidate)
 })
 test('a repaired task reply cannot contradict a different known state dimension',async()=>{
  const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request'}}

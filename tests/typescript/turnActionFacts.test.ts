@@ -40,7 +40,7 @@ test('an available image and completed call do not imply delivery or a future ta
 test('a failed delivery prompt states the observed failure without inventing rejection or interception', () => {
   const actual = validateTurnActionFacts(facts([task({delivery:{state:'failed'}})]), event, now)
   const prompt = buildTurnActionFactsPrompt(actual)
-  assert.equal(prompt.split('\n').find(line=>line.startsWith('原请求 ')), '原请求 request：执行已结束；已有产物；投递失败，具体原因未确认。')
+  assert.equal(prompt.split('\n').find(line=>line.startsWith('原请求 ')), '原请求 request（任务类型：图片处理）：执行已结束；已有产物；投递失败，具体原因未确认。')
   assert.match(prompt, /投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因/)
   assert.match(prompt, /没有原因证据时，不自行补写失败原因/)
   assert.doesNotMatch(prompt, /投递被明确拒绝|有消息回执确认送达|回执消息/)
@@ -57,7 +57,7 @@ test('missing records and registrations describe this lookup rather than system 
 test('a verified sent receipt remains delivery evidence rather than an unknown failure cause', () => {
   const actual = validateTurnActionFacts(facts([task({delivery:{state:'sent',messageId:'receipt'}})]), event, now)
   const prompt = buildTurnActionFactsPrompt(actual)
-  assert.equal(prompt.split('\n').find(line=>line.startsWith('原请求 ')), '原请求 request：执行已结束；已有产物；有消息回执确认送达（回执消息 receipt）。')
+  assert.equal(prompt.split('\n').find(line=>line.startsWith('原请求 ')), '原请求 request（任务类型：图片处理）：执行已结束；已有产物；有消息回执确认送达（回执消息 receipt）。')
   assert.doesNotMatch(prompt, /投递失败|投递被明确拒绝|投递结果未确认/)
   const withoutReceipt = validateTurnActionFacts(facts([task({delivery:{state:'sent'}})]), event, now)
   assert.match(buildTurnActionFactsPrompt(withoutReceipt), /已有产物；投递结果未确认/)
@@ -105,4 +105,12 @@ test('an unknown callback remains unknown rather than being projected as an expl
  assert.doesNotMatch(prompt,/已核验该任务当前没有仍有效的后续投递登记/)
  assert.match(prompt,/未确认不等于没有、失败或未完成/)
  assert.match(prompt,/颜色、背景、版本等限定语，不改变该任务的证据归属/)
+})
+
+test('each request identifies its actual task type so a reminder queue cannot become an image job',()=>{
+ const reminder=task({taskId:'exam',requestMessageId:'exam-request',source:'reminder',toolName:'reminderTool',execution:'queued',result:'unknown',followUp:{state:'registered',kind:'reminder',id:'r-exam',dueAt:now+60_000}})
+ const prompt=buildTurnActionFactsPrompt(facts([reminder,task({requestMessageId:'image-request'})]))
+ assert.match(prompt,/原请求 exam-request（任务类型：定时提醒）：已登记排队/)
+ assert.match(prompt,/原请求 image-request（任务类型：图片处理）：执行已结束/)
+ assert.match(prompt,/这里的登记和排队只属于该提醒，不证明图片处理任务存在、已登记、正在排队或会在完成后发图/)
 })
