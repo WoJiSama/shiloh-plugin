@@ -424,6 +424,32 @@ function unsupportedRecipientCause(clause: string, rawUserText: string, adjacent
   return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
 }
 
+const RERUN_ACTION = '(?:重做|重跑|重试|(?:重新|再)(?:做|弄|跑|生成|出图|画图|改图|处理))'
+const REQUIRED_RERUN = new RegExp(`(?:必须|必需|需要|非得|得|只能|只有|要)(?:先)?${RERUN_ACTION}(?:一(?:次|遍|下))?(?:${ARTIFACT_SUBJECT}|${TASK_SUBJECT})?(?:(?:后|之后|以后)?(?:才(?:能|可以)${DELIVERY_EVENT}|才行))?${PARTICLES}$`, 'u')
+const RERUN_DELIVERY_CONDITION = new RegExp(`^(?:(${ARTIFACT_SUBJECT})?(?:要|想)${DELIVERY_EVENT}|(?:要|想)(?:发|发送|投递)(${ARTIFACT_SUBJECT}))(?:的话)?(?:就)?$`, 'u')
+
+function rerunTaskSubject(prefix: string, context: boolean, topic: EvidenceTopic): boolean {
+  const subject = prefix.replace(SUBJECT_CONNECTOR, '').replace(/^(?:那(?:就)?|就)/u, '').trim()
+  const condition = RERUN_DELIVERY_CONDITION.exec(subject)
+  if (condition) {
+    const object = condition[1] || condition[2]
+    return Boolean(object ? taskObjectReference(object, false, topic) : context)
+  }
+  const object = taskObjectReference(subject, context, topic)
+  return Boolean(object && object.kind !== 'follow_up')
+}
+
+/** A missing receipt is not proof that an existing artifact must be recreated.
+ * Availability, failure and callback records do not encode that prerequisite. */
+function unsupportedRerunRequirement(clause: string, context: boolean, topic: EvidenceTopic): boolean {
+  const match = REQUIRED_RERUN.exec(clause)
+  if (!match || /不(?:必|需要|用|一定|认为|觉得)|未必|无需|不用|毋须/u.test(clause)) return false
+  // Bare “要” can express a future choice; only its prerequisite form is an
+  // asserted necessity. Optional offers and requests are not state claims.
+  if (/^(?:要|只有)/u.test(match[0]) && !/才(?:能|可以|行)/u.test(match[0])) return false
+  return rerunTaskSubject(clause.slice(0, match.index), context, topic)
+}
+
 /** Narrow, evidence-backed rejection signals. This is not a general truth or
  * naturalness score. Scope and freshness must be validated by the caller.
  * The current words, not the mere presence of an empty facts envelope, scope
@@ -471,10 +497,22 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
     }
     const clauses = sentence.text.split(/[，,]/u).map(value => value.trim()).filter(Boolean)
     let sentenceTaskContext = taskContext
+    let rerunContext = taskContext
     for (const [index, clause] of clauses.entries()) {
       const explicitTopic = evidenceTopic(clause)
       if (!['unknown', 'generic', 'artifact', 'ambiguous'].includes(explicitTopic)) currentObjectTopic = explicitTopic
-      if (unasserted(clause, sentence.question && index === clauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
+      if (OTHER_SUBJECT.test(clause)) {rerunContext = false; continue}
+      if (unasserted(clause, sentence.question && index === clauses.length - 1)) continue
+      if (unsupportedRerunRequirement(clause, rerunContext, currentObjectTopic)) {
+        violations.push({code: 'unsupported_task_state', claim: sentence.text,
+          reason: '当前记录没有证明原产物必须重做或任务必须重跑才能交付；缺少记录、投递失败或未登记自动发送都不能证明这个必要条件。',
+          correctionInstruction: '撤回必须重做、重跑才能发的断言，分别说明已核验的产物与投递状态。尚未核实时保留不确定；可以提出由用户选择是否重新发起任务，不把它说成获取原产物的唯一途径。'})
+      }
+      // Inherit an omitted rerun subject only from a local task condition or
+      // task evidence, not from an unrelated human activity in the same reply.
+      rerunContext = rerunTaskSubject(clause, false, currentObjectTopic)
+        || rerunContext && explicitTopic !== 'reminder' && /(?:任务|产物|结果|回执|登记|记录)/u.test(clause)
+          && !/别人|他|她|(?:我|你)(?:妈|爸|姐姐|妹妹|哥哥|弟弟|朋友|同事)/u.test(clause)
       // “好了我会发你” is a future condition, not a claim that it is ready.
       if (/^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
         || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))) continue

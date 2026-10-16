@@ -729,3 +729,51 @@ test('a later user request owns its synchronous lookup but cannot license a sepa
  ]) assert.ok(validateActionReply(text,facts(),raw).some(item=>item.code==='unregistered_followup'),text)
   assert.ok(validateActionReply('你回来再问我，我现在发给你。',facts(),raw).some(item=>item.code==='unsupported_delivery'))
 })
+
+
+test('missing image records cannot establish that a rerun is required before delivery', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reminder = fact({source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})
+  const reply = '改背景的图我这边没查到有登记记录，可能当时没接上，啦。考试提醒是登记了的，但那只是提醒，不会带图。图要发你的话，得重新弄一次才行。'
+  assert.ok(validateActionReply(reply,facts([reminder]),raw).some(item=>item.code==='unsupported_task_state'))
+  for (const current of [facts(),facts([fact()]),facts([reminder]),facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])]) {
+    for (const text of [
+      '图要发你的话，得重新弄一次才行。', '图必须重新生成才能发给你。',
+      '这张图需要重做才能发你。', '要发图的话，只能重新生成。',
+      '图要重做才能发你。', '只有重做才能发你。', '图得重跑。',
+      '没查到这张图的记录，所以得重新弄一次才行。'
+    ]) assert.ok(validateActionReply(text,current,raw).some(item=>item.code==='unsupported_task_state'),text)
+  }
+})
+
+test('optional, denied, questioned and quoted reruns do not assert mandatory recreation', () => {
+  const raw = '刚才那张图出来了吗？'
+  for (const text of [
+    '要不要重新做一遍？', '如果你想，也可以重新生成。', '图未必需要重做才能发你。',
+    '图不需要重新生成。', '图不必重做。', '图无需重做。', '我不觉得图必须重新生成。',
+    '图必须重做才能发你吗？', '图要发你的话，得重新弄一次才行吗？',
+    '我还不清楚图是否需要重做。', '“图必须重做才能发你”只是个例子。',
+    '不要说图必须重新生成才能发你。', '例如图必须重做才能发你。',
+    '你想重新发起改图请求的话，下次把图和要求发来就行。',
+    '你下次再让我重做这张图，我再按新要求生成。'
+  ]) assert.deepEqual(validateActionReply(text,facts(),raw),[],text)
+})
+
+test('rerun necessity remains scoped to runtime tasks rather than people or human activities', () => {
+  const raw = '刚才那张图出来了吗？'
+  for (const text of [
+    '我妹妹得重新弄一次才行。', '她的图必须重做才能发你。',
+    '别人的报告需要重做。', '别人的图要发你的话，得重新弄一次才行。',
+    '别人的图没有查到记录，得重新弄一次才行。', '我得重新做饭。', '我得重新跑步。',
+    '我在练厨艺，得重新弄一次才行。', '妹妹刚刚做蛋糕，得重新弄一次才行。',
+    '图里的女孩得重新弄一次才行。'
+  ]) assert.deepEqual(validateActionReply(text,facts(),raw),[],text)
+  assert.deepEqual(validateActionReply('得重新弄一次才行。',facts(),'我今天做饭失败了。'),[])
+})
+
+test('new requested reruns stay future actions while immediate unexecuted reruns still fail', () => {
+  const raw = '把刚才的图重新生成一遍，背景换成蓝色。'
+  assert.deepEqual(validateActionReply('你下次发来原图并重新提出要求时，我再按要求生成。',facts(),raw),[])
+  assert.deepEqual(validateActionReply('你下次要求我换成蓝色，那就需要重新生成。',facts(),raw),[])
+  assert.ok(validateActionReply('我现在给你重跑。',facts(),raw).some(item=>item.code==='unregistered_followup'))
+})

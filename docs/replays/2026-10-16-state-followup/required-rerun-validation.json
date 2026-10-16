@@ -1,0 +1,22 @@
+{
+  "steps": {
+    "typecheck": 0,
+    "build": 0,
+    "test-compile": 0,
+    "targeted": 0
+  },
+  "targetedTests": {
+    "tests": 232,
+    "pass": 232,
+    "fail": 0,
+    "skipped": 0
+  },
+  "parentCommit": "b660d6abc82ac95b94de97d718b3a552cf86303b",
+  "sourceHook": {
+    "tests": 49,
+    "pass": 49,
+    "fail": 0,
+    "skipped": 0
+  },
+  "scope": "Required rerun grounding plus final reply persistence. Frozen candidate commit follows; replay and full deploy gate are still pending."
+}
