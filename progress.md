@@ -1774,3 +1774,11 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 原目录最新8a831d3为01a后继，391接受目标全部原hash保持；新HEAD/index/dirty及全文件hash另备份，旧baseline保留。线上只读已7ad2f83；继续合入新模块子开关与广告扫描功能，安装前增加可选预期生产commit核对，配置审计改为显式预部署hash快照，避免覆盖并发更新。
 
 - 1005固定只读产物复核已停写并归档message-outcome-compiled-review.json：1003期望通过、source/dist1005逐项相等，旧810实测810相同及3补充实测3相同、新192全部通过；原两份期望差异保留。8a831d3合并11冲突备份/tmp/bl-final-merge-8a831d3-20261016；所有聊天源码/相关测试与280a9a4一致，所有群管业务/测试与8a831d3一致，不借旧产物成绩代替合并版全量门禁。新增adScan只进入完整配置默认字段差异，适用性审计显式加此根。
+
+- 原目录同版检查已收齐：strict/build/testcompile与382/382通过，五业务TS/JS逐项一致、manifest自洽。末尾比对曾因合并删除旧guoba文件的历史diff范围过宽失败，原日志保留；仅按独立冻结报告显式五模块重做比对，不重复模型或改业务。最终release只读审计通过，配置完整hash差异与五根投影独立保留。
+
+- 4f7f8f7完整60轮已收齐：60结构通过，76/76请求HTTP200且全部显式low，16纠正8兜底，P50/P95/最大2.409/9.944/17.460秒；QQ/真实工具/生产测试写入0。7协议指纹一致，完整effectiveConfigHash差异显式保留，并附五个非聊天根的独立适用性证据。两个fresh匿名评审各读14组，未提供mapping或源码。父逐句补记剩余否定边界及正常风险/前置条件误拒，业务冻结保持，不宣称P0全部语义或自然度达标。
+
+- Evidence report append via stdin Python hit invalid UTF-8 before execution; no file writes occurred. Retried using apply_patch; source bytes remain frozen.
+
+- 4f最终28组fresh盲评已校验并封存：综合5胜6负17平、209:213，自然度1胜5负22平、50:54，候选1/基线3硬错。候选“产物没确认，所以暂时不会自动发你”原评保持，不改分数或冻结业务；残留观察并列披露。本轮验收流程完成不等于自然度或全部P0语义达标，继续最终提交与完整部署。

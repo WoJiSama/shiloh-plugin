@@ -4,11 +4,56 @@
     "scenariosHash",
     "memoryHelperHash",
     "configHash",
-    "effectiveConfigHash",
     "personaHash",
     "personaLibraryHash",
     "repetitions"
   ],
+  "protocolDifferences": [
+    "effectiveConfigHash"
+  ],
+  "configApplicability": {
+    "at": "2026-10-16T15:43:38.404Z",
+    "method": "Full effective configuration hashes retained; only the explicitly listed non-chat roots are removed for the separate applicability comparison. No configuration values are exported.",
+    "allowedNonChatRoots": [
+      "groupModeration.overlongMessage",
+      "groupModeration.burstMessage",
+      "groupModeration.adScan",
+      "emojiSystem.admissionExtraReject",
+      "groupAdmin"
+    ],
+    "finalCommit": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+    "referenceCommit": "8529c94d8032d3ad8156afa1f07c6bd9131963b7",
+    "frozenConfigHash": "94e667393df864e61f030822bc19a72ef7d59e39446907799a45280ecbcd301b",
+    "frozenPersonaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "runtimeComparison": {
+      "firstHash": "24622f1bc1b8457a103877e2a8ed867ab95dec677f89c6f99e22f91316ca5d86",
+      "secondHash": "c0649f49284b3cb28cfb7790852dc0a6ab562f4d9c1f222ce7f63f149fed7f06",
+      "differingPaths": [
+        "groupModeration.adScan",
+        "groupModeration.overlongMessage",
+        "groupModeration.burstMessage",
+        "groupAdmin"
+      ],
+      "firstRelevantHash": "86309bfd95c5e174296c89f0d4fa9b6e70ec6b7d390fff658e26055fcd0964b4",
+      "secondRelevantHash": "86309bfd95c5e174296c89f0d4fa9b6e70ec6b7d390fff658e26055fcd0964b4",
+      "relevantEqual": true
+    },
+    "productionComparison": {
+      "firstHash": "c0649f49284b3cb28cfb7790852dc0a6ab562f4d9c1f222ce7f63f149fed7f06",
+      "secondHash": "f757830d3f0fbf13e305cb3e253703dca3d81d6b8e8c363dd245541149798c04",
+      "differingPaths": [
+        "groupAdmin.overrides",
+        "emojiSystem.admissionExtraReject"
+      ],
+      "firstRelevantHash": "86309bfd95c5e174296c89f0d4fa9b6e70ec6b7d390fff658e26055fcd0964b4",
+      "secondRelevantHash": "86309bfd95c5e174296c89f0d4fa9b6e70ec6b7d390fff658e26055fcd0964b4",
+      "relevantEqual": true
+    },
+    "productionConfigHashes": {
+      "config/message.yaml": "90d3a064d7f8c9da31590f838b478c39ebd2bf8c14a50816e615243b5d07ad8a",
+      "config/persona-library.yaml": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f"
+    }
+  },
   "baseline": {
     "commit": "7548294b5f8896feb5f099dad6365d72c130d7ff",
     "complete": true,
@@ -37,20 +82,20 @@
     "semanticEvaluation": "requires_entire_conversation_review; HTTP_and_structure_are_not_quality_scores"
   },
   "candidate": {
-    "commit": "8529c94d8032d3ad8156afa1f07c6bd9131963b7",
+    "commit": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
     "complete": true,
     "turns": 60,
     "structuralPassed": 60,
     "structuralDifferences": [],
-    "httpRequests": 72,
-    "http200": 72,
-    "explicitLow": 72,
-    "repairTurns": 12,
-    "fallbackTurns": 6,
+    "httpRequests": 76,
+    "http200": 76,
+    "explicitLow": 76,
+    "repairTurns": 16,
+    "fallbackTurns": 8,
     "replyLatencyMs": {
-      "p50": 2661,
-      "p95": 12786,
-      "max": 21231
+      "p50": 2409,
+      "p95": 9944,
+      "max": 17460
     },
     "platformMessagesSent": 0,
     "productionStoreWrites": 0,

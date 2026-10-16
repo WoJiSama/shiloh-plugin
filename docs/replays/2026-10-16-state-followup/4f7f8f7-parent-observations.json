@@ -1,0 +1,35 @@
+{
+  "candidate": "4f7f8f70e0729c1790927f85a22c55d974eccfd5",
+  "sourceEdits": 0,
+  "scope": "parent follow-up observations retained separately from independent anonymous review; not a complete semantic acceptance",
+  "findings": [
+    {
+      "rows": [
+        3
+      ],
+      "category": "followup-denial-boundary",
+      "quote": "没有欸，我不会自动盯着发。",
+      "note": "Task follow-up is unknown. This may still imply an unsupported negative follow-up state; preserve as a remaining boundary for later repair rather than claim full P0 acceptance."
+    },
+    {
+      "rows": [
+        25,
+        28,
+        54,
+        55,
+        56
+      ],
+      "category": "guard-overrejection",
+      "note": "Normal risk explanations, prohibition, professional precondition and static observation questions still produced extra repairs or fallbacks. Final replies preserve the safe course, but these overrejections increase stiffness and latency."
+    },
+    {
+      "rows": [
+        59
+      ],
+      "category": "temporary-delivery-vs-followup",
+      "quote": "产物没确认，所以暂时不会自动发你。",
+      "note": "Temporary withholding before verification and future completion-follow-up denial remain grammatically ambiguous; current evidence does not justify treating every temporarily-not-sending statement as a missing registration."
+    }
+  ],
+  "releaseLimit": "This frozen release improves the covered contracts but is not evidence that every P0 semantic boundary or naturalness goal is finished."
+}
