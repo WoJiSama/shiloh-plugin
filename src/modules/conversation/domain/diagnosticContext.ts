@@ -457,11 +457,11 @@ function professionalOperationCondition(clause: string, professionalReference = 
     || /(?:无需|不用|不必|不需要|没必要).{0,12}(?:检修|检查|维修|放行)/u.test(clause)) return false
   // Inspection is a future gate only when its result permits operation. Merely
   // mentioning a repair shop or technician cannot authorize a user action.
-  const clearance = /放行|排除.{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没有|没|无).{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没问题|安全|正常|(?:可|能|允许)(?:安全)?(?:开机|通电|$))/u.exec(clause)
+  const clearance = /放行|排除.{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|确认.{0,20}(?:没有|没|无).{0,12}(?:电气损坏|供电损坏|电路损坏|问题|故障)|(?:确认|明确(?:说|表示)).{0,20}(?:没问题|安全|正常|(?:可以|能够|能|允许|可)(?:安全)?(?:开机|通电|正常使用|$))/u.exec(clause)
   if (!clearance) return false
   const before = clause.slice(0, clearance.index)
   const after = clause.slice(clearance.index + clearance[0].length)
-  const future = /等|待|只有|如果|须|需|必须|(?<!已)经|前提/u.test(before)
+  const future = /等|待|只有|如果|须|需|必须|(?<!已)经|前提|(?:让|请)(?:他们|他|她|专业|维修|检修|售后|师傅)/u.test(before)
     || /^\s*(?:(?:并(?:且)?|且|和|、)(?:明确)?放行)*(?:之后|以后|后|的话|才(?:能|可))/u.test(after)
   return future && !deniesProfessionalClearance(clause)
 }
@@ -520,6 +520,10 @@ function temperatureAssurance(clause: string): boolean {
   // Reporting that a machine has run does not itself assert that its temperature
   // is normal. A permission to keep using it is a separate positive conclusion.
   if (/(?:正常|安全)(?:运行|工作|使用)/u.test(clause)) return false
+  // Health and reassurance are still positive conclusions when their subject
+  // is this reading. Keep unrelated personal well-being outside this scope.
+  const reading = /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)/iu.test(clause)
+  if (reading && /健康|(?:不(?:用|必|需要)|无需)(?:再)?担心|(?:离|距离|距).{0,12}(?:降频|温度墙|(?:温度)?上限).{0,12}(?:距离|余量|空间)|(?:离|距离|距).{0,12}(?:降频|温度墙|(?:温度)?上限).{0,6}(?:远|很远)/u.test(clause)) return true
   const conclusion = /(?:正常(?:范围|区间)?|不算高|不高|没问题|没事|安全|不(?:算|是)危险(?:信号)?|没有(?:明显)?风险)|放心(?:用|使用|运行)/u
   if (!conclusion.test(clause)) return false
   return /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)|(?:就|很|挺|算|是|属于|在|落在|基本|完全|非常).{0,8}(?:正常|不高|没问题|没事|安全)|放心(?:用|使用|运行)|^\s*(?:正常|不算高|不高|没问题|没事|安全|不(?:算|是)危险(?:信号)?|没有(?:明显)?风险)/iu.test(clause)
@@ -617,6 +621,10 @@ function advisesUnclearedOperation(clause: string, carriedCondition = false, pro
   for (const match of clause.matchAll(action)) {
     const prefix = clause.slice(0, match.index)
     const suffix = clause.slice(match.index + match[0].length)
+    // An operation inside the professional's requested permission is a
+    // complement of "confirm", not the user's instruction to run it now.
+    if (professionalOperationCondition(clause, professionalReference)
+      && /(?:确认|明确(?:说|表示)).{0,20}(?:可以|能够|能|允许|可)(?:安全)?$/u.test(prefix)) continue
     // A later "别摸内部" cannot negate an earlier "先开机". Only a
     // prohibition immediately governing this operation can do that.
     if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|自己|亲自|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
@@ -624,6 +632,11 @@ function advisesUnclearedOperation(clause: string, carriedCondition = false, pro
     const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|自己|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
     if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
     const operationTail = suffix.replace(/^\s*(?:(?:再)?(?:测试|试机|检测|检查|试验|试|测)(?:一下)?)*(?:本身)?/u, '')
+    // Naming the same event twice explains why isolation matters. A preceding
+    // permission or imperative still makes it an instruction.
+    if (/^\s*(?:本身)?(?:就)?是(?:重新|再次|再)?(?:通电|上电)[，,。；;\s]*$/u.test(operationTail)
+      && /^\s*(?:现在|目前)?\s*$/u.test(prefix)) continue
+    if (/开机(?:本身)?(?:就)?是(?:重新|再次|再)?$/u.test(prefix)) continue
     // A future boundary and an explicitly delegated professional procedure are
     // different from instructions for the user to run the device now.
     if (/^(?:之|以)?前/u.test(operationTail)

@@ -1478,3 +1478,36 @@ test('future professional clearance cannot become an absolute whole-machine guar
   assert.ok(validateDiagnosticReply('等专业检修确认没问题并放行之后整机绝对安全。', context).some(item => item.code === 'unsupported_safety_certification'))
   assert.deepEqual(validateDiagnosticReply('等专业检修确认没问题并放行之后再开机，这不代表整机绝对安全。', context), [])
 })
+
+test('unknown temperature cannot establish a healthy reading or a comfortable thermal margin', () => {
+  const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
+  const complete = '82℃满载这数其实挺健康的，大多数CPU的温度墙在95~105℃，82℃离降频还有段距离。\n\n判断的话看三点：一是你的U的Tjunction上限（查型号规格就知道）；二是满载时频率有没有掉，没掉说明没撞温度墙；三是环境温度和散热条件，夏天机箱闷的话会整体高几度。无烟无味加上运行正常，这个温度本身不用担心。'
+  for (const unsupported of [complete, '82℃满载这个读数挺健康的。', '这个温度本身不用担心。', '82℃离降频还有段距离。']) {
+    assert.ok(validateDiagnosticReply(unsupported, context).some(item => item.code === 'unsupported_temperature_assurance'), unsupported)
+  }
+  for (const normal of [
+    '82℃单看无法判断是否健康，仍需型号、测点和规格。',
+    '不用担心我，我身体很健康。',
+    '如果该型号官方规格允许此测点和负载下的温度，82℃就在规格范围内。',
+    '这个温度是否需要担心，要结合型号、传感器和规格。',
+    '82℃也许在允许范围，仍要查该型号的官方规格。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+})
+
+test('professional permission and operation equivalence are not current instructions to run the device', () => {
+  const context = buildDiagnosticContext({rawUserText: '那我能先开机试一下吗？', speakerId, history: [{role:'user', userId:speakerId, text:'电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'}]})!
+  for (const normal of [
+    '还是别开机。冒烟加焦糊味说明出现过异常，外面看不到烧痕、味道散了，只说明没观察到现象，不能排除里面有元件出问题——具体哪里坏、坏到什么程度，光靠这些判断不了，贸然通电有可能让损坏扩大。\n\n保持断电，送修或找专业人员检测，让他们确认可以开机了再开。忍一下，别省这一步。',
+    '不能。开机就是重新通电，而电源位置的焦糊味还没被专业检测排除异常，再通电可能扩大损坏甚至有起火风险。\n\n先送去检修，等维修方明确说这台机器检测通过、可以正常使用了，再开机。',
+    '不能。开机本身就是通电，焦糊味说明电源那里有异常，再通电可能让损坏扩大，甚至有起火风险。\n\n刚才看着没事、味道散了都不代表安全。让维修的人检测确认没问题之前，线就别插回去了。',
+    '开机就是重新通电。',
+    '先送修，让专业人员确认可以开机后再开。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  for (const unsupported of [
+    '可以开机，等维修人员之后确认。',
+    '让他们确认可以开机了再开。现在你先通电。',
+    '师傅在旁边，你先开机。',
+    '先开机就是重新通电。',
+    '等检测过了，再开机。'
+  ]) assert.ok(validateDiagnosticReply(unsupported, context).some(item => item.code === 'unmet_operational_prerequisite'), unsupported)
+})
