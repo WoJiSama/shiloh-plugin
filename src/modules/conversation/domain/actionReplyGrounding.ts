@@ -20,8 +20,13 @@ function withoutQuotations(text: string): string {
 function assertions(text: string): ReplySentence[] {
   // A quoted name can still be the object of an arrangement assertion. Keep
   // that noun phrase without treating the quoted promise as an assertion.
-  const namedArrangements = text.replace(/“[^”\n]*”|「[^」\n]*」|'[^'\n]*'|"[^"\n]*"/gu, (quoted, offset: number) =>
-    /^的(?:安排|设置|登记)/u.test(text.slice(offset + quoted.length)) && /(?:好了|完成|结果).{0,12}(?:发|投递|通知)/u.test(quoted) ? '完成后发送' : quoted)
+  const namedArrangements = text.replace(/“[^”\n]*”|「[^」\n]*」|'[^'\n]*'|"[^"\n]*"/gu, (quoted, offset: number) => {
+    if (!/(?:好了|完成|结果).{0,12}(?:发|投递|通知)/u.test(quoted)) return quoted
+    if (/^的(?:安排|设置|登记)/u.test(text.slice(offset + quoted.length))) return '完成后发送'
+    // Arrangement verbs can take the quoted action as their direct object.
+    // Preserve the object without treating its quoted words as our promise.
+    return /(?:安排|设置|登记)(?:了|好|过)?$/u.test(text.slice(0, offset)) ? '完成后自动发送' : quoted
+  })
   return [...withoutQuotations(namedArrangements).replace(/\.{3,}/gu, '…').matchAll(/[^。！？!?；;…\n]+[。！？!?；;…]?/gu)]
     .map(match => ({text: match[0].replace(/[。！？!?；;…]+$/u, '').trim(), question: /[？?]$/u.test(match[0])}))
     .filter(sentence => Boolean(sentence.text))
@@ -243,8 +248,12 @@ function automaticDenialObject(clause: string, topic: EvidenceTopic): TaskObject
   if (!denied) return undefined
   let prefix = clause.slice(0, denied.index).replace(SUBJECT_CONNECTOR, '')
     .replace(/^(?:取消|撤销)(?:了)?(?:发送|投递|通知)?(?:之?后|以后|的话)?(?:那|就|也)*/u, '')
-  const condition = [...prefix.matchAll(COMPLETION_TRIGGER)].at(-1)
-  if (condition && condition.index! + condition[0].length === prefix.length) prefix = prefix.slice(0, condition.index)
+  const condition = [...prefix.matchAll(COMPLETION_TRIGGER), ...prefix.matchAll(new RegExp(`${READY}$`, 'gu'))]
+    .filter(match => match.index! + match[0].length === prefix.length).sort((a, b) => a.index! - b.index!)[0]
+  if (condition) {
+    prefix = prefix.slice(0, condition.index)
+    if (/(?:还没(?:有)?|没有|尚未|暂未|未|没)$/u.test(prefix)) return undefined
+  }
   const object = taskObjectReference(prefix, true, topic)
   return object ? {...object, kind:'follow_up', surface:clause} : undefined
 }
@@ -446,6 +455,36 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
   return claims
 }
 
+/** A request may authorize a later send; it cannot supply that send's future
+ * receipt. Parse the send and its consequent together, retaining an omitted
+ * recipient only for an assistant-owned artifact delivery. */
+function guaranteesFutureReceipt(sentence: ReplySentence, taskContext: boolean): boolean {
+  if (!taskContext) return false
+  const clauses = localClauses(sentence.text)
+  const success = new RegExp(`^(?:了)?(?:一(?:次|遍|下))?(?:之后|以后|后)?(?:[，,]\\s*)?(?:(?:你|您)(?:这边|那边)?(?:就|肯定|一定|必定|保证)?|(?:就|肯定|一定|必定|保证))(?:会|能(?:够)?)?收到(?:${ARTIFACT_SUBJECT}|它)?(?:了)?${PARTICLES}(?=$|[，,])`, 'u')
+  for (const action of sentence.text.matchAll(ASYNC_ACTION)) {
+    if (!/发|投递|补给|补上/u.test(action[0])) continue
+    const actionEnd = action.index! + action[0].length
+    const result = success.exec(sentence.text.slice(actionEnd))
+    if (!result) continue
+    const clause = clauses.find(value => value.start <= action.index! && action.index! < value.end)
+    const resultEnd = actionEnd + result[0].length
+    const resultClause = clauses.find(value => value.start < resultEnd && resultEnd <= value.end)
+    if (!clause || !resultClause || unasserted(clause.text, sentence.question && clause.end === sentence.text.length)
+      || unasserted(resultClause.text, sentence.question && resultClause.end === sentence.text.length)) continue
+    let prefix = sentence.text.slice(clause.start, action.index).replace(SUBJECT_CONNECTOR, '')
+    if (NEGATED_ACTION.test(prefix) || OTHER_SUBJECT.test(prefix)
+      || /(?:上次|那次|之前|当时|曾经|已经|已|刚才|刚刚|早就)/u.test(prefix) && !/会|将|之后|以后|稍后|到时/u.test(prefix)) continue
+    const completion = completionBefore(prefix)
+    if (completion >= 0) prefix = prefix.slice(completion)
+    prefix = prefix.replace(/^(?:(?:如果|要是)?(?:你|您)(?:要|想要|需要)(?:的话)?|只要|如果|要是)/u, '')
+    // Explicit user senders and unrelated objects do not become our action.
+    if (!new RegExp(`^(?:我(?:这边)?|这边)?(?:那|就|会|再|先|直接|手动|帮你|给你|把${ARTIFACT_SUBJECT})*$`, 'u').test(prefix)) continue
+    return true
+  }
+  return false
+}
+
 function stateSupported(proposition: TaskStateProposition, tasks: TurnTaskFact[]): boolean {
   return tasks.some(task => {
     switch (proposition.dimension) {
@@ -640,6 +679,11 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
   let rerunContext = taskContext
   const requestedReruns = requestedRerunTopics(rawUserText)
   for (const sentence of assertions(reply)) {
+    if (guaranteesFutureReceipt(sentence, taskContext)) {
+      violations.push({code:'unsupported_delivery', claim:sentence.text,
+        reason:'现有记录没有证明这次或未来的重发会送达；用户愿意再要一次、旧发送回执或完成回调都不能保证新发送一定被收到。',
+        correctionInstruction:'撤回重发后一定收到的保证。可以提出由用户请求重发，但是否送达须等这次真实发送的对应回执，不能从上次失败或已有产物推导重试成功。'})
+    }
     const followUps = followUpClaims(sentence, taskContext, currentObjectTopic)
     if (followUps.some(claim => claim.kind === 'immediate_delivery')) {
       violations.push({code: 'unsupported_delivery', claim: sentence.text,

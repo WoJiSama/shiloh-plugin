@@ -1232,3 +1232,94 @@ test('a future result condition cannot supply an asserted task-page pickup locat
   assert.deepEqual(validateActionReply('图出来后，你可以自己去任务页下载。', current,
     '平台说明：“你可以自己去任务页下载”。我刚取消了完成后发送，图好了怎么办？'), [])
 })
+
+test('671 complete replay 3 cannot infer no automatic delivery from an unknown registration', () => {
+  const raw = '那我先去吃饭。好了你会自动发给我吗？'
+  const reply = '这次没查到有效的后续登记，所以做好了也不会自动发。原任务进度我也还没核实到，你吃完回来问一声，我再帮你看。'
+  assert.ok(validateActionReply(reply, facts(), raw).some(item=>item.code==='unsupported_task_state'))
+})
+
+test('671 complete replay 58 retains the quoted action as the object of an arrangement denial', () => {
+  const raw = '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'
+  const reply = '查了下记录，目前只核验到你那条考试提醒的登记，改背景那张图没有对应的任务记录欸，所以我这边没法确认它在跑，也没有安排“好了自动发你”。\n\n你要是想改，可以再发一次图、明确说一声，我确认登记了再告诉你。'
+  const reminder = facts([fact({taskId:'exam-reminder', requestMessageId:'exam-request', source:'reminder', toolName:'reminderTool', execution:'queued', delivery:{state:'not_attempted'}, followUp:{state:'registered', kind:'reminder', id:'exam-reminder', dueAt:4102444800000}})])
+  assert.ok(validateActionReply(reply, reminder, raw).some(item=>item.code==='unsupported_task_state'))
+})
+
+test('671 complete replay 11 cannot guarantee the receipt of an unexecuted resend', () => {
+  const raw = '所以我现在没收到，是还没做好吗？'
+  const reply = '图是做好了的，就是上次发送没成功。你要的话再发一次就收到了。'
+  const failed = facts([fact({execution:'completed', result:'available', delivery:{state:'failed'}, followUp:{state:'none'}})])
+  assert.ok(validateActionReply(reply, failed, raw).some(item=>item.code==='unsupported_delivery'))
+})
+
+test('a full completion predicate owns an automatic-delivery denial with or without a receiver', () => {
+  const raw = '刚才的图做好了会自动发我吗？'
+  const none = facts([fact({execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['做好了也不会自动发。', '图弄好了也不会自动发你。', '画完了也不会主动发给你。']) {
+    for (const current of [facts(), live]) assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unsupported_task_state'), reply)
+    assert.deepEqual(validateActionReply(reply, none, raw), [], reply)
+  }
+  for (const reply of [
+    '不能确认做好了也不会自动发。', '做好了会不会自动发？',
+    '“做好了也不会自动发”只是个例子。', '她做好了也不会自动发。',
+    '做好了也不代表不会自动发。', '没做好也不代表不会自动发。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
+
+test('a quoted completion action remains a nominal object without turning quoted speech into a promise', () => {
+  const raw = '刚才的图好了会自动发我吗？'
+  const none = facts([fact({execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['我这边没有安排“好了自动发你”。', '没有安排「好了自动发你」。', "我没有安排'好了自动发你'。"] ) {
+    assert.ok(validateActionReply(reply, facts(), raw).some(item=>item.code==='unsupported_task_state'), reply)
+    assert.deepEqual(validateActionReply(reply, none, raw), [], reply)
+  }
+  assert.ok(validateActionReply('我已经安排“好了自动发你”。', facts(), raw).some(item=>item.code==='unregistered_followup'))
+  assert.deepEqual(validateActionReply('我已经安排“好了自动发你”。', live, raw), [])
+  for (const reply of [
+    '有没有安排“好了自动发你”尚未核实。', '我没有查到安排“好了自动发你”的记录。',
+    '不能确认没有安排“好了自动发你”。', '没有安排“好了自动发你”吗？',
+    '“我没有安排好了自动发你”只是个例子。', '她没有安排“好了自动发你”。',
+    '不能承诺“好了自动发你”。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
+
+test('a resend-success guarantee keeps its own evidence requirement after a user request', () => {
+  const raw = '刚才的图发了吗？'
+  const failed = facts([fact({execution:'completed', result:'available', delivery:{state:'failed'}})])
+  const sent = facts([fact({execution:'completed', result:'available', delivery:{state:'sent', messageId:'old-receipt'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of [
+    '你要的话再发一次就收到了。', '再发一次你就收到了。',
+    '你回来再问我，我再发一次就能收到图了。', '图好了我发给你，你就收到了。'
+  ]) for (const current of [failed, sent, live]) {
+    assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unsupported_delivery'), reply)
+  }
+  for (const reply of [
+    '你要的话，可以请求重发，是否收到要看实际发送回执。',
+    '再发一次就收到了吗？', '不能保证再发一次就能收到。', '再发一次也不一定收到。',
+    '她再发一次就收到了。', '你把图再发一次，我就收到了。',
+    '上次再发一次你就收到了。', '“再发一次就收到了”只是个例子。',
+    '你回来再问我，我再查，有结果再告诉你。'
+  ]) assert.deepEqual(validateActionReply(reply, sent, raw), [], reply)
+  assert.ok(validateActionReply('我现在重新发一次。', failed, raw).some(item=>item.code==='unsupported_delivery'))
+  assert.ok(validateActionReply('图已经发给你了。', failed, raw).some(item=>item.code==='unsupported_delivery'))
+  assert.deepEqual(validateActionReply('图已经发给你了。', sent, raw), [])
+})
+
+test('671 supported complete replies preserve cancelled callbacks and user-triggered new requests', () => {
+  const cancelled = facts([fact({source:'live_job', execution:'running', result:'unavailable', delivery:{state:'not_attempted'}, followUp:{state:'none'}})])
+  const raw = '我刚在任务页取消了完成后发送。那现在还会自动发吗？'
+  for (const reply of [
+    '那就不会自动发了，取消之后这个安排就没了。\n\n图还没出来呢，好了你再来问我一声就行。',
+    '对，取消之后就不会自动发了。我这边也没查到还生效的自动发送安排，所以做出来也不会自己弹给你～\n\n图本身还是在处理中的，你要是之后想要成品，到时候再跟我说一声就行。'
+  ]) assert.deepEqual(validateActionReply(reply, cancelled, raw), [], reply)
+  assert.deepEqual(validateActionReply('现在还没拿到结果，进度我这边确认不了。\n\n图真出来了我手上也没有凭证，你要是还想改，再跟我说一声，我重新跑一遍。', facts(), '刚才改背景的图出来了吗？'), [])
+  const failed = facts([fact({execution:'completed', result:'available', delivery:{state:'failed'}})])
+  assert.deepEqual(validateActionReply('图做好了，傍晚背景那版是有的。\n不过刚才发的时候没发出去，具体为啥没成功我这边也没查到。现在这条我也没法直接把图带上，得重新发一次才行。', failed, '刚才的图出来了吗？'), [])
+  const reminder = facts([fact({source:'reminder', toolName:'reminderTool', execution:'queued', followUp:{state:'registered', kind:'reminder', id:'exam', dueAt:4102444800000}})])
+  assert.deepEqual(validateActionReply('改背景的图我这儿没有确认记录，现在不能说它出来没有。考试提醒是登记了，但那只是提醒，不会附带发图。\n\n你要是想弄那张图，把图再发一次跟我说一声，我来处理。', reminder,
+    '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'), [])
+})

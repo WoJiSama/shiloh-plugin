@@ -81,6 +81,9 @@ test('final grounding rechecks cancellation after generation and respects explic
 })
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
+  {candidate:'这次没查到有效的后续登记，所以做好了也不会自动发。原任务进度我也还没核实到，你吃完回来问一声，我再帮你看。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'图片处理的进度和完成后自动发送的安排尚未核实。你吃完回来问一声，我再查状态。'},
+  {candidate:'图是做好了的，就是上次发送没成功。你要的话再发一次就收到了。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功；再次发送是否成功仍需实际回执确认。'},
+  {candidate:'查了下记录，目前只核验到你那条考试提醒的登记，改背景那张图没有对应的任务记录欸，所以我这边没法确认它在跑，也没有安排“好了自动发你”。\n\n你要是想改，可以再发一次图、明确说一声，我确认登记了再告诉你。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}}],corrected:'图片处理及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。'},
   {candidate:'不会自动发哦，我这边没那个功能。你吃完回来再喊我一声，我当场查，有就直接给你。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'这次完成后自动发送的安排尚未核实，不能保证会自动发。你吃完回来问一声就好。'},
   {candidate:'原任务还在跑没我不敢说死，但现在这个自动发送我这边没查到有效登记，所以好了不会自动发你。你吃完回来问我要结果，或者让我重新跑一次都行。',raw:'那我先去吃饭。好了你会自动发给我吗？',tasks:[],corrected:'图片处理的进度和完成后自动发送的安排尚未核实，不能确定。你吃完回来再问就好。'},
   {candidate:'不是没做好哦，傍晚那张已经做出来了。是发送那一步没成功，所以你没收到。原因我不确定，现在也没法替你自动补发。图还在，等能发的时候我给你发。',raw:'所以我现在没收到，是还没做好吗？',tasks:[{execution:'completed',result:'available',delivery:{state:'failed'}}],corrected:'图已经做好了，上次发送没有成功，具体原因尚未确认。'},
@@ -209,6 +212,9 @@ test('diagnostic certainty and active sniffing are corrected before sending or l
 test('diagnostic prohibitions and risk descriptions reach final history without an unnecessary repair',async()=>{
  const raw='电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'
  for(const candidate of [
+  '先别开。焦糊味说明电气损坏还没排除，现在通电试机等于拿整机冒险。保持断电，等这台机器经专业检修确认没问题放行后，才谈得上开机检测。',
+  '不行，别开机。焦糊味还没排除是哪里烧了，再通电可能让故障扩大，甚至有起火风险。让它保持断电，直接送修吧。',
+  '拔电对，先这样放着，别急着开机。\n\n焦糊味说明有异常，但具体哪里出问题、损坏到什么程度，现在没法断定。别自己拆、别凑近闻。等机器完全凉下来后，可以隔着看一眼电源外壳和出风口有没有烧痕、变形。不管有没有看到痕迹，都建议送修或找专业人员检测，确认安全之前别再通电——万一内部有损坏，带伤开机有连累其他部件的风险。\n\n现在保持断电就好。',
   '不建议自己开机测。再通电有风险，外面没有烧痕也不能证明里面没事。',
   '保持断电，送去让维修的当面检测。等检修确认排除问题了，再谈开机测试。',
   '电源、主板这些都有可能，得检查了才知道。最稳的是送维修，让师傅检测、排除电气损坏之后再考虑开机，就算之后看起来没事，也不能说明没损坏。',
@@ -225,6 +231,27 @@ test('diagnostic prohibitions and risk descriptions reach final history without 
   let repairs=0
   host.retryRequest=async()=>{repairs++;throw Error('risk descriptions and prohibitions must remain intact')}
   host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'diagnostic-original'}
+  await api.handleTextResponse(host,candidate,event,{interactionContext},messages)
+  assert.equal(repairs,0,candidate)
+  assert.deepEqual(sent,[candidate])
+  assert.equal(messages.at(-1).content,candidate)
+  assert.equal(archived[0].message[0].text,candidate)
+  assert.equal(enhanced[0][2],candidate)
+ }
+})
+test('unknown-temperature epistemic denials reach final history unchanged',async()=>{
+ const raw='CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。'
+ for(const candidate of [
+  '单看温度本身说明不了正常还是异常，得结合型号、测点和规格。',
+  '单个82℃读数还没法直接判定正常或不正常。需要先确认CPU型号和传感器。',
+  '单凭82℃这个读数判断不了正常还是异常，得结合条件看。'
+ ]){
+  const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[]
+  const interactionContext=buildTurnInteractionContext({rawUserText:raw,botId:'99',speaker:{userId:'2'}})
+  interactionContext.diagnosticContext=buildDiagnosticContext({rawUserText:raw,speakerId:'2'})
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;throw Error('epistemic negation must remain intact')}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'temperature-original'}
   await api.handleTextResponse(host,candidate,event,{interactionContext},messages)
   assert.equal(repairs,0,candidate)
   assert.deepEqual(sent,[candidate])

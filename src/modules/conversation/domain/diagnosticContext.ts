@@ -429,7 +429,7 @@ export function buildDiagnosticContextPrompt(context?: DiagnosticContext): strin
 }
 
 function deniesConclusion(clause: string): boolean {
-  return /(?:无法|不能|尚不能|不够|不足以|没法|未能|还不能)(?:仅凭|只凭|据此|直接|就|远程|确定地)?(?:判断|确认|确定|断定|说|证明|认定|保证)|(?:不能|无法).{0,12}(?:判断|确认|确定|断定|证明|认定)|不代表|不等于|并非|不是说|不意味着|不说明|未必|不一定|不是(?:已经|肯定|确定|正常)|没有(?:证据|依据).{0,8}(?:确认|说明|证明)|(?:结论|判断).{0,6}(?:不能下|下不了|尚早)/u.test(clause)
+  return /(?:无法|不能|尚不能|不够|不足以|没法|未能|还不能)(?:仅凭|只凭|据此|直接|就|远程|确定地)?(?:判断|判定|确认|确定|断定|说|证明|认定|保证)|(?:不能|无法).{0,12}(?:判断|判定|确认|确定|断定|证明|认定)|(?:判断|判定|确认|确定|断定|说明|证明|认定|保证)(?:不了|不出)|不代表|不等于|并非|不是说|不意味着|不说明|未必|不一定|不是(?:已经|肯定|确定|正常)|没有(?:证据|依据).{0,8}(?:确认|说明|证明)|(?:结论|判断).{0,6}(?:不能下|下不了|尚早)/u.test(clause)
 }
 
 function offersPossibility(clause: string): boolean {
@@ -489,6 +489,15 @@ function supportedDamage(proposition: DamageProposition, findings: DamageFinding
 function isDamageDiscussion(clause: string, proposition: DamageProposition, professionalReference = false, carriedCondition = false): boolean {
   const prefix = proposition.text
   const suffix = clause.slice(prefix.length)
+  // A concrete damage premise is hypothetical only in its own proposition.
+  // It does not excuse a later diagnosis, temperature assurance or instruction.
+  const hypothesis = HYPOTHETICAL.exec(prefix)
+  if (hypothesis) {
+    const premise = prefix.slice(hypothesis.index + hypothesis[0].length)
+    const previousDamage = [...premise.matchAll(DAMAGE_TERMS)].at(-2)
+    const independentConclusion = previousDamage && /就|便|则|而/u.test(premise.slice(previousDamage.index + previousDamage[0].length))
+    if (!independentConclusion && !/那么|那就|则|所以|说明|证明|可见|(?:就|便)(?:能|可|可以|能够)?(?:确认|确定|断定|判断|判定|认定)/u.test(premise)) return true
+  }
   if (/(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|烧损|损坏|受损|短路|过热|击穿)$/u.test(prefix)) return true
   const inspectionTarget = /(?:排除|排查|检查|确认|判断|检测)(?:(?!已经|肯定|确定|大概率|很可能|多半|说明|证明|之后|以后|烧坏|烧毁|烧损|损坏|受损|短路|过热|击穿).){0,24}(?:烧坏|烧毁|烧损|损坏|受损|短路|过热|击穿)$/u.test(prefix)
   if (inspectionTarget && /^\s*(?:之前|以前|前)/u.test(suffix)) return true
@@ -513,7 +522,7 @@ function temperatureAssurance(clause: string): boolean {
   if (/(?:正常|安全)(?:运行|工作|使用)/u.test(clause)) return false
   const conclusion = /(?:正常(?:范围|区间)?|不算高|不高|没问题|没事|安全|不(?:算|是)危险(?:信号)?|没有(?:明显)?风险)|放心(?:用|使用|运行)/u
   if (!conclusion.test(clause)) return false
-  return /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)|(?:就|很|挺|算|是|属于|在|落在|基本|完全|非常).{0,8}(?:正常|不高|没问题|没事|安全)|放心(?:用|使用|运行)|^\s*(?:正常|不算高|不高|没问题|没事|安全)/iu.test(clause)
+  return /温度|读数|\d{1,3}\s*(?:℃|°\s*C|度)|(?:就|很|挺|算|是|属于|在|落在|基本|完全|非常).{0,8}(?:正常|不高|没问题|没事|安全)|放心(?:用|使用|运行)|^\s*(?:正常|不算高|不高|没问题|没事|安全|不(?:算|是)危险(?:信号)?|没有(?:明显)?风险)/iu.test(clause)
 }
 
 type ThermalComponent = 'cpu' | 'gpu'
@@ -593,7 +602,7 @@ function replyAssertions(text: string): string[] {
       else {assertions.push(current); current = next}
     }
     assertions.push(current)
-    return assertions.flatMap(assertion => assertion.split(/(?=但是|不过|然而|可是|但(?!凡)|却)/u))
+    return assertions.flatMap(assertion => assertion.split(/(?=但是|不过|然而|可是|但(?!凡)|却|而(?!且|已|是|非))/u))
   }).filter(clause => clause.trim())
 }
 
@@ -625,7 +634,7 @@ function advisesUnclearedOperation(clause: string, carriedCondition = false, pro
     // Bare "directly/again power on" can name the risky event. Imperative or
     // permission predicates still advise it even when followed by a warning.
     const directInstruction = /(?:可以|能够|能|建议|先|试着|不妨|然后|接着|请)(?:再次|再一次|再|重新|直接|立即|自行|自己|擅自|贸然|去|就|尝试|试着|继续)*\s*$/u.test(prefix)
-    const riskPredicate = /^(?:的)?(?:就|也|同样|仍然|还是)?(?:有.{0,18}风险|存在.{0,12}风险|风险(?:(?:很|较|太|更)?(?:大|高|真实存在|存在)|(?:就|也|还|主要)?(?:是|包括|在于|指的是))|(?:很|比较|十分|非常|更)?危险|(?:会|可能|有可能|一旦|万一).{0,22}(?:短路|损坏|受损|烧|过热|击穿|起火|危险|风险)|(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)(?:(?:或(?:者)?|和|及|甚至)(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)){0,3}的?风险)/u.test(operationTail)
+    const riskPredicate = /^(?:的)?(?:瞬间|之后|以后|时|后)?(?:就|也|同样|仍然|还是)?(?:有.{0,18}风险|存在.{0,12}风险|风险(?:(?:很|较|太|更)?(?:大|高|真实存在|存在)|(?:就|也|还|主要)?(?:是|包括|在于|指的是))|(?:很|比较|十分|非常|更)?危险|(?:等于|无异于).{0,16}冒险|(?:会|可能|有可能|一旦|万一).{0,22}(?:短路|损坏|损伤|受损|烧|过热|击穿|起火|危险|风险|(?:故障|问题)(?:扩大|加重)|(?:扩大|加重)(?:故障|问题))|(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)(?:(?:或(?:者)?|和|及|甚至)(?:短路|(?:扩大|加重)?(?:损坏|损伤)|受损|烧毁|击穿)){0,3}的?风险)/u.test(operationTail)
       || (/^[，,]\s*$/u.test(operationTail) && /^\s*风险(?:就|也|还|主要)?(?:是|包括|在于|指的是)/u.test(nextClause))
     if (!directInstruction && riskPredicate) continue
     // "Can start briefly" in a denial of its diagnostic value is a capability
@@ -768,7 +777,7 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
       const localization: DamageProposition = {text: clause, negated: false, kind: 'damaged', components: componentsIn(clause)}
       if (!supportedDamage(localization, assessment.damage.findings)) add('unsupported_damage_diagnosis', clause.trim(), '症状不能给具体故障部件排出高概率，当前也没有该部件的已报告专业结论。', '将部件保留为待检查的可能来源，不给出没有证据支持的高概率排序。')
     }
-    if (!conclusionDenied && !possible && !conditional && /绝对安全|保证.{0,4}安全|肯定(?:没事|没有问题|没问题)|百分之百(?:正常|安全)|整机.{0,6}(?:完全正常|没有任何问题|绝对没事)/u.test(clause)) {
+    if (!conclusionDenied && !possible && /绝对安全|保证.{0,4}安全|肯定(?:没事|没有问题|没问题)|百分之百(?:正常|安全)|整机.{0,6}(?:完全正常|没有任何问题|绝对没事)/u.test(clause)) {
       add('unsupported_safety_certification', clause.trim(), '远程用户陈述和局部检查都不支持整机安全保证。', '按报告说明能确认的范围，说明检查前提与停止条件，不给整机安全保证。')
     }
     const thermalClaim = thermalConclusion(clause)

@@ -1402,3 +1402,79 @@ test('professional conditions preserve noncontact monitoring while active smell 
     '既然已报告检修放行，可以受控开机并非接触观察状态。'
   ]) assert.deepEqual(validateDiagnosticReply(normal, cleared), [], normal)
 })
+
+test('epistemic predicate negation does not become a temperature assurance or exempt the next assertion', () => {
+  const context = buildDiagnosticContext({rawUserText: 'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。', speakerId})!
+  for (const normal of [
+    '单看温度本身说明不了正常还是异常。',
+    '单个82℃读数还没法直接判定正常或不正常。',
+    '单凭82℃这个读数判断不了正常还是异常，得结合条件看。',
+    '仅凭这个温度确认不出是否安全。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  for (const unsupported of [
+    '单看温度本身说明不了正常还是异常，但82℃不算危险信号。',
+    '单个82℃读数还没法直接判定正常或不正常。82℃肯定安全。',
+    '判断不了整机是否健康，82℃本身挺正常的。',
+    '单看温度本身说明不了正常还是异常而82℃肯定正常。',
+    '82℃落在中间，不算危险信号。'
+  ]) assert.ok(validateDiagnosticReply(unsupported, context).some(item => item.code === 'unsupported_temperature_assurance'), unsupported)
+  assert.ok(validateDiagnosticReply('82℃这个读数判定不了正常还是异常而这台整机绝对安全。', context).some(item => item.code === 'unsupported_safety_certification'))
+})
+
+test('hypothetical local damage premises stay distinct from a neighboring present diagnosis', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const normal of [
+    '万一内部有损坏，带伤开机有连累其他部件的风险。',
+    '如果内部元件已经损坏，重新通电可能扩大损伤。',
+    '假如电容受损，需要让维修人员现场确认。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  for (const unsupported of [
+    '万一内部有损坏，但这台电容已经烧毁。',
+    '如果内部有损坏。这台电源已经烧了。',
+    '电源内部很可能有元件烧损。',
+    '如果内部有损坏就能确认这台电源已经烧毁。',
+    '万一内部有损坏就意味着这台电容已经烧毁。',
+    '假如内部有损坏而这台电源肯定已经烧坏。'
+  ]) assert.ok(validateDiagnosticReply(unsupported, context).some(item => item.code === 'unsupported_damage_diagnosis'), unsupported)
+})
+
+test('temporal event and risk equivalence predicates do not authorize operation', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const normal of [
+    '通电瞬间可能短路扩大。',
+    '再通电可能让故障扩大，甚至有起火风险。',
+    '现在通电试机等于拿整机冒险。',
+    '重新开机无异于拿整机冒险。',
+    '重新开机以后可能扩大问题。',
+    '上电后可能加重损坏。'
+  ]) assert.deepEqual(validateDiagnosticReply(normal, context), [], normal)
+  for (const unsupported of [
+    '先通电瞬间可能短路扩大。',
+    '可以再通电可能让故障扩大。',
+    '现在先通电试机等于拿整机冒险。',
+    '请重新开机无异于拿整机冒险。',
+    '可以重新开机以后可能扩大问题。',
+    '可以上电后可能加重损坏。',
+    '再通电可能让故障扩大，你现在先开机。'
+  ]) assert.ok(validateDiagnosticReply(unsupported, context).some(item => item.code === 'unmet_operational_prerequisite'), unsupported)
+})
+
+test('67157cf full repaired warnings retain their local uncertainty and operation scope', () => {
+  const context = buildDiagnosticContext({rawUserText: '那我能先开机试一下吗？', speakerId, history: [{role: 'user', userId: speakerId, text: '电脑电源那里有焦糊味，已经拔电了。别开玩笑，能怎么办？'}]})!
+  for (const reply of [
+    '拔电对，先这样放着，别急着开机。\n\n焦糊味说明有异常，但具体哪里出问题、损坏到什么程度，现在没法断定。别自己拆、别凑近闻。等机器完全凉下来后，可以隔着看一眼电源外壳和出风口有没有烧痕、变形。不管有没有看到痕迹，都建议送修或找专业人员检测，确认安全之前别再通电——万一内部有损坏，带伤开机有连累其他部件的风险。\n\n现在保持断电就好。',
+    '先别开。焦糊味说明电气损坏还没排除，现在通电试机等于拿整机冒险。保持断电，等这台机器经专业检修确认没问题放行后，才谈得上开机检测。',
+    '不行，别开机。焦糊味还没排除是哪里烧了，再通电可能让故障扩大，甚至有起火风险。让它保持断电，直接送修吧。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+  const original = '不建议自己点亮。外面没烧痕、味道散了只说明看不到痕迹，冒烟那一下的电气损坏还是没排除——里面真有损伤的话，通电瞬间可能短路扩大。\n\n按之前说的：保持断电，侧板开了只看不动手，然后拿去维修检测，检测过了再开机。真想早点确认，也是让维修那边在检测台上点亮，不是在家自己试。'
+  assert.deepEqual(validateDiagnosticReply(original, context).map(({code, claim}) => ({code, claim})), [
+    {code: 'unmet_operational_prerequisite', claim: '检测过了再开机。'}
+  ], 'a warning is preserved while detection alone still does not establish clearance')
+})
+
+test('future professional clearance cannot become an absolute whole-machine guarantee', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  assert.ok(validateDiagnosticReply('等专业检修确认没问题并放行之后，整机绝对安全。', context).some(item => item.code === 'unsupported_safety_certification'))
+  assert.ok(validateDiagnosticReply('等专业检修确认没问题并放行之后整机绝对安全。', context).some(item => item.code === 'unsupported_safety_certification'))
+  assert.deepEqual(validateDiagnosticReply('等专业检修确认没问题并放行之后再开机，这不代表整机绝对安全。', context), [])
+})
