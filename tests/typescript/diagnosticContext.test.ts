@@ -4,6 +4,23 @@ import {buildDiagnosticContext, buildDiagnosticContextPrompt, buildDiagnosticFal
 import type {DiagnosticHistoryMessage} from '../../src/modules/conversation/domain/diagnosticContext.js'
 import type {TurnEvidence} from '../../src/contracts/turnInteraction.js'
 
+test('8529c94 operating temperature is a reading assessment rather than an observation of operation', () => {
+  const context = buildDiagnosticContext({rawUserText:'CPU满载82℃，没有焦糊味，也没有冒烟，一直正常运行。我只想了解这个温度该怎么判断。',speakerId:'202'})!
+  for (const reply of [
+    '82℃对这颗U就是正常工作温度。',
+    '这个读数属于正常运行温度。',
+    '频率没有下降，82℃对这颗U就是正常工作温度。',
+    '如果型号官方的温度规格允许这个读数，可以继续核对。但82℃就是正常工作温度。'
+  ]) assert.ok(validateDiagnosticReply(reply,context).some(item=>item.code==='unsupported_temperature_assurance'),reply)
+  for (const reply of [
+    '机器一直正常工作，但这不能证明82℃正常。',
+    '一直正常运行不等于这个温度正常。',
+    '82℃可能是正常工作温度，还得看具体型号和测点。',
+    '如果该型号官方的温度规格允许这个读数，才可将它视为正常工作温度。',
+    '正常工作温度要看型号和测点，目前还不能确认。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply,context),[],reply)
+})
+
 const speakerId = '202'
 const incident: DiagnosticHistoryMessage = {role: 'user', userId: speakerId, text: '我的电脑满载92℃，闻到焦糊味，还冒烟了。', messageId: 'incident-1'}
 const history = [incident]

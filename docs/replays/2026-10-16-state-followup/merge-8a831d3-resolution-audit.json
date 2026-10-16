@@ -1,0 +1,79 @@
+[
+  {
+    "file": "docs/ai-state-followup-2026-10-16.md",
+    "strategy": "ours-latest",
+    "ours": "adf1bcb0281b8a1f35687a3d7cf0ecc60789a46175ab16fddc4f7b9fa63d2f67",
+    "theirs": "c0de65629b1be2cc8dd114f8aedcf801b5a68b75b085fd9c527280538373bc8d",
+    "resolved": "adf1bcb0281b8a1f35687a3d7cf0ecc60789a46175ab16fddc4f7b9fa63d2f67"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/blind-conversations.json",
+    "strategy": "ours-latest",
+    "ours": "9f7dc147e8933f3779aca246e798d4e2f7152d0c3b740398fcf97f074e8691f7",
+    "theirs": "04f2ef5608e26c01d473f3a9867fcac90a66db1e5b758db8293e8de7f3f26dbc",
+    "resolved": "9f7dc147e8933f3779aca246e798d4e2f7152d0c3b740398fcf97f074e8691f7"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/blind-revealed.json",
+    "strategy": "ours-latest",
+    "ours": "5364dfa43272490ab7c31d13dcfe78b36549bcc83ae5fecb3f0cc8a1e9b695e5",
+    "theirs": "26f70406635d56f84885c855db41177871e2e4d0fe34027ec0c2538a88a1595f",
+    "resolved": "5364dfa43272490ab7c31d13dcfe78b36549bcc83ae5fecb3f0cc8a1e9b695e5"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/blind-review.json",
+    "strategy": "ours-latest",
+    "ours": "34d0fca45027fe4f5bcfac5a70ae6749b35fe877064fe780eb991382161c6a73",
+    "theirs": "f62e59a6150b44f99a538a3925f0fc506149d63e2e31a352656262019f913152",
+    "resolved": "34d0fca45027fe4f5bcfac5a70ae6749b35fe877064fe780eb991382161c6a73"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/candidate.json",
+    "strategy": "ours-latest",
+    "ours": "3b3c8d0ed9df311fece0e44bf8382f49308557bf206b3edff301518c6b07d346",
+    "theirs": "1cf541ac4c5ddbd7ef13054e21fc5ad231a12815a5507ee6a2cefc688fcc2b60",
+    "resolved": "3b3c8d0ed9df311fece0e44bf8382f49308557bf206b3edff301518c6b07d346"
+  },
+  {
+    "file": "docs/replays/2026-10-16-state-followup/summary.json",
+    "strategy": "ours-latest",
+    "ours": "ded3dda39e25e7195e18b7ef8587ca34b6f7ad83b6de3ae87ce44d21e0f10307",
+    "theirs": "12a06ad2013dd116fd3c7172e9c0cb60b91ff7853392c42653e7bb7f03221f7c",
+    "resolved": "ded3dda39e25e7195e18b7ef8587ca34b6f7ad83b6de3ae87ce44d21e0f10307"
+  },
+  {
+    "file": "findings.md",
+    "strategy": "theirs-prefix-ours-task-section",
+    "ours": "9055a9268a996f8156070faf6712382f744026b0e26abba7f80659baea0e182d",
+    "theirs": "7f05072ab8805de711a97f7501fe6dc12734aff5d07f69519d414c58edac5d5e",
+    "resolved": "9055a9268a996f8156070faf6712382f744026b0e26abba7f80659baea0e182d"
+  },
+  {
+    "file": "progress.md",
+    "strategy": "theirs-prefix-ours-task-section",
+    "ours": "adde610a717d76ab2e2970b95c8d8f5bcd683fdf797e334e63aba319d900581b",
+    "theirs": "4ffa33b2784722c74dc9d73e83bfe616c0ec580d1bbb823bc92cf42f9e310d42",
+    "resolved": "adde610a717d76ab2e2970b95c8d8f5bcd683fdf797e334e63aba319d900581b"
+  },
+  {
+    "file": "src/modules/conversation/domain/actionReplyGrounding.ts",
+    "strategy": "ours-latest",
+    "ours": "34906a185e2f0b448f8c08ae35e1d5f76823550cff74301d5bdac231b85c3a76",
+    "theirs": "c5d94f3897b07b4af7df30c0c7d424584ee7c6e403f1ce1c975aa8e247c7c1e6",
+    "resolved": "34906a185e2f0b448f8c08ae35e1d5f76823550cff74301d5bdac231b85c3a76"
+  },
+  {
+    "file": "task_plan.md",
+    "strategy": "theirs-prefix-ours-task-section",
+    "ours": "1adfc2d68a465d075a0c46fe08cd692e287fc279c1f40d9321848ac003fd72b8",
+    "theirs": "a0949a31f13a4cd2e20f7e5eeb87643bbf5b545fdda33a5b14e05ba06e583eb7",
+    "resolved": "1adfc2d68a465d075a0c46fe08cd692e287fc279c1f40d9321848ac003fd72b8"
+  },
+  {
+    "file": "tests/typescript/actionReplyGrounding.test.ts",
+    "strategy": "ours-latest",
+    "ours": "1d06ecf6cc312649ccc85ccd5bfe57acd9975af6e8ff90ecede8ebcdfb849fb0",
+    "theirs": "ec215f34a24da3b0da43f14d5252c7bcd84fea4efb699609ae71d8e4232fd325",
+    "resolved": "1d06ecf6cc312649ccc85ccd5bfe57acd9975af6e8ff90ecede8ebcdfb849fb0"
+  }
+]

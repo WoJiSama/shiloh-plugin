@@ -170,6 +170,7 @@ const DELIVERY_ASPECT_SUBJECT = '(?:发送|投递)(?:(?:这|那)边)?'
 const IMAGE_REFERENCE = '(?:第[一二三四五六七八九十0-9]+张|这张|那张)'
 const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景(?:的)?${IMAGE_REFERENCE}(?:图(?:片)?)?$`, 'u')
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
+const SENDABLE_ARTIFACT = new RegExp(`^(?:能(?:够)?|可以|可)(?:直接)?(?:发(?:送)?|投递)(?:给(?:你|您)|到(?:群里|这里|私聊))?的(${ARTIFACT_SUBJECT})$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次|件)?|的)?(?:任务|请求|事)(?:本身)?(?:的)?$/u
 const QUALIFIED_TASK_REFERENCE = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图)(?:的)?(?:这|那)(?:个|次|件)$/u
@@ -190,6 +191,13 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
     .replace(new RegExp(`(?:在${SELF_LOCATION}|${SELF_LOCATION})(?:的)?$`, 'u'), '')
   subject = subject.replace(/^(?:我(?:这边|这里|这儿)?|这边|这里|这儿)(?:的)?(?=(?:这|那|第|任务|请求|图|文件|结果|成品|视频|报告))/u, '')
   if (OTHER_SUBJECT.test(subject) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(subject)) return undefined
+  const sendable = SENDABLE_ARTIFACT.exec(subject)
+  if (sendable) {
+    // In “没有能发的成品”, sendability modifies the possessed artifact;
+    // it does not turn its asserted absence into a local tool limitation.
+    const artifact = taskObjectReference(sendable[1]!, context, rawTopic)
+    return artifact?.kind === 'artifact' ? {...artifact, surface:rawSubject} : undefined
+  }
   const deicticFollowUp = DEICTIC_FOLLOW_UP.exec(subject)
   if (deicticFollowUp) {
     const prefix = deicticFollowUp[1]!.replace(/的$/u, '')
@@ -301,7 +309,7 @@ function automaticDenialObject(clause: string, topic: EvidenceTopic): TaskObject
     const object = taskObjectReference(clause.slice(0, inability.index), true, topic)
     if (object?.kind === 'follow_up') return {...object, surface:clause}
   }
-  const denied = new RegExp(`(?:也|就|仍然|还)*不会(?:再)?(.*?)(?:自动|主动)(?:发(?:送|图)?(?:给(?:你|您)|(?:你|您)|出(?:来|去)?|到(?:群里|这里|私聊))?|投递(?:给(?:你|您))?|(?:通知|提醒)(?:你|您)?)(?:了)?${PARTICLES}$`, 'u').exec(clause)
+  const denied = new RegExp(`(?:也|就|仍然|还)*不会(?:再)?(.*?)(?:自动|主动)(?:(?:发(?:送)?|投递)(${ARTIFACT_SUBJECT})?(?:给(?:你|您)|(?:你|您)|出(?:来|去)?|到(?:群里|这里|私聊))?|(?:通知|提醒)(?:你|您)?)(?:了|的)?${PARTICLES}$`, 'u').exec(clause)
   if (!denied) return undefined
   // Negation may precede the complete condition (“不会好了自动发你”).
   // Reuse the same object/condition boundary as “好了不会自动发你”.
@@ -316,7 +324,9 @@ function automaticDenialObject(clause: string, topic: EvidenceTopic): TaskObject
     if (/(?:还没(?:有)?|没有|尚未|暂未|未|没)$/u.test(prefix)) return undefined
     prefix = prefix.replace(/^(?:就算|即使|即便|哪怕|纵使|如果|要是|假如|一旦|等(?:到)?|待)/u, '')
   }
-  const object = taskObjectReference(prefix, true, topic)
+  const subject = taskObjectReference(prefix, true, topic)
+  const sentArtifact = denied[2] && taskObjectReference(denied[2], false, topic)
+  const object = subject?.kind === 'implicit' && sentArtifact ? sentArtifact : subject
   return object ? {...object, kind:'follow_up', surface:clause} : undefined
 }
 const BARE_ABSENT_ANSWER = new RegExp(`^还没(?:有)?${PARTICLES}$`, 'u')
@@ -331,8 +341,10 @@ const SPOKEN_UPDATE = /^(?:(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:�
 const SPEECH_DELAY = /等(?:我)?(?:确认|核实|查清|弄清|查到)|(?:确认|核实|查清|弄清|查到).{0,12}(?:之后|以后|后)|稍后|待会|过会|明早|明天|到时候|到时|届时|之后|自动|主动/u
 // An omitted recipient still leaves a self-owned send. Require the complete
 // predicate boundary so “发言/发誓/发呆” cannot become delivery actions.
-const ASYNC_ACTION = /回(?:复)?(?:你|您)(?:的?消息|一声|一下)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))|(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出来|出去)|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补(?:上|(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))))|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)|我(?:这边)?(?:会|就|再|来|直接|第一时间|自动|主动)*发(?:送)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,]|$))/gu
+const ATTEMPTED_DELIVERY = new RegExp(`(?:再|重新)?(?:试(?:着)?|尝试)(?:再|重新)?(?:发(?:送)?|投递)(?:${ARTIFACT_SUBJECT})?(?:给(?:你|您)|(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))?(?:一(?:次|遍|下))?(?=${PARTICLES}(?:[，,：:]|$))`, 'u')
+const ASYNC_ACTION = new RegExp(`${ATTEMPTED_DELIVERY.source}|${/回(?:复)?(?:你|您)(?:的?消息|一声|一下)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))|(?:跟|和|对|向)(?:你|您)(?:说明|说|讲)(?:一声|一下|清楚)?|告知(?:你|您)|发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊)|出来|出去)|(?:重|再|重新)发(?:送)?(?:一(?:次|遍|下))?|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补(?:上|(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,：:]|$))))|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度|(?:单独)?给(?:你|您)(?=[呀啊啦咯喽欸呢哦哈吧～~]*$)|我(?:这边)?(?:会|就|再|来|直接|第一时间|自动|主动)*发(?:送)?(?=[呀啊啦咯喽欸呢哦哈吧～~]*(?:[，,]|$))/u.source}`, 'gu')
 const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:实际(?:的)?|真正(?:的)?)?(?:产出|成品)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
+const MESSAGE_OUTCOME = /(?:有(?:了)?消息(?:了)?|消息(?:一来|一到|来了|到了))(?:之后|以后|后)?(?=我|就|再|会|直接|第一时间|通知|提醒|告诉|[，,]|$)/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
 const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持续|定时|自动|继续)(?:查|查询|检查)/u
@@ -354,8 +366,12 @@ interface OutputCondition {start: number; end: number; subject: 'self' | 'user' 
 /** Consume the verb and its complete output object together. Confirmation of
  * an actual artifact is not an unspecified investigation; a person obtaining
  * their own result also cannot become the assistant's background action. */
-function outputConditions(text: string): OutputCondition[] {
-  return [...text.matchAll(ACQUIRED_OUTPUT)].flatMap(match => {
+function outputConditions(text: string, includeMessages = false): OutputCondition[] {
+  // Bare news is a task follow-up only inside task context. A user's ordinary
+  // conversation about messages must not acquire an artifact callback scope.
+  const conditions = [...text.matchAll(ACQUIRED_OUTPUT), ...(includeMessages ? text.matchAll(MESSAGE_OUTCOME) : [])]
+    .sort((a, b) => a.index! - b.index!)
+  return conditions.flatMap(match => {
     const prefix = (text.slice(0, match.index).split(/[，,]/u).at(-1) || '').replace(SUBJECT_CONNECTOR, '')
     if (pastAction(prefix)) return []
     const agent = /(?:等(?:到)?|待|一旦|如果|要是)([^，,]*)$/u.exec(prefix)?.[1] || prefix
@@ -428,9 +444,9 @@ function userRequestedAction(text: string, before: string, actionEnd: number, co
   if (verification && verification.index! + verification[0].length === completion
     && /^[，,](?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?了?$/u.test(verification[0])
     && ON_DEMAND_LOOKUP.test(response)) return true
-  const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(ELLIPTICAL_RESULT), ...before.matchAll(ACQUIRED_OUTPUT)]
+  const condition = [...before.matchAll(COMPLETION_TRIGGER), ...before.matchAll(MESSAGE_OUTCOME), ...before.matchAll(ELLIPTICAL_RESULT), ...before.matchAll(ACQUIRED_OUTPUT)]
     .sort((a, b) => a.index! - b.index!).at(-1)
-  return Boolean(condition && (/^(?:有(?:了)?结果|有(?:了)?)$/u.test(condition[0])
+  return Boolean(condition && (/^(?:有(?:了)?(?:结果|消息)(?:了)?|有(?:了)?)$/u.test(condition[0])
     || new RegExp(`^(?:${ACQUIRED_OUTPUT.source})$`, 'u').test(condition[0])) && ON_DEMAND_LOOKUP.test(response))
 }
 
@@ -449,7 +465,7 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const actionPrefix = sentence.text.slice(clauseStart, match.index)
     // Bare consent followed by our own present action is not reported speech
     // (“你说一声我现在发你”). Keep actual quotations and later requests intact.
-    const selfActionPrefix = actionPrefix.replace(/^(?:你|您)(?:(?:要|需要|想要)(?:的话)?|说一声(?:的话)?)(?=我(?:这边)?(?:现在|这就|马上|立刻|立即|先|就|再|来))/u, '')
+    const selfActionPrefix = actionPrefix.replace(/^(?:(?:你|您)(?:(?:要|需要|想要)(?:的话)?|说一声(?:的话)?)|(?:要|需要|想要)的话)(?=我(?:这边)?(?:现在|这就|马上|立刻|立即|先|就|再|来))/u, '')
     const assertionClause = selfActionPrefix + clause.slice(actionPrefix.length)
     const lastClause = local?.end === sentence.text.length
     if (unasserted(assertionClause, sentence.question && lastClause) || NEGATED_ACTION.test(actionPrefix + match[0])
@@ -457,7 +473,8 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
       || OTHER_SUBJECT.test(actionPrefix) && !/我(?:会|来|再|就|到时|稍后)/u.test(actionPrefix)
       || /(?:他|她|别人)(?:会|来|再|到时)/u.test(actionPrefix)) continue
     const implicitResult = taskContext ? [...before.matchAll(ELLIPTICAL_RESULT)].at(-1) : undefined
-    const completion = Math.max(completionBefore(before), implicitResult ? implicitResult.index! + implicitResult[0].length : -1)
+    const outputCondition = outputConditions(before, taskContext).at(-1)
+    const completion = Math.max(completionBefore(before), outputCondition?.end ?? -1, implicitResult ? implicitResult.index! + implicitResult[0].length : -1)
     const verification = [...before.matchAll(DEFERRED_VERIFICATION)].at(-1)
     const verificationEnd = verification ? verification.index! + verification[0].length : -1
     const deliveryCondition = [...before.matchAll(DEFERRED_DELIVERY_CONDITION)].at(-1)
@@ -467,7 +484,6 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const resolution = [...before.matchAll(DEFERRED_RESOLUTION)].at(-1)
     const resolutionEnd = resolution ? resolution.index! + resolution[0].length : -1
     const conditionEnd = Math.max(completion, verificationEnd, deliveryConditionEnd, capabilityEnd, resolutionEnd)
-    const outputCondition = outputConditions(before).at(-1)
     if (outputCondition && outputCondition.subject !== 'self' && outputCondition.end === completion
       && !/^(?:我(?:这边)?|这边)/u.test(selfActionPrefix)) continue
     // A bare handoff after completion still promises later delivery. Ordinary

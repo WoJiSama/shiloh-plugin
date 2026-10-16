@@ -1948,3 +1948,145 @@ test('916bb76 local tool limits, ordinary follow-up wording and later user reque
   ]) assert.deepEqual(validateActionReply(reply,quotedFollowUpReplayFacts(),quotedFollowUpRaw),[],reply)
   assert.deepEqual(validateActionReply('这种跟进没有。',facts(),'这个销售话题需要继续吗？'),[])
 })
+
+const messageOutcomeReminderFacts = (conversationId: string, observedAt: number): TurnActionFacts => composedReplayFacts(conversationId,observedAt,[{...quotedFollowUpReminder(),observedAt}])
+const messageOutcomeReplays: {index:number; input:string; output:string; facts:TurnActionFacts; code:string}[] = [
+  {index:0,input:'刚才改背景的图出来了吗？',
+    output:'这个我这边还没确认到结果，图有没有出来不好说。我再看看，有消息就告诉你。',
+    facts:composedReplayFacts('group:900001',1792163362822),code:'unregistered_followup'},
+  {index:9,input:'所以我现在没收到，是还没做好吗？',
+    output:'做好了，之前那次是发送失败，不是没做完。你没收到就是这个原因。想要的话我现在再试发一次。',
+    facts:composedReplayFacts('group:900005',1792163398905,[{
+      taskId:'synthetic-task-001',requestMessageId:'synthetic-request-001',toolName:'imageEdit',source:'task_record',
+      execution:'completed',result:'available',delivery:{state:'failed'},followUp:{state:'none'},observedAt:1792163398905
+    }]),code:'unsupported_delivery'},
+  {index:58,input:quotedFollowUpRaw,
+    output:'没有查到改背景那单的记录，可能当时没登记上。你登记的只有考试提醒那个。\n\n图不会自动发的。要弄的话现在再发一次图，我看看这次能不能处理。',
+    facts:messageOutcomeReminderFacts('group:900027',1792163610828),code:'unsupported_task_state'},
+  {index:59,input:quotedFollowUpRaw,
+    output:'图这边我没查到对应的处理记录，所以现在没有能发的成品，也说不好它会不会自己好。\n\n你登记的只有考试提醒，那个不会带着发图。想要的话，把改背景这事再正式跟我说一声，我看看能不能重新跑一次。',
+    facts:messageOutcomeReminderFacts('group:900028',1792163613926),code:'unsupported_task_state'}
+]
+for (const replay of messageOutcomeReplays) test(`8529 complete replay ${replay.index} retains its unsupported message, artifact or send proposition`, () => {
+  assert.ok(validateActionReply(replay.output,replay.facts,replay.input).some(item=>item.code===replay.code))
+})
+
+test('8529 a task message arriving is a later condition that needs the matching completion callback', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  for (const reply of [
+    '我再看看，有消息就告诉你。','有了消息再告诉你。','有消息了我就通知你。',
+    '消息一到就告诉你。','等消息来了，我再通知你。','等消息到了，我就告诉你。'
+  ]) {
+    for (const current of [facts(),quotedFollowUpReplayFacts(),capabilityReplayFacts(1792163398905)]) {
+      assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unregistered_followup'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,live,raw),[],reply)
+  }
+})
+
+test('8529 a user-requested lookup can own its message but not a newer arrival condition', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  for (const reply of [
+    '你回来再问我，我再查，有消息就告诉你。',
+    '你再发一句要图，我当场查状态，有了消息再告诉你。',
+    '等消息到了，你回来再问我，我再告诉你。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  for (const reply of [
+    '你回来再问我，消息一到我就告诉你。',
+    '你回来再问我，我再查，等消息来了我再告诉你。'
+  ]) assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unregistered_followup'),reply)
+})
+
+test('8529 task-message conditions preserve nonassertions, other speakers and non-task conversation', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  for (const reply of [
+    '不能承诺有消息就告诉你。','有消息也不代表我会告诉你。','有消息就告诉你吗？',
+    '“有消息就告诉你”只是个例子。','她有消息就告诉你。','等她有消息，再告诉你。',
+    '等她消息到了，再告诉你。','消息一到，她就告诉你。','她说有消息就告诉你。',
+    '我现在告诉你一个解释：消息记录还没核实。','我这边有消息记录，但还没核实结果。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+  assert.deepEqual(validateActionReply('有消息就告诉你。',facts(),'今晚聚会有什么安排？'),[])
+})
+
+test('8529 a preposed sendability modifier still denotes the artifact in a possession assertion', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const unavailable = facts([fact({result:'unavailable'})])
+  const available = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  for (const reply of [
+    '现在没有能发的成品。','没有可以发送的结果。','我这边没有可发送的图片。',
+    '没有能直接发送给你的图片。','没有能发的成品，具体进度还未核实。'
+  ]) {
+    for (const current of [facts(),quotedFollowUpReplayFacts(),facts([fact({result:'unknown'})]),available]) {
+      assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,unavailable,raw),[],reply)
+  }
+  assert.deepEqual(validateActionReply('我这边有能发的成品。',available,raw),[])
+  assert.ok(validateActionReply('我这边有能发的成品。',unavailable,raw).some(item=>item.code==='unsupported_task_state'))
+  const file = fact({taskId:'file-task',toolName:'reportTool',result:'unavailable'})
+  assert.deepEqual(validateActionReply('没有能直接投递的文件。',facts([file,available.tasks[0]!]),raw),[])
+  assert.ok(validateActionReply('没有能发的图片。',facts([file]),raw).some(item=>item.code==='unsupported_task_state'))
+})
+
+test('8529 sendable artifact nominals preserve uncertain evidence, other subjects and current tool limits', () => {
+  for (const reply of [
+    '现在有没有能发的成品还未核实。','不能确认现在没有能发的成品。','现在可能没有能发的成品。',
+    '没有能发的成品吗？','“现在没有能发的成品”只是个例子。','她没有能发的成品。',
+    '图里的人没有能发的成品。','这轮我没有能发图的工具。','这轮没有能直接发送的工具。',
+    '现在没法直接发送成品。','我没有能发的邀请。','你回来问我，我再查有没有能发的成品。'
+  ]) assert.deepEqual(validateActionReply(reply,quotedFollowUpReplayFacts(),quotedFollowUpRaw),[],reply)
+})
+
+test('8529 an automatic-send denial keeps its artifact before or after the send predicate', () => {
+  const none = facts([fact({source:'live_job',execution:'running',followUp:{state:'none'}}),quotedFollowUpReminder()])
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}}),quotedFollowUpReminder({state:'none'})])
+  const reminderNone = facts([quotedFollowUpReminder({state:'none'})])
+  for (const reply of [
+    '图不会自动发的。','图片不会自动发送的。','图不会自动发。',
+    '不会自动发图的。','不会主动发送图片的。',
+    '考试提醒已登记好了。图不会自动发的。'
+  ]) {
+    for (const current of [facts(),quotedFollowUpReplayFacts(),reminderNone,facts([fact({followUp:{state:'unknown'}})]),live]) {
+      assert.ok(validateActionReply(reply,current,quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'),reply)
+    }
+    assert.deepEqual(validateActionReply(reply,none,quotedFollowUpRaw),[],reply)
+  }
+  const file = fact({taskId:'file-task',toolName:'reportTool',source:'live_job',execution:'running',followUp:{state:'none'}})
+  assert.deepEqual(validateActionReply('文件不会自动投递的。',facts([file]),quotedFollowUpRaw),[])
+  assert.ok(validateActionReply('不会自动发图的。',facts([file,quotedFollowUpReminder({state:'none'})]),quotedFollowUpRaw).some(item=>item.code==='unsupported_task_state'))
+})
+
+test('8529 automatic-send grammar retains questions, reports, other senders and local capability limits', () => {
+  for (const reply of [
+    '不能确认图不会自动发的。','图可能不会自动发的。','图不会自动发的吗？',
+    '“图不会自动发的”只是个例子。','她不会自动发图的。','她说图不会自动发的。',
+    '你说图不会自动发的。','这轮没有自动发图的工具。',
+    '你登记的只有考试提醒，那个不会带着发图。','你回来再问我，我再帮你看状态。'
+  ]) assert.deepEqual(validateActionReply(reply,quotedFollowUpReplayFacts(),quotedFollowUpRaw),[],reply)
+})
+
+test('8529 an assistant-owned present trial send is an actual delivery commitment', () => {
+  const raw = '所以我现在没收到，是还没做好吗？'
+  const live = facts([fact({source:'live_job',execution:'running',followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})])
+  const sent = facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'old-receipt'}})])
+  for (const reply of [
+    '想要的话我现在再试发一次。','你要的话我现在试着发一次。','我现在试发一次。',
+    '我这就尝试发送一次。','我现在试着重新发一次。','你说一声我现在再试发一次。',
+    '我现在试着投递图片给你。'
+  ]) for (const current of [facts(),capabilityReplayFacts(1792163398905),live,sent]) {
+    assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_delivery'),reply)
+  }
+})
+
+test('8529 trial-send grammar preserves later user requests, nonassertions and non-delivery verbs', () => {
+  const raw = '所以我现在没收到，是还没做好吗？'
+  for (const reply of [
+    '你回来再问我，我再试发一次。','你再发一句要图，我到时候再试发一次。',
+    '想要的话，你以后再来找我，我再查，有结果就试发一次。',
+    '我现在不会试发一次。','我现在可能试发一次。','我现在试发一次吗？',
+    '“我现在试发一次”只是个例子。','她现在试发一次。','她说我现在试发一次。',
+    '我看看能不能试发一次。','这轮没有可以试发的工具。',
+    '我现在尝试说明一下这段话。','我现在试着发言。','我现在试着发现问题。','我现在尝试发起讨论。'
+  ]) assert.deepEqual(validateActionReply(reply,capabilityReplayFacts(1792163398905),raw),[],reply)
+})

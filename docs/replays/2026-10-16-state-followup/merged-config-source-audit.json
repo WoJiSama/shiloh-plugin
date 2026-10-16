@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-10-16T15:34:34.886480+00:00",
+  "auditKind": "read_only_source_and_configuration_applicability",
+  "workspace": "/Users/shiqi/.codex/worktrees/task-grounding-20261015/bl-chat-plugin",
+  "headAtReport": "bcd704fd9764ace543a309f9ff54b1692a9c253c",
+  "constraints": {
+    "repositoryWrites": 0,
+    "productionWrites": 0,
+    "modelRequests": 0,
+    "platformMessagesSent": 0,
+    "privateConfigDownloaded": false,
+    "privateConfigValuesPrinted": false,
+    "onlyWrittenFile": "/tmp/bl-final-merge-config-audit-20261016.json"
+  },
+  "retainedFailures": [
+    {
+      "source": "parent_message",
+      "failure": "first subagent model route returned HTTP 404 before tool execution",
+      "recovery": "parent redelivered task; this resumed instance completed all read-only tools"
+    },
+    {
+      "source": "first local search command",
+      "failure": "zsh no matches found for docs/replays/2026-10-16-state-followup/*.js",
+      "recovery": "used rg --files and explicit scripts/conversationQualityReplay.mjs path; no mutation"
+    }
+  ],
+  "configurationEvidence": {
+    "checkedAt": "2026-10-16T15:32:56.603Z",
+    "frozenMessageHash": "94e667393df864e61f030822bc19a72ef7d59e39446907799a45280ecbcd301b",
+    "productionMessageHash": "c7b7331d50916f8c6d3b045f5f084991f18099c6b11b58ddd71e5d3f31feb4e8",
+    "differenceRoots": [
+      "pluginSettings.groupModeration.overlongMessage",
+      "pluginSettings.groupModeration.burstMessage",
+      "pluginSettings.emojiSystem.admissionExtraReject",
+      "pluginSettings.groupAdmin"
+    ],
+    "outsidePermittedDifferenceRoots": [],
+    "normalization": "recursively sort object keys; retain array order; delete exactly these four roots; SHA256 of JSON.stringify result",
+    "frozenRemainderHash": "9cd16ec25fc079c05a566aa5bf231ed8d3554453a6f103846fc145a73b1498f8",
+    "productionRemainderHash": "9cd16ec25fc079c05a566aa5bf231ed8d3554453a6f103846fc145a73b1498f8",
+    "normalizedRemainderEqual": true,
+    "frozenPersonaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "productionPersonaLibraryHash": "01f5ace9c7ccc05dc7917ad13d6b79d0d493cb37eef1cef6c481614faad59d4f",
+    "caveat": "snapshot observation only; parent observed production config changing during concurrent console edits; refresh immediately before and after deploy"
+  },
+  "staticClosure": {
+    "method": "static source runtime import graph from 26 replay literal load seeds, excluding import type and including conditional optional memory modules; not dynamic runtime coverage",
+    "seedCount": 26,
+    "moduleCount": 67,
+    "seeds": [
+      "adapters/modelFetch.js",
+      "modules/config/infrastructure/configStore.js",
+      "modules/conversation/application/chatFailureReply.js",
+      "modules/conversation/application/finalReply.js",
+      "modules/conversation/application/messageFormatting.js",
+      "modules/conversation/application/outputGuardPipeline.js",
+      "modules/conversation/application/turnContinuity.js",
+      "modules/conversation/domain/agentIntelligence.js",
+      "modules/conversation/domain/promptLayers.js",
+      "modules/conversation/domain/replyRhythm.js",
+      "modules/conversation/domain/systemPromptTemplate.js",
+      "modules/conversation/infrastructure/groupContextResolver.js",
+      "modules/conversation/infrastructure/personaLibrary.js",
+      "modules/conversation/infrastructure/personaSnapshot.js",
+      "modules/conversation/infrastructure/promptContext.js",
+      "modules/conversation/infrastructure/turnPlan.js",
+      "modules/conversation/infrastructure/turnPromptComposer.js",
+      "modules/foundation/domain/textUtils.js",
+      "modules/host/infrastructure/hostConfig.js",
+      "modules/memory/infrastructure/episodicMemory.js",
+      "modules/memory/infrastructure/personaFeedbackManager.js",
+      "modules/models/application/chatRequestRecovery.js",
+      "modules/models/application/modelExecution.js",
+      "modules/models/domain/chatCompletionUrl.js",
+      "modules/models/domain/modelGateway.js",
+      "modules/tools/infrastructure/chatTurn.js"
+    ],
+    "modules": [
+      "adapters/modelFetch.js",
+      "contracts/chatEvent.js",
+      "contracts/forwardContext.js",
+      "contracts/recentMessages.js",
+      "modules/config/infrastructure/configRepository.js",
+      "modules/config/infrastructure/configStore.js",
+      "modules/config/infrastructure/filePersistence.js",
+      "modules/conversation/application/chatFailureReply.js",
+      "modules/conversation/application/finalReply.js",
+      "modules/conversation/application/groundedReply.js",
+      "modules/conversation/application/messageFormatting.js",
+      "modules/conversation/application/outputGuardPipeline.js",
+      "modules/conversation/application/promptLayerCache.js",
+      "modules/conversation/application/turnContinuity.js",
+      "modules/conversation/domain/actionOutcomes.js",
+      "modules/conversation/domain/actionReplyGrounding.js",
+      "modules/conversation/domain/agentIntelligence.js",
+      "modules/conversation/domain/diagnosticContext.js",
+      "modules/conversation/domain/drawFailureNote.js",
+      "modules/conversation/domain/forwardCompleteness.js",
+      "modules/conversation/domain/internalStatusLeak.js",
+      "modules/conversation/domain/mentionFailureReply.js",
+      "modules/conversation/domain/mentionTargets.js",
+      "modules/conversation/domain/messageContext.js",
+      "modules/conversation/domain/messageIntent.js",
+      "modules/conversation/domain/messageSegments.js",
+      "modules/conversation/domain/narrativeReply.js",
+      "modules/conversation/domain/personaMoods.js",
+      "modules/conversation/domain/personaSource.js",
+      "modules/conversation/domain/personaTonePolicy.js",
+      "modules/conversation/domain/promptCompiler.js",
+      "modules/conversation/domain/promptLayers.js",
+      "modules/conversation/domain/replyRhythm.js",
+      "modules/conversation/domain/replySanitizer.js",
+      "modules/conversation/domain/solutionExplanationStyle.js",
+      "modules/conversation/domain/systemContentSource.js",
+      "modules/conversation/domain/systemPromptTemplate.js",
+      "modules/conversation/domain/textPolicy.js",
+      "modules/conversation/domain/turnActionFacts.js",
+      "modules/conversation/domain/turnInteractionContext.js",
+      "modules/conversation/domain/turnPlanPolicy.js",
+      "modules/conversation/domain/turnPresentation.js",
+      "modules/conversation/infrastructure/groupContextResolver.js",
+      "modules/conversation/infrastructure/personaLibrary.js",
+      "modules/conversation/infrastructure/personaSnapshot.js",
+      "modules/conversation/infrastructure/promptContext.js",
+      "modules/conversation/infrastructure/turnPlan.js",
+      "modules/conversation/infrastructure/turnPromptComposer.js",
+      "modules/conversation/infrastructure/understandingBrief.js",
+      "modules/foundation/domain/textUtils.js",
+      "modules/host/infrastructure/hostConfig.js",
+      "modules/image/domain/imageFailurePolicy.js",
+      "modules/image/domain/imageRequestGuard.js",
+      "modules/image/domain/imageTaskPolicy.js",
+      "modules/memory/infrastructure/episodicMemory.js",
+      "modules/memory/infrastructure/personaFeedbackManager.js",
+      "modules/messaging/domain/deliveryObservability.js",
+      "modules/models/application/chatRequestRecovery.js",
+      "modules/models/application/modelExecution.js",
+      "modules/models/domain/chatCompletionUrl.js",
+      "modules/models/domain/chatResponse.js",
+      "modules/models/domain/modelGateway.js",
+      "modules/models/domain/thinkingProcessor.js",
+      "modules/models/domain/unicodeText.js",
+      "modules/models/domain/visibleFailure.js",
+      "modules/tools/domain/toolManifestRegistry.js",
+      "modules/tools/infrastructure/chatTurn.js"
+    ],
+    "missing": [],
+    "changedSourceComparison": [
+      "8529c94d8032d3ad8156afa1f07c6bd9131963b7",
+      "01a48566c38d484123704fe749c87749fab30313"
+    ],
+    "changedSourceCount": 28,
+    "changedRuntimeClosureIntersections": [
+      "src/modules/conversation/domain/actionReplyGrounding.ts",
+      "src/modules/conversation/domain/diagnosticContext.ts"
+    ],
+    "groupAdminOrConsoleInClosure": []
+  },
+  "sourceEvidence": [
+    {
+      "file": "scripts/conversationQualityReplay.mjs",
+      "lines": [
+        147,
+        177
+      ],
+      "finding": "runner imports conversation factories plus mergeDeepConfig/decodeHostConfig; merges runtime defaults with explicit configRoot/config/message.yaml"
+    },
+    {
+      "file": "scripts/conversationQualityReplay.mjs",
+      "lines": [
+        252,
+        286
+      ],
+      "finding": "host has tools=[], getToolsByName=[]; send methods capture in-memory and real tools throw"
+    },
+    {
+      "file": "scripts/conversationQualityReplay.mjs",
+      "lines": [
+        296,
+        324
+      ],
+      "finding": "ports inject chat-only contexts; tool route is none and toolScopeLocked; no group moderation/console manager"
+    },
+    {
+      "file": "scripts/conversationQualityReplay.mjs",
+      "lines": [
+        351,
+        377
+      ],
+      "finding": "fixture calls createChatTurn(ports).handleToolInner directly, not platform event dispatcher"
+    },
+    {
+      "file": "src/modules/groupAdmin/infrastructure/moderationMessage.ts",
+      "lines": [
+        8,
+        43
+      ],
+      "finding": "group moderation is separate message.group plugin priority 9990 whose handler calls GroupModerationManager; runner never creates it"
+    },
+    {
+      "file": "src/modules/groupAdmin/infrastructure/GroupModerationManager.ts",
+      "lines": [
+        575,
+        635
+      ],
+      "finding": "overlong/burst settings govern separate moderation tracking and recall/forward flow; these handlers are not in replay closure"
+    },
+    {
+      "file": "src/modules/groupAdmin/domain/groupAdminPolicy.ts",
+      "lines": [
+        34,
+        72
+      ],
+      "finding": "groupAdmin overrides resolve groupGuard/groupModeration/groupNotice settings; no conversation config override"
+    },
+    {
+      "file": "src/modules/emoji/infrastructure/EmojiPackManager.ts",
+      "lines": [
+        533,
+        570
+      ],
+      "finding": "admissionExtraReject only builds added rejection text in contentFilterWithVLM emoji admission prompt, not chat generation prompt"
+    },
+    {
+      "file": "src/modules/host/infrastructure/hostConfig.ts",
+      "lines": [
+        28,
+        69
+      ],
+      "finding": "decodeHostConfig preserves extension-owned keys opaquely; it does not map these moderation/admission fields into chat prompt options"
+    },
+    {
+      "file": "config_default/message.yaml",
+      "lines": [
+        481,
+        547
+      ],
+      "finding": "merged defaults add groupAdmin.overrides and overlongMessage/burstMessage; these can change metadata.effectiveConfigHash even with unchanged private frozen message.yaml"
+    }
+  ],
+  "fileSha256": {
+    "config_default/message.yaml": "a54bd7f88a91aaa52f45f904cd0aab13ea36be072daf63e8b9af63e0ddb2911a",
+    "scripts/conversationQualityReplay.mjs": "66d28b4385b4a5679afd02a950b3ba048812f3586d91645a4073fbf3be88e302",
+    "src/adapters/modelFetch.ts": "06b3464f064003057fd9b0c04b34b165aa8ce47a0a81e70fc4c7dbc4aea1ec9b",
+    "src/contracts/chatEvent.ts": "d4e5ea1b1c8a57e2d645b81c9041ca9496ecca5271f5a1166601cd87bbddb205",
+    "src/contracts/forwardContext.ts": "4c50546c2d91d31ba7720380a3ab0b85f9e8461e553c9de45c2670d2812c0926",
+    "src/contracts/recentMessages.ts": "00e0b7e29a55669370b3f7d2bac68107f1379b29df2cd4e250fa83b4ff76982e",
+    "src/modules/config/infrastructure/configRepository.ts": "0898a5929a7301aa804b036d8266f1f4915be985e07f7cc6b63d7f5f4ae57f3a",
+    "src/modules/config/infrastructure/configStore.ts": "87fadc694be0a57b99ae00edaf19b8260f126de34283608e91659d1bb3ddca5a",
+    "src/modules/config/infrastructure/filePersistence.ts": "81ea6cc14606bce3dac28a8232bcc7072ab2cedd71cbde4a966a4f0e57e9cf9f",
+    "src/modules/conversation/application/chatFailureReply.ts": "b0cbecd54e4e4fba79a27355fd41f06d3b330e5daeb4c09d2fef58c9b48ada6d",
+    "src/modules/conversation/application/finalReply.ts": "dfa4307866fd2be44def82626d3773f13b46a9e7eae086a6aeba37ad2ed0b964",
+    "src/modules/conversation/application/groundedReply.ts": "46555d3b95f2a0146d36d9ca30bcd700da6aeb34c38fa30409798755a666635a",
+    "src/modules/conversation/application/messageFormatting.ts": "5e1aac5f4369576228e62fcf688383326d089035126ef50a62942f5f0068b6a3",
+    "src/modules/conversation/application/outputGuardPipeline.ts": "55dc5cc164df8af2071c16c198d0f343970a33993c11f9cd8755fdea029d2899",
+    "src/modules/conversation/application/promptLayerCache.ts": "335674f663b9cb72da399ef8aae70303710bd60bb2d3438cc369a9f5e7bd55d4",
+    "src/modules/conversation/application/turnContinuity.ts": "505901ac1855d27c913053ea7c067b9f2c5e533a66fcccad3bd47051a3e0dc21",
+    "src/modules/conversation/domain/actionOutcomes.ts": "b5f930d15018506f9299664cf0066fa1c1253deec356e73cad4331f9d191a370",
+    "src/modules/conversation/domain/actionReplyGrounding.ts": "c5d94f3897b07b4af7df30c0c7d424584ee7c6e403f1ce1c975aa8e247c7c1e6",
+    "src/modules/conversation/domain/agentIntelligence.ts": "7b000a957b0f209d6ef89e27138a9439267f666c911b30c81cdd542bc283c3b9",
+    "src/modules/conversation/domain/diagnosticContext.ts": "85be114598a03e5039b6cc598f87e60dca66e3a192b299440670c365ae2760a7",
+    "src/modules/conversation/domain/drawFailureNote.ts": "0117d8766e486de86b0fa2b9ce14a571c0ec721fbfb890a57c8da8246bd20515",
+    "src/modules/conversation/domain/forwardCompleteness.ts": "ff51b253d683b4bd6e39e0afe440907cd6be870962825e8086f0bd642b4be9a1",
+    "src/modules/conversation/domain/internalStatusLeak.ts": "bce9c28bc1201827316c0b3bac07f34424505ea55f76ac770cd889f8d92a0b45",
+    "src/modules/conversation/domain/mentionFailureReply.ts": "aef4c98c886f6341a87209caa82d81bffabbe2cfbe14512d4e340de3e20b92d8",
+    "src/modules/conversation/domain/mentionTargets.ts": "2afd7978c7275a60de7546768c2b563bd2ae1f66e4abb4a941c296bff3cd32bf",
+    "src/modules/conversation/domain/messageContext.ts": "c6cc53f670af0e1cc70af96fc9cd1bb61095204f87b3d625ee28fcc325701982",
+    "src/modules/conversation/domain/messageIntent.ts": "ed9f963c09aa2a4acd61b5b883caa959b11ac58eb8fd66542947eabc72685c68",
+    "src/modules/conversation/domain/messageSegments.ts": "547f805a1a53e3c14111f9585c829dcef4ada8bc5dd11075c11f76d313e9e3e3",
+    "src/modules/conversation/domain/narrativeReply.ts": "a4e8b71d13c3c5cd3dab85488ab6ba5e843f18730b9fe79c8984c908d5c5277a",
+    "src/modules/conversation/domain/personaMoods.ts": "6b1aaad5b590fb9d749fd84b92100c2cfedb29d285b06eb28a44f74add96b577",
+    "src/modules/conversation/domain/personaSource.ts": "0f90db7a5ba225df84284865f2b6bbd5ab82331384bf8b7703f8cf60647bb776",
+    "src/modules/conversation/domain/personaTonePolicy.ts": "5305d2ebcba0ee356ba77dd2d01a760abd7f2ef912cd0f6265f0399e3b95fba5",
+    "src/modules/conversation/domain/promptCompiler.ts": "17d0849ed994018a34489d16f5f745f82dd08e89db9190949cc59f281c007ff7",
+    "src/modules/conversation/domain/promptLayers.ts": "a6b499e4f56e080e484e1fdae1397738c8586ab8c5ac03cbf0f40e3d062a66dc",
+    "src/modules/conversation/domain/replyRhythm.ts": "49874f840634ec26b84d9fdaef69e0be3b377598bb7cabe9f252c9eb98c46889",
+    "src/modules/conversation/domain/replySanitizer.ts": "9b2cd0e51cdb0806fc00b13caa834500c1f2ddab3a0c62c3e5ecfedb5d6ebb26",
+    "src/modules/conversation/domain/solutionExplanationStyle.ts": "661621d577b2636575e30d86280cac3b1bea14b9d4765000fe9f403742ba54dd",
+    "src/modules/conversation/domain/systemContentSource.ts": "5edf85c70052c85111750fea4859ec9e1d9f262b777eda4cce5faf97c1b0cfd6",
+    "src/modules/conversation/domain/systemPromptTemplate.ts": "e7697fbcc4cc220d19890722b9f4c1ac371ea3faea419eb5fed4a345188d0107",
+    "src/modules/conversation/domain/textPolicy.ts": "f4a809231202b9ad74b00ddb38f950e03eb82d6fefa4007d43d29345284db4a1",
+    "src/modules/conversation/domain/turnActionFacts.ts": "33c8fa73c02d5fcd46f4c2d0189c8fe3ab40fc98db7759804a7e076928b4242e",
+    "src/modules/conversation/domain/turnInteractionContext.ts": "fc6f82a9ed8663587ad59074b83643cc0069125f994bd5a0c23c955751b0b5b6",
+    "src/modules/conversation/domain/turnPlanPolicy.ts": "b56557ecf45951b477f2ac7184058d1b67fdc3d9dc2854b9fdbf42c3064c3fde",
+    "src/modules/conversation/domain/turnPresentation.ts": "b8b9abd76c607d9736da14535100157b99a79f89314da955f52ff9349d1973cc",
+    "src/modules/conversation/infrastructure/groupContextResolver.ts": "7f3aaf1bb92b59f90c982e49f055bb8180f76701fbe0b6da46c37857e46b661d",
+    "src/modules/conversation/infrastructure/personaLibrary.ts": "c15424959eb83b7c337949e87ca5895b6299ddbb6fa53edfcf0c846c2c22089d",
+    "src/modules/conversation/infrastructure/personaSnapshot.ts": "d688a6e02f9293953ba1d952b38f437880de8b6a822b631b6527a1a8611048fe",
+    "src/modules/conversation/infrastructure/promptContext.ts": "06f22f268285ac0c038af8305d62d087a51c588fe7104ed4f513ea776f4d850a",
+    "src/modules/conversation/infrastructure/turnPlan.ts": "268da2d960389af118c64c07cc8fc7125dd2994de8b691c14e03d895fa9bf30f",
+    "src/modules/conversation/infrastructure/turnPromptComposer.ts": "77998cba207daad84373704e5f61d83044dc9d5f3842cba229db6852526cbf6c",
+    "src/modules/conversation/infrastructure/understandingBrief.ts": "96d99478ee0a4a0b3189c6f80dd49d6bdc686bb6635de9753fec193499f87252",
+    "src/modules/emoji/infrastructure/EmojiPackManager.ts": "d5f15f7f57c7a113f65b5e9c612f5b18d468fddd864229b4b005f2415aa7aff0",
+    "src/modules/foundation/domain/textUtils.ts": "03efb432fb4109950e212e5a35eabb43687aa7325039debd5b0ba838034a92cd",
+    "src/modules/groupAdmin/domain/groupAdminPolicy.ts": "52905649a38adf0fb46a99348cc4d6d0d93694647eebceb3561ec1abc7adf4a8",
+    "src/modules/groupAdmin/infrastructure/GroupGuardManager.ts": "e9e7e6e410d9f7054f2b86e8df1dfb6f9d3f5e028ac187a16b304fb1fad86fd5",
+    "src/modules/groupAdmin/infrastructure/GroupModerationManager.ts": "9de1b2ba13de06b832b5cb7f2f19254a65884eaab33e0b418776da3a93b47b1f",
+    "src/modules/groupAdmin/infrastructure/GroupNoticeManager.ts": "eba39f05b0e6aca1fcad6355716fee5ca108d020eea8e1fa07685fdcee0735ad",
+    "src/modules/groupAdmin/infrastructure/moderationMessage.ts": "4ba459e5dc02eea4de8ae999ab36c777d7c8116b3b4438e1e5b5d8e4508af050",
+    "src/modules/host/infrastructure/hostConfig.ts": "3f502f4c927c8a3328f59e0be4af08f4e4141e7f7ad6a3701c6fb4e5ffa5aa89",
+    "src/modules/image/domain/imageFailurePolicy.ts": "49d2c1fca596459e5d440912688179fd655cfb8e64144b652eb74c9b0382843f",
+    "src/modules/image/domain/imageRequestGuard.ts": "b76186792400491f5824ead223009d9f0cba702e3b12248d8004a64fc07091ce",
+    "src/modules/image/domain/imageTaskPolicy.ts": "8a7d2f1b6c6d330d16b3ebdea95e7c2f8cce7a32ff386de059d2c6c06c2935a4",
+    "src/modules/memory/infrastructure/episodicMemory.ts": "47c921b0179cf13e60043282d9006f20f8a8479c8b35bcd6abf50af95245e7a1",
+    "src/modules/memory/infrastructure/personaFeedbackManager.ts": "43706e4041c049c2eaf7f93271b4736f067726e71ff90553a791e84a16b2bc7a",
+    "src/modules/messaging/domain/deliveryObservability.ts": "699cedc22577efaf874301565b561a4b32523134c810da2f10902965c3e827f1",
+    "src/modules/models/application/chatRequestRecovery.ts": "c8c5f93c6cdda364ecac1573b56ada5187fb11137fbbf07a20f78322f7a30a4f",
+    "src/modules/models/application/modelExecution.ts": "e618a810a7de02a1e07b320ff13432cd93672cbc2f7ecbbc571ea09358dad2d1",
+    "src/modules/models/domain/chatCompletionUrl.ts": "3bca60413803efb616f1ba0f6999665096270747f0e35e57cd3692147e2767c0",
+    "src/modules/models/domain/chatResponse.ts": "16daaac8c1416f5a66dbfaea1753621ef02ba6fb8367a348d83a676eb9af99c8",
+    "src/modules/models/domain/modelGateway.ts": "4f62dc3bafa938e30b0adb7d524be18c245f35417a28c63cb19b2ba1f52e2ab5",
+    "src/modules/models/domain/thinkingProcessor.ts": "4125db858747b5400519e87a228d13bd8d03b8b0dea9c0c88300352ae5d8cace",
+    "src/modules/models/domain/unicodeText.ts": "0f8f5b63a4f0ab452e9b9a56dc71ce44de193db4059488573ce14fb6cb60e92a",
+    "src/modules/models/domain/visibleFailure.ts": "51f5fdda20c2b75ec4c52bbf3dc5398cdde0cf4b0296d8e38dfd9378a9f14152",
+    "src/modules/platform/infrastructure/console/consoleServer.ts": "723b17b60dd0eae1aa074f9b19f9d7741bdafb41293dddd900b101f0653fabbe",
+    "src/modules/tools/domain/toolManifestRegistry.ts": "ba3c6e873fd362fb628bf3d294f43cf9b5685fbdf70ebf672c511a2865744237",
+    "src/modules/tools/infrastructure/chatTurn.ts": "de18eb5bd4484a0fdecf95272c22b0b66c32f4bec7aa6219305bebb10baedafc"
+  },
+  "recommendation": {
+    "finalMergedRuntimeFullReplay": "required; previous 8529c94 results must not be relabeled as merged runtime results",
+    "configuration": "continue original frozen private config for final same-protocol 60-turn replay; preserve baseline comparability and do not chase mutable live moderation settings",
+    "productionApplicability": "at the audited snapshot, all non-moderation/non-admission config and persona libraries are identical; four differences do not enter this runner chat execution closure",
+    "metadata": "retain original full configHash/effectiveConfigHash/runtimeTreeHash and all old evidence; explicitly disclose differences, with four-root projection equality as supplemental evidence; never convert 6/8 or 7/8 fingerprints into an 8/8 claim",
+    "deployment": "preserve live config; independently audit newest production hash before/after deployment rather than enforce old frozen hash",
+    "limits": "does not validate actual QQ event entry, moderation, console behavior, emoji admission, real tools, production storage or naturalness; static source audit is not runtime test"
+  },
+  "complete": true
+}

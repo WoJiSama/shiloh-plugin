@@ -1760,3 +1760,17 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 继续窄补row59引号名词主题与指示代词跟进；row57“点亮”同义启动及换电源不等于专业放行。父新最终发送三组在冻结dist上真实RED。诊断首修暴露旧完整并列假设警告误伤，已保持原期望并补局部并列能力边界；灯/手电筒明确对象不当设备启动，source103/103通过，首次失败日志保留。动作owner及独立固定矩阵准备中，尚未build新版或部署。
 
 - 任务owner已停写：source133/133、strict noEmit通过，quoted名词与typed跟进分别保留对象归属，row12合法“完成前不乱发”不扩大拒绝。父诊断补正常“确认可以点亮后再点亮”的专业许可补语；source103/103、实际RED及各次误伤均保留。全owner停写后统一strict/backend build/testcompile和10文件最终发送/实际产物365/365通过，无跳过；quoted-start-*日志及验证已归档，独立810固定source/dist复核进行中。一次zsh未匹配日志通配符返回1，未改文件，随后采用Path.glob归档。
+
+- 独立810项source/dist完整输出一致，旧766实测无漂移；808符合冻结期望，保留原孤立代词差异和新增control装配遗漏考试提醒的1失败。该完整row59控制仍断言考试提醒已登记却只装image none，实际unregistered_followup正确针对提醒；原报告/期望保持，另做保留exam+image的最小补充，不改生产逻辑。
+- 原目录其他会话新增01a4856群管提交，CAS正确拒绝后核验354个接受目标hash全未变，保留旧baseline并建立新快照/保护。第十一次同步391目标、51实际写入，1631非目标、新HEAD/index保持；原目录strict/build/testcompile及365/365通过，五业务TS/JS一致、manifest自洽，证据quoted-start-original-*和writeback-audit归档。
+
+- 独立最小补充3/3通过，source/dist完整输出相等：整份row59保留真实exam reminder后，image none放行，registered/unknown仅拦后续图片否定，不误伤考试提醒。原810固定输入/期望/原报告与actual哈希不变，补充输入和逐项证据另存quoted-start-supplement-*。准备提交干净源码及新版完整冻结，尚未部署。
+
+- 续接先核验正在进行的merge，14冲突原件/stage2/stage3完整备份/tmp/bl-final-merge-resolution-20261016；聊天源码/测试/本轮报告保留8529，规划保留01a其他会话前缀及本轮最新suffix，自动合并群管/控制台保留。8529完整60轮已安全导出，72/72HTTP200且low、60结构、12纠正6兜底，P50/P95/最大2.661/12.786/21.231秒；两fresh代理各评14组，尚不声称自然度改善。
+- 配置首次少一层config的路径读取ENOENT、后续误读src/adapters/config/hostConfig.ts路径不存在均未改文件；已按runner实际modules/host入口定位。新代理首次模型路由404未运行工具，续接恢复；只读确认群管/表情四根之外规范化配置hash相同，personality文件相同，生产message仍有并发更新，不沿用旧hash或覆盖它。
+
+- 8529完整28组fresh盲评校验合并/揭盲并封存8529c94-review：综合9胜8负11平、210:212，自然度4胜7负17平、49:52，硬错候选0/基线2；粗评未标父确认的P0漏洞，原评保留，不据此放弃真实回归。动作4类source146/146，诊断source104/104；统一strict/backend build/testcompile及10文件最终发送/实际产物382/382，无跳过。
+- 新诊断source首次直接Node读取TS时依赖.js未映射导致ERR_MODULE_NOT_FOUND（两次日志保留），随后用只读resolver映射实际.ts。新spec跨逗号与“正常工作温度要看型号”的合法控制暴露误伤后修局部条件，不改原期望；真实最终发送3组RED、各次失败和GREEN均归档message-outcome-*。独立1005固定产物复核已启动。
+- 原目录最新8a831d3为01a后继，391接受目标全部原hash保持；新HEAD/index/dirty及全文件hash另备份，旧baseline保留。线上只读已7ad2f83；继续合入新模块子开关与广告扫描功能，安装前增加可选预期生产commit核对，配置审计改为显式预部署hash快照，避免覆盖并发更新。
+
+- 1005固定只读产物复核已停写并归档message-outcome-compiled-review.json：1003期望通过、source/dist1005逐项相等，旧810实测810相同及3补充实测3相同、新192全部通过；原两份期望差异保留。8a831d3合并11冲突备份/tmp/bl-final-merge-8a831d3-20261016；所有聊天源码/相关测试与280a9a4一致，所有群管业务/测试与8a831d3一致，不借旧产物成绩代替合并版全量门禁。新增adScan只进入完整配置默认字段差异，适用性审计显式加此根。
