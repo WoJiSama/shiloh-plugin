@@ -1723,3 +1723,20 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - f00d完整28组fresh盲评已校验、逐组揭盲并封存f00d295-review：9胜6负13平，总分211:205；自然度4胜8负16平、48:52；硬错候选1/基线7。唯一候选硬错与父index59一致。父两条最终发送RED均真实复现（2tests/0pass/2fail），日志已保留，不改写既有期望。owner确认动作名词对象/后置登记、话题切回图片与就算条件消费两个组合根因，正在同域窄修。
 
 - 图片登记对象窄修已停写：source99/99、strict0、diff检查0；父统一strict/build/testcompile与10文件最终发送/实际产物320/320全过无跳过。完整原话纠正及无效纠正兜底均已闭环，正常控制保留。日志归档arrangement-scope-*；已通知只读评审复用旧333固定期望并加完整row59和新邻近控制，不覆盖旧报告、不改期望。原目录CAS与新版冻结继续。
+
+- 第七次CAS同步254目标、36实际写入，1630非目标文件、原HEAD/index保持。原目录严格类型、构建、测试编译与320/320回归全部通过，五业务TS/JS与隔离分支逐项一致，自身manifest自洽；原目录并发改动保留。验证与审计归档arrangement-scope-original-*及writeback-audit，准备提交新版并冻结完整60轮。
+
+- 源码3c26906已提交推送，独立只读产物复核387/387通过：复用333固定期望、新历史1例及owner53控制，source/dist完整输出和distinct codes一致，源码/dist/输入和两份旧报告hash保持。报告归档arrangement-scope-compiled-review.json。
+
+- 3c发布包生成并上传校验成功后，回放wrapper的scp因SSH连接失败中断，未启动runner、未触碰线上。恢复连接后重新核验冻结runtime完整及commit，确认没有log/exit/活动runner，再只上传wrapper并启动一次隔离回放；恢复记录在/tmp/bl-state-3c26906/resume-launch.log，freeze.json已补齐。前14轮无结构失败，生产仍7548294。
+
+- 3c26906完整60轮结束并安全导出：59结构通过，75请求74HTTP200且全部显式low，15纠正9兜底；P50/P95/最大2.508/10.815/19.699秒。raw hash c9e47c455d8c24eaa5df56443f9ba6a8b211c602f25ec674b7c801c796aea30b，8协议指纹一致、平台发送/真实工具/生产测试写入0。唯一结构失败为referenced-missing-task第1样本的纠正请求10秒超时，已产出事实兜底，原件及失败保留，不重跑覆盖。两fresh代理各读14组完整匿名输入，移除expected/semanticChecks/manualReview，canonical与实际评审输入一致。
+
+- 父逐句复核3c完整正文，rows0/1/3/9/59仍见并列产物条件后发送、谓词支配引号动作的否定、改图那件事运行断言、等想到办法后发送及否定词先于完成条件的漏检，均属现有任务契约。已交owner仅续修两授权文件，不扩大日期/社交/领取位置；父追加五份完整原话和真实tasks到最终发送回归，冻结3c产物上首条真实RED保留/tmp/bl-state-composed-claims-checks-20261016/final-red.log。新版统一与原目录检查脚本已备，待owner停写再build。
+
+- 续接3c封存结果与当前源码：首次统一331项330通过/1失败原日志保留，正常纠正文“图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。”被误拦，动作owner继续同两文件窄修。另由事实提示owner处理投递失败不证明通道缺失、当前取消不倒推旧回答记错、再次请求不保证新投递成功；不添加普通社交调用或扩大黑名单。独立只读复核准备复用387固定期望，待统一build。
+
+- source probe澄清331项唯一失败的真实根因：最终发送测试把真实任务synthetic-request-001放入facts，却固定查询original-request，归属校验正确剔除了该task。保留首次失败日志，父仅修测试query按所装配任务请求ID取值；正常纠正文与fallback=false期望均保持，不为harness问题改生产核验器。
+
+- 全owner停写后统一strict/backend build/testcompile及10文件最终发送/实际产物334/334通过，无跳过；source动作109/109、事实提示15/15保持。独立source/dist497/497通过，复用387完整固定输入/期望及新增110原话/控制；源码/dist/旧报告hash保持。首次331项harness失败及RED、probe日志均独立归档。
+- 一次归档脚本含中文stdin编码失败，未执行写入，改ASCII归档与apply_patch记录；首次apply_patch上下文不匹配，未改文件，改用已核验尾部重新追加。CAS按原保护发现其他会话已将原目录HEAD推进7257445、index变化而拒绝写入。只读核验254个已接受目标全部与上次hash一致，后续另存新HEAD/index及原目录快照后续用窄CAS，不覆盖旧baseline或其他会话提交。

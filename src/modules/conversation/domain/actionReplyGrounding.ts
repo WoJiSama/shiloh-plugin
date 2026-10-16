@@ -23,6 +23,9 @@ function assertions(text: string): ReplySentence[] {
   const namedArrangements = text.replace(/“[^”\n]*”|「[^」\n]*」|'[^'\n]*'|"[^"\n]*"/gu, (quoted, offset: number) => {
     if (!/(?:好了|完成|结果).{0,12}(?:发|投递|通知)/u.test(quoted)) return quoted
     if (/^的(?:安排|设置|登记)/u.test(text.slice(offset + quoted.length))) return '完成后发送'
+    // A modal predicate can govern the quoted action itself. Its negation
+    // remains asserted even though the named action is not our promise.
+    if (/(?:不会|不能|无法|没法)(?:再)?$/u.test(text.slice(0, offset))) return quoted.slice(1, -1)
     // Arrangement verbs can take the quoted action as their direct object.
     // Preserve the object without treating its quoted words as our promise.
     return /(?:安排|设置|登记)(?:了|好|过)?$/u.test(text.slice(0, offset)) ? '完成后自动发送' : quoted
@@ -156,7 +159,7 @@ const IMAGE_REFERENCE = '(?:第[一二三四五六七八九十0-9]+张|这张|�
 const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景(?:的)?${IMAGE_REFERENCE}(?:图(?:片)?)?$`, 'u')
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
-const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次)?|的)?(?:任务|请求)(?:本身)?(?:的)?$/u
+const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次|件)?|的)?(?:任务|请求|事)(?:本身)?(?:的)?$/u
 const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|功能|能力|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
 const FOLLOW_UP_DELIVERY_OBJECT = new RegExp(`^(?:给(?:你|您))?(?:发(?:送)?|投递)(${ARTIFACT})(?:这(?:件)?事)?$`, 'u')
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
@@ -247,9 +250,18 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
 /** Completion is the condition of an automatic-send denial, not uncertainty
  * about its registration. Consume that condition and the full send predicate. */
 function automaticDenialObject(clause: string, topic: EvidenceTopic): TaskObjectReference | undefined {
-  const denied = new RegExp(`(?:也|就|仍然|还)*不会(?:再)?(?:自动|主动)(?:发(?:送|图)?(?:给(?:你|您)|(?:你|您)|出(?:来|去)?|到(?:群里|这里|私聊))?|投递(?:给(?:你|您))?|(?:通知|提醒)(?:你|您)?)(?:了)?${PARTICLES}$`, 'u').exec(clause)
+  const inability = new RegExp(`(?:目前|现在)?不行${PARTICLES}$`, 'u').exec(clause)
+  if (inability) {
+    const object = taskObjectReference(clause.slice(0, inability.index), true, topic)
+    if (object?.kind === 'follow_up') return {...object, surface:clause}
+  }
+  const denied = new RegExp(`(?:也|就|仍然|还)*不会(?:再)?(.*?)(?:自动|主动)(?:发(?:送|图)?(?:给(?:你|您)|(?:你|您)|出(?:来|去)?|到(?:群里|这里|私聊))?|投递(?:给(?:你|您))?|(?:通知|提醒)(?:你|您)?)(?:了)?${PARTICLES}$`, 'u').exec(clause)
   if (!denied) return undefined
-  let prefix = clause.slice(0, denied.index).replace(SUBJECT_CONNECTOR, '')
+  // Negation may precede the complete condition (“不会好了自动发你”).
+  // Reuse the same object/condition boundary as “好了不会自动发你”.
+  const innerCondition = denied[1] || ''
+  if (innerCondition && !new RegExp(`^(?:${COMPLETION_TRIGGER.source}|(?:${ARTIFACT_SUBJECT})?${READY})$`, 'u').test(innerCondition)) return undefined
+  let prefix = (clause.slice(0, denied.index) + innerCondition).replace(SUBJECT_CONNECTOR, '')
     .replace(/^(?:取消|撤销)(?:了)?(?:发送|投递|通知)?(?:之?后|以后|的话)?(?:那|就|也)*/u, '')
   const condition = [...prefix.matchAll(COMPLETION_TRIGGER), ...prefix.matchAll(new RegExp(`${READY}$`, 'gu'))]
     .filter(match => match.index! + match[0].length === prefix.length).sort((a, b) => a.index! - b.index!)[0]
@@ -286,8 +298,10 @@ const ON_DEMAND_LOOKUP = /我(?:到时候|届时|那时|回来后)?(?:现|当场
 const DEFERRED_VERIFICATION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?(?:再)?)?(?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?(?:了)?|(?:^|[，,])(?:实际)?(?:确认|核实|查到|查清|弄清)(?:到|出)?了(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])|(?:^|[，,])(?:确认|核实|查到|查清|弄清)到(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
 const ELLIPTICAL_RESULT = /有(?:了)?(?=我|就|再|会|直接|第一时间|[，,])/gu
 const REGISTERED = /(?:已经|已|帮你|给你).{0,8}(?:登记|安排|设好|设置好|定好).{0,12}(?:提醒|闹钟|定时|通知|自动|任务)|(?:提醒|闹钟|定时(?:任务)?|后续(?:投递|发送)).{0,8}(?:已经|已)?(?:登记|安排|设好|设置好|定好)(?:了|好了)?/gu
-const ACQUIRED_OUTPUT = /(?:确认到|拿到|收到)(?:了)?(?:(?:实际|真正|真实)(?:的)?)?(?:产出|产物|成品|结果|图(?:片)?|文件|视频|报告)(?:了)?(?:之后|以后|后|时)?(?=我|就|再|会|直接|马上|立刻|立即|第一时间|自动|主动|给|发|通知|提醒|告诉|跟|和|对|向|[，,]|$)/gu
+const ACQUIRED_ARTIFACT = `(?:产出|${ARTIFACT})`
+const ACQUIRED_OUTPUT = new RegExp(`(?:确认到|拿到|收到)(?:了)?(?:(?:实际|真正|真实)(?:的)?)?${ACQUIRED_ARTIFACT}(?:(?:或者|或|和|及|以及)${ACQUIRED_ARTIFACT})*(?:了)?(?:之后|以后|后|时)?(?=我|就|再|会|直接|马上|立刻|立即|第一时间|自动|主动|给|发|通知|提醒|告诉|跟|和|对|向|[，,]|$)`, 'gu')
 const DEFERRED_DELIVERY_CONDITION = /(?:等(?:到)?|待|一旦)(?:我(?:这边)?|图(?:片)?|成品|结果|文件|视频)?(?:能(?:够)?|可以)(?:重新|再次|再|补)?(?:发(?:送)?|投递)(?:图(?:片)?|成品|结果|文件|视频)?(?:给(?:你|您)|到(?:群里|这里|私聊))?(?:的时候|时|之后|以后|后)/gu
+const DEFERRED_RESOLUTION = /(?:等(?:到)?|待|一旦)?我(?:这边)?(?:想(?:到|出)|找(?:到|出))(?:办法|解决(?:方案|方法))(?=我|就|再|会|马上|立刻|立即|第一时间|[，,])/gu
 
 interface OutputCondition {start: number; end: number; subject: 'self' | 'user' | 'other'}
 /** Consume the verb and its complete output object together. Confirmation of
@@ -401,7 +415,9 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     const verificationEnd = verification ? verification.index! + verification[0].length : -1
     const deliveryCondition = [...before.matchAll(DEFERRED_DELIVERY_CONDITION)].at(-1)
     const deliveryConditionEnd = deliveryCondition ? deliveryCondition.index! + deliveryCondition[0].length : -1
-    const conditionEnd = Math.max(completion, verificationEnd, deliveryConditionEnd)
+    const resolution = [...before.matchAll(DEFERRED_RESOLUTION)].at(-1)
+    const resolutionEnd = resolution ? resolution.index! + resolution[0].length : -1
+    const conditionEnd = Math.max(completion, verificationEnd, deliveryConditionEnd, resolutionEnd)
     const outputCondition = outputConditions(before).at(-1)
     if (outputCondition && outputCondition.subject !== 'self' && outputCondition.end === completion
       && !/^(?:我(?:这边)?|这边)/u.test(selfActionPrefix)) continue
@@ -444,7 +460,7 @@ function followUpClaims(sentence: ReplySentence, taskContext: boolean, rawTopic:
     // unspecified investigation or confirmation of the failure cause.
     const independentVerification = verification && !(outputCondition
       && outputCondition.start <= verificationEnd && verificationEnd <= outputCondition.end)
-    if (deliveryCondition || independentVerification || outputCondition && outputCondition.subject !== 'self'
+    if (deliveryCondition || resolution || independentVerification || outputCondition && outputCondition.subject !== 'self'
       || spokenUpdate && (completion < 0 || /原因|为什么/u.test(sentence.text))) {add('unsupported', match.index! + match[0].length); continue}
     if (RERUN_OR_POLL.test(match[0])) add('unsupported', match.index! + match[0].length)
     else if (completion >= 0) add('job_completion', match.index! + match[0].length)

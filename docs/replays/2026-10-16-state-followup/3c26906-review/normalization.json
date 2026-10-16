@@ -1,0 +1,33 @@
+{
+  "scope": "Only finding IDs and matching case references are namespaced; scores, winners, reasons and quoted evidence are unchanged.",
+  "sources": {
+    "review-01-14.json": {
+      "rawSha256": "003bbffb8aaf1f70265046ce32fcb785498cb3855ea5d0b3927f0377fc540c7f",
+      "normalizedSha256": "e0ff1f15e16d210b28994048c317424033a4c2f22fed51ca4af55f4533492cbf",
+      "idMap": {
+        "C1-001": "R01-14-C1-001",
+        "C1-002": "R01-14-C1-002",
+        "C1-003": "R01-14-C1-003",
+        "C2-001": "R01-14-C2-001",
+        "C2-002": "R01-14-C2-002",
+        "C2-003": "R01-14-C2-003",
+        "C2-004": "R01-14-C2-004",
+        "C3-001": "R01-14-C3-001",
+        "C5-001": "R01-14-C5-001",
+        "C5-002": "R01-14-C5-002",
+        "C6-001": "R01-14-C6-001",
+        "C7-001": "R01-14-C7-001",
+        "C9-001": "R01-14-C9-001",
+        "C10-001": "R01-14-C10-001"
+      }
+    },
+    "review-15-28.json": {
+      "rawSha256": "0dd9d2aec5732b86a879d2a1df03d1bf4bb05d29a0146d1d5fd3b02ce5bcc55f",
+      "normalizedSha256": "57d7877f850a6aca6be310249bb13d19306ddada1ddfac689b49fae8e77889fd",
+      "idMap": {
+        "C2-001": "R15-28-C2-001",
+        "C2-002": "R15-28-C2-002"
+      }
+    }
+  }
+}

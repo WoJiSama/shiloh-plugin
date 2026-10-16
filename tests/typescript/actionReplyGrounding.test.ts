@@ -1519,3 +1519,113 @@ test('f00d local arrangement checks retain unknown evidence, nonassertions and u
     '你回来再问我，我再查，有结果就发给你。'
   ]) assert.deepEqual(validateActionReply(reply, f00dReminderOnlyFacts(), raw), [], reply)
 })
+
+const composedReplayFacts = (conversationId: string, observedAt: number, tasks: TurnTaskFact[] = []): TurnActionFacts => ({
+  scope:{botId:'99', conversationId, userId:'202'}, observedAt, lookup:'ok', tasks
+})
+const composedReplays: {index:number; input:string; output:string; facts:TurnActionFacts; code:string}[] = [
+  {index:0, input:'刚才改背景的图出来了吗？',
+    output:'这个我现在没法给你准信欸。你之前发的那张我记得，但我这边没查到处理结果的记录，做得怎么样、出没出图都还没确认。\n\n我这边没有可核验的进度，不想瞎猜给你一个假答案。等我实际拿到图或者结果，再发给你。',
+    facts:composedReplayFacts('group:900001',1792157653279), code:'unregistered_followup'},
+  {index:1, input:'那我先去吃饭。好了你会自动发给我吗？',
+    output:'去吃吧。不过老实说，我这边没有查到会自动跟进的安排，所以不会“好了自动发你”。你要是吃完了想看进度，回来喊我一声，我再帮你查。',
+    facts:composedReplayFacts('group:900001',1792157655173), code:'unsupported_task_state'},
+  {index:3, input:'那我先去吃饭。好了你会自动发给我吗？',
+    output:'改图那件事还在处理中，具体好没好我这边没查到。自动发不行，你吃完回来喊我一声，我再去看结果。',
+    facts:composedReplayFacts('group:900002',1792157663583), code:'unsupported_task_state'},
+  {index:9, input:'所以我现在没收到，是还没做好吗？',
+    output:'做好了，图是有的。卡的是发出来那一步，不是还没做。你再等等，我想到办法就发你。',
+    facts:composedReplayFacts('group:900005',1792157677554,[{
+      taskId:'synthetic-task-001', requestMessageId:'synthetic-request-001', toolName:'imageEdit', source:'task_record',
+      execution:'completed', result:'available', delivery:{state:'failed'}, followUp:{state:'none'}, observedAt:1792157677554
+    }]), code:'unregistered_followup'},
+  {index:59, input:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',
+    output:'我这边只核验到你的考试提醒登记了（2100年1月1日早上八点那个），改背景的图没有对应记录，所以现在没法确认它在跑，也不会好了自动发你。\n\n想要的话重新把图发我一次，我这轮能做就直接做。',
+    facts:composedReplayFacts('group:900028',1792157892801,[{
+      taskId:'exam-reminder', requestMessageId:'exam-request', toolName:'reminderTool', source:'reminder',
+      execution:'queued', result:'unknown', delivery:{state:'not_attempted'},
+      followUp:{state:'registered', kind:'reminder', id:'exam-reminder', dueAt:4102444800000}, observedAt:1792157892801
+    }]), code:'unsupported_task_state'}
+]
+for (const replay of composedReplays) test(`3c complete replay ${replay.index} retains its unsupported local action claim`, () => {
+  assert.ok(validateActionReply(replay.output,replay.facts,replay.input).some(item=>item.code===replay.code))
+})
+
+test('3c coordinated acquired artifacts keep their full completion condition across a comma', () => {
+  const raw = '刚才改背景的图出来了吗？'
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['等我实际拿到图或者结果，再发给你。','等拿到图片或成品，我会发给你。','确认到图和结果后，我再回复你。','等我实际拿到产出或者结果，再发给你。']) {
+    assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unregistered_followup'),reply)
+    assert.deepEqual(validateActionReply(reply,live,raw),[],reply)
+  }
+  for (const reply of [
+    '等我实际拿到图或者结果，也不会发给你。','等我实际拿到图或者结果，再发给你吗？',
+    '“等我实际拿到图或者结果，再发给你”只是个例子。','她拿到图或者结果后会发给你。',
+    '等她拿到图或者结果，再发给你。','你回来再问我，我再查，拿到图或者结果再发给你。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})
+
+test('3c a negated predicate owns its quoted action while quoted speech remains unasserted', () => {
+  const raw = '刚才的图好了会自动发我吗？'
+  const none = facts([fact({source:'live_job', execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['所以不会“好了自动发你”。','不会「好了自动发你」。',"不会'好了自动发你'。"] ) {
+    for (const current of [facts(),live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.deepEqual(validateActionReply(reply,none,raw),[],reply)
+  }
+  for (const reply of [
+    '不能确认不会“好了自动发你”。','不会“好了自动发你”吗？',
+    '“不会好了自动发你”只是个例子。','她不会“好了自动发你”。',
+    '不要说“好了自动发你”。','不能承诺“好了自动发你”。','她说不会“好了自动发你”。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})
+
+test('3c task activity nouns and a local inability to auto-send keep their own evidence dimensions', () => {
+  const raw = '刚才的图好了会自动发我吗？'
+  const runningNone = facts([fact({source:'live_job', execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['改图那件事还在处理中。','画图这件事还在生成。','改背景那件事还在处理。']) {
+    assert.ok(validateActionReply(reply,facts(),raw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.deepEqual(validateActionReply(reply,runningNone,raw),[],reply)
+  }
+  for (const reply of ['自动发不行。','自动发送目前不行。']) {
+    for (const current of [facts(),live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.deepEqual(validateActionReply(reply,runningNone,raw),[],reply)
+  }
+  for (const reply of [
+    '改图那件事是否还在处理尚未核实。','改图那件事可能还在处理中。','改图那件事还在处理中吗？',
+    '“改图那件事还在处理中”只是个例子。','她改图那件事还在处理中。',
+    '不能确认自动发不行。','自动发不行吗？','“自动发不行”只是个例子。','她自动发不行。',
+    '你吃完回来喊我一声，我再去看结果。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})
+
+test('3c finding a send solution is an independent future condition that a job callback cannot supply', () => {
+  const raw = '刚才的图怎么没发来？'
+  const failed = composedReplays.find(item=>item.index===9)!.facts
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['你再等等，我想到办法就发你。','我找到办法就发给你。','你回来再问我，我再查，等我想到办法就发给你。']) {
+    for (const current of [facts(),failed,live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unregistered_followup'),reply)
+  }
+  for (const reply of [
+    '想到办法也不代表会发给你。','我想到办法也不会发你。','我想到办法就发你吗？',
+    '“我想到办法就发你”只是个例子。','她想到办法就发你。',
+    '你回来再问我，我再查，有结果就发给你。',
+    '你要的话，可以再问我，我们一起看看有没有办法。'
+  ]) assert.deepEqual(validateActionReply(reply,failed,raw),[],reply)
+})
+
+test('3c denial before a complete completion condition still asserts absent automatic delivery', () => {
+  const raw = '刚才的图好了会自动发我吗？'
+  const none = facts([fact({source:'live_job', execution:'running', followUp:{state:'none'}})])
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'callback'}})])
+  for (const reply of ['也不会好了自动发你。','不会做好了自动发。','不会图好了自动发你。']) {
+    for (const current of [facts(),live]) assert.ok(validateActionReply(reply,current,raw).some(item=>item.code==='unsupported_task_state'),reply)
+    assert.deepEqual(validateActionReply(reply,none,raw),[],reply)
+  }
+  for (const reply of [
+    '不能确认也不会好了自动发你。','也不会好了自动发你吗？',
+    '“也不会好了自动发你”只是个例子。','她也不会好了自动发你。',
+    '好了会不会自动发你还没核实。','不是不会好了自动发你，是还没核实。'
+  ]) assert.deepEqual(validateActionReply(reply,facts(),raw),[],reply)
+})

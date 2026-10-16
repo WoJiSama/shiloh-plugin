@@ -64,6 +64,8 @@ export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
   const lines = ['【已核验的任务事实】', '以下来自当前机器人、当前会话和当前请求者的任务记录。任务存在、执行、产物、投递和后续登记分别成立；历史承诺、进度消息和工具调用返回都不等于最终产物已送达。']
   lines.push('未查到记录不代表任务没有在执行；这次未核验到有效后续登记，只限制本次自动跟进，不能据此说系统没有这个功能。')
   lines.push('以下各维度只按各自证据说明：未确认不等于没有、失败或未完成。对同一张图增加颜色、背景、版本等限定语，不改变该任务的证据归属。')
+  lines.push('以下是本轮核验时的任务状态，并非完整历史审计。当前没有有效登记或登记未确认时，不能倒推先前从未登记或旧回复有误；只有当时证据能证明旧回复错误，才将其说明为记错或说错。')
+  lines.push('有前后状态证据时按状态变化解释；没有历史证据时，不补写过去的登记、取消过程或执行者。用户对操作的转述应保留来源，不能说成机器人刚执行的操作。')
   if (facts.lookup === 'unavailable' && facts.tasks.length) lines.push('部分记录未能核验；以下已确认的事实仍成立，未列出的任务或后续安排保持未知。')
   if (!facts.tasks.length) lines.push(facts.lookup === 'unavailable' ? '本次未能核验相关任务记录；不能推断任务不存在、仍在执行或已经完成。' : '当前查询没有匹配的可核验任务记录；进度、产物与投递保持未确认。')
   for (const task of facts.tasks) {
@@ -72,7 +74,10 @@ export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
     if (task.source === 'reminder') lines.push('这是一条定时提醒记录。这里的登记和排队只属于该提醒，不证明图片处理任务存在、已登记、正在排队或会在完成后发图。')
     lines.push('已核验该请求对应的任务记录存在；后续发送未登记、已取消或未确认，均不能否定原任务存在，也不能据此推断任务停止或产物不可用。')
     if (task.result === 'available') lines.push('已确认有可用产物，这一事实独立于投递状态；不能因投递状态改述为没有图、没有成品或尚未做好。')
-    if (task.delivery.state === 'failed') lines.push('投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因。没有原因证据时，不自行补写失败原因。')
+    if (task.delivery.state === 'failed') {
+      lines.push('投递失败只说明这次发送未成功，不证明接收者拒收、系统拦截、屏蔽或接收设置等具体原因。没有原因证据时，不自行补写失败原因。')
+      lines.push('这次发送失败也不能证明重发通道缺失或不可用；是否可重发应依据当轮可用工具、权限和实际执行结果，不能单凭任务记录判断。')
+    }
     if (task.followUp.state === 'registered') {
       lines.push(task.followUp.kind === 'reminder'
         ? `已核验提醒登记 ${task.followUp.id}，北京时间 ${new Date(task.followUp.dueAt!).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})} 触发。这只证明该提醒已登记，不证明原图会完成、已安排重跑或稍后交付原结果。`
@@ -80,6 +85,7 @@ export function buildTurnActionFactsPrompt(facts?: TurnActionFacts): string {
     } else if (task.followUp.state === 'none') lines.push('已核验该任务当前没有仍有效的后续投递登记；这只说明本次没有完成后自动发送的安排，原任务及其执行状态仍按上面的记录成立。不能承诺自动查询、重跑或“好了再发”。')
     else lines.push('后续投递登记尚未确认，不能确认会自动发，也不能说原任务不存在或已经取消。不能承诺自动查询、重跑或“好了再发”。')
   }
+  lines.push('用户再次发起请求时，可以按当轮可用工具和权限同步查询、回复或尝试发送，这不需要现在预先登记自动跟进；但用户愿意再要一次、已有产物或历史投递记录，都不能保证届时具备重发条件或一定发送成功。')
   lines.push('向用户只说与这次追问有关的事实及具体缺口，避免照读内部字段。用户说“好了发我”表达的是请求，不能自行变成已经安排的任务；若本轮可用工具支持且用户已授权，实际登记成功后再确认。')
   return lines.join('\n')
 }

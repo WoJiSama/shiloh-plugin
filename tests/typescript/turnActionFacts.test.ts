@@ -47,6 +47,45 @@ test('a failed delivery prompt states the observed failure without inventing rej
   assert.match(prompt, /已核验该任务当前没有仍有效的后续投递登记/)
 })
 
+test('a failed delivery does not establish whether a resend channel is available', () => {
+  const actual = validateTurnActionFacts(facts([task({delivery:{state:'failed'}})]), event, now)
+  const prompt = buildTurnActionFactsPrompt(actual)
+  assert.equal(actual.tasks[0]?.result, 'available')
+  assert.equal(actual.tasks[0]?.delivery.state, 'failed')
+  assert.match(prompt, /这次发送失败也不能证明重发通道缺失或不可用/)
+  assert.match(prompt, /是否可重发应依据当轮可用工具、权限和实际执行结果/)
+  assert.doesNotMatch(prompt, /(?:当前|现在)没有(?:能|可用的?)重发通道/)
+})
+
+test('a later user request permits synchronous work without guaranteeing a future resend', () => {
+  for (const followUp of [{state:'none'}, {state:'unknown'}, {state:'registered',kind:'job_completion',id:'job'}] as const) {
+    const actual = validateTurnActionFacts(facts([task({source:'live_job',execution:'running',followUp})]), event, now)
+    const prompt = buildTurnActionFactsPrompt(actual)
+    assert.equal(actual.tasks[0]?.followUp.state, followUp.state)
+    assert.match(prompt, /用户再次发起请求时，可以按当轮可用工具和权限同步查询、回复或尝试发送/)
+    assert.match(prompt, /不需要现在预先登记自动跟进/)
+    assert.match(prompt, /不能保证届时具备重发条件或一定发送成功/)
+    if (followUp.state === 'registered') {
+      assert.match(prompt, /已核验仍有效的完成后投递任务 job/)
+      assert.doesNotMatch(prompt, /已核验该任务当前没有仍有效的后续投递登记|后续投递登记尚未确认/)
+    }
+  }
+})
+
+test('current callback facts cannot rewrite an unobserved history or assign a cancellation actor', () => {
+  for (const followUp of [{state:'none'}, {state:'unknown'}] as const) {
+    const actual = validateTurnActionFacts(facts([task({source:'live_job',execution:'running',followUp})]), event, now)
+    const prompt = buildTurnActionFactsPrompt(actual)
+    assert.equal(actual.tasks[0]?.followUp.state, followUp.state)
+    assert.match(prompt, /本轮核验时的任务状态，并非完整历史审计/)
+    assert.match(prompt, /不能倒推先前从未登记或旧回复有误/)
+    assert.match(prompt, /只有当时证据能证明旧回复错误，才将其说明为记错或说错/)
+    assert.match(prompt, /没有历史证据时，不补写过去的登记、取消过程或执行者/)
+    assert.match(prompt, /用户对操作的转述应保留来源，不能说成机器人刚执行的操作/)
+    assert.doesNotMatch(prompt, /上一轮(?:记错|说错)|机器人(?:刚|已经)取消了/)
+  }
+})
+
 test('missing records and registrations describe this lookup rather than system capability', () => {
   const prompt = buildTurnActionFactsPrompt({scope:{botId:'99',conversationId:'group:1',userId:'2'},observedAt:now,lookup:'unavailable',tasks:[]})
   assert.match(prompt,/未查到记录不代表任务没有在执行/)
