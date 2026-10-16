@@ -39,7 +39,7 @@ if (protocolDifferences.length) {
   assert.equal(configApplicability.frozenPersonaLibraryHash, candidate.metadata.personaLibraryHash)
   assert.equal(configApplicability.runtimeComparison.relevantEqual, true)
   assert.ok(configApplicability.runtimeComparison.differingPaths.every(name =>
-    ['groupModeration.overlongMessage', 'groupModeration.burstMessage', 'emojiSystem.admissionExtraReject', 'groupAdmin']
+    ['groupModeration.overlongMessage', 'groupModeration.burstMessage', 'groupModeration.adScan', 'emojiSystem.admissionExtraReject', 'groupAdmin']
       .some(root => name === root || name.startsWith(`${root}.`))))
 }
 assert.deepEqual(candidate.results.map(key), baseline.results.map(key))

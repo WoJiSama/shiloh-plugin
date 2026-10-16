@@ -333,3 +333,83 @@ test("连发窗口外的不计入：分两条慢速消息不触发", async () =>
   assert.equal(calls.apis.filter(call => call.method === "delete_msg").length, 0)
   assert.equal(calls.forwards.length, 0)
 })
+
+test("回归：子功能开关按配置值展示，不再被模块启用状态覆盖", async () => {
+  const { buildGroupAdminView } = await import("../dist/backend/adapters/config/groupAdminConfig.js")
+  // 复刻线上真实状态：模块已启用 + 本群 override 里 burstMessage.enabled=false
+  const settings = {
+    groupModeration: { enabled: true, enabledGroups: ["821466122"] },
+    groupAdmin: {
+      overrides: [
+        {
+          groupId: "763694201",
+          groupModeration: {
+            enabled: true,
+            overlongMessage: { enabled: true, maxLength: 200 },
+            burstMessage: { enabled: false }
+          }
+        }
+      ]
+    }
+  }
+  const view = buildGroupAdminView("763694201", settings)
+  const pick = name => view.groups.flatMap(group => group.fields).find(field => field.field === name)
+  assert.equal(pick("groupModeration.enabled").value, true, "模块本群启用状态不变")
+  assert.equal(pick("groupModeration.overlongMessage.enabled").value, true)
+  assert.equal(pick("groupModeration.overlongMessage.maxLength").value, 200)
+  assert.equal(
+    pick("groupModeration.burstMessage.enabled").value,
+    false,
+    "连发折叠开关必须按 override 的 false 展示，而不是跟着 enabledGroups 变 true"
+  )
+  // 标签改写只作用于模块级启用字段，子功能开关保留原名
+  assert.equal(pick("groupModeration.enabled").label, "在本群启用")
+  assert.equal(pick("groupModeration.burstMessage.enabled").label, "连发消息折叠开关")
+  assert.equal(pick("groupModeration.overlongMessage.enabled").label, "超长消息折叠开关")
+})
+
+test("adScan 配置归一化：默认开启，显式 false 才关闭", () => {
+  assert.equal(normalizeGroupModerationConfig({}).adScan.enabled, true)
+  assert.equal(normalizeGroupModerationConfig({ adScan: { enabled: false } }).adScan.enabled, false)
+  assert.equal(normalizeGroupModerationConfig({ adScan: { enabled: true } }).adScan.enabled, true)
+})
+
+test("广告扫描关闭：广告消息不再触发风控处置", async () => {
+  const { manager, calls, makeEvent } = createHarness({
+    settings: baseSettings({
+      overlongMessage: { enabled: true, maxLength: 20 },
+      adScan: { enabled: false },
+      publicReportEnabled: true
+    })
+  })
+  const adText = `长期招募兼职代理，日结佣金，加微信 abc12345，详情看 https://example.com/${"详情".repeat(20)}`
+  const handled = await manager.handleMessage(makeEvent(adText))
+  assert.equal(handled, false, "广告判定关闭后不处置")
+  assert.equal(calls.apis.filter(call => call.method === "delete_msg").length, 0)
+  assert.equal(calls.replies.length, 0, "不发群内提醒")
+})
+
+test("广告扫描关闭：超长折叠与连发折叠仍然生效", async () => {
+  const settings = baseSettings({
+    overlongMessage: { enabled: true, maxLength: 100 },
+    burstMessage: { enabled: true, maxMessages: 3, muteSeconds: 30 },
+    adScan: { enabled: false }
+  })
+  const { manager, calls, makeEvent } = createHarness({ settings })
+  // 超长折叠
+  const longText = "今天天气真好。".repeat(20)
+  assert.equal(await manager.handleMessage(makeEvent(longText)), true, "超长折叠仍触发")
+  assert.equal(calls.forwards.length, 1)
+  // 连发折叠
+  await sendBurstMessages(manager, makeEvent, 3)
+  assert.equal(calls.forwards.length, 2, "连发折叠仍触发")
+  assert.ok(calls.apis.some(call => call.method === "set_group_ban"), "连发禁言仍生效")
+})
+
+test("广告扫描关闭支持按群覆盖浅合并", () => {
+  const resolved = resolveGroupAdminSettings({
+    groupModeration: { adScan: { enabled: true } },
+    groupAdmin: { overrides: [{ groupId: String(GROUP_ID), groupModeration: { adScan: { enabled: false } } }] }
+  }, GROUP_ID)
+  assert.equal(normalizeGroupModerationConfig(resolved.groupModeration).adScan.enabled, false)
+})

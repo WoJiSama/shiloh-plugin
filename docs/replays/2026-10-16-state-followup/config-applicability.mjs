@@ -14,7 +14,7 @@ const sha = value => createHash('sha256').update(value).digest('hex')
 const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value
 const hashValue = value => sha(JSON.stringify(stable(value)))
-const roots = ['groupModeration.overlongMessage', 'groupModeration.burstMessage', 'emojiSystem.admissionExtraReject', 'groupAdmin']
+const roots = ['groupModeration.overlongMessage', 'groupModeration.burstMessage', 'groupModeration.adScan', 'emojiSystem.admissionExtraReject', 'groupAdmin']
 const withoutNonChatRoots = input => {
   const value = structuredClone(input)
   for (const name of roots) {
@@ -52,7 +52,7 @@ const comparison = (first, second) => ({
   relevantEqual:hashValue(withoutNonChatRoots(first)) === hashValue(withoutNonChatRoots(second))
 })
 const result = {
-  at:new Date().toISOString(), method:'Full effective configuration hashes retained; only the four explicitly listed non-chat roots are removed for the separate applicability comparison. No configuration values are exported.',
+  at:new Date().toISOString(), method:'Full effective configuration hashes retained; only the explicitly listed non-chat roots are removed for the separate applicability comparison. No configuration values are exported.',
   allowedNonChatRoots:roots,
   finalCommit:JSON.parse(read(runtime, 'release-manifest.json')).commit,
   referenceCommit:JSON.parse(read(reference, 'release-manifest.json')).commit,
@@ -65,6 +65,6 @@ const result = {
 console.log(JSON.stringify(result, null, 2))
 for (const value of [result.runtimeComparison, result.productionComparison]) {
   assert.ok(value.relevantEqual, 'Chat-relevant effective configuration changed')
-  assert.ok(value.differingPaths.every(allowed), 'Configuration changed outside the four non-chat roots')
+  assert.ok(value.differingPaths.every(allowed), 'Configuration changed outside the declared non-chat roots')
 }
 assert.equal(result.frozenPersonaLibraryHash, result.productionConfigHashes['config/persona-library.yaml'])

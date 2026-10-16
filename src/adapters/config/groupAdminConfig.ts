@@ -67,12 +67,15 @@ export function buildGroupAdminView(groupId: string, settings: Data) {
   const resolved = normalizeSettings(settings, id)
   const view = buildSchemaConfigView(`groupAdmin:${id}`, groupEntry, resolved)
   const legacyRule = legacyNoticeRule(settings, id)
+  // 只有三个模块级启用字段才由 enabledGroups 推导；子功能开关（如 overlongMessage.enabled）
+  // 是普通继承字段，直接读配置值，否则会跟着模块启用状态永远显示为开、关不掉
+  const moduleEnable = (field: string) => GROUP_ADMIN_MODULES.some(key => field === `${key}.enabled`)
   const selection = (source: Data, field: string) => {
-    if (field.endsWith('.enabled')) return (adminRecord(source[field.split('.')[0]!]).enabledGroups as string[]).includes(id)
+    if (moduleEnable(field)) return (adminRecord(source[field.split('.')[0]!]).enabledGroups as string[]).includes(id)
     return getIn(source, field)
   }
   view.groups = view.groups.map(group => ({ ...group, fields: group.fields.map(field => {
-    const isEnabled = field.field.endsWith('.enabled')
+    const isEnabled = moduleEnable(field.field)
     const fallback = isEnabled ? false : getIn(globals, field.field)
     const inherited = selection(legacy, field.field)
     const value = selection(resolved, field.field)
@@ -136,7 +139,8 @@ export function prepareGroupAdminUpdates(groupId: string, settings: Data, payloa
   }
   for (const name of resets as string[]) {
     if (!fields.has(name)) throw fail(`未知本群配置字段: ${name}`)
-    if (name.endsWith('.enabled')) throw fail('恢复默认保留本群启用状态，请单独调整启用开关')
+    // 只有模块级启用状态不允许恢复默认；子功能开关（超长/连发折叠等）可以正常恢复默认继承
+    if (GROUP_ADMIN_MODULES.some(key => name === `${key}.enabled`)) throw fail('恢复默认保留本群启用状态，请单独调整启用开关')
     removePath(row, name)
     if (['groupNotice.welcomeEnabled', 'groupNotice.leaveEnabled'].includes(name)) {
       const message = name.includes('.welcome') ? 'welcomeMessage' : 'leaveMessage'

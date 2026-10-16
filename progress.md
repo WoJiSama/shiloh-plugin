@@ -1772,3 +1772,5 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 8529完整28组fresh盲评校验合并/揭盲并封存8529c94-review：综合9胜8负11平、210:212，自然度4胜7负17平、49:52，硬错候选0/基线2；粗评未标父确认的P0漏洞，原评保留，不据此放弃真实回归。动作4类source146/146，诊断source104/104；统一strict/backend build/testcompile及10文件最终发送/实际产物382/382，无跳过。
 - 新诊断source首次直接Node读取TS时依赖.js未映射导致ERR_MODULE_NOT_FOUND（两次日志保留），随后用只读resolver映射实际.ts。新spec跨逗号与“正常工作温度要看型号”的合法控制暴露误伤后修局部条件，不改原期望；真实最终发送3组RED、各次失败和GREEN均归档message-outcome-*。独立1005固定产物复核已启动。
 - 原目录最新8a831d3为01a后继，391接受目标全部原hash保持；新HEAD/index/dirty及全文件hash另备份，旧baseline保留。线上只读已7ad2f83；继续合入新模块子开关与广告扫描功能，安装前增加可选预期生产commit核对，配置审计改为显式预部署hash快照，避免覆盖并发更新。
+
+- 1005固定只读产物复核已停写并归档message-outcome-compiled-review.json：1003期望通过、source/dist1005逐项相等，旧810实测810相同及3补充实测3相同、新192全部通过；原两份期望差异保留。8a831d3合并11冲突备份/tmp/bl-final-merge-8a831d3-20261016；所有聊天源码/相关测试与280a9a4一致，所有群管业务/测试与8a831d3一致，不借旧产物成绩代替合并版全量门禁。新增adScan只进入完整配置默认字段差异，适用性审计显式加此根。

@@ -594,15 +594,22 @@ export class GroupModerationManager {
 
     // 连发折叠检测：独立于广告规则；触发后优先于刷屏/超长处理，避免同一批消息被处理两次
     const burst = this.trackBurstMessage(e, config)
+    // 超长折叠与广告风控并行判定：命中风控的消息优先按风控处理（不把广告内容再转发一遍）
+    const visibleText = this.extractVisibleText(e)
+    const overlong = this.checkOverlongMessage(visibleText, config)
+
+    // 广告扫描关闭：跳过广告/刷屏判定，只保留超长/连发折叠（各自另有开关）
+    if (config.adScan?.enabled === false) {
+      if (burst) return await this.handleBurstMessage(e, config, burst)
+      if (overlong) return await this.handleOverlongMessage(e, config, visibleText, overlong)
+      return false
+    }
+
     // 刷屏检测：独立等级门槛，与广告规则无关（纯表情/短消息刷屏也算）
     const flood = burst ? null : this.checkFlood(groupId, userId, member?.level, config)
 
     const content = await this.extractContent(e, config)
     if (!content.text && !content.imageCount && !content.forwardCount && !flood && !burst) return false
-
-    // 超长折叠与广告风控并行判定：命中风控的消息优先按风控处理（不把广告内容再转发一遍）
-    const visibleText = this.extractVisibleText(e)
-    const overlong = this.checkOverlongMessage(visibleText, config)
 
       const base = analyzeModerationRules({
         text: content.text,
