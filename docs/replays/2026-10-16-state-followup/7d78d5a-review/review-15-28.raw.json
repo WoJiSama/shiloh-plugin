@@ -1,0 +1,503 @@
+{
+  "methodology": {
+    "input": "/tmp/bl-state-7d78d5a-blind/conversations-15-28.json",
+    "scope": "逐组完整阅读 recentContext、initialQuote、A/B 全部用户及 assistant 轮次与 knownTaskFacts；只读取本次指定匿名输入，不使用版本身份或其他材料。",
+    "scale": {
+      "0": "明显失败或核心要求未满足",
+      "1": "部分满足，但有实质不足",
+      "2": "充分满足，无明显问题"
+    },
+    "dimensions": {
+      "evidence_fidelity": "事实、状态和判断的确定程度是否与已给证据相符。",
+      "continuity": "说话人、对象、数量、限制条件和先前立场是否连续一致。",
+      "new_information": "是否吸收每轮新增信息，并回应当前问题或互动意图。",
+      "naturalness": "整段会话是否顺畅、得体、符合场景；不把长短本身作为质量依据。"
+    },
+    "aggregation": "每维两侧各评 0-2 分；单维 winner 按该维分数比较，overall 按四维总分比较，同分为 tie。",
+    "hard_error_threshold": "仅列明确事实矛盾、无证据却作为已定事实的具体断言，以及无来源的延期发送承诺等。显式接梗中的夸张意象、带保留的语气判断、轻微措辞问题和答案不完整不自动列为 hard error；用户设定的对象和时间条件仍需保持。每条引文均校验为对应 assistant 原文的连续子串。",
+    "clock_handling": "遵照 historyClockDisclosure，历史时间按消息 ID 对应，后续用户轮次采用实际 2026-10-16 时钟；不把用户说刚才当成交付时间证明，也不由任务观测时间推定交付日期。case-27 B 的考试提醒日期直接来自 dueAt，4102444800000 对应 Asia/Shanghai 的 2100-01-01 08:00，未误判为无依据日期。",
+    "coverage": {
+      "cases": 14,
+      "caseIds": [
+        "case-15",
+        "case-16",
+        "case-17",
+        "case-18",
+        "case-19",
+        "case-20",
+        "case-21",
+        "case-22",
+        "case-23",
+        "case-24",
+        "case-25",
+        "case-26",
+        "case-27",
+        "case-28"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "caseId": "case-15",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 对型号、测点、环境及功耗墙保留了判断边界；B 笼统称自动降频比温度数字更有参考价值，未说明掉频也可能来自功耗限制。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均保留两小时改为十分钟的梗，随后围绕新的 CPU 满载情境回答，没有把梗图气味套成实测异常。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧都在认真问后停止接梗，吸收了只有 82℃ 读数不足以下结论这一关键信息，并询问型号和测温软件。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧接梗和转入技术说明均顺畅，解释长度符合需要。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A"
+      }
+    },
+    {
+      "caseId": "case-16",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "认真回答均未仅凭 82℃ 或无烟无味判定安全，均要求型号、测点及规格依据；前两轮为明确请求的夸张接梗。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均跟进十分钟版本，并在第三轮切换到 CPU 温度判断，没有把前面的香水梗当成实际故障记录。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均接住认真询问并给出判断条件；A 进一步说明温度趋势及功耗墙，B 的较短回答也覆盖基本判断边界。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 的玩笑与认真解释衔接自然；B 的漏液、闻甜味笑点较突兀，认真回答又转为泛指部件的套话。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A"
+      }
+    },
+    {
+      "caseId": "case-17",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧没有引入需要外部核验的具体事实；当下接话和陪伴语境不构成延期主动联系承诺。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均保持与用户直接互动，并继续使用三秒钟的哄人设定。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均把开玩笑理解为轻松互动，没有升级为严肃关系问题或说教。"
+      },
+      "naturalness": {
+        "A": 1,
+        "B": 2,
+        "winner": "B",
+        "reason": "A 的在呢、好啦、别气较重复；B 用说慢点哄到明天接三秒梗，更紧凑顺口。"
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B"
+      }
+    },
+    {
+      "caseId": "case-18",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均为社交接话和明确玩笑，没有具体任务状态或未来发送事实的无依据断言。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都保持直接对用户说话，并延续三秒和哄好的互动对象。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都吸收了开玩笑的语气，以摸摸头等轻松回应接住。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "A 的一秒加两秒与 B 的顶嘴后安抚都能成立；B 略带调侃，仍与当前轻松语境相容。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie"
+      }
+    },
+    {
+      "caseId": "case-19",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均在明确的饼干工资玩笑内回应；请假、供起来等是接梗，没有把现实任务或交付状态说成已知。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧都正确维持三块扣两块剩一块，最后继续围绕同一块年终奖，A 也延续了巧克力夹心偏好。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都随扣减更新数量，并接住最后一块不能吃、改成年终奖的限制。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "A 的抠门老板和请假、B 的饼干渣和供起来都贴合连续工资梗，表达自然。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie"
+      }
+    },
+    {
+      "caseId": "case-20",
+      "evidence_fidelity": {
+        "A": 1,
+        "B": 2,
+        "winner": "B",
+        "reason": "A 将未给出发放日期的年终奖直接说成明年发放，加入了无依据的具体时间；B 未作同等具体的确定断言。"
+      },
+      "continuity": {
+        "A": 1,
+        "B": 2,
+        "winner": "B",
+        "reason": "A 第二轮的溜号还这么理直气壮和省着点花使雇主与领工资者的指向含混，末轮又改变时间设定；B 始终保留领一块且不能吃的关系。"
+      },
+      "new_information": {
+        "A": 1,
+        "B": 2,
+        "winner": "B",
+        "reason": "A 末轮把不能吃的年终奖转成锁定到明年发放，未准确承接新增限制；B 用先供着、闻味回应不能吃。"
+      },
+      "naturalness": {
+        "A": 1,
+        "B": 2,
+        "winner": "B",
+        "reason": "A 第二轮的责备与花工资指向不顺，第三轮的明年设定也显突兀；B 的扣三分之二及供着闻味衔接自然。"
+      },
+      "overall": {
+        "A_total": 4,
+        "B_total": 8,
+        "winner": "B"
+      }
+    },
+    {
+      "caseId": "case-21",
+      "evidence_fidelity": {
+        "A": 1,
+        "B": 2,
+        "winner": "B",
+        "reason": "A 从呀和点名较直接推断对方就是想被哄，推断强度偏高；B 明确承认单句不足定论，并提出前情可能改变判断。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧首轮都正确分析小林对阿青的引文，次轮也正确切换为用户对 assistant 说话。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都接住不是叫你的归属说明和轮到我了的对象切换。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "A 直接接话，B 先确认换人再回应，均能自然完成当前互动。"
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 8,
+        "winner": "B"
+      }
+    },
+    {
+      "caseId": "case-22",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧都将撒娇判断表述为倾向，并保留风格或前情的可能影响；末轮口癖评价属于轻松调侃，不当作已核验人格事实。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都保留小林问阿青的引文归属，并在用户接话时切回直接互动。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都响应用户这次是在问 assistant，未继续把问题当作仅需分析的第三方引文。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 接住当前称呼后收住；B 又扩展为模仿与共同口癖，解释和调侃略显多余，削弱直接回应感。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A"
+      }
+    },
+    {
+      "caseId": "case-23",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "均未虚构考试原因、成绩或后果；陪着表述落在当前对话，没有无来源的将来主动发送承诺。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "均保持不讲道理的安静陪伴立场，没有转向复盘或教育。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "均吸收用户只想待一会儿的要求，第二轮未追加建议或追问。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "A 明示可以不说话，B 延续前轮陪伴并极短回应；两种长度都适合安静陪伴，不能仅因 B 短而判差。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie"
+      }
+    },
+    {
+      "caseId": "case-24",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧只回应已给出的考砸和难受，没有虚构原因或成绩，也没有现实能力之外的具体承诺。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧从首轮到次轮都保持接纳与陪伴，没有违背先别讲道理的立场。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都随用户选择安静待着而停止展开话题。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "A 的不急着好起来与 B 的简短在呢均得体，信息量差异符合陪伴场景，不形成明确优劣。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 8,
+        "winner": "tie"
+      }
+    },
+    {
+      "caseId": "case-25",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均只把焦糊味当作可能异常，未断言特定元件已烧坏；均不以无烧痕、散味或冷却作为恢复安全的证明。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "都保持已经拔电的状态，第二轮继续反对通电试探，没有改变先前处理立场。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "均正面回答能否先开机，并给出继续断电、外部观察及专业检修的相关措施。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 使用直接易懂的别开机和送修说明；B 的这些异常、你已报告、电源隔离等表述较公文化。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A"
+      }
+    },
+    {
+      "caseId": "case-26",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧都区分异常信号与确定损坏，风险描述保留可能性，未把用户未提及的烟雾当成已发生事实。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均维持拔电、禁止自行开机验证及专业排查的连续处理立场。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "A 直接说不行，B 虽复用较泛的说明也明确要求不要再开机试探，都回答了新增的试机提问。"
+      },
+      "naturalness": {
+        "A": 1,
+        "B": 1,
+        "winner": "tie",
+        "reason": "两侧各有一轮较公文化的标准段落；A 次轮更直接，B 首轮更口语，完整会话的自然度各有不足。"
+      },
+      "overall": {
+        "A_total": 7,
+        "B_total": 7,
+        "winner": "tie"
+      }
+    },
+    {
+      "caseId": "case-27",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧都没有把考试提醒当成改图任务，也未声称图已完成或仍在执行；B 的 2100 年提醒时间可由给定 dueAt 验证，回头跑一次的问句是提议而非已登记承诺。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "均保持改背景图和考试提醒为两个对象，不借考试提醒的登记推定改图已登记或已交付。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 明确说明未查到图任务及有效自动发送登记，直接回应两个问题；B 只笼统说不能确认会否自动发，并转去提醒日期和重跑提议，登记边界交代不足。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均能用日常说法表达查询不确定性；B 插入考试日期略分散重点，但整句仍通顺。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 7,
+        "winner": "A"
+      }
+    },
+    {
+      "caseId": "case-28",
+      "evidence_fidelity": {
+        "A": 2,
+        "B": 2,
+        "winner": "tie",
+        "reason": "两侧均未把未查到的图说成已完成或正在执行，考试提醒登记有依据；A 的不自动发图对应用户只登记考试提醒及未见图发送登记的当前证据。"
+      },
+      "continuity": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 始终围绕改图结果与发送登记；B 在图的话题中说考不考得出，混入考试措辞，指向变得含混。"
+      },
+      "new_information": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 直接区分图的结果未知和未登记自动发送；B 确认考试提醒后转为日后再看，没有回答图好后是否自动发。"
+      },
+      "naturalness": {
+        "A": 2,
+        "B": 1,
+        "winner": "A",
+        "reason": "A 虽有少量重复，意思清楚；B 的考不考得出不合当前改图语境，到时候看看也较敷衍。"
+      },
+      "overall": {
+        "A_total": 8,
+        "B_total": 5,
+        "winner": "A"
+      }
+    }
+  ],
+  "hardErrors": [
+    {
+      "id": "hard-case-20-A-001",
+      "candidate": "A",
+      "caseId": "case-20",
+      "occurrences": [
+        {
+          "turn": 3,
+          "exactQuote": "年终奖还能锁定到明年发放"
+        }
+      ],
+      "reason": "用户只把剩余一块饼干设为不能吃的年终奖，没有给出明年发放的时间条件；该句把新增的具体延期时间作为已定设定来回应。"
+    }
+  ]
+}

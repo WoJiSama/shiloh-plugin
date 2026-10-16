@@ -117,7 +117,8 @@ const TASK_SUBJECT = `${SUBJECT_PREFIX}(?:任务|请求|处理|生成|改图|画
 const PARTICLES = '(?:[呀啊啦咯喽欸呢哦哈吧～~]*)'
 const PAST = '(?:已经|已|刚才|刚刚|早就)?'
 const READY = `${PAST}(?:出来|做好|弄好|弄完|完成|生成好|生成完|改好|画好|画完|做完|好)(?:了|啦)?`
-const ABSENT = '(?:(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:跑出来|出来|做好|弄(?:好|完)|完成|生成(?:好|出)?|改好|产出|画完)|没(?:有)?(?:跑到|生成出|产出)(?:结果|成品))'
+const ABSENT = '(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:跑出来|出来|做好|弄(?:好|完)|完成|生成(?:好|出)?|改好|产出|画完)'
+const RESULT_ABSENT = '(?:还没(?:有)?|尚未|暂未|没有|没|未)(?:出|跑到|生成出|产出)(?:结果|成品)'
 const RUNNING = '(?:(?:还(?:在)?|仍(?:然)?(?:在)?|正在|目前(?:还)?在|现在(?:还)?在|在)(?:生成|处理|制作|画图|改图|运行|跑)(?:中|着)?|(?:生成|处理|制作|运行|执行)中)'
 const QUEUED = '(?:(?:还|仍|正在|目前|现在)?在排队(?:中)?|排队中)'
 const FAILED = `${PAST}(?:失败|没跑成|中断|出错)(?:了|啦)?`
@@ -136,6 +137,7 @@ const predicate = (dimension: TaskStateDimension, value: TaskStateValue, state: 
 const STATE_PREDICATES: StatePredicate[] = [
   predicate('artifact', 'available', READY, 'artifact'),
   predicate('artifact', 'unavailable', ABSENT, 'artifact'),
+  predicate('artifact', 'unavailable', RESULT_ABSENT, 'either'),
   predicate('artifact', 'unavailable', '(?:还|仍)?不算(?:已经|已)?(?:出来|做好|完成)(?:了)?', 'artifact'),
   predicate('execution', 'running', RUNNING, 'either'),
   predicate('execution', 'not_running', '(?:已经|现在|目前|还|也)?(?:没有|没|不|未)(?:在|正在)?(?:生成|处理|制作|画图|改图|运行|跑|执行)(?:中|着)?(?:了)?', 'either'),
@@ -155,11 +157,13 @@ const STATE_PREDICATES: StatePredicate[] = [
   predicate('follow_up', 'registered', '(?:仍|还|依然)?(?:有效|生效)(?:的)?', 'either', false)
 ]
 const SELF_LOCATION = '(?:我(?:这边|这里|这儿|手里|手上)?|这边|这里|这儿|手头)'
+const DELIVERY_ASPECT_SUBJECT = '(?:发送|投递)(?:(?:这|那)边)?'
 const IMAGE_REFERENCE = '(?:第[一二三四五六七八九十0-9]+张|这张|那张)'
 const QUALIFIED_IMAGE_REFERENCE = new RegExp(`^(?:改|换)(?:图(?:片)?)?背景(?:的)?${IMAGE_REFERENCE}(?:图(?:片)?)?$`, 'u')
 const NOMINAL_HEAD = new RegExp(`^(?:${ARTIFACT_SUBJECT}|${IMAGE_REFERENCE})(.*)$`, 'u')
 const TASK_HEAD = new RegExp(`^(?:${TASK_SUBJECT}|${ARTIFACT_SUBJECT}的?(?:任务|请求))(?:本身)?(?:的)?$`, 'u')
 const QUALIFIED_TASK_HEAD = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图|生成(?:图(?:片)?|视频|文件|报告))(?:(?:的)?(?:这|那)(?:个|次|件)?|的)?(?:任务|请求|事)(?:本身)?(?:的)?$/u
+const QUALIFIED_TASK_REFERENCE = /^(?:(?:改|换)(?:图(?:片)?)?背景|出图|改图|画图)(?:的)?(?:这|那)(?:个|次|件)$/u
 const FOLLOW_UP_OBJECT = /(?:自动|主动|完成后|好了(?:后)?|后续|定时|到点|提醒|闹钟).{0,16}(?:发(?:送|图)?|推送|投递|补发|通知|提醒|安排|登记|任务)(?:的)?(?:安排|设置|机制|功能|能力|登记|任务)?$|(?:提醒|闹钟)(?:安排|设置|登记|任务)?$/u
 const FOLLOW_UP_DELIVERY_OBJECT = new RegExp(`^(?:给(?:你|您))?(?:发(?:送)?|投递)(${ARTIFACT})(?:这(?:件)?事)?$`, 'u')
 const IMPLICIT_SUBJECT = new RegExp(`^${IMPLICIT_PREFIX}$`, 'u')
@@ -178,13 +182,14 @@ function taskObjectReference(rawSubject: string, context: boolean, rawTopic: Evi
   if (OTHER_SUBJECT.test(subject) || /(?:没(?:有)?|尚未|未能)(?:查到|核实到|确认到)/u.test(subject)) return undefined
   const delivery = FOLLOW_UP_DELIVERY_OBJECT.exec(subject)
   if (delivery) return {kind:'follow_up', topic:evidenceTopic(delivery[1]!), surface:rawSubject}
+  if (context && new RegExp(`^${DELIVERY_ASPECT_SUBJECT}$`, 'u').test(subject)) return {kind:'follow_up',topic:rawTopic,surface:rawSubject}
   if (context && /^(?:这|那)(?:个|种)?(?:功能|能力)$/u.test(subject)) return {kind:'follow_up', topic:rawTopic, surface:rawSubject}
   if (FOLLOW_UP_OBJECT.test(subject)) return {kind: 'follow_up', topic: rawTopic, surface: rawSubject}
   if (TASK_HEAD.test(subject) || QUALIFIED_TASK_HEAD.test(subject)) {
     const topic = evidenceTopic(subject)
     return {kind: 'task', topic: topic === 'unknown' || topic === 'generic' ? rawTopic : topic, surface: rawSubject}
   }
-  if (context && rawTopic === 'image' && /^(?:改图|画图)(?:这|那)个$/u.test(subject)) return {kind:'task',topic:'image',surface:rawSubject}
+  if (context && rawTopic === 'image' && QUALIFIED_TASK_REFERENCE.test(subject)) return {kind:'task',topic:'image',surface:rawSubject}
   if (context && rawTopic === 'image' && QUALIFIED_IMAGE_REFERENCE.test(subject)) return {kind: 'artifact', topic: 'image', surface: rawSubject}
   const nominal = NOMINAL_HEAD.exec(subject)
   if (nominal) {
@@ -216,7 +221,17 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
     // Time and additive adjuncts do not supply another sender. Resolve an
     // omitted delivery subject locally, without changing artifact predicates.
     const pastDelivery = state.dimension === 'delivery' && PAST_DELIVERY_SUBJECT.test(subject.replace(SUBJECT_CONNECTOR, '').trim())
-    const object = taskObjectReference(pastDelivery ? '' : subject, context, rawTopic)
+    let object = taskObjectReference(pastDelivery ? '' : subject, context, rawTopic)
+    if (!object && subject) {
+      // Adjacent predicates can share one task without punctuation. Inherit
+      // only after another complete state predicate, never a free qualifier.
+      const preceding = taskStatePropositions(subject.replace(/(?:也|并且|且|并)$/u, ''),context,rawTopic,false)
+      const owner = preceding.at(-1)?.object
+      if (owner && owner.kind !== 'follow_up') {
+        propositions.push(...preceding)
+        object = owner
+      }
+    }
     if (!object || object.kind === 'implicit' && !state.implicit || state.dimension === 'existence' && !context && object.kind !== 'follow_up'
       || object.kind === 'task' && state.accepts === 'artifact' || object.kind === 'artifact' && state.accepts === 'task') continue
     if (object.kind === 'follow_up') {
@@ -232,7 +247,7 @@ function taskStatePropositions(clause: string, context: boolean, rawTopic: Evide
   }
   // Existential speech puts the state before the object (“没有这张图” /
   // “没挂着这个任务”), rather than requiring a new whole-sentence pattern.
-  const possession = new RegExp(`^(?:${SELF_LOCATION})?(?:现在|目前|本来|原来|一直|也|本来也|本来就)*(还没(?:有)?|没(?:有)?(?:挂(?:着)?)?|尚未|仍(?:然)?有|还有|有)(.+?)${PARTICLES}$`, 'u').exec(clause.replace(SUBJECT_CONNECTOR, ''))
+  const possession = new RegExp(`^(?:${SELF_LOCATION}|${DELIVERY_ASPECT_SUBJECT})?(?:现在|目前|本来|原来|一直|也|本来也|本来就)*(还没(?:有)?|没(?:有)?(?:挂(?:上|着)?)?|尚未|仍(?:然)?有|还有|有)(.+?)${PARTICLES}$`, 'u').exec(clause.replace(SUBJECT_CONNECTOR, ''))
   if (possession && !/^(?:查到|核实到|确认到)/u.test(possession[2]!)) {
     const object = taskObjectReference(possession[2]!, context, rawTopic)
     const absent = /没|未/u.test(possession[1]!)
