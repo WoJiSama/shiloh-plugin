@@ -407,7 +407,12 @@ function damageClaim(clause: string): string | undefined {
 }
 
 function isDamageDiscussion(clause: string): boolean {
-  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|短路)|(?:烧坏|烧毁|损坏|短路)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
+  return /(?:查明|排查|检查|检测|确认|确定|判断|看看|看一下).{0,18}(?:是否|有没有|哪(?:里|个)|有无).{0,12}(?:烧坏|烧毁|损坏|短路)|(?:排除|排查|检查|确认).{0,24}(?:烧坏|烧毁|损坏|短路).{0,5}(?:之前|以前|前)|(?:烧坏|烧毁|损坏|短路)(?:时|后|的情况下|一般|通常|会)|(?:要|需|应|得)(?:由|请|找).{0,10}(?:维修|专业).{0,15}(?:判断|确认|检查|检测)/u.test(clause)
+    // A statement about the limits of external observation is not by itself a
+    // claim that this device contains damage. Explicit current diagnoses remain
+    // subject to evidence checking even when followed by the same limitation.
+    || (!/(?:已经|已然|确定|确认|肯定|一定|大概率|很可能|多半|就是|说明|证明).{0,14}(?:烧坏|烧毁|损坏|短路)|(?:你(?:的|这台)|这台|这只|这块|当前(?:这台)?|本机).{0,18}(?:电源|主板|内部|里面).{0,12}(?:损坏|故障)/u.test(clause)
+      && /(?:内部|里面)(?:的)?(?:损坏|故障).{0,8}(?:外面|外观|肉眼).{0,8}(?:看不出|看不到|无法(?:看|判断)|不能(?:看|判断))/u.test(clause))
 }
 
 function temperatureAssurance(clause: string): boolean {
@@ -431,9 +436,15 @@ function advisesUnclearedOperation(clause: string): boolean {
   const action = /开机|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)/gu
   for (const match of clause.matchAll(action)) {
     const prefix = clause.slice(0, match.index)
+    const suffix = clause.slice(match.index + match[0].length)
     // A later "别摸内部" cannot negate an earlier "先开机". Only a
     // prohibition immediately governing this operation can do that.
     if (/(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|先不|暂不|无法|不宜|避免|不该|不可|不用|无需|不需要|没必要|没有必要)(?:(?:再次|再一次|再|先|重新|直接|立即|自行|擅自|贸然|去|急着|随便|就|尝试|试着|继续)|(?:把|将)(?:电源(?:线)?|插头)|给(?:这台|那台)?(?:电脑|设备|机器|主机))*(?:把|将)?\s*$/u.test(prefix)) continue
+    const objectProhibition = /(?:别|不要|不能|不可以|不建议|不允许|勿|禁止|暂不|不宜|避免|不该|不可)((?:(?:先|再|重新|直接|立即|自行|擅自|贸然|继续))*(?:用|拿|把|将|给)[^，,。！？!?；;\n]{1,30})$/u.exec(prefix)?.[1]
+    if (objectProhibition && !/摸|拆|碰|观察|检查|嗅|闻|触|开|通电|上电|测|判断|确认|操作/u.test(objectProhibition)) continue
+    // Nominal risk statements describe the cost of powering on; they do not
+    // instruct the user to do it. Keep affirmative "先通电试试" detectable.
+    if (/^\s*(?:的)?(?:风险(?:很|较|太|更)?(?:大|高)|(?:很|比较|十分|非常|更)?危险|(?:会|可能|一旦|万一).{0,18}(?:短路|损坏|烧|危险|风险))/u.test(suffix)) continue
     if (/(?:可以|能够|能|建议|先|直接|重新|试着|不妨|然后|接着|再|试试).{0,18}$/u.test(prefix)
       || /^\s*(?:(?:那|现在|你|你就|那就|还是|请|把|将)\s*)*$/u.test(prefix)) return true
   }

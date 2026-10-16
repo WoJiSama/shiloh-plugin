@@ -95,6 +95,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     session.tools = turnAvailableTools
     session.toolDecision = null
     delete session.executionTools
+    delete session.actionFactsQuery
+    delete session.replyGrounding
     const conversationContext = resolveConversationContext(e)
     if (conversationContext) session.context = conversationContext
     session.personaSnapshot = personaSnapshot

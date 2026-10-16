@@ -106,7 +106,7 @@ const STATE_CLAIMS: StateClaim[] = [
 const REFERENCED_IMAGE_STATE = /^(?:第[一二三四五六七八九十\d]+张|这张|那张)(?:图|图片)?(?:我(?:这边)?|这边)?(.+)$/u
 
 const ASYNC_ACTION = /发给(?:你|您)|发你|给(?:你|您)发|(?:发|发送|投递)(?:图|图片|成品|文件|结果)?(?:给(?:你|您)|到(?:群里|群内|群聊|这里|这儿|私聊))|(?:通知|提醒|告诉|来找|找)(?:你|您)|(?:补发|补给(?:你|您)|给(?:你|您)补上)|重跑|重试|(?:重新|再次)(?:生成|出图|画图|处理)|(?:持续|定时|自动|继续)(?:查|查询|检查)(?:进度|结果)|查进度|查询进度/gu
-const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)/gu
+const COMPLETION_TRIGGER = /(?:等(?:到)?|一旦|如果|要是|待)?(?:图(?:片)?|成品|结果|文件|任务)?(?:一出(?:来|图)?|一好|一完成|好了|好(?:后|以后|之后|时)|完成(?:了|后|以后|之后|时)|出来(?:了|后|以后|之后)|出图(?:了|后|以后|之后)|有(?:了)?结果|确认到(?:成品|结果)|拿到(?:成品|结果))|(?:图(?:片)?|成品|结果|文件|任务)(?:好|出来|完成|生成完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:出来|出图|生成完|画完|改完|做完)(?=我|就|再|会|自动|主动|给|发|通知|提醒|告诉|[，,])|(?:图(?:片)?|成品|结果|文件)(?:出了|出后|出之后)|(?:结果|成品)(?:一到|一回|到了)|(?:等(?:我)?(?:确认(?:了|到)?)?(?:真)?有图(?:了)?)|有(?:了)?(?:准信|确切(?:的)?消息|新(?:的)?进展|进展)(?:了|后|之后|以后)?/gu
 const DELAYED_PROMISE = /我(?:会|来|再|到时|稍后|明天|明早|晚上|一会儿|待会|等下)|稍后|待会儿?|过会儿|明早|到时候|到时|届时|随后|之后|自动|主动/u
 const NEGATED_ACTION = /不会|不能|不敢|无法|没法|不再|不自动|不主动|不一定会/u
 const RERUN_OR_POLL = /重跑|重试|重新|再次|查进度|查询进度|(?:持续|定时|自动|继续)(?:查|查询|检查)/u
@@ -201,6 +201,19 @@ function stateSupported(dimension: StateClaim['dimension'], tasks: TurnTaskFact[
   })
 }
 
+// Delivery records expose receipt state, not the recipient's settings or the
+// transport's rejection cause. Only flag a direct attribution of these narrow
+// states; conditional troubleshooting suggestions remain ordinary speech.
+const RECIPIENT_DELIVERY_CAUSE = /(?:你(?:那边|这边)?|接收方|收件方)(?:的)?(?:接收(?:设置|权限)?|收图(?:设置|权限)?|陌生人消息(?:设置|权限)?)[^，,。；;!?！？]{0,10}(?:拦住|拦在|拦截|挡住|拒收|屏蔽)|(?:你(?:那边|这边)?|接收方|收件方)(?:已经|已|把)?(?:图片|图|文件|消息|视频|我发的图)?(?:给)?(?:拒收|拒绝接收|屏蔽|拦截)(?:了)?|你(?:那边|这边)?(?:的)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|你(?:那边|这边)?(?:把)?(?:陌生人)?(?:图片|文件|消息|视频)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了|屏蔽了)|你(?:那边|这边)?(?:的)?(?:接收(?:开关|权限)?|收图)(?:是)?(?:关闭|关着|没开|未开|禁用)(?:的|了)?/u
+function unsupportedRecipientCause(clause: string, rawUserText: string, adjacentCause = false): boolean {
+  if (!RECIPIENT_DELIVERY_CAUSE.test(clause) || /(?:如果|假如|要是|倘若|若是)/u.test(clause)
+    || /不能(?:归因|认定|断定)|无法(?:说明|断定)|没法(?:确认|核实)|没(?:有)?核实/u.test(clause)) return false
+  // A user can report their own setting. Restating that report is allowed;
+  // attributing this particular failure to it still requires causal evidence.
+  const reported = /我(?:这边|那边)?(?:把)?(?:还)?(?:没(?:有)?|未)(?:开|开启|打开|允许|启用)(?:陌生人)?(?:图片|图|文件|消息|视频)?(?:接收|收图)|我(?:这边|那边)?(?:把)?(?:接收(?:开关|权限)?|收图)(?:给)?(?:关了|关闭了|禁用了)|我(?:已经|刚才)?(?:拒收|拒绝接收|屏蔽)(?:了)?/u.test(withoutQuotations(rawUserText))
+  return !reported || adjacentCause || /因为|所以|因此|导致|造成|就是|才(?:会|没)/u.test(clause)
+}
+
 /** Narrow, evidence-backed rejection signals. This is not a general truth or
  * naturalness score. Scope and freshness must be validated by the caller.
  * The current words, not the mere presence of an empty facts envelope, scope
@@ -213,7 +226,10 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
   for (const sentence of assertions(reply)) {
     const followUps = followUpClaims(sentence)
     const sentenceTopic = evidenceTopic(sentence.text)
-    const followUpTopic = ['unknown', 'generic', 'artifact'].includes(sentenceTopic) ? rawTopic : sentenceTopic
+    const completionNotification = sentenceTopic === 'reminder' && followUps.includes('job_completion') && !followUps.includes('reminder')
+    const followUpTopic = completionNotification
+      ? rawTopic === 'unknown' ? 'artifact' : rawTopic
+      : ['unknown', 'generic', 'artifact'].includes(sentenceTopic) ? rawTopic : sentenceTopic
     const followUpTasks = uniqueMatchingTasks(tasks, followUpTopic)
     if (followUps.some(kind => !followUpTasks.some(task => supportsFollowUp(task, kind)))) {
       violations.push({code: 'unregistered_followup', claim: sentence.text,
@@ -224,6 +240,17 @@ export function validateActionReply(reply: string, facts?: TurnActionFacts, rawU
     let sentenceTaskContext = taskContext
     for (const [index, clause] of clauses.entries()) {
       if (unasserted(clause, sentence.question && index === clauses.length - 1) || OTHER_SUBJECT.test(clause)) continue
+      const nextClause = clauses[index + 1] || ''
+      const previousClause = clauses[index - 1] || ''
+      const deliveryFailure = /(?:发送|投递|送达)(?:失败|没(?:有)?成功)|(?:图(?:片)?|消息|文件|视频)?(?:没(?:有)?(?:发|送)(?:给|到|出|过)|发不(?:出|过)|送不(?:到|出))/u
+      const adjacentCause = !unasserted(nextClause, sentence.question && index + 1 === clauses.length - 1)
+        && /^(?:所以|因此|因而|才)/u.test(nextClause) && deliveryFailure.test(nextClause)
+        || !unasserted(previousClause) && deliveryFailure.test(previousClause) && /(?:因为|由于)[呀啊呢]?$/u.test(previousClause)
+      if (taskContext && unsupportedRecipientCause(clause, rawUserText, adjacentCause)) {
+        violations.push({code: 'unsupported_delivery', claim: sentence.text,
+          reason: '当前投递记录只证明发送状态，没有证明用户拒收、关闭接收或接收设置导致失败。',
+          correctionInstruction: '只说明已核验的发送状态，缺少原因就说原因尚未确认。不要把失败归因于用户拒收或没开接收，也不要据此要求用户修改设置；条件性的排查建议需明确仍是假设。'})
+      }
       // “好了我会发你” is a future condition, not a claim that it is ready.
       if (/^(?:如果|要是|假如|一旦|等|待)/u.test(clause)
         || completionBefore(clause) >= 0 && (new RegExp(ASYNC_ACTION.source, 'u').test(clause) || hasLaterCompletionAction(clauses, index))) continue

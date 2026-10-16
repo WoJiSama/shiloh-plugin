@@ -186,3 +186,56 @@ test('completion promises require the matching artifact callback and a unique ta
     assert.deepEqual(validateActionReply(text, facts([image,video]), '刚才那张图出来了吗？'), [], text)
   }
 })
+
+test('news and progress follow-ups require the unique matching completion callback', () => {
+  const image = fact({taskId:'image', source:'live_job', execution:'running', followUp:{state:'registered',kind:'job_completion',id:'image-callback'}})
+  const video = fact({...image,taskId:'video',toolName:'videoTool',followUp:{state:'registered',kind:'job_completion',id:'video-callback'}})
+  const reminder = fact({source:'reminder',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam',dueAt:Date.now()+60_000}})
+  for (const text of [
+    '这个我现在没法确认欸，手头没有实际跑出来的结果。有准信了我直接发你。',
+    '有确切消息后我发给你。', '有确切的消息以后我发给你。',
+    '有进展再发你。', '有新的进展了我就通知你。', '有新进展我提醒你。'
+  ]) {
+    for (const list of [[], [reminder], [video], [image,{...image,taskId:'other-image'}]]) {
+      assert.ok(validateActionReply(text, facts(list), '刚才那张图出来了吗？').some(item=>item.code==='unregistered_followup'), text)
+    }
+    assert.deepEqual(validateActionReply(text, facts([image,video]), '刚才那张图出来了吗？'), [], text)
+  }
+  assert.deepEqual(validateActionReply('有新进展我提醒你。', facts([image])), [])
+  assert.ok(validateActionReply('有新进展我提醒你。', facts([reminder])).some(item=>item.code==='unregistered_followup'))
+})
+
+test('news follow-up negations, quotations, questions and user-triggered replies remain ordinary speech', () => {
+  for (const text of [
+    '有准信了你再来问我，我再发你。', '你有准信了再来问我，我再发你。',
+    '我不会有准信就发你。', '不能承诺有确切消息就通知你。',
+    '“有准信了我直接发你”这句话不能保证。', '例如有进展再发你。',
+    '有准信了我就发你吗？', '有进展，我会提醒你吗？'
+  ]) assert.deepEqual(validateActionReply(text, facts(), '刚才那张图出来了吗？'), [], text)
+})
+
+test('a failed delivery does not prove recipient rejection or closed receiving settings', () => {
+  const failedDelivery = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  for (const text of [
+    '你那边接收把我拦在外面了，把接收打开。',
+    '你拒收了图片。', '接收方拒绝接收了文件。',
+    '你没开接收，先把接收打开。', '你未开启图片接收。',
+    '你把接收关了。', '你那边接收没开。', '你那边接收权限是关闭的。'
+  ]) {
+    assert.ok(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？').some(item=>item.code==='unsupported_delivery'), text)
+  }
+  for (const text of [
+    '图已经做好了，发送没有成功，原因还没核实。',
+    '可能你没开接收，可以检查一下。', '如果你没开接收，可以检查一下。',
+    '不能断定你没开接收。', '我没法确认你没开接收。', '不能归因于你拒收了图片。',
+    '不是你拒收了图片，是我这边还没有回执。', '你没开接收吗？', '有没有开接收？',
+    '“你没开接收”只是个假设。', '例如你拒收了图片。', '你不接受我的道歉也没关系。'
+  ]) assert.deepEqual(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？'), [], text)
+  assert.deepEqual(validateActionReply('你把接收关了，可以先打开试一下。', failedDelivery, '我把接收关了，刚才的图没收到。'), [])
+  assert.deepEqual(validateActionReply('你把接收关了，所以可以先打开试一下。', failedDelivery, '我把接收关了，刚才的图没收到。'), [])
+  assert.deepEqual(validateActionReply('你把接收关了，所以发送失败了吗？', failedDelivery, '我把接收关了，刚才的图没收到。'), [])
+  assert.ok(validateActionReply('因为你把接收关了导致这次发送失败。', failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'))
+  assert.ok(validateActionReply('你把接收关了，所以这次发送失败了。', failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'))
+  assert.ok(validateActionReply('这次发送失败就是因为，你把接收关了。', failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'))
+  assert.deepEqual(validateActionReply('你拒收了我的邀请也没关系。', facts(), '今晚想聚一聚吗？'), [])
+})

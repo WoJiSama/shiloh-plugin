@@ -695,6 +695,30 @@ test('arbitrary if clauses cannot exempt unknown-temperature assurances', () => 
   ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
 })
 
+test('real-model warnings and pending exclusion remain distinct from a diagnosis or operation advice', () => {
+  const context = buildDiagnosticContext({rawUserText: '电脑电源有焦糊味，已经拔电了，怎么办？', speakerId})!
+  for (const reply of [
+    '之后交给维修检测，排除电源或主板损坏之前，不要再通电试。',
+    '焦糊味加冒烟说明可能有部件烧了，通电风险大。',
+    '没看到烧痕不代表电源、电容或主板没损伤，一通电万一短路可能把别的件也带走。',
+    '别直接用这台的原电源开机试',
+    '不要再用这台的原装电源开机检测。',
+    '电源或主板内部的损坏外面看不出来。',
+    '重新通电可能造成短路或进一步损坏。'
+  ]) assert.deepEqual(validateDiagnosticReply(reply, context), [], reply)
+  for (const reply of [
+    '排除电源或主板损坏之前，可以先通电看看。',
+    '电源或主板已经损坏，外面看不出来。',
+    '电源内部已经损坏外面看不出来。',
+    '你的电源内部的损坏外面看不出来。',
+    '这台主板内部的损坏外面看不出来。',
+    '先通电试试，注意短路风险。',
+    '通电风险大但可以先通电观察。',
+    '先用这台的原电源开机试，别直接摸内部。',
+    '别用手摸内部先开机看看。'
+  ]) assert.ok(validateDiagnosticReply(reply, context).length > 0, reply)
+})
+
 test('fallbacks use observed prerequisites and pass the same validation without rewriting the candidate', () => {
   const inputs = [
     {rawUserText: '电脑有焦糊味，已经拔电了，怎么办？'},

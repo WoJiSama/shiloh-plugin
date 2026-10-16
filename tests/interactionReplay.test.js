@@ -247,8 +247,15 @@ for (const scenario of scenarios) {
     const context = f.session.interactionContext
     assert.equal(context.kind, scenario.expectedKind)
     assert.equal(context.rawUserText, scenario.rawUserText)
-    assert.equal(f.captures.compose[0].turn.interactionContext, context)
-    assert.equal(f.captures.guards[0].interactionContext, context)
+    const withoutFacts = ({actionFacts, ...rest}) => rest
+    assert.deepEqual(withoutFacts(f.captures.compose[0].turn.interactionContext), withoutFacts(context))
+    assert.deepEqual(withoutFacts(f.captures.guards[0].interactionContext), withoutFacts(context))
+    if (context.actionFacts) {
+      assert.equal(context.actionFacts.scope.botId, '99')
+      assert.equal(context.actionFacts.scope.conversationId, `group:${f.event.group_id}`)
+      assert.equal(context.actionFacts.scope.userId, '202')
+      assert.ok(context.actionFacts.observedAt >= (f.captures.compose[0].turn.interactionContext.actionFacts?.observedAt || 0))
+    }
     assert.equal(f.captures.guards[0].userText, scenario.rawUserText)
     const system = f.captures.requests[0].find(message => message.role === 'system').content
     assert.match(system, /【本轮互动】/)
@@ -492,18 +499,38 @@ test('task lookup failure cannot borrow another account and becomes an explicit 
  }
 })
 
+test('a reused session clears the previous request scope and grounding audit at the next turn', async () => {
+  const f = fixture({rawUserText:'聊会儿天吧',modelReply:'好呀，聊什么？'})
+  f.session.actionFactsQuery = {referenceMessageId:'previous-request'}
+  f.session.replyGrounding = {original:'previous-rejected-candidate'}
+  let observed = false
+  f.host.retryRequest = async () => {
+    observed = true
+    assert.equal(f.session.actionFactsQuery,undefined)
+    assert.equal(f.session.replyGrounding,undefined)
+    return {choices:[{message:{content:'好呀，聊什么？'}}]}
+  }
+  assert.equal(await f.run(),true)
+  assert.equal(observed,true)
+  assert.equal(f.session.replyGrounding.original,'好呀，聊什么？')
+})
+
 test('terse status followups and quoted requests refresh task facts rather than old assistant promises',async()=>{
  for(const scenario of [
   {rawUserText:'好了吗？'}, {rawUserText:'还在做吗？'}, {rawUserText:'那还会自动给我吗？'},
   {rawUserText:'怎么样？',quote:{userId:'202',messageId:'original',name:'测试群友',text:'把背景改成傍晚。'}}
  ]){
   const f=fixture({...scenario,modelReply:'图片已生成，发送尚未确认。'},{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+  f.host.messageManager.getMessages=async()=>[{message_id:'original',content:'把背景改成傍晚。',sender:{user_id:202,nickname:'测试群友',role:'member'}}]
   let calls=0
-  f.host.getTurnActionFacts=async e=>{
+  const queries=[]
+  f.host.getTurnActionFacts=async (e,query)=>{
    calls++
+   queries.push(query)
    return {scope:{botId:'99',conversationId:`group:${e.group_id}`,userId:'202'},observedAt:Date.now(),lookup:'ok',tasks:[{taskId:'actual-task',requestMessageId:'original',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'completed',result:'available',delivery:{state:'unknown'},followUp:{state:'none'}}]}
   }
-  assert.equal(await f.run(),true);assert.equal(calls,1)
+  assert.equal(await f.run(),true);assert.equal(calls,2, 'lookup before generation and again before sending')
+  assert.ok(queries.every(query=>scenario.quote ? query.referenceMessageId==='original' : query.recentRequestMessageIds.includes('original')))
   assert.equal(f.session.interactionContext.actionFacts.tasks[0].execution,'completed')
   assert.ok(f.captures.gatewayRequests[0].body.messages.some(message=>String(message.content).includes('已有产物；投递结果未确认')))
  }
@@ -511,6 +538,7 @@ test('terse status followups and quoted requests refresh task facts rather than 
 
 test('text-only turn respects a separately verified existing completion registration',async()=>{
  const f=fixture({rawUserText:'刚才的图出来了吗？',modelReply:'还在生成，完成后发送的安排仍有效。'},{realPlanning:true,gatewayConfig:reasoningGatewayConfig()})
+ f.host.messageManager.getMessages=async()=>[{message_id:'original',content:'把背景改成傍晚。',sender:{user_id:202,nickname:'测试群友',role:'member'}}]
  f.host.getTurnActionFacts=async e=>({scope:{botId:'99',conversationId:`group:${e.group_id}`,userId:'202'},observedAt:Date.now(),lookup:'ok',tasks:[{taskId:'actual-task',requestMessageId:'original',toolName:'imageEdit',source:'live_job',observedAt:Date.now(),execution:'running',result:'unavailable',delivery:{state:'not_attempted'},followUp:{state:'registered',kind:'job_completion',id:'followup'}}]})
  assert.equal(await f.run(),true)
  const messages=f.captures.gatewayRequests[0].body.messages
