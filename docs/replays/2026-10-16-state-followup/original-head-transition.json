@@ -1,0 +1,20 @@
+{
+  "oldHead": "de0352134807c5aea7adf69c1af90d0e1e76db1d",
+  "newHead": "7257445f06d4f8e34e34b8cdbce7dc8edc422783",
+  "oldIndex": "d3376d9f4cebc0dbed824660fba5ba28e1676a71b8f67473d1d8aefd0955ed24",
+  "newIndex": "0c846b68c97ab36c011e009c50288e85417c40be8b483674f40e46c90664f049",
+  "acceptedTargets": 254,
+  "allAcceptedTargetHashesUnchanged": true,
+  "oldBaselinePreserved": true,
+  "snapshot": "/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/bl-fact-state-start-20261016-z3pus4g5/head-transition-20261016-215605",
+  "dirtyPaths": [
+    " M config_default/message.yaml",
+    " M src/contracts/groupAdmin.ts",
+    " M src/modules/config/domain/schemas/shared/groupGuard.ts",
+    " M src/modules/groupAdmin/domain/groupAdminPolicy.ts",
+    " M src/modules/groupAdmin/domain/groupModerationRules.ts",
+    " M src/modules/groupAdmin/infrastructure/GroupModerationManager.ts",
+    " M src/modules/groupAdmin/infrastructure/moderationMessage.ts",
+    "?? tests/groupModerationOverlong.test.js"
+  ]
+}

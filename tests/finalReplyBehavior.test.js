@@ -79,8 +79,16 @@ test('final grounding rechecks cancellation after generation and respects explic
  assert.equal(reads.length,2);assert.ok(reads.every(query=>query.referenceMessageId==='original-request'))
  assert.equal(sent[0],'我还没核实到进度，自动补发安排也尚未确认。')
 })
+const composedReplayCandidates=[
+  {"candidate":"这个我现在没法给你准信欸。你之前发的那张我记得，但我这边没查到处理结果的记录，做得怎么样、出没出图都还没确认。\n\n我这边没有可核验的进度，不想瞎猜给你一个假答案。等我实际拿到图或者结果，再发给你。","raw":"刚才改背景的图出来了吗？","tasks":[],"corrected":"图片处理结果及完成后发送的安排尚未核实。你之后再问一声，我再查当前状态。"},
+  {"candidate":"去吃吧。不过老实说，我这边没有查到会自动跟进的安排，所以不会“好了自动发你”。你要是吃完了想看进度，回来喊我一声，我再帮你查。","raw":"那我先去吃饭。好了你会自动发给我吗？","tasks":[],"corrected":"图片处理结果及完成后发送的安排尚未核实。你之后再问一声，我再查当前状态。"},
+  {"candidate":"改图那件事还在处理中，具体好没好我这边没查到。自动发不行，你吃完回来喊我一声，我再去看结果。","raw":"那我先去吃饭。好了你会自动发给我吗？","tasks":[],"corrected":"图片处理结果及完成后发送的安排尚未核实。你之后再问一声，我再查当前状态。"},
+  {"candidate":"做好了，图是有的。卡的是发出来那一步，不是还没做。你再等等，我想到办法就发你。","raw":"所以我现在没收到，是还没做好吗？","tasks":[{"taskId":"synthetic-task-001","requestMessageId":"synthetic-request-001","toolName":"imageEdit","source":"task_record","execution":"completed","result":"available","delivery":{"state":"failed"},"followUp":{"state":"none"},"observedAt":1792157677554}],"corrected":"图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"},
+  {"candidate":"我这边只核验到你的考试提醒登记了（2100年1月1日早上八点那个），改背景的图没有对应记录，所以现在没法确认它在跑，也不会好了自动发你。\n\n想要的话重新把图发我一次，我这轮能做就直接做。","raw":"刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？","tasks":[{"taskId":"exam-reminder","requestMessageId":"exam-request","toolName":"reminderTool","source":"reminder","execution":"queued","result":"unknown","delivery":{"state":"not_attempted"},"followUp":{"state":"registered","kind":"reminder","id":"exam-reminder","dueAt":4102444800000},"observedAt":1792157892801}],"corrected":"图片处理及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"},
+]
 test('qualified task claims and contradictions never become the next turn history',async()=>{
  const cases=[
+  ...composedReplayCandidates,
   {candidate:'图这边我还没查到结果，不确定好没好，别急哈。\n\n考试提醒那个是登记上了的，到 2100 年 1 月 1 号早上八点会触发。发图这事目前没有后续登记，所以就算图好了也不会自动发你，到时候你再喊我一声就行。',raw:'刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？',tasks:[{source:'reminder',toolName:'reminderTool',execution:'queued',followUp:{state:'registered',kind:'reminder',id:'exam-reminder',dueAt:4102444800000}}],corrected:'图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。'},
   {candidate:'你回来再问我，我再查，图真正出来后我再回你。',raw:'我问的是这张图，出来了吗？',tasks:[],corrected:'第一张图片的结果和后续通知安排尚未核实。你之后再问一声，我再查当前状态。'},
   {candidate:'这个我这边还没查到结果，进度我不敢乱说欸。\n\n任务我之前是接了的，现在有没有跑完还没确认，等我确认到就回你。',raw:'刚才改背景的图出来了吗？',tasks:[],corrected:'图片处理结果尚未核实，后续通知安排也尚未确认。你之后再问一声，我再查当前状态。'},
@@ -120,9 +128,10 @@ test('qualified task claims and contradictions never become the next turn histor
   {candidate:'我这边本来也没挂着这个任务。',raw:'我取消了完成后发送，那图任务也没了吗？',tasks:[{execution:'running',result:'unavailable',delivery:{state:'not_attempted'},source:'live_job'}],corrected:'图任务还在处理，当前没有完成后自动发送的安排。'}
  ]
  for(const item of cases){
-  const {api,event,host,archived,saved,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction(),actionFactsQuery:{referenceMessageId:'original-request'}}
+  const {api,event,host,archived,saved,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
   session.interactionContext.rawUserText=item.raw
   session.interactionContext.actionFacts.tasks=item.tasks.map(change=>({taskId:'job',requestMessageId:'original-request',toolName:'imageEdit',source:'task_record',observedAt:Date.now(),execution:'unknown',result:'unknown',delivery:{state:'unknown'},followUp:{state:'none'},...change}))
+  session.actionFactsQuery={recentRequestMessageIds:session.interactionContext.actionFacts.tasks.map(task=>task.requestMessageId)}
   let repairs=0
   host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:item.corrected}}]}}
   host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'state-corrected'}
@@ -136,6 +145,24 @@ test('qualified task claims and contradictions never become the next turn histor
   assert.equal(saved.length,1)
   assert.equal(enhanced[0][2],item.corrected)
   assert.doesNotMatch(JSON.stringify(messages),new RegExp(item.candidate.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))
+ }
+})
+test('invalid composed task claims returned by repair fall back before history or learning',async()=>{
+ for(const item of composedReplayCandidates){
+  const {api,event,host,archived,enhanced}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()}
+  session.interactionContext.rawUserText=item.raw
+  session.interactionContext.actionFacts.tasks=item.tasks
+  let repairs=0
+  host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:item.candidate}}]}}
+  host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'composed-claim-fallback'}
+  await api.handleTextResponse(host,'还没出来，好了我第一时间发你。',event,session,messages)
+  assert.equal(repairs,1,item.candidate)
+  assert.equal(session.replyGrounding.fallback,true,item.candidate)
+  assert.equal(sent.length,1)
+  assert.notEqual(sent[0],item.candidate)
+  assert.equal(messages.at(-1).content,sent[0])
+  assert.equal(archived[0].message[0].text,sent[0])
+  assert.equal(enhanced[0][2],sent[0])
  }
 })
 test('an explicit later user request can lead to another reply without a background registration',async()=>{
