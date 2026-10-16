@@ -295,3 +295,82 @@ test('passive rejection still requires cause evidence rather than a failed deliv
   ]) assert.deepEqual(validateActionReply(text, failedDelivery, '刚才那张图怎么没发来？'), [], text)
   assert.deepEqual(validateActionReply('图片被拒收了。', failedDelivery, '我拒收了你刚才发的图。'), [])
 })
+
+test('delivery rejection and interception share task scope without borrowing an unrecorded failure cause', () => {
+  const failedDelivery = facts([fact({execution:'completed',result:'available',delivery:{state:'failed'}})])
+  const raw = '刚才那张图怎么没发来？'
+  for (const text of [
+    '做好了，只是之前投递被拒，卡在发不出去这一步。',
+    '图其实早就出好了，就是之前发给你的时候被拦下来了，没送出去。',
+    '做好了，只是上次发的时候被拦下来，不是没做完。'
+  ]) assert.ok(validateActionReply(text, failedDelivery, raw).some(item=>item.code==='unsupported_delivery'), text)
+  for (const subject of ['之前那次投递', '只是上次发的时候', '就是之前发给你的时候', '我之前给你发的图片', '那张图的投递']) {
+    for (const cause of ['被拒', '被拒绝', '被拒收', '被拦截', '被拦下', '被拦下来', '被屏蔽', '被平台拦截']) {
+      const text = `${subject}${cause}了。`
+      assert.ok(validateActionReply(text, failedDelivery, raw).some(item=>item.code==='unsupported_delivery'), text)
+      assert.ok(validateActionReply(text, failedDelivery, '我把接收关了，刚才的图没收到。').some(item=>item.code==='unsupported_delivery'), text)
+    }
+  }
+  for (const text of [
+    '只是上次发的时候可能被拦下来，可以检查一下。',
+    '如果上次发的时候被拦截了，可以检查一下。', '不能认定之前投递被拒绝。',
+    '上次发的时候没有被拦截。', '之前投递并没有被拒。', '不是图片被屏蔽了。',
+    '只是上次发的时候被拦下来了吗？', '就是之前投递被拒吗？',
+    '“之前投递被拒”只是个假设。', '例如上次发的时候被拦下来。',
+    '只是上次邀请被拒了。', '我的邀请被拒绝了。', '只是她的包裹被拦截了。',
+    '妹妹的包裹被拒收了。', '只是他上次发的图被屏蔽了。', '之前寄包裹的时候被拒收了。'
+  ]) assert.deepEqual(validateActionReply(text, failedDelivery, raw), [], text)
+  for (const [text, report] of [
+    ['图片被拦截了。', '我刚才拦截了你发的图。'],
+    ['图片被屏蔽了。', '我屏蔽了你发的图。'],
+    ['图片被拒绝了。', '我拒收了你刚才发的图。'],
+    ['图片被拦下来了。', '刚才那张图片被拦截了。']
+  ]) assert.deepEqual(validateActionReply(text!, failedDelivery, report!), [], text)
+  assert.ok(validateActionReply('图片被拒绝了。', failedDelivery, '我屏蔽了你发的图。').some(item=>item.code==='unsupported_delivery'))
+  assert.ok(validateActionReply('图片被拦截了。', failedDelivery, '如果我拦截了你发的图呢？').some(item=>item.code==='unsupported_delivery'))
+})
+
+test('bare negative answers assert absence only in an artifact result question', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const available = facts([fact({execution:'completed',result:'available'})])
+  const sent = facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'receipt'}})])
+  for (const current of [facts(), facts([fact()]), available, sent]) {
+    for (const text of [
+      '还没欸。', '还没呢。',
+      '还没欸，第一张我这边没有记录说弄好了，别等错消息——刚才那张是第二张的傍晚版。'
+    ]) assert.ok(validateActionReply(text, current, raw).some(item=>item.code==='unsupported_task_state'), text)
+  }
+  const absent = facts([fact({result:'unavailable'})])
+  assert.deepEqual(validateActionReply('还没呢。', absent, raw), [])
+  for (const question of ['吃饭了吗？', '你妹妹回家了吗？', '图片里的人出来了吗？', '姐姐的图片做好了吗？', '“这张图出来了吗”是什么意思？', '']) {
+    assert.deepEqual(validateActionReply('还没欸。', facts(), question), [], question)
+  }
+  for (const text of [
+    '还没确认呢。', '没有记录说弄好了。', '这张我这边没确认到弄好了。',
+    '还没呢？', '“还没欸”只是个例子。', '如果还没呢，可以再核实。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), raw), [], text)
+})
+
+test('an assertion of no delivery requires a failed or unattempted delivery rather than unknown evidence', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const unknown = [facts(), facts([fact()]), facts([fact({execution:'completed',result:'available'})])]
+  const sent = facts([fact({execution:'completed',result:'available',delivery:{state:'sent',messageId:'receipt'}})])
+  const negatives = [
+    '没发出来过。', '没送出去。', '还没发给你。', '图片没有投递过。',
+    '这张我这边没确认到弄好了，没发出来过。'
+  ]
+  for (const current of [...unknown, sent]) {
+    for (const text of negatives) assert.ok(validateActionReply(text, current, raw).some(item=>item.code==='unsupported_delivery'), text)
+  }
+  for (const state of ['failed', 'not_attempted'] as const) {
+    const notSent = facts([fact({delivery:{state}})])
+    for (const text of negatives) assert.deepEqual(validateActionReply(text, notSent, raw), [], `${state}: ${text}`)
+  }
+  for (const text of [
+    '是否发出还不能确认。', '没有记录说明发出过。', '未确认是否发出。',
+    '可能没送出去。', '没有证据说明没发出来。', '没发出来过吗？',
+    '“没送出去”只是个例子。', '如果没送出去，可以再核实。',
+    '我妹妹没送出去。', '没有发出邀请。'
+  ]) assert.deepEqual(validateActionReply(text, facts(), raw), [], text)
+  for (const text of ['没送出去。', '没发出来过。']) assert.deepEqual(validateActionReply(text, facts(), '你把邀请发出去了吗？'), [], text)
+})

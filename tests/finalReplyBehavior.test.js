@@ -51,10 +51,10 @@ test('tool calls and invalid repairs cannot execute or leak into sent history',a
   assert.equal(messages[0].content,sent[0]);assert.equal(archived.length,1)
  }
 })
-test('a text-only final reply cannot promise an immediate resend or rerun without execution',async()=>{
- for(const candidate of ['我现在再发一次。','我现在发给你。','我现在重跑。']){
+test('a text-only final reply cannot archive unsupported actions, delivery causes or negative states',async()=>{
+ for(const candidate of ['我现在再发一次。','我现在发给你。','我现在重跑。','上次发给你的时候被拦下来了。','之前那次投递被拒。','没发出来过。','还没欸。']){
   const {api,event,host,archived}=fixture(),sent=[],messages=[],session={interactionContext:taskInteraction()};let repairs=0
-  session.interactionContext.rawUserText='刚才那张图没收到，能再发一次吗？'
+  session.interactionContext.rawUserText='刚才那张图出来了吗？我还没收到。'
   host.sendSegmentedMessage=async(_e,text)=>{sent.push(text);return 'honest-reply'}
   host.retryRequest=async()=>{repairs++;return {choices:[{message:{content:'我还没核实到那张图的发送记录，暂时不能确认。'}}]}}
   await api.handleTextResponse(host,candidate,event,session,messages)
