@@ -1,0 +1,28 @@
+{
+  "commit": "d2a4a373a8dcd883aed7e6d28bb20d1a50cde80e",
+  "exit": 0,
+  "countsInOrder": {
+    "tests": [
+      2409
+    ],
+    "pass": [
+      2407
+    ],
+    "fail": [
+      0
+    ],
+    "skipped": [
+      2
+    ]
+  },
+  "frontend": {
+    "files": 11,
+    "tests": 34,
+    "passed": 34,
+    "failed": 0
+  },
+  "skips": [
+    "document template screenshot: Chromium unavailable",
+    "knowledge template screenshot: Chromium unavailable"
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "sameProtocolFields": [
+    "runnerHash",
+    "scenariosHash",
+    "memoryHelperHash",
+    "configHash",
+    "effectiveConfigHash",
+    "personaHash",
+    "personaLibraryHash",
+    "repetitions"
+  ],
+  "baseline": {
+    "commit": "7548294b5f8896feb5f099dad6365d72c130d7ff",
+    "complete": true,
+    "turns": 60,
+    "structuralPassed": 59,
+    "structuralDifferences": [
+      {
+        "key": "fictional-meme-updated-duration-and-negative-fault:2:2",
+        "failures": [
+          "modelResponded"
+        ]
+      }
+    ],
+    "httpRequests": 73,
+    "http200": 72,
+    "explicitLow": 73,
+    "repairTurns": 13,
+    "fallbackTurns": 5,
+    "replyLatencyMs": {
+      "p50": 2970,
+      "p95": 9639,
+      "max": 15081
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0,
+    "semanticEvaluation": "requires_entire_conversation_review; HTTP_and_structure_are_not_quality_scores"
+  },
+  "candidate": {
+    "commit": "d2a4a373a8dcd883aed7e6d28bb20d1a50cde80e",
+    "complete": true,
+    "turns": 60,
+    "structuralPassed": 59,
+    "structuralDifferences": [
+      {
+        "key": "real-fault-retains-condition:2:1",
+        "failures": [
+          "modelResponded"
+        ]
+      }
+    ],
+    "httpRequests": 80,
+    "http200": 79,
+    "explicitLow": 80,
+    "repairTurns": 20,
+    "fallbackTurns": 8,
+    "replyLatencyMs": {
+      "p50": 4514,
+      "p95": 13711,
+      "max": 19928
+    },
+    "platformMessagesSent": 0,
+    "productionStoreWrites": 0,
+    "semanticEvaluation": "requires_entire_conversation_review; HTTP_and_structure_are_not_quality_scores"
+  }
+}

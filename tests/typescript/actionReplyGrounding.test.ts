@@ -1323,3 +1323,53 @@ test('671 supported complete replies preserve cancelled callbacks and user-trigg
   assert.deepEqual(validateActionReply('改背景的图我这儿没有确认记录，现在不能说它出来没有。考试提醒是登记了，但那只是提醒，不会附带发图。\n\n你要是想弄那张图，把图再发一次跟我说一声，我来处理。', reminder,
     '刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？'), [])
 })
+
+test('d2 complete replay 16 cannot promise to send the unconfirmed first image without naming a recipient', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const reply = '这张还没确认好呢，第二张发出去的时候第一张的结果我这边没收到回执。等真的出来了我会直接发，不骗你。'
+  assert.ok(validateActionReply(reply, facts(), raw).some(item=>item.code==='unregistered_followup'))
+})
+
+test('recipient-omitted self delivery after a completion condition needs the matching live callback', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  const live = facts([fact({source:'live_job', execution:'running', followUp:{state:'registered', kind:'job_completion', id:'first-callback'}})])
+  const secondSent = facts([fact({taskId:'second', requestMessageId:'other-request', execution:'completed', result:'available', delivery:{state:'sent', messageId:'second-receipt'}})])
+  const reminder = facts([fact({source:'reminder', toolName:'reminderTool', execution:'queued', followUp:{state:'registered', kind:'reminder', id:'exam', dueAt:4102444800000}})])
+  for (const reply of [
+    '等真的出来了我会直接发。', '等确实出来了，我会直接发。',
+    '等图真的出来了我就直接发。', '图确实出来后，我会直接发送。',
+    '等这张图出来后我第一时间发。', '有实际产出我会直接发。'
+  ]) {
+    for (const current of [facts(), secondSent, reminder]) {
+      assert.ok(validateActionReply(reply, current, raw).some(item=>item.code==='unregistered_followup'), reply)
+    }
+    assert.deepEqual(validateActionReply(reply, live, raw), [], reply)
+  }
+})
+
+test('recipient-omitted delivery keeps user-requested lookup separate from a new completion promise', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  for (const reply of [
+    '你回来再问我，我再查，有结果我会直接发。',
+    '你回来再问我，我再查，有结果就发给你。',
+    '等真的出来了你再来问我，我再发。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+  for (const reply of [
+    '你回来再问我，我再查，等真的出来了我会直接发。',
+    '你回来再问我，我再查，图确实出来后我会直接发。'
+  ]) assert.ok(validateActionReply(reply, facts(), raw).some(item=>item.code==='unregistered_followup'), reply)
+})
+
+test('recipient-omitted sends preserve denials, questions, quotations, third parties and non-send verbs', () => {
+  const raw = '我问的是这张图，出来了吗？'
+  for (const reply of [
+    '等真的出来了我也不会直接发。', '不能承诺等真的出来了我会直接发。',
+    '等确实出来了我会直接发吗？', '等真的出来了我会直接发？',
+    '“等真的出来了我会直接发”只是个例子。',
+    '她等真的出来了会直接发。', '等真的出来了她会直接发。',
+    '等她的图出来了，她会直接发。', '等真的出来了小明会直接发。',
+    '等真的出来了，你直接发。',
+    '等真的出来了我会直接发言。', '等真的出来了我会直接发誓。',
+    '等真的出来了我会直接发呆。', '刚才我已经直接发。'
+  ]) assert.deepEqual(validateActionReply(reply, facts(), raw), [], reply)
+})
