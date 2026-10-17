@@ -2,7 +2,7 @@ import fs from "fs"
 import path from "path"
 import type {Browser} from "puppeteer"
 import {adminRecord,adminError} from "../../../contracts/groupAdmin.js"
-import type {AdminEvent,GroupAdminLogger} from "../../../contracts/groupAdmin.js"
+import type {AdminEvent,GroupAdminLogger,CompoundRuleConfig} from "../../../contracts/groupAdmin.js"
 import {resolveGroupAdminSettings,groupAdminOverrides,groupAdminRowId} from "../domain/groupAdminPolicy.js"
 import {normalizeGroupModerationConfig} from "../domain/groupModerationRules.js"
 import {normalizeGroupGuardConfig} from "./GroupGuardManager.js"
@@ -171,7 +171,63 @@ export type GroupAdminCommand =
   | {ok:true;type:"feature";feature:FeatureDef;action:"help"}
   | {ok:true;type:"feature";feature:FeatureDef;action:"toggle";enable:boolean}
   | {ok:true;type:"feature";feature:FeatureDef;action:"set";changes:FeatureChange[]}
-  | {ok:false;type:"toggle"|"set"|"feature";message:string}
+  | {ok:true;type:"compound";action:"list"}
+  | {ok:true;type:"compound";action:"toggle";index:number;enable:boolean}
+  | {ok:true;type:"compound";action:"set";index:number;field:string;value:unknown;label:string}
+  | {ok:false;type:"toggle"|"set"|"feature"|"compound";message:string}
+
+// 复合规则的可调参数（按序号定位，新建/删除在控制台完成）
+const COMPOUND_NUMBER_PARAMS:{names:string[];field:string;label:string;min:number;max:number}[] = [
+  {names:["条数"],field:"burstCount",label:"连发条数",min:2,max:100},
+  {names:["窗口"],field:"windowSeconds",label:"时间窗(秒)",min:2,max:600},
+  {names:["单条字数","单条最长"],field:"maxLength",label:"单条最长字数",min:0,max:20000},
+  {names:["总字数"],field:"totalLength",label:"窗口总字数",min:0,max:50000},
+  {names:["禁言"],field:"muteSeconds",label:"禁言秒数",min:0,max:2592000}
+]
+const COMPOUND_BOOL_PARAMS:{names:string[];field:string;label:string}[] = [
+  {names:["撤回"],field:"recall",label:"撤回"},
+  {names:["转发"],field:"forward",label:"合并转发"}
+]
+const COMPOUND_TEXT_PARAMS:{names:string[];field:string;label:string;max:number}[] = [
+  {names:["名称"],field:"name",label:"规则名",max:20}
+]
+
+function parseCompoundCommand(rest:string):GroupAdminCommand {
+  if (!rest) return {ok:true,type:"compound",action:"list"}
+  if (/^\d+\s*$/.test(rest)) return {ok:true,type:"compound",action:"list"}
+  const match = rest.match(/^(\d+)\s+([\s\S]+?)\s*$/)
+  if (!match) return {ok:false,type:"compound",message:"用法：.群管 复合规则 查看列表；.群管 复合规则 <序号> 开|关；.群管 复合规则 <序号> <参数> <值>"}
+  const index = Number(match[1]) - 1
+  if (index < 0) return {ok:false,type:"compound",message:"序号从 1 开始"}
+  const body = match[2]!.trim()
+  if (TRUE_WORDS.has(body)) return {ok:true,type:"compound",action:"toggle",index,enable:true}
+  if (FALSE_WORDS.has(body)) return {ok:true,type:"compound",action:"toggle",index,enable:false}
+  const tokens = body.split(/\s+/)
+  const name = tokens[0]!
+  const textParam = COMPOUND_TEXT_PARAMS.find(item => item.names.includes(name))
+  if (textParam) {
+    const value = tokens.slice(1).join(" ").replace(/\s+/g, " ").trim()
+    if (!value) return {ok:false,type:"compound",message:`「${textParam.label}」内容不能为空`}
+    if ([...value].length > textParam.max) return {ok:false,type:"compound",message:`「${textParam.label}」最多 ${textParam.max} 字`}
+    return {ok:true,type:"compound",action:"set",index,field:textParam.field,value,label:textParam.label}
+  }
+  const boolParam = COMPOUND_BOOL_PARAMS.find(item => item.names.includes(name))
+  if (boolParam) {
+    const raw = tokens[1] || ""
+    if (TRUE_WORDS.has(raw.toLowerCase())) return {ok:true,type:"compound",action:"set",index,field:boolParam.field,value:true,label:boolParam.label}
+    if (FALSE_WORDS.has(raw.toLowerCase())) return {ok:true,type:"compound",action:"set",index,field:boolParam.field,value:false,label:boolParam.label}
+    return {ok:false,type:"compound",message:`「${boolParam.label}」只能填 开 或 关`}
+  }
+  const numberParam = COMPOUND_NUMBER_PARAMS.find(item => item.names.includes(name))
+  if (numberParam) {
+    const raw = tokens[1] || ""
+    if (!raw || /\s/.test(raw) || !Number.isFinite(Number(raw))) return {ok:false,type:"compound",message:`「${numberParam.label}」需要填整数`}
+    const value = Number(raw)
+    if (!Number.isInteger(value) || value < numberParam.min || value > numberParam.max) return {ok:false,type:"compound",message:`「${numberParam.label}」需在 ${numberParam.min} 到 ${numberParam.max} 之间`}
+    return {ok:true,type:"compound",action:"set",index,field:numberParam.field,value,label:numberParam.label}
+  }
+  return {ok:false,type:"compound",message:`复合规则没有参数「${name}」。可用：${[...COMPOUND_NUMBER_PARAMS, ...COMPOUND_BOOL_PARAMS, ...COMPOUND_TEXT_PARAMS].map(item => item.names[0]).join("、")}`}
+}
 
 function findFeature(name:string) {
   return FEATURE_DEFS.find(item => item.names.includes(name))
@@ -199,6 +255,9 @@ export function parseGroupAdminCommand(msg:unknown):GroupAdminCommand|null {
   const name = head[1]!
   const rest = (head[2] || "").trim()
   if (!rest && ["页面","面板","帮助","help"].includes(name)) return {ok:true,type:"view"}
+
+  // 复合规则语法：.群管 复合规则 [序号] [开|关|参数 值]
+  if (name === "复合规则" || name === "复合") return parseCompoundCommand(rest)
 
   // 功能语法
   const feature = findFeature(name)
@@ -369,6 +428,27 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
             ]
           }
         ]
+      },
+      {
+        label: "复合规则",
+        enabled: on("groupModeration"),
+        masterOk: masterOk("groupModeration"),
+        rows: moderation.compoundRules.length
+          ? moderation.compoundRules.map((rule, i) => ({
+              label: `${i + 1}. ${rule.name}`,
+              on: rule.enabled,
+              detail: `${rule.windowSeconds} 秒内连发 ≥${rule.burstCount} 条`
+                + (rule.maxLength > 0 ? `，且单条 >${rule.maxLength} 字` : "")
+                + (rule.totalLength > 0 ? `，且合计 >${rule.totalLength} 字` : "")
+                + ` → ${[rule.recall ? "撤回" : "", rule.forward ? "转发" : "", rule.muteSeconds > 0 ? `禁言${rule.muteSeconds}秒` : ""].filter(Boolean).join("+") || "仅提示"}`,
+              commands: [
+                `.群管 复合规则 ${i + 1} ${rule.enabled ? "关" : "开"}`,
+                `.群管 复合规则 ${i + 1} 条数 ${rule.burstCount}`,
+                `.群管 复合规则 ${i + 1} 单条字数 ${rule.maxLength}`,
+                `.群管 复合规则 ${i + 1} 禁言 ${rule.muteSeconds}`
+              ]
+            }))
+          : [{label: "复合规则", on: false, detail: "未配置——控制台「群管理 → 复合规则」添加，最多 5 条", commands: [".群管 复合规则"]}]
       },
       {
         label: "入群验证",
@@ -545,6 +625,42 @@ export function buildGroupAdminOverrideUpdates(settings:Data, groupId:unknown, c
   return { "groupAdmin.overrides": filtered }
 }
 
+/** 复合规则列表文本（.群管 复合规则） */
+export function buildCompoundRulesText(rules:{name:string;enabled:boolean;burstCount:number;windowSeconds:number;maxLength:number;totalLength:number;recall:boolean;forward:boolean;muteSeconds:number}[]) {
+  if (!rules.length) return "还没有复合规则。请在控制台「群管理 → 复合规则」添加（最多 5 条），再用 .群管 复合规则 <序号> <参数> <值> 调整。\n示例条件：5 秒内连发 10 条且单条超过 160 字 → 撤回+转发+禁言 60 秒"
+  const lines = ["复合规则（同时命中时最新的、列表靠后的优先；新增/删除在控制台操作）"]
+  rules.forEach((rule, i) => {
+    const conditions = [
+      `${rule.windowSeconds} 秒内连发 ≥${rule.burstCount} 条`,
+      rule.maxLength > 0 ? `单条 >${rule.maxLength} 字` : "",
+      rule.totalLength > 0 ? `合计 >${rule.totalLength} 字` : ""
+    ].filter(Boolean).join(" 且 ")
+    const action = [rule.recall ? "撤回" : "", rule.forward ? "转发" : "", rule.muteSeconds > 0 ? `禁言${rule.muteSeconds}秒` : ""].filter(Boolean).join("+") || "仅提示"
+    lines.push(`${i + 1}. ${rule.name} [${rule.enabled ? "开" : "关"}] ${conditions} → ${action}`)
+    lines.push(`   .群管 复合规则 ${i + 1} ${rule.enabled ? "关" : "开"} · .群管 复合规则 ${i + 1} 条数 ${rule.burstCount} · .群管 复合规则 ${i + 1} 单条字数 ${rule.maxLength}`)
+  })
+  return lines.join("\n")
+}
+
+/** 按序号修改复合规则：写入按群覆盖（数组从解析后的规则拷贝基底，保证序号对齐页面所见） */
+export function buildCompoundRuleUpdate(settings:Data, groupId:unknown, resolvedRules:CompoundRuleConfig[], index:number, field:string, value:unknown) {
+  const id = String(groupId || "").trim()
+  const rows = groupAdminOverrides(settings).map(row => JSON.parse(JSON.stringify(row)) as Data)
+  let row = rows.find(item => groupAdminRowId(item) === id)
+  if (!row) {
+    row = { groupId: id }
+    rows.push(row)
+  }
+  const moderation = { ...adminRecord(row.groupModeration) }
+  if (!Array.isArray(moderation.compoundRules)) moderation.compoundRules = resolvedRules.map(rule => ({ ...rule })) as Data[]
+  const rules = moderation.compoundRules as Data[]
+  const target = rules[index]
+  if (!target) return null
+  target[field] = value
+  row.groupModeration = moderation
+  return { "groupAdmin.overrides": rows }
+}
+
 function getIn(source:unknown, dotted:string) {
   let cursor:unknown = source
   for (const key of dotted.split(".")) {
@@ -696,6 +812,39 @@ export function createGroupAdminPageMessage(Plugin:new(options:Record<string,unk
         const summary = changes.map(change => this.describeChange(command.feature, change)).join("、")
         ports.logger?.info?.(`[GroupAdminPage] ${e.group_id} user=${e.user_id} ${command.feature.label}: ${summary}`)
         await e.reply(`已设置「${command.feature.label}」：${summary}，发送 .群管 查看最新面板。`)
+        return true
+      }
+
+      // 复合规则语法：.群管 复合规则 [序号] [开|关|参数 值]
+      if (command.type === "compound") {
+        const settings = ports.readSettings()
+        const rules = normalizeGroupModerationConfig(resolveGroupAdminSettings(settings, String(e.group_id || "")).groupModeration).compoundRules
+        if (command.action === "list") {
+          await e.reply(buildCompoundRulesText(rules))
+          return true
+        }
+        if (!canManage(e)) {
+          await e.reply(notAllowedMessage())
+          return true
+        }
+        if (command.index >= rules.length) {
+          await e.reply(`没有第 ${command.index + 1} 条复合规则（当前共 ${rules.length} 条）。发送 .群管 复合规则 查看列表`)
+          return true
+        }
+        const field = command.action === "toggle" ? "enabled" : command.field
+        const value = command.action === "toggle" ? command.enable : command.value
+        const update = buildCompoundRuleUpdate(settings, e.group_id, rules, command.index, field, value)
+        if (!update) {
+          await e.reply("规则写入失败，请稍后重试")
+          return true
+        }
+        ports.applyUpdates(update)
+        const ruleName = rules[command.index]?.name || `规则${command.index + 1}`
+        const shown = command.action === "toggle"
+          ? `已${command.enable ? "开启" : "关闭"}`
+          : `已设置 ${command.label}=${typeof command.value === "boolean" ? (command.value ? "开" : "关") : String(command.value)}`
+        ports.logger?.info?.(`[GroupAdminPage] ${e.group_id} user=${e.user_id} 复合规则${command.index + 1} ${shown}`)
+        await e.reply(`${shown}（复合规则 ${command.index + 1}. ${ruleName}），发送 .群管 查看最新面板。`)
         return true
       }
 

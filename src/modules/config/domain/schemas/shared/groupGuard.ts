@@ -336,6 +336,63 @@ const schema: ConfigSchemaItem[] = [
     label: "折叠后转发聊天记录",
     component: "Switch",
     bottomHelpMessage: "默认开启。关闭后只撤回连发消息并禁言，不再合并转发"
+  },
+  {
+    component: "Divider",
+    label: "复合规则"
+  },
+  {
+    field: "groupModeration.compoundRules",
+    label: "复合规则列表",
+    component: "GSubForm",
+    componentProps: {
+      multiple: true,
+      modalProps: { title: "复合规则（最多 5 条，越靠后优先级越高）" },
+      schemas: [
+        {
+          field: "name",
+          label: "规则名",
+          component: "Input",
+          required: true,
+          componentProps: { placeholder: "例如 长文刷屏" }
+        },
+        { field: "enabled", label: "启用", component: "Switch" },
+        {
+          field: "burstCount",
+          label: "连发条数≥",
+          component: "InputNumber",
+          componentProps: { min: 2, max: 100, placeholder: "10" }
+        },
+        {
+          field: "windowSeconds",
+          label: "时间窗(秒)",
+          component: "InputNumber",
+          componentProps: { min: 2, max: 600, placeholder: "5" }
+        },
+        {
+          field: "maxLength",
+          label: "单条最长字数>",
+          component: "InputNumber",
+          componentProps: { min: 0, max: 20000, placeholder: "160，0=不启用该条件" }
+        },
+        {
+          field: "totalLength",
+          label: "窗口总字数>",
+          component: "InputNumber",
+          componentProps: { min: 0, max: 50000, placeholder: "0=不启用该条件" }
+        },
+        { field: "recall", label: "撤回", component: "Switch" },
+        { field: "forward", label: "合并转发", component: "Switch" },
+        {
+          field: "muteSeconds",
+          label: "禁言秒数",
+          component: "InputNumber",
+          componentProps: { min: 0, max: 2592000, step: 30, placeholder: "60，0=不禁言" }
+        }
+      ]
+    },
+    bottomHelpMessage:
+      "条件全部满足才触发：连发条数 + 时间窗 + 可选的单条最长字数/窗口总字数；与超长折叠、连发折叠相互独立，同时命中多条时最新的（列表靠后）优先"
   }
 ]
 

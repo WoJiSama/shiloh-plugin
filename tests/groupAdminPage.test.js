@@ -254,3 +254,56 @@ test("功能帮助：展示当前状态与当前值示例", async () => {
   assert.ok(help.includes(".群管 刷屏检测 条数 "), "帮助含参数用法")
   assert.ok(help.includes("窗口"), "帮助含全部参数")
 })
+
+test("复合规则命令：列表/开关/调参/错误引导", () => {
+  assert.deepEqual(parseGroupAdminCommand(".群管 复合规则"), { ok: true, type: "compound", action: "list" })
+  const toggle = parseGroupAdminCommand(".群管 复合规则 2 开")
+  assert.deepEqual({ ok: toggle.ok, type: toggle.type, action: toggle.action, index: toggle.index, enable: toggle.enable },
+    { ok: true, type: "compound", action: "toggle", index: 1, enable: true })
+  const setCount = parseGroupAdminCommand(".群管 复合规则 1 条数 8")
+  assert.deepEqual({ action: setCount.action, field: setCount.field, value: setCount.value }, { action: "set", field: "burstCount", value: 8 })
+  const setName = parseGroupAdminCommand(".群管 复合规则 1 名称 长文刷屏")
+  assert.deepEqual({ field: setName.field, value: setName.value }, { field: "name", value: "长文刷屏" })
+  const setBool = parseGroupAdminCommand(".群管 复合规则 1 撤回 关")
+  assert.deepEqual({ field: setBool.field, value: setBool.value }, { field: "recall", value: false })
+  const badParam = parseGroupAdminCommand(".群管 复合规则 1 高度 99")
+  assert.equal(badParam.ok, false)
+  assert.ok(badParam.message.includes("没有参数「高度」") && badParam.message.includes("单条字数"))
+  const outOfRange = parseGroupAdminCommand(".群管 复合规则 1 条数 1")
+  assert.ok(outOfRange.message.includes("2 到 100"))
+  const zeroIndex = parseGroupAdminCommand(".群管 复合规则 0 开")
+  assert.equal(zeroIndex.ok, false)
+})
+
+test("复合规则列表文本与按序号写入", async () => {
+  const { buildCompoundRulesText, buildCompoundRuleUpdate } = await import("../dist/backend/modules/groupAdmin/infrastructure/groupAdminPage.js")
+  const text = buildCompoundRulesText([{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }])
+  assert.ok(text.includes("1. 长文刷屏 [开]"))
+  assert.ok(text.includes("5 秒内连发 ≥10 条") && text.includes("单条 >160 字"))
+  assert.ok(text.includes("撤回+转发+禁言60秒"))
+  assert.ok(buildCompoundRulesText([]).includes("还没有复合规则"))
+
+  const settings = serverLikeSettings()
+  settings.groupModeration.compoundRules = [{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }]
+  const update = buildCompoundRuleUpdate(settings, GROUP_ID, settings.groupModeration.compoundRules, 0, "burstCount", 8)
+  const row = update["groupAdmin.overrides"].find(item => item.groupId === String(GROUP_ID))
+  assert.equal(row.groupModeration.compoundRules[0].burstCount, 8)
+  assert.equal(row.groupModeration.compoundRules[0].name, "长文刷屏", "未改字段保留")
+  assert.equal(row.groupModeration.overlongMessage.maxLength, 200, "同模块其他自定义不受影响")
+  assert.equal(buildCompoundRuleUpdate(settings, GROUP_ID, settings.groupModeration.compoundRules, 5, "burstCount", 8), null, "越界序号返回 null")
+})
+
+test("面板展示复合规则分区", () => {
+  const settings = serverLikeSettings()
+  settings.groupModeration.compoundRules = [{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }]
+  const data = buildGroupAdminPageData(settings, GROUP_ID)
+  const section = data.sections.find(item => item.label === "复合规则")
+  assert.ok(section, "面板有复合规则分区")
+  const rule = section.rows[0]
+  assert.equal(rule.label, "1. 长文刷屏")
+  assert.ok(rule.detail.includes("≥10 条") && rule.detail.includes("单条 >160 字"))
+  assert.ok(rule.commands.includes(".群管 复合规则 1 关"))
+  const empty = buildGroupAdminPageData(serverLikeSettings(), GROUP_ID)
+  const emptySection = empty.sections.find(item => item.label === "复合规则")
+  assert.ok(emptySection.rows[0].detail.includes("未配置"))
+})

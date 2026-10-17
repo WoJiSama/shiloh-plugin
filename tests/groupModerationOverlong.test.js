@@ -413,3 +413,98 @@ test("广告扫描关闭支持按群覆盖浅合并", () => {
   }, GROUP_ID)
   assert.equal(normalizeGroupModerationConfig(resolved.groupModeration).adScan.enabled, false)
 })
+
+function compoundSettings(rules, overrides = {}) {
+  return baseSettings({
+    overlongMessage: { enabled: false },
+    burstMessage: { enabled: false },
+    compoundRules: rules,
+    ...overrides
+  })
+}
+
+test("复合规则归一化：上限 5 条、字段钳制、名称兜底", async () => {
+  const { normalizeCompoundRules } = await import("../dist/backend/modules/groupAdmin/domain/groupModerationRules.js")
+  assert.deepEqual(normalizeCompoundRules(undefined), [])
+  const rules = normalizeCompoundRules([
+    { name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 },
+    { enabled: true, burstCount: 1, windowSeconds: 1, maxLength: 99999, muteSeconds: -1, recall: false, forward: false },
+    {}, {}, {}, {}
+  ])
+  assert.equal(rules.length, 5, "超过 5 条截断")
+  assert.deepEqual(
+    { name: rules[1].name, burstCount: rules[1].burstCount, windowSeconds: rules[1].windowSeconds, maxLength: rules[1].maxLength, muteSeconds: rules[1].muteSeconds, recall: rules[1].recall },
+    { name: "规则2", burstCount: 2, windowSeconds: 2, maxLength: 20000, muteSeconds: 0, recall: false },
+    "缺省与越界值被钳制，名称按序号兜底"
+  )
+})
+
+test("复合规则命中：连发+单条最长同时满足才触发", async () => {
+  const { manager, calls, makeEvent } = createHarness({
+    settings: compoundSettings([{ name: "长文刷屏", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 10, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }])
+  })
+  // 3 条都短 → 不触发
+  await sendBurstMessages(manager, makeEvent, 3)
+  assert.equal(calls.forwards.length, 0, "单条最长不满足不触发")
+
+  const fresh = createHarness({
+    settings: compoundSettings([{ name: "长文刷屏", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 10, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }])
+  })
+  // 2 短 + 1 长（第 3 条 20 字）
+  await fresh.manager.handleMessage(fresh.makeEvent("短", { message_id: 701 }))
+  await fresh.manager.handleMessage(fresh.makeEvent("短", { message_id: 702 }))
+  const handled = await fresh.manager.handleMessage(fresh.makeEvent("这是一条超过十字的长消息内容", { message_id: 703 }))
+  assert.equal(handled, true, "条数与单条最长同时满足触发")
+  assert.deepEqual(
+    fresh.calls.apis.filter(call => call.method === "delete_msg").map(call => call.params.message_id),
+    [701, 702, 703],
+    "整批撤回"
+  )
+  const ban = fresh.calls.apis.find(call => call.method === "set_group_ban")
+  assert.equal(ban.params.duration, 60, "按规则禁言秒数")
+  assert.equal(fresh.calls.forwards.length, 1)
+  const nodes = fresh.calls.forwards[0]
+  assert.ok(nodes[0].message.includes("长文刷屏"), "转发首节点带规则名")
+  assert.ok(nodes[0].message.includes("单条最长"), "首节点带命中条件")
+  assert.equal(nodes.length, 4, "1 说明 + 3 原文")
+})
+
+test("复合规则：最新（靠后）优先、总字数条件、不撤回只转发禁言", async () => {
+  // 最新优先：两条都满足时命中列表末尾那条
+  const newest = createHarness({
+    settings: compoundSettings([
+      { name: "旧规则", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 5, totalLength: 0, recall: true, forward: true, muteSeconds: 10 },
+      { name: "新规则", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 5, totalLength: 0, recall: true, forward: true, muteSeconds: 99 }
+    ])
+  })
+  await newest.manager.handleMessage(newest.makeEvent("长消息超过五个字", { message_id: 801 }))
+  await newest.manager.handleMessage(newest.makeEvent("长消息超过五个字", { message_id: 802 }))
+  await newest.manager.handleMessage(newest.makeEvent("长消息超过五个字", { message_id: 803 }))
+  const ban = newest.calls.apis.find(call => call.method === "set_group_ban")
+  assert.equal(ban.params.duration, 99, "同时命中取最新规则的禁言时长")
+
+  // 不撤回只转发
+  const noRecall = createHarness({
+    settings: compoundSettings([{ name: "只转发", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 5, totalLength: 0, recall: false, forward: true, muteSeconds: 30 }])
+  })
+  await noRecall.manager.handleMessage(noRecall.makeEvent("长消息超过五个字", { message_id: 901 }))
+  await noRecall.manager.handleMessage(noRecall.makeEvent("长消息超过五个字", { message_id: 902 }))
+  await noRecall.manager.handleMessage(noRecall.makeEvent("长消息超过五个字", { message_id: 903 }))
+  assert.equal(noRecall.calls.apis.filter(call => call.method === "delete_msg").length, 0, "recall=false 不撤回")
+  assert.equal(noRecall.calls.forwards.length, 1, "仍合并转发")
+  assert.ok(noRecall.calls.apis.some(call => call.method === "set_group_ban"), "仍禁言")
+})
+
+test("复合规则与连发折叠并集互不影响", async () => {
+  // 复合规则未命中时不抢占连发折叠
+  const settings = baseSettings({
+    overlongMessage: { enabled: false },
+    burstMessage: { enabled: true, maxMessages: 3, muteSeconds: 30 },
+    compoundRules: [{ name: "苛刻", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 500, totalLength: 0, recall: true, forward: true, muteSeconds: 88 }]
+  })
+  const harness = createHarness({ settings })
+  await sendBurstMessages(harness.manager, harness.makeEvent, 3)
+  const ban = harness.calls.apis.find(call => call.method === "set_group_ban")
+  assert.equal(ban.params.duration, 30, "复合条件不满足时连发折叠照常，用自己的禁言时长")
+  assert.ok(harness.calls.forwards[0][0].message.includes("连发"), "连发折叠的说明节点")
+})

@@ -83,11 +83,11 @@ const composedReplayCandidates=[
   {"candidate":"这个我现在没法给你准信欸。你之前发的那张我记得，但我这边没查到处理结果的记录，做得怎么样、出没出图都还没确认。\n\n我这边没有可核验的进度，不想瞎猜给你一个假答案。等我实际拿到图或者结果，再发给你。","raw":"刚才改背景的图出来了吗？","tasks":[],"corrected":"图片处理结果及完成后发送的安排尚未核实。你之后再问一声，我再查当前状态。"},
   {"candidate":"去吃吧。不过老实说，我这边没有查到会自动跟进的安排，所以不会“好了自动发你”。你要是吃完了想看进度，回来喊我一声，我再帮你查。","raw":"那我先去吃饭。好了你会自动发给我吗？","tasks":[],"corrected":"图片处理结果及完成后发送的安排尚未核实。你之后再问一声，我再查当前状态。"},
   {"candidate":"改图那件事还在处理中，具体好没好我这边没查到。自动发不行，你吃完回来喊我一声，我再去看结果。","raw":"那我先去吃饭。好了你会自动发给我吗？","tasks":[],"corrected":"图片处理结果及完成后发送的安排尚未核实。你之后再问一声，我再查当前状态。"},
-  {"candidate":"做好了，图是有的。卡的是发出来那一步，不是还没做。你再等等，我想到办法就发你。","raw":"所以我现在没收到，是还没做好吗？","tasks":[{"taskId":"synthetic-task-001","requestMessageId":"synthetic-request-001","toolName":"imageEdit","source":"task_record","execution":"completed","result":"available","delivery":{"state":"failed"},"followUp":{"state":"none"},"observedAt":1792157677554}],"corrected":"图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"},
-  {"candidate":"我这边只核验到你的考试提醒登记了（2100年1月1日早上八点那个），改背景的图没有对应记录，所以现在没法确认它在跑，也不会好了自动发你。\n\n想要的话重新把图发我一次，我这轮能做就直接做。","raw":"刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？","tasks":[{"taskId":"exam-reminder","requestMessageId":"exam-request","toolName":"reminderTool","source":"reminder","execution":"queued","result":"unknown","delivery":{"state":"not_attempted"},"followUp":{"state":"registered","kind":"reminder","id":"exam-reminder","dueAt":4102444800000},"observedAt":1792157892801}],"corrected":"图片处理及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"},
+  {"candidate":"做好了，图是有的。卡的是发出来那一步，不是还没做。你再等等，我想到办法就发你。","raw":"所以我现在没收到，是还没做好吗？","tasks":[{"taskId":"synthetic-task-001","requestMessageId":"synthetic-request-001","toolName":"imageEdit","source":"task_record","execution":"completed","result":"available","delivery":{"state":"failed"},"followUp":{"state":"none"},"observedAt":Date.now()}],"corrected":"图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"},
+  {"candidate":"我这边只核验到你的考试提醒登记了（2100年1月1日早上八点那个），改背景的图没有对应记录，所以现在没法确认它在跑，也不会好了自动发你。\n\n想要的话重新把图发我一次，我这轮能做就直接做。","raw":"刚才改背景的图出来了吗？我只登记了考试提醒，图好了会自动发我吗？","tasks":[{"taskId":"exam-reminder","requestMessageId":"exam-request","toolName":"reminderTool","source":"reminder","execution":"queued","result":"unknown","delivery":{"state":"not_attempted"},"followUp":{"state":"registered","kind":"reminder","id":"exam-reminder","dueAt":4102444800000},"observedAt":Date.now()}],"corrected":"图片处理及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"},
 ]
 const capacityReplayCandidates=[
-  {"candidate": "\u4f60\u90a3\u6761\u8003\u8bd5\u63d0\u9192\u662f\u767b\u8bb0\u4e0a\u4e86\uff0c2100\u5e741\u67081\u53f7\u65e9\u4e0a\u516b\u70b9\u89e6\u53d1\u3002\u6539\u80cc\u666f\u7684\u56fe\u8fd9\u8fb9\u6211\u8fd9\u8f6e\u6ca1\u67e5\u5230\u76f8\u5173\u8bb0\u5f55\uff0c\u505a\u6ca1\u505a\u597d\u3001\u51fa\u6765\u6ca1\u51fa\u6765\u90fd\u8fd8\u6ca1\u6cd5\u786e\u8ba4\uff0c\u4e5f\u5c31\u4e0d\u80fd\u66ff\u4f60\u6253\u5305\u7968\u3002\n\n\u201c\u597d\u4e86\u81ea\u52a8\u53d1\u201d\u8fd9\u79cd\u6ca1\u6709\u54e6\uff0c\u6ca1\u8fd9\u4e2a\u81ea\u52a8\u8ddf\u8fdb\u3002\u4f60\u8981\u662f\u8fd8\u60f3\u8981\uff0c\u76f4\u63a5\u518d\u6765\u627e\u6211\u8981\u4e00\u6b21\u5c31\u884c\uff0c\u6211\u5230\u65f6\u5019\u6309\u5f53\u8f6e\u80fd\u505a\u7684\u5e2e\u4f60\u67e5\u548c\u53d1\u3002", "raw": "\u521a\u624d\u6539\u80cc\u666f\u7684\u56fe\u51fa\u6765\u4e86\u5417\uff1f\u6211\u53ea\u767b\u8bb0\u4e86\u8003\u8bd5\u63d0\u9192\uff0c\u56fe\u597d\u4e86\u4f1a\u81ea\u52a8\u53d1\u6211\u5417\uff1f", "tasks": [{"taskId": "exam-reminder", "requestMessageId": "exam-request", "toolName": "reminderTool", "source": "reminder", "execution": "queued", "result": "unknown", "delivery": {"state": "not_attempted"}, "followUp": {"state": "registered", "kind": "reminder", "id": "exam-reminder", "dueAt": 4102444800000}, "observedAt": 1792162483918}], "corrected": "\u56fe\u7247\u5904\u7406\u7ed3\u679c\u53ca\u5b8c\u6210\u540e\u53d1\u9001\u7684\u5b89\u6392\u5c1a\u672a\u6838\u5b9e\uff1b\u8003\u8bd5\u63d0\u9192\u4e0d\u5305\u542b\u56fe\u7247\u5b8c\u6210\u540e\u7684\u6295\u9012\u5b89\u6392\u3002"},
+  {"candidate": "\u4f60\u90a3\u6761\u8003\u8bd5\u63d0\u9192\u662f\u767b\u8bb0\u4e0a\u4e86\uff0c2100\u5e741\u67081\u53f7\u65e9\u4e0a\u516b\u70b9\u89e6\u53d1\u3002\u6539\u80cc\u666f\u7684\u56fe\u8fd9\u8fb9\u6211\u8fd9\u8f6e\u6ca1\u67e5\u5230\u76f8\u5173\u8bb0\u5f55\uff0c\u505a\u6ca1\u505a\u597d\u3001\u51fa\u6765\u6ca1\u51fa\u6765\u90fd\u8fd8\u6ca1\u6cd5\u786e\u8ba4\uff0c\u4e5f\u5c31\u4e0d\u80fd\u66ff\u4f60\u6253\u5305\u7968\u3002\n\n\u201c\u597d\u4e86\u81ea\u52a8\u53d1\u201d\u8fd9\u79cd\u6ca1\u6709\u54e6\uff0c\u6ca1\u8fd9\u4e2a\u81ea\u52a8\u8ddf\u8fdb\u3002\u4f60\u8981\u662f\u8fd8\u60f3\u8981\uff0c\u76f4\u63a5\u518d\u6765\u627e\u6211\u8981\u4e00\u6b21\u5c31\u884c\uff0c\u6211\u5230\u65f6\u5019\u6309\u5f53\u8f6e\u80fd\u505a\u7684\u5e2e\u4f60\u67e5\u548c\u53d1\u3002", "raw": "\u521a\u624d\u6539\u80cc\u666f\u7684\u56fe\u51fa\u6765\u4e86\u5417\uff1f\u6211\u53ea\u767b\u8bb0\u4e86\u8003\u8bd5\u63d0\u9192\uff0c\u56fe\u597d\u4e86\u4f1a\u81ea\u52a8\u53d1\u6211\u5417\uff1f", "tasks": [{"taskId": "exam-reminder", "requestMessageId": "exam-request", "toolName": "reminderTool", "source": "reminder", "execution": "queued", "result": "unknown", "delivery": {"state": "not_attempted"}, "followUp": {"state": "registered", "kind": "reminder", "id": "exam-reminder", "dueAt": 4102444800000}, "observedAt": Date.now()}], "corrected": "\u56fe\u7247\u5904\u7406\u7ed3\u679c\u53ca\u5b8c\u6210\u540e\u53d1\u9001\u7684\u5b89\u6392\u5c1a\u672a\u6838\u5b9e\uff1b\u8003\u8bd5\u63d0\u9192\u4e0d\u5305\u542b\u56fe\u7247\u5b8c\u6210\u540e\u7684\u6295\u9012\u5b89\u6392\u3002"},
   {"candidate": "\u6539\u80cc\u666f\u90a3\u4e2a\u8fd8\u5728\u5904\u7406\u4e2d\u6ca1\u51fa\u7ed3\u679c\uff0c\u505a\u597d\u6ca1\u6211\u8fd9\u4f1a\u513f\u8bf4\u4e0d\u597d\u3002\u53d1\u9001\u8fd9\u8fb9\u4e5f\u6ca1\u6302\u4e0a\u81ea\u52a8\u53d1\u7684\u5b89\u6392\uff0c\u6240\u4ee5\u4f60\u5403\u5b8c\u56de\u6765\u95ee\u6211\u4e00\u58f0\uff0c\u6211\u518d\u5e2e\u4f60\u770b\u3002", "raw": "\u90a3\u6211\u5148\u53bb\u5403\u996d\u3002\u597d\u4e86\u4f60\u4f1a\u81ea\u52a8\u53d1\u7ed9\u6211\u5417\uff1f", "tasks": [], "corrected": "\u56fe\u7247\u5904\u7406\u7ed3\u679c\u53ca\u5b8c\u6210\u540e\u53d1\u9001\u7684\u5b89\u6392\u5c1a\u672a\u6838\u5b9e\u3002"},
   {
     "candidate": "图是做好了，傍晚背景那版成品是有的。就是之前发给你那一下没发出去，具体原因我也没查到欸。\n\n这轮我手上没有能直接重发的工具，你现在再要一次的话，我下次拿到发送能力就给你补上。",
@@ -106,7 +106,7 @@ const capacityReplayCandidates=[
         "followUp": {
           "state": "none"
         },
-        "observedAt": 1792159132705
+        "observedAt": Date.now()
       }
     ],
     "corrected": "图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"
@@ -128,7 +128,7 @@ const capacityReplayCandidates=[
         "followUp": {
           "state": "none"
         },
-        "observedAt": 1792159135239
+        "observedAt": Date.now()
       }
     ],
     "corrected": "图已经做好了，上次发送没有成功，后续再次发送的安排尚未核实。"
@@ -507,7 +507,7 @@ test('8529c94 message outcomes require their own task evidence before sending an
         "followUp": {
           "state": "none"
         },
-        "observedAt": 1792163398905
+        "observedAt": Date.now()
       }
     ],
     "corrected": "图已经做好了，上次发送没有成功，具体原因尚未确认。"
@@ -533,7 +533,7 @@ test('8529c94 message outcomes require their own task evidence before sending an
           "id": "exam-reminder",
           "dueAt": 4102444800000
         },
-        "observedAt": 1792163610828
+        "observedAt": Date.now()
       }
     ],
     "corrected": "图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"
@@ -559,7 +559,7 @@ test('8529c94 message outcomes require their own task evidence before sending an
           "id": "exam-reminder",
           "dueAt": 4102444800000
         },
-        "observedAt": 1792163613926
+        "observedAt": Date.now()
       }
     ],
     "corrected": "图片处理结果及完成后发送的安排尚未核实；考试提醒不包含图片完成后的投递安排。"

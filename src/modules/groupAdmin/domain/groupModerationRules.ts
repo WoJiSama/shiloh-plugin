@@ -1,5 +1,6 @@
 import {adminRecord} from '../../../contracts/groupAdmin.js'
-import type {ModerationConfig,ModerationContext,RuleContext,ModerationResult} from '../../../contracts/groupAdmin.js'
+import type {ModerationConfig,ModerationContext,RuleContext,ModerationResult,CompoundRuleConfig} from '../../../contracts/groupAdmin.js'
+import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
 export const DEFAULT_GROUP_MODERATION_CONFIG:ModerationConfig = {
   enabled: false,
   enabledGroups: [],
@@ -37,6 +38,7 @@ export const DEFAULT_GROUP_MODERATION_CONFIG:ModerationConfig = {
   adScan: {
     enabled: true
   },
+  compoundRules: [],
   adTemplates: [
     "AI 培训公司 需要 软件工程师 线上培训讲课 要求 6年以上代码经验 前端 后端 晚上时间 在家即可上课 无需外出 保障收益 加创始人微信",
     "扫码进群 加群二维码 群聊邀请 长按识别二维码 进群领取福利",
@@ -259,6 +261,7 @@ export function normalizeGroupModerationConfig(input:unknown = {}):ModerationCon
   }
   // 广告/刷屏检测默认开启；显式 false 才关闭（关闭后只保留超长/连发折叠）
   config.adScan = { enabled: adminRecord(raw.adScan).enabled !== false }
+  config.compoundRules = normalizeCompoundRules(raw.compoundRules)
   config.adTemplates = normalizeStringList(config.adTemplates)
   config.thresholds.report = normalizeNumber(config.thresholds.report, 0.7, 0, 1)
   config.thresholds.recall = normalizeNumber(config.thresholds.recall, 0.85, 0, 1)
@@ -270,6 +273,26 @@ export function normalizeGroupModerationConfig(input:unknown = {}):ModerationCon
 
 export function clamp01(value:unknown) {
   return Math.min(1, Math.max(0, Number(value) || 0))
+}
+
+// 复合规则：连发 + 单条最长/总字数等条件全部满足才触发；每群最多 5 条，评估时最新的（列表末尾）优先
+export const COMPOUND_RULES_LIMIT = 5
+export function normalizeCompoundRules(value:unknown):CompoundRuleConfig[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, COMPOUND_RULES_LIMIT).map((item, index) => {
+    const raw = adminRecord(item)
+    return {
+      name: safeTruncateUnicode(String(raw.name || `规则${index + 1}`).trim(), 20) || `规则${index + 1}`,
+      enabled: raw.enabled === true,
+      burstCount: Math.floor(normalizeNumber(raw.burstCount, 5, 2, 100)),
+      windowSeconds: Math.floor(normalizeNumber(raw.windowSeconds, 5, 2, 600)),
+      maxLength: Math.floor(normalizeNumber(raw.maxLength, 0, 0, 20000)),
+      totalLength: Math.floor(normalizeNumber(raw.totalLength, 0, 0, 50000)),
+      recall: raw.recall !== false,
+      forward: raw.forward !== false,
+      muteSeconds: Math.floor(normalizeNumber(raw.muteSeconds, 0, 0, 2592000))
+    }
+  })
 }
 
 export function formatActionName(action:string) {

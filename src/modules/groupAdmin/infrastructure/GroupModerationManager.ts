@@ -11,6 +11,7 @@ import {
   normalizeGroupModerationConfig,
   normalizeStringList
 } from "../domain/groupModerationRules.js"
+import type {CompoundRuleConfig} from "../../../contracts/groupAdmin.js"
 import { getMentionTargetId } from "../../conversation/domain/mentionTargets.js"
 import { safeTruncateUnicode, splitUnicodeText } from "../../models/domain/unicodeText.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
@@ -79,6 +80,7 @@ export function isIgnoredBotUser(userId:unknown, config:Partial<ModerationConfig
 export class GroupModerationManager {
   floodTrackers = new Map<string,number[]>()
   burstTrackers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
+  compoundBuffers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
   constructor(private readonly ports:AdminPorts,private readonly corpus:AdCorpusStore) {}
   getConfig(groupId?:GroupId) {
     return normalizeGroupModerationConfig(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupModeration)
@@ -390,6 +392,88 @@ export class GroupModerationManager {
     return true
   }
 
+  // 复合规则：窗口内连发达标且 单条最长/总字数 条件全部满足才触发。
+  // 独立于连发折叠（并集互不影响），评估从最新的（列表末尾）往前，首条命中生效并清空窗口
+  trackCompoundRules(e:AdminEvent, config:ModerationConfig, now = Date.now()) {
+    const rules = (config.compoundRules || []).filter(rule => rule.enabled)
+    if (!rules.length) return null
+    const key = `${e.group_id}:${e.user_id}`
+    this.compoundBuffers ||= new Map()
+    const buffer = (this.compoundBuffers.get(key) || []).filter(item => now - item.at < 600000)
+    buffer.push({ messageId: e?.message_id || e?.seq, text: this.extractVisibleText(e), at: now })
+    this.compoundBuffers.set(key, buffer)
+
+    for (let index = rules.length - 1; index >= 0; index--) {
+      const rule = rules[index]!
+      const windowMs = Math.max(2, Number(rule.windowSeconds) || 5) * 1000
+      const entries = buffer.filter(item => now - item.at < windowMs)
+      if (entries.length < Math.max(2, Math.floor(Number(rule.burstCount) || 5))) continue
+      const lengths = entries.map(item => Array.from(item.text || "").length)
+      if (rule.maxLength > 0 && Math.max(...lengths) <= rule.maxLength) continue
+      if (rule.totalLength > 0 && lengths.reduce((sum, length) => sum + length, 0) <= rule.totalLength) continue
+      this.compoundBuffers.delete(key)
+      return { rule, index, messages: entries, windowSeconds: Math.round(windowMs / 1000) }
+    }
+    if (this.compoundBuffers.size > 10000) this.compoundBuffers.clear()
+    return null
+  }
+
+  // 复合规则处置：按规则自带动作撤回/转发/禁言；一条都没撤回成功时不做后续动作
+  async handleCompoundRule(e:AdminEvent, hit:{rule:CompoundRuleConfig;index:number;messages:{messageId:GroupId|undefined;text:string;at:number}[];windowSeconds:number}) {
+    const { rule, messages } = hit
+    const senderName = this.getSenderName(e)
+    this.ports.logger?.info?.(`[GroupModeration] 复合规则命中 group=${e.group_id} user=${e.user_id} rule=${rule.name} count=${messages.length}/${hit.windowSeconds}s maxLength=${rule.maxLength} totalLength=${rule.totalLength}`)
+    const bot = requireAdminBot(this.ports,e)
+    const seen = new Set<GroupId>()
+    let recalled = 0
+    if (rule.recall) {
+      for (const item of messages) {
+        const messageId = item.messageId
+        if (!messageId || seen.has(messageId)) continue
+        seen.add(messageId)
+        try {
+          await bot.sendApi("delete_msg", { message_id: messageId })
+          recalled++
+        } catch (error) {
+          this.ports.logger?.warn?.(`[GroupModeration] 复合规则撤回失败 msg=${messageId}: ${adminError(error)}`)
+        }
+      }
+      if (!recalled) return false
+    }
+    if (rule.muteSeconds > 0) {
+      try {
+        await bot.sendApi("set_group_ban", {
+          group_id: Number(e.group_id),
+          user_id: Number(e.user_id),
+          duration: rule.muteSeconds
+        })
+      } catch (error) {
+        this.ports.logger?.warn?.(`[GroupModeration] 复合规则禁言失败 group=${e.group_id} user=${e.user_id}: ${adminError(error)}`)
+      }
+    }
+    if (rule.recall) this.floodTrackers.delete(`${e.group_id}:${e.user_id}`)
+
+    if (rule.forward) {
+      const botId = e?.self_id || e?.bot?.uin || this.ports.getBot()?.uin || 80000000
+      const longest = messages.reduce((best, item) => Array.from(item.text || "").length > Array.from(best.text || "").length ? item : best, messages[0]!)
+      const summary = [
+        `复合规则「${rule.name}」命中：${senderName} 在 ${hit.windowSeconds} 秒内发送 ${messages.length} 条`,
+        rule.maxLength > 0 ? `（其中单条最长 ${Array.from(longest.text || "").length} 字 > ${rule.maxLength}）` : "",
+        rule.totalLength > 0 ? `（合计 ${messages.reduce((sum, item) => sum + Array.from(item.text || "").length, 0)} 字 > ${rule.totalLength}）` : ""
+      ].join("")
+      const nodes = [
+        { user_id: botId, nickname: "群管助手", message: summary + (rule.muteSeconds > 0 ? `，已禁言 ${rule.muteSeconds} 秒` : "") + "：" },
+        ...messages.map(item => ({ user_id: e.user_id, nickname: senderName, message: item.text || " " }))
+      ]
+      if (await this.sendForwardNodes(e, nodes)) return true
+      try {
+        await e.reply?.(`${summary}，已处置${rule.muteSeconds > 0 ? `并禁言 ${rule.muteSeconds} 秒` : ""}（转发聊天记录失败）`)
+      } catch (error) {
+        this.ports.logger?.warn?.(`[GroupModeration] 发送复合规则提示失败 group=${e.group_id}: ${adminError(error)}`)
+      }
+    }
+    return true
+  }
   // 连发折叠：记录窗口内每条消息的 id 和文本，达到条数阈值返回全部待折叠消息并清空窗口。
   // 命中后由连发分支统一撤回/转发/禁言，避免与刷屏风控重复处理同一批消息
   trackBurstMessage(e:AdminEvent, config:ModerationConfig, now = Date.now()) {
@@ -592,14 +676,17 @@ export class GroupModerationManager {
     const level = Number(member?.level)
     if (config.inspectLowLevelOnly && Number.isFinite(level) && level > config.minActiveLevel) return false
 
+    // 复合规则检测：连发+单条最长/总字数组合条件，独立于广告与连发折叠，最新规则优先
+    const compound = this.trackCompoundRules(e, config)
     // 连发折叠检测：独立于广告规则；触发后优先于刷屏/超长处理，避免同一批消息被处理两次
-    const burst = this.trackBurstMessage(e, config)
+    const burst = compound ? null : this.trackBurstMessage(e, config)
     // 超长折叠与广告风控并行判定：命中风控的消息优先按风控处理（不把广告内容再转发一遍）
     const visibleText = this.extractVisibleText(e)
     const overlong = this.checkOverlongMessage(visibleText, config)
 
     // 广告扫描关闭：跳过广告/刷屏判定，只保留超长/连发折叠（各自另有开关）
     if (config.adScan?.enabled === false) {
+      if (compound) return await this.handleCompoundRule(e, compound)
       if (burst) return await this.handleBurstMessage(e, config, burst)
       if (overlong) return await this.handleOverlongMessage(e, config, visibleText, overlong)
       return false
@@ -609,7 +696,7 @@ export class GroupModerationManager {
     const flood = burst ? null : this.checkFlood(groupId, userId, member?.level, config)
 
     const content = await this.extractContent(e, config)
-    if (!content.text && !content.imageCount && !content.forwardCount && !flood && !burst) return false
+    if (!content.text && !content.imageCount && !content.forwardCount && !flood && !burst && !compound) return false
 
       const base = analyzeModerationRules({
         text: content.text,
@@ -636,6 +723,8 @@ export class GroupModerationManager {
 
     const action = this.decideAction(config, confidence)
     if (action === "ignore") {
+      // 复合规则优先（条件更具体）：整批撤回 + 可配转发/禁言
+      if (compound) return await this.handleCompoundRule(e, compound)
       // 连发折叠优先：整批撤回 + 合并转发 + 可选禁言
       if (burst) return await this.handleBurstMessage(e, config, burst)
       // 未命中风控但超长的普通消息：撤回后把内容转成合并聊天记录
