@@ -1,549 +1,319 @@
-# shiloh-plugin 个人改造版
+# bl-chat-plugin
 
-> 本项目借鉴并基于 [Cat-bl/shiloh-plugin](https://github.com/Cat-bl/shiloh-plugin) 做二次改造。
->
-> 这里不是上游项目的官方文档，也不是通用发行版说明。这个仓库主要记录我在原项目基础上，为自己的 TRSS Yunzai + NapCat 环境做了哪些重构、增强和定制。
+> 基于 TRSS-Yunzai + NapCat 的 QQ 群聊 LLM Agent 平台（部署名 `shiloh-plugin`）
 
-## 项目定位
+TRSS-Yunzai · OneBot v11（NapCat）· Node.js ≥ 22.12 · TypeScript 严格模式 · MIT
 
-上游项目已经提供了 Yunzai 插件结构、OneAPI/工具调用框架、触发模式、本地工具、表情包等基础能力。本仓库的 README 不再重复说明这些原有能力，而是重点说明这个分支实际改动过的部分。
+bl-chat-plugin 不只是一个"能回话的聊天插件"。它把一个大模型 Agent 需要的对话编排、多层记忆、函数调用工具、消息可靠投递、群自动化管理和运营观测做成了一个完整平台，并在 23 个群、周消息 3.4 万条、峰值日 6,500+ 条的真实环境里持续运行。
 
-当前改造重点：
+本项目基于 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin)（原 shiloh-plugin）深度二次开发：业务代码已 100% 迁移到 TypeScript 严格模式并按领域分层重写，消息管道、语义记忆、Agent 调度、群管系统、控制台均为本仓库重新实现。与上游的关系见文末[致谢](#致谢与上游)。
 
-- 重构 Redis 长期记忆存储，不再把聊天内容混在一个大文本里。
-- 用实体、别名、用户事实、群事实、元信息拆分记忆结构。
-- 优化 embedding 语义召回和去重，让相关记忆更容易被取出来。
-- 把记忆抽取、保存、召回、prompt 注入拆成更清晰的管线。
-- 减少工具输出、系统消息、机器人回复、低价值闲聊污染长期记忆。
-- 优化长任务期间的回复体验，避免用户不知道任务是否开始或是否卡住。
-- 记忆策略、对话追踪与骰子基础设置在控制台编辑，锅巴移除对应重复入口。
-- 清理仓库中的硬编码敏感信息，改成通过配置或环境变量注入。
+## 目录
 
-当前只按我的环境维护：
+- [核心亮点](#核心亮点)
+- [功能总览](#功能总览)
+- [快速开始](#快速开始)
+- [配置体系](#配置体系)
+- [常用指令](#常用指令)
+- [Web 控制台](#web-控制台)
+- [独立功能插件](#独立功能插件)
+- [架构概览](#架构概览)
+- [开发与测试](#开发与测试)
+- [使用建议](#使用建议)
 
-- TRSS Yunzai
-- NapCat
-- Node.js 插件环境
-- OpenAI 兼容接口 / Gemini / 火山 Ark 等模型服务按配置接入
+## 核心亮点
 
-其他 Yunzai 分支、适配器或部署方式没有保证。
+### 1. 两级 LLM 调度，不靠正则瀑布路由
 
-## 和上游的关系
+群聊 90% 的消息不需要 AI 回复。消息先经过轻量时机闸门（TimingGate）判断"是否值得回应"，命中后再由一次语义分类调用同时产出意图、工具选择和参考图角色规划，最后才交给主模型执行。无关消息不出成本，正则路由只作失败兜底。全链路有 `#观测日志` 流水和控制台"运行观测"页可查每次路由决策与模型耗时。
 
-上游 [Cat-bl/shiloh-plugin](https://github.com/Cat-bl/shiloh-plugin) 是本仓库的基础来源。上游已有能力仍然以原项目为准，本仓库主要是在其基础上继续维护个人化改造。
+### 2. 三层记忆体系
 
-如果你想找更通用的原版说明，请优先看上游项目。
+- **长期记忆**：以群为作用域、以实体为中心的 Redis 结构化存储（用户实体、别名映射、用户事实、群事实）。AI 负责判断内容类型（明确教学 / 自我陈述 / 偏好 / 群共识 / 闲聊），代码负责边界、归一化和安全落库；工具输出与机器人回复不会污染记忆。事实积累后自动触发反思压缩，embedding 语义召回与近重复合并让"同一件事不会被写一百遍"。
+- **语义记忆（RAG）**：直接在自己产出的群聊归档上建索引——按群滑窗分块，BM25（CJK bigram）与向量检索双路召回，RRF 融合后再用交叉编码器重排。实测 recall@10 达 94%，P50 检索延迟 386ms，且检索超时自动跳过、绝不阻塞回复。配套专属后台页：量化总览、检索游乐场、分块浏览器、评估历史。
+- **中期记忆与画像**：会话摘要缓冲、情绪状态、人物画像自动注入上下文，让"上周聊过的那个游戏"和每个人的说话风格都能被想起。
 
-## 我主要做了什么
+### 3. 恰好一次的消息管道
 
-以下内容根据本仓库 git 记录整理，重点覆盖 `memory`、Redis 存储、embedding 召回、上下文注入、记忆配置、图像任务体验和敏感信息清理相关提交。
+QQ 事件处理内嵌了一套微型事件处理系统：Redis 任务存储（事件 / 投递两类 job）+ 按会话串行队列 + 租约锁防多实例并发 + 指数退避重试 + 启动恢复 + 媒体 outbox。进程重启不丢消息、不重复搬运；媒体发送失败可可靠重试。全量消息按群按天 NDJSON 归档，撤回事件幂等回写 `recalled` 标记，本地仍可查。
 
-### 1. Redis 记忆结构重构
+### 4. 40 个函数调用工具 + MCP 扩展
 
-原来的长期记忆更接近“把聊天内容抽取后塞进一段记忆”。现在改成以群为作用域、以实体为中心的结构化 Redis 存储。
+生图 / 修图 / 识图、联网搜索、网页解析、视频分析、音乐 / 视频 / Pixiv / Bing 图片搜索、思维导图、文本转图、Excel 工作簿、语音合成、提醒、聊天记录查询，以及禁言、戳一戳、点赞、@成员、送礼物等群互动工具。长任务工具可加 `(dedupe)` 防止重复触发。
 
-核心 Redis key：
+支持标准 MCP（Model Context Protocol）：在 `config/mcp-servers.yaml` 声明 stdio / SSE 服务器，外部工具自动注入主模型，带自动重连与结果截断。
 
-```text
-ytbot:mem:g:<groupId>:entities
-ytbot:mem:g:<groupId>:alias
-ytbot:mem:g:<groupId>:facts
-ytbot:mem:g:<groupId>:meta
-```
+### 5. 海豹（SealDice）兼容骰娘
 
-主要改造：
+COC7 / DND 全套指令（`.r` `.ra` `.st` `.pc` `.sc` `.ri` `.log` 等约 85 条路由），牌堆、人物卡按群隔离、先攻、对抗、团录导出 txt/html、跑团期间 AI 对话自动静默。声明式 YAML 自定义规则包（运行时 2.0）支持自定义骰池、NPC、群共享状态、权限、战役 / 章节与快照——不执行任意 JavaScript，不接受自然语言触发跑团操作。扩展兼容层按 sealdice-core 源码逐项对齐语义。
 
-- `entities` 存用户实体、别名、用户事实和事实来源。
-- `alias` 单独存别名到 QQ 的映射，支持同一个人多个称呼。
-- `facts` 单独存群事实、群共识和群内长期状态。
-- `meta` 存群记忆开关、用户 opt-out、抽取失败次数等运行状态。
-- 写入前会做 slim 化，避免旧字段、临时字段、过大的运行时对象继续膨胀 Redis。
-- 旧记忆和新结构隔离，降低历史脏数据污染新召回链路的概率。
+### 6. 全自动群管理
 
-相关文件：
+入群答题验证（超时 / 答错可踢出）、广告与刷屏检测（10 条内置规则加权打分 + 广告语料库相似度 + 可选模型复审，提醒 / 撤回 / 禁言 / 踢出分级动作）、超长消息与连发消息自动折叠为合并转发、可配复合规则（连发条数 + 单条字数 + 总字数组合）、入群欢迎与退群通知。群管理员用 `.群管` 面板即可查看和修改本群策略，无需接触配置文件。
 
-- `utils/MemoryManager.js`
-- `utils/memory/redisStore.js`
-- `utils/memory/entityModel.js`
-- `utils/memory/constants.js`
+### 7. AI 主持的群游戏
 
-### 2. 记忆分类和写入边界
+海龟汤（AI 出题、主持、提示与投降、赛后评分，支持 AI 生成新题库存）、赛马娘养成竞速（属性、词条、训练、全局积分排行）、三角洲行动数据查询（今日密码、物品价值、价格曲线、改枪码）。游戏会话与主对话互相隔离，互不打断。
 
-这次重构的重点不是“代码决定一切”，而是让 AI 负责判断内容类型，代码只负责边界、归一化和安全落库。
+### 8. Web 管理控制台
 
-抽取结果会被路由成几类：
+独立 Vue 3 + TypeScript 控制台（默认 8787 端口），13 个页面覆盖机器人状态、群聊统计、群管策略、对话设置、人设绑定、AI 渠道、命令与骰子规则、语义记忆、消息管道、风控策略、运行观测与生图工作台。配置保存带 revision 乐观锁、凭据脱敏读写、YAML 定点更新保留注释与无关字段。
 
-- `explicit_teaching`：用户明确教机器人记住某个称呼、关系或事实。
-- `self_statement`：用户对自己的稳定描述。
-- `user_preference`：用户偏好、习惯、长期倾向。
-- `group_consensus`：群内共识、长期约定、共同背景。
-- `ordinary_chat`：普通闲聊，不写长期记忆。
+### 9. 风控与表达质量
 
-代码侧主要做这些事：
+出站消息走审查 + 随机延迟 + 令牌桶限流；风控信号三级响应（记录失败码 → 管理群加急告警 → 低调模式加倍延迟）。回复侧有违禁词护栏、人设守护、思考过程转发开关、全局表达学习与风格反馈（`.希洛反馈`），长任务先发确认再后台执行，工具失败不向群里抛原始报错。
 
-- 只接受结构化 JSON 结果，解析失败就放弃写入。
-- 过滤工具结果、系统提示、机器人输出、空消息和低信号文本。
-- refs 只保留纯数字 QQ，避免模型幻觉出无效引用。
-- 群记忆抽取只允许写入群事实或教学型别名，避免把无主语用户事实乱写给别人。
-- 支持用户关闭自己的记忆写入。
-- 支持按群禁用长期记忆。
+### 10. 工程质量
 
-相关文件：
+- 业务代码 100% TypeScript 严格模式（`noUncheckedIndexedAccess` / `exactOptionalPropertyTypes`），src 下 491 个 TS 文件按 domain / application / infrastructure 分层。
+- `npm run test:boundaries` 用 AST 强制分层边界：纯路径禁止 IO、禁止引用 `Bot` / `redis` / `global` 等全局。
+- 后端 1800+ 项、前端 30+ 项单测全绿；类型负例、发布产物加载合约、影子机器人 E2E（注入假 OneBot 客户端跑全链路，不污染真实群）。
+- 发布包带逐文件哈希 manifest，支持校验、原子安装与自动回滚。
 
-- `utils/memory/extractor.js`
-- `utils/memory/boundary.js`
-- `utils/memory/conflictResolver.js`
+## 功能总览
 
-### 3. Embedding 语义召回和去重
+| 能力域 | 说明 | 主要入口 |
+| --- | --- | --- |
+| 智能对话 | 时机闸门、语义意图路由、人设切换与群绑定、私聊支持、违禁词 | 群内自然聊天 + 触发前缀 |
+| 记忆 | 长期记忆、语义记忆 RAG、中期记忆、情绪与画像 | `#记忆状态`、`.语义记忆` |
+| 知识 | 主人知识库、群知识（谁是谁 / 黑话） | `#知识库添加`、`#群知识` |
+| 表情包 | 自动收集、VLM 打标、语义搜索斗图、入库双维审核 | `#表情包列表` |
+| 工具 | 40 个函数调用工具，工具清单单一声明点 | `#tool <内容>` |
+| MCP | 标准 MCP 服务器接入，工具注入主模型 | `#mcp 列表` |
+| 骰娘 | COC7 / DND、牌堆、团录、YAML 规则包 2.0 | `.r`、`.骰规则` |
+| 游戏 | 海龟汤、赛马娘、三角洲行动 | `.游戏`、`.赛马娘`、`.三角洲` |
+| 群管理 | 入群验证、广告 / 刷屏、折叠、复合规则、通知 | `.群管` |
+| 消息搬运 | B 站高清搬运（可扫码取会员）、抖音 / YouTube / Pixiv 卡片、磁链搜索 | `.高清搬运`、`.磁力搜索` |
+| 聊天记录 | NDJSON 归档、撤回回写、关键词搜索、音乐提取 | `#查看群聊记录` |
+| 风控观测 | 出站审查限流、三级风控响应、观测日志 | `#观测日志` |
+| 运维 | 命令总表（121 条）、一键部署与回滚、Web 控制台 | `.命令`、`scripts/deploy.sh` |
 
-`embeddingAiConfig` 现在不仅服务知识库，也可以用于长期记忆的语义召回和近重复合并。
+## 快速开始
 
-主要改造：
+### 环境要求
 
-- 用户事实和群事实可以补 embedding。
-- 召回时如果有 query embedding，会优先按语义相似度排序。
-- 没有 embedding 或模型失败时，自动降级为置信度、权限和时间排序。
-- 通过 `semanticDupCosine` 合并语义上高度相近的事实，减少“同一件事写很多遍”。
-- 对 embedding 失败保持静默降级，不影响正常聊天。
-- 增加 embedding 单测，覆盖向量归一化、相似度排序和去重阈值。
+- TRSS-Yunzai（自带 Redis，消息管道 / 记忆 / 统计依赖它）
+- NapCat 或其他 OneBot v11 适配器
+- Node.js ≥ 22.12
+- Chromium（puppeteer 渲染兜底：QQ 信息卡片、抖音解析、文本转图；系统已有 Chromium 时可设 `PUPPETEER_SKIP_DOWNLOAD=true` 跳过下载）
 
-相关配置：
+### 安装
 
-```yaml
-memorySystem:
-  semanticRecallEnabled: false
-  semanticDupCosine: 0.92
-
-embeddingAiConfig:
-  embeddingApiUrl: ""
-  embeddingApiKey: ""
-  embeddingModel: ""
-```
-
-相关文件：
-
-- `utils/memory/embeddings.js`
-- `utils/memory/retriever.js`
-- `utils/MemoryManager.js`
-- `tests/memory/embeddings.test.js`
-
-### 4. 上下文记忆注入
-
-记忆不是只负责“存”，还要在回复前把真正相关的内容注入 prompt。
-
-主要改造：
-
-- 回复前读取 speaker 自己的记忆。
-- 解析消息里提到的人，召回被提及对象的相关记忆。
-- 注入群事实和别名提示。
-- 支持 pending/time-sensitive 信息，让“几天后”“上周”“某天”等时间信息能参与上下文。
-- 用 `promptMaxChars`、`promptMaxGroupFacts`、`promptMaxEntityFacts` 控制注入长度。
-- 空记忆不注入，避免污染主 prompt。
-
-相关配置：
-
-```yaml
-memorySystem:
-  promptMaxGroupFacts: 6
-  promptMaxEntityFacts: 6
-  promptMaxChars: 1200
-  recallMaxMentionedEntities: 3
-```
-
-相关文件：
-
-- `utils/memory/mentionResolver.js`
-- `utils/memory/retriever.js`
-- `utils/MemoryManager.js`
-- `apps/test.js`
-
-### 5. 记忆反思和压缩
-
-为了避免 Redis 里长期积累重复、冲突、过期事实，新增了反思整理链路。
-
-主要改造：
-
-- 用户实体事实达到阈值后，可以触发实体级反思。
-- 群事实达到阈值后，可以触发群级反思。
-- 反思产物标记为 `origin: reflection`，和直接抽取的事实区分。
-- `origin: config` 的事实不会被反思覆盖，避免配置锚点被模型改写。
-- 反思失败静默降级，不影响原始记忆写入。
-
-相关配置：
-
-```yaml
-memorySystem:
-  reflectEntityThreshold: 12
-  reflectGroupThreshold: 30
-```
-
-相关文件：
-
-- `utils/memory/reflector.js`
-- `utils/MemoryManager.js`
-- `tests/memory/reflector.test.js`
-
-### 6. 抽取节流、批处理和刷屏保护
-
-群里有人连续刷消息时，记忆系统不能每条都跑一次模型。
-
-主要改造：
-
-- 用户记忆支持 debounce。
-- 用户消息支持攒批后统一抽取。
-- 群记忆支持最小抽取间隔。
-- 群记忆支持最大批处理条数。
-- 抽取失败会记录 failureCount，方便状态诊断。
-- 增加内存队列，避免同一个群的记忆读写并发互相覆盖。
-
-相关配置：
-
-```yaml
-memorySystem:
-  userExtractDebounceSeconds: 8
-  userExtractMaxBatchMessages: 5
-  groupExtractMinIntervalMinutes: 10
-  groupExtractMaxBatchMessages: 12
-```
-
-相关文件：
-
-- `utils/MemoryManager.js`
-- `utils/memory/stats.js`
-- `tests/memory/manager.test.js`
-
-### 7. 记忆管理指令
-
-为了能在群里直接检查和纠错，补齐了记忆管理入口。
-
-常用指令：
-
-```text
-#记忆状态
-#我的记忆
-#群记忆
-#搜索记忆 <关键词>
-#删除记忆 <记忆ID>
-#清空我的记忆
-#清空群记忆
-#禁用我的记忆
-#启用我的记忆
-```
-
-这些指令主要用于：
-
-- 查看当前群记忆是否开启。
-- 看自己的事实和别名。
-- 搜索群事实。
-- 删除错误记忆。
-- 清空当前群的记忆 Redis key。
-- 关闭或恢复自己的记忆写入。
-
-### 8. 图像任务和长文本体验修正
-
-这部分不是上游能力本身的说明，而是围绕实际群聊体验做的修正。
-
-主要改造：
-
-- 生图、修图、识图等长任务开始前先发一条自然确认，避免用户以为没响应。
-- 长任务放到后台执行，减少生成图片时阻塞后续聊天。
-- 图像需求会尽量补足引用消息、近期上下文和指代内容。
-- 对敏感图像需求先做含蓄化、全年龄化表达，再决定是否继续调用工具。
-- 工具失败、审核拦截、上游超时等情况不直接暴露原始 API 报错。
-- 长文本转图支持更适合阅读的羊皮纸样式和正文/口头补充分离。
-
-相关文件：
-
-- `functions/functions_tools/BananaTool.js`
-- `functions/functions_tools/GoogleImageEditTool.js`
-- `functions/functions_tools/GoogleAnalysisTool.js`
-- `functions/functions_tools/TextImageTool.js`
-- `apps/test.js`
-
-### 9. 配置整理和敏感信息清理
-
-主要改造：
-
-- 记忆配置集中到 `memorySystem` 和锅巴记忆页。
-- 模型配置继续使用 `memoryAiConfig`、`embeddingAiConfig` 等独立块。
-- 移除仓库里的硬编码第三方 API key、cookie 和 session。
-- 视频分析、ModelScope 等运行时凭据改为配置或环境变量读取。
-- README 只保留配置入口，不写任何真实密钥。
-
-相关文件：
-
-- `config_default/message.yaml`
-- `models/configSchemas/memory.js`
-- `src/modules/config/domain/aiProviderConfig.ts`
-- `functions/functions_tools/VoiceTool.js`
-- `functions/functions_tools/VideoAnalysisTool.js`
-- `utils/apiClient.js`
-
-## 快速安装
-
-在 Yunzai 根目录执行：
+在 Yunzai 根目录执行（目录名必须是 `shiloh-plugin`，独立功能插件按相对路径引用它）：
 
 ```bash
-git clone --depth=1 https://github.com/WoJiSama/shiloh-plugin plugins/shiloh-plugin
+git clone --depth=1 https://github.com/WoJiSama/shiloh-plugin.git plugins/shiloh-plugin
 cd plugins/shiloh-plugin
-pnpm install
+npm install
+npm run backend:build
 ```
 
-如果你想安装上游原版，请使用：
+TypeScript 编译产物 `dist/backend` 不随仓库分发，`npm run backend:build` 是必需步骤；构建带 manifest 校验，失败自动回滚旧产物。启动时如果产物缺失，插件会明确报错而不是静默降级。
+
+首次启动自动创建 `config/` 目录。不要删除 `config_default/`（默认配置模板与命令总表）。
+
+### 更新
+
+项目已启用 TypeScript 编译发布，群内 `#bl更新` 自动更新已停用（不会拉取代码或重启服务）。维护者更新方式二选一：
 
 ```bash
-git clone --depth=1 https://github.com/Cat-bl/shiloh-plugin plugins/shiloh-plugin
+# 手动：拉取 → 装依赖 → 重建 → 重启 Yunzai
+git pull && npm install && npm run backend:build
+
+# 或一键部署（先跑全量验收，再打包校验、原子安装、健康检查，失败自动回滚）
+bash scripts/deploy.sh
 ```
 
-首次启动会自动创建 `config` 文件夹。
+### 最小可用配置
 
-不要删除：
-
-- `config_default/`
-- `config_default/message.yaml`
-- `config_default/mcp-servers.yaml`
-
-运行时主要改：
-
-- `config/message.yaml`
-- `config/mcp-servers.yaml`
-
-## 配置入口
-
-对话与权限、AI 模型、人设与画像、消息搬运、群管理和风控通过管理控制台配置，安装与启动见 [控制台说明](console/README.md)。这些已完整覆盖的配置已从锅巴移除。
-
-智能追踪参数、归档、记忆、知识、情绪、表达与表情策略、语音、工具凭据及娱乐模块基础设置暂时保留在锅巴。自定义补充提示 `systemContent` 也继续使用锅巴编辑。
-
-在 Yunzai 根目录执行：
-
-```bash
-git clone --depth=1 https://gitee.com/guoba-yunzai/guoba-plugin.git ./plugins/Guoba-Plugin/
-pnpm install --filter=guoba-plugin
-```
-
-重启 Yunzai 后，发送：
-
-```text
-#锅巴登录
-```
-
-打开锅巴面板后，可管理上述剩余设置。升级后请刷新已打开的旧页面；包含已迁移字段的旧表单会拒绝保存，相关配置请到控制台修改。
-
-## 常用指令
-
-### 插件管理
-
-```text
-#bl更新
-#bl强制更新
-#对话插件更新
-#对话插件强制更新
-#全局方案添加白名单群组 <群号>
-#全局方案删除白名单群组 <群号>
-#清除群聊记录
-```
-
-### MCP 管理
-
-```text
-#mcp 重载
-#mcp 状态
-#mcp 列表
-#mcp 测试 <工具名> <JSON参数>
-```
-
-### 记忆管理
-
-```text
-#记忆状态
-#我的记忆
-#群记忆
-#搜索记忆 <关键词>
-#删除记忆 <记忆ID>
-#清空我的记忆
-#清空群记忆
-#禁用我的记忆
-#启用我的记忆
-```
-
-### 知识库管理
-
-```text
-#知识库添加 <知识内容>
-#知识库删除 <关键词>
-#知识库列表 [页码]
-#知识库搜索 <文本>
-#知识库清空
-#知识库统计
-```
-
-### 表情包管理
-
-表情包能力主要来自原有系统，这里只保留常用入口，具体能力以代码和上游文档为准。
-
-```text
-#表情包导入
-#表情包列表 [页码]
-#表情包预览 [hash前缀]
-#表情包删除 [hash前缀]
-#表情包封禁 [hash前缀]
-#表情包解封 [hash前缀]
-#表情包打标 [hash前缀]
-#表情包统计
-#表情包重载
-#表情包巡检
-#表情包清空 [确认]
-```
-
-## 关键配置入口
-
-### 基础对话
+编辑 `config/message.yaml`：
 
 ```yaml
 pluginSettings:
   enable: true
-  allowedGroups: []
+  enableGroupWhitelist: true
+  allowedGroups:
+    - 你的群号
   chatTriggerMode: strict
   triggerPrefixes:
     - 你的触发词
+
+  chatAiConfig:
+    chatApiUrl: "https://你的-openai-兼容-接口/v1"
+    chatApiKey: "sk-..."
+    chatApiModel: "..."
 ```
 
-### 模型配置
+配好 `chatAiConfig` 即可聊天；要用工具再加 `toolsAiConfig`，要长期记忆再加 `memoryAiConfig`。重启 Yunzai 生效。
 
-常用模型配置块：
+## 配置体系
+
+### 三个配置入口
+
+| 入口 | 覆盖范围 |
+| --- | --- |
+| Web 控制台（推荐） | 对话与权限、AI 渠道、人设、管道、群管策略、风控、骰子基础、追踪与记忆策略，带凭据脱敏和 revision 冲突保护 |
+| `config/message.yaml` | 全量配置的持久化源，控制台即写此文件 |
+| 锅巴面板 | 仅剩控制台未覆盖的字段（表情策略、语音、工具凭据、娱乐模块等），已迁移字段会拒绝保存并提示 |
+
+### AI 模型配置
+
+所有模型块都走 OpenAI 兼容接口，按需分角色配置，各块可指向不同供应商（自建网关 / Gemini / 火山 Ark 等）：
 
 ```yaml
-trackAiConfig:        # 会话跟踪 / Gate 判断
-toolsAiConfig:        # 工具调用模型
-chatAiConfig:         # 普通聊天模型
-imageEditAiConfig:    # 修图 / 图生图
-analysisAiConfig:     # 识图 / 截图分析
-searchAiConfig:       # 联网搜索总结
-memoryAiConfig:       # 记忆抽取和反思
-embeddingAiConfig:    # 知识库和语义记忆召回
+trackAiConfig:      # 时机闸门 / 会话跟踪（建议小而快）
+intentAiConfig:     # 语义意图与工具分类
+toolsAiConfig:      # 工具调用模型
+chatAiConfig:       # 主聊天模型
+imageEditAiConfig:  # 修图 / 图生图
+analysisAiConfig:   # 识图 / 截图分析
+searchAiConfig:     # 联网搜索总结
+memoryAiConfig:     # 记忆抽取与反思
+embeddingAiConfig:  # 知识库与语义记忆召回（选稳定便宜的即可）
 ```
 
 ### 长期记忆
 
 ```yaml
-memorySystem:
-  enabled: true
-  saveStrictness: normal
-  semanticRecallEnabled: true
-  promptMaxGroupFacts: 6
-  promptMaxEntityFacts: 6
-  promptMaxChars: 1200
+pluginSettings:
+  memorySystem:
+    enabled: true
+    saveStrictness: normal
+    semanticRecallEnabled: true   # 语义召回需另配 embeddingAiConfig
+    promptMaxGroupFacts: 6
+    promptMaxEntityFacts: 6
+    promptMaxChars: 1200
 ```
 
-开启长期记忆至少需要配置：
+抽取有 debounce、攒批和群级最小间隔，刷屏不会打爆模型；失败静默降级不影响聊天。
 
-- `memoryAiConfig`
+### 工具开关
 
-如果要用语义召回，还需要配置：
-
-- `embeddingAiConfig`
-
-### 图片生成 / 修图 / 识图
-
-```yaml
-imageEditAiConfig:
-  imageEditApiUrl: ""
-  imageEditApiKey: ""
-  imageEditApiModel: ""
-
-analysisAiConfig:
-  analysisApiUrl: ""
-  analysisApiKey: ""
-  analysisApiModel: ""
-```
-
-图像相关工具会根据消息自动选择：
-
-- 文字画图：`bananaTool`
-- 修图 / 图生图：`googleImageEditTool`
-- 看图 / 分析截图：`googleImageAnalysisTool`
-
-### 工具列表
-
-`oneapi_tools` 控制暴露给模型的工具。
-
-执行时间长的工具可以加 `(dedupe)`：
+`pluginSettings.oneapi_tools` 控制暴露给模型的工具，长任务建议加 `(dedupe)` 防重复触发：
 
 ```yaml
 oneapi_tools:
   - bananaTool(dedupe)
   - googleImageEditTool(dedupe)
-  - videoAnalysisTool(dedupe)
-  - textImageTool
   - googleImageAnalysisTool
   - searchInformationTool
-  - webParserTool
+  - textImageTool
 ```
 
-`(dedupe)` 只用于防止同一用户重复触发同一个长任务，模型看到的工具名仍然是不带后缀的原名。
+### MCP 服务
 
-### 自定义骰娘规则包
+编辑 `config/mcp-servers.yaml` 声明 stdio / SSE 服务器（连接与调用超时、结果截断、自动重连均可配），然后发 `#mcp 重载`。工具测试用 `#mcp 测试 <工具名> <JSON参数>`。
 
-开启 `diceSystem.customRulesEnabled` 后，主人可以导入声明式 YAML 规则包，群管理员再按群启用具体版本。规则运行时 2.0 支持自定义骰点与成功骰池、按群隔离人物卡、角色目标、NPC、群共享状态、权限、可恢复私密结果、对抗、团录审计、战役/章节/记录、团务历史与快照、先攻、持续状态、可执行物品/技能事件、自动群名片请求、版本迁移/回滚和中文句号命令，不执行任意 JavaScript，也不接受自然语言触发跑团操作。
+## 常用指令
 
-完整字段说明、表达式语法、权限、固定命令、操作步骤和四个可导入范例见 [自定义骰娘规则包教程](docs/dice-rules/骰娘自定义规则接入指南.md)。
-
-## 自定义本地工具
-
-不要直接改 `functions/functions_tools` 里的自带工具。自定义工具放这里：
+完整命令总表（121 条，11 个模块）在群里发 `.命令` 查看，或读 [docs/commands.md](docs/commands.md)。高频指令：
 
 ```text
-plugins/shiloh-plugin/custom_tools/
+# 帮助与观测
+.命令 / .帮助                # 命令总表菜单
+#观测日志 [条数]              # 工具调用与路由决策流水
+
+# 人设与表达
+#人设列表 / #切换人设 <名称> / #人设绑定列表
+#思考过程 开启|关闭
+.希洛反馈 <意见>              # 对说话风格提意见
+
+# 记忆
+#记忆状态 / #我的记忆 / #群记忆
+#搜索记忆 <关键词> / #删除记忆 <ID>
+#清空我的记忆 / #禁用我的记忆
+.语义记忆 状态|查询|评估|重建
+
+# 知识与表情
+#知识库添加|删除|列表|搜索|统计
+#表情包导入|列表|删除|打标|统计|巡检
+
+# 游戏
+.游戏                        # 游戏中心（海龟汤等）
+.赛马娘 / .三角洲
+
+# 群管理
+.群管                        # 本群群管面板（开关、规则、帮助）
+.广告入库 <样本> / .广告样本 统计
+
+# 搬运与记录
+.高清搬运 <B站链接>
+.磁力搜索 <关键词>
+#查看群聊记录 [条数] / #搜索聊天记录 <关键词>
+.音乐提取                    # 引用音乐卡片
+
+# MCP
+#mcp 状态 / #mcp 列表 / #mcp 测试 <工具> <JSON> / #mcp 重载
 ```
 
-步骤：
+骰娘指令（`.r` `.ra` `.st` `.pc` `.coc7` `.dnd` `.ri` `.log` 等约 85 条）与自定义规则包见 [骰娘自定义规则接入指南](docs/dice-rules/骰娘自定义规则接入指南.md)。
 
-1. 复制 `custom_tools/exampleTool.js.example`。
-2. 修改类名、`this.name`、`description`、`parameters`。
-3. 实现 `func()`。
-4. 在 `config/message.yaml` 的 `oneapi_tools` 里加入工具名。
-5. 重启，或修改一次配置触发热更新。
+## Web 控制台
 
-## 项目内文件速查
+控制台是独立 Koa + Vue 3 服务，安装、构建和环境变量详见 [console/README.md](console/README.md)：
 
-```text
-apps/test.js
-  主对话入口、触发逻辑、工具选择、最终回复清理、会话追踪。
-
-functions/functions_tools/
-  本地工具目录。生图、修图、识图、文字转图、搜索、提醒等都在这里。
-
-utils/MemoryManager.js
-  记忆系统门面，负责提取、保存、召回、反思和 prompt 组装。
-
-utils/memory/
-  记忆重构后的核心模块，包括 Redis 存储、抽取路由、embedding、召回和反思。
-
-models/Guoba/schemas/
-  尚未迁移的锅巴配置 schema。
-
-src/modules/config/domain/schemas/shared/
-  控制台独立配置声明，models/configSchemas/ 提供导出。
-
-config_default/message.yaml
-  默认配置模板。
-
-config_default/mcp-servers.yaml
-  MCP 服务默认配置模板。
+```bash
+npm --prefix console/frontend ci
+npm --prefix console/frontend run build
+npm run console:start    # 默认 0.0.0.0:8787
 ```
+
+首次访问创建管理员账号（scrypt 密码哈希 + HttpOnly 会话）。页面分四组：日常运营（机器人 / 群聊 / 群管理）、机器人能力（对话 / 人设 / AI 模型 / 命令骰子 / 语义记忆）、消息与运行（管道 / 风控 / 观测）、创作工具（生图工作台）。
+
+## 独立功能插件
+
+`standalone/` 下有 7 个可选拆分插件：`bl-dice-plugin`、`bl-emoji-plugin`、`bl-games-plugin`、`bl-group-admin-plugin`、`bl-knowledge-plugin`、`bl-media-plugin`、`bl-memory-plugin`。它们是主插件领域代码的独立入口，**必须与主插件以兄弟目录形式共存**，配置仍读写同一份 `message.yaml`，不会双重注册命令：
+
+```bash
+bash scripts/deploy-standalone.sh [yunzai根目录]
+```
+
+拆分部署后对应命令只由独立插件加载。主插件更新后需重跑上面的脚本同步独立插件。
+
+## 架构概览
+
+```
+src/
+  contracts/        # 共用契约：DTO、端口（模型网关/回执/配置）、错误
+  adapters/         # QQ / Yunzai / HTTP 平台适配，平台对象只在此转换
+  modules/<域>/
+    domain/           # 纯策略与值对象：零 IO、零全局、可独立测试
+    application/      # 用例编排，依赖 domain 与端口
+    infrastructure/   # 端口实现：Redis、模型网关、文件、SDK
+```
+
+22 个业务模块：conversation（对话编排）、memory（三层记忆）、tools / toolSupport / qqTools / content（工具体系）、messaging（消息管道与归档）、image（生图）、knowledge、emoji、dice、games、groupAdmin、media、rendering、models（LLM 网关）、platform（QQ / 多 bot 联邦 / 命令闸门 / 控制台服务）、config、runtime、host（Yunzai 装配）、foundation / shared（横切设施）。
+
+构建产物为 `dist/backend`（带逐文件哈希 manifest，启动时校验）。根目录 `apps/`、`utils/`、`domains/`、`functions/` 等旧 JS 文件全部是登记在案的兼容薄壳，仅 re-export 编译产物，`npm run migration:report` 维护 366 条旧路径 → 新实现的映射并逐一校验。
+
+## 开发与测试
+
+| 命令 | 说明 |
+| --- | --- |
+| `npm run backend:typecheck` | 两个 tsconfig 严格类型检查 |
+| `npm run backend:build` | 编译到 dist/backend（原子替换，失败回滚） |
+| `npm test` | 全量测试：legacy + TS 测试一起编译执行（node:test） |
+| `npm run test:boundaries` | AST 分层边界检查 |
+| `npm run test:artifacts` | 发布产物加载合约测试 |
+| `npm run migration:report` | 旧路径兼容层映射校验 |
+| `npm run verify:phase` | 聚合以上全部 + 前端检查 / 测试 / 构建 |
+| `npm run console:dev` … | 控制台开发 / 构建 / 检查 / 冒烟 |
+| `npm run release:pack` / `release:verify` | 发布打包与校验（支持原子安装与回滚） |
+
+自定义本地工具放 `custom_tools/`（不要改 `functions/functions_tools` 内置工具）：复制 `exampleTool.js.example`，实现 `func()`，把工具名加进 `oneapi_tools`，重启或改一次配置触发热更新。
 
 ## 使用建议
 
-- 先把 `chatAiConfig` 和 `toolsAiConfig` 配好，再开工具。
-- 长期记忆先配 `memoryAiConfig`，确认抽取稳定后再打开 `semanticRecallEnabled`。
-- `embeddingAiConfig` 优先选稳定、便宜、延迟低的模型；只要召回质量够用，不必一开始就上最贵模型。
-- 群聊量大的群建议调大 `userExtractDebounceSeconds` 和 `groupExtractMinIntervalMinutes`，避免频繁抽取。
-- 生图、修图、识图建议分别配适合的模型，不要所有任务共用一个慢模型。
-- 长任务工具建议加 `(dedupe)`，防止群里连续刷同一个请求。
-- 如果你只想要原版插件，建议直接使用上游 [Cat-bl/shiloh-plugin](https://github.com/Cat-bl/shiloh-plugin)。
+- 先配 `chatAiConfig`，跑通聊天后再逐个加 `toolsAiConfig`、`memoryAiConfig`，最后开 `semanticRecallEnabled`。
+- `trackAiConfig` / `intentAiConfig` 选快而便宜的模型，闸门延迟直接决定群里"像不像人在看消息"。
+- 群聊量大的群调大记忆抽取的 debounce 与最小间隔，避免频繁调用模型。
+- 生图、修图、识图分开配模型，不要共用一个慢模型；长任务工具都加 `(dedupe)`。
+- 部署到生产建议走 `npm run verify:phase` + `release:pack` 流程，产物带校验、可回滚。
 
-## 维护说明
+## 致谢与上游
 
-这个 README 主要面向我自己的改造版，内容会优先描述本仓库的设计目标和改造主线。
+本项目源自 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin)（原 shiloh-plugin），感谢上游提供的 Yunzai 插件结构与初始能力。本仓库随后完成了 TypeScript 全量迁移、分层重写、消息管道、语义记忆、控制台等大规模重构，代码组织与运行方式已与上游不同；上游原有能力请以上游文档为准。只需要原版插件的用户建议直接使用上游仓库。
 
-详细参数最终以 `config_default/message.yaml`、控制台与剩余锅巴 schema 和实际代码为准。上游功能如果发生变化，本仓库不保证同步更新说明。
+## 许可证
+
+MIT
