@@ -16,6 +16,8 @@ export interface TurnTraceReport {
   tools: { runs: number; failures: number; topFailures: TallyEntry[] }
   failureStages: TallyEntry[]
   outbound: { total: number; avgPerTurn: number }
+  toolRouting: { trackedTurns: number; destinations: TallyEntry[]; lossStages: TallyEntry[]; intentionalReductions: TallyEntry[]; reductionReasons: TallyEntry[]; removedTools: TallyEntry[]; plannerStatuses: TallyEntry[]; routeRules: TallyEntry[] }
+  intentShadow: { samples: number; mismatches: number; statuses: TallyEntry[] }
 }
 
 function record(value: unknown): TraceRecord {
@@ -23,6 +25,9 @@ function record(value: unknown): TraceRecord {
 }
 function records(value: unknown): TraceRecord[] {
   return Array.isArray(value) ? value.map(record) : []
+}
+function names(value: unknown): string[] {
+  return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string' && Boolean(item)))] : []
 }
 function percentile(sorted: number[], p: number): number {
   if (!sorted.length) return 0
@@ -44,7 +49,51 @@ function tally(getKey: (item: TraceRecord) => unknown, items: TraceRecord[]): Ta
 }
 
 export function buildTurnTraceReport(input: unknown[] = []): TurnTraceReport {
-  const turns = input.map(record).filter(item => Boolean(item.turnId))
+  const entries = input.map(record).filter(item => Boolean(item.turnId) || item.event === 'intent_shadow' && Boolean(item.parentTurnId))
+  const turns = entries.filter(item => Boolean(item.turnId) && item.event !== 'intent_shadow')
+  const shadows = new Map<string, TraceRecord>()
+  for (const entry of entries) {
+    if (record(entry.intentShadow).status) shadows.set(String(entry.parentTurnId || entry.turnId), record(entry.intentShadow))
+  }
+  const routing: TraceRecord[] = turns.filter(turn => Object.keys(record(turn.toolRouting)).length > 0)
+    .map(turn => ({...record(turn.toolRouting), routeReason: record(turn.route).reason}))
+  const losses: TraceRecord[] = []
+  const intentionalReductions: TraceRecord[] = []
+  const reductionReasons: TraceRecord[] = []
+  const removedTools: TraceRecord[] = []
+  for (const item of routing) {
+    const planner = record(item.planner)
+    const normalizedNoAction = planner.reason === 'normalized_no_action'
+    if (normalizedNoAction) {
+      // Normalization may have rejected an unavailable tool or invalid target
+      // before beforeFilter was captured. It is not an explicit chat decision,
+      // and empty downstream snapshots must not hide the planner transition.
+      losses.push({stage: 'planner'})
+      reductionReasons.push({key: 'planner/normalized_no_action'})
+    }
+    for (const [stage, before, after] of [['filter', 'beforeFilter', 'afterFilter'], ['plan', 'afterFilter', 'finalTools'], ['request', 'finalTools', 'requestTools']] as const) {
+      // A deterministic call bypasses the main model. An empty requestTools is
+      // expected there, and incomplete legacy records cannot prove a loss.
+      if (stage === 'request' && item.executionPath === 'forced') continue
+      if (!Array.isArray(item[before]) || !Array.isArray(item[after])) continue
+      const kept = new Set(names(item[after]))
+      const removed = names(item[before]).filter(name => !kept.has(name))
+      if (removed.length) {
+        // Preserve interpretation of old traces without a reason while giving
+        // the new validation-fallback reason precedence over semantic_chat.
+        const explicitChat = !normalizedNoAction && (planner.status === 'chat' || item.routeReason === 'semantic_chat')
+        const selected = typeof item.toolChoice === 'string' && !['auto', 'none'].includes(item.toolChoice) && names(item.finalTools).includes(item.toolChoice)
+        const selectionReduction = stage === 'plan' && (selected || item.executionPath === 'forced' && names(item.finalTools).length > 0)
+        const reason = normalizedNoAction ? 'normalized_no_action' : explicitChat ? 'explicit_chat' : selectionReduction ? 'selected_tool' : String(item.routeReason || planner.status || 'unclassified')
+        reductionReasons.push({key: `${stage}/${reason}`})
+        if (!normalizedNoAction) {
+          if (explicitChat || selectionReduction) intentionalReductions.push({key: `${stage}/${reason}`})
+          else losses.push({stage})
+        }
+      }
+      removedTools.push(...removed.map(name => ({key: `${stage}/${name}`})))
+    }
+  }
   const modelValues = new Map<string, number[]>()
   for (const turn of turns) {
     for (const call of records(turn.modelCalls)) {
@@ -76,7 +125,26 @@ export function buildTurnTraceReport(input: unknown[] = []): TurnTraceReport {
     modelStages,
     tools: { runs: toolRuns.length, failures: failures.length, topFailures: tally(tool => tool.name, failures).slice(0, 5) },
     failureStages: tally(failure => failure.stage, turns.flatMap(turn => records(turn.failures))),
-    outbound: { total: outbound, avgPerTurn: turns.length ? Math.round(outbound / turns.length * 10) / 10 : 0 }
+    outbound: { total: outbound, avgPerTurn: turns.length ? Math.round(outbound / turns.length * 10) / 10 : 0 },
+    toolRouting: {
+      trackedTurns: routing.length,
+      destinations: tally(item => {
+        if (item.executionPath === 'forced') return 'forced_call'
+        if (Array.isArray(item.requestTools)) return names(item.requestTools).length && item.toolChoice !== 'none' ? 'gateway_input_tools' : 'gateway_input_text'
+        if (!Array.isArray(item.finalTools)) return 'unknown'
+        // A plan can exist even when execution fails before gateway dispatch.
+        return names(item.finalTools).length && item.toolChoice !== 'none' ? 'planned_tools' : 'planned_text'
+      }, routing),
+      // These are observed reductions, not labelled false negatives. Narrowing
+      // to a selected tool or honoring explicit chat is often correct behavior.
+      lossStages: tally(item => item.stage, losses),
+      intentionalReductions: tally(item => item.key, intentionalReductions),
+      reductionReasons: tally(item => item.key, reductionReasons),
+      removedTools: tally(item => item.key, removedTools),
+      plannerStatuses: tally(item => record(item.planner).status, routing.filter(item => record(item.planner).status)),
+      routeRules: tally(item => item.name, routing.flatMap(item => names(item.applied).map(name => ({name}))))
+    },
+    intentShadow: { samples: shadows.size, mismatches: [...shadows.values()].filter(item => item.status === 'mismatch').length, statuses: tally(item => item.status, [...shadows.values()]) }
   }
 }
 
@@ -97,6 +165,17 @@ export function formatTurnTraceReport(report: Partial<TurnTraceReport> = {}): st
     lines.push(`  ${stage}: n=${value.count} p50=${value.p50}ms p95=${value.p95}ms avg=${value.avg}ms`)
   }
   lines.push(`工具执行: ${report.tools?.runs || 0} 次，失败 ${report.tools?.failures || 0} 次`)
+  if (report.toolRouting?.trackedTurns) {
+    lines.push(`工具路由观测: ${report.toolRouting.trackedTurns} 回合\n${renderTally(report.toolRouting.destinations)}`)
+    lines.push('requestTools = 模型网关入口暴露；不代表最终后端已消费，后续文字降级未追踪。')
+    lines.push(`待复核的工具集合收窄环节（不等于漏调）:\n${renderTally(report.toolRouting.lossStages)}`)
+    if (report.toolRouting.intentionalReductions.length) lines.push(`明确不执行或选中工具后的收窄:\n${renderTally(report.toolRouting.intentionalReductions)}`)
+    if (report.toolRouting.reductionReasons.length) lines.push(`收窄原因:\n${renderTally(report.toolRouting.reductionReasons)}`)
+    if (report.toolRouting.removedTools.length) lines.push(`被移除的工具:\n${renderTally(report.toolRouting.removedTools)}`)
+    if (report.toolRouting.plannerStatuses.length) lines.push(`规划器状态:\n${renderTally(report.toolRouting.plannerStatuses)}`)
+    if (report.toolRouting.routeRules.length) lines.push(`命中路由规则:\n${renderTally(report.toolRouting.routeRules)}`)
+  }
+  if (report.intentShadow?.samples) lines.push(`快路影子: ${report.intentShadow.samples} 次，分歧 ${report.intentShadow.mismatches} 次（分歧需复核）\n${renderTally(report.intentShadow.statuses)}`)
   if (report.tools?.topFailures?.length) lines.push(`失败工具 Top:\n${renderTally(report.tools.topFailures)}`)
   if (report.failureStages?.length) lines.push(`失败阶段:\n${renderTally(report.failureStages)}`)
   return lines.join('\n')

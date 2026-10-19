@@ -3,6 +3,7 @@
 import { hasExplicitImageGenerationRequest, hasExplicitImageEditAction, shouldTreatAsAvatarInspection } from "../../image/domain/imageTaskPolicy.js"
 import { looksLikeVisualInspectionRequest, looksLikeImageVerificationRequest, looksLikeImageAuthenticityRequest } from "../../image/domain/imageRequestGuard.js"
 import { getTerminalToolSet, getBackgroundTerminalToolSet } from "../../tools/domain/toolManifestRegistry.js"
+import { MEMBER_INFO_PATTERNS, CHAT_HISTORY_PATTERNS } from '../../tools/domain/memberMemoryIntent.js'
 
 // 终态工具：本轮调用后不再请求 LLM 续话（工具的执行结果本身即为最终输出）。
 // 活集合:工具在自己的 manifest 里声明 terminal:true,由 LocalToolRegistry
@@ -76,6 +77,8 @@ const EXPLICIT_SEARCH_PATTERNS = [
 ]
 
 const TOOL_INTENT_PATTERNS = [
+  ...MEMBER_INFO_PATTERNS,
+  ...CHAT_HISTORY_PATTERNS,
   /(画图|生图|修图|改图|图片分析|看图|识图|视频分析|语音|点歌|音乐|提醒我|定时提醒|撤回|禁言|改名片|戳一下|点赞|送礼物|红包|思维导图|导图|生成图片|生成照片|生成照|生成语音|Excel|工作簿|工作表|sheet|tab页|单元格|\.xlsx\b|\.xlsm\b|磁链|磁力链接|magnet:\?|艾特|通知.*(?:人|一下)|喊.*(?:人|一下)|叫.*(?:人|一下)|(?<![笔字漫画动刻描油])(?:画|绘制|捏)(?:一|1)?(?:个|张|幅|只|位)[^，,。！!？?？\n]{1,80})/i
 ]
 

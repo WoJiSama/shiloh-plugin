@@ -12,6 +12,8 @@ import { resolveSystemContentSource } from "../../conversation/domain/systemCont
 import { summarizeForLog, formatMemberDisplayName } from "../../conversation/domain/messageContext.js"
 import { randomUUID } from "crypto"
 import {createPersonaSnapshot} from "../../conversation/infrastructure/personaSnapshot.js"
+import {scheduleSkippedIntentShadow} from '../../conversation/application/intentShadow.js'
+import {MEMBER_INFO_PATTERNS, CHAT_HISTORY_PATTERNS} from '../domain/memberMemoryIntent.js'
 
 // Only the quoted message's own text is eligible as a previous bot reply, not nested forwards.
 function quotedMessageText(reply: QuotedMessage | null): string {
@@ -310,6 +312,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         const currentIntentText = joinIntentParts(args, msg)
         session.turnDrawRequested = isImageGenerationRequest(currentIntentText)
         const intentToolCandidates = selectToolIntentCandidates(currentIntentText, turnAvailableTools.map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name)))
+        turnTrace.setToolRouting?.({candidates: intentToolCandidates, planner: {status: 'skipped', reason: 'route_not_evaluated'}})
         let skipIntentModel = shouldSkipIntentModel({
           text: currentIntentText,
           hasImages: Boolean(images?.length),
@@ -325,7 +328,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             text: currentIntentText,
             media: groupContextAssets?.media
           }),
-          hasPixivSearchSession: hasRecentPixivSearch({ group_id: groupId, user_id: userId })
+          hasPixivSearchSession: hasRecentPixivSearch({ group_id: groupId, user_id: userId }),
+          atQq, currentUserId: userId, replyTargetUserId: groupContextAssets.replyTargetUserId,
+          memberMap, rawText: e.raw_message || currentIntentText, botId: Bot.uin
         }))
         if (deterministicIntentReady) {
           turnTrace.setIntent("tool", null, "deterministic_skip")
@@ -343,8 +348,20 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           ? null
           : runStage("intent", () => host.resolvePrimaryModelIntent(currentIntentText, { hasImages: Boolean(images?.length) }))
         if (skipIntentModel) {
-          turnTrace.setIntent("chat", null, "fast_path_skip")
-          logger.info(`[意图快路] group=${groupId} 无工具信号的短闲聊，跳过意图模型`)
+          if (!deterministicIntentReady) {
+            turnTrace.setIntent("chat", null, "fast_path_skip")
+            logger.info(`[意图快路] group=${groupId} 无工具信号的短闲聊，跳过意图模型`)
+            const shadow = host.config.agentIntelligence || {}
+            scheduleSkippedIntentShadow({
+              enabled: shadow.intentShadowEnabled === true,
+              isCasualFastPath: true,
+              rate: Number(shadow.intentShadowRate ?? 0.1),
+              maxConcurrent: Number(shadow.intentShadowMaxConcurrent ?? 1),
+              timeoutMs: Number(shadow.intentShadowTimeoutMs ?? 3000),
+              classify: ({signal, timeoutMs}) => host.resolvePrimaryModelIntent(currentIntentText, {hasImages: false, signal, timeoutMs}),
+              onResult: result => { turnTrace.setIntentShadow?.(result) }
+            })
+          }
         } else {
           const intentStartedAt = Date.now()
           modelIntentDecision = await intentPromise
@@ -371,6 +388,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           responseKind: isEducationalExplanationRequest(currentIntentText) ? "knowledge" : "chat",
           modelIntent: modelIntentDecision?.intent || "",
           requiredToolNames: intentToolCandidates,
+          needsMemberContext: MEMBER_INFO_PATTERNS.some(pattern => pattern.test(currentIntentText)),
+          needsMemoryContext: CHAT_HISTORY_PATTERNS.some(pattern => pattern.test(currentIntentText)),
           hasImages: Boolean(images?.length),
           hasVideos: Boolean(videos?.length)
         })
@@ -419,9 +438,12 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         if (modelIntentDecision && 'social' in modelIntentDecision) session.interactionContext = withTurnSocialInterpretation(session.interactionContext, modelIntentDecision.social, 'intent_model')
         // Read the same conversation history once. Only the requester's own
         // user messages can establish diagnostic observations or candidate tasks.
-        const chatHistory = host.config.groupHistory
-          ? await host.messageManager.getMessages(e.message_type, isPrivateChat ? userId : groupId)
+        let historyUnavailable = false
+        const chatHistory = host.config.groupHistory || turnAvailableTools.some(tool => tool.function?.name === 'chatHistoryTool')
+          ? await host.messageManager.getMessages(e.message_type, isPrivateChat ? userId : groupId, {throwOnError: true}).catch(() => { historyUnavailable = true; return [] })
           : []
+        e._chatHistoryMessages = chatHistory.filter(item => String(item.message_id) !== String(e.message_id))
+        e._chatHistoryUnavailable = historyUnavailable
         const ownRecentMessages = (chatHistory || []).filter(item =>
           item.source !== 'tool' && String(item.sender?.user_id) === String(userId)
           && item.source !== 'forward' && !item.forwardCompleteness
@@ -816,13 +838,14 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           modelIntent: modelIntentDecision?.intent,
           images, videos, groupId, userId,
           botName: Bot?.nickname || "",
+          botId: Bot.uin,
           config: turnConfig,
           memberMap,
           hasExcelContext, excelToolIntent, excelToolParams, hasPixivSearchSession,
           groupWorkflowPrompt: workflowPrompt,
           emojiCooldownMs,
           session: routingSession,
-          promptContext: () => ({ e, args, msg, currentIntentText, userContent, groupUserMessages: session.groupUserMessages, interactionContext: session.interactionContext, modelIntent: modelIntentDecision?.intent, sessionTools: turnAvailableTools }),
+          promptContext: () => ({ e, args, msg, currentIntentText, userContent, groupUserMessages: session.groupUserMessages, interactionContext: session.interactionContext, modelIntent: modelIntentDecision?.intent, sessionTools: turnAvailableTools, session, botId: Bot.uin, rawText: e.raw_message || currentIntentText }),
           imageGenerationReferenceImages: () => host.getImageGenerationReferenceImages(images, session),
           applyTools: (names:string[]) => { routingSession.tools = toolsForThisTurn(names); return routingSession.tools },
           log: (text:string) => logger.info(text),
@@ -853,6 +876,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         let toolChoice = route.toolChoice
         let forcedToolCall = route.forcedToolCall
         let toolScopeLocked = route.toolScopeLocked
+        turnTrace.setToolRouting?.({applied: route.applied, beforeFilter: (session.tools || []).flatMap(tool => tool.function?.name ? [tool.function.name] : [])})
+        if (route.forcedToolCall && !route.applied.includes('semanticPlanner')) turnTrace.setToolRouting?.({planner: {status: 'skipped', reason: 'forced_route'}})
         session.toolDecision = route.toolDecision || null
         if (session.toolDecision?.intent === "chat") {
           session.tools = []
@@ -863,7 +888,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
 
         if (!toolScopeLocked && toolChoice === "auto") {
           const beforeToolCount = session.tools?.length || 0
-          session.tools = filterToolsForMessageIntent(session.tools, e, args, { allowSearch: modelIntentDecision?.intent === "search", emojiCooldownMs: Number(host.config?.emojiSystem?.emojiCooldownMs ?? 120000) })
+          session.tools = filterToolsForMessageIntent(session.tools, e, args, { allowSearch: modelIntentDecision?.intent === "search", emojiCooldownMs: Number(host.config?.emojiSystem?.emojiCooldownMs ?? 120000),
+            toolCandidates: selectToolIntentCandidates(currentIntentText, (session.tools || []).flatMap(tool => tool.function?.name ? [tool.function.name] : [])) })
+          turnTrace.setToolRouting?.({filterStatus: 'applied', afterFilter: (session.tools || []).flatMap(tool => tool.function?.name ? [tool.function.name] : [])})
           if (!session.tools.length) {
             toolChoice = "none"
           } else if (session.tools.length === 1 && session.tools[0]?.function?.name === "sendLocalEmojiTool") {
@@ -872,6 +899,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
             logger.info(`[工具选择] group=${groupId} 按需启用 ${session.tools.length}/${beforeToolCount} 个工具`)
           }
         }
+        if (toolScopeLocked || route.toolChoice !== 'auto') turnTrace.setToolRouting?.({filterStatus: 'bypassed', afterFilter: (session.tools || []).flatMap(tool => tool.function?.name ? [tool.function.name] : [])})
 
         const availableToolNames = (session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name))
         const requestedActionCapabilities = session.toolDecision
@@ -888,6 +916,7 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           toolScopeLocked,
           forcedToolCall,
           explicitEmojiRequest: classifyEmojiToolExposure(currentIntentText) === "explicit",
+          keepAutoToolsOnChatTurn: host.config.agentIntelligence?.keepAutoToolsOnChatTurn !== false,
           historyMode: session.historySelectionMode,
           selectedHistoryCount: session.selectedGroupHistoryCount
         })
@@ -913,6 +942,9 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         // flight. Only this plan's immutable membership authorizes dispatch.
         const executionTools = [...(session.tools || [])]
         session.executionTools = executionTools
+        turnTrace.setRoute?.(turnPlan.execution.mode, turnPlan.execution.modelProfile, turnPlan.observability.routeReason)
+        turnTrace.setToolRouting?.({finalTools: executionTools.flatMap(tool => tool.function?.name ? [tool.function.name] : []), toolChoice,
+          executionPath: forcedToolCall ? 'forced' : executionTools.length ? 'model' : 'none'})
         const executionToolNames = new Set(executionTools.map(tool => tool.function?.name))
         const selectedToolName = typeof toolChoice === "object" ? toolChoice.function?.name : session.toolDecision?.toolName
         const authorizedToolNames = turnPlan.execution.mode === "tool" && selectedToolName && executionToolNames.has(selectedToolName)
@@ -941,11 +973,12 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
 	        // 抽取规则,不同群的上下文会让它摇摆(反问澄清/换错工具)。把候选工具的
 	        // 披露说明注入本轮请求,让主模型和规划器看到同一套规则。
 	        const toolNamesForRequest = executionTools.map(tool => tool?.function?.name).filter((name):name is string=>Boolean(name))
-	        const disclosureForMainModel = [turnPlanRequest.executionPrompt, buildToolIntentDisclosure(toolNamesForRequest)].filter(Boolean).join("\n\n")
+	        const disclosureForMainModel = [turnPlanRequest.executionPrompt, session.toolDecision?.goal ? `【本轮查询约束】${session.toolDecision.goal}` : '', buildToolIntentDisclosure(toolNamesForRequest)].filter(Boolean).join("\n\n")
 	        const requestMessages = disclosureForMainModel
 	          ? [...session.groupUserMessages, { role: "system", content: disclosureForMainModel }]
 	          : session.groupUserMessages
 	        const requestData = buildChatRequestData(host.config, requestMessages, executionTools, toolChoice)
+            turnTrace.setToolRouting?.({requestTools: ((requestData as {tools?: {function?: {name?:string}}[]}).tools || []).flatMap(tool => tool.function?.name ? [tool.function.name] : [])})
             const initialModelStartedAt = Date.now()
 	        let response = await host.retryRequest(requestData, session.toolContent, 1, undefined, turnPlanRequest.requestOptions)
 	        const mainElapsedMs = Date.now() - initialModelStartedAt

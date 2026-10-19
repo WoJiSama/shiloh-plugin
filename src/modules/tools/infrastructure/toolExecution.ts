@@ -1,5 +1,7 @@
 import type {ToolExecutionHost,ToolExecutionPorts,ExecutionMessage,ExecutionSession,ExecutionEvent,ExecutionResult,ToolCall,LocalExecutableTool,ToolExecutorPort} from "../../../contracts/toolExecution.js"
 import {toolRecord} from "../../../contracts/toolExecution.js"
+import {validateMemberQueryTarget} from '../domain/memberMemoryIntent.js'
+import {isToolActionDenied} from '../../conversation/domain/toolActionPolicy.js'
 import type {TurnEvidence} from '../../../contracts/turnInteraction.js'
 import type {TurnTaskFact} from '../../../contracts/turnActionFacts.js'
 import {buildTurnInteractionPrompt,withTurnInteractionEvidence} from '../../conversation/domain/turnInteractionContext.js'
@@ -215,6 +217,7 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
     if (type !== "function" || !funcData?.name) return null
 
     const toolName = funcData.name
+    if (isToolActionDenied(session.rawArgs || e.msg || '', toolName)) return {toolCall, toolName, result: 'error: 当前消息明确要求不执行此工具操作。'}
     const isMCPTool = mcpManager.isMCPTool(toolName)
     const isLocalTool = !isMCPTool && host.toolInstances[toolName]
     const isValidTool = session.toolDecision?.intent !== "chat" && (session.executionTools ?? session.tools)?.some(t => t.function?.name === toolName)
@@ -235,6 +238,24 @@ async function runToolCall(host: ToolExecutionHost, toolCall: ToolCall, e: Execu
         toolCall,
         toolName,
         result: `error: 参数 JSON 解析失败：${buildVisibleFailureDetail(error)}`
+      }
+    }
+
+    if (toolName === 'memberInfoTool' || toolName === 'chatHistoryTool') {
+      const text = session.rawArgs || e.msg || ''
+      const memberContext = {atQq: session.atQq, memberMap: session.memberMap, currentUserId: e.user_id,
+        replyTargetUserId: session.groupContextAssets?.replyTargetUserId, rawText: e.raw_message || text, botId: e.self_id || e.bot?.uin}
+      const target = validateMemberQueryTarget(text, params, memberContext)
+      const reject = (message: string, status = 'needs_clarification') => ({toolCall, toolName,
+        result: JSON.stringify({action: toolName === 'memberInfoTool' ? 'member_info' : 'chat_history', success: false, status, message})})
+      if (target.status === 'needs_clarification' || target.status === 'invalid_target') return reject(target.message, target.status)
+      if (target.status === 'resolved') { params.user_id = target.userId; delete params.nickname }
+      else if (target.status === 'lookup_by_name') {
+        if (toolName === 'chatHistoryTool') return reject('请明确@要检索的成员，以便核实QQ号。')
+        params.nickname = target.nickname; delete params.user_id
+      } else {
+        delete params.user_id; delete params.nickname
+        if (toolName === 'memberInfoTool') return reject('请确认要查哪位成员。')
       }
     }
 

@@ -1,5 +1,5 @@
 interface IntentBackend {intentAiUrl?:string;intentAiApikey?:string|string[];intentAiModel?:string;toolsAiUrl?:string;toolsAiApikey?:string|string[];toolsAiModel?:string}
-interface IntentOptions {text?:string;hasImages?:boolean;config?:{intentAiConfig?:IntentBackend;toolsAiConfig?:IntentBackend};fetchImpl?:typeof fetch;timeoutMs?:number;now?:()=>number}
+interface IntentOptions {text?:string;hasImages?:boolean;config?:{intentAiConfig?:IntentBackend;toolsAiConfig?:IntentBackend};fetchImpl?:typeof fetch;timeoutMs?:number;signal?:AbortSignal;now?:()=>number}
 function record(value:unknown):Record<string,unknown>{return value && typeof value==='object' && !Array.isArray(value)?value as Record<string,unknown>:{}}
 import { resolveChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
 import {parseSocialInterpretation, socialInterpretationInstruction} from '../domain/turnInteractionContext.js'
@@ -56,6 +56,7 @@ export async function classifyIntentWithModel({
   config = {},
   fetchImpl = fetch,
   timeoutMs = 6000,
+  signal,
   now = Date.now
 }:IntentOptions = {}): Promise<ModelIntentResult> {
   const content = String(text || "").trim()
@@ -89,7 +90,7 @@ export async function classifyIntentWithModel({
         max_tokens: 800,
         response_format: { type: "json_object" }
       }),
-      signal: controller.signal
+      signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
     })
     if (!response.ok) return { intent: "unavailable", confidence: 0, reason: `HTTP ${response.status}` }
     const data=record(await response.json())

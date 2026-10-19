@@ -90,6 +90,16 @@ test("规则表顺序 = 原主链路 16 块的书写顺序(裁决优先级的唯
   assert.deepEqual(ROUTE_RULES.map(rule => rule.name), EXPECTED_ORDER)
 })
 
+test('explicit refusal prevents deterministic and semantic forced actions', async () => {
+  const ctx=buildCtx({ctx:{intentText:'别查三角洲今日密码了，继续聊天'}})
+  const result=await resolveToolRoute(ctx)
+  assert.equal(result.toolChoice,'none')
+  assert.equal(result.forcedToolCall,null)
+  assert.equal(result.toolDecision.intent,'chat')
+  assert.deepEqual(ctx.session.tools,[])
+  assert.equal(ctx.classifierCalls.length,0)
+})
+
 test("首中即停:群主艾特命中后锁死,语义规划器不再发起 LLM 调用", async () => {
   const ctx = buildCtx()
   ctx.helpers.resolveSingularOwnerMention = () => ({ targetUserId: "20002", message: "叫群主" })

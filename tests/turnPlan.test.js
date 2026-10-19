@@ -126,3 +126,24 @@ test('explicit selected capability wins over stale regex candidates', () => {
   assert.deepEqual(plan.capabilities.required, ['reminderTool'])
   assert.equal(plan.execution.mode, 'tool')
 })
+
+
+test('auto candidates remain optional and produce a consistent tool-capable request', () => {
+  const plan = createTurnPlan({intentText: '那哥们是谁来着', availableCapabilities: ['memberInfoTool'], toolChoice: 'auto'})
+  assert.equal(plan.execution.mode, 'tool')
+  assert.deepEqual(plan.capabilities.required, [])
+  assert.deepEqual(plan.capabilities.optional, ['memberInfoTool'])
+  assert.equal(plan.observability.routeReason, 'optional_tools')
+  const request = deriveTurnPlanRequest(plan)
+  assert.equal(request.toolChoice, 'auto')
+  assert.equal(request.executionPrompt, undefined)
+})
+
+test('the compatibility switch and explicit no-action preserve chat semantics', () => {
+  for (const input of [{keepAutoToolsOnChatTurn: false}, {toolChoice: 'none'}, {toolDecision: {intent:'chat'}}]) {
+    const plan = createTurnPlan({intentText:'查一下这个人', availableCapabilities:['memberInfoTool'], ...input})
+    assert.equal(plan.execution.mode, 'chat')
+    assert.equal(deriveTurnPlanRequest(plan).toolChoice, 'none')
+    assert.match(deriveTurnPlanRequest(plan).executionPrompt, /没有可调用的工具/)
+  }
+})

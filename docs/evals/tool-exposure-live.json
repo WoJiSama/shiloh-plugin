@@ -1,0 +1,1710 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-10-19T04:02:33.895Z",
+  "kind": "offline_branch_replay",
+  "scenarioCount": 12,
+  "modelReplays": [
+    "unavailable"
+  ],
+  "limitations": [
+    "固定输出只测试路由分支，不代表模型准确率",
+    "直调或进入模型网关请求的工具列表都算路由到达；未追踪后端降级后的消费，不代表实际调用",
+    "未执行任何工具、未访问 QQ、最终回答与证据真实性未测量",
+    "answer/clarify 场景仅统计误直调和曝光；最终答复是否正确需 live 主模型或运行时回放",
+    "负例曝光包含可选emoji，不等于误调用；误直调单独计数"
+  ],
+  "summary": {
+    "unavailable/memberInfoTool/regression": {
+      "total": 2,
+      "positives": 2,
+      "reached": 2,
+      "direct": 2,
+      "exposed": 0,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 2,
+      "paramsPassed": 2,
+      "stages": {
+        "manifest": {
+          "drop": 0,
+          "applicable": 2,
+          "dropRate": 0
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "turnPlan": {
+          "drop": 0,
+          "applicable": 2,
+          "dropRate": 0
+        },
+        "request": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        }
+      }
+    },
+    "unavailable/chatHistoryTool/regression": {
+      "total": 1,
+      "positives": 1,
+      "reached": 1,
+      "direct": 0,
+      "exposed": 1,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 0,
+      "paramsPassed": 0,
+      "stages": {
+        "manifest": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "turnPlan": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "request": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        }
+      }
+    },
+    "unavailable/searchInformationTool/regression": {
+      "total": 1,
+      "positives": 1,
+      "reached": 0,
+      "direct": 0,
+      "exposed": 1,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 0,
+      "paramsPassed": 0,
+      "stages": {
+        "manifest": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "turnPlan": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "request": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        }
+      }
+    },
+    "unavailable/deltaForceTool/regression": {
+      "total": 1,
+      "positives": 1,
+      "reached": 1,
+      "direct": 1,
+      "exposed": 0,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 1,
+      "paramsPassed": 1,
+      "stages": {
+        "manifest": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "turnPlan": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "request": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        }
+      }
+    },
+    "unavailable/searchMusicTool/regression": {
+      "total": 1,
+      "positives": 1,
+      "reached": 0,
+      "direct": 0,
+      "exposed": 1,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 0,
+      "paramsPassed": 0,
+      "stages": {
+        "manifest": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "turnPlan": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "request": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        }
+      }
+    },
+    "unavailable/reminderTool/regression": {
+      "total": 1,
+      "positives": 1,
+      "reached": 0,
+      "direct": 0,
+      "exposed": 1,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 0,
+      "paramsPassed": 0,
+      "stages": {
+        "manifest": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "turnPlan": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        },
+        "request": {
+          "drop": 1,
+          "applicable": 1,
+          "dropRate": 100
+        }
+      }
+    },
+    "unavailable/githubRepoTool/regression": {
+      "total": 1,
+      "positives": 1,
+      "reached": 1,
+      "direct": 1,
+      "exposed": 0,
+      "unsafeDirect": 0,
+      "negativeExposed": 0,
+      "paramsMeasured": 1,
+      "paramsPassed": 1,
+      "stages": {
+        "manifest": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "turnPlan": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "request": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        }
+      }
+    },
+    "unavailable/negative/regression": {
+      "total": 3,
+      "positives": 0,
+      "reached": 0,
+      "direct": 0,
+      "exposed": 2,
+      "unsafeDirect": 0,
+      "negativeExposed": 2,
+      "paramsMeasured": 0,
+      "paramsPassed": 0,
+      "stages": {
+        "manifest": {
+          "drop": 1,
+          "applicable": 3,
+          "dropRate": 33.3
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 0,
+          "applicable": 2,
+          "dropRate": 0
+        },
+        "turnPlan": {
+          "drop": 1,
+          "applicable": 3,
+          "dropRate": 33.3
+        },
+        "request": {
+          "drop": 1,
+          "applicable": 3,
+          "dropRate": 33.3
+        }
+      }
+    },
+    "unavailable/negative/holdout": {
+      "total": 1,
+      "positives": 0,
+      "reached": 0,
+      "direct": 0,
+      "exposed": 1,
+      "unsafeDirect": 0,
+      "negativeExposed": 1,
+      "paramsMeasured": 0,
+      "paramsPassed": 0,
+      "stages": {
+        "manifest": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "intent": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "planner": {
+          "drop": 0,
+          "applicable": 0,
+          "dropRate": 0
+        },
+        "filter": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "turnPlan": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        },
+        "request": {
+          "drop": 0,
+          "applicable": 1,
+          "dropRate": 0
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "memberInfoTool-02",
+      "family": "memberInfoTool",
+      "split": "regression",
+      "difficulty": "direct",
+      "text": "[CQ:at,qq=20002]是谁",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "candidates": [
+        "memberInfoTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "intent": {
+          "state": "bypass",
+          "reason": "deterministic_skip"
+        },
+        "planner": {
+          "state": "bypass",
+          "reason": "earlier_direct_route"
+        },
+        "filter": {
+          "state": "bypass",
+          "reason": "locked_or_forced",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "committed_action",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "request": {
+          "state": "bypass",
+          "reason": "direct_dispatch_no_main_request",
+          "tools": []
+        }
+      },
+      "primaryIntent": "tool(deterministic_skip)",
+      "plannerDecision": {
+        "intent": "tool",
+        "toolName": "memberInfoTool",
+        "params": {
+          "user_id": "20002"
+        },
+        "reason": "deterministic_manifest"
+      },
+      "appliedRules": [
+        "deterministicManifest"
+      ],
+      "executionMode": "tool",
+      "toolChoice": {
+        "type": "function",
+        "function": {
+          "name": "memberInfoTool"
+        }
+      },
+      "requestTools": [],
+      "directTool": "memberInfoTool",
+      "actualParams": {
+        "user_id": "20002"
+      },
+      "routingSuccess": true,
+      "parameterStatus": "pass",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "memberInfoTool-05",
+      "family": "memberInfoTool",
+      "split": "regression",
+      "difficulty": "colloquial",
+      "text": "那哥们是谁来着",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "candidates": [
+        "memberInfoTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "intent": {
+          "state": "bypass",
+          "reason": "deterministic_skip"
+        },
+        "planner": {
+          "state": "bypass",
+          "reason": "earlier_direct_route"
+        },
+        "filter": {
+          "state": "bypass",
+          "reason": "locked_or_forced",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "committed_action",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "request": {
+          "state": "bypass",
+          "reason": "direct_dispatch_no_main_request",
+          "tools": []
+        }
+      },
+      "primaryIntent": "tool(deterministic_skip)",
+      "plannerDecision": {
+        "intent": "tool",
+        "toolName": "memberInfoTool",
+        "params": {
+          "user_id": "20002"
+        },
+        "reason": "deterministic_manifest"
+      },
+      "appliedRules": [
+        "deterministicManifest"
+      ],
+      "executionMode": "tool",
+      "toolChoice": {
+        "type": "function",
+        "function": {
+          "name": "memberInfoTool"
+        }
+      },
+      "requestTools": [],
+      "directTool": "memberInfoTool",
+      "actualParams": {
+        "user_id": "20002"
+      },
+      "routingSuccess": true,
+      "parameterStatus": "pass",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "chatHistoryTool-05",
+      "family": "chatHistoryTool",
+      "split": "regression",
+      "difficulty": "colloquial",
+      "text": "他上次说啥",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "candidates": [
+        "chatHistoryTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "chatHistoryTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "pass",
+          "reason": "exposed",
+          "tools": [
+            "chatHistoryTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "requested_action",
+          "tools": [
+            "chatHistoryTool"
+          ]
+        },
+        "request": {
+          "state": "pass",
+          "reason": "tools_in_request",
+          "tools": [
+            "chatHistoryTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "chatHistoryTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": true,
+      "parameterStatus": "unmeasured",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "searchInformationTool-05",
+      "family": "searchInformationTool",
+      "split": "regression",
+      "difficulty": "colloquial",
+      "text": "这会儿上海下不下雨",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "candidates": [
+        "sendLocalEmojiTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "drop",
+          "reason": "only_unrelated_candidates",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "drop",
+          "reason": "only_unrelated_tools",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "drop",
+          "reason": "optional_reaction",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "request": {
+          "state": "drop",
+          "reason": "tools_in_request",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "sendLocalEmojiTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": false,
+      "parameterStatus": "unmeasured",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": "filter",
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "deltaForceTool-04",
+      "family": "deltaForceTool",
+      "split": "regression",
+      "difficulty": "direct",
+      "text": "三角洲H70现在多少钱",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "candidates": [
+        "deltaForceTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "deltaForceTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "bypass",
+          "reason": "locked_or_forced",
+          "tools": [
+            "deltaForceTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "committed_action",
+          "tools": [
+            "deltaForceTool"
+          ]
+        },
+        "request": {
+          "state": "bypass",
+          "reason": "direct_dispatch_no_main_request",
+          "tools": []
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [
+        "naturalDeltaForce"
+      ],
+      "executionMode": "tool",
+      "toolChoice": {
+        "type": "function",
+        "function": {
+          "name": "deltaForceTool"
+        }
+      },
+      "requestTools": [],
+      "directTool": "deltaForceTool",
+      "actualParams": {
+        "operation": "object_value",
+        "prompt": "三角洲H70现在多少钱",
+        "keyword": "H70"
+      },
+      "routingSuccess": true,
+      "parameterStatus": "pass",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "searchMusicTool-05",
+      "family": "searchMusicTool",
+      "split": "regression",
+      "difficulty": "colloquial",
+      "text": "整首晴天听听",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "candidates": [
+        "sendLocalEmojiTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "drop",
+          "reason": "only_unrelated_candidates",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "drop",
+          "reason": "only_unrelated_tools",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "drop",
+          "reason": "optional_reaction",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "request": {
+          "state": "drop",
+          "reason": "tools_in_request",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "sendLocalEmojiTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": false,
+      "parameterStatus": "unmeasured",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": "filter",
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "reminderTool-05",
+      "family": "reminderTool",
+      "split": "regression",
+      "difficulty": "colloquial",
+      "text": "过五分钟喊我起来",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "candidates": [
+        "sendLocalEmojiTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "drop",
+          "reason": "only_unrelated_candidates",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "drop",
+          "reason": "only_unrelated_tools",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "drop",
+          "reason": "optional_reaction",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "request": {
+          "state": "drop",
+          "reason": "tools_in_request",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "sendLocalEmojiTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": false,
+      "parameterStatus": "unmeasured",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": "filter",
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "githubRepoTool-01",
+      "family": "githubRepoTool",
+      "split": "regression",
+      "difficulty": "direct",
+      "text": "分析这个GitHub仓库 https://github.com/openai/openai-node",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "candidates": [
+        "githubRepoTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "githubRepoTool"
+          ]
+        },
+        "intent": {
+          "state": "bypass",
+          "reason": "deterministic_skip"
+        },
+        "planner": {
+          "state": "bypass",
+          "reason": "earlier_direct_route"
+        },
+        "filter": {
+          "state": "bypass",
+          "reason": "locked_or_forced",
+          "tools": [
+            "githubRepoTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "committed_action",
+          "tools": [
+            "githubRepoTool"
+          ]
+        },
+        "request": {
+          "state": "bypass",
+          "reason": "direct_dispatch_no_main_request",
+          "tools": []
+        }
+      },
+      "primaryIntent": "tool(deterministic_skip)",
+      "plannerDecision": {
+        "intent": "tool",
+        "toolName": "githubRepoTool",
+        "params": {
+          "repoUrl": "https://github.com/openai/openai-node"
+        },
+        "reason": "deterministic_manifest"
+      },
+      "appliedRules": [
+        "deterministicManifest"
+      ],
+      "executionMode": "tool",
+      "toolChoice": {
+        "type": "function",
+        "function": {
+          "name": "githubRepoTool"
+        }
+      },
+      "requestTools": [],
+      "directTool": "githubRepoTool",
+      "actualParams": {
+        "repoUrl": "https://github.com/openai/openai-node"
+      },
+      "routingSuccess": true,
+      "parameterStatus": "pass",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "negative-01",
+      "family": "negative",
+      "split": "regression",
+      "difficulty": "direct",
+      "text": "那哥们是谁来着",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "clarify",
+      "expectedTool": null,
+      "candidates": [
+        "memberInfoTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "pass",
+          "reason": "exposed",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "requested_action",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "request": {
+          "state": "pass",
+          "reason": "tools_in_request",
+          "tools": [
+            "memberInfoTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "memberInfoTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": null,
+      "parameterStatus": "n/a",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": true,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "negative-03",
+      "family": "negative",
+      "split": "regression",
+      "difficulty": "direct",
+      "text": "查一下小林的资料",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "clarify",
+      "expectedTool": null,
+      "candidates": [
+        "memberInfoTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "pass",
+          "reason": "exposed",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "requested_action",
+          "tools": [
+            "memberInfoTool"
+          ]
+        },
+        "request": {
+          "state": "pass",
+          "reason": "tools_in_request",
+          "tools": [
+            "memberInfoTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "memberInfoTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": null,
+      "parameterStatus": "n/a",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": true,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "negative-09",
+      "family": "negative",
+      "split": "regression",
+      "difficulty": "context",
+      "text": "他说十分钟后提醒我喝水，我只是转述，别执行",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "answer",
+      "expectedTool": null,
+      "candidates": [],
+      "stages": {
+        "manifest": {
+          "state": "drop",
+          "reason": "no_manifest_candidate",
+          "tools": []
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "bypass",
+          "reason": "earlier_direct_route"
+        },
+        "filter": {
+          "state": "bypass",
+          "reason": "locked_or_forced",
+          "tools": []
+        },
+        "turnPlan": {
+          "state": "drop",
+          "reason": "semantic_chat",
+          "tools": []
+        },
+        "request": {
+          "state": "drop",
+          "reason": "no_tools_in_request",
+          "tools": []
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": {
+        "intent": "chat",
+        "goal": "用户明确要求不执行工具操作，本轮只回答当前问题。"
+      },
+      "appliedRules": [
+        "explicitNoAction"
+      ],
+      "executionMode": "chat",
+      "toolChoice": "none",
+      "requestTools": [],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": null,
+      "parameterStatus": "n/a",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": false,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    },
+    {
+      "id": "negative-11",
+      "family": "negative",
+      "split": "holdout",
+      "difficulty": "context",
+      "text": "引用里说周三20点发布，那发布是几点",
+      "modelReplay": "unavailable",
+      "modelAssumption": "模型未配置的兜底覆盖率",
+      "expectedAction": "answer",
+      "expectedTool": null,
+      "candidates": [
+        "sendLocalEmojiTool"
+      ],
+      "stages": {
+        "manifest": {
+          "state": "pass",
+          "reason": "expected_manifest_candidate",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "intent": {
+          "state": "n/a",
+          "reason": "unavailable"
+        },
+        "planner": {
+          "state": "n/a",
+          "reason": "unconfigured"
+        },
+        "filter": {
+          "state": "pass",
+          "reason": "exposed",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "turnPlan": {
+          "state": "pass",
+          "reason": "optional_reaction",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        },
+        "request": {
+          "state": "pass",
+          "reason": "tools_in_request",
+          "tools": [
+            "sendLocalEmojiTool"
+          ]
+        }
+      },
+      "primaryIntent": "unavailable",
+      "plannerDecision": null,
+      "appliedRules": [],
+      "executionMode": "tool",
+      "toolChoice": "auto",
+      "requestTools": [
+        "sendLocalEmojiTool"
+      ],
+      "directTool": null,
+      "actualParams": null,
+      "routingSuccess": null,
+      "parameterStatus": "n/a",
+      "unsafeDirectCall": false,
+      "negativeToolsExposed": true,
+      "deadAt": null,
+      "modelCalls": {
+        "intent": 0,
+        "planner": 0
+      },
+      "answerQuality": "unmeasured",
+      "toolResult": "not_executed"
+    }
+  ],
+  "provenance": {
+    "runtime": "current compiled source",
+    "manifestSha256": "00efd5812bab4d9cbee3243101753242b072ec8df5c5db9f9a2378f195781ddc",
+    "sourcesSha256": "6b52255a5440751b461a6114d0f9c53164052fb9cdae9dc5abe5b88d49d71954",
+    "fixtureSha256": "df90d74445e4f1566f260a5dbbcef6f2cc29c5a45d7641b8c96682e67ace457e",
+    "evaluatorSha256": "0ede5dc5550cfb31144910e22813dd0f30206e1f5290c992b48015a425d09f12"
+  },
+  "live": {
+    "schema": 1,
+    "generatedAt": "2026-10-19T04:02:33.905Z",
+    "kind": "live_model_sandbox",
+    "limitations": [
+      "仅请求模型；不执行工具、不访问 QQ、不写业务数据",
+      "主模型沙箱观察可用 schema 下的文本/调用，不代表完整生产上下文与后端降级表现",
+      "真实模型输出用于分析，不自动把模型意见当真值"
+    ],
+    "observations": [
+      {
+        "id": "memberInfoTool-02",
+        "expectedAction": "tool",
+        "expectedTool": "memberInfoTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "memberInfoTool-05",
+        "expectedAction": "tool",
+        "expectedTool": "memberInfoTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "chatHistoryTool-05",
+        "expectedAction": "tool",
+        "expectedTool": "chatHistoryTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "searchInformationTool-05",
+        "expectedAction": "tool",
+        "expectedTool": "searchInformationTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "deltaForceTool-04",
+        "expectedAction": "tool",
+        "expectedTool": "deltaForceTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "searchMusicTool-05",
+        "expectedAction": "tool",
+        "expectedTool": "searchMusicTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "reminderTool-05",
+        "expectedAction": "tool",
+        "expectedTool": "reminderTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "githubRepoTool-01",
+        "expectedAction": "tool",
+        "expectedTool": "githubRepoTool",
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "negative-01",
+        "expectedAction": "clarify",
+        "expectedTool": null,
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "negative-03",
+        "expectedAction": "clarify",
+        "expectedTool": null,
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "negative-09",
+        "expectedAction": "answer",
+        "expectedTool": null,
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      },
+      {
+        "id": "negative-11",
+        "expectedAction": "answer",
+        "expectedTool": null,
+        "models": [
+          {
+            "stage": "intent",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产意图后端缺少 endpoint/key"
+          },
+          {
+            "stage": "planner",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "生产规划器后端缺少 endpoint/key/model"
+          },
+          {
+            "stage": "main",
+            "status": "skipped",
+            "model": null,
+            "ms": 0,
+            "outputKind": "none",
+            "reason": "主工具模型配置缺少 endpoint/key/model"
+          }
+        ]
+      }
+    ]
+  }
+}

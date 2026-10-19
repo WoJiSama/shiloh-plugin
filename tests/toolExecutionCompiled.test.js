@@ -5,6 +5,8 @@ import { createSemanticToolIntent } from '../dist/backend/modules/tools/infrastr
 import {buildTurnInteractionContext} from '../dist/backend/modules/conversation/domain/turnInteractionContext.js'
 import {buildDiagnosticContext} from '../dist/backend/modules/conversation/domain/diagnosticContext.js'
 import {createTurnSessionStore} from '../utils/turnSession.js'
+import {createChatHistoryTool} from '../dist/backend/modules/qqTools/infrastructure/ChatHistoryTool.js'
+import {classifyToolResult} from '../utils/toolResultGrounding.js'
 const logger={info(){},warn(){},error(){}}
 
 test('compiled executor dispatches MCP and retries local execution once',async()=>{
@@ -200,4 +202,80 @@ test('MCP native continuation keeps the original alias and schema while rejectin
   assert.equal(f.requests.length, 2)
   for (const request of f.requests) assert.deepEqual(request.tools, [mcp])
   assert.deepEqual(f.sent, ['两页结果已取得。'])
+})
+
+test('member tool execution replaces guessed parameters with the real mention and preserves event evidence', async () => {
+ const f=scopedExecutorFixture([{function:{name:'memberInfoTool'}}]),received=[]
+ f.host.toolInstances.memberInfoTool={execute:async(params,event)=>{received.push({params,event});return 'verified member'}}
+ f.session.rawArgs='查一下他的名片'
+ f.session.atQq=[99,303]
+ f.session.memberMap=new Map([[99,{user_id:99,nickname:'机器人'}],[202,{user_id:202,nickname:'发言人'}],[303,{user_id:303,nickname:'小明'}]])
+ const e={self_id:99,user_id:202,msg:f.session.rawArgs,_chatHistoryMessages:[{message_id:'source'}]}
+ const result=await f.api.runToolCall(f.host,f.host.buildForcedToolCall('memberInfoTool',{user_id:'202',nickname:'发言人'}),e,f.session)
+ assert.equal(result.result,'verified member')
+ assert.deepEqual(received[0].params,{user_id:'303'})
+ assert.equal(received[0].event._chatHistoryMessages,e._chatHistoryMessages)
+})
+
+test('member executor refuses guessed, ambiguous and unresolved targets before calling the tool', async () => {
+ for(const scenario of [
+  {text:'那哥们是谁来着',params:{user_id:'303'}},
+  {text:'查一下成员资料',params:{user_id:'303'}},
+  {text:'小明是谁',params:{user_id:'303'},duplicate:true},
+  {text:'这两位是谁',params:{user_id:'303'},atQq:[202,303]}
+ ]) {
+  const f=scopedExecutorFixture([{function:{name:'memberInfoTool'}}]);let executed=0
+  f.host.toolInstances.memberInfoTool={execute:async()=>{executed++;return 'must not execute'}}
+  f.session.rawArgs=scenario.text
+  f.session.atQq=scenario.atQq||[]
+  f.session.memberMap=new Map([[202,{user_id:202,nickname:scenario.duplicate?'小明':'用户'}],[303,{user_id:303,nickname:'小明'}]])
+  const result=await f.api.runToolCall(f.host,f.host.buildForcedToolCall('memberInfoTool',scenario.params),{user_id:202,msg:scenario.text},f.session)
+  assert.equal(JSON.parse(result.result).status,'needs_clarification',scenario.text)
+  assert.equal(executed,0,scenario.text)
+ }
+})
+
+test('history executor resolves self to sender and leaves group-wide queries unfiltered', async () => {
+ for(const [text,params,expected] of [
+  ['我上次说啥',{question:'我上次说啥',user_id:'303'},'202'],
+  ['上次大家讨论什么',{question:'上次大家讨论什么'},undefined]
+ ]) {
+  const f=scopedExecutorFixture([{function:{name:'chatHistoryTool'}}]),received=[]
+  f.host.toolInstances.chatHistoryTool={execute:async params=>{received.push(params);return 'history evidence'}}
+  f.session.rawArgs=text
+  f.session.memberMap=new Map([[202,{user_id:202,nickname:'用户'}],[303,{user_id:303,nickname:'小明'}]])
+  await f.api.runToolCall(f.host,f.host.buildForcedToolCall('chatHistoryTool',params),{user_id:202,msg:text},f.session)
+  assert.equal(received.length,1)
+  assert.equal(received[0].user_id,expected)
+ }
+})
+
+test('planner target normalization shares the executor evidence boundary', () => {
+ const api=createSemanticToolIntent({logger,isExplicitAdminCollectionMentionRequest:()=>false,resolveMemberAvatarReferences:()=>[],normalizeToolSkillParams:(_tool,params)=>params})
+ const host={toolInstances:{memberInfoTool:{}}}
+ const decision={intent:'tool',confidence:0.95,toolName:'memberInfoTool',params:{user_id:'202'}}
+ const context={currentIntentText:'查一下他的名片',atQq:[303],currentUserId:202,memberMap:new Map([[202,{user_id:202,nickname:'用户'}],[303,{user_id:303,nickname:'小明'}]]),availableToolNames:['memberInfoTool']}
+ assert.equal(api.normalizeToolDecision(host,structuredClone(decision),context).params.user_id,'303')
+ assert.equal(api.normalizeToolDecision(host,structuredClone(decision),{...context,currentIntentText:'那哥们是谁来着',atQq:[]}).intent,'chat')
+ assert.equal(api.normalizeToolDecision(host,structuredClone(decision),{...context,currentIntentText:'查一下成员资料',atQq:[]}).intent,'chat')
+})
+
+test('history with no usable evidence exits before a model can fill gaps from old messages', async () => {
+ for(const unavailable of [false,true]) {
+  const f=scopedExecutorFixture([{function:{name:'chatHistoryTool'}}]),failed=[]
+  const History=createChatHistoryTool(),history=new History()
+  f.host.toolInstances.chatHistoryTool={execute:(params,event)=>history.func(params,event)}
+  f.host.serializeToolResult=value=>JSON.stringify(value)
+  f.host.isToolResultError=value=>classifyToolResult(value).kind!=='success'
+  f.host.handleToolFailureResponse=async(_name,context)=>failed.push(context)
+  f.session.rawArgs='最近大家聊了什么'
+  const e={msg:f.session.rawArgs,user_id:202,_chatHistoryMessages:[],_chatHistoryUnavailable:unavailable}
+  await f.api.processToolCalls(f.host,{tool_calls:[f.host.buildForcedToolCall('chatHistoryTool',{question:f.session.rawArgs,keywords:[]})]},e,f.session,[{role:'assistant',content:'旧回答声称大家约了周六去公园。'}],[])
+  assert.equal(f.requests.length,0)
+  assert.equal(f.sent.length,0)
+  assert.equal(failed.length,1)
+  assert.doesNotMatch(failed[0].factualReply,/周六|公园/)
+  const result=JSON.parse(f.session.toolResults[0].result)
+  assert.equal(result.status,unavailable?'unavailable':'not_found')
+ }
 })

@@ -45,6 +45,7 @@ test('compiled-path dry replay repeats independent multiline conversations witho
   const code=`
     import fs from 'node:fs';
     const privateRoot=${JSON.stringify(privateRoot)};
+    Math.random=()=>0; // Any accidental shadow sampling must be deterministic.
     const originalRead=fs.readFileSync;
     fs.readFileSync=(file,...args)=>{if(String(file).startsWith(privateRoot))throw new Error('private config was read');return originalRead(file,...args);};
     const originalLog=console.log;console.log=()=>{};
@@ -66,7 +67,9 @@ test('compiled-path dry replay repeats independent multiline conversations witho
   }
   assert.equal(replay.configHash,null);
   assert.equal(replay.personaLibraryHash,null);
-  assert.equal(JSON.parse(fs.readFileSync(path.join(outputDir,'dry-results.json'),'utf8')).complete,true);
+  const saved=JSON.parse(fs.readFileSync(path.join(outputDir,'dry-results.json'),'utf8'));
+  assert.equal(saved.complete,true);
+  assert.equal(saved.metadata.intentShadow,'disabled_for_conversation_quality_isolation');
 });
 
 test('repetitions default to one and accept only positive safe integer CLI values',()=>{

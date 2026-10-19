@@ -41,3 +41,10 @@ test("joinIntentParts:args 与 msg 相同时不重复拼接", () => {
   // args 是 msg 去掉 #tool 前缀的形态,两者都保留
   assert.equal(joinIntentParts("#tool 查密码", "查密码"), "#tool 查密码\n查密码")
 })
+
+
+test('current-price wording is not part of an object name', () => {
+  const result = resolveNaturalDeltaForceToolCall('三角洲H70现在多少钱')
+  assert.equal(result.params.operation, 'object_value')
+  assert.equal(result.params.keyword, 'H70')
+})

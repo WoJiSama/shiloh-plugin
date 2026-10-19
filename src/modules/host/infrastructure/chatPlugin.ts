@@ -919,6 +919,13 @@ class ExamplePlugin extends ports.Plugin {
 
   isToolResultError(result:unknown) {
     const text = typeof result === "string" ? result : JSON.stringify(result || "")
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.success === false) return true
+        if (['chat_history', 'member_info'].includes(parsed.action) && parsed.success === true) return false
+      }
+    } catch {}
     return /^error[:：]/i.test(text.trim()) || /"error"\s*:/.test(text) || /失败|错误|失敗|錯誤/.test(text)
   }
 
@@ -1162,11 +1169,11 @@ class ExamplePlugin extends ports.Plugin {
   }
 
   // P4 主判定：模型意图优先（6s 超时，confidence<0.7 或失败返回 null 走正则兜底）
-  async resolvePrimaryModelIntent(text:string, { hasImages = false } = {}) {
+  async resolvePrimaryModelIntent(text:string, { hasImages = false, timeoutMs = 6000, signal }: {hasImages?:boolean;timeoutMs?:number;signal?:AbortSignal} = {}) {
     const ai = this.config?.intentAiConfig || this.config?.toolsAiConfig || {}
     if (!this.config.intentAiConfig?.intentAiUrl && !this.config.toolsAiConfig?.toolsAiUrl) return null
     try {
-      const result = await classifyIntentWithModel({ text, hasImages, config: this.config, timeoutMs: 6000 })
+      const result = await classifyIntentWithModel({ text, hasImages, config: this.config, timeoutMs, ...(signal ? {signal} : {}) })
       if (result.intent === "unavailable" || result.confidence < 0.7) return null
       logger.info(`[意图主判定] model=${result.intent} conf=${result.confidence} text=${String(text).slice(0, 30)}`)
       return result

@@ -1,14 +1,14 @@
 import {resolveForcedReactionEmoji,suppressEmojiByCooldown,pickForcedReplyLayout} from '../domain/emojiToolPolicy.js'
-import type {ToolDefinition,ToolCall,SemanticDecision,SemanticMember,ToolSemanticContext,ExecutionAvatar} from '../../../contracts/toolExecution.js'
+import type {ToolDefinition,ToolCall,SemanticDecision,SemanticMember,ToolSemanticContext,ExecutionAvatar,ToolIntentContext} from '../../../contracts/toolExecution.js'
 interface Reaction {replies:string[];tags:string[];useCases:string[]}
 interface RoutePorts {
- resolveDeterministicToolIntent(text:string,tools:string[],context:{hasExcelContext?:boolean|undefined;hasPixivSearchSession?:boolean|undefined}):SemanticDecision|null;
+ resolveDeterministicToolIntent(text:string,tools:string[],context:ToolIntentContext):SemanticDecision|null;
  resolveNaturalDeltaForceToolCall(text:string,options:{botName:string}):{params:Record<string,unknown>}|null;
 }
 interface RoutedCall {tools:ToolDefinition[];toolName:string;toolCall:ToolCall;intent?:string|undefined}
 interface RouteDecision {toolNames?:string[];toolChoiceName?:string;forcedToolCallParams?:Record<string,unknown>;toolCall?:ToolCall;tools?:ToolDefinition[];toolDecision?:SemanticDecision|undefined;noTools?:boolean;lock?:boolean;appendAvatarLink?:string|number;log?:string;logParams?:unknown;abort?:string;warn?:string;intent?:string|undefined;silent?:boolean}
 export interface RouteContext {
- intentText:string;groupId:string|number;userId:string|number;botName:string;emojiCooldownMs:number;rawMsg:string;args:string;modelIntent?:string;
+ intentText:string;groupId:string|number;userId:string|number;botName:string;botId?:string|number;emojiCooldownMs:number;rawMsg:string;args:string;modelIntent?:string;
  memberMap?:Map<number,SemanticMember>|undefined;config?:{forcedAvatarMode?:boolean};excelToolIntent?:boolean;excelToolParams?:Record<string,unknown>|null;images:string[];videos:string[];
  hasExcelContext?:boolean;hasPixivSearchSession?:boolean;groupWorkflowPrompt?:string;
  session:{tools?:ToolDefinition[];avatarEditBase?:{images:string[];promptHint?:string};avatarInspection?:{images:string[];prompt:string};imageVerificationNeedsSearch?:boolean;imageVerificationMode?:string;recentImageContinuation?:{image:string};avatarDrawReference?:ExecutionAvatar|undefined;atQq?:(string|number)[];groupContextAssets?:{replyTargetUserId?:string|number};memberMap?:Map<number,SemanticMember>;editAssets?:{promptHint?:string};groupUserMessages:{content?:unknown}[]};
@@ -32,6 +32,7 @@ export interface RouteContext {
 import { isImageAnalysisRequest, isImageCompositionEditRequest, getImageVerificationMode, normalizeIntentText, isRealtimeInfoRequest, isExplicitSearchRequest } from "../domain/messageIntent.js"
 import { looksLikeImageVerificationRequest } from "../../image/domain/imageRequestGuard.js"
 import { shouldPreferImageGeneration } from "../../image/domain/imageTaskPolicy.js"
+import {isExplicitNoToolAction} from '../domain/toolActionPolicy.js'
 
 
 
@@ -285,7 +286,9 @@ const ROUTE_RULES: {name:string;guard:"auto"|"both"|"unlocked";evaluate(context:
       const decision = resolveDeterministicToolIntent(
         ctx.intentText,
         (ctx.session.tools || []).map(tool => tool?.function?.name).filter((name):name is string=>typeof name === "string"),
-        { hasExcelContext: ctx.hasExcelContext, hasPixivSearchSession: ctx.hasPixivSearchSession }
+        { hasExcelContext: ctx.hasExcelContext === true, hasPixivSearchSession: ctx.hasPixivSearchSession === true,
+          atQq: ctx.session.atQq, currentUserId: ctx.userId, replyTargetUserId: ctx.session.groupContextAssets?.replyTargetUserId,
+          memberMap: ctx.memberMap || ctx.session.memberMap, rawText: ctx.rawMsg, botId: ctx.botId }
       )
       const toolCall = decision
         ? ctx.helpers.buildToolCallFromDecision(decision, ctx.promptContext())
@@ -391,6 +394,12 @@ async function resolveToolRoute(ctx:RouteContext) {
   const applied = []
   let aborted:string|null = null
   let warn:string|null = null
+
+  if (isExplicitNoToolAction(ctx.intentText)) {
+    ctx.session.tools = []
+    return {toolChoice: 'none' as const, forcedToolCall: null, toolScopeLocked: true,
+      toolDecision: {intent: 'chat', goal: '用户明确要求不执行工具操作，本轮只回答当前问题。'}, applied: ['explicitNoAction'], aborted, warn}
+  }
 
   for (const rule of ROUTE_RULES) {
     if (aborted) break

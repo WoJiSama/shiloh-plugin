@@ -28,6 +28,7 @@ export function formatDirectToolResult(toolName = "", serialized = "") {
         `禁言 ${data.shut_up_timestamp} · 性别 ${data.sex} · 年龄 ${data.age} · 地区 ${data.area}`
       ].join("\n")
     }
+    if (typeof parsed?.message === 'string') return parsed.message
   }
   return text.replace(/^error:\s*/i, "")
 }

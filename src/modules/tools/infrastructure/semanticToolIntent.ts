@@ -4,6 +4,8 @@ import { normalizeIntentText, isRealtimeInfoRequest, isExplicitSearchRequest, is
 import {safeTruncateUnicode} from "../../models/domain/unicodeText.js"
 import {joinIntentParts,formatMemberDisplayName} from "../../conversation/domain/messageContext.js"
 import {replaceCqMentions} from "../../conversation/domain/mentionTargets.js"
+import {validateMemberQueryTarget} from '../domain/memberMemoryIntent.js'
+import {isExplicitNoToolAction,isToolActionDenied} from '../../conversation/domain/toolActionPolicy.js'
 export function createSemanticToolIntent(ports:SemanticToolPorts) {
 const {logger,isExplicitAdminCollectionMentionRequest,selectToolIntentCandidates,normalizeToolSkillParams,resolveMemberAvatarReferences,buildToolSkillCatalog,resolvePersonaName,hasSemanticPlannerCandidate,shouldRunSemanticToolPlanner,fetchWithTimeout}=ports
 function shouldUseSemanticToolIntent(host: SemanticToolHost, e: SemanticEvent = {}, text = "", images: string[] = [], videos: string[] = [], options: {knownToolCandidates?:string[];hasMemberMentions?:boolean;modelIntent?:string|undefined} = {}) {
@@ -26,11 +28,13 @@ function normalizeToolDecision(host: SemanticToolHost, decision: Record<string,u
     if (intent !== "tool" && !SEMANTIC_TOOL_INTENTS.has(intent)) return null
     const goal = safeTruncateUnicode(String(decision.goal || "").trim(), 800)
     const noToolDecision = { intent: "chat", ...(goal ? { goal } : {}) }
+    if (isExplicitNoToolAction(context.currentIntentText || context.args || context.msg || '')) return {intent: 'chat', goal: '用户明确要求不执行工具操作，本轮只回答当前问题。'}
     // A deliberate no-action answer is different from an unavailable planner.
     // Ignore stale tool fields rather than turning a chat decision into an action.
     if (intent === "chat") return noToolDecision
 
     const requestedToolName = String(decision.toolName || decision.tool_name || "").trim()
+    if (requestedToolName && isToolActionDenied(context.currentIntentText || context.args || context.msg || '', requestedToolName)) return {intent:'chat',goal:'用户明确要求不执行这项工具操作，请保留其他明确请求。'}
     const availableToolNames = new Set(Array.isArray(context.availableToolNames) ? context.availableToolNames : [])
     if (requestedToolName === "mentionAdminsTool" && !isExplicitAdminCollectionMentionRequest(context.currentIntentText || context.args || context.msg || "")) {
       logger.warn("[语义工具分类] 拒绝非集合措辞的 mentionAdminsTool 请求")
@@ -50,6 +54,19 @@ function normalizeToolDecision(host: SemanticToolHost, decision: Record<string,u
       : "style"
     if (intent === "tool" && requestedToolName && availableToolNames.has(requestedToolName)) {
       const params = toolRecord(decision.params || decision.arguments)
+      if (requestedToolName === 'memberInfoTool' || requestedToolName === 'chatHistoryTool') {
+        const userText = context.currentIntentText || context.args || context.msg || ''
+        const target = validateMemberQueryTarget(userText, params, {...context, rawText: context.rawText || context.e?.raw_message || userText})
+        if (target.status === 'needs_clarification' || target.status === 'invalid_target') return {...noToolDecision, goal: target.message}
+        if (target.status === 'resolved') { params.user_id = target.userId; delete params.nickname }
+        else if (target.status === 'lookup_by_name') {
+          if (requestedToolName === 'chatHistoryTool') return {...noToolDecision, goal: '请明确@要检索的成员，以便核实QQ号。'}
+          params.nickname = target.nickname; delete params.user_id
+        } else {
+          delete params.user_id; delete params.nickname
+          if (requestedToolName === 'memberInfoTool') return {...noToolDecision, goal: '请确认要查哪位成员。'}
+        }
+      }
       const tool = host.toolInstances?.[requestedToolName]
       let normalizedParams
       try {
@@ -76,6 +93,7 @@ function normalizeToolDecision(host: SemanticToolHost, decision: Record<string,u
 
     if (intent === "tool") return noToolDecision
     const intentToolNames: Record<string,string> = {image_generate:"bananaTool",image_edit:"googleImageEditTool",image_analysis:"googleImageAnalysisTool",search:"searchInformationTool"}
+    if (isToolActionDenied(context.currentIntentText || context.args || context.msg || '', intentToolNames[intent] || '')) return {intent:'chat',goal:'用户明确要求不执行这项工具操作，请保留其他明确请求。'}
     if (!availableToolNames.has(intentToolNames[intent] || "")) return noToolDecision
 
     const images = Array.isArray(context.images) ? context.images : []
@@ -198,6 +216,8 @@ function extractJsonObject(host: SemanticToolHost, text = "") {
   }
 
 async function classifySemanticToolIntent(host: SemanticToolHost, context: ToolSemanticContext = {}) {
+    const trace = context.session?.turnTrace
+    const plannerStatus = (status:string, reason?:string) => trace?.setToolRouting?.({planner: {status, ...(reason ? {reason} : {})}})
     // 分类需要低延迟:优先独立的 intentAiConfig(可指向快速模型),回落 tools 模型。
     // 实测 gpt-5.6-sol 单次 14-48s(必超时),deepseek-v4-flash 稳定 ~4s。
     const fastIntent = host.config?.intentAiConfig || {}
@@ -205,7 +225,7 @@ async function classifySemanticToolIntent(host: SemanticToolHost, context: ToolS
     const apiUrl = fastIntent.intentAiUrl || cfg.toolsAiUrl
     const apiKey = fastIntent.intentAiApikey || cfg.toolsAiApikey
     const model = fastIntent.intentAiModel || cfg.toolsAiModel
-    if (!apiUrl || !apiKey || !model || String(apiKey).includes("sk-xxx")) return null
+    if (!apiUrl || !apiKey || !model || String(apiKey).includes("sk-xxx")) { plannerStatus('unavailable', 'unconfigured'); return null }
 
     const url = host.resolveChatCompletionUrl(apiUrl)
     // 当前文本做 @ 注解:CQ 码对模型是不透明记号,替换成 @名字 后
@@ -227,7 +247,7 @@ async function classifySemanticToolIntent(host: SemanticToolHost, context: ToolS
       knownToolCandidates: hasSemanticPlannerCandidate(knownToolCandidates) ? knownToolCandidates : [],
       hasMemberMentions: Boolean((Array.isArray(context.atQq) && context.atQq.length) || context.replyTargetUserId),
       modelIntent: context.modelIntent
-    })) return null
+    })) { plannerStatus('skipped', 'no_tool_signal'); return null }
     const toolCatalog = buildToolSkillCatalog(host.toolInstances, availableToolNames, context.sessionTools || context.tools)
     // 成员候选:机械组装(被@名单/发送者/回复目标),不做任何语义判断
     const memberCandidateLines = buildMemberCandidateLines({
@@ -240,6 +260,7 @@ async function classifySemanticToolIntent(host: SemanticToolHost, context: ToolS
     })
 
     const classifyStartedAt = Date.now()
+    plannerStatus('running')
     try {
       const response = await fetchWithTimeout(url, {
         method: "POST",
@@ -305,8 +326,8 @@ async function classifySemanticToolIntent(host: SemanticToolHost, context: ToolS
       }, SEMANTIC_TOOL_INTENT_TIMEOUT_MS)
 
       const text = await response.text()
-      context.session?.turnTrace?.addModelCall("planner", Date.now() - classifyStartedAt)
       if (!response.ok) {
+        plannerStatus('error', `http_${response.status}`)
         logger.warn(`[语义工具分类] 请求失败: ${response.status} ${text.slice(0, 240)}`)
         return null
       }
@@ -320,12 +341,17 @@ async function classifySemanticToolIntent(host: SemanticToolHost, context: ToolS
         availableToolNames
       })
       if (normalized) {
+        plannerStatus(normalized.intent === 'chat' ? 'chat' : 'tool', normalized.intent === 'chat' ? parsed?.intent === 'chat' ? 'explicit_chat' : 'normalized_no_action' : 'selected_tool')
         logger.info(`[语义工具分类] intent=${normalized.intent} tool=${normalized.toolName || "none"} confidence=${parsed?.confidence ?? ""} elapsed=${Date.now() - classifyStartedAt}ms reason=${String(parsed?.reason || "").slice(0, 80)}`)
       }
+      else plannerStatus('invalid', 'invalid_or_low_confidence')
       return normalized
     } catch (error) {
+      plannerStatus(/abort|timeout|超时/i.test(String(error)) ? 'timeout' : 'error', 'request_failed')
       logger.warn(`[语义工具分类] 失败 elapsed=${Date.now() - classifyStartedAt}ms: ${error instanceof Error ? error.message : String(error)}`)
       return null
+    } finally {
+      trace?.addModelCall('planner', Date.now() - classifyStartedAt)
     }
   }
 

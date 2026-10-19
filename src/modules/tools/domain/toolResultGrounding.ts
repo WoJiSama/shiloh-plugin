@@ -25,6 +25,14 @@ export function classifyToolResult(result:unknown) {
   const text = typeof result === "string" ? result.trim() : JSON.stringify(result ?? "").trim()
   if (!text) return { kind: "empty", text: "" }
   const parsed = parseJson(text)
+  const structured = toolRecord(parsed)
+  if (structured.action === 'chat_history' || structured.action === 'member_info') {
+    if (structured.status === 'not_found') return {kind: 'not_found', text, parsed}
+    if (structured.status === 'unavailable') return {kind: 'empty', text, parsed}
+    if (structured.success === false) return {kind: 'error', text, parsed}
+    // Retrieved messages and nicknames may themselves contain failure words.
+    if (structured.success === true) return {kind: 'success', text, parsed}
+  }
   if (toolRecord(parsed).kind === "tool_outcome") {
     const status = String(toolRecord(parsed).status || "").toLowerCase()
     if (["error", "failed", "timeout"].includes(status)) return { kind: "error", text, parsed }

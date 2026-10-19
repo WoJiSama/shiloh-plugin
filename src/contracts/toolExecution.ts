@@ -27,10 +27,11 @@ export interface ToolSemanticContext {
  e?:SemanticEvent|undefined; currentIntentText?:string|undefined;args?:string|undefined;msg?:string|undefined;userContent?:string|undefined;
  images?:string[]|undefined;videos?:string[]|undefined;atQq?:(string|number)[]|undefined;
  memberMap?:Map<number,SemanticMember>|null|undefined;currentUserId?:string|number|null|undefined;replyTargetUserId?:string|number|null|undefined;
+ botId?:string|number|undefined;rawText?:string|undefined;
  sessionTools?:ToolDefinition[];tools?:ToolDefinition[];availableToolNames?:string[];authorizedToolNames?:string[];
  interactionContext?:TurnInteractionContext|undefined;modelIntent?:string|undefined;toolDecision?:SemanticDecision|null|undefined;
  groupWorkflowPrompt?:string;groupUserMessages?:unknown;
- session?:{turnTrace?:{addModelCall(kind:string,duration:number):void}};
+ session?:{turnTrace?:{addModelCall(kind:string,duration:number):void;setToolRouting?(update:{planner?:{status:string;reason?:string}}):void}};
  prompt?:string;modelCommittedToDraw?:boolean
 }
 export interface SemanticDecision {intent:string;toolName?:string;params?:Record<string,unknown>;goal?:string}
@@ -75,7 +76,7 @@ export interface ExecutionSession {
  groupUserMessages?:ExecutionMessage[];editAssets?:{promptHint?:string};avatarEditBase?:{promptHint?:string};avatarDrawReference?:ExecutionAvatar;
  memberMap?:Map<number,SemanticMember>|null;atQq?:(string|number)[];groupContextAssets?:{replyTargetUserId?:string|number};taskContext?:{messageId?:unknown};
  turnPlan?:import('./turnPlan.js').TurnPlan;emojiToolSentThisTurn?:number;toolContent?:unknown;modrinthCardItems?:unknown[];
- turnTrace?:{addTool(name:string,success:boolean,elapsed:number):void;addModelCall(kind:string,elapsed:number):void};
+ turnTrace?:{addTool(name:string,success:boolean,elapsed:number):void;addModelCall(kind:string,elapsed:number):void;setToolRouting?(update:{planner?:{status:string;reason?:string}}):void};
  outboundArbiter?:{resolveToolOutcomes():void}
 }
 export interface LocalExecutableTool {execute(params:Record<string,unknown>,event:ExecutionEvent):unknown}

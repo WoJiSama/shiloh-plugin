@@ -76,3 +76,52 @@ test("default archive dir resolves without throwing", () => {
   assert.ok(typeof resolveTurnTraceArchiveDir() === "string")
   assert.ok(resolveTurnTraceArchiveDir("/tmp/custom-trace") === path.resolve("/tmp/custom-trace"))
 })
+
+test('tool routing snapshots survive later array changes and incremental updates', () => {
+  const trace = createTurnTrace()
+  const candidates = ['memberInfoTool', 'memberInfoTool']
+  const tools = ['memberInfoTool', 'chatHistoryTool']
+  trace.setToolRouting({candidates,beforeFilter:tools,planner:{status:'running'}})
+  candidates.push('unrelatedTool')
+  tools.length = 0
+  trace.setToolRouting({afterFilter:['memberInfoTool'],finalTools:['memberInfoTool'],toolChoice:{type:'function',function:{name:'memberInfoTool'}},applied:['semanticPlanner'],executionPath:'forced',planner:{status:'tool',reason:'selected'}})
+  const record = trace.finish()
+  assert.deepEqual(record.toolRouting.candidates,['memberInfoTool'])
+  assert.deepEqual(record.toolRouting.beforeFilter,['memberInfoTool','chatHistoryTool'])
+  assert.equal(record.toolRouting.toolChoice,'memberInfoTool')
+  assert.equal(record.toolRouting.planner.status,'tool')
+  assert.equal(record.toolRouting.executionPath,'forced')
+  trace.setToolRouting({finalTools:[]})
+  assert.deepEqual(record.toolRouting.finalTools,['memberInfoTool'],'a completed observation is immutable')
+})
+
+test('shadow results that arrive after finish remain linked without creating another turn', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'turn-shadow-'))
+  try {
+    const trace = createTurnTrace({archive:{enabled:true,dir}})
+    trace.setIntent('chat',null,'fast_path_skip')
+    const finished = trace.finish()
+    trace.finish()
+    trace.setIntentShadow({status:'mismatch',intent:'other_tool',confidence:0.9,elapsedMs:70})
+    assert.equal(finished.intentShadow,undefined,'late observers do not mutate the finished turn')
+    await new Promise(resolve=>setTimeout(resolve,200))
+    const files = fs.readdirSync(dir).filter(name=>name.endsWith('.ndjson'))
+    const records = files.flatMap(file=>fs.readFileSync(path.join(dir,file),'utf8').trim().split('\n').map(line=>JSON.parse(line)))
+    assert.equal(records.length,2,'one turn plus one separately archived shadow event')
+    assert.equal(records[1].event,'intent_shadow')
+    assert.equal(records[1].parentTurnId,finished.turnId)
+    assert.equal(records[1].turnId,undefined,'legacy turnId-based dashboards skip the auxiliary event')
+    const report = buildTurnTraceReport(records)
+    assert.equal(report.turns,1)
+    assert.equal(report.intentShadow.samples,1)
+    assert.equal(report.intentShadow.mismatches,1)
+  } finally {
+    fs.rmSync(dir,{recursive:true,force:true})
+  }
+})
+
+test('a shadow result completed before the turn is embedded in its archive record', () => {
+  const trace = createTurnTrace()
+  trace.setIntentShadow({status:'match',intent:'chat',confidence:1,elapsedMs:10})
+  assert.equal(trace.finish().intentShadow.status,'match')
+})

@@ -7,8 +7,8 @@ import { isCasualChatTurn } from "./turnPlanPolicy.js"
  *
  * 跳过有代价（可能漏掉只有模型能看出的隐式意图），因此条件从严：
  * 任何一个显式工具/搜索/实时信息信号、素材或工具候选都会放行分类。
- * 调用方必须按比例抽样跑影子意图（shouldSampleSkippedIntent），
- * 用 [意图影子](fast_path) 分歧日志持续验证跳过规则的漏判率。
+ * 可按配置启用独立预算的影子抽样，持续观察快路与模型判断的分歧；
+ * 影子结果只用于观测，不改变本轮已经选择的执行范围。
  */
 // isCasualChatTurn 之外的快路专属排除：时间/天气/新闻等事实型短问句，
 // 意图分类器可能把它们路由到搜索，不能因为"句子短"就跳过
@@ -25,7 +25,7 @@ export function shouldSkipIntentModel({ text = "", hasImages = false, hasVideos 
 }
 
 /** 被跳过的消息按比例抽样做影子验证，默认 10% */
-export function shouldSampleSkippedIntent(rate = 0.1) {
+export function shouldSampleSkippedIntent(rate = 0.1, random = Math.random) {
   const value = Math.max(0, Math.min(1, Number(rate) || 0))
-  return Math.random() < value
+  return random() < value
 }

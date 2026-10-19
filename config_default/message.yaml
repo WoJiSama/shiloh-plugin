@@ -280,6 +280,11 @@ pluginSettings:
   maxToolRounds: 2
   agentIntelligence:
     enabled: true
+    keepAutoToolsOnChatTurn: true
+    intentShadowEnabled: true
+    intentShadowRate: 0.1
+    intentShadowMaxConcurrent: 1
+    intentShadowTimeoutMs: 3000
     recentHistoryMessages: 10
     relevantHistoryMessages: 6
     maxSelectedHistoryMessages: 18

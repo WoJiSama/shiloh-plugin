@@ -32,20 +32,20 @@ test("skipped turns sample shadow verification at a bounded rate", () => {
   assert.equal(shouldSampleSkippedIntent(0), false, "0% 永不抽样")
   assert.equal(shouldSampleSkippedIntent(1), true, "100% 必抽样")
   assert.equal(shouldSampleSkippedIntent("not-a-number"), false, "非法值按 0 处理不抛错")
-  let hits = 0
-  for (let i = 0; i < 2000; i++) if (shouldSampleSkippedIntent(0.1)) hits++
-  assert.ok(hits > 100 && hits < 300, `2000 次按 10% 抽样应约 200 次，实际 ${hits}`)
+  assert.equal(shouldSampleSkippedIntent(0.1, () => 0.09), true)
+  assert.equal(shouldSampleSkippedIntent(0.1, () => 0.1), false)
+  assert.equal(shouldSampleSkippedIntent(-1, () => 0), false)
+  assert.equal(shouldSampleSkippedIntent(2, () => 0.99), true)
 })
 
-test("handleTool wires the fast path without shadow sampling", () => {
+test("handleTool keeps the fast path and its prompt layer budget", () => {
   const src = readSource("apps/lib/chatTurn.js") // 主链路已迁 lib(P 重构)
   // 闲聊快路的层裁剪已迁入 utils/turnPromptComposer.js(提示词组装重构)
   const composerSrc = readSource("utils/turnPromptComposer.js")
   assert.ok(src.includes("let skipIntentModel = shouldSkipIntentModel({"), "快路判定接入")
   assert.ok(src.includes('turnTrace.setIntent("chat", null, "fast_path_skip")'), "快路来源写入 trace")
-  // P4 已转正：影子抽样验证随之移除，快路跳过不再并行跑模型
-  assert.ok(!src.includes("shouldSampleSkippedIntent"), "影子抽样已随转正移除")
-  assert.ok(!src.includes("runShadowIntent"), "不再有并行影子意图调用")
+  // Optional shadow evaluation is verified behaviorally in intentShadow.test.js;
+  // its background result must never become the primary turn decision.
   // 闲聊快路径的层计算裁剪(在 composer 内按回合画像判定)
   assert.ok(composerSrc.includes("const chatFastPath = profile?.profile === \"chat\""), "层计算按画像裁剪")
   assert.ok(composerSrc.includes("!knowledgeSearcher || !rawMessageText || chatFastPath"), "知识库检索跳过")

@@ -49,12 +49,14 @@ export function resolvePromptLayerProfile({
   responseKind = "chat",
   modelIntent = "",
   requiredToolNames = [],
+  needsMemberContext = false,
+  needsMemoryContext = false,
   hasImages = false,
   hasVideos = false
-}: {responseKind?:string;modelIntent?:string;requiredToolNames?:string[];hasImages?:boolean;hasVideos?:boolean} = {}) {
+}: {responseKind?:string;modelIntent?:string;requiredToolNames?:string[];needsMemberContext?:boolean;needsMemoryContext?:boolean;hasImages?:boolean;hasVideos?:boolean} = {}) {
   const intent = String(modelIntent || "")
   const modelIntentIsTask = TASK_INTENT_KINDS.has(intent)
-  const hasTaskSignal = modelIntentIsTask || responseKind === "knowledge" || hasImages || hasVideos || requiredToolNames.length > 0
+  const hasTaskSignal = modelIntentIsTask || responseKind === "knowledge" || hasImages || hasVideos || requiredToolNames.length > 0 || needsMemberContext || needsMemoryContext
   const reason = modelIntentIsTask
     ? `intent:${intent}`
     : responseKind === "knowledge"
@@ -65,7 +67,7 @@ export function resolvePromptLayerProfile({
           ? "has_videos"
           : requiredToolNames.length
             ? "tool_candidates"
-            : "casual"
+            : needsMemberContext ? 'member_context' : needsMemoryContext ? 'memory_context' : "casual"
   return {
     profile: hasTaskSignal ? "task" : "chat",
     reason,

@@ -1,5 +1,6 @@
 import { toolRecord, type ToolIntentContext } from "../../../contracts/toolExecution.js"
 import { getAllRegisteredIntentManifests } from "./toolManifestRegistry.js"
+import {isExplicitNoToolAction,isToolActionDenied} from '../../conversation/domain/toolActionPolicy.js'
 export function createToolIntentManifests(classifyEmojiToolExposure:(text:string)=>string) {
 function normalizeText(text = "") {
   return String(text || "")
@@ -19,6 +20,7 @@ function selectToolIntentCandidates(text = "", availableToolNames: string[] = []
   const candidates: string[] = []
   for (const [toolName, manifest] of Object.entries(allIntentManifests())) {
     if (!available.has(toolName)) continue
+    if (isToolActionDenied(content, toolName)) continue
     if (toolName === "sendLocalEmojiTool") {
       if (classifyEmojiToolExposure(content) !== "none") candidates.push(toolName)
       continue
@@ -89,6 +91,7 @@ function allIntentManifests() {
 
 
 function resolveDeterministicToolIntent(text = "", availableToolNames: string[] = [], context: ToolIntentContext = {}) {
+  if (isExplicitNoToolAction(text)) return null
   const candidates = selectToolIntentCandidates(text, availableToolNames, context)
   if (candidates.length !== 1) return null
   const toolName = candidates[0]!

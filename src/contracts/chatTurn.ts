@@ -9,13 +9,20 @@ export type ChatId=string|number
 export interface IdentityBinding {qq?:string|number|null|undefined;name?:string;aliases?:string[];notes?:string}
 export interface ChatTurnMember extends SemanticMember {group_name?:string}
 export interface ChatGroup {group_name?:string;getMemberMap():Promise<Map<number,ChatTurnMember>>;pickMember(id:ChatId|null|undefined):{info:ChatTurnMember|Promise<ChatTurnMember>}}
-export interface ChatTurnEvent extends ExecutionEvent {_personaSnapshot?:PersonaSnapshot;_pendingPersonaSnapshot?:PersonaSnapshot;_pendingSocialState?:PendingSocialState;message_type?:string;self_id?:ChatId;group?:ChatGroup;group_name?:string;sender:ChatTurnMember;bot:{uin?:ChatId;nickname?:string;pickGroup(id:ChatId|undefined):ChatGroup};message?:import('./chatEvent.js').MessageSegment[];isMaster?:boolean;sessionId?:string;_turnId?:string;_triggerContext?:{mode?:string;[key:string]:unknown};_progressReplyState?:{sent:boolean;reserved:boolean};_receivedAt?:number;_groupContextAssets?:GroupAssets;reply_id?:unknown;getReply?():Promise<QuotedMessage|null>;_prefilterKind?:string;forceGrabRedBag?:boolean;_mergedMessageCount?:number;_quotedPromptContext?:{text?:string;messageId?:unknown}}
+export interface ChatTurnEvent extends ExecutionEvent {_chatHistoryMessages?:unknown[];_chatHistoryUnavailable?:boolean;_personaSnapshot?:PersonaSnapshot;_pendingPersonaSnapshot?:PersonaSnapshot;_pendingSocialState?:PendingSocialState;message_type?:string;self_id?:ChatId;group?:ChatGroup;group_name?:string;sender:ChatTurnMember;bot:{uin?:ChatId;nickname?:string;pickGroup(id:ChatId|undefined):ChatGroup};message?:import('./chatEvent.js').MessageSegment[];isMaster?:boolean;sessionId?:string;_turnId?:string;_triggerContext?:{mode?:string;[key:string]:unknown};_progressReplyState?:{sent:boolean;reserved:boolean};_receivedAt?:number;_groupContextAssets?:GroupAssets;reply_id?:unknown;getReply?():Promise<QuotedMessage|null>;_prefilterKind?:string;forceGrabRedBag?:boolean;_mergedMessageCount?:number;_quotedPromptContext?:{text?:string;messageId?:unknown}}
 export interface QuotedMessage {message?:unknown;[key:string]:unknown}
 export interface GroupMediaReference {source?:string;type?:string;origin?:string}
 export interface GroupAssets {images:{source:string;origin?:string}[];currentImages:unknown[];quotedImages:unknown[];forwardImages:unknown[];videos:(string|GroupMediaReference)[];media?:GroupMediaReference[];files?:unknown[];replyTargetUserId?:ChatId;replyTargetLabel?:string;currentForwardText?:string;quotedForwardText?:string;currentForwardCompleteness?:import('./forwardContext.js').ForwardCompleteness;quotedForwardCompleteness?:import('./forwardContext.js').ForwardCompleteness}
 export interface AvatarAssets extends ExecutionAvatar {targets:{userId:string;label:string}[];references?:{id:string}[]}
 export interface TraceRecord {modelCalls:unknown[];tools:unknown[]}
-export interface ChatTrace {id:string;setTrigger(mode:string|undefined,context:unknown):void;setIntent(intent:string,confidence:number|null|undefined,source:string):void;addModelCall(kind:string,elapsed:number,options?:{tokens:number}):void;addTool(name:string,success:boolean,elapsed:number):void;finish():TraceRecord}
+export interface ChatTrace {
+ id:string;setTrigger(mode:string|undefined,context:unknown):void;setIntent(intent:string,confidence:number|null|undefined,source:string):void;
+ setRoute?(mode:string,profile:string,reason:string):void;
+ // requestTools describes model-gateway input; later backend fallbacks are not observed here.
+ setToolRouting?(update:{candidates?:string[];beforeFilter?:string[];afterFilter?:string[];finalTools?:string[];requestTools?:string[];toolChoice?:unknown;applied?:string[];executionPath?:'forced'|'model'|'none';filterStatus?:'applied'|'bypassed';planner?:{status:string;reason?:string}}):void;
+ setIntentShadow?(result:{status:string;elapsedMs:number;intent?:string;confidence?:number;reason?:string}):void;
+ addModelCall(kind:string,elapsed:number,options?:{tokens:number}):void;addTool(name:string,success:boolean,elapsed:number):void;finish():TraceRecord
+}
 export interface ChatArbiter {wrapEvent(e:ChatTurnEvent):ChatTurnEvent;beginToolOutcomes():void;enqueue(kind:string,send:()=>Promise<unknown>):unknown;settle(outcomes:{toolName:string;success:boolean}[]):void;resolveToolOutcomes():void}
 export interface ChatTurnMessage extends ExecutionMessage {messageId?:unknown;userId?:unknown;contextSection?:string}
 export interface ChatTurnSession extends Omit<ExecutionSession,'groupContextAssets'|'memberMap'|'turnTrace'|'outboundArbiter'|'groupUserMessages'> {
@@ -35,14 +42,14 @@ export interface ChatTurnHost {
  beginConversationTask(e:ChatTurnEvent):Promise<{messageId?:unknown}>;getOrCreateSession(id:string,tools:ToolDefinition[]):ChatTurnSession;
  clearSession(id:string):void;sendObservedReply(e:ChatTurnEvent,text:string):Promise<unknown>;sendSegmentedMessage(e:ChatTurnEvent,text:string,delay:number):Promise<unknown>;
  handleActiveDrawStatusQuestion(e:ChatTurnEvent,text:string):Promise<boolean>;buildMessageContent(sender:ChatTurnMember,args:string,images:string[],atQq:ChatId[],group?:ChatGroup,event?:ChatTurnEvent):Promise<string>;
- resolvePrimaryModelIntent(text:string,options:{hasImages:boolean}):Promise<{intent:string;confidence?:number;social?:unknown}|null>;
+ resolvePrimaryModelIntent(text:string,options:{hasImages:boolean;timeoutMs?:number;signal?:AbortSignal}):Promise<{intent:string;confidence?:number;social?:unknown}|null>;
  getSmartState(groupId:ChatId|undefined,event:ChatTurnEvent):{lastBotReplyToUserId?:ChatId|null}|null;
  getPersonaFor(e:ChatTurnEvent):{name?:string;[key:string]:unknown};getPersonaSnapshotFor?(e:ChatTurnEvent):PersonaSnapshot;getChatConfig(e:ChatTurnEvent):ChatTurnConfig;
  memoryManager:{interpretGroupKnowledgeInstruction(context:unknown):Promise<GroupMemoryCommit>;commitGroupMemoryDecision(groupId:ChatId,decision:GroupMemoryCommit,context:Record<string,unknown>):Promise<GroupMemoryCommit>;seedFromConfig(groupId:ChatId,bindings:IdentityBinding[]):Promise<unknown>};
  emotionManager:unknown;expressionLearner:unknown;knowledgeSearcher:unknown;
  getCurrentGroupContext(e:ChatTurnEvent):Promise<{groupId?:ChatId;groupName?:string;groupNotice?:unknown}>;getBasicGroupContext(e:ChatTurnEvent):{groupId?:ChatId;groupName?:string;groupNotice?:unknown};
  buildMergedDirectTriggerPrompt(e:ChatTurnEvent):string;
- messageManager:{getMessages(type:string|undefined,id:ChatId|undefined):Promise<{message_id?:unknown;source?:string;personaSource?:PersonaScope;forwardCompleteness?:import('./forwardContext.js').ForwardCompleteness;content?:string;at?:unknown;time?:unknown;sender:{user_id?:ChatId|undefined;nickname?:string|undefined;role?:string|undefined}}[]>};
+ messageManager:{getMessages(type:string|undefined,id:ChatId|undefined,options?:{throwOnError?:boolean}):Promise<{message_id?:unknown;source?:string;personaSource?:PersonaScope;forwardCompleteness?:import('./forwardContext.js').ForwardCompleteness;content?:string;at?:unknown;time?:unknown;sender:{user_id?:ChatId|undefined;nickname?:string|undefined;role?:string|undefined}}[]>};
  getTaskStatus(groupId:ChatId|undefined,messageId:unknown):Promise<unknown>;formatTaskStatusForPrompt(status:unknown):string;
  getTurnActionFacts?(event:ChatTurnEvent,query:ActionFactsQuery):Promise<TurnActionFacts>;
  resolveUnderstandingPrompt(context:unknown):Promise<string>;trimMessageHistory(messages:ChatTurnMessage[]):ChatTurnMessage[];filterChatByQQ(messages:ChatTurnMessage[],userId:ChatId|undefined):ChatTurnMessage[];

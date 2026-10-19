@@ -354,6 +354,15 @@ test("ordinary emoji availability does not hide sibling operational tools", () =
   }
 })
 
+test('colloquial member attributes and original-message recall remain discoverable', () => {
+  for(const text of ['他是不是管理员','这位的群头衔是啥','他名字是啥来着','[CQ:at,qq=20002]他在群里叫啥']) {
+    assert.ok(selectToolIntentCandidates(text,['memberInfoTool']).includes('memberInfoTool'),text)
+  }
+  for(const text of ['那句原话还能翻到吗','刚刚提的发布窗口是几点']) {
+    assert.ok(selectToolIntentCandidates(text,['chatHistoryTool']).includes('chatHistoryTool'),text)
+  }
+})
+
 test("explicit emoji requests still override serious-context suppression", () => {
   const text = "这个报错先别分析，给我发个无语表情包"
   assert.equal(classifyEmojiToolExposure(text), "explicit")

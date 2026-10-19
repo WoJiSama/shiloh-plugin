@@ -3,6 +3,7 @@ import type {DeltaForceIntent} from '../../../contracts/deltaForce.js'
 // 唯一改动:原实现直接读全局 Bot.nickname,迁出后改为参数注入(默认仍读全局,行为不变)。
 import { normalizeIntentText } from "../../conversation/domain/messageIntent.js"
 import { removeBotAnchors } from "../../conversation/domain/messageContext.js"
+import {isToolActionDenied} from '../../conversation/domain/toolActionPolicy.js'
 
 function cleanDeltaForceKeyword(text = "", operation = "", botName = "") {
   let value = removeBotAnchors(text, botName, [])
@@ -15,7 +16,7 @@ function cleanDeltaForceKeyword(text = "", operation = "", botName = "") {
   if (operation === "solution_list") {
     value = value.replace(/(?:改枪码|改枪方案|方案码|枪码|改枪|方案)/g, " ")
   } else if (operation === "object_value") {
-    value = value.replace(/(?:物品价值|价值搜索|查价值|价格走向|价格走势|走势|走向|趋势|行情|涨跌|波动|变化|价格|价值|多少钱|卖多少|值多少)/g, " ")
+    value = value.replace(/(?:物品价值|价值搜索|查价值|价格走向|价格走势|走势|走向|趋势|行情|涨跌|波动|变化|价格|价值|多少钱|卖多少|值多少)/g, " ").replace(/(?:现在|当前|目前)\s*$/u, '')
   } else if (operation === "price_history") {
     value = value.replace(/(?:价格走向|价格走势|价格历史|历史价格|走势|走向|趋势图|趋势|行情|价格曲线|折线图|价格|历史|最近|近\s*\d{1,2}\s*天|这\s*\d{1,2}\s*天)/g, " ")
   } else {
@@ -47,6 +48,7 @@ function extractDeltaForceKeyword(text = "", operation = "", botName = "") {
 }
 
 export function resolveNaturalDeltaForceToolCall(text = "", { botName = "" } = {}) {
+  if (isToolActionDenied(text, 'deltaForceTool')) return null
   const content = normalizeIntentText(text)
   if (!content.includes("三角洲")) return null
 

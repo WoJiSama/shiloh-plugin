@@ -1,5 +1,5 @@
-import {qqViewRecord,qqViewEvent,qqViewBot,callQqViewApi} from '../../../contracts/qqToolViews.js'
-import type {QqViewEvent,QqViewMember,QqViewPorts} from '../../../contracts/qqToolViews.js'
+import {qqViewRecord,qqViewEvent,callQqViewApi,qqViewApiSucceeded} from '../../../contracts/qqToolViews.js'
+import type {QqViewEvent,QqViewPorts} from '../../../contracts/qqToolViews.js'
 import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js';
 
 /**
@@ -18,11 +18,11 @@ class MemberInfoTool extends AbstractTool {
       properties: {
         user_id: {
           type: 'string',
-          description: '要查询的用户QQ号，不填则查询消息发送者'
+          description: '要查询的真实用户QQ号；优先使用明确的@或回复目标。只有明确询问本人信息时才可省略'
         },
         nickname: {
           type: 'string',
-          description: '通过昵称或群名片查找用户，支持模糊匹配'
+          description: '通过昵称或群名片查找用户，精确匹配优先；有多个同名或模糊匹配时返回候选并要求澄清'
         }
       }
     };
@@ -42,27 +42,38 @@ class MemberInfoTool extends AbstractTool {
         group_id: groupId
       },event);
 
-      if (response.status === 'ok' && response.data) {
+      if (qqViewApiSucceeded(response) && response.data) {
         return Array.isArray(response.data) ? response.data.map(qqViewRecord) : [];
       }
-      return [];
+      throw new Error('群成员列表接口未返回成功结果');
     } catch (error) {
       console.error('获取群成员列表失败:', error);
-      return [];
+      throw error;
     }
   }
 
   /**
    * 通过昵称查找成员
    */
+  findMembersByNickname(nickname:string, members:Record<string,unknown>[]) {
+    const searchTarget = nickname.trim().toLowerCase();
+    if (!searchTarget) return [];
+    const names = (member:Record<string,unknown>) => [String(member.card || '').trim().toLowerCase(), String(member.nickname || '').trim().toLowerCase()];
+    const exact = members.filter(member => names(member).some(name => name === searchTarget));
+    const matches = exact.length ? exact : members.filter(member => names(member).some(name => name.includes(searchTarget)));
+    return [...new Map(matches.map(member => [String(member.user_id), member])).values()];
+  }
+
   findMemberByNickname(nickname:string, members:Record<string,unknown>[]) {
-    const searchTarget = nickname.toLowerCase();
-    return members.find(member => {
-      const card = String(member.card || '').toLowerCase();
-      const nick = String(member.nickname || '').toLowerCase();
-      return card === searchTarget || nick === searchTarget ||
-             card.includes(searchTarget) || nick.includes(searchTarget);
-    });
+    const matches = this.findMembersByNickname(nickname, members);
+    return matches.length === 1 ? matches[0] : undefined;
+  }
+
+  validUserId(value:unknown) {
+    if (typeof value !== 'string' && typeof value !== 'number') return null;
+    if (typeof value === 'number' && (!Number.isSafeInteger(value) || value <= 0)) return null;
+    const id = String(value).trim();
+    return /^[1-9]\d{0,19}$/.test(id) ? id : null;
   }
 
   /**
@@ -98,42 +109,53 @@ class MemberInfoTool extends AbstractTool {
   async func(input:unknown, event:unknown) {
     const opts=qqViewRecord(input), e=qqViewEvent(event)
     const { user_id, nickname } = opts;
+    const failure = (status:string, message:string, candidates?:Record<string,unknown>[]) => ({
+      action: 'member_info', success: false, status, message,
+      ...(candidates ? {candidates: candidates.slice(0, 10).map(member => ({user_id: member.user_id, nickname: member.nickname || '', card: member.card || ''})), total_candidates: candidates.length} : {})
+    });
 
     if (!e.group_id) {
       return '此功能仅支持群聊使用';
     }
 
-    let targetUserId:string|number|null = null;
-
-    // 确定要查询的用户ID
-    if (user_id) {
-      targetUserId = Number(user_id);
-    } else if (nickname) {
-      // 通过昵称查找
-      const members = await this.getGroupMemberList(e.group_id,e);
-      const found = this.findMemberByNickname(String(nickname), members);
-      if (found) {
-        targetUserId = String(found.user_id);
-      } else {
-        return `未找到昵称包含 "${nickname}" 的群成员`;
-      }
-    } else {
-      // 默认查询发送者
-      targetUserId = e.user_id;
-    }
-
     try {
+      let targetUserId:string|null = null;
+      if (user_id !== undefined) {
+        targetUserId = this.validUserId(user_id);
+        if (!targetUserId) return failure('invalid_target', '提供的user_id不是有效QQ号，请明确要查询的成员。');
+      } else if (nickname !== undefined) {
+        if (typeof nickname !== 'string' || !nickname.trim()) return failure('invalid_target', '请提供有效的昵称、群名片或QQ号。');
+        const members = await this.getGroupMemberList(e.group_id,e);
+        const matches = this.findMembersByNickname(nickname, members);
+        if (matches.length > 1) {
+          const labels = matches.slice(0, 10).map(member => `${member.card || member.nickname || '群成员'}（QQ ${member.user_id}）`).join('、');
+          return failure('needs_clarification', `找到多位匹配成员：${labels}。请明确@哪位或提供QQ号。`, matches);
+        }
+        if (!matches.length) return failure('not_found', `未找到昵称或群名片匹配“${nickname}”的群成员。`);
+        targetUserId = this.validUserId(matches[0]?.user_id);
+        if (!targetUserId) return failure('invalid_target', '匹配成员缺少有效QQ号，无法核实。');
+      } else {
+        const raw = qqViewRecord(event);
+        const text = [raw.msg, raw.raw_message].find(value => typeof value === 'string' && value.trim());
+        const asksForSelf = typeof text === 'string' && /我(?:是|叫)(?:谁|什么|啥)|我的(?:群)?(?:名片|昵称|资料|信息|头衔|等级|身份)|(?:查|看)(?:询|一下|下)?我(?:的)?(?:资料|信息|名片)/.test(text);
+        // Legacy callers without message text retain the documented sender default.
+        // A live ambiguous request must not silently turn "he" into the sender.
+        if (text && !asksForSelf) return failure('needs_clarification', '要查询哪位成员？请明确@对象、QQ号或昵称。');
+        targetUserId = this.validUserId(e.user_id);
+        if (!targetUserId) return failure('invalid_target', '没有可确认的查询对象，请提供QQ号或明确@成员。');
+      }
       const response = await this.callApi('get_group_member_info', {
         group_id: e.group_id,
         user_id: targetUserId,
         no_cache: true
       },e);
 
-      if (response.status !== 'ok' || !response.data) {
-        return '获取成员信息失败';
+      if (!qqViewApiSucceeded(response) || !response.data) {
+        return failure('unavailable', '获取成员信息失败，本次无法核实。');
       }
 
       const info = qqViewRecord(response.data);
+      if (this.validUserId(info.user_id) !== targetUserId) return failure('unavailable', '成员接口返回的对象与查询QQ号不一致，无法核实。');
 
       return {
         action: 'member_info',
@@ -155,7 +177,7 @@ class MemberInfoTool extends AbstractTool {
       };
     } catch (error) {
       console.error('查询成员信息失败:', error);
-      return `查询成员信息失败: ${error instanceof Error?error.message:String(error)}`;
+      return failure('unavailable', `查询成员信息失败: ${error instanceof Error?error.message:String(error)}`);
     }
   }
 }

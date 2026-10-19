@@ -78,6 +78,21 @@ const schema: ConfigSchemaItem[] = [
     bottomHelpMessage: "长请求、多人物、引用指代、工具总结等场景自动升到 toolsAiConfig 模型"
   },
   {
+    field: 'agentIntelligence.keepAutoToolsOnChatTurn',
+    label: '保留本轮可选工具',
+    component: 'Switch',
+    bottomHelpMessage: '规划器未作出决定时，将本轮相关候选交给工具模型；明确选择文字回复时仍关闭工具'
+  },
+  {
+    field: 'agentIntelligence.intentShadowEnabled',
+    label: '闲聊快路抽样核验',
+    component: 'Switch',
+    bottomHelpMessage: '后台抽样核对跳过意图模型的消息，只记录分歧，不改变当前回复'
+  },
+  {field: 'agentIntelligence.intentShadowRate', label: '抽样比例', component: 'InputNumber', componentProps: {min: 0, max: 1, step: 0.01}},
+  {field: 'agentIntelligence.intentShadowMaxConcurrent', label: '抽样最大并发', component: 'InputNumber', componentProps: {min: 1, max: 8}},
+  {field: 'agentIntelligence.intentShadowTimeoutMs', label: '抽样超时（毫秒）', component: 'InputNumber', componentProps: {min: 100, max: 30000, step: 100}},
+  {
     field: "agentIntelligence.complexMaxToolRounds",
     label: "复杂任务最大工具轮次",
     component: "InputNumber",

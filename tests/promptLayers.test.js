@@ -93,3 +93,14 @@ test("model image intent outranks conflicting regex routing", () => {
     "成图续改不得抢走识图意图"
   )
 })
+
+
+test('member and recall context survives a missing model decision even without an enabled tool', () => {
+ for (const input of [{needsMemberContext:true},{needsMemoryContext:true}]) {
+  const profile=resolvePromptLayerProfile(input)
+  assert.equal(profile.profile,'task')
+  assert.ok(profile.layers.includes('memberLookup'))
+  assert.ok(profile.layers.includes('groupKnowledge'))
+  assert.ok(profile.layers.includes('memory'))
+ }
+})

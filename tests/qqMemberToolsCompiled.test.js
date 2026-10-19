@@ -27,7 +27,7 @@ test('compiled reaction and recall reject contradictory failure receipts',async(
  const Recall=createRecallTool();assert.equal((await new Recall().func({message_id:'42'},{bot})).success,false)
 })
 test('compiled chat history tolerates primitive events and preserves chronological text',async()=>{
- const Tool=createChatHistoryTool();const tool=new Tool();assert.equal(await tool.func({},null),'无法获取历史记录');assert.match(await tool.func({}, {msg:{historyData:'[new] B: latest\n[old] A: 发送了一张图片'}}),/A: \[图片\]\nB: latest/)
+ const Tool=createChatHistoryTool();const tool=new Tool();assert.equal((await tool.func({},null)).status,'unavailable');const history=await tool.func({}, {msg:{historyData:'[new] B: latest\n[old] A: 发送了一张图片'}});assert.equal(history.status,'found');assert.match(history.summary,/A: \[图片\]\nB: latest/)
 })
 test('compiled qzone rejects missing deletion items and invalid positions without mutation',async()=>{
  let deletes=0;const Tool=createQQZoneTool(()=>({setQzone:async()=>({code:0}),getQzone:async()=>({msglist:[]}),delQzone:async()=>{deletes++;return {subcode:0}}}));const tool=new Tool();assert.match(await tool.func({type:true,pos:-1},{}),/第几个/);assert.match(await tool.func({type:true,pos:1},{}),/未获取/);assert.equal(deletes,0)

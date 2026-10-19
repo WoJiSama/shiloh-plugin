@@ -18,6 +18,14 @@ test("distinguishes errors, not-found results and grounded success", () => {
   assert.equal(classifyToolResult('{"analysis":"图片里写着测试"}').kind, "success")
 })
 
+test('structured history status takes precedence over quoted failure words', () => {
+  const result = {action:'chat_history',success:true,status:'found',messages:[{message_id:'source-1',content:'刚才查询失败，没有找到那张图。'}]}
+  assert.equal(classifyToolResult(result).kind,'success')
+  assert.equal(classifyToolResult({...result,status:'not_found',messages:[]}).kind,'not_found')
+  assert.equal(classifyToolResult({...result,success:false,status:'unavailable',messages:[]}).kind,'empty')
+  assert.equal(classifyToolResult({...result,success:false,status:'needs_clarification',messages:[]}).kind,'error')
+})
+
 test("preserves structured tool outcomes and gives image-specific unavailable replies", () => {
   const timeout = [{
     toolName: "googleImageAnalysisTool",

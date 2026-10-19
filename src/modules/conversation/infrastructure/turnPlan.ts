@@ -56,6 +56,7 @@ export function createTurnPlan({
   toolScopeLocked = false,
   forcedToolCall = null,
   explicitEmojiRequest = false,
+  keepAutoToolsOnChatTurn = true,
   historyMode = "full",
   selectedHistoryCount = 0
 }:TurnPlanInput = {}):TurnPlan {
@@ -84,7 +85,8 @@ export function createTurnPlan({
   // text reply. It must nevertheless reach the tool-capable model, otherwise
   // the emoji tool is silently stripped before the request is made.
   const hasOptionalReaction = casual && optional.some(name => OPTIONAL_CAPABILITIES.has(name))
-  const executionMode = hasRequiredAction || hasOptionalReaction ? "tool" : "chat"
+  const hasOptionalTools = !noTools && keepAutoToolsOnChatTurn && toolChoice === 'auto' && optional.some(name => !OPTIONAL_CAPABILITIES.has(name))
+  const executionMode = hasRequiredAction || hasOptionalReaction || hasOptionalTools ? "tool" : "chat"
   // 认真处理问题与思考预算分开：技术追问即使被判为 chat，也保留 reasoning 路由和
   // 证据约束，但不会因此自动提高到 high；casual 仍由 isCasualChatTurn 排除。
   const reasoning = executionMode === "chat" && (groundedReply || needsDeliberateReasoning(intentText))
@@ -115,7 +117,7 @@ export function createTurnPlan({
     presentation: { kind: responseKind === "knowledge" ? "knowledge" : "text" },
     observability: {
       routeReason: toolDecision?.intent === "chat" ? "semantic_chat" : executionMode === "tool"
-        ? committedAction ? "committed_action" : hasOptionalReaction ? "optional_reaction" : "requested_action"
+        ? committedAction ? "committed_action" : hasOptionalReaction ? "optional_reaction" : hasRequiredAction ? "requested_action" : "optional_tools"
         : seriousAnswer
           ? "serious_answer"
           : deliveryStatus

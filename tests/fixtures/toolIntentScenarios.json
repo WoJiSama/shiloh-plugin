@@ -1,0 +1,2522 @@
+{
+  "schema": 1,
+  "description": "固定上下文路由回放。8类工具各12条，含负例、歧义对象与留出样本；schema为无执行能力的沙箱定义。参数仅比较标注字段，最终回答与工具数据需另外评测。",
+  "tools": {
+    "memberInfoTool": {
+      "description": "查询群成员昵称、群名片、入群时间、头衔、角色等；必须准确确定查询对象。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "要查询的QQ号"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "昵称或群名片，歧义时需要澄清"
+          }
+        },
+        "required": []
+      }
+    },
+    "chatHistoryTool": {
+      "description": "查询本群已接入聊天记录，按问题、成员与时间筛选；无记录时保持未确认。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "用户问题"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "明确查询的成员QQ号"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "需要筛选的主题关键词"
+          },
+          "start_time": {
+            "type": "string",
+            "description": "筛选开始日期/带时区时间"
+          },
+          "end_time": {
+            "type": "string",
+            "description": "筛选结束日期/带时区时间"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "question"
+        ]
+      }
+    },
+    "searchInformationTool": {
+      "description": "联网检索当前信息与事实并根据结果回答。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "检索问题"
+          },
+          "progressText": {
+            "type": "string",
+            "description": "搜索中途的自然接话"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    },
+    "deltaForceTool": {
+      "description": "三角洲行动查询，支持密码、改枪码、物价、特勤处利润。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "description": "daily_keyword/solution_list/object_value/place_profit/profit_rank/price_history"
+          },
+          "keyword": {
+            "type": "string",
+            "description": "查询关键词"
+          },
+          "days": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operation"
+        ]
+      }
+    },
+    "searchMusicTool": {
+      "description": "根据关键词搜索并发送QQ音乐歌曲。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "description": "歌曲名或歌手名"
+          },
+          "isArtistOnly": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "keyword"
+        ]
+      }
+    },
+    "sendLocalEmojiTool": {
+      "description": "发送本地匹配表情包。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "useCases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "leadText": {
+            "type": "string",
+            "description": "附带文本"
+          }
+        },
+        "required": [
+          "tags"
+        ]
+      }
+    },
+    "reminderTool": {
+      "description": "创建、查询或删除提醒。创建需要用户明确要求和具体时间内容。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "list",
+              "cancel"
+            ],
+            "description": "create创建提醒，list查询列表，cancel取消"
+          },
+          "content": {
+            "type": "string",
+            "description": "提醒内容"
+          },
+          "reminder_time": {
+            "type": "string",
+            "description": "ISO 8601触发时间，创建必填，包含+08:00时区"
+          },
+          "reminder_id": {
+            "type": "string",
+            "description": "取消提醒的ID"
+          },
+          "reminder_message": {
+            "type": "string",
+            "description": "提醒时实际发送的文字"
+          },
+          "extra_action": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string"
+              },
+              "params": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    },
+    "githubRepoTool": {
+      "description": "读取并分析指定GitHub仓库。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "repoUrl": {
+            "type": "string",
+            "description": "GitHub仓库URL"
+          }
+        },
+        "required": [
+          "repoUrl"
+        ]
+      }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "memberInfoTool-01",
+      "family": "memberInfoTool",
+      "text": "查询QQ 20002的成员信息",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001"
+      }
+    },
+    {
+      "id": "memberInfoTool-02",
+      "family": "memberInfoTool",
+      "text": "[CQ:at,qq=20002]是谁",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "atQq": [
+          "20002"
+        ]
+      }
+    },
+    {
+      "id": "memberInfoTool-03",
+      "family": "memberInfoTool",
+      "text": "[CQ:at,qq=20002]查他名片",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "atQq": [
+          "20002"
+        ]
+      }
+    },
+    {
+      "id": "memberInfoTool-04",
+      "family": "memberInfoTool",
+      "text": "[CQ:at,qq=20002]什么时候进群的",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "atQq": [
+          "20002"
+        ]
+      }
+    },
+    {
+      "id": "memberInfoTool-05",
+      "family": "memberInfoTool",
+      "text": "那哥们是谁来着",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 我刚忙完"
+      }
+    },
+    {
+      "id": "memberInfoTool-06",
+      "family": "memberInfoTool",
+      "text": "他是不是管理员",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 我刚忙完"
+      }
+    },
+    {
+      "id": "memberInfoTool-07",
+      "family": "memberInfoTool",
+      "text": "这位的群头衔是啥",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 我刚忙完"
+      }
+    },
+    {
+      "id": "memberInfoTool-08",
+      "family": "memberInfoTool",
+      "text": "查一下我在群里的资料",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "10001"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001"
+      }
+    },
+    {
+      "id": "memberInfoTool-09",
+      "family": "memberInfoTool",
+      "text": "他名字是啥来着",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 我刚忙完"
+      }
+    },
+    {
+      "id": "memberInfoTool-10",
+      "family": "memberInfoTool",
+      "text": "刚才这个人的入群时间呢",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 我刚忙完"
+      }
+    },
+    {
+      "id": "memberInfoTool-11",
+      "family": "memberInfoTool",
+      "text": "[CQ:at,qq=20002]能看看他的群等级吗",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "atQq": [
+          "20002"
+        ]
+      }
+    },
+    {
+      "id": "memberInfoTool-12",
+      "family": "memberInfoTool",
+      "text": "[CQ:at,qq=20002]他在群里叫啥",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "memberInfoTool",
+      "expectedParams": {
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "currentUserId": "10001",
+        "atQq": [
+          "20002"
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-01",
+      "family": "chatHistoryTool",
+      "text": "查一下群聊天记录，刚才谁说了发布延后",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "查一下群聊天记录，刚才谁说了发布延后"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-02",
+      "family": "chatHistoryTool",
+      "text": "最近在聊什么",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "最近在聊什么"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-03",
+      "family": "chatHistoryTool",
+      "text": "群友们在讨论什么",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "群友们在讨论什么"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-04",
+      "family": "chatHistoryTool",
+      "text": "查一下阿强上次说了什么",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "查一下阿强上次说了什么",
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ],
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 帮我翻一下之前那次发言，细节我也忘了"
+      }
+    },
+    {
+      "id": "chatHistoryTool-05",
+      "family": "chatHistoryTool",
+      "text": "他上次说啥",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "他上次说啥",
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ],
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 帮我翻一下之前那次发言，细节我也忘了"
+      }
+    },
+    {
+      "id": "chatHistoryTool-06",
+      "family": "chatHistoryTool",
+      "text": "那句原话还能翻到吗",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "那句原话还能翻到吗"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-07",
+      "family": "chatHistoryTool",
+      "text": "帮我翻翻前面的聊天",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "帮我翻翻前面的聊天"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-08",
+      "family": "chatHistoryTool",
+      "text": "刚刚提的发布窗口是几点",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "刚刚提的发布窗口是几点"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-09",
+      "family": "chatHistoryTool",
+      "text": "他刚才怎么说的",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "他刚才怎么说的",
+        "user_id": "20002"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ],
+        "replyTargetUserId": "20002",
+        "quote": "阿强: 帮我翻一下之前那次发言，细节我也忘了"
+      }
+    },
+    {
+      "id": "chatHistoryTool-10",
+      "family": "chatHistoryTool",
+      "text": "之前谁说周三发布来着",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "之前谁说周三发布来着"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-11",
+      "family": "chatHistoryTool",
+      "text": "刚才你们聊到哪儿了",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "刚才你们聊到哪儿了"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chatHistoryTool-12",
+      "family": "chatHistoryTool",
+      "text": "翻一下上次聊数据库升级的那段",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "chatHistoryTool",
+      "expectedParams": {
+        "question": "翻一下上次聊数据库升级的那段"
+      },
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ],
+        "history": [
+          {
+            "user_id": "10001",
+            "content": "发布安排之前聊过，我忘记时间了"
+          },
+          {
+            "user_id": "30003",
+            "content": "你翻翻前面的记录吧，这里没写"
+          }
+        ]
+      }
+    },
+    {
+      "id": "searchInformationTool-01",
+      "family": "searchInformationTool",
+      "text": "搜索今天上海天气",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "搜索今天上海天气"
+      }
+    },
+    {
+      "id": "searchInformationTool-02",
+      "family": "searchInformationTool",
+      "text": "查一下最新Node.js版本",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "查一下最新Node.js版本"
+      }
+    },
+    {
+      "id": "searchInformationTool-03",
+      "family": "searchInformationTool",
+      "text": "帮我搜搜人民币兑美元汇率",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "帮我搜搜人民币兑美元汇率"
+      }
+    },
+    {
+      "id": "searchInformationTool-04",
+      "family": "searchInformationTool",
+      "text": "今天黄金价格是多少",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "今天黄金价格是多少"
+      }
+    },
+    {
+      "id": "searchInformationTool-05",
+      "family": "searchInformationTool",
+      "text": "这会儿上海下不下雨",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "这会儿上海下不下雨"
+      }
+    },
+    {
+      "id": "searchInformationTool-06",
+      "family": "searchInformationTool",
+      "text": "现在美元换人民币啥价",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "现在美元换人民币啥价"
+      }
+    },
+    {
+      "id": "searchInformationTool-07",
+      "family": "searchInformationTool",
+      "text": "最近AI有什么新闻",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "最近AI有什么新闻"
+      }
+    },
+    {
+      "id": "searchInformationTool-08",
+      "family": "searchInformationTool",
+      "text": "周末杭州会下雨不",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "周末杭州会下雨不"
+      }
+    },
+    {
+      "id": "searchInformationTool-09",
+      "family": "searchInformationTool",
+      "text": "这个政策现在还有效吗",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "这个政策现在还有效吗"
+      },
+      "context": {
+        "quote": "上海将调整住房政策，发布时间2026-10-18"
+      }
+    },
+    {
+      "id": "searchInformationTool-10",
+      "family": "searchInformationTool",
+      "text": "他说的消息是真是假，联网核实一下",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "他说的消息是真是假，联网核实一下"
+      },
+      "context": {
+        "quote": "上海将调整住房政策，发布时间2026-10-18"
+      }
+    },
+    {
+      "id": "searchInformationTool-11",
+      "family": "searchInformationTool",
+      "text": "眼下英超比分多少",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "眼下英超比分多少"
+      }
+    },
+    {
+      "id": "searchInformationTool-12",
+      "family": "searchInformationTool",
+      "text": "最近的台风到哪儿了",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "searchInformationTool",
+      "expectedParams": {
+        "query": "最近的台风到哪儿了"
+      }
+    },
+    {
+      "id": "deltaForceTool-01",
+      "family": "deltaForceTool",
+      "text": "三角洲今日密码",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "daily_keyword"
+      }
+    },
+    {
+      "id": "deltaForceTool-02",
+      "family": "deltaForceTool",
+      "text": "三角洲每日密码是什么",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "daily_keyword"
+      }
+    },
+    {
+      "id": "deltaForceTool-03",
+      "family": "deltaForceTool",
+      "text": "查三角洲改枪码277",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "solution_list",
+        "keyword": "277"
+      }
+    },
+    {
+      "id": "deltaForceTool-04",
+      "family": "deltaForceTool",
+      "text": "三角洲H70现在多少钱",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "object_value",
+        "keyword": "H70"
+      }
+    },
+    {
+      "id": "deltaForceTool-05",
+      "family": "deltaForceTool",
+      "text": "给个三角洲今天口令",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "daily_keyword"
+      }
+    },
+    {
+      "id": "deltaForceTool-06",
+      "family": "deltaForceTool",
+      "text": "277那把枪的改枪方案有吗",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "solution_list",
+        "keyword": "277"
+      }
+    },
+    {
+      "id": "deltaForceTool-07",
+      "family": "deltaForceTool",
+      "text": "特勤处制造利润排个榜",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "place_profit"
+      }
+    },
+    {
+      "id": "deltaForceTool-08",
+      "family": "deltaForceTool",
+      "text": "三角洲显卡最近的价格走势",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "price_history",
+        "keyword": "显卡"
+      }
+    },
+    {
+      "id": "deltaForceTool-09",
+      "family": "deltaForceTool",
+      "text": "三角洲今天密码再发下",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "daily_keyword"
+      }
+    },
+    {
+      "id": "deltaForceTool-10",
+      "family": "deltaForceTool",
+      "text": "三角洲M4A1物品价值",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "object_value",
+        "keyword": "M4A1"
+      }
+    },
+    {
+      "id": "deltaForceTool-11",
+      "family": "deltaForceTool",
+      "text": "三角洲的利润排行前几名呢",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "profit_rank"
+      }
+    },
+    {
+      "id": "deltaForceTool-12",
+      "family": "deltaForceTool",
+      "text": "三角洲显卡价格历史看下",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "deltaForceTool",
+      "expectedParams": {
+        "operation": "price_history",
+        "keyword": "显卡"
+      }
+    },
+    {
+      "id": "searchMusicTool-01",
+      "family": "searchMusicTool",
+      "text": "播放周杰伦的晴天",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "晴天",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-02",
+      "family": "searchMusicTool",
+      "text": "来首周杰伦的歌",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "周杰伦",
+        "isArtistOnly": true
+      }
+    },
+    {
+      "id": "searchMusicTool-03",
+      "family": "searchMusicTool",
+      "text": "搜索陈奕迅的十年",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "十年",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-04",
+      "family": "searchMusicTool",
+      "text": "点歌稻香",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "稻香",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-05",
+      "family": "searchMusicTool",
+      "text": "整首晴天听听",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "晴天",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-06",
+      "family": "searchMusicTool",
+      "text": "想听林俊杰的歌了",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "林俊杰",
+        "isArtistOnly": true
+      }
+    },
+    {
+      "id": "searchMusicTool-07",
+      "family": "searchMusicTool",
+      "text": "放一首夜曲吧",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "夜曲",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-08",
+      "family": "searchMusicTool",
+      "text": "帮我点个告白气球",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "告白气球",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-09",
+      "family": "searchMusicTool",
+      "text": "刚才那首是晴天，放一下",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "晴天",
+        "isArtistOnly": false
+      },
+      "context": {
+        "quote": "刚才那首叫晴天"
+      }
+    },
+    {
+      "id": "searchMusicTool-10",
+      "family": "searchMusicTool",
+      "text": "就来首周杰伦的呗",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "周杰伦",
+        "isArtistOnly": true
+      }
+    },
+    {
+      "id": "searchMusicTool-11",
+      "family": "searchMusicTool",
+      "text": "我想听孙燕姿的遇见",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "遇见",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "searchMusicTool-12",
+      "family": "searchMusicTool",
+      "text": "给大伙放个青花瓷",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "searchMusicTool",
+      "expectedParams": {
+        "keyword": "青花瓷",
+        "isArtistOnly": false
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-01",
+      "family": "sendLocalEmojiTool",
+      "text": "来个开心的表情包",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "开心"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-02",
+      "family": "sendLocalEmojiTool",
+      "text": "发一张猫猫表情",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "猫猫"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-03",
+      "family": "sendLocalEmojiTool",
+      "text": "给我个无语的梗图",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "无语"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-04",
+      "family": "sendLocalEmojiTool",
+      "text": "发个加油表情包",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "加油"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-05",
+      "family": "sendLocalEmojiTool",
+      "text": "整张狗头表情包",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "狗头"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-06",
+      "family": "sendLocalEmojiTool",
+      "text": "丢个晚安表情",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "晚安"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-07",
+      "family": "sendLocalEmojiTool",
+      "text": "配个吃瓜表情包",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "吃瓜"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-08",
+      "family": "sendLocalEmojiTool",
+      "text": "发个可爱的表情",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "可爱"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-09",
+      "family": "sendLocalEmojiTool",
+      "text": "给上面那句配个表情包",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "吐槽"
+        ]
+      },
+      "context": {
+        "quote": "今天又有五个需求进来了"
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-10",
+      "family": "sendLocalEmojiTool",
+      "text": "来个表示震惊的反应图",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "震惊"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-11",
+      "family": "sendLocalEmojiTool",
+      "text": "给群里整张摸鱼表情",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "摸鱼"
+        ]
+      }
+    },
+    {
+      "id": "sendLocalEmojiTool-12",
+      "family": "sendLocalEmojiTool",
+      "text": "甩一个猫猫点头表情包",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "sendLocalEmojiTool",
+      "expectedParams": {
+        "tags": [
+          "猫猫",
+          "点头"
+        ]
+      }
+    },
+    {
+      "id": "reminderTool-01",
+      "family": "reminderTool",
+      "text": "十分钟后提醒我喝水",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "喝水"
+      }
+    },
+    {
+      "id": "reminderTool-02",
+      "family": "reminderTool",
+      "text": "明天下午三点提醒我开会",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "开会"
+      }
+    },
+    {
+      "id": "reminderTool-03",
+      "family": "reminderTool",
+      "text": "半小时后提醒我收菜",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "收菜"
+      }
+    },
+    {
+      "id": "reminderTool-04",
+      "family": "reminderTool",
+      "text": "帮我设置一个今晚八点吃药的提醒",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "吃药"
+      }
+    },
+    {
+      "id": "reminderTool-05",
+      "family": "reminderTool",
+      "text": "过五分钟喊我起来",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "起来"
+      }
+    },
+    {
+      "id": "reminderTool-06",
+      "family": "reminderTool",
+      "text": "明早七点记得叫我起床",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "起床"
+      }
+    },
+    {
+      "id": "reminderTool-07",
+      "family": "reminderTool",
+      "text": "到九点提醒一下交日报",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "交日报"
+      }
+    },
+    {
+      "id": "reminderTool-08",
+      "family": "reminderTool",
+      "text": "晚上八点别让我忘记吃药",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "吃药"
+      }
+    },
+    {
+      "id": "reminderTool-09",
+      "family": "reminderTool",
+      "text": "他说明天下午三点开会，帮我加个提醒",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "开会"
+      },
+      "context": {
+        "quote": "阿强: 明天下午三点开会"
+      }
+    },
+    {
+      "id": "reminderTool-10",
+      "family": "reminderTool",
+      "text": "查一下我还有哪些提醒",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "list"
+      }
+    },
+    {
+      "id": "reminderTool-11",
+      "family": "reminderTool",
+      "text": "后天早上十点提醒我续费",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "续费"
+      }
+    },
+    {
+      "id": "reminderTool-12",
+      "family": "reminderTool",
+      "text": "一小时后叫我去拿快递",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "reminderTool",
+      "expectedParams": {
+        "action": "create",
+        "content": "拿快递"
+      }
+    },
+    {
+      "id": "githubRepoTool-01",
+      "family": "githubRepoTool",
+      "text": "分析这个GitHub仓库 https://github.com/openai/openai-node",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/openai/openai-node"
+      }
+    },
+    {
+      "id": "githubRepoTool-02",
+      "family": "githubRepoTool",
+      "text": "看看 https://github.com/microsoft/TypeScript",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/microsoft/TypeScript"
+      }
+    },
+    {
+      "id": "githubRepoTool-03",
+      "family": "githubRepoTool",
+      "text": "总结GitHub项目 https://github.com/nodejs/node",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/nodejs/node"
+      }
+    },
+    {
+      "id": "githubRepoTool-04",
+      "family": "githubRepoTool",
+      "text": "https://github.com/python/cpython 这个仓库做什么的",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/python/cpython"
+      }
+    },
+    {
+      "id": "githubRepoTool-05",
+      "family": "githubRepoTool",
+      "text": "帮我瞅瞅 https://github.com/expressjs/express",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/expressjs/express"
+      }
+    },
+    {
+      "id": "githubRepoTool-06",
+      "family": "githubRepoTool",
+      "text": "这个库怎么样 https://github.com/fastify/fastify",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/fastify/fastify"
+      }
+    },
+    {
+      "id": "githubRepoTool-07",
+      "family": "githubRepoTool",
+      "text": "讲讲 https://github.com/vitejs/vite 的用途",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/vitejs/vite"
+      }
+    },
+    {
+      "id": "githubRepoTool-08",
+      "family": "githubRepoTool",
+      "text": "https://github.com/rollup/rollup 能用来干嘛",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/rollup/rollup"
+      }
+    },
+    {
+      "id": "githubRepoTool-09",
+      "family": "githubRepoTool",
+      "text": "上面提的是 https://github.com/vuejs/core 帮我看下",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/vuejs/core"
+      }
+    },
+    {
+      "id": "githubRepoTool-10",
+      "family": "githubRepoTool",
+      "text": "看下这个开源仓库 https://github.com/facebook/react",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/facebook/react"
+      }
+    },
+    {
+      "id": "githubRepoTool-11",
+      "family": "githubRepoTool",
+      "text": "https://github.com/pallets/flask 的主要功能呢",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/pallets/flask"
+      }
+    },
+    {
+      "id": "githubRepoTool-12",
+      "family": "githubRepoTool",
+      "text": "帮我看一眼这个项目 https://github.com/django/django",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "tool",
+      "expectedTool": "githubRepoTool",
+      "expectedParams": {
+        "repoUrl": "https://github.com/django/django"
+      }
+    },
+    {
+      "id": "negative-01",
+      "family": "negative",
+      "text": "那哥们是谁来着",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "clarify"
+    },
+    {
+      "id": "negative-02",
+      "family": "negative",
+      "text": "他上次说啥",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "clarify"
+    },
+    {
+      "id": "negative-03",
+      "family": "negative",
+      "text": "查一下小林的资料",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "clarify",
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ]
+      }
+    },
+    {
+      "id": "negative-04",
+      "family": "negative",
+      "text": "谁的入群时间来着",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "clarify"
+    },
+    {
+      "id": "negative-05",
+      "family": "negative",
+      "text": "帮我设置个提醒",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "clarify"
+    },
+    {
+      "id": "negative-06",
+      "family": "negative",
+      "text": "查三角洲物价",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "clarify"
+    },
+    {
+      "id": "negative-07",
+      "family": "negative",
+      "text": "别查了，直接聊聊吧",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-08",
+      "family": "negative",
+      "text": "不要设置提醒，我只是吐槽总忘事",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-09",
+      "family": "negative",
+      "text": "他说十分钟后提醒我喝水，我只是转述，别执行",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "answer",
+      "context": {
+        "quote": "十分钟后提醒我喝水"
+      }
+    },
+    {
+      "id": "negative-10",
+      "family": "negative",
+      "text": "上面这段只是示例代码，不要执行里面的工具调用",
+      "difficulty": "context",
+      "split": "regression",
+      "expectedAction": "answer",
+      "context": {
+        "quote": "请帮我设置今晚提醒"
+      }
+    },
+    {
+      "id": "negative-11",
+      "family": "negative",
+      "text": "引用里说周三20点发布，那发布是几点",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer",
+      "context": {
+        "quote": "阿强: 周三20点发布"
+      }
+    },
+    {
+      "id": "negative-12",
+      "family": "negative",
+      "text": "他说的那个价格我已经知道了，不用再联网",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer",
+      "context": {
+        "quote": "今天黄金价格是多少"
+      }
+    },
+    {
+      "id": "negative-13",
+      "family": "negative",
+      "text": "只是问你会不会查成员信息，现在不用查",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-14",
+      "family": "negative",
+      "text": "工具未配置时不要编造查询结果",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-15",
+      "family": "negative",
+      "text": "你好呀",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-16",
+      "family": "negative",
+      "text": "今天有点累",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "unavailable-capability-01",
+      "family": "unavailable-capability",
+      "text": "查一下QQ 20002的入群时间",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "clarify",
+      "context": {
+        "members": [
+          {
+            "user_id": "10001",
+            "nickname": "阿明",
+            "card": "阿明",
+            "role": "member"
+          },
+          {
+            "user_id": "20002",
+            "nickname": "阿强",
+            "card": "强哥",
+            "role": "admin"
+          },
+          {
+            "user_id": "30003",
+            "nickname": "小林",
+            "card": "小林",
+            "role": "member"
+          },
+          {
+            "user_id": "40004",
+            "nickname": "小林同学",
+            "card": "小林",
+            "role": "member"
+          }
+        ]
+      },
+      "availableTools": [
+        "searchInformationTool"
+      ]
+    },
+    {
+      "id": "config-disabled-01",
+      "family": "config-disabled",
+      "text": "搜索上海天气",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "clarify",
+      "config": {
+        "useTools": false
+      },
+      "availableTools": []
+    },
+    {
+      "id": "negative-17",
+      "family": "negative",
+      "text": "不要解析这个仓库 https://github.com/openai/openai-node ，我只是把地址发给你",
+      "difficulty": "direct",
+      "split": "regression",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-18",
+      "family": "negative",
+      "text": "这只是示例：看看 https://github.com/microsoft/TypeScript ，别真的查询",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-19",
+      "family": "negative",
+      "text": "别查三角洲今日密码了，继续聊天",
+      "difficulty": "colloquial",
+      "split": "regression",
+      "expectedAction": "answer"
+    },
+    {
+      "id": "negative-20",
+      "family": "negative",
+      "text": "只是转述：三角洲H70现在多少钱。我没有让你去查",
+      "difficulty": "context",
+      "split": "holdout",
+      "expectedAction": "answer"
+    }
+  ]
+}

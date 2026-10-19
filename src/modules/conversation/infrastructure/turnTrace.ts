@@ -1,6 +1,22 @@
 interface TraceLogger {info?(message:string):void;debug?(message:string):void}
 interface Archive {dir:string;retentionDays?:number;enabled?:boolean}
-interface TraceRecord {turnId:string;at:string;groupId:string;userId:string;sessionId:string;intent:{kind:string;confidence:number|null;source:string}|null;trigger:{mode:string;gateDecision:string;gateReason:string;phase:string}|null;route:{mode:string;profile:string;reason:string}|null;modelCalls:{stage:string;ms:number;tokens?:number}[];tools:{name:string;ok:boolean;ms:number}[];failures:{stage:string;error:string}[];outbound:number;totalMs:number|null}
+export interface ToolRoutingTraceUpdate {
+  candidates?: string[]
+  beforeFilter?: string[]
+  afterFilter?: string[]
+  finalTools?: string[]
+  // Tools in the request handed to the model gateway. This snapshot does not
+  // establish provider consumption or describe later text-backend fallbacks.
+  requestTools?: string[]
+  toolChoice?: unknown
+  applied?: string[]
+  executionPath?: 'forced' | 'model' | 'none'
+  filterStatus?: 'applied' | 'bypassed'
+  planner?: {status: string; reason?: string}
+}
+export interface IntentShadowTraceResult {status:string;elapsedMs:number;intent?:string;confidence?:number;reason?:string}
+interface TraceRecord {turnId:string;at:string;groupId:string;userId:string;sessionId:string;intent:{kind:string;confidence:number|null;source:string}|null;trigger:{mode:string;gateDecision:string;gateReason:string;phase:string}|null;route:{mode:string;profile:string;reason:string}|null;toolRouting?:ToolRoutingTraceUpdate;intentShadow?:IntentShadowTraceResult;modelCalls:{stage:string;ms:number;tokens?:number}[];tools:{name:string;ok:boolean;ms:number}[];failures:{stage:string;error:string}[];outbound:number;totalMs:number|null}
+interface ShadowTraceEvent {event:'intent_shadow';parentTurnId:string;at:string;intentShadow:IntentShadowTraceResult}
 import fs from "node:fs"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
@@ -57,7 +73,7 @@ export async function pruneTurnTraceArchive(dir = "", retentionDays = 7) {
   return removed
 }
 
-function queueArchiveWrite(record:TraceRecord, archive:Archive, logger?:TraceLogger) {
+function queueArchiveWrite(record:TraceRecord|ShadowTraceEvent, archive:Archive, logger?:TraceLogger) {
   // 并发回合的追加必须串行，否则 NDJSON 会出现交错行
   archiveState.tail = archiveState.tail.then(async () => {
     try {
@@ -79,6 +95,7 @@ function queueArchiveWrite(record:TraceRecord, archive:Archive, logger?:TraceLog
  */
 export function createTurnTrace({ groupId = "", userId = "", sessionId = "", logger, archive = null }: {groupId?:unknown;userId?:unknown;sessionId?:unknown;logger?:TraceLogger;archive?:Archive|null} = {}) {
   const startedAt = Date.now()
+  let finished = false
   const record:TraceRecord = {
     turnId: randomUUID(),
     at: new Date().toISOString(),
@@ -114,6 +131,39 @@ export function createTurnTrace({ groupId = "", userId = "", sessionId = "", log
     setRoute(mode:unknown, profile:unknown, reason:unknown) {
       record.route = { mode: String(mode || ""), profile: String(profile || ""), reason: String(reason || "") }
     },
+    setToolRouting(update:ToolRoutingTraceUpdate) {
+      if (finished) return
+      const routing = record.toolRouting ??= {}
+      for (const key of ['candidates', 'beforeFilter', 'afterFilter', 'finalTools', 'requestTools', 'applied'] as const) {
+        if (Array.isArray(update[key])) routing[key] = [...new Set(update[key].filter(name => typeof name === 'string' && name.trim()).map(name => name.trim()))]
+      }
+      if (update.toolChoice !== undefined) {
+        const choice = update.toolChoice
+        const selected = typeof choice === 'object' && choice !== null ? Reflect.get(choice, 'function') : null
+        routing.toolChoice = typeof choice === 'string' ? choice : selected && typeof selected === 'object' ? String(Reflect.get(selected, 'name') || '') : ''
+      }
+      if (update.executionPath) routing.executionPath = update.executionPath
+      if (update.filterStatus) routing.filterStatus = update.filterStatus
+      if (update.planner) routing.planner = {status: String(update.planner.status), ...(update.planner.reason ? {reason: compactError(update.planner.reason)} : {})}
+    },
+    setIntentShadow(result:IntentShadowTraceResult) {
+      const intentShadow:IntentShadowTraceResult = {
+        status: String(result.status), elapsedMs: Math.max(0, Number(result.elapsedMs) || 0),
+        ...(result.intent ? {intent: String(result.intent)} : {}),
+        ...(Number.isFinite(result.confidence) ? {confidence: result.confidence!} : {}),
+        ...(result.reason ? {reason: compactError(result.reason)} : {})
+      }
+      if (!finished) {
+        record.intentShadow = intentShadow
+        return
+      }
+      // A background sample usually finishes after the reply. Keep the archived
+      // turn immutable and join this small follow-up event in reports. Using a
+      // parent id also keeps legacy turnId-based dashboards from counting it.
+      const event:ShadowTraceEvent = {event: 'intent_shadow', parentTurnId: record.turnId, at: new Date().toISOString(), intentShadow}
+      logger?.info?.(`[TurnTraceShadow] ${JSON.stringify(event)}`)
+      if (archive?.enabled) queueArchiveWrite(event, archive, logger)
+    },
     addModelCall(stage:unknown, ms:unknown, extra?:{tokens?:unknown}) {
       const call:{stage:string;ms:number;tokens?:number} = { stage: String(stage || ""), ms: Number(ms) || 0 }
       // extra: { tokens } 等;token 数用于区分"上游慢"与"prompt 巨型"两类慢
@@ -130,6 +180,8 @@ export function createTurnTrace({ groupId = "", userId = "", sessionId = "", log
       record.outbound += Math.max(0, Number(n) || 0)
     },
     finish() {
+      if (finished) return record
+      finished = true
       record.totalMs = Date.now() - startedAt
       logger?.info?.(`[TurnTrace] ${JSON.stringify(record)}`)
       if (archive?.enabled) queueArchiveWrite(record, archive, logger)

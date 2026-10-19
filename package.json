@@ -7,6 +7,7 @@
   "scripts": {
     "test": "npm run backend:test",
     "trace:report": "node scripts/turn-trace-report.mjs",
+    "eval:tools": "node scripts/tool-exposure-eval.mjs",
     "persona:replay": "node scripts/personaReplay.mjs",
     "console:dev": "npm --prefix console/frontend run dev",
     "console:build": "npm --prefix console/frontend run build",
