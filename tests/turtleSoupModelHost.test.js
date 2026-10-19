@@ -45,8 +45,9 @@ test("主持人答题提示词接地：关键点清单入 prompt、未提及事�
   const system = messages[0].content
   assert.ok(system.includes("关键点"), "prompt 提供关键点清单")
   assert.ok(system.includes("伞是遗物"), "关键点内容接地")
-  assert.ok(system.includes("不得推测"), "明确禁止脑补未提及事实")
-  assert.ok(system.includes("没提隐瞒"), "给出与本案同型的反例(隐瞒类问题→与此无关)")
+  assert.ok(system.includes("绝不脑补"), "明确禁止脑补未提及事实")
+  assert.ok(system.includes("意外或疾病"), "主线未指明分支有同型示例(→是也不是)")
+  assert.ok(system.includes("只用于与本案无关的闲聊"), "与此无关仅限无关闲聊,不得用于主线问题")
   // 模糊解析长词优先
   assert.equal(parseHostAnswer("是也不是的"), "是也不是", "不能截断成'是'")
   assert.equal(parseHostAnswer("答案:不是"), "不是")
