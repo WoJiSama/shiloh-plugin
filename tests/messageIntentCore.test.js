@@ -66,3 +66,14 @@ test("意图层核心模块：分类函数行为锁定（从 apps/test.js 迁出
   assert.equal(intent.TERMINAL_TOOL_NAMES.has("bananaTool"), true)
   assert.equal(intent.BACKGROUND_TERMINAL_TOOL_NAMES.has("bananaTool"), true)
 })
+
+test("isParenthesizedAside detects fully parenthesized messages only", async () => {
+  const {isParenthesizedAside} = await import('../dist/backend/modules/conversation/domain/messageIntent.js')
+  assert.equal(isParenthesizedAside("(歪着头看希洛)"), true)
+  assert.equal(isParenthesizedAside("（希洛快出来玩）"), true)
+  assert.equal(isParenthesizedAside("(举手)（我有疑问）"), true)
+  assert.equal(isParenthesizedAside("(希洛你好"), false)
+  assert.equal(isParenthesizedAside("希洛(小声)你在吗"), false)
+  assert.equal(isParenthesizedAside("他是不是盲人(我猜是)"), false)
+  assert.equal(isParenthesizedAside(""), false)
+})

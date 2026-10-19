@@ -1,8 +1,9 @@
 import type {ConversationEvent,ConversationState} from '../application/smartConversation.js'
 import {messageMentionsUser,collectMentionTargetIds} from '../domain/mentionTargets.js'
 import {messageQuotesUser,hasBotTextAnchor,getReplySender,getPreviousRecentMessage,looksAddressedToPreviousSpeaker} from '../domain/messageContext.js'
-import {looksDirectedAtBotByPronoun,looksGroupAddressed,isLikelyFollowupMessage,isQuestionMessage,isFeedbackMessage} from '../domain/messageIntent.js'
+import {looksDirectedAtBotByPronoun,looksGroupAddressed,isLikelyFollowupMessage,isQuestionMessage,isFeedbackMessage,isParenthesizedAside} from '../domain/messageIntent.js'
 import {extractForwardIdsFromSegments} from './groupContextResolver.js'
+import {readActiveGameGroups} from '../../games/infrastructure/gameSessionRegistry.js'
 export interface PrefilterHost {
  config:{triggerPrefixes?:unknown[];smartTrigger?:{skipWhenAddressedOther?:boolean;skipWhenEmptyText?:boolean;quickResponseMs?:number;continuationLookbackMs?:number;continuationFollowupMatch?:boolean;continuationKeywordMatch?:boolean;continuationQuestionMatch?:boolean;continuationFeedbackMatch?:boolean}};
  getPersonaFor(e:ConversationEvent):unknown
@@ -16,6 +17,15 @@ function prefilterMessage(host:PrefilterHost,e:ConversationEvent,state:Conversat
       const botId = e?.bot?.uin || ports.bot().uin
       if (botId && String(e?.user_id) === String(botId)) {
         return { kind: 'bot_self_echo', reason: 'sender_is_self' }
+      }
+      // 小游戏进行中:该群主聊天人格整体静默(局内玩家由游戏主持人应答)
+      const groupId = String(e?.group_id || '')
+      if (groupId && readActiveGameGroups().has(groupId)) {
+        return { kind: 'game_occupied', reason: 'game_in_progress' }
+      }
+      // 全局场外:整条括号包裹的消息(哪怕喊了人设名)一律不回应
+      if (isParenthesizedAside(String(e?.msg || ''))) {
+        return { kind: 'aside_content', reason: 'parenthesized_aside' }
       }
       const atSelf = messageMentionsUser(e, botId)
       const quotesSelf = messageQuotesUser(e, botId)

@@ -149,7 +149,7 @@ async function handleRandomReplySmart(host:SmartConversationHost, e:Conversation
       let prefilter = { kind: 'regular', reason: '' }
       if (shouldPrefilter) {
         prefilter = host.prefilterMessage(e, state)
-        if (prefilter.kind === 'addressed_other' || prefilter.kind === 'empty_content' || prefilter.kind === 'bot_self_echo' || prefilter.kind === 'likely_addressed_other') {
+        if (prefilter.kind === 'addressed_other' || prefilter.kind === 'empty_content' || prefilter.kind === 'bot_self_echo' || prefilter.kind === 'likely_addressed_other' || prefilter.kind === 'aside_content' || prefilter.kind === 'game_occupied') {
           // 回滚刚才计入的 pendingCount（这些消息不应推动触发阈值）
           state.pendingCount = Math.max(0, state.pendingCount - pendingDelta)
           logger.info(`[Prefilter] group=${groupId} skip kind=${prefilter.kind} reason=${prefilter.reason}`)

@@ -361,6 +361,15 @@ function isDrawContextContinuationRequest(text = "") {
 function shouldInjectGroupContext(text = "") {
   return matchesAnyPattern(text, GROUP_CONTEXT_PATTERNS)
 }
+// 全局场外约定:整条消息(去除空白后)全部包在括号里=对机器人的旁白/扮演,
+// 任何人格(含人设名/前缀点名/@)都不应回应。混合括号配对(如"(你好)")按未剥离处理。
+export function isParenthesizedAside(text:unknown):boolean {
+  const value = String(text ?? '').trim()
+  if (!value) return false
+  if (!/^[（(]/.test(value) || !/[)）]$/.test(value)) return false
+  return value.replace(/（[^（）]*）/g, '').replace(/\([^()]*\)/g, '').trim() === ''
+}
+
 export {
   TERMINAL_TOOL_NAMES,
   BACKGROUND_TERMINAL_TOOL_NAMES,
