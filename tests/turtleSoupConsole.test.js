@@ -158,3 +158,21 @@ test("重新审计接口:三域结论追加到题目记录", async t => {
   const overview = await (await request("/api/games/turtle-soup/overview")).json()
   assert.equal(overview.puzzles[0].audits.length, 3, "审计结果随题持久化")
 })
+
+test("手动标记分:设置/清除/影响出题反馈", async t => {
+  const { root, request } = await fixture(t)
+  seedStore(root, [puzzleOf("p1", { status: "active" }), puzzleOf("p2", { status: "active" })])
+  // 设置
+  const set = await request("/api/games/turtle-soup/puzzles/p1/score", { method: "PUT", body: JSON.stringify({ score: 5 }) })
+  assert.equal(set.status, 200)
+  const overview = await (await request("/api/games/turtle-soup/overview")).json()
+  assert.equal(overview.puzzles.find(z => z.id === "p1").manualScore, 5)
+  // 非法值
+  const bad = await request("/api/games/turtle-soup/puzzles/p1/score", { method: "PUT", body: JSON.stringify({ score: 6 }) })
+  assert.equal(bad.status, 400)
+  // 清除
+  const clear = await request("/api/games/turtle-soup/puzzles/p1/score", { method: "DELETE" })
+  assert.equal(clear.status, 200)
+  const after = await (await request("/api/games/turtle-soup/overview")).json()
+  assert.equal(after.puzzles.find(z => z.id === "p1").manualScore, null)
+})

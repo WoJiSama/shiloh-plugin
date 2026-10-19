@@ -1619,7 +1619,8 @@ const server = http.createServer(async (req, res) => {
           keyPoints: puzzle.keyPoints, hints: puzzle.hints,
           ratingCount: puzzle.ratingCount, ratingAverage: puzzle.ratingCount > 0 ? Number((puzzle.ratingSum / puzzle.ratingCount).toFixed(1)) : null,
           plays: playCount.get(puzzle.id) || 0, createdAt: puzzle.createdAt,
-          audits: puzzle.audits || []
+          audits: puzzle.audits || [],
+          manualScore: puzzle.manualScore ?? null
         })),
         sessions,
         generating: soupGenerationJob,
@@ -1671,6 +1672,26 @@ const server = http.createServer(async (req, res) => {
         soupGenerationJob.log.push("生成结束")
       })()
       return sendJson(res, 200, { ok: true, generating: soupGenerationJob })
+    }
+    const soupScoreRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)\/score$/)
+    if (soupScoreRoute && req.method === "PUT") {
+      const body = await readJsonBody(req, 16 * 1024)
+      const score = Math.round(Number(body.score))
+      if (!Number.isInteger(score) || score < 1 || score > 5) return sendJson(res, 400, { error: "score 需为 1-5 的整数" })
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
+      const puzzle = store.readPuzzles().puzzles.find(item => item.id === soupScoreRoute[1])
+      if (!puzzle) return sendJson(res, 404, { error: "题目不存在" })
+      await store.savePuzzle({ ...puzzle, manualScore: score, manualScoreAt: Date.now() })
+      return sendJson(res, 200, { ok: true, id: puzzle.id, manualScore: score })
+    }
+    const soupScoreClearRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)\/score$/)
+    if (soupScoreClearRoute && req.method === "DELETE") {
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
+      const puzzle = store.readPuzzles().puzzles.find(item => item.id === soupScoreClearRoute[1])
+      if (!puzzle) return sendJson(res, 404, { error: "题目不存在" })
+      const { manualScore: _drop, manualScoreAt: _dropAt, ...rest } = puzzle
+      await store.savePuzzle(rest as typeof puzzle)
+      return sendJson(res, 200, { ok: true, id: puzzle.id })
     }
     const soupDeleteRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)$/)
     if (soupDeleteRoute && req.method === "DELETE") {

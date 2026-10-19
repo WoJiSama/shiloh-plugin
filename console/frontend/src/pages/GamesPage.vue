@@ -22,6 +22,7 @@ interface SoupPuzzle {
   plays: number
   createdAt: number
   audits?: SoupAudit[]
+  manualScore?: number | null
 }
 interface SoupSession { groupId: string; phase: string; puzzleId: string; players: number; lastActivityAt: number }
 interface SoupOverview {
@@ -109,8 +110,12 @@ const columns: DataTableColumns<SoupPuzzle> = [
   {
     title: '评分',
     key: 'rating',
-    width: 110,
-    render: row => (row.ratingCount > 0 ? `${row.ratingAverage}星/${row.ratingCount}人` : '—')
+    width: 130,
+    render: row => {
+      const manual = row.manualScore ? `${row.manualScore}★管` : ''
+      const player = row.ratingCount > 0 ? `${row.ratingAverage}★/${row.ratingCount}人` : ''
+      return manual || player ? [manual, player].filter(Boolean).join(' ') : '—'
+    }
   },
   { title: '开局', key: 'plays', width: 70 },
   {
@@ -177,6 +182,19 @@ const rowProps = (row: SoupPuzzle) => ({
                 ])
               : h('div', { class: 'audit-row audit-empty' }, `${auditDomainLabel[domain]}：未记录(老题可点下方重新审计补齐)`)
           ),
+          h('div', { class: 'manual-score-row' }, [
+            h('span', { class: 'detail-label' }, '手动标记'),
+            h('div', { class: 'star-row' }, [
+              ...[1, 2, 3, 4, 5].map(star =>
+                h('button', {
+                  key: star,
+                  class: ['star-btn', row.manualScore && star <= row.manualScore ? 'active' : ''].filter(Boolean).join(' '),
+                  onClick: () => setManualScore(row, star === row.manualScore ? null : star)
+                }, '★')
+              ),
+              row.manualScore ? h('span', { class: 'star-value' }, `${row.manualScore} 分`) : h('span', { class: 'star-hint' }, '点击打分(影响出题反馈)')
+            ])
+          ]),
           h('div', { class: 'audit-actions' }, [
             h(NButton, { size: 'small', secondary: true, loading: auditingId.value === row.id, disabled: auditingId.value === row.id, onClick: () => reaudit(row) }, { default: () => '重新审计' })
           ])
@@ -186,6 +204,21 @@ const rowProps = (row: SoupPuzzle) => ({
 })
 
 const auditingId = ref('')
+async function setManualScore(row: SoupPuzzle, score: number | null) {
+  try {
+    if (score === null) {
+      await api(`/api/games/turtle-soup/puzzles/${row.id}/score`, { method: 'DELETE' })
+      message.info('已清除手动标记')
+    } else {
+      await api(`/api/games/turtle-soup/puzzles/${row.id}/score`, { method: 'PUT', body: JSON.stringify({ score }) })
+      message.success(`已标记 ${score} 分`)
+    }
+    row.manualScore = score
+    await loadOverview()
+  } catch (cause: any) {
+    message.error(cause.message || '标记失败')
+  }
+}
 async function reaudit(row: SoupPuzzle) {
   auditingId.value = row.id
   try {
@@ -433,6 +466,13 @@ const phaseLabel: Record<string, string> = {
 .audit-reason { font-size: 12px; margin-top: 4px; color: var(--c-text); }
 .audit-hole { font-size: 12px; color: var(--c-danger); margin-top: 2px; }
 .audit-empty { font-size: 12px; color: var(--c-muted); }
+.manual-score-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--c-border); }
+:global(.star-row) { display: flex; align-items: center; gap: 2px; }
+:global(.star-btn) { appearance: none; border: none; background: transparent; font-size: 18px; color: var(--c-border); cursor: pointer; padding: 0 2px; line-height: 1; transition: color 0.15s; }
+:global(.star-btn:hover) { color: var(--c-accent); }
+:global(.star-btn.active) { color: #f5a623; }
+:global(.star-value) { font-size: 12px; color: #f5a623; margin-left: 6px; }
+:global(.star-hint) { font-size: 11px; color: var(--c-muted); margin-left: 6px; }
 .audit-actions { margin-top: 8px; display: flex; justify-content: flex-end; }
 :global(.soup-detail-rich) { max-height: 65vh; overflow: auto; }
 :global(.soup-detail) {

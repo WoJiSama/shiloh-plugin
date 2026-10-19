@@ -77,14 +77,15 @@ export class TurtleSoupGenerator {
   // 汇总评分反馈:高分解构风格、低分带玩家批评,喂给出题模型迭代质量
   buildGenerationFeedback():{high:{title:string;score:number;comments:string[]}[];low:{title:string;score:number;comments:string[]}[]} {
     const {store} = this.ports
-    const puzzles = store.readPuzzles().puzzles.filter(puzzle => puzzle.ratingCount > 0)
+    // 玩家评分与手动标记分都纳入反馈:手动分优先(管理员终审),无手动分时用玩家均分
+    const puzzles = store.readPuzzles().puzzles.filter(puzzle => puzzle.ratingCount > 0 || (puzzle.manualScore ?? 0) >= 1)
     const commentsOf = (puzzleId:string) => store.readPlays().plays
       .filter(play => play.puzzleId === puzzleId)
       .flatMap(play => play.ratings)
       .filter(rating => rating.comment && rating.comment.trim())
       .map(rating => String(rating.comment).trim())
     const ranked = puzzles
-      .map(puzzle => ({title: puzzle.title, score: puzzle.ratingSum / puzzle.ratingCount, comments: commentsOf(puzzle.id)}))
+      .map(puzzle => ({title: puzzle.title, score: (puzzle.manualScore ?? 0) >= 1 ? puzzle.manualScore! : puzzle.ratingSum / puzzle.ratingCount, comments: commentsOf(puzzle.id)}))
       .sort((left, right) => right.score - left.score)
     return {
       high: ranked.filter(item => item.score >= 4).slice(0, 5),

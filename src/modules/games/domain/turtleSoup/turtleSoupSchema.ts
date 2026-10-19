@@ -20,6 +20,7 @@ export function decodeTurtleSoupPuzzle(value:unknown):TurtleSoupPuzzle {
     source: raw.source==='manual'?'manual':'ai',
     createdAt: numberOr(raw.createdAt, 0),
     status: raw.status==='retired'?'retired':raw.status==='pending'?'pending':'active',
+    ...(typeof raw.manualScore==='number' && raw.manualScore>=1 && raw.manualScore<=5 ? {manualScore: Math.round(raw.manualScore), ...(typeof raw.manualScoreAt==='number' ? {manualScoreAt: raw.manualScoreAt} : {})} : {}),
     ...(Array.isArray(raw.audits) ? {audits: raw.audits.filter((item):item is TurtleSoupAuditRecord => {
       const entry=item as Record<string, unknown>
       return typeof entry?.domain==='string' && ['structure','playability','logic'].includes(String(entry.domain)) && typeof entry?.pass==='boolean'
