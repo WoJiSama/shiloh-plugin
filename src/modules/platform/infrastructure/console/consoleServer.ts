@@ -1598,6 +1598,17 @@ const server = http.createServer(async (req, res) => {
       await store.savePuzzle({ ...puzzle, audits: [...(puzzle.audits || []), ...audits] })
       return sendJson(res, 200, { ok: true, id: puzzle.id, audits })
     }
+    if (url.pathname === "/api/games/turtle-soup/rejected") {
+      const rejectedPath = path.join(PLUGIN_ROOT, "data", "turtle_soup", "rejected.jsonl")
+      let rejected:unknown[] = []
+      try {
+        const text = fs.readFileSync(rejectedPath, "utf8")
+        rejected = text.split("\n").filter(line => line.trim()).map(line => {
+          try { return JSON.parse(line) } catch { return null }
+        }).filter(Boolean).slice(-30)
+      } catch {}
+      return sendJson(res, 200, { rejected })
+    }
     if (url.pathname === "/api/games/turtle-soup/overview") {
       const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
       const { puzzles } = store.readPuzzles()

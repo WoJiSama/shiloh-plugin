@@ -49,12 +49,18 @@ const statusOptions = [
   { value: 'retired', label: '已出池' }
 ]
 
+const rejected = ref<{title:string;surface:string;solution:string;holes:string[];at:number}[]>([])
+
 async function loadOverview() {
   try {
     overview.value = await api<SoupOverview>('/api/games/turtle-soup/overview')
     error.value = ''
     if (overview.value.generating.running) ensurePolling()
     else stopPolling()
+    try {
+      const result = await api<{rejected: typeof rejected.value}>('/api/games/turtle-soup/rejected')
+      rejected.value = result.rejected || []
+    } catch {}
   } catch (cause: any) {
     error.value = cause.message || '题库加载失败'
   } finally {
@@ -337,6 +343,25 @@ const phaseLabel: Record<string, string> = {
             <p class="table-hint">点击行查看完整汤面与汤底。</p>
           </section>
 
+          <section v-if="rejected.length" class="panel rejected-panel">
+            <details>
+              <summary class="rejected-summary">被拒汤留档（{{ rejected.length }} 条，含完整汤面汤底与拒绝原因）</summary>
+              <div v-for="(item, index) in rejected" :key="index" class="rejected-item">
+                <div class="rejected-head">
+                  <strong>【{{ item.title }}】</strong>
+                  <span class="rejected-at">{{ new Date(item.at).toLocaleString() }}</span>
+                </div>
+                <div class="rejected-body">
+                  <div class="rejected-line"><span>汤面</span>{{ item.surface }}</div>
+                  <div class="rejected-line"><span>汤底</span>{{ item.solution }}</div>
+                  <div class="rejected-holes">
+                    <div v-for="(hole, hi) in item.holes" :key="hi" class="hole">✗ {{ hole }}</div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </section>
+
           <SchemaPage kind="turtleSoup" embedded />
         </template>
       </PageState>
@@ -484,6 +509,16 @@ const phaseLabel: Record<string, string> = {
   overflow: auto;
   margin: 0;
 }
+.rejected-panel { padding: 12px 22px; }
+.rejected-summary { cursor: pointer; font-size: 13px; color: var(--c-muted); padding: 4px 0; }
+.rejected-item { border: 1px solid var(--c-border); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+.rejected-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.rejected-at { font-size: 11px; color: var(--c-muted); }
+.rejected-body { display: grid; gap: 6px; }
+.rejected-line { display: grid; grid-template-columns: 36px 1fr; gap: 8px; font-size: 12px; line-height: 1.6; }
+.rejected-line > span { color: var(--c-muted); flex-shrink: 0; }
+.rejected-holes { margin-top: 4px; }
+.hole { font-size: 12px; color: var(--c-danger); line-height: 1.5; }
 @media (max-width: 736px) {
   .soup-summary {
     flex-wrap: wrap;

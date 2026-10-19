@@ -209,6 +209,26 @@ export function parseLogicAudit(text:unknown):ParsedLogicAudit|null {
   }
 }
 
+// 修复式重生成:把逻辑审计漏洞喂回模型修同一道题,而非整个重掷
+export function buildPuzzleRepairMessages(puzzle:TurtleSoupPuzzle, holes:string[]):ChatMessage[] {
+  return [
+    {role: 'system', content: [
+      '你是海龟汤修复师。这道题的逻辑审计发现了以下漏洞,请针对性修复,不要重写整个故事:',
+      ...holes.map(hole => `- ${hole}`),
+      '',
+      '修复要求:',
+      '1. 保持汤面和汤底的核心谜题不变(离奇表象+真相揭示的本质不能变,标题不改)',
+      '2. 针对每个漏洞修改汤底或汤面中的对应部分,让逻辑闭环',
+      '3. 时间线漏洞→补时间交代或调整时长;物件流转漏洞→补来源去向;动机链漏洞→补动机或减少巧合',
+      '4. 修复后所有关键点仍然成立,已有提示不需大改',
+      '5. 汤面字数维持80-200字',
+      '只输出修复后的完整JSON,格式:',
+      '{"title":"标题(不改)","surface":"汤面","solution":"汤底","keyPoints":["关键点"],"hints":["提示1","提示2","提示3"],"difficulty":"原难度","tags":["标签"]}'
+    ].join('\n')},
+    {role: 'user', content: JSON.stringify({title: puzzle.title, surface: puzzle.surface, solution: puzzle.solution, keyPoints: puzzle.keyPoints, hints: puzzle.hints, difficulty: puzzle.difficulty, tags: puzzle.tags}, null, 2)}
+  ]
+}
+
 export function parseGeneratedPuzzle(text:unknown, meta:{nowMs:number;random:number;model:string}):TurtleSoupPuzzle|null {
   const value = extractFirstJsonObject(text)
   if (!value) return null

@@ -1,10 +1,12 @@
 // 海龟汤生成器:调主模型出题 -> 审题自评 -> 去重 -> 入库;维护鲜汤池保有量。
 // 进程内互斥锁防并发重复生成(单进程Yunzai足够,无需跨进程锁)。
 import type {TurtleSoupLogger, TurtleSoupPuzzle, TurtleSoupConfig, TurtleSoupAuditRecord} from '../../../../contracts/turtleSoup.js'
+import fs from 'fs'
+import path from 'path'
 import type {ChatMessage} from '../../../../contracts/modelGateway.js'
 import {buildPuzzleGenerationMessages, buildPuzzleReviewMessages, parseGeneratedPuzzle, parsePuzzleReview} from '../../domain/turtleSoup/turtleSoupPrompts.js'
 import {auditPuzzleStructure, freshPuzzleIds, pendingPuzzleIds, puzzlePlayStats} from '../../domain/turtleSoup/turtleSoupRules.js'
-import {buildLogicAuditMessages, parseLogicAudit} from '../../domain/turtleSoup/turtleSoupPrompts.js'
+import {buildLogicAuditMessages, parseLogicAudit, buildPuzzleRepairMessages} from '../../domain/turtleSoup/turtleSoupPrompts.js'
 import {literalSoupSimilarity} from '../../domain/turtleSoup/turtleSoupSimilarity.js'
 import type {TurtleSoupStore} from './TurtleSoupStore.js'
 
@@ -113,27 +115,82 @@ export class TurtleSoupGenerator {
         // 第一关:确定性结构审核(长度/条数/关键点泄露)
         const structureIssues = auditPuzzleStructure(puzzle)
         audits.push({domain: 'structure', pass: !structureIssues.length, reason: structureIssues.length ? '存在结构性问题' : '结构合规(长度/条数/无泄底)', ...(structureIssues.length ? {holes: structureIssues} : {}), at: auditAt})
-        if (structureIssues.length) throw new Error(`结构审核未通过: ${structureIssues.join(';')}`)
+        if (structureIssues.length) {
+          this.logRejected({...puzzle, audits}, [`结构: ${structureIssues.join(';')}`])
+          throw new Error(`结构审核未通过: ${structureIssues.join(';')}`)
+        }
         // 第二关:可玩性审题
         const reviewText = await this.ports.callModel(buildPuzzleReviewMessages(puzzle), {temperature: 0.2, model: settings.generationModel || undefined})
         const review = parsePuzzleReview(reviewText)
         if (!review) throw new Error('审题产物无法解析')
         audits.push({domain: 'playability', pass: review.pass === true, reason: review.reason || (review.pass ? '可玩性通过' : '审题未通过'), at: auditAt, ...(settings.generationModel ? {model: settings.generationModel} : {})})
-        if (!review.pass) throw new Error(`审题未通过: ${review.reason}`)
+        if (!review.pass) {
+          this.logRejected({...puzzle, audits}, [`审题: ${review.reason}`])
+          throw new Error(`审题未通过: ${review.reason}`)
+        }
         // 第三关:独立逻辑审计(逐句对照/时间线/物件流转/动机链),发现漏洞直接废弃
         const auditText = await this.ports.callModel(buildLogicAuditMessages(puzzle), {temperature: 0.2, model: settings.generationModel || undefined})
         const audit = parseLogicAudit(auditText)
         if (!audit) throw new Error('逻辑审计产物无法解析')
         audits.push({domain: 'logic', pass: audit.pass === true, reason: audit.reason || (audit.pass ? '无逻辑漏洞' : '存在逻辑漏洞'), ...(audit.holes.length ? {holes: audit.holes} : {}), at: auditAt, ...(settings.generationModel ? {model: settings.generationModel} : {})})
-        if (!audit.pass) throw new Error(`逻辑审计未通过: ${audit.holes.slice(0, 2).join(';') || audit.reason}`)
+        let finalPuzzle = puzzle
+        if (!audit.pass) {
+          // 修复式重生成:把漏洞喂回模型修同一道题,修完重审;最多两轮
+          let repaired = false
+          for (let repairRound = 0; repairRound < 2 && !repaired; repairRound++) {
+            try {
+              const repairText = await this.ports.callModel(buildPuzzleRepairMessages(finalPuzzle, audit.holes), {temperature: 0.3, model: settings.generationModel || undefined})
+              const repairedPuzzle = parseGeneratedPuzzle(repairText, {nowMs: this.now() + this.sequence++, random: this.random(), model: settings.generationModel || '主模型'})
+              if (!repairedPuzzle) throw new Error('修复产物不是合法JSON')
+              if (repairedPuzzle.title !== puzzle.title) throw new Error('修复改了标题')
+              const repairIssues = auditPuzzleStructure(repairedPuzzle)
+              if (repairIssues.length) throw new Error(`修复后结构问题: ${repairIssues.join(';')}`)
+              const reAuditText = await this.ports.callModel(buildLogicAuditMessages(repairedPuzzle), {temperature: 0.2, model: settings.generationModel || undefined})
+              const reAudit = parseLogicAudit(reAuditText)
+              if (!reAudit) throw new Error('重审产物无法解析')
+              if (reAudit.pass) {
+                finalPuzzle = repairedPuzzle
+                audits.push({domain: 'logic', pass: true, reason: `修复后通过(第${repairRound + 1}轮),原漏洞: ${audit.holes.slice(0, 2).join(';').slice(0, 80)}`, holes: audit.holes, at: this.now(), ...(settings.generationModel ? {model: settings.generationModel} : {})})
+                repaired = true
+                this.ports.logger?.info?.(`[海龟汤] 修复成功: ${finalPuzzle.title}(第${repairRound + 1}轮)`)
+              } else {
+                audit.holes = reAudit.holes
+                audit.reason = reAudit.reason
+              }
+            } catch (repairError) {
+              this.ports.logger?.warn?.(`[海龟汤] 修复失败(第${repairRound + 1}轮): ${repairError instanceof Error ? repairError.message : String(repairError)}`)
+              break
+            }
+          }
+          if (!repaired) {
+            // 最终失败:留档(汤面/汤底/漏洞),不进主池
+            this.logRejected({...finalPuzzle, audits}, audit.holes)
+            throw new Error(`逻辑审计未通过(含修复尝试): ${audit.holes.slice(0, 2).join(';') || audit.reason}`)
+          }
+        }
         // 入库即待审,管理员过审后才进入投放池
-        const pending = {...puzzle, status: 'pending' as const, audits}
+        const pending = {...finalPuzzle, status: 'pending' as const, audits}
         await store.savePuzzle(pending)
         this.ports.logger?.info?.(`[海龟汤] 新汤待审: ${pending.title}(${pending.difficulty})`)
         return pending
       } catch (error) { lastError = error }
     }
     throw lastError instanceof Error ? lastError : new Error(String(lastError))
+  }
+
+  // 失败留档:追加到 data/turtle_soup/rejected.jsonl,含汤面汤底和拒绝原因
+  private logRejected(puzzle:TurtleSoupPuzzle, holes:string[]) {
+    try {
+      const rejectedPath = path.join(this.ports.store.dataDir, 'rejected.jsonl')
+      const entry = JSON.stringify({
+        title: puzzle.title, surface: puzzle.surface, solution: puzzle.solution,
+        keyPoints: puzzle.keyPoints, difficulty: puzzle.difficulty, tags: puzzle.tags,
+        holes, at: Date.now()
+      })
+      fs.appendFileSync(rejectedPath, entry + '\n')
+    } catch (error) {
+      this.ports.logger?.warn?.(`[海龟汤] 失败留档写入失败: ${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   duplicatesExisting(candidate:TurtleSoupPuzzle, puzzles:TurtleSoupPuzzle[]):boolean {

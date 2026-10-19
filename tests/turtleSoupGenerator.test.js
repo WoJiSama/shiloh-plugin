@@ -183,7 +183,8 @@ test("生成三道关:结构不过/审题不过/逻辑审计不过均不入库,�
   // 3) 逻辑审计不过
   const reviewTrue = JSON.stringify({ pass: true, reason: "ok" })
   const auditFalse = JSON.stringify({ pass: false, holes: ["伞的流转无解释"], reason: "有漏洞" })
-  plan = { responses: [genText, reviewTrue, auditFalse, genText, reviewTrue, auditFalse], saved: [] }
+  // 修复提示词也返回非法JSON → 修复失败 → 最终被拒
+  plan = { responses: [genText, reviewTrue, auditFalse, "not-json", genText, reviewTrue, auditFalse, "not-json"], saved: [] }
   await assert.rejects(new TurtleSoupGenerator(makePorts(plan)).generateOne(), /逻辑审计未通过.*伞的流转无解释/)
   assert.equal(plan.saved.length, 0, "不过审不入库")
   // 4) 全过 → pending 入库
