@@ -279,6 +279,7 @@ test("复合规则列表文本与按序号写入", async () => {
   const { buildCompoundRulesText, buildCompoundRuleUpdate } = await import("../dist/backend/modules/groupAdmin/infrastructure/groupAdminPage.js")
   const text = buildCompoundRulesText([{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }])
   assert.ok(text.includes("1. 长文刷屏 [开]"))
+  assert.ok(text.includes("条件组合"), "列表头带例子解释")
   assert.ok(text.includes("5 秒内连发 ≥10 条") && text.includes("单条 >160 字"))
   assert.ok(text.includes("撤回+转发+禁言60秒"))
   assert.ok(buildCompoundRulesText([]).includes("还没有复合规则"))
@@ -305,7 +306,7 @@ test("面板展示复合规则分区", () => {
   assert.ok(rule.commands.includes(".群管 复合规则 1 关"))
   const empty = buildGroupAdminPageData(serverLikeSettings(), GROUP_ID)
   const emptySection = empty.sections.find(item => item.label === "复合规则")
-  assert.ok(emptySection.rows[0].detail.includes("未配置"))
+  assert.ok(emptySection.rows[0].detail.includes("5 秒内连发 10 条且单条超过 160 字"), "空态给具体例子")
 })
 
 test("新语义：本群显式开关优先于默认总开关", () => {

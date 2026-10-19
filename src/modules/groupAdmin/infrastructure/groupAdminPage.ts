@@ -448,7 +448,12 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
                 `.群管 复合规则 ${i + 1} 禁言 ${rule.muteSeconds}`
               ]
             }))
-          : [{label: "复合规则", on: false, detail: "未配置——控制台「群管理 → 复合规则」添加，最多 5 条", commands: [".群管 复合规则"]}]
+          : [{
+              label: "复合规则（未配置）",
+              on: false,
+              detail: "条件组合：同时满足才处理。例：5 秒内连发 10 条且单条超过 160 字 → 撤回全部+合并转发+禁言 60 秒；控制台添加，最多 5 条",
+              commands: [".群管 复合规则"]
+            }]
       },
       {
         label: "入群验证",
@@ -624,9 +629,19 @@ export function buildGroupAdminOverrideUpdates(settings:Data, groupId:unknown, c
 }
 
 /** 复合规则列表文本（.群管 复合规则） */
+const COMPOUND_EXAMPLE = "复合规则 = 条件组合，几件事同时发生才处理。例：『5 秒内连发 10 条，且单条超过 160 字 → 撤回全部 + 合并转发 + 禁言 60 秒』——单独刷短句、单发长文都不触发"
+
 export function buildCompoundRulesText(rules:{name:string;enabled:boolean;burstCount:number;windowSeconds:number;maxLength:number;totalLength:number;recall:boolean;forward:boolean;muteSeconds:number}[]) {
-  if (!rules.length) return "还没有复合规则。请在控制台「群管理 → 复合规则」添加（最多 5 条），再用 .群管 复合规则 <序号> <参数> <值> 调整。\n示例条件：5 秒内连发 10 条且单条超过 160 字 → 撤回+转发+禁言 60 秒"
-  const lines = ["复合规则（同时命中时最新的、列表靠后的优先；新增/删除在控制台操作）"]
+  if (!rules.length) return [
+    "还没有复合规则。",
+    COMPOUND_EXAMPLE + "。",
+    "在控制台「群管理 → 广告与刷屏 → 复合规则」添加（最多 5 条），加好后就能用 .群管 复合规则 <序号> <参数> <值> 随时调。"
+  ].join("\n")
+  const lines = [
+    COMPOUND_EXAMPLE + "。",
+    "",
+    "本群的复合规则（多条同时命中取靠后/最新的；新增删除在控制台操作）："
+  ]
   rules.forEach((rule, i) => {
     const conditions = [
       `${rule.windowSeconds} 秒内连发 ≥${rule.burstCount} 条`,
