@@ -26,6 +26,8 @@ class TurtleSoupPlugin extends plugin {
         { reg: "^[.。]游戏\\s+海龟汤\\s*(猜|猜汤底|答案)[\\s\\S]+$", fnc: "guessSoup" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*(提示|线索)\\s*$", fnc: "useHint" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*(投降|认输)\\s*$", fnc: "surrender" },
+        { reg: "^[.。]游戏\\s+海龟汤\\s*换汤\\s*$", fnc: "switchPuzzleCmd" },
+        { reg: "^[.。]游戏\\s+海龟汤\\s*(排行|榜单|汤榜)\\s*$", fnc: "rankingsCmd" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*(状态|进度)\\s*$", fnc: "showStatus" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*(结束|终止|收局)\\s*$", fnc: "endGame" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*评分\\s+[1-5](\\s+[\\s\\S]*)?\\s*$", fnc: "rateGame" },
@@ -115,6 +117,16 @@ class TurtleSoupPlugin extends plugin {
 
   async generateMore(e:AppEvent) {
     await this.reply(e, await turtleSoupManager.generateMore(e))
+    return true
+  }
+
+  async switchPuzzleCmd(e:AppEvent) {
+    await this.reply(e, await turtleSoupManager.switchPuzzle(e))
+    return true
+  }
+
+  async rankingsCmd(e:AppEvent) {
+    await this.reply(e, turtleSoupManager.rankings())
     return true
   }
 

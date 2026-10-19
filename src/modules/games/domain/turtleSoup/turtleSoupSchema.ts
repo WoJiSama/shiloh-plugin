@@ -58,7 +58,7 @@ export function decodeTurtleSoupPlay(value:unknown):TurtleSoupPlay {
     ratings: Array.isArray(raw.ratings)?raw.ratings.map(decodeTurtleSoupRating):[]
   }
   if(typeof raw.endedAt==='number'&&Number.isFinite(raw.endedAt))play.endedAt=raw.endedAt
-  if(raw.endReason==='solved'||raw.endReason==='manual'||raw.endReason==='idle_timeout'||raw.endReason==='join_timeout'||raw.endReason==='all_surrendered')play.endReason=raw.endReason
+  if(raw.endReason==='solved'||raw.endReason==='manual'||raw.endReason==='idle_timeout'||raw.endReason==='join_timeout'||raw.endReason==='all_surrendered'||raw.endReason==='switched')play.endReason=raw.endReason
   if(typeof raw.winnerId==='string'&&raw.winnerId)play.winnerId=raw.winnerId
   const mvp=record(raw.mvp)
   const mvpUserId=text(mvp.userId)

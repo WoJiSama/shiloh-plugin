@@ -353,6 +353,52 @@ export class TurtleSoupManager {
     return await this.finishGame(session, 'manual')
   }
 
+  // 换汤:当局直接废弃,原班人马立刻新开一局(换汤不换人)
+  async switchPuzzle(e:TurtleSoupEvent):Promise<string> {
+    const session = this.sessions.get(this.getGroupId(e))
+    if (!session) return "本群没有进行中的海龟汤"
+    if (session.phase !== 'playing' && session.phase !== 'choosing') return "只有问答中/选汤中才能换汤"
+    if (this.getUserId(e) !== session.initiatorId && !this.isAdmin(e)) return "只有发起人或群管理可以换汤"
+    if (session.players.length < Math.max(1, this.config().minPlayers)) return `人数不足(最少${this.config().minPlayers}人),换汤后无法开局,可用 ${SOUP_COMMAND} 结束 收局`
+    const oldTitle = this.findPuzzle(session.puzzleId)?.title || '上一题'
+    // 本局按"换汤"废弃归档,旧题计入游玩史(新局不会再随机到它)
+    const play = this.findOpenPlay(session.groupId)
+    if (play) {
+      play.endedAt = this.now()
+      play.endReason = 'switched'
+      play.players = [...new Set([...session.players.map(player => player.userId), ...Object.keys(session.surrendered || {})])]
+      play.qaCount = session.qaLog.length
+      await this.store.upsertPlay(play)
+    }
+    await this.drop(session.groupId)
+    // 原班人马直接进入新局:重建会话并立即上菜
+    const nowMs = this.now()
+    const next:TurtleSoupSession = {
+      groupId: session.groupId, phase: 'joining', puzzleId: '', initiatorId: session.initiatorId,
+      players: session.players, createdAt: nowMs,
+      joinDeadlineAt: nowMs + this.config().joinWindowMinutes * 60_000,
+      lastActivityAt: nowMs, qaLog: [], guessLog: [], usedHints: 0, lastGuessAt: {}, surrendered: {}
+    }
+    await this.persist(next)
+    const menu = await this.launchPlay(next)
+    return `已放弃【${oldTitle}】,换汤不换人,原班${next.players.length}人继续!\n${menu}`
+  }
+
+  // 排行榜:汤永久记录,按评分展示 x人评分x星
+  rankings():string {
+    const rated = this.store.readPuzzles().puzzles
+      .filter(puzzle => puzzle.ratingCount > 0)
+      .map(puzzle => ({title: puzzle.title, count: puzzle.ratingCount, score: puzzle.ratingSum / puzzle.ratingCount, status: puzzle.status}))
+      .sort((left, right) => right.score - left.score || right.count - left.count)
+    if (!rated.length) return "还没有汤被评过分。揭晓后发 .游戏 海龟汤 评分 1-5 就能攒榜"
+    const lines = ["🏆 海龟汤榜单(永久记录):"]
+    rated.slice(0, 10).forEach((item, index) => {
+      lines.push(`${index + 1}.【${item.title}】${item.count}人评分${item.score.toFixed(1)}星${item.score >= 4.5 && item.count >= 3 ? " ⭐精选" : ""}${item.status === 'retired' ? '(已出池)' : ""}`)
+    })
+    if (rated.length > 10) lines.push(`…共${rated.length}道有评分记录`)
+    return lines.join("\n")
+  }
+
   // 个人投降:汤底私发给投降者,其退出本局;最后一名玩家投降则公开收局。
   async surrender(e:TurtleSoupEvent):Promise<string> {
     const session = this.sessions.get(this.getGroupId(e))

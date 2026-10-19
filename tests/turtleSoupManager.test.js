@@ -683,3 +683,46 @@ test("题库审核命令:待审列表/过审进入投放/淘汰出池", async ()
     assert.ok(manager.inventory(admin).includes("题库"))
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
+
+test("换汤:当局废弃原班人马直接新开,旧题不再随机到", async () => {
+  const harness = makeHarness()
+  try {
+    await harness.seedPuzzles([puzzleOf("p1"), puzzleOf("p2"), puzzleOf("p3")])
+    await harness.manager.openGame(harness.event("u1", ".游戏 海龟汤 开局"))
+    await harness.manager.joinGame(harness.event("u1", ".游戏 海龟汤 加入"))
+    await harness.manager.joinGame(harness.event("u2", ".游戏 海龟汤 加入"))
+    await harness.manager.startGame(harness.event("u1", ".游戏 海龟汤 开始"))
+    await harness.manager.choosePuzzle(harness.event("u1", ".游戏 海龟汤 选 1"))
+    const session = harness.manager.getSession("100")
+    const oldPuzzleId = session.puzzleId
+    // 非发起人被拦
+    assert.match(await harness.manager.switchPuzzle(harness.event("u9", ".游戏 海龟汤 换汤")), /只有发起人或群管理/)
+    const reply = await harness.manager.switchPuzzle(harness.event("u1", ".游戏 海龟汤 换汤"))
+    assert.match(reply, /换汤不换人,原班2人继续/)
+    assert.match(reply, /上菜!三选一/)
+    const next = harness.manager.getSession("100")
+    assert.equal(next.phase, "choosing", "新局直接进入选汤")
+    assert.ok(!next.choosing.candidates.includes(oldPuzzleId), "旧题不再出现在候选")
+    assert.equal(next.players.length, 2, "原班人马保留")
+    // 旧局按 switched 归档
+    const play = harness.store.readPlays().plays.find(item => item.puzzleId === oldPuzzleId)
+    assert.equal(play.endReason, "switched")
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("排行榜:按评分展示 x人评分x星,永久记录", async () => {
+  const harness = makeHarness()
+  try {
+    await reachPlaying(harness, { users: ["u1", "u2"] })
+    await harness.manager.endGame(harness.event("u1", ".游戏 海龟汤 结束"))
+    await harness.manager.rateGame(harness.event("u1", ".游戏 海龟汤 评分 5 好玩"))
+    await harness.manager.rateGame(harness.event("u2", ".游戏 海龟汤 评分 4"))
+    const text = harness.manager.rankings()
+    assert.match(text, /🏆 海龟汤榜单/)
+    assert.match(text, /2人评分4\.5星/)
+    const empty = makeHarness()
+    try {
+      assert.match(empty.manager.rankings(), /还没有汤被评过分/)
+    } finally { fs.rmSync(empty.dir, {recursive: true, force: true}) }
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})

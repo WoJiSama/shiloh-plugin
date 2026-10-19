@@ -4,7 +4,7 @@ export type TurtleSoupPuzzleStatus = 'active'|'retired'|'pending'
 export type TurtleSoupPuzzleSource = 'ai'|'manual'
 export interface TurtleSoupPuzzle {id:string;title:string;surface:string;solution:string;keyPoints:string[];hints:string[];difficulty:string;tags:string[];source:TurtleSoupPuzzleSource;model?:string;createdAt:number;status:TurtleSoupPuzzleStatus;ratingSum:number;ratingCount:number}
 export interface TurtleSoupRating {userId:string;score:number;comment?:string;at:number}
-export type TurtleSoupEndReason = 'solved'|'manual'|'idle_timeout'|'join_timeout'|'all_surrendered'
+export type TurtleSoupEndReason = 'solved'|'manual'|'idle_timeout'|'join_timeout'|'all_surrendered'|'switched'
 export interface TurtleSoupMvp {userId:string;reason:string}
 export interface TurtleSoupPlay {playId:string;puzzleId:string;puzzleTitle:string;groupId:string;startedAt:number;endedAt?:number;endReason?:TurtleSoupEndReason;solved:boolean;winnerId?:string;mvp?:TurtleSoupMvp;players:string[];qaCount:number;ratings:TurtleSoupRating[]}
 export interface TurtleSoupPlayer {userId:string;nickname:string;joinedAt:number}
