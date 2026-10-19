@@ -1559,16 +1559,24 @@ const server = http.createServer(async (req, res) => {
     // ---------- 海龟汤题库管理(文件存储,与机器人进程共享 data 目录) ----------
     function makeSoupModelCall(apiUrl:string, apiKey:string, defaultModel:string) {
       return async (messages:unknown[], options:{temperature?:number|undefined;model?:string|undefined} = {}) => {
-        const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({ model: options.model || defaultModel || undefined, messages, temperature: options.temperature ?? 0.7, top_p: 0.9 })
-        })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const data = await response.json() as Data
-        const text = (data.choices as Data[] | undefined)?.[0] && ((data.choices as Data[])[0]!.message as Data | undefined)?.content
-        if (typeof text !== "string" || !text) throw new Error("模型空回复")
-        return text
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 120_000)
+        try {
+          const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+            body: JSON.stringify({ model: options.model || defaultModel || undefined, messages, temperature: options.temperature ?? 0.7, top_p: 0.9}),
+            signal: controller.signal
+          })
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          const data = await response.json() as Data
+          const text = (data.choices as Data[] | undefined)?.[0] && ((data.choices as Data[])[0]!.message as Data | undefined)?.content
+          if (typeof text !== "string" || !text) throw new Error("模型空回复")
+          return text
+        } catch (error) {
+          if (error instanceof Error && error.name === "AbortError") throw new Error("模型响应超时(120秒)")
+          throw error
+        } finally { clearTimeout(timeout) }
       }
     }
     const soupAuditRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)\/audit$/)
