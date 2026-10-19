@@ -1677,14 +1677,18 @@ const server = http.createServer(async (req, res) => {
       })
       soupGenerationJob = { running: true, total: count, added: 0, failed: 0, startedAt: Date.now(), log: [`开始生成 ${count} 道(三道审核:结构/审题/逻辑审计)`] }
       void (async () => {
-        for (let index = 0; index < count; index++) {
-          try {
-            const puzzle = await generator.generateOne(difficulty)
+        // 并行生成:每道题独立走完三道审核管线,互不阻塞
+        const results = await Promise.allSettled(
+          Array.from({length: count}, () => generator.generateOne(difficulty))
+        )
+        for (const result of results) {
+          if (result.status === "fulfilled") {
             soupGenerationJob.added++
-            soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 已生成待审: ${puzzle.title}`)
-          } catch (error) {
+            soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 已生成待审: ${result.value.title}`)
+          } else {
             soupGenerationJob.failed++
-            soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 失败: ${error instanceof Error ? error.message : String(error)}`)
+            const reason = result.reason instanceof Error ? result.reason.message : String(result.reason)
+            soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 失败: ${reason}`)
           }
         }
         soupGenerationJob.running = false
