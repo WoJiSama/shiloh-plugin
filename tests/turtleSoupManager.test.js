@@ -4,12 +4,14 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import {TurtleSoupManager} from "../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupManager.js"
+import {normalizeSoupText} from "../dist/backend/modules/games/domain/turtleSoup/turtleSoupSimilarity.js"
+import {puzzleContentHash} from "../dist/backend/modules/games/domain/turtleSoup/turtleSoupQuality.js"
 import {TurtleSoupStore} from "../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupStore.js"
 
 const baseConfig = {enabled: true, minPlayers: 2, joinWindowMinutes: 5, idleTimeoutMinutes: 5, guessCooldownSeconds: 30, similarityHitThreshold: 0.9, similarityMissThreshold: 0, freshPoolTarget: 2, generationModel: "", ratingWindowMinutes: 5, maxHints: 3, contentPolicy: "测试尺度", recapEveryQuestions: 10, chooseWindowSeconds: 60, baseDir: "data/turtle_soup"}
 const SOLUTION = "男人是盲人,把伞当拐杖探路"
 
-function makeHarness({hostOverrides = {}} = {}) {
+function makeHarness({hostOverrides = {}, configOverrides = {}, extraPorts = {}} = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "turtle-soup-mgr-"))
   let currentNow = 1_700_000_000_000
   const state = {replies: [], broadcasts: []}
@@ -17,8 +19,8 @@ function makeHarness({hostOverrides = {}} = {}) {
   const judgeDecisions = new Map()
   const host = {
     answerQuestion: async ({question}) => (/盲|看不见/.test(question) ? "是" : "与此无关"),
-    judgeGuess: async ({guess}) => ({correct: judgeDecisions.get(guess) === true, reason: judgeDecisions.get(guess) === true ? "语义等价" : "核心事实不符", closeness: 35}),
-    selectMvp: async ({brief}) => (brief.players.length ? {userId: brief.players[0].userId, reason: "全场提问最多"} : null),
+    judgeGuess: async ({guess}) => ({correct: judgeDecisions.get(guess) === true || normalizeSoupText(guess) === normalizeSoupText(SOLUTION), reason: judgeDecisions.get(guess) === true ? "语义等价" : "核心事实不符", closeness: 35}),
+    selectMvp: async () => null,
     ...hostOverrides
   }
   const generatorStubs = {refills: 0}
@@ -31,8 +33,9 @@ function makeHarness({hostOverrides = {}} = {}) {
     sendSmartReply: async (event, message) => { state.replies.push({groupId: String(event?.group_id || ""), message: String(message) }); return null },
     replyGroup: async (groupId, message) => { state.broadcasts.push({groupId, message}) },
     host, generator, logger: undefined, cwd: dir,
-    config: () => ({...baseConfig}),
-    now: () => currentNow
+    config: () => ({...baseConfig, ...configOverrides}),
+    now: () => currentNow,
+    ...extraPorts
   })
   const event = (userId, msg, {groupId = "100", isMaster = false, role} = {}) => ({group_id: groupId, user_id: userId, msg, isMaster, sender: {user_id: userId, card: `玩家${userId}`, role}})
   const seedPuzzles = async puzzles => { for (const puzzle of puzzles) await store.savePuzzle(puzzle) }
@@ -49,7 +52,7 @@ async function reachPlaying(harness, {groupId = "100", users = ["u1", "u2"]} = {
 }
 
 test("full flow: open, join, start, ask, miss, cooldown, hit, reveal, rate, archive", async () => {
-  const harness = makeHarness()
+  const harness = makeHarness({hostOverrides: {selectMvp: async ({brief}) => ({userId: brief.players[0].userId, reason: "关键提问"})}})
   try {
     const openMessage = await reachPlaying(harness)
     assert.match(openMessage, /汤面p1:|汤面p2:/)
@@ -70,7 +73,7 @@ test("full flow: open, join, start, ask, miss, cooldown, hit, reveal, rate, arch
     const grayGuess = "那个男人眼睛看不见东西"
     harness.judgeDecisions.set(grayGuess, false)
     const grayReply = await harness.manager.guessSoup(harness.event("u2", `.游戏 海龟汤 猜 ${grayGuess}`))
-    assert.match(grayReply, /没猜中——与汤底关联度约35%/)
+    assert.match(grayReply, /没猜中——关键事实覆盖约35%/)
     assert.doesNotMatch(grayReply, /核心事实不符/)
     assert.doesNotMatch(grayReply, /汤底核心/)
 
@@ -83,7 +86,9 @@ test("full flow: open, join, start, ask, miss, cooldown, hit, reveal, rate, arch
     assert.match(hitReply, /—— 汤面 ——/)
     assert.match(hitReply, /汤面p[12]/)
     assert.match(hitReply, new RegExp(SOLUTION))
-    assert.match(hitReply, /MVP:玩家u1/)
+    assert.doesNotMatch(hitReply, /本局未评选出MVP/)
+    await harness.manager.waitForBackgroundTasks()
+    assert.match(harness.state.broadcasts.at(-1).message, /MVP:玩家u1/)
     assert.match(hitReply, /评分/)
 
     const play = harness.store.readPlays().plays[0]
@@ -190,13 +195,16 @@ test("hints are capped and non-participants cannot guess or use hints", async ()
     assert.match(await harness.manager.useHint(harness.event("u9", ".游戏 海龟汤 提示")), /先 .游戏 海龟汤 加入/)
     assert.match(await harness.manager.guessSoup(harness.event("u9", ".游戏 海龟汤 猜 什么")), /先 .游戏 海龟汤 加入/)
     assert.match(await harness.manager.useHint(harness.event("u1", ".游戏 海龟汤 提示")), /提示\(1\/3\)/)
+    assert.match(await harness.manager.useHint(harness.event("u1", ".游戏 海龟汤 提示")), /先一起讨论/)
+    harness.advance(16_000)
     assert.match(await harness.manager.useHint(harness.event("u1", ".游戏 海龟汤 提示")), /提示\(2\/3\)/)
+    harness.advance(16_000)
     assert.match(await harness.manager.useHint(harness.event("u1", ".游戏 海龟汤 提示")), /提示\(3\/3\)/)
     assert.match(await harness.manager.useHint(harness.event("u1", ".游戏 海龟汤 提示")), /本局提示已用完/)
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
 
-test("low-rated puzzles retire after the third rating", async () => {
+test("low-rated puzzles pause for review after three independent ratings", async () => {
   const harness = makeHarness()
   try {
     await reachPlaying(harness, {users: ["u1", "u2", "u3"]})
@@ -206,9 +214,9 @@ test("low-rated puzzles retire after the third rating", async () => {
       assert.match(await harness.manager.rateGame(harness.event(user, ".游戏 海龟汤 评分 1")), /已记录评分:1星/)
     }
     const retiring = await harness.manager.rateGame(harness.event("u3", ".游戏 海龟汤 评分 1"))
-    assert.match(retiring, /自动出池/)
+    assert.match(retiring, /暂缓投放/)
     const puzzle = harness.store.readPuzzles().puzzles.find(item => item.id === session.puzzleId)
-    assert.equal(puzzle.status, "retired")
+    assert.equal(puzzle.status, "pending")
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
 
@@ -222,7 +230,7 @@ test("manual end reveals; inventory and generation are admin-only", async () => 
     assert.equal(harness.manager.getSession("100").phase, "reveal")
     assert.match(await harness.manager.inventory(harness.event("u1", ".游戏 海龟汤 库存")), /仅管理员/)
     assert.match(await harness.manager.generateMore(harness.event("u1", ".游戏 海龟汤 生成 3")), /仅管理员/)
-    assert.match(await harness.manager.inventory(harness.event("admin", ".游戏 海龟汤 库存", {isMaster: true})), /题库:共1道/)
+    assert.match(await harness.manager.inventory(harness.event("admin", ".游戏 海龟汤 库存", {isMaster: true})), /题库:共1个版本/)
     assert.match(await harness.manager.generateMore(harness.event("admin", ".游戏 海龟汤 生成 3", {isMaster: true})), /成功3道/)
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
@@ -481,7 +489,7 @@ test("playingGroupIds tracks only groups with an active Q&A session", async () =
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
 
-test("after reveal, the initiator can close the rating window immediately and start a new game", async () => {
+test("after reveal, archiving leaves the independent rating window available", async () => {
   const harness = makeHarness()
   try {
     await reachPlaying(harness)
@@ -490,7 +498,7 @@ test("after reveal, the initiator can close the rating window immediately and st
 
     assert.match(await harness.manager.endGame(harness.event("u9", ".游戏 海龟汤 结束")), /发起人或群管理可发/)
     const closed = await harness.manager.endGame(harness.event("u1", ".游戏 海龟汤 结束"))
-    assert.match(closed, /评分窗口提前关闭,本局评分:|评分窗口提前关闭,本局无人评分/)
+    assert.match(closed, /评分窗口保留至原截止时间/)
     assert.match(closed, /本局归档/)
     assert.equal(harness.manager.getSession("100"), undefined)
 
@@ -498,13 +506,13 @@ test("after reveal, the initiator can close the rating window immediately and st
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
 
-test("openGame during the rating window gives an actionable hint", async () => {
+test("openGame during the rating window immediately opens a new lobby", async () => {
   const harness = makeHarness()
   try {
     await reachPlaying(harness)
     await harness.manager.guessSoup(harness.event("u1", `.游戏 海龟汤 猜 ${SOLUTION}`))
-    assert.match(await harness.manager.openGame(harness.event("u2", ".游戏 海龟汤 开局")), /评分窗口中:.*评分 1-5/)
-    assert.match(await harness.manager.openGame(harness.event("u2", ".游戏 海龟汤 开局")), /结束 可立即归档后再开局/)
+    assert.match(await harness.manager.openGame(harness.event("u2", ".游戏 海龟汤 开局")), /报名开始/)
+    assert.match(await harness.manager.rateGame(harness.event("u1", ".游戏 海龟汤 评分 上一局 5")), /已记录评分:5星/)
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
 
@@ -645,7 +653,7 @@ test("三选一随机池同样按参与人跨群排除", async () => {
   try {
     await harness.seedPuzzles([puzzleOf("p1"), puzzleOf("p2"), puzzleOf("p3")])
     // 历史记录：u1 在群 200 玩过 p1；剩两道才走三选一
-    harness.store.upsertPlay({playId: "hist", puzzleId: "p1", puzzleTitle: "t1", groupId: "200", startedAt: 1, solved: false, players: ["u1"], qaCount: 0, ratings: []})
+    await harness.store.upsertPlay({playId: "hist", puzzleId: "p1", puzzleTitle: "t1", groupId: "200", startedAt: 1, solved: false, players: ["u1"], qaCount: 0, ratings: []})
     await harness.manager.openGame(harness.event("u1", ".游戏 海龟汤 开局"))
     await harness.manager.joinGame(harness.event("u1", ".游戏 海龟汤 加入"))
     await harness.manager.joinGame(harness.event("u2", ".游戏 海龟汤 加入"))
@@ -672,6 +680,10 @@ test("题库审核命令:待审列表/过审进入投放/淘汰出池", async ()
     assert.match(manager.listPending(admin), /2\.【标题pC/)
     // 非管理员被拦
     assert.match(await manager.reviewPuzzle(harness.event("u9", ".游戏 海龟汤 过审 1"), "approve"), /仅管理员/)
+    assert.match(await manager.reviewPuzzle(harness.event("u1", ".游戏 海龟汤 过审 1", { isMaster: true }), "approve"), /当前版本尚未通过完整审核/)
+    const reviewed = harness.store.readPuzzles().puzzles.find(puzzle => puzzle.id === "pB")
+    reviewed.audits = ["structure", "playability", "logic", "simulation"].map(domain => ({domain, pass: true, reason: "通过", holes: [], at: harness.getNow(), contentHash: puzzleContentHash(reviewed)}))
+    await harness.store.savePuzzle(reviewed)
     // 过审 1 号(pB) → active 进入投放
     assert.match(await manager.reviewPuzzle(harness.event("u1", ".游戏 海龟汤 过审 1", { isMaster: true }), "approve"), /标题pB.*已过审/)
     assert.equal(harness.store.readPuzzles().puzzles.find(z => z.title.includes("pB")).status, "active")
@@ -724,5 +736,278 @@ test("排行榜:按评分展示 x人评分x星,永久记录", async () => {
     try {
       assert.match(empty.manager.rankings(), /还没有汤被评过分/)
     } finally { fs.rmSync(empty.dir, {recursive: true, force: true}) }
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return {promise, resolve} }
+
+test("slow Q&A cannot resurrect the previous puzzle after switching", async () => {
+  const entered = deferred(), answer = deferred()
+  const harness = makeHarness({hostOverrides: {answerQuestion: async () => { entered.resolve(); return answer.promise }}})
+  try {
+    await reachPlaying(harness)
+    await harness.seedPuzzles([puzzleOf("p2")])
+    const pending = harness.manager.handleChat(harness.event("u1", "男人是不是盲人？"))
+    await entered.promise
+    const before = harness.manager.getSession("100").playId
+    assert.match(await harness.manager.switchPuzzle(harness.event("u1", ".游戏 海龟汤 换汤 卡住了")), /换汤不换人/)
+    const next = harness.manager.getSession("100").playId
+    assert.notEqual(next, before)
+    answer.resolve("是")
+    assert.equal(await pending, null)
+    assert.equal(harness.manager.getSession("100").puzzleId, "p2")
+    assert.equal(harness.manager.getSession("100").qaLog.length, 0)
+    assert.equal(harness.store.readPlays().plays.find(play => play.playId === next).endedAt, undefined)
+  } finally { answer.resolve("是"); fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("slow guess cannot solve a replacement game and does not block switching", async () => {
+  const entered = deferred(), verdict = deferred()
+  const harness = makeHarness({hostOverrides: {judgeGuess: async () => { entered.resolve(); return verdict.promise }}})
+  try {
+    await reachPlaying(harness)
+    await harness.seedPuzzles([puzzleOf("p2")])
+    const pending = harness.manager.guessSoup(harness.event("u1", `.游戏 海龟汤 猜 ${SOLUTION}`))
+    await entered.promise
+    await harness.manager.switchPuzzle(harness.event("u1", ".游戏 海龟汤 换汤"))
+    verdict.resolve({correct: true, reason: "覆盖", closeness: 100})
+    assert.match(await pending, /对局已变更/)
+    assert.equal(harness.manager.getSession("100").puzzleId, "p2")
+    assert.equal(harness.manager.getSession("100").phase, "playing")
+    assert.equal(harness.store.readPlays().plays.find(play => play.puzzleId === "p2").solved, false)
+  } finally { verdict.resolve({correct: false}); fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("a high literal overlap never bypasses semantic contradiction checking", async () => {
+  const calls = []
+  const solution = "男人是盲人，他每天下班都沿着同一条路回家。那天雨很大，他把长柄伞当拐杖探路，却因路边新出现的障碍物摔倒。他拒绝旁人的帮助，是因为害怕让家人发现自己失明。"
+  const harness = makeHarness({hostOverrides: {judgeGuess: async input => { calls.push(input); return {correct: false, reason: "核心矛盾", closeness: 90} }}})
+  try {
+    await harness.seedPuzzles([puzzleOf("long", {solution})])
+    await harness.manager.openGame(harness.event("u1", ""))
+    await harness.manager.joinGame(harness.event("u2", ""))
+    await harness.manager.startGame(harness.event("u1", ""))
+    const reply = await harness.manager.guessSoup(harness.event("u1", `.游戏 海龟汤 猜 ${solution.replace("是盲人", "不是盲人")}`))
+    assert.match(reply, /没猜中/)
+    assert.equal(calls.length, 1)
+    assert.ok(calls[0].literalScore > 0.9)
+    assert.equal(harness.manager.getSession("100").phase, "playing")
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("unavailable judging is retryable without recording a wrong guess or cooldown", async () => {
+  const harness = makeHarness({hostOverrides: {judgeGuess: async () => ({correct: false, closeness: 0, reason: "schema", status: "unavailable"})}})
+  try {
+    await reachPlaying(harness)
+    assert.match(await harness.manager.guessSoup(harness.event("u1", ".游戏 海龟汤 猜 男人是盲人")), /不计失败和冷却/)
+    assert.match(await harness.manager.guessSoup(harness.event("u1", ".游戏 海龟汤 猜 男人是盲人")), /不计失败和冷却/)
+    assert.equal(harness.manager.getSession("100").guessLog.length, 0)
+    assert.equal(harness.manager.getSession("100").lastGuessAt.u1, undefined)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("simultaneous participant ratings both persist and aggregate correctly", async () => {
+  const harness = makeHarness()
+  try {
+    await reachPlaying(harness)
+    await harness.manager.endGame(harness.event("u1", ""))
+    const responses = await Promise.all([harness.manager.rateGame(harness.event("u1", ".游戏 海龟汤 评分 5")), harness.manager.rateGame(harness.event("u2", ".游戏 海龟汤 评分 1"))])
+    assert.ok(responses.every(response => response.includes("已记录评分")))
+    assert.equal(harness.store.readPlays().plays[0].ratings.length, 2)
+    const puzzle = harness.store.readPuzzles().puzzles[0]
+    assert.equal(puzzle.ratingCount, 2)
+    assert.equal(puzzle.ratingSum, 6)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("switched games retain diagnostics and a classified rating window while the next game runs", async () => {
+  const harness = makeHarness()
+  try {
+    await reachPlaying(harness)
+    await harness.manager.handleChat(harness.event("u1", "男人是盲人吗"))
+    const previous = harness.manager.getSession("100").playId
+    await harness.seedPuzzles([puzzleOf("p2")])
+    await harness.manager.switchPuzzle(harness.event("u1", ".游戏 海龟汤 换汤 主持回答前后矛盾"))
+    const current = harness.manager.getSession("100").playId
+    assert.match(await harness.manager.rateGame(harness.event("u1", `.游戏 海龟汤 评分 ${previous} 2 主持 回答矛盾`)), /已记录评分:2星/)
+    const old = harness.store.readPlays().plays.find(play => play.playId === previous)
+    assert.equal(old.switchReason, "主持回答前后矛盾")
+    assert.equal(old.qaLog.length, 1)
+    assert.equal(old.ratings[0].category, "host")
+    assert.equal(old.ratings[0].comment, "回答矛盾")
+    assert.equal(harness.manager.getSession("100").playId, current)
+    assert.match(await harness.manager.rateGame(harness.event("u9", `.游戏 海龟汤 评分 ${previous} 1`)), /仅本局参与者/)
+    harness.advance(301_000)
+    assert.match(await harness.manager.rateGame(harness.event("u1", `.游戏 海龟汤 评分 ${previous} 5`)), /评分窗口已结束/)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("family exposure blocks late joining and active players are recorded immediately", async () => {
+  const harness = makeHarness()
+  try {
+    const revised = puzzleOf("p1", {familyId: "story", version: 2})
+    revised.audits = ["structure", "playability", "logic", "simulation"].map(domain => ({domain, pass: true, reason: "通过", holes: [], at: harness.getNow(), contentHash: puzzleContentHash(revised)}))
+    await harness.seedPuzzles([revised])
+    await harness.store.upsertPlay({playId: "old", puzzleId: "old-version", familyId: "story", puzzleTitle: "旧版", groupId: "200", startedAt: 1, endedAt: 2, solved: false, players: ["seen"], qaCount: 0, ratings: []})
+    await harness.manager.openGame(harness.event("u1", ""))
+    await harness.manager.joinGame(harness.event("u2", ""))
+    await harness.manager.startGame(harness.event("u1", ""))
+    assert.match(await harness.manager.joinGame(harness.event("seen", "")), /已看过这道汤或其旧版本/)
+    const playId = harness.manager.getSession("100").playId
+    assert.deepEqual(harness.store.readPlays().plays.find(play => play.playId === playId).players, ["u1", "u2"])
+    assert.match(await harness.manager.joinGame(harness.event("u3", "")), /中途加入/)
+    assert.ok(harness.store.readPlays().plays.find(play => play.playId === playId).players.includes("u3"))
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("actual opening prioritizes a fresh soup over three previously exposed candidates", async () => {
+  const harness = makeHarness()
+  try {
+    await harness.seedPuzzles([puzzleOf("fresh"), ...[1, 2, 3].map(index => puzzleOf(`old${index}`))])
+    for (const index of [1, 2, 3]) await harness.store.upsertPlay({playId: `oldplay${index}`, puzzleId: `old${index}`, puzzleTitle: "旧汤", groupId: "200", startedAt: index, solved: false, players: ["other"], qaCount: 0, ratings: []})
+    await harness.manager.openGame(harness.event("u1", ""))
+    await harness.manager.joinGame(harness.event("u2", ""))
+    await harness.manager.startGame(harness.event("u1", ""))
+    assert.equal(harness.manager.getSession("100").puzzleId, "fresh")
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("the last surrender closes immediately even when private delivery is unavailable", async () => {
+  const harness = makeHarness({configOverrides: {minPlayers: 1}, extraPorts: {sendPrivate: async () => { throw new Error("offline") }}})
+  try {
+    await reachPlaying(harness, {users: ["u1"]})
+    const result = await harness.manager.surrender(harness.event("u1", ""))
+    assert.match(result, /所有玩家均已投降/)
+    assert.equal(harness.manager.getSession("100").phase, "reveal")
+    assert.equal(harness.store.readPlays().plays[0].endReason, "all_surrendered")
+    assert.match(await harness.manager.surrender(harness.event("u1", "")), /已揭晓/)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("late joiners receive used hints and the host receives surface and fixed facts", async () => {
+  let received
+  const harness = makeHarness({hostOverrides: {answerQuestion: async input => { received = input; return "无法确定" }}})
+  try {
+    await reachPlaying(harness)
+    await harness.store.updatePuzzle("p1", puzzle => ({...puzzle, facts: ["信箱是红色"]}))
+    await harness.manager.useHint(harness.event("u1", ""))
+    const catchup = await harness.manager.joinGame(harness.event("u3", ""))
+    assert.match(catchup, /注意他为什么撞树/)
+    assert.deepEqual(await harness.manager.handleChat(harness.event("u1", "男人喜欢下雨吗")), {reply: "无法确定"})
+    assert.match(received.surface, /汤面p1/)
+    assert.deepEqual(received.facts, ["信箱是红色"])
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("MVP is based on actual contributions including surrenderers and never delays reveal", async () => {
+  const entered = deferred(), award = deferred()
+  let brief
+  const harness = makeHarness({hostOverrides: {selectMvp: async input => { brief = input.brief; entered.resolve(); return award.promise }}})
+  try {
+    await reachPlaying(harness)
+    await harness.manager.handleChat(harness.event("u1", "男人是盲人吗"))
+    await harness.manager.surrender(harness.event("u1", ""))
+    const reply = await harness.manager.endGame(harness.event("u1", ""))
+    assert.match(reply, /—— 汤底 ——/)
+    const oldPlayId = harness.manager.getSession("100").playId
+    assert.ok(harness.store.readPlays().plays[0].endedAt)
+    await entered.promise
+    assert.ok(brief.players.some(player => player.userId === "u1"))
+    assert.equal(brief.qaLog[0].question, "男人是盲人吗")
+    assert.equal(brief.solution, SOLUTION)
+    await harness.manager.openGame(harness.event("u2", ""))
+    award.resolve({userId: "u1", reason: "锁定关键事实"})
+    await harness.manager.waitForBackgroundTasks()
+    assert.equal(harness.manager.getSession("100").phase, "joining")
+    assert.equal(harness.store.readPlays().plays.find(play => play.playId === oldPlayId).mvp.userId, "u1")
+  } finally { award.resolve(null); await harness.manager.waitForBackgroundTasks(); fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("failed finish transaction leaves the game playable and can be retried", async () => {
+  const harness = makeHarness()
+  try {
+    await reachPlaying(harness)
+    const actual = harness.manager.store.transaction.bind(harness.manager.store)
+    harness.manager.store.transaction = async () => { throw new Error("disk fault") }
+    await assert.rejects(harness.manager.endGame(harness.event("u1", "")), /disk fault/)
+    assert.equal(harness.manager.getSession("100").phase, "playing")
+    assert.equal(harness.store.readPlays().plays[0].endedAt, undefined)
+    harness.manager.store.transaction = actual
+    assert.match(await harness.manager.endGame(harness.event("u1", "")), /—— 汤底 ——/)
+    assert.equal(harness.manager.getSession("100").phase, "reveal")
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("approving a reviewed revision retires its prior family version while preserving old ratings", async () => {
+  const harness = makeHarness()
+  try {
+    const old = puzzleOf("old", {familyId: "story", ratingSum: 5, ratingCount: 1})
+    const next = puzzleOf("next", {familyId: "story", version: 2, status: "pending"})
+    next.audits = ["structure", "playability", "logic", "simulation"].map(domain => ({domain, pass: true, reason: "通过", holes: [], at: harness.getNow(), contentHash: puzzleContentHash(next)}))
+    await harness.seedPuzzles([old, next])
+    assert.match(await harness.manager.reviewPuzzle(harness.event("admin", ".游戏 海龟汤 过审 next", {isMaster: true}), "approve"), /已过审/)
+    const puzzles = harness.store.readPuzzles().puzzles
+    assert.equal(puzzles.find(puzzle => puzzle.id === "old").status, "retired")
+    assert.equal(puzzles.find(puzzle => puzzle.id === "old").ratingSum, 5)
+    assert.equal(puzzles.find(puzzle => puzzle.id === "next").status, "active")
+    assert.match(puzzles.find(puzzle => puzzle.id === "old").statusHistory.at(-1).reason, /新版本next替代/)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("approving an old revision cannot retire a newer active family version", async () => {
+  const harness = makeHarness()
+  try {
+    const old = puzzleOf("old", {familyId: "story", version: 1, status: "pending"})
+    old.audits = ["structure", "playability", "logic", "simulation"].map(domain => ({domain, pass: true, reason: "通过", holes: [], at: harness.getNow(), contentHash: puzzleContentHash(old)}))
+    const current = puzzleOf("current", {familyId: "story", version: 2})
+    await harness.seedPuzzles([old, current])
+    const before = harness.store.readPuzzles().puzzles
+    assert.match(await harness.manager.reviewPuzzle(harness.event("admin", ".游戏 海龟汤 过审 old", {isMaster: true}), "approve"), /已有更新版本投放/)
+    assert.deepEqual(harness.store.readPuzzles().puzzles, before)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("a restored legacy playing session finishes and rates its existing play with participant exposure", async () => {
+  const harness = makeHarness()
+  try {
+    await reachPlaying(harness)
+    const playId = harness.manager.getSession("100").playId
+    await harness.store.transaction(state => {
+      const session = state.sessions["100"]
+      delete session.playId
+      delete session.sessionId
+      delete session.revision
+      delete session.participantHistory
+      const play = state.plays.find(item => item.playId === playId)
+      play.players = []
+      delete play.familyId
+      delete play.participantHistory
+    })
+    const restored = new TurtleSoupManager(harness.manager.ports)
+    assert.equal(restored.getSession("100").playId, playId)
+    assert.match(await restored.endGame(harness.event("u1", ".游戏 海龟汤 结束")), /—— 汤底 ——/)
+    assert.equal(harness.store.readPlays().plays.length, 1)
+    const play = harness.store.readPlays().plays[0]
+    assert.equal(play.playId, playId)
+    assert.equal(play.endReason, "manual")
+    assert.deepEqual(play.players, ["u1", "u2"])
+    assert.match(await restored.rateGame(harness.event("u1", ".游戏 海龟汤 评分 4")), /已记录评分:4星/)
+    assert.equal(harness.store.readPlays().plays[0].ratings[0].score, 4)
+    await restored.openGame(harness.event("u1", "", {groupId: "200"}))
+    await restored.joinGame(harness.event("u3", "", {groupId: "200"}))
+    assert.match(await restored.startGame(harness.event("u1", "", {groupId: "200"})), /没有本群及当前玩家都没看过的汤/)
+    assert.equal(harness.store.readPlays().plays.length, 1)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("simultaneous starts cannot expose the same family to one player in two groups", async () => {
+  const harness = makeHarness({configOverrides: {minPlayers: 1}})
+  try {
+    await harness.seedPuzzles([puzzleOf("p1")])
+    await harness.manager.openGame(harness.event("u1", "", {groupId: "100"}))
+    await harness.manager.openGame(harness.event("u1", "", {groupId: "200"}))
+    await Promise.all([harness.manager.startGame(harness.event("u1", "", {groupId: "100"})), harness.manager.startGame(harness.event("u1", "", {groupId: "200"}))])
+    assert.equal(harness.store.readPlays().plays.length, 1)
+    assert.equal(harness.manager.playingGroupIds().size, 1)
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })

@@ -1,6 +1,6 @@
 // 海龟汤三份数据文件(puzzles/plays/sessions)的解码校验,风格对齐 umaState.ts:
 // 从 unknown JSON 严格解码,格式无效即抛错,由基建层决定兜底策略。
-import type {TurtleSoupPuzzle, TurtleSoupPuzzleFile, TurtleSoupPlay, TurtleSoupPlayFile, TurtleSoupPlayer, TurtleSoupQaEntry, TurtleSoupGuessEntry, TurtleSoupSession, TurtleSoupSessionFile, TurtleSoupRating, TurtleSoupAuditRecord} from '../../../../contracts/turtleSoup.js'
+import type {TurtleSoupPuzzle, TurtleSoupPuzzleFile, TurtleSoupPlay, TurtleSoupPlayFile, TurtleSoupPlayer, TurtleSoupQaEntry, TurtleSoupGuessEntry, TurtleSoupSession, TurtleSoupSessionFile, TurtleSoupRating, TurtleSoupAuditRecord, TurtleSoupCandidate, TurtleSoupCandidateFile, TurtleSoupCandidateStage, TurtleSoupFeedbackCategory} from '../../../../contracts/turtleSoup.js'
 
 const record=(value:unknown):Record<string,unknown>=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}
 const text=(value:unknown):string|undefined=>typeof value==='string'&&value.trim()?value:undefined
@@ -11,6 +11,7 @@ export function decodeTurtleSoupPuzzle(value:unknown):TurtleSoupPuzzle {
   const raw=record(value)
   const id=text(raw.id), title=text(raw.title), surface=text(raw.surface), solution=text(raw.solution)
   if(!id||!title||!surface||!solution) throw new Error('海龟汤汤面记录无效:缺少id/标题/汤面/汤底')
+  if(raw.status !== undefined && !['active','retired','pending'].includes(String(raw.status))) throw new Error('海龟汤状态无效')
   const puzzle:TurtleSoupPuzzle={
     id, title, surface, solution,
     keyPoints: strings(raw.keyPoints),
@@ -19,16 +20,24 @@ export function decodeTurtleSoupPuzzle(value:unknown):TurtleSoupPuzzle {
     tags: strings(raw.tags),
     source: raw.source==='manual'?'manual':'ai',
     createdAt: numberOr(raw.createdAt, 0),
-    status: raw.status==='retired'?'retired':raw.status==='pending'?'pending':'active',
+    status: raw.status==='active'?'active':raw.status==='retired'?'retired':'pending',
     ...(typeof raw.manualScore==='number' && raw.manualScore>=1 && raw.manualScore<=5 ? {manualScore: Math.round(raw.manualScore), ...(typeof raw.manualScoreAt==='number' ? {manualScoreAt: raw.manualScoreAt} : {})} : {}),
     ...(Array.isArray(raw.audits) ? {audits: raw.audits.filter((item):item is TurtleSoupAuditRecord => {
       const entry=item as Record<string, unknown>
-      return typeof entry?.domain==='string' && ['structure','playability','logic'].includes(String(entry.domain)) && typeof entry?.pass==='boolean'
-    }).map(entry => ({domain: entry.domain as TurtleSoupAuditRecord['domain'], pass: entry.pass===true, reason: String(entry.reason||''), ...(Array.isArray(entry.holes)?{holes: entry.holes.filter((hole:unknown):hole is string=>typeof hole==='string')}:{}) , at: typeof entry.at==='number'?entry.at:0, ...(typeof entry.model==='string'?{model:entry.model}:{})}))} : {}),
+      return typeof entry?.domain==='string' && ['structure','playability','logic','simulation'].includes(String(entry.domain)) && typeof entry?.pass==='boolean'
+    }).map(entry => ({domain: entry.domain as TurtleSoupAuditRecord['domain'], pass: entry.pass===true, reason: String(entry.reason||''), ...(Array.isArray(entry.holes)?{holes: entry.holes.filter((hole:unknown):hole is string=>typeof hole==='string')}:{}) , at: typeof entry.at==='number'?entry.at:0, ...(typeof entry.model==='string'?{model:entry.model}:{}), ...(entry.contentHash ? {contentHash: String(entry.contentHash)} : {}), ...(typeof entry.version==='number' ? {version: entry.version} : {}), ...(typeof entry.repairable==='boolean' ? {repairable: entry.repairable} : {})}))} : {}),
     ratingSum: numberOr(raw.ratingSum, 0),
     ratingCount: numberOr(raw.ratingCount, 0)
   }
   if(typeof raw.model==='string'&&raw.model)puzzle.model=raw.model
+  for(const key of ['familyId','parentPuzzleId','contentHash','mechanism','manualScoreReason'] as const) if(text(raw[key]))puzzle[key]=String(raw[key])
+  if(typeof raw.version==='number'&&Number.isInteger(raw.version)&&raw.version>=1)puzzle.version=raw.version
+  for(const key of ['facts','keyPointIds','requiredKeyPointIds'] as const) if(Array.isArray(raw[key]))puzzle[key]=strings(raw[key])
+  if(Array.isArray(raw.statusHistory))puzzle.statusHistory=raw.statusHistory.flatMap(value=>{
+    const item=record(value)
+    if(!['active','retired','pending'].includes(String(item.from))||!['active','retired','pending'].includes(String(item.to)))return []
+    return [{from:item.from as TurtleSoupPuzzle['status'],to:item.to as TurtleSoupPuzzle['status'],reason:String(item.reason||''),actor:String(item.actor||''),at:numberOr(item.at,0),contentHash:String(item.contentHash||'')}]
+  })
   return puzzle
 }
 
@@ -45,6 +54,7 @@ export function decodeTurtleSoupRating(value:unknown):TurtleSoupRating {
   const rating:TurtleSoupRating={userId, score, at: numberOr(raw.at, 0)}
   const comment=text(raw.comment)
   if(comment)rating.comment=comment
+  if(['logic','clues','hints','host','difficulty','taste','technical','other'].includes(String(raw.category)))rating.category=raw.category as TurtleSoupFeedbackCategory
   return rating
 }
 
@@ -68,6 +78,11 @@ export function decodeTurtleSoupPlay(value:unknown):TurtleSoupPlay {
   const mvp=record(raw.mvp)
   const mvpUserId=text(mvp.userId)
   if(mvpUserId)play.mvp={userId:mvpUserId, reason:String(mvp.reason||'')}
+  for(const key of ['familyId','switchReason'] as const) if(text(raw[key]))play[key]=String(raw[key])
+  for(const key of ['ratingDeadlineAt','usedHints'] as const) if(typeof raw[key]==='number'&&Number.isFinite(raw[key]))play[key]=raw[key]
+  if(Array.isArray(raw.qaLog))play.qaLog=raw.qaLog.map(decodeTurtleSoupQaEntry).slice(-100)
+  if(Array.isArray(raw.guessLog))play.guessLog=raw.guessLog.map(decodeTurtleSoupGuessEntry).slice(-100)
+  if(Array.isArray(raw.participantHistory))play.participantHistory=raw.participantHistory.map(decodeTurtleSoupPlayer)
   return play
 }
 
@@ -122,6 +137,9 @@ export function decodeTurtleSoupSession(value:unknown):TurtleSoupSession {
     surrendered: (()=>{const result:Record<string,{at:number;delivered:boolean}>={};for(const[key,v]of Object.entries(record(raw.surrendered))){const item=record(v);if(typeof item.at==='number'&&Number.isFinite(item.at))result[key]={at:item.at,delivered:item.delivered===true}}return result})()
   }
   if(typeof raw.startedAt==='number'&&Number.isFinite(raw.startedAt))session.startedAt=raw.startedAt
+  for(const key of ['sessionId','playId'] as const) if(text(raw[key]))session[key]=String(raw[key])
+  for(const key of ['revision','lastHintAt'] as const) if(typeof raw[key]==='number'&&Number.isFinite(raw[key]))session[key]=raw[key]
+  if(Array.isArray(raw.participantHistory))session.participantHistory=raw.participantHistory.map(decodeTurtleSoupPlayer)
   const choosing=record(raw.choosing)
   if(Array.isArray(choosing.candidates)&&typeof choosing.deadlineAt==='number'&&Number.isFinite(choosing.deadlineAt))session.choosing={candidates: choosing.candidates.filter((item):item is string=>typeof item==='string'), deadlineAt: choosing.deadlineAt}
   const reveal=record(raw.reveal)
@@ -140,3 +158,26 @@ export function decodeTurtleSoupSessionFile(value:unknown):TurtleSoupSessionFile
 export function emptyTurtleSoupPuzzleFile():TurtleSoupPuzzleFile { return {puzzles: []} }
 export function emptyTurtleSoupPlayFile():TurtleSoupPlayFile { return {plays: []} }
 export function emptyTurtleSoupSessionFile():TurtleSoupSessionFile { return {sessions: {}} }
+
+export function decodeTurtleSoupCandidate(value:unknown):TurtleSoupCandidate {
+  const raw=record(value),id=text(raw.id)
+  if(!id||!text(raw.familyId))throw new Error('海龟汤候选记录无效:缺少id/familyId')
+  const statuses=['draft','reviewing','repairing','pending','failed','recovered']
+  const stages=['generation','structure','playability','logic','simulation','repair','save']
+  if(!statuses.includes(String(raw.status))||!stages.includes(String(raw.stage)))throw new Error('海龟汤候选阶段或状态无效')
+  const candidate:TurtleSoupCandidate={id,familyId:String(raw.familyId),status:raw.status as TurtleSoupCandidate['status'],stage:raw.stage as TurtleSoupCandidateStage,currentVersion:numberOr(raw.currentVersion,0),createdAt:numberOr(raw.createdAt,0),updatedAt:numberOr(raw.updatedAt,0),versions:Array.isArray(raw.versions)?raw.versions.map(value=>{
+    const version=record(value),puzzle=decodeTurtleSoupPuzzle(version.puzzle)
+    return {version:numberOr(version.version,1),contentHash:String(version.contentHash||''),puzzle,audits:decodeTurtleSoupPuzzle({...puzzle,audits:version.audits}).audits||[],issues:strings(version.issues),createdAt:numberOr(version.createdAt,0)}
+  }):[]}
+  for(const key of ['sourcePuzzleId','repairReason','rawOutput','lastError','recoveredPuzzleId','model'] as const) if(typeof raw[key]==='string')candidate[key]=raw[key]
+  if(raw.failureKind==='technical'||raw.failureKind==='content')candidate.failureKind=raw.failureKind
+  if(raw.requestedDifficulty==='easy'||raw.requestedDifficulty==='normal'||raw.requestedDifficulty==='hard')candidate.requestedDifficulty=raw.requestedDifficulty
+  for(const key of ['attempts','modelCalls'] as const)if(typeof raw[key]==='number'&&Number.isFinite(raw[key]))candidate[key]=raw[key]
+  return candidate
+}
+
+export function decodeTurtleSoupCandidateFile(value:unknown):TurtleSoupCandidateFile {
+  const raw=record(value)
+  if(!Array.isArray(raw.candidates))throw new Error('海龟汤候选文件格式无效')
+  return {candidates:raw.candidates.map(decodeTurtleSoupCandidate)}
+}

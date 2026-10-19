@@ -1,230 +1,351 @@
-// 海龟汤生成器:调主模型出题 -> 审题自评 -> 去重 -> 入库;维护鲜汤池保有量。
-// 进程内互斥锁防并发重复生成(单进程Yunzai足够,无需跨进程锁)。
-import type {TurtleSoupLogger, TurtleSoupPuzzle, TurtleSoupConfig, TurtleSoupAuditRecord} from '../../../../contracts/turtleSoup.js'
-import fs from 'fs'
-import path from 'path'
+// Persist each candidate revision before reviewing it. All entry points share the store's generation lease.
+import type {TurtleSoupLogger, TurtleSoupPuzzle, TurtleSoupConfig, TurtleSoupAuditRecord, TurtleSoupCandidate, TurtleSoupCandidateVersion, TurtleSoupRating} from '../../../../contracts/turtleSoup.js'
+import fs from 'node:fs'
+import {randomUUID} from 'node:crypto'
+import path from 'node:path'
 import type {ChatMessage} from '../../../../contracts/modelGateway.js'
-import {buildPuzzleGenerationMessages, buildPuzzleReviewMessages, parseGeneratedPuzzle, parsePuzzleReview} from '../../domain/turtleSoup/turtleSoupPrompts.js'
+import {buildPuzzleGenerationMessages, buildPuzzleReviewMessages, parseGeneratedPuzzle, parsePuzzleReview, buildLogicAuditMessages, parseLogicAudit, buildPuzzleRepairMessages, buildPuzzleSimulationMessages, parsePuzzleSimulation} from '../../domain/turtleSoup/turtleSoupPrompts.js'
+import type {GenerationFeedbackItem, ParsedReview} from '../../domain/turtleSoup/turtleSoupPrompts.js'
 import {auditPuzzleStructure, freshPuzzleIds, pendingPuzzleIds, puzzlePlayStats} from '../../domain/turtleSoup/turtleSoupRules.js'
-import {buildLogicAuditMessages, parseLogicAudit, buildPuzzleRepairMessages} from '../../domain/turtleSoup/turtleSoupPrompts.js'
-import {literalSoupSimilarity} from '../../domain/turtleSoup/turtleSoupSimilarity.js'
+import {comparablePuzzles, duplicatePuzzle, puzzleContentHash, puzzleFamilyId, hasCurrentPassingAudits} from '../../domain/turtleSoup/turtleSoupQuality.js'
 import type {TurtleSoupStore} from './TurtleSoupStore.js'
 
-export interface TurtleSoupModelCallOptions {model?:string|undefined;temperature?:number|undefined}
+export interface TurtleSoupModelCallOptions {model?:string|undefined;temperature?:number|undefined;signal?:AbortSignal|undefined}
 export type TurtleSoupModelCall = (messages:ChatMessage[], options?:TurtleSoupModelCallOptions) => Promise<string>
-
-export interface TurtleSoupGeneratorPorts {
-  store:TurtleSoupStore
-  config:() => TurtleSoupConfig
-  callModel:TurtleSoupModelCall
-  logger?:TurtleSoupLogger
-  now?:() => number
-  random?:() => number
-}
-
+export interface TurtleSoupGeneratorPorts {store:TurtleSoupStore;config:() => TurtleSoupConfig;callModel:TurtleSoupModelCall;logger?:TurtleSoupLogger;now?:() => number;random?:() => number;modelTimeoutMs?:number;retryDelayMs?:number}
 export interface GenerateOutcome {added:number;failed:number;lastError:string|undefined}
+type Difficulty = 'easy'|'normal'|'hard'
+type Stage = TurtleSoupCandidate['stage']
+interface Budget {used:number;limit:number}
+interface RunContext {candidate?:TurtleSoupCandidate;budget:Budget;shared?:Budget}
+class PipelineFailure extends Error {constructor(readonly kind:'technical'|'content', message:string, readonly repairable = true) {super(message)}}
+const errorMessage = (error:unknown) => error instanceof Error ? error.message : String(error)
+const difficulties:Difficulty[] = ['easy', 'normal', 'hard']
+const themes = ['日常误会', '职业与规则', '家庭与记忆', '旅途与空间', '物件与时间', '社会关系']
 
 export class TurtleSoupGenerator {
   private readonly ports:TurtleSoupGeneratorPorts
   private generating = false
   private sequence = 0
   constructor(ports:TurtleSoupGeneratorPorts) { this.ports = ports }
-
   get busy() { return this.generating }
 
   freshCount():number {
     const {puzzles} = this.ports.store.readPuzzles()
-    return freshPuzzleIds(puzzles, puzzlePlayStats(this.ports.store.readPlays().plays)).length
+    return freshPuzzleIds(puzzles, puzzlePlayStats(this.ports.store.readPlays().plays, puzzles)).length
   }
+  readyFreshCount():number { return this.freshCount() + pendingPuzzleIds(this.ports.store.readPuzzles().puzzles).length }
 
-  // 鲜汤保有量含待审:待审不算可玩,但已占生成额度,避免管理员未过审时无限生成
-  readyFreshCount():number {
-    const {puzzles} = this.ports.store.readPuzzles()
-    const played = puzzlePlayStats(this.ports.store.readPlays().plays)
-    return freshPuzzleIds(puzzles, played).length + pendingPuzzleIds(puzzles).length
-  }
-
-  // 鲜汤不足时补货到目标值;拿不到锁说明已有补货在进行,直接返回。
   async ensureFreshPool():Promise<GenerateOutcome> {
+    if (!this.ports.config().enabled) return {added: 0, failed: 0, lastError: 'disabled'}
     if (this.generating) return {added: 0, failed: 0, lastError: 'busy'}
-    this.generating = true
-    try {
+    return this.lock(async () => {
+      const target = this.ports.config().freshPoolTarget
+      const pendingLimit = this.ports.config().maxPending || Math.max(4, target * 2)
+      const budget:Budget = {used: 0, limit: Math.min(48, pendingLimit * this.callBudget())}
       let added = 0, failed = 0, lastError:string|undefined
-      const attemptsLimit = this.ports.config().freshPoolTarget * 3
-      let attempts = 0
-      while (this.readyFreshCount() < this.ports.config().freshPoolTarget && attempts < attemptsLimit) {
-        attempts++
-        try { await this.generateOne(); added++ }
-        catch (error) { failed++; lastError = error instanceof Error ? error.message : String(error) }
+      while (this.ports.config().enabled && this.freshCount() < target && pendingPuzzleIds(this.ports.store.readPuzzles().puzzles).length < pendingLimit && added + failed < pendingLimit) {
+        try { await this.runCandidate(this.createCandidate(), budget); added++ }
+        catch (error) {
+          failed++; lastError = errorMessage(error)
+          this.ports.logger?.warn?.(`[海龟汤] 补货未完成: ${lastError}`)
+          // A broken service/format should not drain a pool-sized retry multiplier.
+          if (!(error instanceof PipelineFailure) || error.kind === 'technical') break
+        }
+      }
+      if (this.freshCount() < target && pendingPuzzleIds(this.ports.store.readPuzzles().puzzles).length >= pendingLimit) {
+        lastError = '可玩鲜汤不足，待审队列已满，请管理员审核后继续补货'
+        this.ports.logger?.warn?.(`[海龟汤] ${lastError}`)
       }
       return {added, failed, lastError}
-    } finally { this.generating = false }
+    }).catch(error => {
+      if (/busy|生成任务.*进行|生成锁|generation.*lock/i.test(errorMessage(error))) return {added: 0, failed: 0, lastError: 'busy'}
+      throw error
+    })
   }
 
-  // 手动种子生成(管理命令),同样受互斥锁保护。
-  async seed(count:number, difficulty?:'easy'|'normal'|'hard'):Promise<GenerateOutcome> {
-    const total = Math.max(1, Math.min(20, Math.floor(count) || 1))
+  async seed(count:number, difficulty?:Difficulty):Promise<GenerateOutcome> {
     if (this.generating) return {added: 0, failed: 0, lastError: 'busy'}
-    this.generating = true
-    try {
+    return this.lock(async () => {
+      const total = Math.max(1, Math.min(20, Math.floor(count) || 1))
+      const budget:Budget = {used: 0, limit: Math.min(120, total * this.callBudget())}
       let added = 0, failed = 0, lastError:string|undefined
       for (let index = 0; index < total; index++) {
-        try { await this.generateOne(difficulty); added++ }
-        catch (error) { failed++; lastError = error instanceof Error ? error.message : String(error) }
+        try { await this.runCandidate(this.createCandidate(difficulty), budget); added++ }
+        catch (error) {
+          failed++; lastError = errorMessage(error)
+          if (!(error instanceof PipelineFailure) || error.kind === 'technical') {
+            failed += total - index - 1
+            break
+          }
+        }
       }
       return {added, failed, lastError}
-    } finally { this.generating = false }
+    }).catch(error => {
+      if (/busy|生成任务.*进行|生成锁|generation.*lock/i.test(errorMessage(error))) return {added: 0, failed: 0, lastError: 'busy'}
+      throw error
+    })
   }
 
-  // 汇总评分反馈:高分解构风格、低分带玩家批评,喂给出题模型迭代质量
-  buildGenerationFeedback():{high:{title:string;score:number;comments:string[]}[];low:{title:string;score:number;comments:string[]}[]} {
-    const {store} = this.ports
-    // 玩家评分与手动标记分都纳入反馈:手动分优先(管理员终审),无手动分时用玩家均分
-    const puzzles = store.readPuzzles().puzzles.filter(puzzle => puzzle.ratingCount > 0 || (puzzle.manualScore ?? 0) >= 1)
-    const commentsOf = (puzzleId:string) => store.readPlays().plays
-      .filter(play => play.puzzleId === puzzleId)
-      .flatMap(play => play.ratings)
-      .filter(rating => rating.comment && rating.comment.trim())
-      .map(rating => String(rating.comment).trim())
-    const ranked = puzzles
-      .map(puzzle => ({title: puzzle.title, score: (puzzle.manualScore ?? 0) >= 1 ? puzzle.manualScore! : puzzle.ratingSum / puzzle.ratingCount, comments: commentsOf(puzzle.id)}))
-      .sort((left, right) => right.score - left.score)
+  generateOne(difficulty?:Difficulty):Promise<TurtleSoupPuzzle> { return this.lock(() => this.runCandidate(this.createCandidate(difficulty))) }
+
+  repairPuzzle(id:string, reason?:string):Promise<TurtleSoupPuzzle> {
+    return this.lock(async () => {
+      const puzzle = this.ports.store.readPuzzles().puzzles.find(item => item.id === id)
+      if (!puzzle) throw new Error('题目不存在')
+      const candidate = this.createCandidate(difficulties.includes(puzzle.difficulty as Difficulty) ? puzzle.difficulty as Difficulty : 'normal', puzzle)
+      candidate.repairReason = reason?.trim() || puzzle.manualScoreReason || this.feedbackFor(puzzle).comments.join(';') || '重新检查公平线索、固定事实、关键点和递进提示，修复质量问题'
+      candidate.stage = 'repair'
+      return this.runCandidate(candidate, undefined, true)
+    })
+  }
+
+  recoverCandidate(id:string):Promise<TurtleSoupPuzzle> {
+    return this.lock(async () => {
+      const candidate = this.ports.store.readCandidates().candidates.find(item => item.id === id)
+      if (!candidate) throw new Error('候选不存在')
+      if (candidate.recoveredPuzzleId) {
+        const existing = this.ports.store.readPuzzles().puzzles.find(item => item.id === candidate.recoveredPuzzleId)
+        if (existing) return existing
+      }
+      const latest = candidate.versions.at(-1)
+      if (latest?.audits.some(audit => !audit.pass && audit.repairable === false)) throw new Error('该候选存在不可修复或重复的核心机制，请参考失败教训生成新题')
+      const repairFirst = !!latest && (candidate.stage === 'repair' || candidate.failureKind === 'content' || latest.issues.length > 0 || latest.puzzle.hints.length < 3)
+      return this.runCandidate(candidate, undefined, repairFirst)
+    })
+  }
+
+  /** Shared by admin re-review. Passing evidence is bound to this exact content. */
+  auditPuzzle(puzzle:TurtleSoupPuzzle):Promise<TurtleSoupAuditRecord[]> {
+    return this.lock(async () => {
+      const context:RunContext = {budget: {used: 0, limit: 8}}
+      const revision:TurtleSoupCandidateVersion = {version: puzzle.version || 1, contentHash: puzzleContentHash(puzzle), puzzle, audits: [], issues: [], createdAt: this.now()}
+      await this.auditVersion(revision, context)
+      return revision.audits
+    })
+  }
+
+  buildGenerationFeedback():{high:GenerationFeedbackItem[];low:GenerationFeedbackItem[]} {
+    const plays = this.ports.store.readPlays().plays
+    const scored = this.ports.store.readPuzzles().puzzles.map(puzzle => {
+      const ratings = this.contentRatings(plays.filter(play => play.puzzleId === puzzle.id).flatMap(play => play.ratings))
+      return {feedback: this.feedbackFor(puzzle, ratings), praise: this.commentsFrom(ratings, true)}
+    })
     return {
-      high: ranked.filter(item => item.score >= 4).slice(0, 5),
-      low: ranked.filter(item => item.score < 3.5).reverse().slice(0, 5)
+      high: scored.filter(({feedback:item}) => (item.sampleCount! >= 3 && (item.playerScore ?? 0) >= 4) || ((item.manualScore ?? 0) >= 4 && !!item.manualReason)).sort((a, b) => b.feedback.score - a.feedback.score).slice(0, 5).map(item => ({...item.feedback, comments: item.praise})),
+      low: scored.map(item => item.feedback).filter(item => (item.sampleCount! >= 3 && (item.playerScore ?? 5) < 3.5) || ((item.manualScore ?? 5) <= 3 && !!item.manualReason)).sort((a, b) => a.score - b.score).slice(0, 5)
     }
   }
 
-  async generateOne(difficulty?:'easy'|'normal'|'hard'):Promise<TurtleSoupPuzzle> {
-    const {store, config} = this.ports
-    const {puzzles} = store.readPuzzles()
-    const settings = config()
-    const avoidTitles = puzzles.map(puzzle => puzzle.title).slice(-60)
-    const feedback = this.buildGenerationFeedback()
-    let lastError:unknown = null
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const rejectionLessons = this.readRejectionLessons()
-        const text = await this.ports.callModel(buildPuzzleGenerationMessages({contentPolicy: settings.contentPolicy, avoidTitles, feedback, rejectionLessons, ...(difficulty ? {difficulty} : {})}), {temperature: 0.9, model: settings.generationModel || undefined})
-        const puzzle = parseGeneratedPuzzle(text, {nowMs: this.now() + this.sequence++, random: this.random(), model: settings.generationModel || '主模型'})
-        if (!puzzle) throw new Error('生成产物不是合法汤面JSON')
-        if (difficulty && puzzle.difficulty !== difficulty) throw new Error(`难度不符:要求${difficulty},产出${puzzle.difficulty}`)
-        if (this.duplicatesExisting(puzzle, puzzles)) throw new Error(`生成产物与现有汤面重复: ${puzzle.title}`)
-        // 三道关全部通过才入库,且各域审核结论随题保存,供控制台展示与追溯
-        const audits:TurtleSoupAuditRecord[] = []
-        const auditAt = this.now()
-        // 第一关:确定性结构审核(长度/条数/关键点泄露)
-        const structureIssues = auditPuzzleStructure(puzzle)
-        audits.push({domain: 'structure', pass: !structureIssues.length, reason: structureIssues.length ? '存在结构性问题' : '结构合规(长度/条数/无泄底)', ...(structureIssues.length ? {holes: structureIssues} : {}), at: auditAt})
-        if (structureIssues.length) {
-          this.logRejected({...puzzle, audits}, [`结构: ${structureIssues.join(';')}`])
-          throw new Error(`结构审核未通过: ${structureIssues.join(';')}`)
-        }
-        // 第二关:可玩性审题
-        const reviewText = await this.ports.callModel(buildPuzzleReviewMessages(puzzle), {temperature: 0.2, model: settings.generationModel || undefined})
-        const review = parsePuzzleReview(reviewText)
-        if (!review) throw new Error('审题产物无法解析')
-        audits.push({domain: 'playability', pass: review.pass === true, reason: review.reason || (review.pass ? '可玩性通过' : '审题未通过'), at: auditAt, ...(settings.generationModel ? {model: settings.generationModel} : {})})
-        if (!review.pass) {
-          this.logRejected({...puzzle, audits}, [`审题: ${review.reason}`])
-          throw new Error(`审题未通过: ${review.reason}`)
-        }
-        // 第三关:独立逻辑审计(逐句对照/时间线/物件流转/动机链),发现漏洞直接废弃
-        const auditText = await this.ports.callModel(buildLogicAuditMessages(puzzle), {temperature: 0.2, model: settings.generationModel || undefined})
-        const audit = parseLogicAudit(auditText)
-        if (!audit) throw new Error('逻辑审计产物无法解析')
-        audits.push({domain: 'logic', pass: audit.pass === true, reason: audit.reason || (audit.pass ? '无逻辑漏洞' : '存在逻辑漏洞'), ...(audit.holes.length ? {holes: audit.holes} : {}), at: auditAt, ...(settings.generationModel ? {model: settings.generationModel} : {})})
-        let finalPuzzle = puzzle
-        if (!audit.pass) {
-          // 修复式重生成:把漏洞喂回模型修同一道题,修完重审;最多两轮
-          let repaired = false
-          for (let repairRound = 0; repairRound < 2 && !repaired; repairRound++) {
-            try {
-              const repairText = await this.ports.callModel(buildPuzzleRepairMessages(finalPuzzle, audit.holes), {temperature: 0.3, model: settings.generationModel || undefined})
-              const repairedPuzzle = parseGeneratedPuzzle(repairText, {nowMs: this.now() + this.sequence++, random: this.random(), model: settings.generationModel || '主模型'})
-              if (!repairedPuzzle) throw new Error('修复产物不是合法JSON')
-              if (repairedPuzzle.title !== puzzle.title) throw new Error('修复改了标题')
-              const repairIssues = auditPuzzleStructure(repairedPuzzle)
-              if (repairIssues.length) throw new Error(`修复后结构问题: ${repairIssues.join(';')}`)
-              const reAuditText = await this.ports.callModel(buildLogicAuditMessages(repairedPuzzle), {temperature: 0.2, model: settings.generationModel || undefined})
-              const reAudit = parseLogicAudit(reAuditText)
-              if (!reAudit) throw new Error('重审产物无法解析')
-              if (reAudit.pass) {
-                finalPuzzle = repairedPuzzle
-                audits.push({domain: 'logic', pass: true, reason: `修复后通过(第${repairRound + 1}轮),原漏洞: ${audit.holes.slice(0, 2).join(';').slice(0, 80)}`, holes: audit.holes, at: this.now(), ...(settings.generationModel ? {model: settings.generationModel} : {})})
-                repaired = true
-                this.ports.logger?.info?.(`[海龟汤] 修复成功: ${finalPuzzle.title}(第${repairRound + 1}轮)`)
-              } else {
-                audit.holes = reAudit.holes
-                audit.reason = reAudit.reason
-              }
-            } catch (repairError) {
-              this.ports.logger?.warn?.(`[海龟汤] 修复失败(第${repairRound + 1}轮): ${repairError instanceof Error ? repairError.message : String(repairError)}`)
-              break
-            }
-          }
-          if (!repaired) {
-            // 最终失败:留档(汤面/汤底/漏洞),不进主池
-            this.logRejected({...finalPuzzle, audits}, audit.holes)
-            throw new Error(`逻辑审计未通过(含修复尝试): ${audit.holes.slice(0, 2).join(';') || audit.reason}`)
-          }
-        }
-        // 入库即待审,管理员过审后才进入投放池
-        const pending = {...finalPuzzle, status: 'pending' as const, audits}
-        await store.savePuzzle(pending)
-        this.ports.logger?.info?.(`[海龟汤] 新汤待审: ${pending.title}(${pending.difficulty})`)
-        return pending
-      } catch (error) { lastError = error }
-    }
-    throw lastError instanceof Error ? lastError : new Error(String(lastError))
-  }
-
-  // 读取最近的被拒记录,提取教训喂给出题提示词——让模型"从错误中学习"
   readRejectionLessons():{title:string;holes:string[]}[] {
+    const candidates = this.ports.store.readCandidates().candidates
+    const lessons = candidates.filter(item => item.failureKind === 'content').sort((a, b) => b.updatedAt - a.updatedAt).map(item => ({title: item.versions.at(-1)?.puzzle.title || item.id, holes: item.versions.at(-1)?.issues || [item.lastError || '内容未通过']}))
+    // Keep old append-only archives readable; malformed/truncated lines cannot poison feedback.
     try {
-      const rejectedPath = path.join(this.ports.store.dataDir, 'rejected.jsonl')
-      const text = fs.readFileSync(rejectedPath, 'utf8')
-      const lines = text.split('\n').filter(line => line.trim())
-      // 取最近 8 条,同标题去重(修复尝试可能产生多条同名记录)
-      const seen = new Set<string>()
-      const lessons:{title:string;holes:string[]}[] = []
-      for (let index = lines.length - 1; index >= 0 && lessons.length < 8; index--) {
+      for (const line of fs.readFileSync(path.join(this.ports.store.dataDir, 'rejected.jsonl'), 'utf8').split('\n').reverse()) {
         try {
-          const entry = JSON.parse(lines[index]!) as {title?:string;holes?:string[]}
-          const title = String(entry.title || '').trim()
-          if (!title || seen.has(title)) continue
-          seen.add(title)
-          lessons.push({title, holes: (entry.holes || []).map(hole => String(hole).slice(0, 80))})
+          const item = JSON.parse(line) as {title?:unknown;holes?:unknown}
+          if (typeof item.title === 'string' && Array.isArray(item.holes)) lessons.push({title: item.title, holes: item.holes.filter((hole):hole is string => typeof hole === 'string')})
         } catch {}
       }
-      return lessons
-    } catch {
-      return []
-    }
+    } catch {}
+    const seen = new Set<string>()
+    return lessons.filter(item => { if (seen.has(item.title) || !item.holes.length) return false; seen.add(item.title); return true }).slice(0, 8)
   }
 
-  // 失败留档:追加到 data/turtle_soup/rejected.jsonl,含汤面汤底和拒绝原因
-  private logRejected(puzzle:TurtleSoupPuzzle, holes:string[]) {
+  duplicatesExisting(candidate:TurtleSoupPuzzle, puzzles:TurtleSoupPuzzle[]):boolean { return !!duplicatePuzzle(candidate, puzzles) }
+
+  private createCandidate(difficulty?:Difficulty, source?:TurtleSoupPuzzle):TurtleSoupCandidate {
+    const now = this.now(), id = `candidate_${randomUUID()}`
+    const candidate:TurtleSoupCandidate = {id, familyId: source ? puzzleFamilyId(source) : id, status: 'draft', stage: 'generation', requestedDifficulty: difficulty || this.diversity().difficulty, currentVersion: 0, versions: [], createdAt: now, updatedAt: now, modelCalls: 0}
+    if (source) {
+      candidate.sourcePuzzleId = source.id
+      candidate.model = this.ports.config().generationModel || source.model || '主模型'
+      candidate.currentVersion = source.version || 1
+      candidate.versions.push({version: candidate.currentVersion, contentHash: puzzleContentHash(source), puzzle: source, audits: [], issues: [], createdAt: now})
+    }
+    return candidate
+  }
+
+  private async runCandidate(candidate:TurtleSoupCandidate, shared?:Budget, forceRepair = false):Promise<TurtleSoupPuzzle> {
+    const context:RunContext = {candidate, budget: {used: 0, limit: this.callBudget()}, ...(shared ? {shared} : {})}
+    candidate.status = 'draft'
+    candidate.attempts = (candidate.attempts || 0) + 1
+    delete candidate.lastError
+    delete candidate.failureKind
+    await this.persist(candidate)
+    let repairs = 0
     try {
-      const rejectedPath = path.join(this.ports.store.dataDir, 'rejected.jsonl')
-      const entry = JSON.stringify({
-        title: puzzle.title, surface: puzzle.surface, solution: puzzle.solution,
-        keyPoints: puzzle.keyPoints, difficulty: puzzle.difficulty, tags: puzzle.tags,
-        holes, at: Date.now()
-      })
-      fs.appendFileSync(rejectedPath, entry + '\n')
+      if (!candidate.versions.length) {
+        const puzzles = this.ports.store.readPuzzles().puzzles, diversity = this.diversity()
+        const puzzle = await this.callStage('generation', buildPuzzleGenerationMessages({contentPolicy: this.ports.config().contentPolicy, avoidTitles: puzzles.map(item => item.title).slice(-60), ...(candidate.requestedDifficulty ? {difficulty: candidate.requestedDifficulty} : {}), preferredTheme: diversity.theme, avoidMechanisms: puzzles.slice(-16).map(item => item.mechanism || '').filter(Boolean), feedback: this.buildGenerationFeedback(), rejectionLessons: this.readRejectionLessons()}), text => this.parsePuzzle(text), context, 0.9)
+        await this.appendVersion(candidate, puzzle)
+      }
+      while (true) {
+        let revision = candidate.versions.at(-1)!
+        if (forceRepair || revision.issues.length) {
+          if (repairs >= 2) throw new PipelineFailure('content', `审核未通过(含两轮修复): ${revision.issues.join(';') || candidate.repairReason}`)
+          repairs++
+          const issues = [...revision.issues, ...(candidate.repairReason ? [candidate.repairReason] : [])]
+          const repaired = await this.callStage('repair', buildPuzzleRepairMessages(revision.puzzle, issues, {contentPolicy: this.ports.config().contentPolicy, ...(candidate.requestedDifficulty ? {difficulty: candidate.requestedDifficulty} : {})}), text => this.parsePuzzle(text), context, 0.3)
+          await this.appendVersion(candidate, repaired)
+          forceRepair = false
+          revision = candidate.versions.at(-1)!
+        }
+        if (revision.issues.length) continue
+        const result = await this.auditVersion(revision, context)
+        await this.persist(candidate)
+        if (revision.issues.length) {
+          if (!result.repairable) throw new PipelineFailure('content', revision.issues.join(';'), false)
+          continue
+        }
+        const pending = {...revision.puzzle, status: 'pending' as const, contentHash: revision.contentHash, audits: revision.audits}
+        if (!hasCurrentPassingAudits(pending)) throw new PipelineFailure('technical', '最终版本缺少完整审核证据')
+        candidate.stage = 'save'
+        await this.persist(candidate)
+        await this.ports.store.transaction(state => {
+          const duplicate = duplicatePuzzle(pending, state.puzzles)
+          if (duplicate) throw new PipelineFailure('content', `入库前发现重复题:${duplicate.title}`, false)
+          const already = state.puzzles.find(item => item.id === pending.id)
+          if (already && puzzleContentHash(already) !== revision.contentHash) throw new PipelineFailure('technical', '题目ID冲突')
+          if (!already) state.puzzles.push(pending)
+          candidate.status = 'pending'; candidate.recoveredPuzzleId = pending.id; candidate.updatedAt = this.now()
+          const index = state.candidates.findIndex(item => item.id === candidate.id)
+          if (index >= 0) state.candidates[index] = candidate
+          else state.candidates.push(candidate)
+        })
+        this.ports.logger?.info?.(`[海龟汤] 新汤待审: ${pending.title}(${pending.difficulty}),版本${pending.version}`)
+        return pending
+      }
     } catch (error) {
-      this.ports.logger?.warn?.(`[海龟汤] 失败留档写入失败: ${error instanceof Error ? error.message : String(error)}`)
+      const failure = error instanceof PipelineFailure ? error : new PipelineFailure('technical', errorMessage(error))
+      candidate.status = 'failed'; candidate.failureKind = failure.kind; candidate.lastError = failure.message
+      await this.persist(candidate)
+      this.ports.logger?.warn?.(`[海龟汤] 候选${candidate.id}停在${candidate.stage}: ${failure.message}`)
+      throw failure
     }
   }
 
-  duplicatesExisting(candidate:TurtleSoupPuzzle, puzzles:TurtleSoupPuzzle[]):boolean {
-    return puzzles.some(existing =>
-      literalSoupSimilarity(candidate.title, existing.title) >= 0.8 ||
-      literalSoupSimilarity(candidate.surface, existing.surface) >= 0.9
-    )
+  private async auditVersion(revision:TurtleSoupCandidateVersion, context:RunContext):Promise<{repairable:boolean}> {
+    const puzzle = revision.puzzle, candidate = context.candidate
+    const record = (domain:TurtleSoupAuditRecord['domain'], pass:boolean, reason:string, holes:string[] = [], repairable = true) => {
+      const audit:TurtleSoupAuditRecord = {domain, pass, reason, holes, repairable, at: this.now(), contentHash: revision.contentHash, version: revision.version, ...((this.ports.config().reviewModel || this.ports.config().generationModel) ? {model: this.ports.config().reviewModel || this.ports.config().generationModel} : {})}
+      revision.audits = [...revision.audits.filter(item => item.domain !== domain), audit]
+    }
+    if (candidate) { candidate.stage = 'structure'; candidate.status = 'reviewing' }
+    const issues = auditPuzzleStructure(puzzle)
+    if (!difficulties.includes(puzzle.difficulty as Difficulty)) issues.push('难度必须为easy/normal/hard')
+    if (candidate?.requestedDifficulty && puzzle.difficulty !== candidate.requestedDifficulty) issues.push(`难度不符:要求${candidate.requestedDifficulty},产出${puzzle.difficulty}`)
+    if (candidate && candidate.versions[0]!.puzzle.title !== puzzle.title) issues.push('修复不得更改标题或核心谜题')
+    if (new Set(puzzle.hints).size !== 3 || puzzle.hints.length !== 3) issues.push('需三条不同的递进提示')
+    if (new Set(puzzle.keyPoints).size !== puzzle.keyPoints.length) issues.push('关键点不可重复')
+    const pointIds = puzzle.keyPointIds || puzzle.keyPoints.map((_, index) => `kp${index + 1}`)
+    const requiredIds = puzzle.requiredKeyPointIds || pointIds
+    if (pointIds.length !== puzzle.keyPoints.length || new Set(pointIds).size !== pointIds.length || !requiredIds.length || new Set(requiredIds).size !== requiredIds.length || requiredIds.some(id => !pointIds.includes(id))) issues.push('关键点ID与必要核心点引用无效')
+    const duplicate = duplicatePuzzle(puzzle, this.ports.store.readPuzzles().puzzles)
+    if (duplicate) issues.push(`与现有题重复:${duplicate.title}`)
+    record('structure', !issues.length, issues.length ? '结构或准入条件未通过' : '结构与准入条件通过', issues, !duplicate)
+    revision.issues = issues
+    if (candidate) await this.persist(candidate)
+    if (issues.length) return {repairable: !duplicate}
+    let repairable = true
+    const comparisons = comparablePuzzles(puzzle, this.ports.store.readPuzzles().puzzles)
+    const stages:{domain:'playability'|'logic'|'simulation';messages:ChatMessage[];parse:(text:string)=>ParsedReview|null}[] = [
+      {domain: 'playability', messages: buildPuzzleReviewMessages(puzzle, {contentPolicy: this.ports.config().contentPolicy, comparisons}), parse: parsePuzzleReview},
+      {domain: 'logic', messages: buildLogicAuditMessages(puzzle), parse: parseLogicAudit},
+      {domain: 'simulation', messages: buildPuzzleSimulationMessages(puzzle), parse: parsePuzzleSimulation}
+    ]
+    for (const stage of stages) {
+      const previous = revision.audits.find(item => item.domain === stage.domain && item.contentHash === revision.contentHash)
+      if (previous?.pass && !previous.holes?.length) continue
+      const review = await this.callStage(stage.domain, stage.messages, text => {
+        const parsed = stage.parse(text)
+        if (parsed?.duplicateOf && !comparisons.some(item => item.id === parsed.duplicateOf)) return null
+        return parsed
+      }, context, 0.2)
+      record(stage.domain, review.pass, review.reason, review.holes, review.repairable)
+      if (!review.pass) {
+        revision.issues.push(...review.holes.map(hole => `${stage.domain}:${hole}`))
+        repairable = repairable && review.repairable
+      }
+      if (candidate) await this.persist(candidate)
+      if (!repairable) break
+    }
+    return {repairable}
   }
 
+  private async callStage<T>(stage:Stage, messages:ChatMessage[], parse:(text:string)=>T|null, context:RunContext, temperature:number):Promise<T> {
+    const candidate = context.candidate
+    if (candidate) { candidate.stage = stage; candidate.status = stage === 'repair' ? 'repairing' : 'reviewing'; await this.persist(candidate) }
+    let lastError = ''
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt && (this.ports.retryDelayMs ?? 250) > 0) await new Promise<void>(resolve => setTimeout(resolve, this.ports.retryDelayMs ?? 250))
+      if (context.budget.used >= context.budget.limit || (context.shared && context.shared.used >= context.shared.limit)) throw new PipelineFailure('technical', '本次模型调用预算已用完，候选已保存，可稍后恢复')
+      context.budget.used++; if (context.shared) context.shared.used++
+      if (candidate) { candidate.modelCalls = (candidate.modelCalls || 0) + 1; await this.persist(candidate) }
+      try {
+        const text = await this.callWithTimeout(attempt ? [...messages, {role: 'user', content: '上一响应无法通过格式校验。请遵循要求返回完整严格JSON,通过与问题列表不得矛盾。'}] : messages, {temperature, model: (stage === 'generation' || stage === 'repair' ? this.ports.config().generationModel : this.ports.config().reviewModel || this.ports.config().generationModel) || undefined})
+        if (candidate) { candidate.rawOutput = text; await this.persist(candidate) }
+        const parsed = parse(text)
+        if (parsed !== null) return parsed
+        lastError = `${stage}产物无法解析或字段互相矛盾`
+      } catch (error) { lastError = errorMessage(error) }
+    }
+    throw new PipelineFailure('technical', `${stage}阶段失败(已重试): ${lastError}`)
+  }
+
+  private async callWithTimeout(messages:ChatMessage[], options:TurtleSoupModelCallOptions):Promise<string> {
+    const controller = new AbortController()
+    let timer:ReturnType<typeof setTimeout>|undefined
+    try {
+      return await Promise.race([
+        this.ports.callModel(messages, {...options, signal: controller.signal}),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('模型调用超时')); }, this.ports.modelTimeoutMs ?? 60_000) })
+      ])
+    } finally { if (timer) clearTimeout(timer) }
+  }
+
+  private parsePuzzle(text:string):TurtleSoupPuzzle|null { return parseGeneratedPuzzle(text, {nowMs: this.now() + this.sequence++, random: this.random(), model: this.ports.config().generationModel || '主模型'}) }
+  private async appendVersion(candidate:TurtleSoupCandidate, puzzle:TurtleSoupPuzzle):Promise<void> {
+    candidate.currentVersion++
+    const next:TurtleSoupPuzzle = {...puzzle, id: `ts_${candidate.id.replace(/^candidate_/, '')}_v${candidate.currentVersion}`, familyId: candidate.familyId, version: candidate.currentVersion, ...(candidate.sourcePuzzleId ? {parentPuzzleId: candidate.sourcePuzzleId} : {})}
+    const contentHash = puzzleContentHash(next)
+    const unchanged = candidate.versions.at(-1)?.contentHash === contentHash
+    next.contentHash = contentHash
+    candidate.versions.push({version: candidate.currentVersion, contentHash, puzzle: next, audits: [], issues: unchanged ? ['修复没有改变任何题目内容'] : [], createdAt: this.now()})
+    await this.persist(candidate)
+  }
+  private async persist(candidate:TurtleSoupCandidate):Promise<void> { candidate.updatedAt = this.now(); await this.ports.store.saveCandidate(candidate) }
+  private async lock<T>(work:()=>Promise<T>):Promise<T> {
+    if (this.generating) throw new Error('busy:已有生成或审核任务进行中')
+    this.generating = true
+    try { return await this.ports.store.withGenerationLock(work) } finally { this.generating = false }
+  }
+  private diversity():{difficulty:Difficulty;theme:string} {
+    const puzzles = this.ports.store.readPuzzles().puzzles.filter(item => item.status !== 'retired')
+    const difficulty = [...difficulties].sort((a, b) => puzzles.filter(item => item.difficulty === a).length - puzzles.filter(item => item.difficulty === b).length)[0]!
+    const theme = [...themes].sort((a, b) => puzzles.filter(item => item.tags.includes(a)).length - puzzles.filter(item => item.tags.includes(b)).length)[0]!
+    return {difficulty, theme}
+  }
+  private contentRatings(ratings:TurtleSoupRating[]):TurtleSoupRating[] {
+    // Latest vote per player wins before classification. A later host complaint
+    // replaces that player's earlier content vote rather than adding another sample.
+    const latest = new Map<string, TurtleSoupRating>()
+    for (const rating of ratings) if (!latest.has(rating.userId) || rating.at >= latest.get(rating.userId)!.at) latest.set(rating.userId, rating)
+    return [...latest.values()].filter(rating => !rating.category || ['logic', 'clues', 'hints', 'other'].includes(rating.category))
+  }
+  private commentsFrom(ratings:TurtleSoupRating[], positive = false):string[] {
+    return this.contentRatings(ratings).filter(rating => !!rating.comment?.trim() && (positive ? rating.score >= 4 : rating.score <= 3))
+      .sort((a, b) => b.at - a.at).map(rating => rating.comment!.trim()).slice(0, 3)
+  }
+  private feedbackFor(puzzle:TurtleSoupPuzzle, ratings = this.ports.store.readPlays().plays.filter(play => play.puzzleId === puzzle.id).flatMap(play => play.ratings)):GenerationFeedbackItem {
+    const contentVotes = this.contentRatings(ratings)
+    const playerScore = contentVotes.length ? contentVotes.reduce((sum, vote) => sum + vote.score, 0) / contentVotes.length : null
+    return {title: puzzle.title, score: playerScore ?? puzzle.manualScore ?? 3, sampleCount: contentVotes.length, playerScore,
+      ...(puzzle.manualScore ? {manualScore: puzzle.manualScore} : {}), ...(puzzle.manualScoreReason ? {manualReason: puzzle.manualScoreReason} : {}),
+      mechanism: puzzle.mechanism || '', solution: puzzle.solution, keyPoints: puzzle.keyPoints, comments: this.commentsFrom(contentVotes)}
+  }
+  private callBudget():number { return Math.max(1, Math.floor(this.ports.config().generationCallBudget || 18)) }
   private now() { return this.ports.now ? this.ports.now() : Date.now() }
   private random() { return this.ports.random ? this.ports.random() : Math.random() }
 }

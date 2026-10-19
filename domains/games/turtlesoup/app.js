@@ -1,13 +1,11 @@
 // 海龟汤组合根:装配store/生成器/主持模型/播报端口,创建插件与单例管理器。
-// 模型调用走 utils/apiClient 的 YTapi(与主聊天同一网关与重试),配置读 message.yaml 根段。
-import fs from "fs"
-import path from "path"
-import YAML from "yaml"
+// 模型调用走 utils/apiClient 的 YTapi,端口按阶段选择模型并传播取消信号。
 import {createTurtleSoupPlugin} from '../../../dist/backend/modules/games/infrastructure/turtleSoup/app.js'
 import {TurtleSoupManager} from '../../../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupManager.js'
 import {TurtleSoupStore, readTurtleSoupConfig} from '../../../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupStore.js'
 import {TurtleSoupGenerator} from '../../../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupGenerator.js'
 import {createTurtleSoupModelHost} from '../../../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupModelHost.js'
+import {createTurtleSoupModelCall} from '../../../dist/backend/modules/games/infrastructure/turtleSoup/turtleSoupModelCall.js'
 import {publishActiveGameGroups} from '../../../dist/backend/modules/games/infrastructure/gameSessionRegistry.js'
 import {sendSmartReply} from '../../../utils/SmartReply.js'
 import {YTapi} from '../../../utils/apiClient.js'
@@ -15,34 +13,7 @@ import {umaRaceManager} from '../uma/UmaRaceManager.js'
 
 const cwd = process.cwd()
 
-function readModelExecutionConfig() {
-  const userPath = path.join(cwd, "plugins/shiloh-plugin/config/message.yaml")
-  const defaultPath = path.join(cwd, "plugins/shiloh-plugin/config_default/message.yaml")
-  const configPath = fs.existsSync(userPath) ? userPath : defaultPath
-  if (!fs.existsSync(configPath)) return {}
-  try {
-    const raw = record(YAML.parse(fs.readFileSync(configPath, "utf8")))
-    // 兼容两种布局:chatAiConfig 在根级(config_default)或包在 pluginSettings 下(用户配置常见)
-    const nested = record(raw.pluginSettings)
-    const pick = key => raw[key] ?? nested[key]
-    return {providers: pick('providers'), useTools: false, chatAiConfig: pick('chatAiConfig')}
-  } catch {
-    return {}
-  }
-}
-
-const record = value => (value !== null && typeof value === 'object' && !Array.isArray(value)) ? value : {}
-
-const modelConfig = readModelExecutionConfig()
-const callModel = async (messages, options = {}) => {
-  const request = {messages, temperature: options.temperature ?? 0.7, top_p: 0.9}
-  if (options.model) request.model = options.model
-  const response = await YTapi(request, modelConfig, undefined, undefined, {})
-  if (response?.error) throw new Error(`模型调用失败: ${typeof response.error === 'object' ? JSON.stringify(response.error) : String(response.error)}`)
-  const content = response?.choices?.[0]?.message?.content
-  if (!content) throw new Error('模型返回内容为空')
-  return String(content)
-}
+const callModel = createTurtleSoupModelCall({cwd, executeModel: YTapi})
 
 const turtleSoupConfig = () => readTurtleSoupConfig(cwd)
 const store = new TurtleSoupStore({cwd, baseDir: turtleSoupConfig().baseDir})

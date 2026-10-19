@@ -3,20 +3,24 @@ import type { ConfigSchemaItem } from '../../../../../contracts/configSchema.js'
 // 游戏模块配置:海龟汤 / 赛马娘 / 三角洲,供控制台「游戏」页嵌入表单
 export const turtleSoupSchema: ConfigSchemaItem[] = [
   { component: 'Divider', label: '海龟汤' },
-  { field: 'turtleSoup.enabled', label: '海龟汤开关', component: 'Switch', bottomHelpMessage: '群聊海龟汤推理:AI 主持问答、猜汤底、MVP 评选' },
-  { field: 'turtleSoup.minPlayers', label: '最少开局人数', component: 'InputNumber', componentProps: { min: 1, max: 20, placeholder: '1' }, bottomHelpMessage: '报名确认制,窗口期内达到才开局;1 = 单人也可玩' },
-  { field: 'turtleSoup.joinWindowMinutes', label: '报名窗口(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 60, placeholder: '5' } },
-  { field: 'turtleSoup.idleTimeoutMinutes', label: '无活动收局(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 120, placeholder: '5' }, bottomHelpMessage: '问答期无人发言满此时长自动揭晓' },
-  { field: 'turtleSoup.guessCooldownSeconds', label: '猜底冷却(秒)', component: 'InputNumber', componentProps: { min: 0, max: 600, placeholder: '30' }, bottomHelpMessage: '每人两次猜底之间的冷却,防穷举刷汤底' },
-  { field: 'turtleSoup.similarityHitThreshold', label: '猜底命中相似度', component: 'InputNumber', componentProps: { min: 0, max: 1, step: 0.01, placeholder: '0.9' }, bottomHelpMessage: '字面相似度达到即判中,不再过模型' },
-  { field: 'turtleSoup.freshPoolTarget', label: '鲜汤保有量', component: 'InputNumber', componentProps: { min: 1, max: 50, placeholder: '6' }, bottomHelpMessage: '「没有任何群玩过」的汤少于该数量时后台自动生成补货(按 active+待审计)' },
-  { field: 'turtleSoup.generationModel', label: '生成模型', component: 'Input', componentProps: { placeholder: '留空 = 主模型' } },
-  { field: 'turtleSoup.maxHints', label: '每局提示条数', component: 'InputNumber', componentProps: { min: 0, max: 10, placeholder: '3' } },
-  { field: 'turtleSoup.recapEveryQuestions', label: '进度卡频率', component: 'InputNumber', componentProps: { min: 0, max: 100, placeholder: '10' }, bottomHelpMessage: '每 N 次提问发一张进度卡;0 = 关闭' },
-  { field: 'turtleSoup.chooseWindowSeconds', label: '选汤窗口(秒)', component: 'InputNumber', componentProps: { min: 10, max: 600, placeholder: '60' }, bottomHelpMessage: '三选一超时自动随机开局' },
-  { field: 'turtleSoup.ratingWindowMinutes', label: '评分窗口(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 120, placeholder: '5' } },
-  { field: 'turtleSoup.contentPolicy', label: '出题题材尺度', component: 'InputTextArea', bottomHelpMessage: '喂给生成模型的题材边界说明' }
-]
+  { field: 'miniGames.enabled', label: '小游戏总开关', component: 'Switch', bottomHelpMessage: '总开关与下方海龟汤开关同时开启，海龟汤才响应群命令和自动补货；关闭不会改写单游戏开关' },
+  { field: 'miniGames.turtleSoup.enabled', label: '海龟汤开关', component: 'Switch', bottomHelpMessage: '海龟汤独立开关；也需小游戏总开关开启。关闭后题库和配置保留' },
+  { field: 'miniGames.turtleSoup.minPlayers', label: '最少开局人数', component: 'InputNumber', componentProps: { min: 1, max: 50, placeholder: '1' }, bottomHelpMessage: '报名确认制,窗口期内达到才开局;1 = 单人也可玩' },
+  { field: 'miniGames.turtleSoup.joinWindowMinutes', label: '报名窗口(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 60, placeholder: '5' } },
+  { field: 'miniGames.turtleSoup.idleTimeoutMinutes', label: '无活动收局(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 240, placeholder: '5' }, bottomHelpMessage: '问答期无人发言满此时长自动揭晓' },
+  { field: 'miniGames.turtleSoup.guessCooldownSeconds', label: '猜底冷却(秒)', component: 'InputNumber', componentProps: { min: 0, max: 3600, placeholder: '30' }, bottomHelpMessage: '每人两次猜底之间的冷却,防穷举刷汤底' },
+  { field: 'miniGames.turtleSoup.freshPoolTarget', label: '可玩鲜汤目标', component: 'InputNumber', componentProps: { min: 1, max: 50, placeholder: '2' }, bottomHelpMessage: '已过审且未被任何群玩过的不同题目数量；修复版本共享曝光史' },
+  { field: 'miniGames.turtleSoup.maxPending', label: '待审池上限', component: 'InputNumber', componentProps: { min: 1, max: 100, placeholder: '默认取 4 与鲜汤目标两倍的较大值' }, bottomHelpMessage: '自动补货达到待审上限后暂停，避免审核积压反复生成' },
+  { field: 'miniGames.turtleSoup.generationCallBudget', label: '每道候选模型调用上限', component: 'InputNumber', componentProps: { min: 4, max: 100, placeholder: '18' }, bottomHelpMessage: '新题至少需要生成与三次模型审核，共 4 次；修复和重试也计数，达到上限保留候选，下次人工重试重新获得一次预算' },
+  { field: 'miniGames.turtleSoup.reviewModel', label: '审核模型', component: 'Input', componentProps: { placeholder: '留空 = 生成模型' }, bottomHelpMessage: '可选择另一模型做可玩性、逻辑与问答推演审核，降低同一模型的盲点' },
+  { field: 'miniGames.turtleSoup.generationModel', label: '生成模型', component: 'Input', componentProps: { placeholder: '留空 = 主模型' } },
+  { field: 'miniGames.turtleSoup.maxHints', label: '每局提示条数', component: 'InputNumber', componentProps: { min: 0, max: 10, placeholder: '3' } },
+  { field: 'miniGames.turtleSoup.hintCooldownSeconds', label: '提示间隔(秒)', component: 'InputNumber', componentProps: { min: 0, max: 300, placeholder: '15' }, bottomHelpMessage: '防止连续领取提示跳过推理；0 = 不限' },
+  { field: 'miniGames.turtleSoup.recapEveryQuestions', label: '进度卡频率', component: 'InputNumber', componentProps: { min: 0, max: 100, placeholder: '10' }, bottomHelpMessage: '每 N 次提问发一张进度卡;0 = 关闭' },
+  { field: 'miniGames.turtleSoup.chooseWindowSeconds', label: '选汤窗口(秒)', component: 'InputNumber', componentProps: { min: 10, max: 300, placeholder: '60' }, bottomHelpMessage: '三选一超时自动随机开局' },
+  { field: 'miniGames.turtleSoup.ratingWindowMinutes', label: '评分窗口(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 120, placeholder: '5' } },
+  { field: 'miniGames.turtleSoup.contentPolicy', label: '出题题材尺度', component: 'InputTextArea', bottomHelpMessage: '喂给生成模型的题材边界说明；留空时使用默认推理题材尺度' }
+].map(item => item.component === 'InputNumber' ? {...item, componentProps: {...item.componentProps, step: 1, precision: 0}} : item)
 
 export const umaRaceSchema: ConfigSchemaItem[] = [
   { component: 'Divider', label: '赛马娘' },

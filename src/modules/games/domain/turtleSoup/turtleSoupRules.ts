@@ -2,6 +2,7 @@
 // 时间戳统一用 epoch 毫秒,由基建层注入,便于测试与重启恢复。
 import type {TurtleSoupPlay, TurtleSoupPuzzle, TurtleSoupSession, TurtleSoupConfig, TurtleSoupPlayer, TurtleSoupRating, MvpBrief, MvpPlayerBrief} from '../../../../contracts/turtleSoup.js'
 import { literalSoupSimilarity, normalizeSoupText } from './turtleSoupSimilarity.js'
+import {hasCurrentPassingAudits} from './turtleSoupQuality.js'
 
 export function joiningOutcome(session:TurtleSoupSession, nowMs:number, minPlayers:number):'wait'|'start'|'cancel' {
   if (session.phase !== 'joining') return 'wait'
@@ -68,14 +69,22 @@ export function takeHint(session:TurtleSoupSession, hints:string[], maxHints:num
 }
 
 export interface PuzzlePlayStats {total:number;groups:Set<string>;users:Set<string>}
-export function puzzlePlayStats(plays:TurtleSoupPlay[]):Map<string, PuzzlePlayStats> {
+export function puzzleFamilyId(puzzle:TurtleSoupPuzzle):string { return puzzle.familyId || puzzle.parentPuzzleId || puzzle.id }
+export function canServePuzzle(puzzle:TurtleSoupPuzzle):boolean {
+  const legacy = !puzzle.contentHash && puzzle.version === undefined && !puzzle.audits?.length
+  return puzzle.status === 'active' && (legacy || hasCurrentPassingAudits(puzzle))
+}
+
+export function puzzlePlayStats(plays:TurtleSoupPlay[], puzzles:TurtleSoupPuzzle[] = []):Map<string, PuzzlePlayStats> {
   const stats = new Map<string, PuzzlePlayStats>()
+  const families = new Map(puzzles.map(puzzle => [puzzle.id, puzzleFamilyId(puzzle)]))
   for (const play of plays) {
-    const entry = stats.get(play.puzzleId) || {total: 0, groups: new Set<string>(), users: new Set<string>()}
+    const familyId = play.familyId || families.get(play.puzzleId) || play.puzzleId
+    const entry = stats.get(familyId) || {total: 0, groups: new Set<string>(), users: new Set<string>()}
     entry.total++
     entry.groups.add(play.groupId)
     for (const userId of play.players || []) entry.users.add(userId)
-    stats.set(play.puzzleId, entry)
+    stats.set(familyId, entry)
   }
   return stats
 }
@@ -106,34 +115,47 @@ export function pendingPuzzleIds(puzzles:TurtleSoupPuzzle[]):string[] {
 }
 
 export function freshPuzzleIds(puzzles:TurtleSoupPuzzle[], stats:Map<string, PuzzlePlayStats>):string[] {
-  return puzzles.filter(puzzle => puzzle.status === 'active' && !stats.has(puzzle.id)).map(puzzle => puzzle.id)
+  return puzzles.filter(puzzle => canServePuzzle(puzzle) && !stats.has(puzzleFamilyId(puzzle))).map(puzzle => puzzle.id)
 }
 
 // 选汤:优先"没有任何群玩过"的鲜汤;本群玩过的永不复用;鲜汤不足时退到全局游玩次数最少者。
 // 按参与人排除：本局任何参与者玩过的汤(任意群)都不再投放,防止跨群串场剧透;
-// 排完为空时退回仅按群排除,避免老玩家把小题库耗尽后开不了局
+// 修订版本共享曝光史;没有未曝光的候选就补库,不静默放入有人看过的题。
 export function soupCandidatesFor(puzzles:TurtleSoupPuzzle[], stats:Map<string, PuzzlePlayStats>, groupId:string, participantIds:string[]) {
   const participants = new Set(participantIds)
   const notPlayedByAnyone = (puzzle:TurtleSoupPuzzle) => {
-    const entry = stats.get(puzzle.id)
+    const entry = stats.get(puzzleFamilyId(puzzle))
     if (!entry) return true
     for (const userId of participants) if (entry.users.has(userId)) return false
     return true
   }
-  const active = puzzles.filter(puzzle => puzzle.status === 'active')
-  const groupOnly = active.filter(puzzle => !stats.get(puzzle.id)?.groups.has(groupId))
+  const latest = new Map<string, TurtleSoupPuzzle>()
+  for (const puzzle of puzzles.filter(canServePuzzle)) {
+    const previous = latest.get(puzzleFamilyId(puzzle))
+    if (!previous || (puzzle.version ?? 1) > (previous.version ?? 1)) latest.set(puzzleFamilyId(puzzle), puzzle)
+  }
+  const groupOnly = [...latest.values()].filter(puzzle => !stats.get(puzzleFamilyId(puzzle))?.groups.has(groupId))
   return {strict: groupOnly.filter(notPlayedByAnyone), groupOnly}
 }
 
 export function selectPuzzleId(puzzles:TurtleSoupPuzzle[], plays:TurtleSoupPlay[], groupId:string, random:() => number = Math.random, participantIds:string[] = []):string|null {
-  const stats = puzzlePlayStats(plays)
-  const candidates = soupCandidatesFor(puzzles, stats, groupId, participantIds).strict.length
-    ? soupCandidatesFor(puzzles, stats, groupId, participantIds).strict
-    : soupCandidatesFor(puzzles, stats, groupId, participantIds).groupOnly
-  if (!candidates.length) return null
-  const fresh = candidates.filter(puzzle => !stats.has(puzzle.id))
-  const pool = fresh.length ? fresh : candidates.filter(puzzle => (stats.get(puzzle.id)?.total ?? 0) === Math.min(...candidates.map(item => stats.get(item.id)?.total ?? 0)))
-  return pool[Math.floor(random() * pool.length)]?.id ?? null
+  return selectPuzzleMenu(puzzles, plays, groupId, participantIds, 1, random)[0]?.id ?? null
+}
+
+// 菜单和随机开局共用同一策略:只用当前最低曝光层,层内均匀抽样。
+export function selectPuzzleMenu(puzzles:TurtleSoupPuzzle[], plays:TurtleSoupPlay[], groupId:string, participantIds:string[], count = 3, random:() => number = Math.random):TurtleSoupPuzzle[] {
+  const stats = puzzlePlayStats(plays, puzzles)
+  const candidates = soupCandidatesFor(puzzles, stats, groupId, participantIds).strict
+  if (!candidates.length) return []
+  const least = Math.min(...candidates.map(puzzle => stats.get(puzzleFamilyId(puzzle))?.total ?? 0))
+  const pool = candidates.filter(puzzle => (stats.get(puzzleFamilyId(puzzle))?.total ?? 0) === least)
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.min(i, Math.max(0, Math.floor(random() * (i + 1))))
+    const item = pool[i]!
+    pool[i] = pool[j]!
+    pool[j] = item
+  }
+  return pool.slice(0, Math.max(0, count))
 }
 
 export function ratingAverage(puzzle:TurtleSoupPuzzle):number|null {
@@ -160,10 +182,11 @@ export function upsertRating(play:TurtleSoupPlay, puzzle:TurtleSoupPuzzle, input
 }
 
 export type {MvpBrief, MvpPlayerBrief} from '../../../../contracts/turtleSoup.js'
-// MVP素材:按玩家聚合提问数、"是"回答数与最接近的猜测,喂给主持模型评选"全场最佳贡献"。
-export function buildMvpBrief(session:TurtleSoupSession, winnerUserId?:string):MvpBrief {
+// MVP素材保留真实问题、猜测与固定真相;投降者先前的贡献仍参与评选。
+export function buildMvpBrief(session:TurtleSoupSession, winnerUserId?:string, puzzle?:TurtleSoupPuzzle):MvpBrief {
   const briefs = new Map<string, MvpPlayerBrief>()
-  for (const player of session.players) briefs.set(player.userId, {userId: player.userId, nickname: player.nickname, questions: 0, yesAnswers: 0, closestGuess: null})
+  for (const player of [...(session.participantHistory ?? []), ...session.players]) briefs.set(player.userId, {userId: player.userId, nickname: player.nickname, questions: 0, yesAnswers: 0, closestGuess: null})
+  for (const userId of Object.keys(session.surrendered ?? {})) if (!briefs.has(userId)) briefs.set(userId, {userId, nickname: session.qaLog.find(entry => entry.userId === userId)?.nickname || userId, questions: 0, yesAnswers: 0, closestGuess: null})
   for (const entry of session.qaLog) {
     const brief = briefs.get(entry.userId)
     if (!brief) continue
@@ -179,7 +202,10 @@ export function buildMvpBrief(session:TurtleSoupSession, winnerUserId?:string):M
     players: [...briefs.values()],
     winnerId: winnerUserId ?? null,
     totalQuestions: session.qaLog.length,
-    totalGuesses: session.guessLog.length
+    totalGuesses: session.guessLog.length,
+    qaLog: session.qaLog.slice(-100),
+    guessLog: session.guessLog.slice(-50),
+    ...(puzzle ? {keyPoints: puzzle.keyPoints, solution: puzzle.solution} : {})
   }
 }
 
@@ -239,7 +265,7 @@ export function formatCountdown(remainMs:number):string { return remainMs > 0 ? 
 
 export function nicknameOf(session:TurtleSoupSession, userId?:string):string {
   if (!userId) return ''
-  return session.players.find(player => player.userId === userId)?.nickname ?? userId
+  return [...session.players, ...(session.participantHistory ?? [])].find(player => player.userId === userId)?.nickname ?? userId
 }
 
 // —— 展示文案(纯函数,基建层只负责发送) ——
@@ -250,29 +276,30 @@ export function buildStatusText(session:TurtleSoupSession, config:TurtleSoupConf
     return [`【海龟汤·报名中】`, `已报名(${session.players.length}/${config.minPlayers}):${roster}`, `报名截止还有:${formatCountdown(session.joinDeadlineAt - nowMs)}`, `发送 ${SOUP_COMMAND} 加入 上车`].join('\n')
   }
   if (session.phase === 'playing') {
-    const surrenderedNote = Object.keys(session.surrendered).length ? `\n已投降:${Object.keys(session.surrendered).length}人(汤底已私发)` : ''
+    const surrenderedNote = Object.keys(session.surrendered).length ? `\n已投降:${Object.keys(session.surrendered).length}人` : ''
     return [
       `【海龟汤·问答中】`,
       `玩家(${session.players.length}人):${roster}${surrenderedNote}`,
       `已提问${session.qaLog.length}次,已猜测${session.guessLog.length}次,提示已用${session.usedHints}/${config.maxHints}`,
-      `${nicknameOf(session, session.initiatorId)}或管理可 .海龟汤 结束 提前揭晓;长时间无人发言自动结束`
+      `${nicknameOf(session, session.initiatorId)}或管理可 ${SOUP_COMMAND} 结束 提前揭晓;长时间没有有效游戏操作自动结束`
     ].join('\n')
   }
+  if (session.phase === 'choosing') return [`【海龟汤·选汤中】`, `玩家:${roster}`, `还有${formatCountdown((session.choosing?.deadlineAt ?? nowMs) - nowMs)}`, `${SOUP_COMMAND} 选 1~${session.choosing?.candidates.length ?? 0} 或 随机`].join('\n')
   return [
     `【海龟汤·已揭晓】`,
     `评分窗口:${formatCountdown((session.reveal?.ratingDeadlineAt ?? nowMs) - nowMs)}`,
-    `参与者可 .海龟汤 评分 1-5 [评论]`
+    `参与者可 ${SOUP_COMMAND} 评分 ${session.playId ?? '上一局'} 1-5 [评论];可直接开新局`
   ].join('\n')
 }
 
-export function buildCatchUpText(session:TurtleSoupSession, puzzle:{title:string;surface:string}|null, config:TurtleSoupConfig):string {
+export function buildCatchUpText(session:TurtleSoupSession, puzzle:{title:string;surface:string;hints?:string[]}|null, config:TurtleSoupConfig):string {
   if (!puzzle) return '(题目记录缺失)'
   const lines = [`【${puzzle.title}】`, puzzle.surface, '']
   if (session.qaLog.length) {
     lines.push('之前的问答:')
     for (const entry of session.qaLog.slice(-10)) lines.push(`Q:${entry.question.slice(0, 60)} → ${entry.answer}`)
   } else lines.push('还没有人提问,你可以是第一个')
-  if (session.usedHints) lines.push(`(已用提示${session.usedHints}/${config.maxHints})`)
+  if (session.usedHints) lines.push(`已用提示(${session.usedHints}/${config.maxHints}):`, ...(puzzle.hints ?? []).slice(0, session.usedHints).map((hint, index) => `${index + 1}. ${hint}`))
   return lines.join('\n')
 }
 
@@ -286,8 +313,7 @@ export function buildRevealText(session:TurtleSoupSession, puzzle:TurtleSoupPuzz
   const lines = [opener, '', `—— 汤面 ——`, `【${puzzle.title}】(${puzzle.difficulty})`, puzzle.surface, '', '—— 汤底 ——', puzzle.solution]
   if (puzzle.keyPoints.length) lines.push('', `关键点:${puzzle.keyPoints.join(';')}`)
   if (mvp) lines.push('', `🏅 本局MVP:${nicknameOf(session, mvp.userId)}`, `颁奖词:${mvp.reason}`)
-  else lines.push('', '本局未评选出MVP')
-  lines.push('', `参与者可在${formatDuration(config.ratingWindowMinutes * 60_000)}内评分:${SOUP_COMMAND} 评分 1-5 [一句话评论]`)
+  lines.push('', `参与者可在${formatDuration(config.ratingWindowMinutes * 60_000)}内评分:${SOUP_COMMAND} 评分 ${session.playId ?? '上一局'} 1-5 [一句话评论]`, `评分不影响下一局,可直接 ${SOUP_COMMAND} 开局`)
   return lines.join('\n')
 }
 
@@ -296,7 +322,8 @@ export const RECAP_BUCKETS:{key:string;label:string}[] = [
   {key: '是', label: '【是的】'},
   {key: '不是', label: '【不是】'},
   {key: '是也不是', label: '【是也不是】'},
-  {key: '与此无关', label: '【这不重要】'}
+  {key: '与此无关', label: '【这不重要】'},
+  {key: '无法确定', label: '【题目未明确】'}
 ]
 
 export function buildRecapText(session:TurtleSoupSession, puzzle:TurtleSoupPuzzle|null):string {
@@ -309,8 +336,9 @@ export function buildRecapText(session:TurtleSoupSession, puzzle:TurtleSoupPuzzl
     const entries = session.qaLog.filter(entry => entry.answer === bucket.key)
     lines.push('', `${bucket.label}(${entries.length})`)
     if (!entries.length) { lines.push('(暂无)'); continue }
-    for (const entry of entries) lines.push(`${entry.nickname || entry.userId}:${entry.question}`)
+    for (const entry of entries.slice(-30)) lines.push(`${entry.nickname || entry.userId}:${entry.question}`)
   }
+  if (puzzle && session.usedHints) lines.push('', '—— 已公布提示 ——', ...puzzle.hints.slice(0, session.usedHints).map((hint, index) => `${index + 1}. ${hint}`))
   lines.push('', '—— 备忘 ——', `想玩随时 ${SOUP_COMMAND} 加入,上车即补发汤面和已问答记录`, `(括号)里的内容算场外,我不会回应`, `${SOUP_COMMAND} 投降 —— 汤底私发给你并退场,别剧透`, `${SOUP_COMMAND} 结束 —— 发起人或群管理可提前揭晓`)
   return lines.join('\n')
 }

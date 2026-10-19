@@ -162,11 +162,11 @@ test("选题按参与人跨群排除：A群玩过的汤,含其参与者的新群
   // 没有交集参与者的群不受影响
   const forC = soupCandidatesFor([p1, p2], stats, "300", ["u9"])
   assert.deepEqual(forC.strict.map(p => p.id), ["p1", "p2"])
-  // 全被排除时退回按群排除,仍能开局
+  // 全被排除时不能悄悄重放已经曝光的题
   const only = soupCandidatesFor([p1], stats, "100", ["u1"])
   assert.deepEqual(only.strict, [])
   assert.deepEqual(only.groupOnly.map(p => p.id), ["p1"])
-  assert.equal(selectPuzzleId([p1], plays, "100", () => 0, ["u1"]), "p1", "退回兜底")
+  assert.equal(selectPuzzleId([p1], plays, "100", () => 0, ["u1"]), null, "不回退到已曝光的题")
   assert.equal(selectPuzzleId([p1, p2], plays, "100", () => 0, ["u1"]), "p2")
 })
 
@@ -197,4 +197,27 @@ test("待审汤不进入投放:候选/随机池只认 active", async () => {
   const { strict, groupOnly } = soupCandidatesFor([p1, p2], new Map(), "100", [])
   assert.deepEqual(strict.map(z => z.id), ["p2"], "pending 不投放")
   assert.equal(selectPuzzleId([p1, p2], [], "100", () => 0), "p2")
+})
+
+test("new revisions need current passing audits while legacy active soups remain available", async () => {
+  const {canServePuzzle} = await import("../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js")
+  const {puzzleContentHash} = await import("../dist/backend/modules/games/domain/turtleSoup/turtleSoupQuality.js")
+  const legacy = makePuzzle("legacy")
+  assert.equal(canServePuzzle(legacy), true)
+  const revised = {...legacy, id: "revised", version: 1, contentHash: "unreviewed"}
+  assert.equal(canServePuzzle(revised), false)
+  revised.audits = ["structure", "playability", "logic", "simulation"].map(domain => ({domain, pass: true, holes: [], reason: "ok", at: 1, contentHash: puzzleContentHash(revised)}))
+  assert.equal(canServePuzzle(revised), true)
+  assert.equal(canServePuzzle({...revised, solution: "修订过的另一个真相"}), false)
+})
+
+test("revised stories inherit exposure from older versions", async () => {
+  const {soupCandidatesFor, puzzlePlayStats} = await import("../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js")
+  const old = makePuzzle("old", {familyId: "family", status: "retired"})
+  const revised = makePuzzle("revised", {familyId: "family"})
+  const unrelated = makePuzzle("other")
+  const plays = [makePlay("old", "200", {players: ["u1"]})]
+  const stats = puzzlePlayStats(plays, [old, revised, unrelated])
+  assert.deepEqual(soupCandidatesFor([old, revised, unrelated], stats, "100", ["u1"]).strict.map(puzzle => puzzle.id), ["other"])
+  assert.deepEqual(soupCandidatesFor([old, revised], stats, "200", ["new-user"]).strict, [])
 })

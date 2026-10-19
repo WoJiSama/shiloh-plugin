@@ -1,0 +1,261 @@
+{
+  "date": "2026-10-19",
+  "baseCommit": "9ec30f9204f422758ba306fee0c070865790a319",
+  "node": "24.14.1",
+  "validationMode": "isolated base checkout plus task-only source overlay",
+  "sourceFiles": [
+    {
+      "path": "config_default/message.yaml",
+      "sha256": "5e7e5db9e8e01c1e82d6a3d4fb54b8668a2b3769fbc06f0f360c2a376a882a9e"
+    },
+    {
+      "path": "console/frontend/src/pages/GamesPage.vue",
+      "sha256": "e3d89a4c6fd870498291de6d436fb6ae712d50c7eaf641f7999356d948681613"
+    },
+    {
+      "path": "console/frontend/src/lib/gamesPage.test.ts",
+      "sha256": "d93a251f9dbeb777759235c3f8e103adba072ac3c612cd26e1a5272d454d1ecb"
+    },
+    {
+      "path": "domains/games/turtlesoup/app.js",
+      "sha256": "ec67c60fdc0d62d1373d579aa0bffebe6b0ed79bf8c42d83935fc658dbfc7f73"
+    },
+    {
+      "path": "src/contracts/turtleSoup.ts",
+      "sha256": "06eaf32e4df7a4d33d5f4955f07f5a5737a53ec725d073c96e83fee6faf26faa"
+    },
+    {
+      "path": "src/modules/config/domain/schemas/shared/games.ts",
+      "sha256": "be657e85c12c93e6e9fbece92d0f35402b258d46a11655455ad14db2976a9888"
+    },
+    {
+      "path": "src/modules/games/domain/turtleSoup/turtleSoupPrompts.ts",
+      "sha256": "02162e820e10dec3d596b26420af80cc8aaaa106d0db8e82a816782462365dc8"
+    },
+    {
+      "path": "src/modules/games/domain/turtleSoup/turtleSoupRules.ts",
+      "sha256": "ea42a0872ab28f78a99530be4fe91742be06aa8e136647fc8f4c73e8907a826f"
+    },
+    {
+      "path": "src/modules/games/domain/turtleSoup/turtleSoupSchema.ts",
+      "sha256": "ef53a37f3e97276e8c65d0cbd6bdba3627f5e685aa1dca2855098c991aed62ff"
+    },
+    {
+      "path": "src/modules/games/domain/turtleSoup/turtleSoupQuality.ts",
+      "sha256": "40ebe1d030ca414e8b25fa760f939ce04aab3d65930eab410c1ddbb823450a53"
+    },
+    {
+      "path": "src/modules/games/infrastructure/gameFiles.ts",
+      "sha256": "3b469050784a0455174d9ffde481b7aefd454aa149c51a85aa4f91579d185f2a"
+    },
+    {
+      "path": "src/modules/games/infrastructure/turtleSoup/TurtleSoupGenerator.ts",
+      "sha256": "f52240bbfe50c4100838a02cdd93b5cb6711114e763778d05017e3ac389b1c76"
+    },
+    {
+      "path": "src/modules/games/infrastructure/turtleSoup/TurtleSoupManager.ts",
+      "sha256": "9f1098cb4dfafcf3d87fe9106f72d1e23dd6fd373777043bba01e4de93d44a42"
+    },
+    {
+      "path": "src/modules/games/infrastructure/turtleSoup/TurtleSoupModelHost.ts",
+      "sha256": "4b168cc073734cfcf05dcae356fc487faa6e9dfdf24a6a7cff408b9fadaf4cbb"
+    },
+    {
+      "path": "src/modules/games/infrastructure/turtleSoup/TurtleSoupStore.ts",
+      "sha256": "e93fe40494829edab079e014c9108ea84a448606deba08b120af0e8c535ff142"
+    },
+    {
+      "path": "src/modules/games/infrastructure/turtleSoup/turtleSoupModelCall.ts",
+      "sha256": "6965c75a8af9c3c50de5b0e47411a2446a02966e6ad0151c87fb3b2acebc4b4d"
+    },
+    {
+      "path": "src/modules/games/infrastructure/turtleSoup/app.ts",
+      "sha256": "9a0ef899e9987cd9c1e7438b1ec881e30962a2f5a91cd26b96548d2d2170a2a8"
+    },
+    {
+      "path": "src/modules/platform/infrastructure/console/consoleServer.ts",
+      "sha256": "b207ff7e0bba1bfedd81d70e2503b23b4e56327c7fca12327d2021259776fdaf"
+    },
+    {
+      "path": "tests/turtleSoupConsole.test.js",
+      "sha256": "8133a9ab9a07491391a98f0e80c43c7fc76be79088c039bad6066aaad99f09f1"
+    },
+    {
+      "path": "tests/turtleSoupGenerator.test.js",
+      "sha256": "87f621d521c22666f633f91e893cbf92c45d32c4d48145b1542a08305c84af3a"
+    },
+    {
+      "path": "tests/turtleSoupManager.test.js",
+      "sha256": "d9079284e02b83cb78203e836c1b5db60abf8608d3471d3b6c48c04d6aa6d3bd"
+    },
+    {
+      "path": "tests/turtleSoupModelHost.test.js",
+      "sha256": "193afdc3d187c6cdd821ab3055612f708ebd0d4b33b079c27191551b56ff2f64"
+    },
+    {
+      "path": "tests/turtleSoupModelCall.test.js",
+      "sha256": "f027a3080da9a815a895f9f72bfdd356a0f988b9343b48b1fcabc3d194582b49"
+    },
+    {
+      "path": "tests/turtleSoupRules.test.js",
+      "sha256": "bf988c0d6e48a8d7fc807380ccdc31efc20b68af128028f66c79836b0716c794"
+    },
+    {
+      "path": "tests/turtleSoupStore.test.js",
+      "sha256": "c942b892bbe3d23bf7fdf02ef75f16e8082b00c7a29b389a16a985e0c1d9a46f"
+    },
+    {
+      "path": "src/adapters/config/turtleSoupConfig.ts",
+      "sha256": "5d769292ca0b214d507e0f69601e300161384fe9eeb2fce19d5d62778990be5c"
+    }
+  ],
+  "gates": {
+    "command": "npm run verify:phase",
+    "exitCode": 0,
+    "backend": {
+      "tests": 2777,
+      "passed": 2775,
+      "failed": 0,
+      "skipped": 2,
+      "skipReasons": [
+        "document template renders a readable html screenshot: Chromium is not available in this checkout",
+        "knowledge template turns structured markdown into distinct knowledge sections: Chromium is not available in this checkout"
+      ]
+    },
+    "frontend": {
+      "files": 15,
+      "passed": 65,
+      "failed": 0
+    },
+    "backendEmittedFiles": 1497,
+    "boundaryViolations": 0,
+    "unregisteredMissingBaseline": [],
+    "unreviewedBootstraps": [],
+    "registeredMigrations": 372
+  },
+  "browser": {
+    "checks": 6,
+    "widths": [
+      1440,
+      390
+    ],
+    "pageErrors": 0,
+    "externalRequests": 0
+  },
+  "preservation": {
+    "at": "2026-10-19T15:47:14.388Z",
+    "sourceCount": 26,
+    "mismatches": [],
+    "otherUnchanged": 1028,
+    "otherChanged": [],
+    "headUnchanged": true,
+    "indexUnchanged": true
+  },
+  "limitations": [
+    "No real model requests, production operations or production data repair",
+    "Full gate excludes unrelated concurrent Xiaohongshu edits in the shared checkout",
+    "Gateway compatibility retries are not included in generator logical-call budgets"
+  ],
+  "evidence": [
+    {
+      "path": "reports/turtle-soup-2026-10-19/backend-manifest.json",
+      "sha256": "36b2cce0491f9c3095747804a497280cfc2f0a6228d02c240225786e3f9ed4f8"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/before-final-validation.json",
+      "sha256": "f5c496d7ed11eb7f9ccb781e178189238c06d7106d7d682cb58164af38111446"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/soup-overlay.json",
+      "sha256": "23de77058935b0c1dcd94e307729586e4389ec47ad93c67d55e9718c8fa31677"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/source-preservation-final.json",
+      "sha256": "b7ef709b5fd06138692aa2facc1340c151f9b59973c6312fab75e5b20bdbac11"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/source-preservation-interim.json",
+      "sha256": "4012cc772d694942cfe0b5beb9f3255004115bdc5231dc7290c99cf60a6bd853"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-backend-build.log",
+      "sha256": "f00cc64eba752b215cdc75d9b5b87a62fc2c03276b2b5578856cf06edb729a3f"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-backend-final-build.log",
+      "sha256": "d841bdc1d83e76f0d5bb1b794d0616a7c65d281ff9d244f7c690754d25e9001c"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-backend-store-final-build.log",
+      "sha256": "d841bdc1d83e76f0d5bb1b794d0616a7c65d281ff9d244f7c690754d25e9001c"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser/desktop-overview.png",
+      "sha256": "826f14a964747dde484d25f9a1cd20abc35166930277d421dace96197c608ce0"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser/desktop-version-comparison.png",
+      "sha256": "d81329670ccb33259d419609a554aec3f3447101f9671744d05651dd618c5fae"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser/mobile-detail-actions.png",
+      "sha256": "1fcb2faa86f4565161dd7e1c5e26a26cec1dc2da744d5b23d4a76d10745ce4a1"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser/mobile-detail.png",
+      "sha256": "d62ef6b43f5adc885516f82b2ab31ef7592178b39c1a5330434917d149ce41d5"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser/mobile-overview.png",
+      "sha256": "b607453505601449a1fd4635ee3eadf3641bc54b31caf97686fa96db77ff2bc7"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser/report.json",
+      "sha256": "3be786dca0cb94326de6e9388ffa9994516269f1c580c7c807578b70a448ff13"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser-smoke-final.log",
+      "sha256": "7f7a901a70cb78fae15504558a1ae06fc75f043f001245ab17766b2cebacedf2"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser-smoke.log",
+      "sha256": "23004e840d20eee2f7a3730a8ce9dff662cb9c241bdf420355d9bc1ecb776ab8"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-browser-smoke.mjs",
+      "sha256": "c65408ebbf2856703e5d16d44e43bb0ed4ab2f7e286e36e7841c61fee0382f95"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-console-probe.tap",
+      "sha256": "30376b7d3fe8c5087f0a29f54f339709625a9a88e76a903ec12670d26f605ccd"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-frontend-build-final.log",
+      "sha256": "2e85665a808b3007573bb8e4aa0621166263e45d5481d21d4a206002ac84629d"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-frontend-build.log",
+      "sha256": "e360ca081769f31c4f2c4887b902502b8b5c6ceaa20cf41e62866e4b9087ecf0"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-store-commit-final.tap",
+      "sha256": "1ef6f4faff473e55b13378a0a5a518ab866ece9a7527158da405d166484ae165"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-targeted-final-2.tap",
+      "sha256": "f79ddac0c784cbc8723c320b5853f322c326f676ed1c036c72baa90bc3ba39f8"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-targeted-final.tap",
+      "sha256": "137640424c429f29278788cb01aa525dff1efa3cff01964ef712e4547bdb3688"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-targeted-initial.tap",
+      "sha256": "109ccde42fdbdddf59e6c558efe33a38b693caa04996c0493f5f3fc851468c31"
+    },
+    {
+      "path": "reports/turtle-soup-2026-10-19/turtle-verify-phase.log",
+      "sha256": "8398bbf4fc63928b5b52aec70a846c354e2eaa063dcc880b51e1d2429235e2ce"
+    }
+  ]
+}

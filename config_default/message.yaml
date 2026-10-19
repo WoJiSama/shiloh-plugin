@@ -133,6 +133,14 @@ pluginSettings:
     maxTotalBytes: 41943040       # bytes，单次作品图片总计最大 40 MiB
     downloadTimeoutMs: 90000      # 毫秒，单张下载超时
     allowRestricted: false
+  # 小红书笔记搬运：群里发小红书链接/分享卡片时自动解析笔记并以图文合并转发到群里。
+  # 解析走"静态请求 → 无头浏览器(移动端UA)"两级降级，视频笔记只搬封面和文字。
+  xiaohongshuRelay:
+    enabled: true
+    cookieHeader: ""               # 可选，小红书网页版登录 Cookie；提供后静态解析可直接命中，减少浏览器兜底
+    maxImages: 20                  # 单篇笔记最多附带的图片张数
+    maxImageBytes: 33554432       # bytes，单张最大 32 MiB
+    downloadTimeoutMs: 60000      # 毫秒，单张图片下载超时
   # 长期聊天归档：只追加保存结构化文本/CQ元数据，不下载图片或视频。用于管理员按群号、QQ、关键词和前后文查询。
   messageArchive:
     enabled: false
@@ -172,17 +180,23 @@ pluginSettings:
       idleTimeoutMinutes: 5
       # 每人两次猜底之间的冷却(秒),防穷举刷汤底
       guessCooldownSeconds: 30
-      # 猜底混合判定:字面相似度>=hit直接判中,>=miss且未达hit交主模型语义判定,<miss直接未中
-      # (中文同义改写字面分极低,miss默认0=除空输入外全部交AI判定;问答期本就逐条过模型,边际成本可忽略)
+      # 旧版字面阈值保留兼容;胜负统一由固定关键点语义校验,不凭字面相似度直接判中
       similarityHitThreshold: 0.9
       similarityMissThreshold: 0
-      # "没有任何群玩过"的鲜汤保有量,不足后台自动生成补货
+      # 没有任何群玩过的不同题目目标;修复版本共享曝光史
       freshPoolTarget: 2
+      # 待审积压上限;不配置时取 max(4,鲜汤目标*2),达到上限暂停自动补货
+      maxPending: 4
+      # 每道候选从生成到审核/修复的模型调用上限,用尽后保留候选供人工重试
+      generationCallBudget: 18
       # 生成模型;留空 = 主模型
       generationModel: ""
+      # 审核模型;留空 = 生成模型,可配置不同模型减少共同盲点
+      reviewModel: ""
       # 每局最多可用提示条数(提示在生成汤时预产出)
       maxHints: 3
-      # 累计每N次提问发一张进度卡面(汤面+四类回答分组+玩家提问);0=关闭
+      hintCooldownSeconds: 15
+      # 累计每N次提问发一张进度卡面(汤面+回答分组+玩家提问);0=关闭
       recapEveryQuestions: 10
       # 开局选汤窗口:开始后展示3道候选,超时自动随机开局
       chooseWindowSeconds: 60
