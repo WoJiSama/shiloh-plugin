@@ -170,6 +170,8 @@ const SOUP_CJK = /[\u4e00-\u9fff]/
 export function looksLikeSoupQuestion(text:unknown):boolean {
   const value = String(text ?? '').trim()
   if (!value) return false
+  // 纯表情/符号不算提问("🤔"、"？？");带文字的表情消息照常放行
+  if (!value.replace(/[\p{Extended_Pictographic}\p{S}\p{P}\s]/gu, '')) return false
   // 剥掉问号/标点/空白后内容太短(两个汉字及以下)的不算提问:"单?"、"?"、"雨夜?"之类
   const core = value.replace(/[?？。.!！~～\s]/g, '')
   if (Array.from(core).length <= 2) return false

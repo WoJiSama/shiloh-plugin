@@ -170,3 +170,12 @@ test("选题按参与人跨群排除：A群玩过的汤,含其参与者的新群
   assert.equal(selectPuzzleId([p1, p2], plays, "100", () => 0, ["u1"]), "p2")
 })
 
+
+test("纯表情/符号不算提问,带文字的表情照常放行", async () => {
+  const { looksLikeSoupQuestion } = await import("../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js")
+  assert.equal(looksLikeSoupQuestion("🤔"), false, "纯 emoji 拦截")
+  assert.equal(looksLikeSoupQuestion("？？"), false, "纯问号拦截")
+  assert.equal(looksLikeSoupQuestion("😀🤔😅"), false, "多 emoji 拦截")
+  assert.equal(looksLikeSoupQuestion("男人犯法了吗🤔"), true, "文字+表情放行")
+  assert.equal(looksLikeSoupQuestion("妻子受伤了吗？🤔"), true, "文字+问号+表情放行")
+})
