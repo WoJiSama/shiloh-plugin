@@ -50,6 +50,8 @@ test("主持人答题提示词接地：关键点清单入 prompt、未提及事�
   assert.ok(system.includes("判定前先默问"), "判定前默问汤底是否写过")
   assert.ok(system.includes("前后答案必须一致"), "一致性铁律")
   assert.ok(system.includes("主动离开的\"→不是"), "反脑补示例(主动离开→不是)")
+  assert.ok(system.includes("生死未卜"), "汤底明写未知的事实有同型示例")
+  assert.ok(system.includes("绝不能答\"不是\""), "明写未知不得断言式否定")
   // 模糊解析长词优先
   assert.equal(parseHostAnswer("是也不是的"), "是也不是", "不能截断成'是'")
   assert.equal(parseHostAnswer("答案:不是"), "不是")
