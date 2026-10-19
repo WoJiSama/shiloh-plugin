@@ -31,6 +31,9 @@ class TurtleSoupPlugin extends plugin {
         { reg: "^[.。]游戏\\s+海龟汤\\s*评分\\s+[1-5](\\s+[\\s\\S]*)?\\s*$", fnc: "rateGame" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*(库存|题库)\\s*$", fnc: "inventory" },
         { reg: "^[.。]游戏\\s+海龟汤\\s*生成(\\s+\\d+)?\\s*$", fnc: "generateMore" },
+        { reg: "^[.。]游戏\\s+海龟汤\\s*待审\\s*$", fnc: "listPendingCmd" },
+        { reg: "^[.。]游戏\\s+海龟汤\\s*过审\\s+\\S+\\s*$", fnc: "approvePuzzleCmd" },
+        { reg: "^[.。]游戏\\s+海龟汤\\s*淘汰\\s+\\S+\\s*$", fnc: "rejectPuzzleCmd" },
         { reg: "^[\\s\\S]*$", fnc: "handleChat", log: false }
       ]
     })
@@ -112,6 +115,21 @@ class TurtleSoupPlugin extends plugin {
 
   async generateMore(e:AppEvent) {
     await this.reply(e, await turtleSoupManager.generateMore(e))
+    return true
+  }
+
+  async listPendingCmd(e:AppEvent) {
+    await this.reply(e, turtleSoupManager.listPending(e))
+    return true
+  }
+
+  async approvePuzzleCmd(e:AppEvent) {
+    await this.reply(e, await turtleSoupManager.reviewPuzzle(e, 'approve'))
+    return true
+  }
+
+  async rejectPuzzleCmd(e:AppEvent) {
+    await this.reply(e, await turtleSoupManager.reviewPuzzle(e, 'reject'))
     return true
   }
 

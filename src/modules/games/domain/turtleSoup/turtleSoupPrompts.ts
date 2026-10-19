@@ -178,6 +178,34 @@ export function makePuzzleId(nowMs:number, random:number):string {
 }
 
 // 生成产物文本 -> 合法汤面记录;字段不合法返回null,由调用方决定重试。
+// 独立逻辑审计:专职审计员逐句对照汤面与汤底,输出发现的逻辑漏洞清单
+export function buildLogicAuditMessages(puzzle:TurtleSoupPuzzle):ChatMessage[] {
+  return [
+    {role: 'system', content: [
+      '你是海龟汤逻辑审计员,唯一职责是挑毛病。对这道题做四项审计:',
+      '1. 逐句对照:把汤底当真相重讲一遍,对汤面每一句问"汤底解释了这句吗",任何一句解释不了或与汤底矛盾,记为漏洞;',
+      '2. 时间线:事件按先后排一遍,先果后因或时长不合理记为漏洞;',
+      '3. 物件与人物流转:汤面里每个关键物品/人物怎么来的、怎么到现在的位置、后来去了哪,说不通记为漏洞(例:某人带走的物品又出现在另一处却无解释);',
+      '4. 动机链:当事人每步行为是否有充分动机,推动剧情的"恰好"记为漏洞。',
+      '另外:汤面若直接泄露汤底或关键点,也是漏洞。',
+      '宁可错杀不可放过:拿不准的疑点也写进 holes。只输出JSON:',
+      '{"pass":true/false,"holes":["漏洞1","漏洞2"],"reason":"一句话总结"}(无漏洞时 pass=true,holes 为空数组)'
+    ].join('\n')},
+    {role: 'user', content: JSON.stringify({title: puzzle.title, surface: puzzle.surface, solution: puzzle.solution, keyPoints: puzzle.keyPoints, hints: puzzle.hints}, null, 2)}
+  ]
+}
+
+export interface ParsedLogicAudit {pass:boolean;holes:string[];reason:string}
+export function parseLogicAudit(text:unknown):ParsedLogicAudit|null {
+  const value = extractFirstJsonObject(text)
+  if (!value || typeof value.pass !== 'boolean') return null
+  return {
+    pass: value.pass === true,
+    holes: Array.isArray(value.holes) ? value.holes.filter((item):item is string => typeof item === 'string').slice(0, 10) : [],
+    reason: String(value.reason || '')
+  }
+}
+
 export function parseGeneratedPuzzle(text:unknown, meta:{nowMs:number;random:number;model:string}):TurtleSoupPuzzle|null {
   const value = extractFirstJsonObject(text)
   if (!value) return null

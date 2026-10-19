@@ -1,7 +1,7 @@
 // 海龟汤会话规则——状态机转移、超时判定、选汤策略、评分聚合与MVP素材,全部纯函数。
 // 时间戳统一用 epoch 毫秒,由基建层注入,便于测试与重启恢复。
 import type {TurtleSoupPlay, TurtleSoupPuzzle, TurtleSoupSession, TurtleSoupConfig, TurtleSoupPlayer, TurtleSoupRating, MvpBrief, MvpPlayerBrief} from '../../../../contracts/turtleSoup.js'
-import {normalizeSoupText} from './turtleSoupSimilarity.js'
+import { literalSoupSimilarity, normalizeSoupText } from './turtleSoupSimilarity.js'
 
 export function joiningOutcome(session:TurtleSoupSession, nowMs:number, minPlayers:number):'wait'|'start'|'cancel' {
   if (session.phase !== 'joining') return 'wait'
@@ -78,6 +78,31 @@ export function puzzlePlayStats(plays:TurtleSoupPlay[]):Map<string, PuzzlePlaySt
     stats.set(play.puzzleId, entry)
   }
   return stats
+}
+
+// 结构性审核(确定性,零成本):长度/条数/泄露等硬性问题;返回问题清单,空即通过
+export function auditPuzzleStructure(puzzle:TurtleSoupPuzzle):string[] {
+  const issues:string[] = []
+  const surfaceLength = Array.from(puzzle.surface || '').length
+  const solutionLength = Array.from(puzzle.solution || '').length
+  if (surfaceLength < 60 || surfaceLength > 250) issues.push(`汤面长度${surfaceLength}字,需60-250`)
+  if (solutionLength < 40) issues.push(`汤底过短(${solutionLength}字)`)
+  if (puzzle.keyPoints.length < 3 || puzzle.keyPoints.length > 6) issues.push(`关键点${puzzle.keyPoints.length}个,需3-6`)
+  if (puzzle.keyPoints.some(point => !String(point || '').trim())) issues.push('存在空关键点')
+  if (puzzle.hints.length < 3) issues.push(`提示仅${puzzle.hints.length}条`)
+  const normalizedSurface = normalizeSoupText(puzzle.surface)
+  for (const point of puzzle.keyPoints) {
+    const normalizedPoint = normalizeSoupText(point)
+    // 关键点成句(≥6字)归一化后整段出现在汤面 = 泄底;短词靠相似度兜底
+    if (normalizedPoint.length >= 6 && normalizedSurface.includes(normalizedPoint)) issues.push(`关键点近乎原文出现在汤面:${String(point).slice(0, 12)}`)
+    else if (normalizedPoint.length < 6 && literalSoupSimilarity(puzzle.surface, point) >= 0.9) issues.push(`关键点近乎原文出现在汤面:${String(point).slice(0, 12)}`)
+  }
+  return issues
+}
+
+// 待审池:生成后先 pending,过审才 active 参与投放
+export function pendingPuzzleIds(puzzles:TurtleSoupPuzzle[]):string[] {
+  return puzzles.filter(puzzle => puzzle.status === 'pending').map(puzzle => puzzle.id)
 }
 
 export function freshPuzzleIds(puzzles:TurtleSoupPuzzle[], stats:Map<string, PuzzlePlayStats>):string[] {

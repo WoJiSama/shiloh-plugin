@@ -19,7 +19,7 @@ export function decodeTurtleSoupPuzzle(value:unknown):TurtleSoupPuzzle {
     tags: strings(raw.tags),
     source: raw.source==='manual'?'manual':'ai',
     createdAt: numberOr(raw.createdAt, 0),
-    status: raw.status==='retired'?'retired':'active',
+    status: raw.status==='retired'?'retired':raw.status==='pending'?'pending':'active',
     ratingSum: numberOr(raw.ratingSum, 0),
     ratingCount: numberOr(raw.ratingCount, 0)
   }

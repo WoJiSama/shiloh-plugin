@@ -179,3 +179,22 @@ test("纯表情/符号不算提问,带文字的表情照常放行", async () => 
   assert.equal(looksLikeSoupQuestion("男人犯法了吗🤔"), true, "文字+表情放行")
   assert.equal(looksLikeSoupQuestion("妻子受伤了吗？🤔"), true, "文字+问号+表情放行")
 })
+
+test("结构审核:长度/条数/关键点泄露硬拦截", async () => {
+  const { auditPuzzleStructure, pendingPuzzleIds } = await import("../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js")
+  const good = { id: "x", title: "t", surface: "汉".repeat(100), solution: "底".repeat(60), keyPoints: ["点一", "点二", "点三"], hints: ["a", "b", "c"], difficulty: "normal", tags: [], source: "ai", createdAt: 1, status: "active", ratingSum: 0, ratingCount: 0 }
+  assert.deepEqual(auditPuzzleStructure(good), [])
+  assert.ok(auditPuzzleStructure({ ...good, surface: "太短" }).some(issue => issue.includes("汤面长度")))
+  assert.ok(auditPuzzleStructure({ ...good, keyPoints: ["仅一个"] }).some(issue => issue.includes("关键点")))
+  assert.ok(auditPuzzleStructure({ ...good, keyPoints: ["妻子当晚撑伞出门未归", "点二", "点三"], surface: "他发现妻子当晚撑伞出门未归,从此再无音讯,只留下这把伞。" + "汉".repeat(30) }).some(issue => issue.includes("近乎原文")), "成句关键点出现在汤面算泄露")
+  assert.deepEqual(pendingPuzzleIds([{ ...good }, { ...good, id: "p1", status: "pending" }]), ["p1"])
+})
+
+test("待审汤不进入投放:候选/随机池只认 active", async () => {
+  const { soupCandidatesFor, selectPuzzleId } = await import("../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js")
+  const p1 = { id: "p1", status: "pending", title: "t1", difficulty: "easy", tags: [], surface: "", solution: "", keyPoints: [], hints: [], ratingSum: 0, ratingCount: 0 }
+  const p2 = { ...p1, id: "p2", status: "active" }
+  const { strict, groupOnly } = soupCandidatesFor([p1, p2], new Map(), "100", [])
+  assert.deepEqual(strict.map(z => z.id), ["p2"], "pending 不投放")
+  assert.equal(selectPuzzleId([p1, p2], [], "100", () => 0), "p2")
+})

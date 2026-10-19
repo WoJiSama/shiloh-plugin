@@ -657,3 +657,29 @@ test("三选一随机池同样按参与人跨群排除", async () => {
     assert.ok(session.choosing.candidates.includes("p2"))
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
+
+test("题库审核命令:待审列表/过审进入投放/淘汰出池", async () => {
+  const harness = makeHarness()
+  try {
+    await harness.seedPuzzles([
+      puzzleOf("pA"),
+      { ...puzzleOf("pB"), status: "pending" },
+      { ...puzzleOf("pC"), status: "pending" }
+    ])
+    const manager = harness.manager
+    const admin = harness.event("u1", ".游戏 海龟汤 待审", { isMaster: true })
+    assert.match(manager.listPending(admin), /待审海龟汤 2 道/)
+    assert.match(manager.listPending(admin), /2\.【标题pC/)
+    // 非管理员被拦
+    assert.match(await manager.reviewPuzzle(harness.event("u9", ".游戏 海龟汤 过审 1"), "approve"), /仅管理员/)
+    // 过审 1 号(pB) → active 进入投放
+    assert.match(await manager.reviewPuzzle(harness.event("u1", ".游戏 海龟汤 过审 1", { isMaster: true }), "approve"), /标题pB.*已过审/)
+    assert.equal(harness.store.readPuzzles().puzzles.find(z => z.title.includes("pB")).status, "active")
+    // 淘汰 pC
+    assert.match(await manager.reviewPuzzle(harness.event("u1", ".游戏 海龟汤 淘汰 pC", { isMaster: true }), "reject"), /标题pC.*已淘汰/)
+    assert.equal(harness.store.readPuzzles().puzzles.find(z => z.title.includes("pC")).status, "retired")
+    assert.equal(manager.listPending(admin), "没有待审的海龟汤")
+    // 库存显示过待审数
+    assert.ok(manager.inventory(admin).includes("题库"))
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})

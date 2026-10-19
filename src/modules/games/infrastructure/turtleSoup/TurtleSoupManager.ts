@@ -427,7 +427,42 @@ export class TurtleSoupManager {
     const played = new Set(plays.map(play => play.puzzleId))
     const fresh = puzzles.filter(puzzle => puzzle.status === 'active' && !played.has(puzzle.id)).length
     const retired = puzzles.filter(puzzle => puzzle.status === 'retired').length
-    return `题库:共${puzzles.length}道(鲜汤${fresh}/目标${this.config().freshPoolTarget},已玩过${played.size},低分出池${retired})${fresh < this.config().freshPoolTarget ? "\n鲜汤不足,后台补货中;也可 .海龟汤 生成 <条数> 手动补充" : ""}`
+    const pending = puzzles.filter(puzzle => puzzle.status === 'pending').length
+    return `题库:共${puzzles.length}道(鲜汤${fresh}/目标${this.config().freshPoolTarget},待审${pending},已玩过${played.size},低分出池${retired})${pending ? `\n有${pending}道待审:.游戏 海龟汤 待审 查看并发 过审/淘汰` : ""}${fresh + pending < this.config().freshPoolTarget ? "\n鲜汤不足,后台补货中;也可 .游戏 海龟汤 生成 <条数> 手动补充" : ""}`
+  }
+
+  // —— 题库审核:生成的新汤默认待审,过审才进入投放池 ——
+
+  private findPending(selector:string):TurtleSoupPuzzle|null {
+    const pending = this.store.readPuzzles().puzzles.filter(puzzle => puzzle.status === 'pending')
+    const index = Number(selector)
+    if (Number.isInteger(index) && index >= 1 && index <= pending.length) return pending[index - 1]!
+    const hit = pending.find(puzzle => puzzle.id.startsWith(selector) || puzzle.title.includes(selector))
+    return hit ?? null
+  }
+
+  listPending(e:TurtleSoupEvent):string {
+    if (!this.isAdmin(e)) return "仅管理员可查看待审题"
+    const pending = this.store.readPuzzles().puzzles.filter(puzzle => puzzle.status === 'pending')
+    if (!pending.length) return "没有待审的海龟汤"
+    const lines = [`待审海龟汤 ${pending.length} 道(过审后才会进入投放池):`]
+    pending.forEach((puzzle, index) => {
+      lines.push(`${index + 1}.【${puzzle.title}】(${puzzle.difficulty}) ${puzzle.surface.slice(0, 48)}…`)
+    })
+    lines.push(`.游戏 海龟汤 过审 <编号> 通过 · .游戏 海龟汤 淘汰 <编号> 弃用`)
+    return lines.join("\n")
+  }
+
+  async reviewPuzzle(e:TurtleSoupEvent, action:'approve'|'reject'):Promise<string> {
+    if (!this.isAdmin(e)) return "仅管理员可审核题库"
+    const selector = String(e?.msg || "").match(/^[.。]游戏\s+海龟汤\s*(?:过审|淘汰)\s+(\S+)\s*$/)?.[1] || ""
+    if (!selector) return "用法:.游戏 海龟汤 过审 <编号或标题> / 淘汰 <编号或标题>"
+    const puzzle = this.findPending(selector)
+    if (!puzzle) return `没找到对应的待审汤(可用编号或标题关键词)。发送 .游戏 海龟汤 待审 查看列表`
+    await this.store.savePuzzle({...puzzle, status: action === 'approve' ? 'active' : 'retired'})
+    return action === 'approve'
+      ? `【${puzzle.title}】已过审,进入投放池`
+      : `【${puzzle.title}】已淘汰`
   }
 
   async generateMore(e:TurtleSoupEvent):Promise<string> {

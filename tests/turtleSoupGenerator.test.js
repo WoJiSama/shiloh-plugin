@@ -20,10 +20,10 @@ function makeGenerator(callModel, {target = 2} = {}) {
 }
 
 const stories = [
-  "一个男人走进餐厅点了一碗汤，尝了一口就跳海了。",
-  "女人每晚都给隔壁送一份晚餐，某天邻居搬走后她却报了警。",
-  "男孩在生日当天收到自己寄出的信，看完后立刻收拾行李远走他乡。",
-  "值班护士查房时发现3床空了，却笑着帮病人掖好了被子。"
+  "一个男人走进海边餐厅点了一碗汤,他安静地尝了一口,随即放下勺子起身离开,走出餐厅直奔防波堤纵身跳海。他没结账,也没留下只言片语。",
+  "女人每晚准时给隔壁送一份晚餐,风雨无阻整整三个月,某天邻居悄悄搬走,她站在空房门前沉默良久,转身报了警,指控的却是自己。",
+  "男孩在生日当天收到一封自己半年前寄出的信,信封完好未拆,他读完信立刻收拾行李,天亮前离开了这座生活了二十年的城市,从此再未回来。",
+  "值班护士凌晨查房时发现3床空了,监护仪安静地摆在原处,她却笑着帮空床掖好了被子,还轻声道了晚安,第二天交班时也只字未提此事。"
 ]
 const soupJson = (title, storyIndex = 0) => [
   "```json",
@@ -42,11 +42,13 @@ test("generateOne parses fenced JSON, self-reviews and saves the puzzle", async 
     const puzzle = await generator.generateOne()
     assert.match(puzzle.id, /^ts_/)
     assert.equal(puzzle.source, "ai")
-    assert.equal(puzzle.status, "active")
+    assert.equal(puzzle.status, "pending", "入库即待审")
     assert.equal(puzzle.hints.length, 3)
-    assert.equal(calls.length, 2)
+    assert.equal(calls.length, 3, "出题+审题+逻辑审计三次调用")
     assert.equal(calls[0].options.temperature, 0.9)
     assert.equal(calls[1].options.temperature, 0.2)
+    assert.equal(calls[2].options.temperature, 0.2)
+    assert.ok(String(calls[2].messages[0].content).includes("逻辑审计员"), "第三道是独立逻辑审计")
     const saved = store.readPuzzles().puzzles
     assert.equal(saved.length, 1)
     assert.equal(saved[0].title, "一碗海龟汤")
@@ -62,8 +64,9 @@ test("ensureFreshPool tops the fresh pool up to target and stops", async () => {
   try {
     const outcome = await generator.ensureFreshPool()
     assert.equal(outcome.added, 2)
-    assert.equal(generator.freshCount(), 2)
+    assert.equal(generator.readyFreshCount(), 2, "待审计入保有量")
     assert.equal(store.readPuzzles().puzzles.length, 2)
+    assert.ok(store.readPuzzles().puzzles.every(z => z.status === "pending"))
     const again = await generator.ensureFreshPool()
     assert.equal(again.added, 0)
     assert.equal(generated, 2)
@@ -154,4 +157,38 @@ test("generation prompt carries rating feedback from the library", async () => {
     assert.match(captured, /标题bad1\(2\.0分\)/)
     assert.match(captured, /批评:"汤底太牵强"/)
   } finally { fs.rmSync(dir, {recursive: true, force: true}) }
+})
+
+test("生成三道关:结构不过/审题不过/逻辑审计不过均不入库,通过则 pending 入库", async () => {
+  const { TurtleSoupGenerator } = await import("../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupGenerator.js")
+  const goodPuzzle = { title: "深夜的钟楼", surface: "汉".repeat(100), solution: "底".repeat(60), keyPoints: ["点一", "点二", "点三"], hints: ["h1", "h2", "h3"], difficulty: "normal", tags: ["悬疑"] }
+  const genText = JSON.stringify(goodPuzzle)
+  const makePorts = replyPlan => {
+    const state = { count: 0 }
+    return {
+      store: { readPuzzles: () => ({ puzzles: []}), readPlays: () => ({plays: []}), savePuzzle: async puzzle => replyPlan.saved.push(puzzle) },
+      config: () => ({ freshPoolTarget: 2, contentPolicy: "宽松" }),
+      callModel: async () => { const item = replyPlan.responses[state.count++] ?? replyPlan.responses.at(-1); return typeof item === 'function' ? item() : item },
+      logger: { info() {} }
+    }
+  }
+
+  // 1) 结构不过(汤面太短)
+  let plan = { responses: [JSON.stringify({ ...goodPuzzle, surface: "太短" })], saved: [] }
+  await assert.rejects(new TurtleSoupGenerator(makePorts(plan)).generateOne(), /结构审核未通过/)
+  // 2) 审题不过(给足两轮重试的应答)
+  const reviewFalse = JSON.stringify({ pass: false, reason: "汤面泄底" })
+  plan = { responses: [genText, reviewFalse, genText, reviewFalse], saved: [] }
+  await assert.rejects(new TurtleSoupGenerator(makePorts(plan)).generateOne(), /审题未通过/)
+  // 3) 逻辑审计不过
+  const reviewTrue = JSON.stringify({ pass: true, reason: "ok" })
+  const auditFalse = JSON.stringify({ pass: false, holes: ["伞的流转无解释"], reason: "有漏洞" })
+  plan = { responses: [genText, reviewTrue, auditFalse, genText, reviewTrue, auditFalse], saved: [] }
+  await assert.rejects(new TurtleSoupGenerator(makePorts(plan)).generateOne(), /逻辑审计未通过.*伞的流转无解释/)
+  assert.equal(plan.saved.length, 0, "不过审不入库")
+  // 4) 全过 → pending 入库
+  plan = { responses: [genText, reviewTrue, JSON.stringify({ pass: true, holes: [], reason: "无漏洞" })], saved: [] }
+  const puzzle = await new TurtleSoupGenerator(makePorts(plan)).generateOne()
+  assert.equal(puzzle.status, "pending", "入库即待审")
+  assert.equal(plan.saved[0].status, "pending")
 })
