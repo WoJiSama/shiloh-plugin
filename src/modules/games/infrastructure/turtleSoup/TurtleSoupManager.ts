@@ -331,6 +331,12 @@ export class TurtleSoupManager {
   async endGame(e:TurtleSoupEvent):Promise<string> {
     const session = this.sessions.get(this.getGroupId(e))
     if (!session) return "本群没有进行中的海龟汤"
+    // 报名期结束 = 取消本局；不处理会让会话留在 joining，被 sweeper 到点自动开局"复活"
+    if (session.phase === 'joining') {
+      if (this.getUserId(e) !== session.initiatorId && !this.isAdmin(e)) return "只有发起人或群管理可以取消"
+      await this.drop(session.groupId)
+      return `报名期已结束,本局取消。想玩再 ${SOUP_COMMAND} 开局`
+    }
     if (session.phase === 'choosing') {
       if (this.getUserId(e) !== session.initiatorId && !this.isAdmin(e)) return "只有发起人或群管理可以取消"
       await this.drop(session.groupId)

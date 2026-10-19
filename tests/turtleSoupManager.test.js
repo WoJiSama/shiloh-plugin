@@ -614,3 +614,26 @@ test("choosing phase: nobody picks, sweep auto-randoms; join and cancel work mid
     assert.equal(harness.manager.getSession("100").phase, "playing")
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
+
+test("结束 during joining drops the lobby instead of leaving it to auto-start", async () => {
+  const harness = makeHarness()
+  try {
+    await harness.seedPuzzles([puzzleOf("p1")])
+    await harness.manager.openGame(harness.event("u1", ".游戏 海龟汤 开局"))
+    await harness.manager.joinGame(harness.event("u1", ".游戏 海龟汤 加入"))
+    await harness.manager.joinGame(harness.event("u2", ".游戏 海龟汤 加入"))
+    // 报名期发"结束"：必须真的取消，不能只回一句"本局已结束"留着会话
+    const reply = await harness.manager.endGame(harness.event("u1", ".游戏 海龟汤 结束"))
+    assert.match(reply, /报名期已结束,本局取消/)
+    assert.equal(harness.manager.getSession("100"), undefined, "报名期会话必须删除")
+    // 到点 sweep 不能再把这局"复活"上菜
+    harness.advance(5 * 60_000 + 1000)
+    await harness.manager.sweep()
+    assert.equal(harness.manager.getSession("100"), undefined)
+    assert.equal(harness.state.broadcasts.length, 0, "不应再出现上菜/开局播报")
+    // 非发起人在报名期结束依然被拦
+    await harness.manager.openGame(harness.event("u1", ".游戏 海龟汤 开局"))
+    await harness.manager.joinGame(harness.event("u1", ".游戏 海龟汤 加入"))
+    assert.match(await harness.manager.endGame(harness.event("u9", ".游戏 海龟汤 结束")), /只有发起人或群管理/)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
