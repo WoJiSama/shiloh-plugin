@@ -29,9 +29,13 @@ export function buildPuzzleGenerationMessages(options:GenerationPromptOptions):C
       '出题铁律:',
       '1. 汤面只呈现表象,不得泄露或强烈暗示汤底;汤底必须是能唯一解释汤面全部细节的完整真相,不允许还有其他同样自洽的解释。',
       '2. 汤面80-200字,信息具体(时间/人物/行为/结果),结局离奇但逻辑严密,不靠超自然解释(除非题面明示奇幻设定)。',
-      '3. keyPoints 列出3-6个判定玩家是否猜中的关键词或关键事实,玩家猜中全部核心要点才算破汤。',
-      '4. hints 给3条由粗到细的提示,第1条只点方向,第3条接近答案但仍不直接说出。',
-      `5. 题材尺度:${options.contentPolicy}。`,
+      '3. 逻辑严密三问,交稿前必须自查:',
+      '   a) 时间线:把事件按先后排一遍,不得有先果后因或时长不合理;',
+      '   b) 物件与人物流转:汤面里每个关键物品/人物在哪、怎么到的那里、后来去了哪,都要有明确交代(例:某人带走的物品又出现在另一处,必须解释它如何回来);',
+      '   c) 动机链:当事人每一步行为都要有充分动机,不得有人物"恰好错过/恰好不知道"这类推动剧情的巧合。',
+      '4. keyPoints 列出3-6个判定玩家是否猜中的关键词或关键事实,玩家猜中全部核心要点才算破汤;关键点必须是汤底明说的事实。',
+      '5. hints 给3条由粗到细的提示,第1条只点方向,第3条接近答案但仍不直接说出。',
+      `6. 题材尺度:${options.contentPolicy}。`,
       '只输出一个JSON对象,不要输出任何其他文字,格式:',
       '{"title":"标题(10字内)","surface":"汤面","solution":"汤底(完整真相)","keyPoints":["关键点"],"hints":["提示1","提示2","提示3"],"difficulty":"easy|normal|hard","tags":["标签"]}'
     ].join('\n')},
@@ -45,8 +49,9 @@ export function buildPuzzleReviewMessages(puzzle:TurtleSoupPuzzle):ChatMessage[]
       '你是海龟汤审题人,严格审查一道新题是否可玩。检查:',
       '1. 汤面是否泄露或过强暗示汤底;',
       '2. 汤底是否唯一解释汤面全部细节,有无其他同样自洽的真相;',
-      '3. 是否存在逻辑硬伤、不靠巧合无法自圆其说的地方;',
-      '4. 题材是否越界(血腥猎奇细节、涉政等)。',
+      '3. 逐句对照:把汤底当故事重讲一遍,对汤面每一句问"汤底解释了这句吗",任何一句解释不了或与汤底矛盾即 fail;',
+      '4. 逻辑三问:时间线是否自洽;关键物品/人物的流转是否闭环(出现的每件物品怎么来的、怎么没的都要说得通);行为动机链是否完整、是否依赖巧合;',
+      '5. 题材是否越界(血腥猎奇细节、涉政等)。',
       '只输出JSON:{"pass":true/false,"reason":"一句话理由"}'
     ].join('\n')},
     {role: 'user', content: JSON.stringify({title: puzzle.title, surface: puzzle.surface, solution: puzzle.solution, keyPoints: puzzle.keyPoints, hints: puzzle.hints}, null, 2)}
