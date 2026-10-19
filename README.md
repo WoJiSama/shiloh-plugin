@@ -1,12 +1,12 @@
-# bl-chat-plugin
+# shiloh-plugin
 
-> 基于 TRSS-Yunzai + NapCat 的 QQ 群聊 LLM Agent 平台（部署名 `shiloh-plugin`）
+> 基于 TRSS-Yunzai + NapCat 的 QQ 群聊 LLM Agent 平台
 
 TRSS-Yunzai · OneBot v11（NapCat）· Node.js ≥ 22.12 · TypeScript 严格模式 · MIT
 
-bl-chat-plugin 不只是一个"能回话的聊天插件"。它把一个大模型 Agent 需要的对话编排、多层记忆、函数调用工具、消息可靠投递、群自动化管理和运营观测做成了一个完整平台，并在 23 个群、周消息 3.4 万条、峰值日 6,500+ 条的真实环境里持续运行。
+shiloh-plugin 不只是一个"能回话的聊天插件"。它把一个大模型 Agent 需要的对话编排、多层记忆、函数调用工具、消息可靠投递、群自动化管理和运营观测做成了一个完整平台，并在 23 个群、周消息 3.4 万条、峰值日 6,500+ 条的真实环境里持续运行。
 
-本项目基于 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin)（原 shiloh-plugin）深度二次开发：业务代码已 100% 迁移到 TypeScript 严格模式并按领域分层重写，消息管道、语义记忆、Agent 调度、群管系统、控制台均为本仓库重新实现。与上游的关系见文末[致谢](#致谢与上游)。
+本项目基于上游 shiloh-plugin（作者 Cat-bl）深度二次开发：业务代码已 100% 迁移到 TypeScript 严格模式并按领域分层重写，消息管道、语义记忆、Agent 调度、群管系统、控制台均为本仓库重新实现。与上游的关系见文末[致谢](#致谢与上游)。
 
 ## 目录
 
@@ -312,7 +312,7 @@ src/
 
 ## 致谢与上游
 
-本项目源自 [Cat-bl/bl-chat-plugin](https://github.com/Cat-bl/bl-chat-plugin)（原 shiloh-plugin），感谢上游提供的 Yunzai 插件结构与初始能力。本仓库随后完成了 TypeScript 全量迁移、分层重写、消息管道、语义记忆、控制台等大规模重构，代码组织与运行方式已与上游不同；上游原有能力请以上游文档为准。只需要原版插件的用户建议直接使用上游仓库。
+本项目源自上游 shiloh-plugin（作者 Cat-bl），感谢上游提供的 Yunzai 插件结构与初始能力。本仓库随后完成了 TypeScript 全量迁移、分层重写、消息管道、语义记忆、控制台等大规模重构，代码组织与运行方式已与上游不同；上游原有能力请以上游文档为准。只需要原版插件的用户建议直接使用上游仓库。
 
 ## 许可证
 
