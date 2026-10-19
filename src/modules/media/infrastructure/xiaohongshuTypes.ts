@@ -1,0 +1,5 @@
+export interface XiaohongshuCard {type?:string;platform?:string;text?:string;data?:{text?:string};note_id?:string;short_url?:string;page_url?:string;xsec_token?:string;metadata_status?:string;metadata_failure_reason?:string;title?:string;description?:string;author?:string;cover_url?:string;images?:string[];liked?:number;collected?:number;comment_count?:number;media_kind?:string;final_url?:string}
+export interface MediaLogger {warn?(message:string):void;info?(message:string):void}
+export interface XiaohongshuOptions {fetchImpl?:typeof fetch;timeoutMs?:number;cacheTtlMs?:number;forceStaticParse?:boolean;cookieHeader?:string;logger?:MediaLogger|undefined;browserResolver?:(card:XiaohongshuCard,options:{logger?:MediaLogger|undefined})=>Promise<XiaohongshuCard|null>}
+export function record(value:unknown):Record<string,unknown>{return value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
+export function errorText(error:unknown):string{return error instanceof Error?error.message:String(error)}

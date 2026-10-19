@@ -3,7 +3,7 @@ export interface RuntimePipeline extends RuntimePart { start(bot:unknown):unknow
 interface FactoryContext {logger?:RuntimeLogger|undefined}
 interface StoreFactoryOptions extends FactoryContext {redis:unknown;eventTtlSeconds:number;deliveryTtlSeconds:number}
 interface ArtifactFactoryOptions extends FactoryContext {ttlMs:number;maxEntries:number;maxIdleBytes:number;maxEncodedBytes:number}
-interface OutboxFactoryOptions extends FactoryContext {store:unknown;gateway:unknown;enabled:boolean;maxAttempts:number;retryBaseMs:number;leaseMs:number;concurrency:number;prepareConcurrency:number;autoBilibiliMemberAuth:boolean;getBilibiliAuthCookie():unknown;artifactStore:unknown;youtubeRelay:unknown;pixivRelay:unknown;sharedMedia:{hostDir:string;containerDir:string}|null}
+interface OutboxFactoryOptions extends FactoryContext {store:unknown;gateway:unknown;enabled:boolean;maxAttempts:number;retryBaseMs:number;leaseMs:number;concurrency:number;prepareConcurrency:number;autoBilibiliMemberAuth:boolean;getBilibiliAuthCookie():unknown;artifactStore:unknown;youtubeRelay:unknown;pixivRelay:unknown;xiaohongshuRelay:unknown;sharedMedia:{hostDir:string;containerDir:string}|null}
 interface PipelineFactoryOptions extends FactoryContext {store:unknown;recentManager:unknown;archiveManager:unknown;mediaOutbox:RuntimePart;emojiCollector:unknown;maxAttempts:number;retryBaseMs:number;leaseMs:number;concurrency:number;resolveForwardContext(envelope:unknown):Promise<unknown>;stats:unknown}
 export interface RuntimeAssemblyPorts {
  getBot():unknown;getRedis():unknown;getLogger():RuntimeLogger|undefined

@@ -1,0 +1,9 @@
+import {createXiaohongshuMessage} from '../dist/backend/modules/media/infrastructure/xiaohongshuMessage.js'
+import {resolveXiaohongshuShareViaBrowser} from './xiaohongshuBrowserResolver.js'
+export {parseXiaohongshuInitialState,buildCardFromNoteState,normalizeXiaohongshuImageUrl,decodeXiaohongshuCardEntities,extractXiaohongshuFileId} from '../dist/backend/modules/media/infrastructure/xiaohongshuMessage.js'
+const runtime=createXiaohongshuMessage({browserResolver:resolveXiaohongshuShareViaBrowser,logger:globalThis.logger})
+export const extractXiaohongshuShareFromText=runtime.extractXiaohongshuShareFromText
+export const enrichXiaohongshuShare=runtime.enrichXiaohongshuShare
+export const formatXiaohongshuHistoryText=runtime.formatXiaohongshuHistoryText
+export const formatXiaohongshuHistoryLinks=runtime.formatXiaohongshuHistoryLinks
+export const clearXiaohongshuMetadataCache=runtime.clearXiaohongshuMetadataCache

@@ -1,0 +1,5 @@
+import {createXiaohongshuMediaRelay} from '../dist/backend/modules/media/infrastructure/xiaohongshuMediaRelay.js'
+const runtime=createXiaohongshuMediaRelay({segmentApi:globalThis.segment,logger:globalThis.logger})
+export const downloadXiaohongshuImage=runtime.downloadXiaohongshuImage
+export const buildXiaohongshuRelaySegments=runtime.buildXiaohongshuRelaySegments
+export const cleanupXiaohongshuRelayFiles=runtime.cleanupXiaohongshuRelayFiles

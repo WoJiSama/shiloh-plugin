@@ -111,6 +111,7 @@ function createMessagePipelineRuntime({
     artifactStore,
     youtubeRelay: pluginSettings.youtubeRelay || {},
     pixivRelay: pluginSettings.pixivRelay || {},
+    xiaohongshuRelay: pluginSettings.xiaohongshuRelay || {},
     sharedMedia: config.mediaSharedHostDir && config.mediaSharedContainerDir
       ? { hostDir: config.mediaSharedHostDir, containerDir: config.mediaSharedContainerDir }
       : null

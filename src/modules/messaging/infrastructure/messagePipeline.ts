@@ -22,7 +22,7 @@ export function isEventJob(value: unknown): value is EventJob {
    ['occurredAt','capturedAt'].every(key => typeof envelope[key] === 'number' && Number.isFinite(envelope[key]))
 }
 export function createMessagePipelineClass(ports:PipelinePorts) {
- const {extractBilibiliShareFromSegment,extractBilibiliShareFromText,extractDouyinShareFromText,extractYoutubeShareFromText,extractPixivShareFromText,isResponsibleBot,isFederationSibling,markBotOnline,onlineBotList,createEventEnvelope}=ports
+ const {extractBilibiliShareFromSegment,extractBilibiliShareFromText,extractDouyinShareFromText,extractYoutubeShareFromText,extractPixivShareFromText,extractXiaohongshuShareFromText,isResponsibleBot,isFederationSibling,markBotOnline,onlineBotList,createEventEnvelope}=ports
  const {enrichBilibili:enrichBilibiliMessageSegments,enrichDouyin:enrichDouyinMessageSegments,enrichYoutube:enrichYoutubeMessageSegments,enrichPixiv:enrichPixivMessageSegments}=ports
 const DEFAULT_MAX_ATTEMPTS = 5
 const DEFAULT_RETRY_BASE_MS = 1000
@@ -50,6 +50,7 @@ function findRawMedia(envelope: EventEnvelope) {
   return extractDouyinShareFromText(envelope.rawMessage)
     || extractYoutubeShareFromText(envelope.rawMessage)
     || extractPixivShareFromText(envelope.rawMessage)
+    || extractXiaohongshuShareFromText(envelope.rawMessage)
 }
 
 function hasCollectibleImage(envelope: EventEnvelope) {

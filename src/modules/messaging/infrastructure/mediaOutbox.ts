@@ -4,7 +4,7 @@ import { AsyncSemaphore, KeyedSerialQueue } from "./keyedSerialQueue.js"
 import { LeaseLostError, startLeaseHeartbeat } from "./leaseHeartbeat.js"
 import type { DeliverySegment, ForwardNode, FileOptions } from './deliveryGateway.js'
 import type { RedisJobStore } from './redisJobStore.js'
-interface Card { type: string; bvid?: string; ep_id?: string; short_url?: string; page_url?: string; aweme_id?: string; video_id?: string; artwork_id?: string; metadata_status?: string; metadata_failure_reason?: string; [key: string]: unknown }
+interface Card { type: string; bvid?: string; ep_id?: string; short_url?: string; page_url?: string; aweme_id?: string; video_id?: string; artwork_id?: string; note_id?: string; metadata_status?: string; metadata_failure_reason?: string; [key: string]: unknown }
 interface Relay { segments: (DeliverySegment | string)[]; tempFiles: string[]; artifactLeases?: { release(): Promise<unknown> }[]; sharedMediaFiles?: string[]; qualityOptions?: { label: string }[]; imageNodes?: DeliverySegment[] }
 interface Timings { refresh: number; playback: number; download: number }
 interface Job { version: number; id: string; eventId: string; platform: string; botId: string; groupId: string; messageId: string; media: Card; state: string; attempts: number; createdAt: number; updatedAt: number; nextRetryAt: number; leaseUntil: number; ownerRunId: string; receipt: unknown; lastError: string; fallbackStatus?: string; fallbackReason?: string; lastMediaError?: string; timings?: object; lastRetcode?: unknown; uncertain?: boolean }
@@ -13,12 +13,12 @@ export function isDeliveryJob(value: unknown): value is Job {
  if (!value || Array.isArray(value) || !job.media || Array.isArray(job.media)) return false
  if (!['pending','processing','retry_wait','sending','sent','failed','uncertain'].includes(String(job.state))) return false
  if (job.version !== 1 || typeof job.id !== 'string' || !job.id || typeof job.eventId !== 'string' || !job.eventId) return false
- if (typeof job.platform !== 'string' || !['bilibili','douyin','youtube','pixiv'].includes(job.platform) || media.type !== job.platform) return false
+ if (typeof job.platform !== 'string' || !['bilibili','douyin','youtube','pixiv','xiaohongshu'].includes(job.platform) || media.type !== job.platform) return false
  if (typeof job.botId !== 'string' || !/^[1-9]\d*$/.test(job.botId) || typeof job.groupId !== 'string' || !/^[1-9]\d*$/.test(job.groupId)) return false
  if (typeof job.messageId !== 'string' || typeof job.ownerRunId !== 'string' || typeof job.lastError !== 'string') return false
  for (const field of ['attempts','createdAt','updatedAt','nextRetryAt','leaseUntil']) if (typeof job[field] !== 'number' || !Number.isFinite(job[field]) || Number(job[field]) < 0) return false
  if (!Number.isInteger(job.attempts)) return false
- for (const field of ['bvid','ep_id','short_url','page_url','aweme_id','video_id','artwork_id','metadata_status','metadata_failure_reason']) if (media[field] !== undefined && typeof media[field] !== 'string') return false
+ for (const field of ['bvid','ep_id','short_url','page_url','aweme_id','video_id','artwork_id','note_id','metadata_status','metadata_failure_reason']) if (media[field] !== undefined && typeof media[field] !== 'string') return false
  return true
 }
 interface Prepared { card: Card; relay: Relay; relayBuildFailed: boolean; timings: Timings }
@@ -31,14 +31,14 @@ interface RelayConfig { enabled?: boolean; binary?: unknown; metadataTimeoutMs?:
 interface OutboxOptions {
  store: RedisJobStore; gateway: { sendGroupForward(args: {botId:string;groupId:string;nodes:ForwardNode[]}): Promise<unknown>; sendGroupText?(args:{botId:string;groupId:string;text:string}):Promise<unknown> }; logger?: Logger
  enabled?: boolean; maxAttempts?: number; retryBaseMs?: number; leaseMs?: number; queue?: KeyedSerialQueue; concurrency?: number; prepareConcurrency?: number
- enrichBilibili?: Enrich; enrichDouyin?: Enrich; enrichYoutube?: Enrich; enrichPixiv?: Enrich
- buildBilibili?: Build; buildDouyin?: Build; buildYoutube?: Build; buildPixiv?: Build
+ enrichBilibili?: Enrich; enrichDouyin?: Enrich; enrichYoutube?: Enrich; enrichPixiv?: Enrich; enrichXiaohongshu?: Enrich
+ buildBilibili?: Build; buildDouyin?: Build; buildYoutube?: Build; buildPixiv?: Build; buildXiaohongshu?: Build
  autoBilibiliMemberAuth?: boolean; getBilibiliAuthCookie?: () => string; artifactStore?: (NonNullable<FileOptions['artifactStore']> & { stop?(): Promise<unknown> }) | null
- sharedMedia?: FileOptions['sharedMedia']; prepareThumbnail?: (file: string) => Promise<{file:string;cleanup():Promise<unknown>}>; youtubeRelay?: RelayConfig; pixivRelay?: RelayConfig
+ sharedMedia?: FileOptions['sharedMedia']; prepareThumbnail?: (file: string) => Promise<{file:string;cleanup():Promise<unknown>}>; youtubeRelay?: RelayConfig; pixivRelay?: RelayConfig; xiaohongshuRelay?: RelayConfig
 }
 interface OutboxPorts {
- defaults: Required<Pick<OutboxOptions,'enrichBilibili'|'enrichDouyin'|'enrichYoutube'|'enrichPixiv'|'buildBilibili'|'buildDouyin'|'buildYoutube'|'buildPixiv'|'prepareThumbnail'>>
- platforms: Record<'bilibili'|'douyin'|'youtube'|'pixiv', Pick<PlatformAdapter,'cleanup'|'formatText'|'formatLinks'>>
+ defaults: Required<Pick<OutboxOptions,'enrichBilibili'|'enrichDouyin'|'enrichYoutube'|'enrichPixiv'|'enrichXiaohongshu'|'buildBilibili'|'buildDouyin'|'buildYoutube'|'buildPixiv'|'buildXiaohongshu'|'prepareThumbnail'>>
+ platforms: Record<'bilibili'|'douyin'|'youtube'|'pixiv'|'xiaohongshu', Pick<PlatformAdapter,'cleanup'|'formatText'|'formatLinks'>>
  logger?: Logger; botIdentity(botId:string): { uin?: string | number; nickname?: string }
  isForwardResourceFailure(error: unknown): boolean
  inlineForwardLocalFileSegment(segment: DeliverySegment, options: FileOptions): Promise<DeliverySegment>
@@ -47,11 +47,12 @@ interface OutboxPorts {
 function record(value: unknown): Record<string,unknown> { return value && typeof value === 'object' ? value as Record<string,unknown> : {} }
 export function createMediaOutboxClass(ports: OutboxPorts) {
 const { inlineForwardLocalFileSegment, inlineForwardVideoSegment, isForwardResourceFailure } = ports
-const { enrichBilibili: enrichBilibiliShare, enrichDouyin: enrichDouyinShare, enrichYoutube: enrichYoutubeShare, enrichPixiv: enrichPixivShare, buildBilibili: buildBilibiliArchiveRelaySegments, buildDouyin: buildDouyinArchiveRelaySegments, buildYoutube: buildYoutubeArchiveRelaySegments, buildPixiv: buildPixivArchiveRelaySegments, prepareThumbnail: createVideoThumbnail } = ports.defaults
+const { enrichBilibili: enrichBilibiliShare, enrichDouyin: enrichDouyinShare, enrichYoutube: enrichYoutubeShare, enrichPixiv: enrichPixivShare, enrichXiaohongshu: enrichXiaohongshuShare, buildBilibili: buildBilibiliArchiveRelaySegments, buildDouyin: buildDouyinArchiveRelaySegments, buildYoutube: buildYoutubeArchiveRelaySegments, buildPixiv: buildPixivArchiveRelaySegments, buildXiaohongshu: buildXiaohongshuRelaySegments, prepareThumbnail: createVideoThumbnail } = ports.defaults
 const { cleanup: cleanupBilibiliArchiveRelayFiles, formatText: formatBilibiliHistoryText, formatLinks: formatBilibiliHistoryLinks } = ports.platforms.bilibili
 const { cleanup: cleanupDouyinArchiveRelayFiles, formatText: formatDouyinHistoryText, formatLinks: formatDouyinHistoryLinks } = ports.platforms.douyin
 const { cleanup: cleanupYoutubeArchiveRelayFiles, formatText: formatYoutubeHistoryText, formatLinks: formatYoutubeHistoryLinks } = ports.platforms.youtube
 const { cleanup: cleanupPixivArchiveRelayFiles, formatText: formatPixivHistoryText, formatLinks: formatPixivHistoryLinks } = ports.platforms.pixiv
+const { cleanup: cleanupXiaohongshuRelayFiles, formatText: formatXiaohongshuHistoryText, formatLinks: formatXiaohongshuHistoryLinks } = ports.platforms.xiaohongshu
 
 const DEFAULT_MAX_ATTEMPTS = 4
 const DEFAULT_RETRY_BASE_MS = 5000
@@ -90,15 +91,16 @@ const PLATFORM_LABELS: Readonly<Record<string,string>> = Object.freeze({
   bilibili: "B站视频搬一下",
   douyin: "抖音视频搬一下",
   youtube: "YouTube视频搬一下",
-  pixiv: "Pixiv作品解析"
+  pixiv: "Pixiv作品解析",
+  xiaohongshu: "小红书笔记搬一下"
 })
 
 class MediaOutbox {
  store: RedisJobStore; gateway: OutboxOptions['gateway']; logger: Logger | undefined; enabled: boolean; maxAttempts:number; retryBaseMs:number;leaseMs:number
  queue: KeyedSerialQueue; semaphore: AsyncSemaphore; prepareSemaphore: AsyncSemaphore
- enrichBilibili: Enrich; enrichDouyin: Enrich; enrichYoutube: Enrich; enrichPixiv: Enrich
- buildBilibili: Build; buildDouyin: Build; buildYoutube: Build; buildPixiv: Build
- autoBilibiliMemberAuth:boolean;getBilibiliAuthCookie:()=>string;artifactStore:OutboxOptions['artifactStore'];sharedMedia:FileOptions['sharedMedia'];prepareThumbnail:NonNullable<OutboxOptions['prepareThumbnail']>;youtubeRelay:RelayConfig;pixivRelay:RelayConfig
+ enrichBilibili: Enrich; enrichDouyin: Enrich; enrichYoutube: Enrich; enrichPixiv: Enrich; enrichXiaohongshu: Enrich
+ buildBilibili: Build; buildDouyin: Build; buildYoutube: Build; buildPixiv: Build; buildXiaohongshu: Build
+ autoBilibiliMemberAuth:boolean;getBilibiliAuthCookie:()=>string;artifactStore:OutboxOptions['artifactStore'];sharedMedia:FileOptions['sharedMedia'];prepareThumbnail:NonNullable<OutboxOptions['prepareThumbnail']>;youtubeRelay:RelayConfig;pixivRelay:RelayConfig;xiaohongshuRelay:RelayConfig
  refreshPromises:Map<string,Promise<Card>>;preparedRelays:Map<string,PreparedEntry>;runId:string;timers:Map<string,ReturnType<typeof setTimeout>>;stopped:boolean
 
   constructor({
@@ -116,17 +118,20 @@ class MediaOutbox {
     enrichDouyin = enrichDouyinShare,
     enrichYoutube = enrichYoutubeShare,
     enrichPixiv = enrichPixivShare,
+    enrichXiaohongshu = enrichXiaohongshuShare,
     buildBilibili = buildBilibiliArchiveRelaySegments,
     buildDouyin = buildDouyinArchiveRelaySegments,
     buildYoutube = buildYoutubeArchiveRelaySegments,
     buildPixiv = buildPixivArchiveRelaySegments,
+    buildXiaohongshu = buildXiaohongshuRelaySegments,
     autoBilibiliMemberAuth = false,
     getBilibiliAuthCookie = () => "",
     artifactStore = null,
     sharedMedia = null,
     prepareThumbnail = createVideoThumbnail,
     youtubeRelay = {},
-    pixivRelay = {}
+    pixivRelay = {},
+    xiaohongshuRelay = {}
   }: OutboxOptions) {
     this.store = store
     this.gateway = gateway
@@ -142,10 +147,12 @@ class MediaOutbox {
     this.enrichDouyin = enrichDouyin
     this.enrichYoutube = enrichYoutube
     this.enrichPixiv = enrichPixiv
+    this.enrichXiaohongshu = enrichXiaohongshu
     this.buildBilibili = buildBilibili
     this.buildDouyin = buildDouyin
     this.buildYoutube = buildYoutube
     this.buildPixiv = buildPixiv
+    this.buildXiaohongshu = buildXiaohongshu
     this.autoBilibiliMemberAuth = autoBilibiliMemberAuth === true
     this.getBilibiliAuthCookie = getBilibiliAuthCookie
     this.artifactStore = artifactStore
@@ -153,6 +160,7 @@ class MediaOutbox {
     this.prepareThumbnail = prepareThumbnail
     this.youtubeRelay = youtubeRelay && typeof youtubeRelay === "object" ? youtubeRelay : {}
     this.pixivRelay = pixivRelay && typeof pixivRelay === "object" ? pixivRelay : {}
+    this.xiaohongshuRelay = xiaohongshuRelay && typeof xiaohongshuRelay === "object" ? xiaohongshuRelay : {}
     this.refreshPromises = new Map()
     this.preparedRelays = new Map()
     this.runId = randomUUID()
@@ -352,6 +360,18 @@ class MediaOutbox {
         enrichOptions: { proxyUrl: this.pixivRelay.proxyUrl },
         enabled: this.pixivRelay.enabled !== false,
         resolvedStatuses: ["resolved"]
+      },
+      xiaohongshu: {
+        stableId: card => card?.note_id || card?.page_url || card?.short_url,
+        enrich: this.enrichXiaohongshu,
+        build: this.buildXiaohongshu,
+        cleanup: cleanupXiaohongshuRelayFiles,
+        formatText: formatXiaohongshuHistoryText,
+        formatLinks: formatXiaohongshuHistoryLinks,
+        relayOptions: { xiaohongshuRelay: this.xiaohongshuRelay },
+        enrichOptions: { cookieHeader: this.xiaohongshuRelay.cookieHeader },
+        enabled: this.xiaohongshuRelay.enabled !== false,
+        resolvedStatuses: ["resolved"]
       }
     }
     return adapters[type] || null
@@ -511,7 +531,9 @@ class MediaOutbox {
       else if (card.metadata_status && !adapter?.resolvedStatuses?.includes(card.metadata_status)) {
         const reason = card.metadata_failure_reason || (card.metadata_status === "bangumi_metadata_failed"
           ? "已识别为B站番剧集，但番剧详情未返回可播放分集信息"
-          : job.platform === "pixiv" ? "Pixiv 作品详情暂时未解析完成" : "视频详情暂时未解析完成")
+          : job.platform === "pixiv" ? "Pixiv 作品详情暂时未解析完成"
+          : job.platform === "xiaohongshu" ? "小红书笔记详情暂时未解析完成"
+          : "视频详情暂时未解析完成")
         nonVideoSegments.push(`\n（${reason}，已保留当前卡片信息和页面）`)
       }
       const videos = []

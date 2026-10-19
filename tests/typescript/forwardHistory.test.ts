@@ -42,7 +42,7 @@ function fixture(t:TestContext) {
  const Recent=createMessageManagerClass(ports), recent=new Recent()
  const pipelinePorts:PipelinePorts={
   enrichBilibili:passthrough,enrichDouyin:passthrough,enrichYoutube:passthrough,enrichPixiv:passthrough,
-  extractBilibiliShareFromSegment:()=>null,extractBilibiliShareFromText:()=>null,extractDouyinShareFromText:()=>null,extractYoutubeShareFromText:()=>null,extractPixivShareFromText:()=>null,
+  extractBilibiliShareFromSegment:()=>null,extractBilibiliShareFromText:()=>null,extractDouyinShareFromText:()=>null,extractYoutubeShareFromText:()=>null,extractPixivShareFromText:()=>null,extractXiaohongshuShareFromText:()=>null,
   isResponsibleBot:async()=>true,isFederationSibling:async()=>false,markBotOnline(){},onlineBotList:async()=>['1'],
   createEventEnvelope:(event,postType)=>createEventEnvelope(event as Record<string,unknown>,postType)
  }

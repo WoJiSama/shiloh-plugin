@@ -2,6 +2,7 @@ import { enrichBilibiliMessageSegments, extractBilibiliShareFromSegment, extract
 import { enrichDouyinMessageSegments, extractDouyinShareFromText } from "../douyinMessage.js"
 import { enrichYoutubeMessageSegments, extractYoutubeShareFromText } from "../youtubeMessage.js"
 import { enrichPixivMessageSegments, extractPixivShareFromText } from "../pixivMessage.js"
+import { extractXiaohongshuShareFromText } from "../xiaohongshuMessage.js"
 import { createEventEnvelope, envelopeToRuntimeEvent, isEnvelopeFromBot } from "./eventEnvelope.js"
 import { isResponsibleBot, isFederationSibling, markBotOnline, onlineBotList } from "../botFederation.js"
 
@@ -10,7 +11,7 @@ const TypedMessagePipeline = createMessagePipelineClass({
   enrichBilibili: enrichBilibiliMessageSegments, enrichDouyin: enrichDouyinMessageSegments,
   enrichYoutube: enrichYoutubeMessageSegments, enrichPixiv: enrichPixivMessageSegments,
   extractBilibiliShareFromSegment, extractBilibiliShareFromText, extractDouyinShareFromText,
-  extractYoutubeShareFromText, extractPixivShareFromText, createEventEnvelope,
+  extractYoutubeShareFromText, extractPixivShareFromText, extractXiaohongshuShareFromText, createEventEnvelope,
   isResponsibleBot, isFederationSibling, markBotOnline, onlineBotList
 })
 export class MessagePipeline extends TypedMessagePipeline {

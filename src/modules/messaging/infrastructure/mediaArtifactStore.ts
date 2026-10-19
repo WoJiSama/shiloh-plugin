@@ -1,6 +1,6 @@
 interface ArtifactEntry { key: string; promise: Promise<string | null> | null; filePath: string; size: number; refs: number; lastAccessAt: number; cleanupTimer: ReturnType<typeof setTimeout> | null; base64Promise: Promise<string> | null }
 export interface ArtifactOptions { ttlMs?: number; maxEntries?: number; maxIdleBytes?: number; maxEncodedBytes?: number; logger?: { warn(message: string): void } }
-export interface ArtifactIdentity { bvid?: unknown; cid?: unknown; page?: unknown; quality?: unknown; qn?: unknown; aweme_id?: unknown; awemeId?: unknown; video_id?: unknown; videoId?: unknown; artwork_id?: unknown; artworkId?: unknown }
+export interface ArtifactIdentity { bvid?: unknown; cid?: unknown; page?: unknown; quality?: unknown; qn?: unknown; aweme_id?: unknown; awemeId?: unknown; video_id?: unknown; videoId?: unknown; artwork_id?: unknown; artworkId?: unknown; note_id?: unknown; noteId?: unknown }
 import fs from "node:fs"
 
 const DEFAULT_TTL_MS = 2 * 60 * 1000

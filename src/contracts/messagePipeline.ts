@@ -2,7 +2,7 @@ import type { EventEnvelope,EventJob,MessageSegment,ForwardContext,PipelineLogge
 export type RuntimeEvent = Record<string,unknown>
 export interface PipelinePorts {
  enrichBilibili(message:MessageSegment[],text:string):Promise<MessageSegment[]>;enrichDouyin(message:MessageSegment[],text:string):Promise<MessageSegment[]>;enrichYoutube(message:MessageSegment[],text:string):Promise<MessageSegment[]>;enrichPixiv(message:MessageSegment[],text:string):Promise<MessageSegment[]>
- extractBilibiliShareFromSegment(segment:MessageSegment,text:string):MessageSegment|null;extractBilibiliShareFromText(text:string):MessageSegment|null;extractDouyinShareFromText(text:string):MessageSegment|null;extractYoutubeShareFromText(text:string):MessageSegment|null;extractPixivShareFromText(text:string):MessageSegment|null
+ extractBilibiliShareFromSegment(segment:MessageSegment,text:string):MessageSegment|null;extractBilibiliShareFromText(text:string):MessageSegment|null;extractDouyinShareFromText(text:string):MessageSegment|null;extractYoutubeShareFromText(text:string):MessageSegment|null;extractPixivShareFromText(text:string):MessageSegment|null;extractXiaohongshuShareFromText(text:string):MessageSegment|null
  isResponsibleBot(input:{groupId:string;selfId:string;atBotQqs:string[];knownBots:string[]}):Promise<boolean>;isFederationSibling(me:string,who:string):Promise<boolean>;markBotOnline(id:string):unknown;onlineBotList():Promise<string[]>
  createEventEnvelope(event:unknown,postType?:string):EventEnvelope
 }
