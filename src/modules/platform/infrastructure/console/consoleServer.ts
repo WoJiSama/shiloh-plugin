@@ -51,7 +51,9 @@ import memorySchema from "../../../config/domain/schemas/shared/memory.js"
 import { turtleSoupSchema, umaRaceSchema, deltaForceSchema } from "../../../config/domain/schemas/shared/games.js"
 import { TurtleSoupStore, readTurtleSoupConfig } from "../../../games/infrastructure/turtleSoup/TurtleSoupStore.js"
 import { TurtleSoupGenerator } from "../../../games/infrastructure/turtleSoup/TurtleSoupGenerator.js"
-import type { TurtleSoupPuzzleStatus } from "../../../../contracts/turtleSoup.js"
+import { auditPuzzleStructure } from "../../../games/domain/turtleSoup/turtleSoupRules.js"
+import { buildPuzzleReviewMessages, buildLogicAuditMessages, parsePuzzleReview, parseLogicAudit } from "../../../games/domain/turtleSoup/turtleSoupPrompts.js"
+import type { TurtleSoupPuzzleStatus, TurtleSoupAuditRecord } from "../../../../contracts/turtleSoup.js"
 import { buildGroupAdminDefaultsView, prepareGroupAdminDefaultUpdates, buildGroupAdminView, prepareGroupAdminUpdates } from "../../../../adapters/config/groupAdminConfig.js"
 import { configuredGroupAdminIds, groupAdminRowId, groupAdminStatus } from "../../../groupAdmin/domain/groupAdminPolicy.js"
 
@@ -1555,6 +1557,47 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { apps: appPageEntryList() })
     }
     // ---------- 海龟汤题库管理(文件存储,与机器人进程共享 data 目录) ----------
+    function makeSoupModelCall(apiUrl:string, apiKey:string, defaultModel:string) {
+      return async (messages:unknown[], options:{temperature?:number|undefined;model?:string|undefined} = {}) => {
+        const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: options.model || defaultModel || undefined, messages, temperature: options.temperature ?? 0.7, top_p: 0.9 })
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json() as Data
+        const text = (data.choices as Data[] | undefined)?.[0] && ((data.choices as Data[])[0]!.message as Data | undefined)?.content
+        if (typeof text !== "string" || !text) throw new Error("模型空回复")
+        return text
+      }
+    }
+    const soupAuditRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)\/audit$/)
+    if (soupAuditRoute && req.method === "POST") {
+      const settings = loadPluginSettings()
+      const chat = (settings.chatAiConfig || (settings.pluginSettings as Data | undefined)?.chatAiConfig || {}) as Data
+      const apiKey = String(chat.chatApiKey || "")
+      const apiUrl = String(chat.chatApiUrl || "")
+      const model = String(chat.chatApiModel || "")
+      if (!apiUrl || !apiKey || apiKey.includes("sk-xxx")) return sendJson(res, 400, { error: "chatAiConfig 未配置,无法调用审核模型" })
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
+      const puzzle = store.readPuzzles().puzzles.find(item => item.id === soupAuditRoute[1])
+      if (!puzzle) return sendJson(res, 404, { error: "题目不存在" })
+      const callModel = makeSoupModelCall(apiUrl, apiKey, model)
+      const audits:TurtleSoupAuditRecord[] = []
+      const auditAt = Date.now()
+      const structureIssues = auditPuzzleStructure(puzzle)
+      audits.push({domain: "structure", pass: !structureIssues.length, reason: structureIssues.length ? "存在结构性问题" : "结构合规(长度/条数/无泄底)", ...(structureIssues.length ? {holes: structureIssues} : {}), at: auditAt})
+      try {
+        const review = parsePuzzleReview(await callModel(buildPuzzleReviewMessages(puzzle), {temperature: 0.2}))
+        audits.push({domain: "playability", pass: review?.pass === true, reason: review?.reason || "审题产物无法解析", at: auditAt, model})
+        const logic = parseLogicAudit(await callModel(buildLogicAuditMessages(puzzle), {temperature: 0.2}))
+        audits.push({domain: "logic", pass: logic?.pass === true, reason: logic?.reason || "审计产物无法解析", ...(logic?.holes?.length ? {holes: logic.holes} : {}), at: auditAt, model})
+      } catch (error) {
+        return sendJson(res, 502, { error: `模型调用失败: ${error instanceof Error ? error.message : String(error)}` })
+      }
+      await store.savePuzzle({ ...puzzle, audits: [...(puzzle.audits || []), ...audits] })
+      return sendJson(res, 200, { ok: true, id: puzzle.id, audits })
+    }
     if (url.pathname === "/api/games/turtle-soup/overview") {
       const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
       const { puzzles } = store.readPuzzles()
@@ -1575,7 +1618,8 @@ const server = http.createServer(async (req, res) => {
           status: puzzle.status, surface: puzzle.surface, solution: puzzle.solution,
           keyPoints: puzzle.keyPoints, hints: puzzle.hints,
           ratingCount: puzzle.ratingCount, ratingAverage: puzzle.ratingCount > 0 ? Number((puzzle.ratingSum / puzzle.ratingCount).toFixed(1)) : null,
-          plays: playCount.get(puzzle.id) || 0, createdAt: puzzle.createdAt
+          plays: playCount.get(puzzle.id) || 0, createdAt: puzzle.createdAt,
+          audits: puzzle.audits || []
         })),
         sessions,
         generating: soupGenerationJob,
@@ -1605,18 +1649,7 @@ const server = http.createServer(async (req, res) => {
       if (!apiUrl || !apiKey || apiKey.includes("sk-xxx")) return sendJson(res, 400, { error: "chatAiConfig 未配置,无法调用生成模型" })
       const soupSettings = readTurtleSoupConfig(PLUGIN_ROOT)
       const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, soupSettings.baseDir || "data/turtle_soup") })
-      const callModel = async (messages:unknown[], options:{temperature?:number|undefined;model?:string|undefined} = {}) => {
-        const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({ model: options.model || model || undefined, messages, temperature: options.temperature ?? 0.7, top_p: 0.9 })
-        })
-        if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        const data = await response.json() as Data
-        const text = (data.choices as Data[] | undefined)?.[0] && ((data.choices as Data[])[0]!.message as Data | undefined)?.content
-        if (typeof text !== "string" || !text) throw new Error("模型空回复")
-        return text
-      }
+      const callModel = makeSoupModelCall(apiUrl, apiKey, model)
       const generator = new TurtleSoupGenerator({
         store, config: () => soupSettings, callModel,
         logger: { info: message => { soupGenerationJob.log.push(`[ok] ${message}`) }, warn: message => { soupGenerationJob.log.push(`[warn] ${message}`) } }

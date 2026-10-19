@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader.vue'
 import PageState from '../components/PageState.vue'
 import SchemaPage from './SchemaPage.vue'
 
+interface SoupAudit { domain: 'structure' | 'playability' | 'logic'; pass: boolean; reason: string; holes?: string[]; at: number; model?: string }
 interface SoupPuzzle {
   id: string
   title: string
@@ -20,6 +21,7 @@ interface SoupPuzzle {
   ratingAverage: number | null
   plays: number
   createdAt: number
+  audits?: SoupAudit[]
 }
 interface SoupSession { groupId: string; phase: string; puzzleId: string; players: number; lastActivityAt: number }
 interface SoupOverview {
@@ -146,22 +148,57 @@ const columns: DataTableColumns<SoupPuzzle> = [
   }
 ]
 
+const auditDomainLabel: Record<string, string> = { structure: '结构审核', playability: '可玩性审题', logic: '逻辑审计' }
+
 const rowProps = (row: SoupPuzzle) => ({
   style: 'cursor: pointer',
   onClick: () => {
-    const detail = [
-      `【${row.title}】(${row.difficulty})`,
-      '',
-      `汤面：${row.surface}`,
-      '',
-      `汤底：${row.solution}`,
-      '',
-      `关键点：${row.keyPoints.join(' / ')}`,
-      `提示：${row.hints.join(' | ')}`
-    ].join('\n')
-    dialog.info({ title: `${row.title} · ${statusLabel[row.status]}`, content: () => h('pre', { class: 'soup-detail' }, detail) })
+    const latestAudits = (['structure', 'playability', 'logic'] as const).map(domain => {
+      const hits = (row.audits || []).filter(audit => audit.domain === domain)
+      return { domain, audit: hits.length ? hits[hits.length - 1]! : null }
+    })
+    const text = (label: string, value: string) => h('div', { class: 'detail-line' }, [h('span', { class: 'detail-label' }, label), h('div', null, value)])
+    dialog.info({
+      title: `${row.title} · ${statusLabel[row.status]}`,
+      content: () =>
+        h('div', { class: 'soup-detail-rich' }, [
+          h('div', { class: 'detail-block' }, [text('汤面', row.surface), text('汤底', row.solution), text('关键点', row.keyPoints.join(' / ')), text('提示', row.hints.join(' | '))]),
+          h('div', { class: 'detail-sec-title' }, '审核结果（各领域最新一次）'),
+          ...latestAudits.map(({ domain, audit }) =>
+            audit
+              ? h('div', { class: 'audit-row' }, [
+                  h('div', { class: 'audit-head' }, [
+                    h(NTag, { size: 'small', bordered: false, type: audit.pass ? 'success' : 'error' }, { default: () => (audit.pass ? '通过' : '未过') }),
+                    h('strong', null, auditDomainLabel[audit.domain]),
+                    h('span', { class: 'audit-meta' }, new Date(audit.at).toLocaleString())
+                  ]),
+                  h('div', { class: 'audit-reason' }, audit.reason || '—'),
+                  ...(audit.holes || []).map(hole => h('div', { class: 'audit-hole' }, `• ${hole}`))
+                ])
+              : h('div', { class: 'audit-row audit-empty' }, `${auditDomainLabel[domain]}：未记录(老题可点下方重新审计补齐)`)
+          ),
+          h('div', { class: 'audit-actions' }, [
+            h(NButton, { size: 'small', secondary: true, loading: auditingId.value === row.id, disabled: auditingId.value === row.id, onClick: () => reaudit(row) }, { default: () => '重新审计' })
+          ])
+        ])
+    })
   }
 })
+
+const auditingId = ref('')
+async function reaudit(row: SoupPuzzle) {
+  auditingId.value = row.id
+  try {
+    const result = await api<{ audits: SoupAudit[] }>(`/api/games/turtle-soup/puzzles/${row.id}/audit`, { method: 'POST', body: JSON.stringify({}) })
+    const failed = result.audits.filter(audit => !audit.pass)
+    message.warning(failed.length ? `重新审计:${failed.length} 个领域未过(${failed.map(audit => auditDomainLabel[audit.domain]).join('、')})` : '重新审计:三个领域全部通过')
+    await loadOverview()
+  } catch (cause: any) {
+    message.error(cause.message || '重新审计失败')
+  } finally {
+    auditingId.value = ''
+  }
+}
 
 async function setStatus(row: SoupPuzzle, status: SoupPuzzle['status']) {
   try {
@@ -386,6 +423,18 @@ const phaseLabel: Record<string, string> = {
   font-size: 12px;
   color: var(--c-muted);
 }
+.detail-block { display: grid; gap: 8px; }
+.detail-line { display: grid; grid-template-columns: 52px 1fr; gap: 10px; font-size: 13px; line-height: 1.7; }
+.detail-label { color: var(--c-muted); flex-shrink: 0; }
+.detail-sec-title { font-size: 12px; color: var(--c-muted); margin: 10px 0 6px; }
+.audit-row { border: 1px solid var(--c-border); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; }
+.audit-head { display: flex; align-items: center; gap: 8px; }
+.audit-meta { font-size: 11px; color: var(--c-muted); margin-left: auto; }
+.audit-reason { font-size: 12px; margin-top: 4px; color: var(--c-text); }
+.audit-hole { font-size: 12px; color: var(--c-danger); margin-top: 2px; }
+.audit-empty { font-size: 12px; color: var(--c-muted); }
+.audit-actions { margin-top: 8px; display: flex; justify-content: flex-end; }
+:global(.soup-detail-rich) { max-height: 65vh; overflow: auto; }
 :global(.soup-detail) {
   white-space: pre-wrap;
   font-family: inherit;

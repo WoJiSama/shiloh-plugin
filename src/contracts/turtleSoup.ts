@@ -2,7 +2,8 @@ export interface TurtleSoupEvent {nickname?:string;group_id?:string|number;user_
 export interface TurtleSoupLogger {warn?(message:string):void;info?(message:string):void;error?(message:string):void}
 export type TurtleSoupPuzzleStatus = 'active'|'retired'|'pending'
 export type TurtleSoupPuzzleSource = 'ai'|'manual'
-export interface TurtleSoupPuzzle {id:string;title:string;surface:string;solution:string;keyPoints:string[];hints:string[];difficulty:string;tags:string[];source:TurtleSoupPuzzleSource;model?:string;createdAt:number;status:TurtleSoupPuzzleStatus;ratingSum:number;ratingCount:number}
+export interface TurtleSoupAuditRecord {domain:'structure'|'playability'|'logic';pass:boolean;reason:string;holes?:string[];at:number;model?:string}
+export interface TurtleSoupPuzzle {id:string;title:string;surface:string;solution:string;keyPoints:string[];hints:string[];difficulty:string;tags:string[];source:TurtleSoupPuzzleSource;model?:string;createdAt:number;status:TurtleSoupPuzzleStatus;ratingSum:number;ratingCount:number;audits?:TurtleSoupAuditRecord[]}
 export interface TurtleSoupRating {userId:string;score:number;comment?:string;at:number}
 export type TurtleSoupEndReason = 'solved'|'manual'|'idle_timeout'|'join_timeout'|'all_surrendered'|'switched'
 export interface TurtleSoupMvp {userId:string;reason:string}

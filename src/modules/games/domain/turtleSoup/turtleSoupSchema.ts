@@ -1,6 +1,6 @@
 // 海龟汤三份数据文件(puzzles/plays/sessions)的解码校验,风格对齐 umaState.ts:
 // 从 unknown JSON 严格解码,格式无效即抛错,由基建层决定兜底策略。
-import type {TurtleSoupPuzzle, TurtleSoupPuzzleFile, TurtleSoupPlay, TurtleSoupPlayFile, TurtleSoupPlayer, TurtleSoupQaEntry, TurtleSoupGuessEntry, TurtleSoupSession, TurtleSoupSessionFile, TurtleSoupRating} from '../../../../contracts/turtleSoup.js'
+import type {TurtleSoupPuzzle, TurtleSoupPuzzleFile, TurtleSoupPlay, TurtleSoupPlayFile, TurtleSoupPlayer, TurtleSoupQaEntry, TurtleSoupGuessEntry, TurtleSoupSession, TurtleSoupSessionFile, TurtleSoupRating, TurtleSoupAuditRecord} from '../../../../contracts/turtleSoup.js'
 
 const record=(value:unknown):Record<string,unknown>=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}
 const text=(value:unknown):string|undefined=>typeof value==='string'&&value.trim()?value:undefined
@@ -20,6 +20,10 @@ export function decodeTurtleSoupPuzzle(value:unknown):TurtleSoupPuzzle {
     source: raw.source==='manual'?'manual':'ai',
     createdAt: numberOr(raw.createdAt, 0),
     status: raw.status==='retired'?'retired':raw.status==='pending'?'pending':'active',
+    ...(Array.isArray(raw.audits) ? {audits: raw.audits.filter((item):item is TurtleSoupAuditRecord => {
+      const entry=item as Record<string, unknown>
+      return typeof entry?.domain==='string' && ['structure','playability','logic'].includes(String(entry.domain)) && typeof entry?.pass==='boolean'
+    }).map(entry => ({domain: entry.domain as TurtleSoupAuditRecord['domain'], pass: entry.pass===true, reason: String(entry.reason||''), ...(Array.isArray(entry.holes)?{holes: entry.holes.filter((hole:unknown):hole is string=>typeof hole==='string')}:{}) , at: typeof entry.at==='number'?entry.at:0, ...(typeof entry.model==='string'?{model:entry.model}:{})}))} : {}),
     ratingSum: numberOr(raw.ratingSum, 0),
     ratingCount: numberOr(raw.ratingCount, 0)
   }

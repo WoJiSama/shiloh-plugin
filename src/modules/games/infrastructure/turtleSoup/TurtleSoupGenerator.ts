@@ -1,6 +1,6 @@
 // 海龟汤生成器:调主模型出题 -> 审题自评 -> 去重 -> 入库;维护鲜汤池保有量。
 // 进程内互斥锁防并发重复生成(单进程Yunzai足够,无需跨进程锁)。
-import type {TurtleSoupLogger, TurtleSoupPuzzle, TurtleSoupConfig} from '../../../../contracts/turtleSoup.js'
+import type {TurtleSoupLogger, TurtleSoupPuzzle, TurtleSoupConfig, TurtleSoupAuditRecord} from '../../../../contracts/turtleSoup.js'
 import type {ChatMessage} from '../../../../contracts/modelGateway.js'
 import {buildPuzzleGenerationMessages, buildPuzzleReviewMessages, parseGeneratedPuzzle, parsePuzzleReview} from '../../domain/turtleSoup/turtleSoupPrompts.js'
 import {auditPuzzleStructure, freshPuzzleIds, pendingPuzzleIds, puzzlePlayStats} from '../../domain/turtleSoup/turtleSoupRules.js'
@@ -105,21 +105,27 @@ export class TurtleSoupGenerator {
         const puzzle = parseGeneratedPuzzle(text, {nowMs: this.now() + this.sequence++, random: this.random(), model: settings.generationModel || '主模型'})
         if (!puzzle) throw new Error('生成产物不是合法汤面JSON')
         if (this.duplicatesExisting(puzzle, puzzles)) throw new Error(`生成产物与现有汤面重复: ${puzzle.title}`)
+        // 三道关全部通过才入库,且各域审核结论随题保存,供控制台展示与追溯
+        const audits:TurtleSoupAuditRecord[] = []
+        const auditAt = this.now()
         // 第一关:确定性结构审核(长度/条数/关键点泄露)
         const structureIssues = auditPuzzleStructure(puzzle)
+        audits.push({domain: 'structure', pass: !structureIssues.length, reason: structureIssues.length ? '存在结构性问题' : '结构合规(长度/条数/无泄底)', ...(structureIssues.length ? {holes: structureIssues} : {}), at: auditAt})
         if (structureIssues.length) throw new Error(`结构审核未通过: ${structureIssues.join(';')}`)
         // 第二关:可玩性审题
         const reviewText = await this.ports.callModel(buildPuzzleReviewMessages(puzzle), {temperature: 0.2, model: settings.generationModel || undefined})
         const review = parsePuzzleReview(reviewText)
         if (!review) throw new Error('审题产物无法解析')
+        audits.push({domain: 'playability', pass: review.pass === true, reason: review.reason || (review.pass ? '可玩性通过' : '审题未通过'), at: auditAt, ...(settings.generationModel ? {model: settings.generationModel} : {})})
         if (!review.pass) throw new Error(`审题未通过: ${review.reason}`)
         // 第三关:独立逻辑审计(逐句对照/时间线/物件流转/动机链),发现漏洞直接废弃
         const auditText = await this.ports.callModel(buildLogicAuditMessages(puzzle), {temperature: 0.2, model: settings.generationModel || undefined})
         const audit = parseLogicAudit(auditText)
         if (!audit) throw new Error('逻辑审计产物无法解析')
+        audits.push({domain: 'logic', pass: audit.pass === true, reason: audit.reason || (audit.pass ? '无逻辑漏洞' : '存在逻辑漏洞'), ...(audit.holes.length ? {holes: audit.holes} : {}), at: auditAt, ...(settings.generationModel ? {model: settings.generationModel} : {})})
         if (!audit.pass) throw new Error(`逻辑审计未通过: ${audit.holes.slice(0, 2).join(';') || audit.reason}`)
         // 入库即待审,管理员过审后才进入投放池
-        const pending = {...puzzle, status: 'pending' as const}
+        const pending = {...puzzle, status: 'pending' as const, audits}
         await store.savePuzzle(pending)
         this.ports.logger?.info?.(`[海龟汤] 新汤待审: ${pending.title}(${pending.difficulty})`)
         return pending

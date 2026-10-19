@@ -143,3 +143,18 @@ test("未配置模型时生成接口返回 400", async t => {
   const body = await response.json()
   assert.ok(String(body.error).includes("未配置"))
 })
+
+test("重新审计接口:三域结论追加到题目记录", async t => {
+  const { root, request } = await fixture(t, stubPort => ({
+    chatAiConfig: { chatApiUrl: `http://127.0.0.1:${stubPort}`, chatApiKey: "stub-key", chatApiModel: "stub" }
+  }))
+  seedStore(root, [puzzleOf("p1", { status: "active" })])
+  const response = await request("/api/games/turtle-soup/puzzles/p1/audit", { method: "POST", body: JSON.stringify({}) })
+  assert.equal(response.status, 200)
+  const body = await response.json()
+  assert.equal(body.audits.length, 3, "结构/审题/逻辑三域")
+  assert.deepEqual(body.audits.map(audit => audit.domain), ["structure", "playability", "logic"])
+  assert.ok(body.audits.every(audit => audit.pass), "桩模型全过")
+  const overview = await (await request("/api/games/turtle-soup/overview")).json()
+  assert.equal(overview.puzzles[0].audits.length, 3, "审计结果随题持久化")
+})
