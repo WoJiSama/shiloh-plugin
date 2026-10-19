@@ -222,3 +222,36 @@ test("难度定向:prompt 携带指定难度,产物难度不符被拒", async ()
     assert.ok(captured[1].includes("难度定为:hard"), "重试仍带难度")
   } finally { fs.rmSync(dir, {recursive: true, force: true}) }
 })
+
+test("被拒教训注入出题提示词:模型看到历史失败原因", async () => {
+  const { TurtleSoupGenerator } = await import("../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupGenerator.js")
+  const { TurtleSoupStore } = await import("../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupStore.js")
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "soup-reject-"))
+  try {
+    const store = new TurtleSoupStore({cwd: dir, baseDir: "data/turtle_soup"})
+    // 写入被拒记录(先确保目录存在)
+    fs.mkdirSync(store.dataDir, {recursive: true})
+    fs.appendFileSync(path.join(store.dataDir, "rejected.jsonl"), JSON.stringify({
+      title: "六点的跳绳声", holes: ["听觉描述自相矛盾", "半栋楼惊醒唯独对门不知"]
+    }) + "\n")
+    fs.appendFileSync(path.join(store.dataDir, "rejected.jsonl"), JSON.stringify({
+      title: "胡萝卜上的婚戒", holes: ["汤面自曝谜底"]
+    }) + "\n")
+
+    let capturedUser = ""
+    const generator = new TurtleSoupGenerator({
+      store, config: () => ({ freshPoolTarget: 1, contentPolicy: "宽松" }),
+      callModel: async messages => {
+        if (String(messages[0].content).includes("出题人")) capturedUser = String(messages[1].content)
+        if (String(messages[0].content).includes("出题人")) return JSON.stringify({ title: "新汤", surface: "汉".repeat(100), solution: "底".repeat(60), keyPoints: ["a","b","c"], hints: ["x","y","z"], difficulty: "normal", tags: [] })
+        if (String(messages[0].content).includes("审题人")) return JSON.stringify({ pass: true, reason: "ok" })
+        return JSON.stringify({ pass: true, holes: [], reason: "ok" })
+      },
+      logger: { info() {}, warn() {} }
+    })
+    await generator.generateOne()
+    assert.ok(capturedUser.includes("历史被拒教训"), "提示词包含被拒教训标题")
+    assert.ok(capturedUser.includes("六点的跳绳声"), "具体被拒题目名出现")
+    assert.ok(capturedUser.includes("自曝谜底"), "拒绝原因出现")
+  } finally { fs.rmSync(dir, {recursive: true, force: true}) }
+})

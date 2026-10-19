@@ -5,13 +5,22 @@ import {decodeTurtleSoupPuzzle} from './turtleSoupSchema.js'
 import type {TurtleSoupPuzzle} from '../../../../contracts/turtleSoup.js'
 
 export interface GenerationFeedbackItem {title:string;score:number;comments:string[]}
-export interface GenerationPromptOptions {contentPolicy:string;avoidTitles:string[];difficulty?:string;feedback?:{high:GenerationFeedbackItem[];low:GenerationFeedbackItem[]}}
+export interface GenerationPromptOptions {contentPolicy:string;avoidTitles:string[];difficulty?:string;feedback?:{high:GenerationFeedbackItem[];low:GenerationFeedbackItem[]};rejectionLessons?:{title:string;holes:string[]}[]}
 
 export function buildPuzzleGenerationMessages(options:GenerationPromptOptions):ChatMessage[] {
   const avoid = options.avoidTitles.length
     ? `已有汤面标题(严禁重复或高度相似):\n${options.avoidTitles.map(title => `- ${title}`).join('\n')}`
     : '题库当前为空,尽情发挥。'
   const difficulty = options.difficulty ? `难度定为:${options.difficulty}。` : '难度自选(easy/normal/hard)。'
+  const rejectionLessons = options.rejectionLessons?.length
+    ? [
+        '',
+        '[历史被拒教训](这些题曾被审核毙掉,出题时必须避免同类问题):',
+        ...options.rejectionLessons.slice(0, 8).map(lesson =>
+          `- 【${lesson.title}】${lesson.holes.slice(0, 2).map(hole => hole.slice(0, 60)).join(';')}`
+        )
+      ]
+    : []
   const feedback = options.feedback && (options.feedback.high.length || options.feedback.low.length)
     ? [
         '',
@@ -39,7 +48,7 @@ export function buildPuzzleGenerationMessages(options:GenerationPromptOptions):C
       '只输出一个JSON对象,不要输出任何其他文字,格式:',
       '{"title":"标题(10字内)","surface":"汤面","solution":"汤底(完整真相)","keyPoints":["关键点"],"hints":["提示1","提示2","提示3"],"difficulty":"easy|normal|hard","tags":["标签"]}'
     ].join('\n')},
-    {role: 'user', content: [`${avoid}`, `${difficulty}请新出一道海龟汤。`, ...feedback].filter(line => line !== '').join('\n')}
+    {role: 'user', content: [`${avoid}`, `${difficulty}请新出一道海龟汤。`, ...feedback, ...rejectionLessons].filter(line => line !== '').join('\n')}
   ]
 }
 

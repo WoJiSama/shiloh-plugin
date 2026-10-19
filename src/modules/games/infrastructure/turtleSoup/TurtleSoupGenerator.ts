@@ -104,7 +104,8 @@ export class TurtleSoupGenerator {
     let lastError:unknown = null
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const text = await this.ports.callModel(buildPuzzleGenerationMessages({contentPolicy: settings.contentPolicy, avoidTitles, feedback, ...(difficulty ? {difficulty} : {})}), {temperature: 0.9, model: settings.generationModel || undefined})
+        const rejectionLessons = this.readRejectionLessons()
+        const text = await this.ports.callModel(buildPuzzleGenerationMessages({contentPolicy: settings.contentPolicy, avoidTitles, feedback, rejectionLessons, ...(difficulty ? {difficulty} : {})}), {temperature: 0.9, model: settings.generationModel || undefined})
         const puzzle = parseGeneratedPuzzle(text, {nowMs: this.now() + this.sequence++, random: this.random(), model: settings.generationModel || '主模型'})
         if (!puzzle) throw new Error('生成产物不是合法汤面JSON')
         if (difficulty && puzzle.difficulty !== difficulty) throw new Error(`难度不符:要求${difficulty},产出${puzzle.difficulty}`)
@@ -176,6 +177,30 @@ export class TurtleSoupGenerator {
       } catch (error) { lastError = error }
     }
     throw lastError instanceof Error ? lastError : new Error(String(lastError))
+  }
+
+  // 读取最近的被拒记录,提取教训喂给出题提示词——让模型"从错误中学习"
+  readRejectionLessons():{title:string;holes:string[]}[] {
+    try {
+      const rejectedPath = path.join(this.ports.store.dataDir, 'rejected.jsonl')
+      const text = fs.readFileSync(rejectedPath, 'utf8')
+      const lines = text.split('\n').filter(line => line.trim())
+      // 取最近 8 条,同标题去重(修复尝试可能产生多条同名记录)
+      const seen = new Set<string>()
+      const lessons:{title:string;holes:string[]}[] = []
+      for (let index = lines.length - 1; index >= 0 && lessons.length < 8; index--) {
+        try {
+          const entry = JSON.parse(lines[index]!) as {title?:string;holes?:string[]}
+          const title = String(entry.title || '').trim()
+          if (!title || seen.has(title)) continue
+          seen.add(title)
+          lessons.push({title, holes: (entry.holes || []).map(hole => String(hole).slice(0, 80))})
+        } catch {}
+      }
+      return lessons
+    } catch {
+      return []
+    }
   }
 
   // 失败留档:追加到 data/turtle_soup/rejected.jsonl,含汤面汤底和拒绝原因
