@@ -67,13 +67,14 @@ export function takeHint(session:TurtleSoupSession, hints:string[], maxHints:num
   return hint
 }
 
-export interface PuzzlePlayStats {total:number;groups:Set<string>}
+export interface PuzzlePlayStats {total:number;groups:Set<string>;users:Set<string>}
 export function puzzlePlayStats(plays:TurtleSoupPlay[]):Map<string, PuzzlePlayStats> {
   const stats = new Map<string, PuzzlePlayStats>()
   for (const play of plays) {
-    const entry = stats.get(play.puzzleId) || {total: 0, groups: new Set<string>()}
+    const entry = stats.get(play.puzzleId) || {total: 0, groups: new Set<string>(), users: new Set<string>()}
     entry.total++
     entry.groups.add(play.groupId)
+    for (const userId of play.players || []) entry.users.add(userId)
     stats.set(play.puzzleId, entry)
   }
   return stats
@@ -84,9 +85,26 @@ export function freshPuzzleIds(puzzles:TurtleSoupPuzzle[], stats:Map<string, Puz
 }
 
 // 选汤:优先"没有任何群玩过"的鲜汤;本群玩过的永不复用;鲜汤不足时退到全局游玩次数最少者。
-export function selectPuzzleId(puzzles:TurtleSoupPuzzle[], plays:TurtleSoupPlay[], groupId:string, random:() => number = Math.random):string|null {
+// 按参与人排除：本局任何参与者玩过的汤(任意群)都不再投放,防止跨群串场剧透;
+// 排完为空时退回仅按群排除,避免老玩家把小题库耗尽后开不了局
+export function soupCandidatesFor(puzzles:TurtleSoupPuzzle[], stats:Map<string, PuzzlePlayStats>, groupId:string, participantIds:string[]) {
+  const participants = new Set(participantIds)
+  const notPlayedByAnyone = (puzzle:TurtleSoupPuzzle) => {
+    const entry = stats.get(puzzle.id)
+    if (!entry) return true
+    for (const userId of participants) if (entry.users.has(userId)) return false
+    return true
+  }
+  const active = puzzles.filter(puzzle => puzzle.status === 'active')
+  const groupOnly = active.filter(puzzle => !stats.get(puzzle.id)?.groups.has(groupId))
+  return {strict: groupOnly.filter(notPlayedByAnyone), groupOnly}
+}
+
+export function selectPuzzleId(puzzles:TurtleSoupPuzzle[], plays:TurtleSoupPlay[], groupId:string, random:() => number = Math.random, participantIds:string[] = []):string|null {
   const stats = puzzlePlayStats(plays)
-  const candidates = puzzles.filter(puzzle => puzzle.status === 'active' && !stats.get(puzzle.id)?.groups.has(groupId))
+  const candidates = soupCandidatesFor(puzzles, stats, groupId, participantIds).strict.length
+    ? soupCandidatesFor(puzzles, stats, groupId, participantIds).strict
+    : soupCandidatesFor(puzzles, stats, groupId, participantIds).groupOnly
   if (!candidates.length) return null
   const fresh = candidates.filter(puzzle => !stats.has(puzzle.id))
   const pool = fresh.length ? fresh : candidates.filter(puzzle => (stats.get(puzzle.id)?.total ?? 0) === Math.min(...candidates.map(item => stats.get(item.id)?.total ?? 0)))

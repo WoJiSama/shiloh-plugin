@@ -410,7 +410,8 @@ test("surrender delivery failure keeps the retry path and everyone-surrendered e
     assert.equal(manager.getSession("100").phase, "reveal")
     const play = harness.store.readPlays().plays[0]
     assert.equal(play.endReason, "all_surrendered")
-    assert.deepEqual(play.players, [])
+    // 投降者拿过汤底也计入参与名单（跨群按参与人排除剧透用）
+    assert.deepEqual(play.players, ["u1", "u2"])
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })
 
@@ -635,5 +636,23 @@ test("结束 during joining drops the lobby instead of leaving it to auto-start"
     await harness.manager.openGame(harness.event("u1", ".游戏 海龟汤 开局"))
     await harness.manager.joinGame(harness.event("u1", ".游戏 海龟汤 加入"))
     assert.match(await harness.manager.endGame(harness.event("u9", ".游戏 海龟汤 结束")), /只有发起人或群管理/)
+  } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
+})
+
+test("三选一随机池同样按参与人跨群排除", async () => {
+  const harness = makeHarness()
+  try {
+    await harness.seedPuzzles([puzzleOf("p1"), puzzleOf("p2"), puzzleOf("p3")])
+    // 历史记录：u1 在群 200 玩过 p1；剩两道才走三选一
+    harness.store.upsertPlay({playId: "hist", puzzleId: "p1", puzzleTitle: "t1", groupId: "200", startedAt: 1, solved: false, players: ["u1"], qaCount: 0, ratings: []})
+    await harness.manager.openGame(harness.event("u1", ".游戏 海龟汤 开局"))
+    await harness.manager.joinGame(harness.event("u1", ".游戏 海龟汤 加入"))
+    await harness.manager.joinGame(harness.event("u2", ".游戏 海龟汤 加入"))
+    harness.advance(5 * 60_000 + 1000)
+    await harness.manager.sweep()
+    const session = harness.manager.getSession("100")
+    assert.equal(session.phase, "choosing", "进入三选一")
+    assert.ok(!session.choosing.candidates.includes("p1"), "u1 玩过的 p1 不进候选")
+    assert.ok(session.choosing.candidates.includes("p2"))
   } finally { fs.rmSync(harness.dir, {recursive: true, force: true}) }
 })

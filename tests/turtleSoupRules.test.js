@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import {joiningOutcome, canManualStart, playingTimedOut, revealTimedOut, joinSession, isParticipant, guessCooldownRemainingMs, takeHint, selectPuzzleId, freshPuzzleIds, puzzlePlayStats, upsertRating, shouldRetirePuzzle, ratingAverage, buildMvpBrief} from "../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js"
+import {joiningOutcome, canManualStart, playingTimedOut, revealTimedOut, joinSession, isParticipant, guessCooldownRemainingMs, takeHint, selectPuzzleId, freshPuzzleIds, puzzlePlayStats, upsertRating, shouldRetirePuzzle, ratingAverage, buildMvpBrief, soupCandidatesFor} from "../dist/backend/modules/games/domain/turtleSoup/turtleSoupRules.js"
 
 const now = 1_700_000_000_000
 function makeSession(overrides = {}) {
@@ -148,3 +148,25 @@ test("buildMvpBrief aggregates questions, yes answers and closest guesses per pl
   assert.equal(brief.totalQuestions, 3)
   assert.equal(brief.totalGuesses, 3)
 })
+
+test("选题按参与人跨群排除：A群玩过的汤,含其参与者的新群不再随机到", () => {
+  const p1 = {id: "p1", status: "active", title: "t1", difficulty: "easy", tags: [], surface: "", solution: "", keyPoints: [], ratingSum: 0, ratingCount: 0}
+  const p2 = {id: "p2", status: "active", title: "t2", difficulty: "easy", tags: [], surface: "", solution: "", keyPoints: [], ratingSum: 0, ratingCount: 0}
+  // u1 在 B 群玩过 p1
+  const plays = [{playId: "x", puzzleId: "p1", puzzleTitle: "t1", groupId: "200", startedAt: 1, solved: false, players: ["u1"], qaCount: 0, ratings: []}]
+  const stats = puzzlePlayStats(plays)
+  assert.equal(stats.get("p1").users.has("u1"), true, "stats 记录参与人")
+  // A 群新局,u1 参与 → strict 排除 p1
+  const forA = soupCandidatesFor([p1, p2], stats, "100", ["u1"])
+  assert.deepEqual(forA.strict.map(p => p.id), ["p2"])
+  // 没有交集参与者的群不受影响
+  const forC = soupCandidatesFor([p1, p2], stats, "300", ["u9"])
+  assert.deepEqual(forC.strict.map(p => p.id), ["p1", "p2"])
+  // 全被排除时退回按群排除,仍能开局
+  const only = soupCandidatesFor([p1], stats, "100", ["u1"])
+  assert.deepEqual(only.strict, [])
+  assert.deepEqual(only.groupOnly.map(p => p.id), ["p1"])
+  assert.equal(selectPuzzleId([p1], plays, "100", () => 0, ["u1"]), "p1", "退回兜底")
+  assert.equal(selectPuzzleId([p1, p2], plays, "100", () => 0, ["u1"]), "p2")
+})
+

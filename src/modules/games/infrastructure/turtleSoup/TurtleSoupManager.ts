@@ -3,7 +3,7 @@
 import type {TurtleSoupConfig, TurtleSoupEvent, TurtleSoupLogger, TurtleSoupPuzzle, TurtleSoupPlay, TurtleSoupSession, TurtleSoupHost} from '../../../../contracts/turtleSoup.js'
 import {TurtleSoupStore, readTurtleSoupConfig} from './TurtleSoupStore.js'
 import type {TurtleSoupGenerator, GenerateOutcome} from './TurtleSoupGenerator.js'
-import {buildMvpBrief, canManualStart, guessCooldownRemainingMs, isParticipant, joiningOutcome, playingTimedOut, revealTimedOut, selectPuzzleId, shouldRetirePuzzle, takeHint, upsertRating, buildCatchUpText, buildStatusText, buildRevealText, buildRecapText, classifyThresholds, formatDuration, formatCountdown, stripAsideSegments, isAsideOnlyText, SOUP_COMMAND, surrenderPlayer, looksLikeSoupQuestion, isRepeatedQuestion, choosingTimedOut, chooseWindowMs, puzzlePlayStats} from '../../domain/turtleSoup/turtleSoupRules.js'
+import {buildMvpBrief, canManualStart, guessCooldownRemainingMs, isParticipant, joiningOutcome, playingTimedOut, revealTimedOut, selectPuzzleId, shouldRetirePuzzle, takeHint, upsertRating, buildCatchUpText, buildStatusText, buildRevealText, buildRecapText, classifyThresholds, formatDuration, formatCountdown, stripAsideSegments, isAsideOnlyText, SOUP_COMMAND, surrenderPlayer, looksLikeSoupQuestion, isRepeatedQuestion, choosingTimedOut, chooseWindowMs, puzzlePlayStats, soupCandidatesFor} from '../../domain/turtleSoup/turtleSoupRules.js'
 import {classifySoupGuess, looksLikeSolutionLeak} from '../../domain/turtleSoup/turtleSoupSimilarity.js'
 
 export interface TurtleSoupManagerPorts {
@@ -192,7 +192,8 @@ export class TurtleSoupManager {
   private async launchPlay(session:TurtleSoupSession):Promise<string> {
     const puzzles = this.store.readPuzzles().puzzles.filter(puzzle => puzzle.status === 'active')
     const stats = puzzlePlayStats(this.store.readPlays().plays)
-    const available = puzzles.filter(puzzle => !stats.get(puzzle.id)?.groups.has(session.groupId))
+    const {strict, groupOnly} = soupCandidatesFor(puzzles, stats, session.groupId, session.players.map(player => player.userId))
+    const available = strict.length ? strict : groupOnly
     if (!available.length) {
       await this.drop(session.groupId)
       return "题库里已经没有本群没玩过的汤了,请管理员用 .游戏 海龟汤 生成 补充题库后再开局"
@@ -232,7 +233,7 @@ export class TurtleSoupManager {
   private async beginPlay(session:TurtleSoupSession, chosenPuzzleId?:string):Promise<string> {
     const puzzles = this.store.readPuzzles().puzzles
     const plays = this.store.readPlays().plays
-    const puzzleId = chosenPuzzleId ?? selectPuzzleId(puzzles, plays, session.groupId)
+    const puzzleId = chosenPuzzleId ?? selectPuzzleId(puzzles, plays, session.groupId, Math.random, session.players.map(player => player.userId))
     if (!puzzleId) {
       await this.drop(session.groupId)
       return "题库里已经没有本群没玩过的汤了,请管理员用 .海龟汤 生成 补充题库后再开局"
@@ -489,7 +490,8 @@ export class TurtleSoupManager {
       play.solved = endReason === 'solved'
       if (winnerId) play.winnerId = winnerId
       if (mvp && session.players.some(player => player.userId === mvp.userId)) play.mvp = mvp
-      play.players = session.players.map(player => player.userId)
+      // 投降者拿过汤底也算玩过(参与人维度去重需要)
+      play.players = [...new Set([...session.players.map(player => player.userId), ...Object.keys(session.surrendered || {})])]
       play.qaCount = session.qaLog.length
       await this.store.upsertPlay(play)
     }
