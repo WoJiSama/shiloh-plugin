@@ -3,7 +3,7 @@ export interface EmojiCriteria {query:string;tags:string[];useCases:string[]}
 export interface EmojiCandidate {item:EmojiItem;score:number}
 export interface EmojiSelection {item:EmojiItem|null;strategy:string;score?:number;criteria?:EmojiCriteria;familiarity?:number;firstUse?:boolean}
 export interface EmojiAddOptions {source?:string;autoTag?:boolean;autoEmbed?:boolean}
-export type EmojiAddResult={added:true;item:EmojiItem}|{added:false;reason:string;item?:EmojiItem;size?:number;width?:number;height?:number;ratio?:string;error?:string;filterReason?:string;hitTags?:string[]}
+export type EmojiAddResult={added:true;item:EmojiItem}|{added:false;reason:string;item?:EmojiItem;size?:number;width?:number;height?:number;ratio?:string;error?:string;filterReason?:string;confidence?:number;hitTags?:string[]}
 export interface EmojiLogger {info?(message:string):void;warn?(message:string):void;error?(message:string):void}
 export interface EmojiPorts {logger?:EmojiLogger|undefined;fetch?:typeof fetch}
 export interface EmojiMaintenance {skipped?:boolean;markedMissing?:number;unmarkedRestored?:number;orphanRegistered?:number;cleanedUntagged?:number;prunedStale?:number;prunedHashes?:string[];total?:number}

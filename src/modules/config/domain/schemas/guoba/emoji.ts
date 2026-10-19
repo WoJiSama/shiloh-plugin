@@ -53,6 +53,19 @@ const schema: ConfigSchemaItem[] = [
     component: "Switch",
     bottomHelpMessage: "入库前调用视觉大模型判断「是否适合作表情包」，挡风景照/截图/广告/二维码。每张图会多消耗 1 次 VLM token。开启自动收集时建议同时开启此项"
   },
+  {
+    field: "emojiSystem.contentSafetyFilter",
+    label: "内容安全审查",
+    component: "Switch",
+    bottomHelpMessage: "在同一次审查里同时判定内容安全：色情擦边/政治敏感/暴恐/图内辱骂文字，任一命中直接拒收。不额外消耗调用。默认开启"
+  },
+  {
+    field: "emojiSystem.contentFilterMinConfidence",
+    label: "审查置信度下限",
+    component: "InputNumber",
+    bottomHelpMessage: "模型对判定的自评把握度低于该值时拒收（宁可漏收不错收）。建议 0.7~0.85",
+    componentProps: { min: 0.5, max: 0.99, step: 0.05, placeholder: "0.75" }
+  },
 
   // ===== 选图与召回 =====
   {

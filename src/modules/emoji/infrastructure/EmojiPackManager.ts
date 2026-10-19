@@ -24,6 +24,8 @@ export const DEFAULT_EMOJI_CONFIG = {
   selectionTopK: 5,
   embeddingThreshold: 0.55,
   contentFiltration: true,
+  contentSafetyFilter: true,
+  contentFilterMinConfidence: 0.75,
   doReplace: false,
   enableMaintenance: false,
   checkIntervalMinutes: 10,
@@ -346,6 +348,17 @@ export class EmojiPackManager {
           this.logInfo(`内容审查未通过 (${hash.slice(0, 8)}): ${verdict.reason}`)
           return { added: false, reason: "content_filtered", filterReason: verdict.reason }
         }
+        // 双维审核：内容安全（低俗/政治/暴恐/辱骂文字）任一命中即拒
+        if (this.config.contentSafetyFilter !== false && !verdict.safe) {
+          this.logInfo(`安全审查未通过 (${hash.slice(0, 8)}): ${verdict.reason}`)
+          return { added: false, reason: "content_unsafe", filterReason: verdict.reason }
+        }
+        const minConfidence = Number(this.config.contentFilterMinConfidence)
+        const confidenceFloor = Number.isFinite(minConfidence) && minConfidence > 0 ? minConfidence : 0.75
+        if (verdict.confidence < confidenceFloor) {
+          this.logInfo(`审查置信度不足 (${hash.slice(0, 8)}): ${verdict.confidence} < ${confidenceFloor} (${verdict.reason})`)
+          return { added: false, reason: "content_low_confidence", filterReason: verdict.reason, confidence: verdict.confidence }
+        }
       } catch (err) {
         // fail-closed：审查异常时拒绝入库（避免错收，宁可漏收）
         this.logWarn(`内容审查异常 (${hash.slice(0, 8)}): ${emojiError(err)}，拒绝入库`)
@@ -547,16 +560,16 @@ export class EmojiPackManager {
     const prepared = await this.prepareVLMImage(buffer, ext)
     const dataUrl = `data:${prepared.mime};base64,${prepared.buffer.toString("base64")}`
 
-    const prompt = `严格判断这张图是否是真正适合 QQ/微信聊天的**表情包**。
-判定标准必须从严，宁可漏判不要错收。
+    const prompt = `严格判断这张图是否适合收入 QQ/微信群聊的表情包库，一次完成两项独立判定。
 
-【判定为 true 的必要条件】（至少明显具备一项）：
+【判定一：是否真正的表情包】（宁可漏判不要错收）
+判定为 true 的必要条件（至少明显具备一项）：
 1. 典型表情包/梗图：网络流行梗图、二次元角色表情、ACG 同人表情、emoji 贴纸、QQ/微信官方表情样式
 2. 强烈情绪/反应表达：图中主体（人/动物/物体）正在做夸张的表情、动作、姿势（生气、哭泣、惊讶、无语、嘲讽、得意、崩溃、卖萌、震惊等可一眼识别的情绪）
-3. 自带梗字/吐槽文字：图片上写有"我也想""绷不住了""我就笑笑""你说啥"等中文梗字 / 二次创作配文
+3. 自带梗字/吐槽文字：图上写有"我也想""绷不住了""我就笑笑""你说啥"等中文梗字 / 二次创作配文
 4. 拟人化反应：动物或无生命物体做出明显人类化的搞笑表情/动作
 
-【判定为 false（必拒）】：
+判定为 false（必拒）：
 - 普通宠物日常照（猫狗坐着、躺着、走路、吃东西等没有夸张表情/动作的）
 - 插画、美术作品、艺术绘画、写实画风的角色立绘、CG 截图
 - 风景照、建筑、产品图、广告海报、横幅、二维码
@@ -567,7 +580,17 @@ export class EmojiPackManager {
 
 **关键测试**：把这张图发到群里，群友能立刻明白"这是在表达 XX 情绪/梗"吗？不能就是 false。
 
-仅输出严格 JSON（不要 markdown 代码块）：{"is_emoji": true 或 false, "reason": "简短理由"}${this.admissionExtrasText()}`
+【判定二：内容安全】（任一命中即 safe=false）：
+- 色情裸露、性暗示擦边、低俗恶趣味
+- 政治敏感：领导人形象、时政梗、意识形态内容、争议地图
+- 暴力血腥、恐怖、自残、毒品、赌博、诈骗二维码/引流
+- 图内文字含辱骂、人身攻击、歧视仇恨用语（轻度语气词如"卧槽""绝了"可放行）
+- 涉未成年人的不当内容
+
+confidence 是你对上述两项判定整体的把握程度（0~1 小数，1 为完全确定），拿不准就给低值。
+
+仅输出严格 JSON（不要 markdown 代码块）：
+{"is_emoji": true 或 false, "safe": true 或 false, "confidence": 0到1的小数, "reason": "简短理由"}${this.admissionExtrasText()}`
 
     const json = await this.callOpenAIChat(
       cfg, "analysisApiUrl", "analysisApiKey",
@@ -587,9 +610,13 @@ export class EmojiPackManager {
     const match = text.match(/\{[\s\S]*\}/)
     if (!match) throw new Error("内容审查未返回 JSON")
     const parsed = emojiRecord(JSON.parse(match[0]))
+    // safe/confidence 缺失按不通过处理（fail-closed，宁可漏收）
+    const confidence = Math.min(1, Math.max(0, Number(parsed.confidence) || 0))
     return {
       isEmoji: parsed.is_emoji === true,
-      reason: String(parsed.reason || "").slice(0, 60)
+      safe: parsed.safe === true,
+      confidence,
+      reason: String(parsed.reason || "").slice(0, 80)
     }
   }
 

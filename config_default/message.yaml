@@ -160,6 +160,37 @@ pluginSettings:
     participationPoints: 1
     rankLimit: 10
     baseDir: data/uma_race
+  miniGames:
+    # 小游戏模块总开关:同群同时只允许一个进行中的小游戏
+    enabled: true
+    turtleSoup:
+      enabled: true
+      # 报名确认制:开局后玩家输入"加入",窗口期内达到最少人数才开局;单人也可玩
+      minPlayers: 1
+      joinWindowMinutes: 5
+      # 任意阶段玩家无活动满此时长 -> 报名期取消/问答期揭晓收局
+      idleTimeoutMinutes: 5
+      # 每人两次猜底之间的冷却(秒),防穷举刷汤底
+      guessCooldownSeconds: 30
+      # 猜底混合判定:字面相似度>=hit直接判中,>=miss且未达hit交主模型语义判定,<miss直接未中
+      # (中文同义改写字面分极低,miss默认0=除空输入外全部交AI判定;问答期本就逐条过模型,边际成本可忽略)
+      similarityHitThreshold: 0.9
+      similarityMissThreshold: 0
+      # "没有任何群玩过"的鲜汤保有量,不足后台自动生成补货
+      freshPoolTarget: 2
+      # 生成模型;留空 = 主模型
+      generationModel: ""
+      # 每局最多可用提示条数(提示在生成汤时预产出)
+      maxHints: 3
+      # 累计每N次提问发一张进度卡面(汤面+四类回答分组+玩家提问);0=关闭
+      recapEveryQuestions: 10
+      # 开局选汤窗口:开始后展示3道候选,超时自动随机开局
+      chooseWindowSeconds: 60
+      # 揭晓后的评分窗口时长(分钟)
+      ratingWindowMinutes: 5
+      # 生成题材尺度约束
+      contentPolicy: "题材保持本格推理趣味,可以悬疑惊悚,但避免直白血腥、猎奇虐待细节与涉政内容"
+      baseDir: data/turtle_soup
   turnTrace:
     # 回合 trace NDJSON 落盘（观测页数据源）
     archiveEnabled: true
@@ -802,6 +833,10 @@ pluginSettings:
     selectionTopK: 5
     embeddingThreshold: 0.55
     contentFiltration: true
+    # 双维审核：同一次审查同时输出「是否表情包」+「内容安全」+「置信度」，
+    # 任一不过或置信度低于 contentFilterMinConfidence 都拒收（宁可漏收不错收）。
+    contentSafetyFilter: true
+    contentFilterMinConfidence: 0.75
     # emoji-only 回复后的冷却毫秒数（期间不再递表情工具给模型；explicit 请求不受限）
     emojiCooldownMs: 120000
     # 强制反应表情（"笑死/离谱/累死"等快路）的配文：从规则配文池抽样一句 leadText，
