@@ -80,6 +80,71 @@ test("download failures degrade to a text note without crashing the relay", asyn
   }
 })
 
+test("video notes attach the downloaded video body", async () => {
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: name => name === "content-length" ? "6" : null },
+      body: Readable.toWeb(Readable.from(Buffer.from("mp4dat")))
+    })
+    const result = await buildXiaohongshuRelaySegments(
+      {type: "xiaohongshu", note_id: "6ad4a9c200000000290162d4", media_kind: "video", duration: 42,
+       play_url: "https://sns-video-v6.xhscdn.com/stream/1/110/259/h264.mp4?sign=a",
+       cover_url: IMAGE_URL, images: [], page_url: "https://www.xiaohongshu.com/discovery/item/6ad4a9c200000000290162d4"},
+      { segmentApi: { image: file => ({type: "image", file}), video: file => ({type: "video", file}) }, logger: { warn() {}, info() {} } }
+    )
+    assert.ok(result.segments.some(part => part?.type === "video"), "视频本体应作为 video segment")
+    assert.equal(result.imageNodes.length, 0)
+    assert.equal(result.tempFiles.length, 1)
+    await cleanupXiaohongshuRelayFiles(result.tempFiles)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test("over-limit videos skip the body and fall back to the cover", async () => {
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.fetch = mockImageFetch()
+    const result = await buildXiaohongshuRelaySegments(
+      {type: "xiaohongshu", note_id: "long1", media_kind: "video", duration: 99999,
+       play_url: "https://sns-video-v6.xhscdn.com/stream/long.mp4?sign=a", cover_url: IMAGE_URL, images: []},
+      { segmentApi: { image: file => ({type: "image", file}), video: file => ({type: "video", file}) }, logger: { warn() {}, info() {} }, xiaohongshuRelay: {maxVideoSeconds: 1800} }
+    )
+    assert.ok(!result.segments.some(part => part?.type === "video"))
+    assert.ok(result.segments.some(part => String(part).includes("视频超过30分钟")))
+    assert.equal(result.imageNodes.length, 1, "降级为封面图")
+    await cleanupXiaohongshuRelayFiles(result.tempFiles)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test("failed video downloads degrade to the cover gallery", async () => {
+  const previousFetch = globalThis.fetch
+  let videoFailed = false
+  try {
+    globalThis.fetch = async (url, init) => {
+      if (String(url).includes("sns-video")) { videoFailed = true; return {ok: false, status: 403, headers: {get: () => null}, body: null} }
+      return await mockImageFetch()()
+    }
+    const result = await buildXiaohongshuRelaySegments(
+      {type: "xiaohongshu", note_id: "fail1", media_kind: "video", duration: 42,
+       play_url: "https://sns-video-v6.xhscdn.com/stream/x.mp4?sign=a", cover_url: IMAGE_URL, images: []},
+      { segmentApi: { image: file => ({type: "image", file}), video: file => ({type: "video", file}) }, logger: { warn() {}, info() {} } }
+    )
+    assert.ok(videoFailed, "应尝试过视频下载")
+    assert.ok(!result.segments.some(part => part?.type === "video"))
+    assert.ok(result.segments.some(part => String(part).includes("视频本体暂时获取失败")))
+    assert.equal(result.imageNodes.length, 1)
+    await cleanupXiaohongshuRelayFiles(result.tempFiles)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
 test("unresolved cards without any image keep the note link only", async () => {
   const result = await buildXiaohongshuRelaySegments(
     {type: "xiaohongshu", note_id: "n3", title: "只有文字", page_url: "https://www.xiaohongshu.com/explore/n3"},

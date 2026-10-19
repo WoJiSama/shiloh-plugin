@@ -195,6 +195,44 @@ export function parseXiaohongshuInitialState(html = "") {
   return record(record(record(extractBalancedJson(html, "window.__INITIAL_STATE__")).note).noteDetailMap)
 }
 
+// 移动端页面水合后 state 里没有 noteDetailMap,视频流挂在结构漂移的路径下:
+// 深找所有 mp4 地址并记录所在子树的编码上下文(h264/h265/av1)。
+// QQ 客户端对 h265 兼容性差,取流优先 h264,再 av1,最后 h265。
+const XHS_VIDEO_CODEC_RANK:Record<string,number> = {h264: 0, av1: 1, h265: 2}
+
+export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>()):{playUrl:string;codec:string;duration:number} {
+  const mp4s:{url:string;codec:string;rank:number}[] = []
+  let duration = 0
+  const walk = (value:unknown, codecHint:string, depth:number) => {
+    if (!value || typeof value !== "object" || visited.has(value as object) || depth > 9) return
+    visited.add(value as object)
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, codecHint, depth + 1)
+      return
+    }
+    const data = value as Record<string,unknown>
+    if (typeof data.duration === "number" && data.duration > 0 && !duration) duration = data.duration
+    if (typeof data.duration_ms === "number" && data.duration_ms > 0 && !duration) duration = Math.round(data.duration_ms / 1000)
+    for (const [key, child] of Object.entries(data)) {
+      const codec = XHS_VIDEO_CODEC_RANK[key] !== undefined ? key : codecHint
+      if (typeof child === "string" && /^https?:\/\/[^"'\\\s]+\.mp4([?#]|$)/i.test(child) && /xhscdn\.com/i.test(child)) {
+        mp4s.push({url: child, codec, rank: XHS_VIDEO_CODEC_RANK[codec] ?? 9})
+        continue
+      }
+      if (child && typeof child === "object") walk(child, codec, depth + 1)
+    }
+  }
+  walk(state, "", 0)
+  mp4s.sort((a, b) => a.rank - b.rank)
+  const best = mp4s[0]
+  return {
+    playUrl: best ? best.url.replace(/^http:\/\//i, "https://") : "",
+    codec: best?.codec || "",
+    // 时长字段存在毫秒口径(>10分钟按毫秒折算)
+    duration: duration > 600 ? Math.round(duration / 1000) : duration
+  }
+}
+
 export function buildCardFromNoteState(base:XiaohongshuCard = {}, noteDetailMap:Record<string,unknown> = {}, finalUrl = ""):XiaohongshuCard|null {
   const entries = Object.entries(noteDetailMap)
   if (!entries.length) return null
@@ -309,6 +347,8 @@ async function enrichXiaohongshuShare(card:XiaohongshuCard = {}, options:Xiaohon
             note_id: String(resolved.note_id || card.note_id || "").trim(),
             cover_url: images[0] || resolved.cover_url || card.cover_url || "",
             images,
+            play_url: resolved.play_url || card.play_url || "",
+            duration: resolved.duration || card.duration || 0,
             final_url: resolved.final_url || card.final_url || "",
             metadata_status: "resolved"
           }
@@ -340,7 +380,7 @@ function formatXiaohongshuHistoryText(card:XiaohongshuCard = {}) {
   if (card.author) basic.push(`作者:${card.author}`)
   if (card.note_id) basic.push(`笔记:${card.note_id}`)
   if (imageCount) basic.push(`图片:${imageCount}张`)
-  if (card.media_kind === "video") basic.push("视频笔记")
+  if (card.media_kind === "video") basic.push(card.duration ? `视频:${Math.floor(card.duration / 60)}分${card.duration % 60}秒` : "视频笔记")
   if (basic.length) lines.push(basic.join(" | "))
   const stats = []
   if (card.liked) stats.push(`点赞:${card.liked}`)

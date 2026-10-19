@@ -8,7 +8,8 @@ import {
   parseXiaohongshuInitialState,
   buildCardFromNoteState,
   normalizeXiaohongshuImageUrl,
-  decodeXiaohongshuCardEntities
+  decodeXiaohongshuCardEntities,
+  extractXiaohongshuVideo
 } from "../utils/xiaohongshuMessage.js"
 
 // 生产归档里的真实 QQ 分享卡片 raw_message(群 763694201, 2026-10-19):
@@ -98,6 +99,35 @@ test("parses __INITIAL_STATE__ note detail map", () => {
 test("state without note data returns null", () => {
   assert.equal(buildCardFromNoteState({type:"xiaohongshu"}, parseXiaohongshuInitialState(`<script>window.__INITIAL_STATE__={"global":{"appSettings":{}}}</script>`), ""), null)
   assert.deepEqual(parseXiaohongshuInitialState("<html>no state</html>"), {})
+})
+
+test("extracts the preferred video stream from a hydrated mobile state", () => {
+  // 移动端 state 的视频流路径随版本漂移,深找时按子树编码上下文排序
+  const state = {
+    note: {
+      videoData: {
+        media: {
+          stream: {
+            h265: [{master_url: "http://sns-video-v6.xhscdn.com/stream/1/110/520/hevc_520.mp4?sign=b", duration: 42000}],
+            h264: [{master_url: "http://sns-video-v6.xhscdn.com/stream/1/110/259/h264_259.mp4?sign=a", duration: 42000}]
+          }
+        }
+      }
+    }
+  }
+  const video = extractXiaohongshuVideo(state)
+  assert.equal(video.playUrl, "https://sns-video-v6.xhscdn.com/stream/1/110/259/h264_259.mp4?sign=a")
+  assert.equal(video.codec, "h264")
+  // 毫秒口径(>10分钟按毫秒折算): 42000ms → 42s
+  assert.equal(video.duration, 42)
+})
+
+test("video extraction tolerates states without streams", () => {
+  assert.deepEqual(extractXiaohongshuVideo({global: {appSettings: {}}}), {playUrl: "", codec: "", duration: 0})
+  assert.equal(extractXiaohongshuVideo(null).playUrl, "")
+  // 秒口径不折算
+  const seconds = extractXiaohongshuVideo({stream: {h264: [{master_url: "https://sns-video.xhscdn.com/a.mp4", duration: 42}]}})
+  assert.equal(seconds.duration, 42)
 })
 
 test("formats history text and links", () => {

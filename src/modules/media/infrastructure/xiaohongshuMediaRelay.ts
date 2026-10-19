@@ -6,16 +6,20 @@ import { pipeline } from "stream/promises"
 import {errorText,type XiaohongshuCard,type MediaLogger} from "./xiaohongshuTypes.js"
 import {normalizeXiaohongshuImageUrl} from "./xiaohongshuMessage.js"
 import { buildMediaArtifactKey } from "../../messaging/infrastructure/mediaArtifactStore.js"
+import { fetchDownloadToFile } from "../../shared/infrastructure/parallelDownload.js"
 
 interface Lease {filePath?:string;release?():Promise<unknown>}
 interface Store {acquire(key:string,download:()=>Promise<string|null>):Promise<Lease|null>}
 interface SegmentApi {image?(path:string):unknown;video?(path:string):unknown}
-export interface XiaohongshuRelayOptions {maxImages?:number;maxImageBytes?:number;downloadTimeoutMs?:number}
+export interface XiaohongshuRelayOptions {maxImages?:number;maxImageBytes?:number;downloadTimeoutMs?:number;maxVideoSeconds?:number;maxVideoBytes?:number;videoDownloadTimeoutMs?:number}
 
 // 小红书笔记单图上限:图床原图普遍 1-8MB;合并转发节点过多会显著拖慢发送
 const XHS_NOTE_IMAGE_MAX_COUNT = 20
 const XHS_NOTE_IMAGE_MAX_BYTES = 32 * 1024 * 1024
 const XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS = 60 * 1000
+const XHS_ARCHIVE_VIDEO_MAX_SECONDS = 1800
+const XHS_ARCHIVE_VIDEO_MAX_BYTES = 256 * 1024 * 1024
+const XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
 
 function xiaohongshuImageExtension(url = "") {
   const match = (String(url).split("?")[0] || "").match(/\.(jpe?g|png|webp|heic|avif|gif)$/i)
@@ -24,6 +28,36 @@ function xiaohongshuImageExtension(url = "") {
 
 export function createXiaohongshuMediaRelay(ports:{segmentApi?:SegmentApi;logger?:MediaLogger;fetchImpl?:typeof globalThis.fetch} = {}) {
 const fetch:typeof globalThis.fetch=(input,init)=>(ports.fetchImpl ?? globalThis.fetch)(input,init)
+
+function shouldAttachXiaohongshuVideo(card:XiaohongshuCard = {}, maxSeconds = XHS_ARCHIVE_VIDEO_MAX_SECONDS) {
+  return Boolean(card.play_url) && Number(card.duration || 0) > 0 && Number(card.duration || 0) <= Math.max(1, Number(maxSeconds) || XHS_ARCHIVE_VIDEO_MAX_SECONDS)
+}
+
+// 视频直链带签名短时有效,解析后立即下载;走同一分片工具(Range 并发),失败由上层降级到封面图
+async function downloadXiaohongshuVideo(card:XiaohongshuCard = {}, { maxBytes = XHS_ARCHIVE_VIDEO_MAX_BYTES, timeoutMs = XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS, logger = ports.logger }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
+  if (!card.play_url) return null
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-xiaohongshu-video")
+  await fs.promises.mkdir(dir, { recursive: true })
+  const safeId = String(card.note_id || "video").replace(/[^A-Za-z0-9_-]/g, "")
+  const filePath = path.join(dir, `${safeId}-${Date.now()}-${Math.random().toString(16).slice(2)}.mp4`)
+  let completed = false
+  try {
+    await fetchDownloadToFile(card.play_url, filePath, {
+      headers: { Referer: "https://www.xiaohongshu.com/", "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" },
+      maxBytes,
+      timeoutMs,
+      logger
+    })
+    const stat = await fs.promises.stat(filePath)
+    completed = stat.size > 0 && stat.size <= maxBytes
+    return completed ? filePath : null
+  } catch (error) {
+    logger?.warn?.(`[小红书] 视频本体下载失败: ${errorText(error)}`)
+    return null
+  } finally {
+    if (!completed) await fs.promises.unlink(filePath).catch(() => {})
+  }
+}
 
 async function downloadXiaohongshuImage(rawUrl = "", { maxBytes = XHS_NOTE_IMAGE_MAX_BYTES, timeoutMs = XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS, logger = ports.logger }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
   const url = normalizeXiaohongshuImageUrl(rawUrl)
@@ -80,10 +114,40 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   const maxImages = Math.min(XHS_NOTE_IMAGE_MAX_COUNT, Math.max(1, Number(xiaohongshuRelay.maxImages) || XHS_NOTE_IMAGE_MAX_COUNT))
   const maxImageBytes = Math.max(1, Number(xiaohongshuRelay.maxImageBytes) || XHS_NOTE_IMAGE_MAX_BYTES)
   const timeoutMs = Number(xiaohongshuRelay.downloadTimeoutMs) || XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS
+  const maxVideoSeconds = Math.max(1, Number(xiaohongshuRelay.maxVideoSeconds) || XHS_ARCHIVE_VIDEO_MAX_SECONDS)
+  const maxVideoBytes = Math.max(1, Number(xiaohongshuRelay.maxVideoBytes) || XHS_ARCHIVE_VIDEO_MAX_BYTES)
+  const videoDownloadTimeoutMs = Number(xiaohongshuRelay.videoDownloadTimeoutMs) || XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS
   const noteImages = (Array.isArray(card.images) ? card.images : [])
     .map(url => normalizeXiaohongshuImageUrl(url))
     .filter(url => /^https?:\/\//i.test(String(url || "")))
   const images = noteImages.length ? noteImages : (card.cover_url ? [normalizeXiaohongshuImageUrl(card.cover_url)].filter(Boolean) : [])
+
+  // 视频笔记优先搬视频本体(直链短时有效,组装阶段立即下载);
+  // 时长超限直接跳过,下载失败降级为封面图集
+  if (card.media_kind === "video" || card.play_url) {
+    if (Number(card.duration || 0) > maxVideoSeconds) {
+      segments.push(`\n（视频超过${Math.floor(maxVideoSeconds / 60)}分钟，未附带视频本体）`)
+    } else if (shouldAttachXiaohongshuVideo(card, maxVideoSeconds)) {
+      if (!segmentApi?.video) return { segments, imageNodes, tempFiles, artifactLeases }
+      const videoDownloadStartedAt = Date.now()
+      const key = buildMediaArtifactKey("xiaohongshu", card)
+      const useArtifactStore = Boolean(artifactStore && key)
+      const lease = useArtifactStore
+        ? await artifactStore!.acquire(key, () => downloadXiaohongshuVideo(card, { maxBytes: maxVideoBytes, timeoutMs: videoDownloadTimeoutMs, logger }))
+        : null
+      const filePath = useArtifactStore ? lease?.filePath : await downloadXiaohongshuVideo(card, { maxBytes: maxVideoBytes, timeoutMs: videoDownloadTimeoutMs, logger })
+      onTiming?.("download", Date.now() - videoDownloadStartedAt)
+      if (filePath) {
+        if (lease) artifactLeases.push(lease)
+        else tempFiles.push(filePath)
+        segments.push("\n", segmentApi.video(filePath))
+        return { segments, imageNodes, tempFiles, artifactLeases }
+      }
+      if (lease) await lease.release?.().catch?.(() => {})
+      segments.push("\n（视频本体暂时获取失败，附封面与原文）")
+    }
+  }
+
   if (!images.length) {
     segments.push("\n（笔记图片暂时获取失败，已保留笔记页面）")
     return { segments, imageNodes, tempFiles, artifactLeases }
@@ -121,5 +185,5 @@ async function cleanupXiaohongshuRelayFiles(tempFiles:string[] = []) {
   await Promise.all((Array.isArray(tempFiles) ? tempFiles : []).map(file => fs.promises.unlink(file).catch(() => {})))
 }
 
-return {downloadXiaohongshuImage,buildXiaohongshuRelaySegments,cleanupXiaohongshuRelayFiles}
+return {downloadXiaohongshuImage,downloadXiaohongshuVideo,shouldAttachXiaohongshuVideo,buildXiaohongshuRelaySegments,cleanupXiaohongshuRelayFiles}
 }

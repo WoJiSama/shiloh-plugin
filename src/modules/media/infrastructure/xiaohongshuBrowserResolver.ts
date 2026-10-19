@@ -1,6 +1,6 @@
 import type {Browser,Page} from "puppeteer"
 import {record,errorText,type XiaohongshuCard,type MediaLogger} from "./xiaohongshuTypes.js"
-import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState} from "./xiaohongshuMessage.js"
+import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo} from "./xiaohongshuMessage.js"
 import { createSingleFlightResolver } from "../../foundation/infrastructure/singleFlightResolver.js"
 
 const RESOLVE_TIMEOUT_MS = 25_000
@@ -113,6 +113,17 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
       }
     } catch {}
     const domInfo = extractFromDomPayload(domPayload)
+    // 视频直链:移动端 state 深找 mp4(带签名,短时有效),优先 h264 保 QQ 兼容
+    let playUrl = ""
+    let duration = 0
+    try {
+      if (domPayload.initialStateJson && domPayload.initialStateJson !== "null") {
+        const parsed = JSON.parse(domPayload.initialStateJson)
+        const video = extractXiaohongshuVideo(parsed)
+        playUrl = video.playUrl
+        duration = video.duration
+      }
+    } catch {}
     const images = stateCard?.images?.length ? stateCard.images : (domInfo.images || [])
     const result:XiaohongshuCard = {
       ...card,
@@ -122,17 +133,19 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
       liked: stateCard?.liked || 0,
       collected: stateCard?.collected || 0,
       comment_count: stateCard?.comment_count || 0,
-      media_kind: stateCard?.media_kind || domInfo.media_kind,
+      media_kind: playUrl ? "video" : (stateCard?.media_kind || domInfo.media_kind),
       cover_url: stateCard?.cover_url || domInfo.cover_url || "",
       images,
+      play_url: playUrl || stateCard?.play_url || "",
+      duration: duration || stateCard?.duration || 0,
       note_id: stateCard?.note_id || card.note_id || "",
       final_url: domPayload.noteUrl || ""
     }
-    if (!images.length && !result.title && !result.cover_url) {
+    if (!images.length && !result.title && !result.cover_url && !playUrl) {
       logger?.warn?.(`[小红书] 浏览器解析未取得笔记内容 note=${result.note_id || "?"} 页面=${domPayload.noteUrl}`)
       return null
     }
-    logger?.info?.(`[小红书] 浏览器解析成功 note=${result.note_id || "?"} ${images.length ? `图${images.length}张` : "无图"} 视频=${result.media_kind === "video" ? 1 : 0} 来源=${stateCard ? "页面状态" : "DOM"}`)
+    logger?.info?.(`[小红书] 浏览器解析成功 note=${result.note_id || "?"} ${images.length ? `图${images.length}张` : "无图"} 视频=${result.media_kind === "video" ? 1 : 0}${playUrl ? `(直链${duration}s)` : ""} 来源=${stateCard ? "页面状态" : "DOM"}`)
     return result
   } catch (error) {
     logger?.warn?.(`[小红书] 浏览器解析异常: ${errorText(error)}`)

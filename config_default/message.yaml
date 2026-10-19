@@ -134,13 +134,16 @@ pluginSettings:
     downloadTimeoutMs: 90000      # 毫秒，单张下载超时
     allowRestricted: false
   # 小红书笔记搬运：群里发小红书链接/分享卡片时自动解析笔记并以图文合并转发到群里。
-  # 解析走"静态请求 → 无头浏览器(移动端UA)"两级降级，视频笔记只搬封面和文字。
+  # 解析走"静态请求 → 无头浏览器(移动端UA)"两级降级；图文笔记搬图集，视频笔记搬视频本体(失败降级封面)。
   xiaohongshuRelay:
     enabled: true
     cookieHeader: ""               # 可选，小红书网页版登录 Cookie；提供后静态解析可直接命中，减少浏览器兜底
     maxImages: 20                  # 单篇笔记最多附带的图片张数
     maxImageBytes: 33554432       # bytes，单张最大 32 MiB
     downloadTimeoutMs: 60000      # 毫秒，单张图片下载超时
+    maxVideoSeconds: 1800         # 秒，超过 30 分钟的视频不搬本体只发封面
+    maxVideoBytes: 268435456      # bytes，视频本体最大 256 MiB
+    videoDownloadTimeoutMs: 600000 # 毫秒，视频本体下载超时
   # 长期聊天归档：只追加保存结构化文本/CQ元数据，不下载图片或视频。用于管理员按群号、QQ、关键词和前后文查询。
   messageArchive:
     enabled: false
