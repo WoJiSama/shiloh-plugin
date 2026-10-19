@@ -5,6 +5,7 @@ import {
   NButton,
   NCollapse,
   NCollapseItem,
+  NSwitch,
   NTab,
   NTabs,
   NTag,
@@ -29,7 +30,7 @@ import {
   type SchemaView
 } from '../lib/schemaState'
 import { useSchemaSaveShortcut } from '../lib/schemaKeyboard'
-import { groupAdminModules } from '../lib/groupAdminState'
+import { groupAdminModules, isGroupEnabled } from '../lib/groupAdminState'
 import { policyAdvanced, policyHelp, policySections, type PolicyKind } from '../lib/policySections'
 
 const props = defineProps<{
@@ -186,6 +187,31 @@ const sections = computed(() => {
     ].filter((section) => section.groups.length)
   return groups.map((group, index) => ({ id: String(index), label: group.label, groups: [group] }))
 })
+// 群管理默认策略：与单群编辑器同构的「模块头部启用卡 + 分组 pill」二级结构
+const activeGroup = ref('')
+const currentGroups = computed(() =>
+  props.kind !== 'groupAdmin'
+    ? []
+    : (current.value?.groups || []).map(group => ({
+        ...group,
+        fields: group.fields.filter(field => !isGroupEnabled(field.field))
+      })).filter(group => group.fields.length)
+)
+const currentEnableField = computed(() => {
+  if (props.kind !== 'groupAdmin') return undefined
+  const enabled = (current.value?.groups || []).flatMap(group => group.fields).find(field => isGroupEnabled(field.field))
+  return enabled ? { field: enabled.field, label: enabled.label, help: enabled.help || '' } : undefined
+})
+const visibleGroup = computed(
+  () => currentGroups.value.find(group => group.label === activeGroup.value) || currentGroups.value[0]
+)
+function groupPillDirty(group: SchemaGroup) {
+  return group.fields.filter(field => !equal(draft.value[field.field], baseline.value[field.field])).length
+}
+watch([activeTab, () => props.kind], () => { activeGroup.value = '' })
+const currentDescription = computed(
+  () => (current.value as { description?: string } | undefined)?.description || ''
+)
 const current = computed(
   () => sections.value.find((section) => section.id === activeTab.value) || sections.value[0]
 )
@@ -411,7 +437,86 @@ defineExpose({ dirty, reload, saving, loading })
           }}</NTab></NTabs
         >
         <NAlert v-if="sectionHelp" type="info" :show-icon="false">{{ sectionHelp }}</NAlert>
+        <template v-if="kind === 'groupAdmin' && current">
+          <section class="panel module-header-panel" :data-module="current.id">
+            <div class="module-header-top">
+              <div>
+                <h2>{{ current.label }}</h2>
+                <p>{{ currentDescription }}</p>
+              </div>
+              <NTag
+                :type="draft[`${current.id}.enabled`] ? 'success' : 'default'"
+                size="small"
+                :bordered="false"
+              >
+                {{ draft[`${current.id}.enabled`] ? '默认启用' : '默认关闭' }}
+              </NTag>
+            </div>
+            <div
+              v-if="currentEnableField"
+              class="module-enable-row"
+              :class="{ 'module-enabled': !!draft[currentEnableField.field] }"
+            >
+              <div class="module-enable-copy">
+                <strong>{{ currentEnableField.label }}</strong>
+                <span v-if="currentEnableField.help">{{ currentEnableField.help }}</span>
+              </div>
+              <NSwitch
+                size="large"
+                :value="!!draft[currentEnableField.field]"
+                :aria-label="currentEnableField.label"
+                @update:value="draft[currentEnableField.field] = $event"
+              />
+            </div>
+          </section>
+          <div
+            class="module-settings"
+            :class="{ 'module-off': !draft[`${current.id}.enabled`] }"
+          >
+            <div v-if="currentGroups.length > 1" class="group-tabs" role="tablist">
+              <button
+                v-for="group in currentGroups"
+                :key="group.label"
+                type="button"
+                role="tab"
+                class="group-tab"
+                :class="{ active: group.label === visibleGroup?.label }"
+                @click="activeGroup = group.label"
+              >
+                {{ group.label
+                }}<span v-if="groupPillDirty(group)"> · {{ groupPillDirty(group) }}</span>
+              </button>
+            </div>
+            <section v-if="visibleGroup" class="panel config-panel">
+              <div class="panel-heading">
+                <h2>{{ visibleGroup.label }}</h2>
+                <span class="muted">{{ visibleGroup.fields.length }} 项设置</span>
+              </div>
+              <div v-if="basicFields(visibleGroup).length" class="field-grid">
+                <SchemaField
+                  v-for="field in basicFields(visibleGroup)"
+                  :key="field.field"
+                  :field="field"
+                  v-model="draft[field.field]"
+                  :apply-hint="describeApply(field, kind)"
+                />
+              </div>
+              <NCollapse v-if="advancedFields(visibleGroup).length" class="advanced-settings"
+                ><NCollapseItem name="advanced" :title="advancedTitle"
+                  ><div class="field-grid">
+                    <SchemaField
+                      v-for="field in advancedFields(visibleGroup)"
+                      :key="field.field"
+                      :field="field"
+                      v-model="draft[field.field]"
+                      :apply-hint="describeApply(field, kind)"
+                    /></div></NCollapseItem
+              ></NCollapse>
+            </section>
+          </div>
+        </template>
         <section
+          v-else
           v-for="group in current?.groups || []"
           :key="group.label"
           class="panel config-panel"
@@ -459,6 +564,86 @@ defineExpose({ dirty, reload, saving, loading })
 </template>
 
 <style scoped>
+/* 群管理默认策略：模块头部启用卡 + 分组 pill（与单群编辑器同构） */
+.module-header-panel {
+  padding: 18px 24px 20px;
+}
+.module-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.module-header-top h2 {
+  font-size: 16px;
+}
+.module-header-top p {
+  color: var(--c-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.module-enable-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-soft);
+}
+.module-enable-row.module-enabled {
+  border-color: color-mix(in srgb, var(--c-green) 45%, var(--c-border));
+}
+.module-enable-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.module-enable-copy strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.module-enable-copy span {
+  font-size: 12px;
+  color: var(--c-muted);
+  line-height: 1.5;
+}
+.module-settings {
+  display: grid;
+  gap: 18px;
+  transition: opacity 0.2s ease;
+}
+.module-settings.module-off {
+  opacity: 0.55;
+}
+.group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 5px;
+  background: var(--c-soft);
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  width: fit-content;
+}
+.group-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--c-muted);
+  font-size: 13px;
+  padding: 7px 18px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.group-tab.active {
+  background: var(--c-panel);
+  color: var(--c-text);
+  box-shadow: 0 1px 4px #0001;
+}
 .schema-page {
   max-width: 1120px;
 }
