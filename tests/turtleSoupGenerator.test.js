@@ -192,3 +192,32 @@ test("生成三道关:结构不过/审题不过/逻辑审计不过均不入库,�
   assert.equal(puzzle.status, "pending", "入库即待审")
   assert.equal(plan.saved[0].status, "pending")
 })
+
+test("难度定向:prompt 携带指定难度,产物难度不符被拒", async () => {
+  const { TurtleSoupGenerator } = await import("../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupGenerator.js")
+  const goodPuzzle = { title: "定向汤", surface: "汉".repeat(100), solution: "底".repeat(60), keyPoints: ["点一", "点二", "点三"], hints: ["h1", "h2", "h3"], difficulty: "hard", tags: [] }
+  const captured = []
+  let state = 0
+  const responses = [
+    JSON.stringify({ ...goodPuzzle, difficulty: "easy" }),  // 难度不符
+    JSON.stringify({ ...goodPuzzle, difficulty: "hard" }),   // 符合
+    JSON.stringify({ pass: true, reason: "ok" }),
+    JSON.stringify({ pass: true, holes: [], reason: "无漏洞" })
+  ]
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "soup-diff-"))
+  const store = new (await import("../dist/backend/modules/games/infrastructure/turtleSoup/TurtleSoupStore.js")).TurtleSoupStore({cwd: dir, baseDir: "data/turtle_soup"})
+  const generator = new TurtleSoupGenerator({
+    store, config: () => ({ freshPoolTarget: 2, contentPolicy: "宽松" }),
+    callModel: async messages => {
+      if (String(messages[0].content).includes("出题人")) captured.push(String(messages[1].content))
+      return responses[state++] ?? JSON.stringify({ pass: true, holes: [], reason: "ok" })
+    },
+    logger: { info() {} }
+  })
+  try {
+    const puzzle = await generator.generateOne("hard")
+    assert.equal(puzzle.difficulty, "hard")
+    assert.ok(captured[0].includes("难度定为:hard"), "prompt 携带难度指令")
+    assert.ok(captured[1].includes("难度定为:hard"), "重试仍带难度")
+  } finally { fs.rmSync(dir, {recursive: true, force: true}) }
+})

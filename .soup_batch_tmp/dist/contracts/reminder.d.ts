@@ -1,0 +1,76 @@
+export interface ReminderRedis {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string, options?: {
+        PX?: number;
+        NX?: boolean;
+        EX?: number;
+    }): Promise<unknown>;
+    del(key: string): Promise<unknown>;
+    eval(script: string, options: {
+        keys: string[];
+        arguments: string[];
+    }): Promise<unknown>;
+}
+export interface ReminderBot {
+    uin?: string | number;
+    sendApi(action: string, params: Record<string, unknown>): Promise<unknown>;
+    pickGroup?(id: number): {
+        sendMsg(message: unknown): Promise<unknown>;
+    };
+    pickFriend?(id: number): {
+        sendMsg(message: unknown): Promise<unknown>;
+    };
+}
+export interface ReminderEvent {
+    user_id: string | number;
+    self_id?: string | number;
+    group_id?: string | number | null;
+    message_id?: string | number;
+    bot?: ReminderBot;
+    isMaster?: boolean;
+    [key: string]: unknown;
+}
+export interface ReminderAction {
+    tool: string;
+    params?: Record<string, unknown>;
+}
+export interface ReminderData {
+    id: string;
+    user_id: string;
+    group_id: string | null;
+    bot_id?: string;
+    message_id: string | number | null;
+    content: string;
+    reminder_message: string | null;
+    trigger_time: number;
+    created_at: number;
+    status: 'pending' | 'sending' | 'unknown' | 'failed' | 'completed';
+    extra_action: ReminderAction | null;
+    extra_attempted?: boolean;
+    retry_count: number;
+    delivery?: import('./delivery.js').DeliveryReceipt;
+    updated_at?: number;
+}
+export interface ReminderPending {
+    id: string;
+    trigger_time: number;
+}
+export interface ReminderTools {
+    [name: string]: {
+        execute(params: Record<string, unknown>, event: ReminderEvent): unknown;
+    };
+}
+export interface ReminderPorts {
+    redis: ReminderRedis;
+    logger: {
+        warn(...values: unknown[]): void;
+        error(...values: unknown[]): void;
+        info(...values: unknown[]): void;
+        debug(...values: unknown[]): void;
+    };
+    getBot(id?: string): ReminderBot | undefined;
+    mcpManager: {
+        isMCPTool(name: string): boolean;
+        executeToolByAlias(name: string, params: Record<string, unknown>): Promise<unknown>;
+    };
+}

@@ -1,0 +1,297 @@
+export interface UmaEvent {
+    nickname?: string;
+    group_id?: string | number;
+    user_id?: string | number;
+    msg?: string;
+    isMaster?: boolean;
+    sender?: {
+        user_id?: string | number;
+        card?: string;
+        nickname?: string;
+        role?: string;
+    };
+    reply?(message: unknown): Promise<unknown>;
+}
+export interface UmaLogger {
+    warn?(message: string): void;
+    info?(message: string): void;
+    error?(message: string): void;
+}
+export interface UmaAffix {
+    id?: string;
+    label: string;
+    quality: string;
+    qualityLabel?: string;
+    tags?: string[];
+    mechanic?: string;
+    effect?: number;
+    rolledAt?: string;
+}
+export interface UmaReportRank {
+    rank: number;
+    name: string;
+    affix?: UmaAffix | null;
+    isNpc?: boolean;
+    gapToPrevious?: number;
+    gapText?: string;
+    meta?: string;
+    strategy?: string;
+    state?: string;
+}
+export interface UmaProficiencyProgress {
+    value: number;
+    level: string;
+    levelIndex: number;
+    nextLevel: string;
+    target: number;
+    need: number;
+    percent: number;
+}
+export interface UmaProficiencyGain {
+    actionKey: string;
+    label: string;
+    gain: number;
+    before?: number;
+    after: number;
+    progress: UmaProficiencyProgress;
+}
+export interface UmaProficiencyEntry {
+    userId?: string;
+    umaName?: string;
+    nickname?: string;
+    gains: UmaProficiencyGain[];
+}
+export interface UmaReport {
+    type?: string;
+    title?: string;
+    subtitle?: string;
+    scene?: string;
+    generatedAt?: string;
+    prompt?: string;
+    ranking?: UmaReportRank[];
+    highlights?: string[];
+    awards?: string[];
+    proficiencyGains?: UmaProficiencyEntry[];
+}
+export interface UmaConfig {
+    enabled: boolean;
+    minPlayers: number;
+    maxPlayers: number;
+    lobbySeconds: number;
+    raceStageSeconds: number;
+    cooldownSeconds: number;
+    winPoints: number;
+    secondPoints: number;
+    thirdPoints: number;
+    participationPoints: number;
+    rankLimit: number;
+    baseDir: string;
+    affixRerollCost?: number;
+}
+export interface UmaManagerPorts {
+    sendSmartReply(event: UmaEvent, message: unknown, options?: {
+        kind?: string;
+    }): Promise<unknown>;
+    renderReport?(event: UmaEvent, report: UmaReport): Promise<unknown>;
+}
+export interface UmaTrait {
+    key: string;
+    label: string;
+    description: string;
+    fit?: Record<string, number>;
+    tagFit?: Record<string, number>;
+    riskAdjust?: number;
+    luckBonus?: number;
+    pattern?: RegExp;
+}
+export interface UmaPet {
+    total?: number;
+    createdAt?: string;
+    name: string;
+    personality: string;
+    attributes: Record<string, number>;
+    trait?: UmaTrait;
+    affix?: UmaAffix | null;
+    proficiency?: Record<string, number>;
+    adoptedAt?: string;
+    updatedAt?: string;
+}
+export interface UmaPlayerRecord {
+    podiums?: number;
+    userId: string;
+    nickname: string;
+    points: number;
+    wins: number;
+    races: number;
+    uma?: UmaPet;
+    updatedAt?: string;
+    lastRaceAt?: string;
+    trainingPity?: Record<string, Record<string, number>>;
+}
+export interface UmaPoints {
+    players: Record<string, UmaPlayerRecord>;
+}
+export interface UmaScene {
+    broadcast?: string;
+    id?: string;
+    name: string;
+    description: string;
+    tags?: string[];
+    fit?: Record<string, number>;
+    weights?: Record<string, number>;
+    events?: string[];
+    riskRate?: number;
+    bonus?: number;
+}
+export interface UmaStage {
+    key: string;
+    label: string;
+    prompt: string;
+    event: string;
+}
+export interface UmaCheck {
+    success?: boolean;
+    text?: string;
+    rawRoll?: number;
+    affixNotes?: string[];
+    grade: string;
+    label: string;
+    roll: number;
+    target: number;
+    primary?: string;
+    secondary?: string;
+    supportBonus?: number;
+    affixBonus?: number;
+    proficiencyBonus?: number;
+    effect?: string;
+}
+export interface UmaRaceState {
+    speed: number;
+    staminaAttr: number;
+    power: number;
+    focus: number;
+    wisdom: number;
+    luck: number;
+    position: number;
+    distance: number;
+    velocity: number;
+    maxVelocity: number;
+    staminaMax: number;
+    stamina: number;
+    rhythmMax: number;
+    rhythm: number;
+    burstMax: number;
+    burstReserve: number;
+    route: number;
+    luckState: number;
+    notes: string[];
+    affixMechanicUsed?: Record<string, boolean>;
+    actionUses?: {
+        actionKey: string;
+        grade: string;
+    }[];
+    lastActionKey?: string;
+    lastCheck?: UmaCheck;
+    lastDelta?: Record<string, number>;
+}
+export interface UmaRunner {
+    personality?: string;
+    joinedAt?: number;
+    userId: string;
+    nickname: string;
+    umaName?: string;
+    umaPersonality?: string;
+    attributes: Record<string, number>;
+    strategyKey: string;
+    strategyLabel?: string;
+    isNpc?: boolean;
+    trait?: UmaTrait;
+    traitKey?: string;
+    traitLabel?: string;
+    traitTagBonus?: number;
+    umaAffix?: UmaAffix | null;
+    affix?: UmaAffix | null;
+    proficiency?: Record<string, number>;
+    raceTags?: string[];
+    race: UmaRaceState;
+}
+export interface UmaRoom {
+    history: {
+        stage: string;
+        lines: string[];
+    }[];
+    advancing?: boolean;
+    stageSnapshot?: Map<string, {
+        rank: number;
+        userId: string;
+        distance: number;
+        velocity: number;
+    }> | null;
+    stageActionEffects?: Map<string, {
+        actionKey: string;
+        velocityBefore: number;
+        velocityAfter: number;
+        velocityDelta: number;
+        distanceDelta: number;
+    }> | null;
+    groupId: string;
+    starterId: string;
+    createdAt: number;
+    phase: string;
+    track: UmaScene;
+    participants: Map<string, UmaRunner>;
+    event: UmaEvent;
+    timer: ReturnType<typeof setTimeout> | null;
+    stageTimer?: ReturnType<typeof setTimeout> | null;
+    twist: UmaScene;
+    scene: UmaScene;
+    condition: UmaScene;
+    runners: UmaRunner[];
+    stageIndex: number;
+    decisions: Map<string, Map<string, string>>;
+    resolving?: boolean;
+    startedAt?: number;
+    stageStartedAt?: number;
+    stageHistory?: string[];
+    raceProfile?: UmaProfile;
+}
+export interface UmaProfile {
+    startSpeedCarry: number;
+    finalSpeedCarry: number;
+    finalRouteDifficulty: number;
+    variance: number;
+    distance: number;
+    segments: number[];
+    friction: number;
+    slope: number[];
+    corner: number[];
+    staminaCostRate: number;
+    rhythmDifficulty: number;
+    routeDifficulty: number;
+    speedCarry: number;
+}
+export interface UmaTrainingType {
+    failTargetPenaltyChance?: number;
+    label: string;
+    aliases: string[];
+    cost: number;
+    baseRate: number;
+    decay: number;
+    minRate: number;
+    gain: number;
+    pity: number;
+    failPenaltyCount: number;
+    failPenaltyChance: number;
+    maxTargetValue?: number;
+    critGain?: number;
+    critRate?: number;
+}
+export interface UmaRaceResult {
+    ranking: UmaRunner[];
+    highlights: string[];
+    track: UmaScene;
+    twist: UmaScene;
+    scene: UmaScene;
+    condition?: UmaScene;
+    proficiencyGains?: UmaProficiencyEntry[];
+}

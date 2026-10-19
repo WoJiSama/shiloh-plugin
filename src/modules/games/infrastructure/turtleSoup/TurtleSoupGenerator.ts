@@ -60,14 +60,14 @@ export class TurtleSoupGenerator {
   }
 
   // 手动种子生成(管理命令),同样受互斥锁保护。
-  async seed(count:number):Promise<GenerateOutcome> {
+  async seed(count:number, difficulty?:'easy'|'normal'|'hard'):Promise<GenerateOutcome> {
     const total = Math.max(1, Math.min(20, Math.floor(count) || 1))
     if (this.generating) return {added: 0, failed: 0, lastError: 'busy'}
     this.generating = true
     try {
       let added = 0, failed = 0, lastError:string|undefined
       for (let index = 0; index < total; index++) {
-        try { await this.generateOne(); added++ }
+        try { await this.generateOne(difficulty); added++ }
         catch (error) { failed++; lastError = error instanceof Error ? error.message : String(error) }
       }
       return {added, failed, lastError}
@@ -92,7 +92,7 @@ export class TurtleSoupGenerator {
     }
   }
 
-  async generateOne():Promise<TurtleSoupPuzzle> {
+  async generateOne(difficulty?:'easy'|'normal'|'hard'):Promise<TurtleSoupPuzzle> {
     const {store, config} = this.ports
     const {puzzles} = store.readPuzzles()
     const settings = config()
@@ -101,9 +101,10 @@ export class TurtleSoupGenerator {
     let lastError:unknown = null
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const text = await this.ports.callModel(buildPuzzleGenerationMessages({contentPolicy: settings.contentPolicy, avoidTitles, feedback}), {temperature: 0.9, model: settings.generationModel || undefined})
+        const text = await this.ports.callModel(buildPuzzleGenerationMessages({contentPolicy: settings.contentPolicy, avoidTitles, feedback, ...(difficulty ? {difficulty} : {})}), {temperature: 0.9, model: settings.generationModel || undefined})
         const puzzle = parseGeneratedPuzzle(text, {nowMs: this.now() + this.sequence++, random: this.random(), model: settings.generationModel || '主模型'})
         if (!puzzle) throw new Error('生成产物不是合法汤面JSON')
+        if (difficulty && puzzle.difficulty !== difficulty) throw new Error(`难度不符:要求${difficulty},产出${puzzle.difficulty}`)
         if (this.duplicatesExisting(puzzle, puzzles)) throw new Error(`生成产物与现有汤面重复: ${puzzle.title}`)
         // 三道关全部通过才入库,且各域审核结论随题保存,供控制台展示与追溯
         const audits:TurtleSoupAuditRecord[] = []

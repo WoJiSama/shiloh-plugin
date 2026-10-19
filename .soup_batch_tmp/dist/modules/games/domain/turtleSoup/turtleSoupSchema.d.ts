@@ -1,0 +1,14 @@
+import type { TurtleSoupPuzzle, TurtleSoupPuzzleFile, TurtleSoupPlay, TurtleSoupPlayFile, TurtleSoupPlayer, TurtleSoupQaEntry, TurtleSoupGuessEntry, TurtleSoupSession, TurtleSoupSessionFile, TurtleSoupRating } from '../../../../contracts/turtleSoup.js';
+export declare function decodeTurtleSoupPuzzle(value: unknown): TurtleSoupPuzzle;
+export declare function decodeTurtleSoupPuzzleFile(value: unknown): TurtleSoupPuzzleFile;
+export declare function decodeTurtleSoupRating(value: unknown): TurtleSoupRating;
+export declare function decodeTurtleSoupPlay(value: unknown): TurtleSoupPlay;
+export declare function decodeTurtleSoupPlayFile(value: unknown): TurtleSoupPlayFile;
+export declare function decodeTurtleSoupPlayer(value: unknown): TurtleSoupPlayer;
+export declare function decodeTurtleSoupQaEntry(value: unknown): TurtleSoupQaEntry;
+export declare function decodeTurtleSoupGuessEntry(value: unknown): TurtleSoupGuessEntry;
+export declare function decodeTurtleSoupSession(value: unknown): TurtleSoupSession;
+export declare function decodeTurtleSoupSessionFile(value: unknown): TurtleSoupSessionFile;
+export declare function emptyTurtleSoupPuzzleFile(): TurtleSoupPuzzleFile;
+export declare function emptyTurtleSoupPlayFile(): TurtleSoupPlayFile;
+export declare function emptyTurtleSoupSessionFile(): TurtleSoupSessionFile;

@@ -1,0 +1,146 @@
+import type { ImageServicePorts } from './imageService.js';
+import type { PersonaSnapshot } from './persona.js';
+export type DrawId = string | number;
+export interface DrawEvent {
+    group_id?: DrawId | null;
+    user_id?: DrawId;
+    self_id?: DrawId;
+    message_id?: DrawId;
+    message_type?: string;
+    msg?: string;
+    raw_message?: string;
+    nickname?: string;
+    sender?: {
+        user_id?: DrawId | undefined;
+        nickname?: string;
+        card?: string;
+    };
+    bot?: DrawBot | null;
+    isGroup?: boolean;
+    _personaSnapshot?: PersonaSnapshot;
+    _progressReplyState?: {
+        sent?: boolean;
+        reserved?: boolean;
+    };
+    reply(message: unknown): Promise<unknown>;
+}
+export interface DrawBot {
+    uin?: DrawId;
+    nickname?: string;
+    pickGroup?(id: number): {
+        sendMsg?(message: unknown): Promise<unknown>;
+    };
+    pickFriend?(id: number): {
+        sendMsg?(message: unknown): Promise<unknown>;
+    };
+    sendApi?(action: string, params: Record<string, unknown>): Promise<unknown>;
+}
+export interface DrawOptions extends Record<string, unknown> {
+    prompt?: string;
+    images?: string[] | string | undefined;
+    provider?: string;
+    aspectRatio?: string;
+    referencePurpose?: string;
+    progressText?: string;
+    agentContext?: string;
+}
+export interface DrawJob {
+    id: string;
+    opts: DrawOptions;
+    e: DrawEvent;
+    scopeKey: string;
+    requesterName: string;
+    requesterId: DrawId;
+    messageId: DrawId;
+    queuedAt: number;
+    notifyFailure: boolean;
+    skipProgressNotice: boolean;
+    recovered?: boolean;
+}
+export interface DrawRecord {
+    id: string;
+    opts: DrawOptions;
+    scopeKey: string;
+    requesterName: string;
+    requesterId: string;
+    userId: string;
+    groupId: string;
+    messageId: DrawId;
+    messageType: string;
+    selfId: DrawId;
+    sender: NonNullable<DrawEvent['sender']>;
+    queuedAt: number;
+    notifyFailure: boolean;
+    skipProgressNotice: boolean;
+}
+export interface DrawActive {
+    jobId: string;
+    requesterName: string;
+    requesterId: DrawId;
+    groupId: DrawId;
+    messageId: DrawId;
+    startedAt: number;
+}
+export interface DrawQueue {
+    activeTask: DrawActive | null;
+    queue: DrawJob[];
+    recovering?: boolean;
+}
+export interface DrawRedis {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string, options: {
+        EX: number;
+    }): Promise<unknown>;
+    del(key: string): Promise<unknown>;
+    scanIterator?(options: {
+        MATCH: string;
+        COUNT: number;
+    }): AsyncIterable<string | string[]>;
+    scan?(cursor: string, match: string, pattern: string, count: string, limit: number): Promise<[string | number, string[]]>;
+    keys?(pattern: string): Promise<string[]>;
+}
+export interface DrawBridge {
+    updateUserToolTaskStatus?(status: Record<string, unknown>): Promise<unknown>;
+    clearUserToolTaskStatus?(status: Record<string, unknown>): Promise<unknown>;
+    saveTaskStatus?(status: Record<string, unknown>): Promise<unknown>;
+    getTaskStatusTtlSeconds?(): number;
+    getPersonaFor?(event: DrawEvent): {
+        name?: string;
+    };
+    config?: {
+        personaGuard?: unknown;
+        persona?: {
+            name?: string;
+        };
+    };
+}
+export interface BananaPorts {
+    imageService: ImageServicePorts;
+    getRedis(): DrawRedis | null;
+    getBot(selfId?: DrawId): DrawBot | null;
+    getBridge(): DrawBridge | null;
+    normalizeImageUrls(images: string[]): Promise<string[]>;
+    guardReply(text: string, config: unknown, context: {
+        userText: string;
+        botNames: (string | undefined)[];
+    }): string;
+    segment: {
+        image(buffer: Buffer): unknown;
+        at?(id: DrawId): unknown;
+        reply?(id: DrawId): unknown;
+    };
+    logger: {
+        info(...args: unknown[]): void;
+        warn(...args: unknown[]): void;
+        error(...args: unknown[]): void;
+    };
+    resolveImageBuffer(image: unknown): Promise<Buffer>;
+    getImageBufferMetadata(buffer: Buffer): Promise<{
+        width: number;
+        height: number;
+        format?: string;
+    }>;
+    isMessageSendFailed(result: unknown): boolean;
+    formatMessageSendFailure(result: unknown): string;
+    isUrlAvailable(url: string): Promise<boolean>;
+}

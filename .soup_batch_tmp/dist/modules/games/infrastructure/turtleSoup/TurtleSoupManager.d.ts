@@ -1,0 +1,73 @@
+import type { TurtleSoupConfig, TurtleSoupEvent, TurtleSoupLogger, TurtleSoupSession, TurtleSoupHost } from '../../../../contracts/turtleSoup.js';
+import type { TurtleSoupGenerator } from './TurtleSoupGenerator.js';
+export interface TurtleSoupManagerPorts {
+    sendSmartReply(event: TurtleSoupEvent, message: unknown, options?: {
+        kind?: string;
+    }): Promise<unknown>;
+    replyGroup?: (groupId: string, message: string) => Promise<unknown>;
+    host: TurtleSoupHost;
+    generator: TurtleSoupGenerator;
+    logger?: TurtleSoupLogger;
+    cwd?: string;
+    config?: () => TurtleSoupConfig;
+    now?: () => number;
+    sweepIntervalMs?: number;
+    isOtherGameActive?: (groupId: string) => boolean;
+    sendPrivate?: (userId: string, message: string, groupId?: string) => Promise<unknown>;
+}
+export declare class TurtleSoupManager {
+    private readonly ports;
+    private readonly store;
+    private readonly sessions;
+    private sweeperTimer;
+    private sweeping;
+    private playSequence;
+    constructor(ports: TurtleSoupManagerPorts);
+    config(): TurtleSoupConfig;
+    start(): void;
+    stop(): void;
+    getUserId(e: TurtleSoupEvent): string;
+    getNickname(e: TurtleSoupEvent): string;
+    getGroupId(e: TurtleSoupEvent): string;
+    isAdmin(e: TurtleSoupEvent): boolean;
+    private now;
+    getSession(groupId: string): TurtleSoupSession | undefined;
+    playingGroupIds(): Set<string>;
+    private findPuzzle;
+    private findOpenPlay;
+    private findLatestPlay;
+    private makePlayId;
+    private persist;
+    private drop;
+    showHelp(): string;
+    showHub(): string;
+    openGame(e: TurtleSoupEvent): Promise<string>;
+    joinGame(e: TurtleSoupEvent): Promise<string>;
+    cancelGame(e: TurtleSoupEvent): Promise<string>;
+    startGame(e: TurtleSoupEvent): Promise<string>;
+    private launchPlay;
+    choosePuzzle(e: TurtleSoupEvent): Promise<string>;
+    private beginPlay;
+    guessSoup(e: TurtleSoupEvent): Promise<string>;
+    useHint(e: TurtleSoupEvent): Promise<string>;
+    showStatus(e: TurtleSoupEvent): string;
+    endGame(e: TurtleSoupEvent): Promise<string>;
+    switchPuzzle(e: TurtleSoupEvent): Promise<string>;
+    rankings(): string;
+    surrender(e: TurtleSoupEvent): Promise<string>;
+    rateGame(e: TurtleSoupEvent): Promise<string>;
+    inventory(e: TurtleSoupEvent): string;
+    private findPending;
+    listPending(e: TurtleSoupEvent): string;
+    reviewPuzzle(e: TurtleSoupEvent, action: 'approve' | 'reject'): Promise<string>;
+    generateMore(e: TurtleSoupEvent): Promise<string>;
+    handleChat(e: TurtleSoupEvent): Promise<{
+        reply: string;
+        recap?: string;
+    } | null>;
+    private finishGame;
+    private buildCatchUp;
+    sweep(): Promise<void>;
+    private archiveRevealed;
+    private broadcast;
+}

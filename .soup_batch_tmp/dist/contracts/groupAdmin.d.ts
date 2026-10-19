@@ -1,0 +1,224 @@
+export type GroupId = string | number;
+export interface GroupAdminLogger {
+    warn?(message: string): void;
+    error?(message: string): void;
+    info?(message: string): void;
+    debug?(message: string): void;
+}
+export interface GroupMember {
+    user_id?: GroupId;
+    nickname?: string;
+    card?: string;
+    role?: string;
+    level?: unknown;
+}
+export interface AdminGroup {
+    name?: string;
+    getMemberMap(): Promise<Map<GroupId, GroupMember>>;
+    sendMsg(message: unknown): Promise<unknown>;
+    makeForwardMsg?(nodes: unknown[]): Promise<unknown>;
+}
+export interface AdminBot {
+    uin?: GroupId;
+    pickGroup(groupId: GroupId): AdminGroup | Promise<AdminGroup>;
+    sendApi(method: string, params: Record<string, unknown>): Promise<unknown>;
+}
+export interface AdminEvent {
+    group_id?: GroupId;
+    user_id?: GroupId;
+    self_id?: GroupId;
+    nickname?: string;
+    card?: string;
+    sub_type?: string;
+    isMaster?: boolean;
+    sender?: GroupMember;
+    message?: unknown[];
+    raw_message?: string;
+    msg?: string;
+    message_id?: GroupId;
+    seq?: GroupId;
+    group?: AdminGroup;
+    bot?: AdminBot;
+    reply?(message: unknown): Promise<unknown>;
+    getReply?(): Promise<unknown>;
+}
+export interface AdminPorts {
+    readSettings(): Record<string, unknown>;
+    getBot(): AdminBot | undefined;
+    logger?: GroupAdminLogger | undefined;
+    at?(userId: GroupId): unknown;
+    fetchImpl?: typeof fetch;
+}
+export interface GuardConfig {
+    enabled: boolean;
+    enabledGroups: string[];
+    verifyInviteJoin: boolean;
+    timeoutSeconds: number;
+    questionMaxNumber: number;
+    questionOperators: string[];
+    maxWrongTimes: number;
+    kickOnTimeout: boolean;
+    kickOnWrongAnswer: boolean;
+    promptTemplate: string;
+    passMessage: string;
+    retryMessage: string;
+    failMessage: string;
+    timeoutMessage: string;
+}
+export interface PendingGuard {
+    groupId: GroupId;
+    userId: GroupId;
+    answer: string;
+    question: string;
+    wrongTimes: number;
+    createdAt: number;
+    timer: ReturnType<typeof setTimeout>;
+}
+export interface NoticeRule {
+    groupId: string;
+    welcomeMessage?: string;
+    leaveMessage?: string;
+}
+export interface NoticeConfig {
+    enabled: boolean;
+    enabledGroups: string[];
+    groupRules: NoticeRule[];
+    welcomeEnabled: boolean;
+    leaveEnabled: boolean;
+    suppressWelcomeWhenGroupGuardEnabled: boolean;
+    welcomeMessage: string;
+    leaveMessage: string;
+}
+export interface OverlongMessageConfig {
+    enabled: boolean;
+    maxLength: number;
+    forwardEnabled: boolean;
+}
+export interface BurstMessageConfig {
+    enabled: boolean;
+    windowSeconds: number;
+    maxMessages: number;
+    muteSeconds: number;
+    forwardEnabled: boolean;
+}
+export interface AdScanConfig {
+    enabled: boolean;
+}
+export interface CompoundRuleConfig {
+    name: string;
+    enabled: boolean;
+    burstCount: number;
+    windowSeconds: number;
+    maxLength: number;
+    totalLength: number;
+    recall: boolean;
+    forward: boolean;
+    muteSeconds: number;
+}
+export interface ModerationConfig {
+    enabled: boolean;
+    enabledGroups: string[];
+    globalAdmins: string[];
+    groupAdmins: {
+        groupId: string;
+        admins: string[];
+    }[];
+    minActiveLevel: number;
+    inspectLowLevelOnly: boolean;
+    publicReportEnabled: boolean;
+    mentionConfiguredAdminsInGroup: boolean;
+    forwardEvidenceToAdmins: boolean;
+    evidenceMaxChars: number;
+    modelReviewEnabled: boolean;
+    modelThreshold: number;
+    adTemplateSimilarityThreshold: number;
+    adTemplateWeight: number;
+    adCorpusAutoCollect: boolean;
+    ignoredBotIds: string[];
+    floodEnabled: boolean;
+    floodMaxLevel: number;
+    floodWindowSeconds: number;
+    floodMaxMessages: number;
+    floodConfidence: number;
+    overlongMessage: OverlongMessageConfig;
+    burstMessage: BurstMessageConfig;
+    adScan: AdScanConfig;
+    compoundRules: CompoundRuleConfig[];
+    adTemplates: string[];
+    thresholds: {
+        report: number;
+        recall: number;
+        mute: number;
+        kick: number;
+    };
+    actions: {
+        recallEnabled: boolean;
+        muteEnabled: boolean;
+        kickEnabled: boolean;
+        muteSeconds: number;
+    };
+    reportTemplate: string;
+}
+export interface ModerationContext {
+    text?: string;
+    memberLevel?: unknown;
+    imageCount?: number;
+    atCount?: number;
+    forwardCount?: number;
+}
+export interface RuleContext {
+    memberLevel: number;
+    imageCount: number;
+    atCount: number;
+    forwardCount: number;
+    minActiveLevel: number;
+    textLength: number;
+}
+export interface ModerationResult {
+    rules: string[];
+    confidence: number;
+    action?: string;
+    flood?: {
+        windowSeconds: number;
+        count: number;
+    } | null;
+    corpusEntryId?: string;
+    evidenceForwarded?: boolean;
+}
+export interface CorpusEntry {
+    id: string;
+    text: string;
+    groupId: string;
+    userId: string;
+    addedBy: string;
+    source: string;
+    addedAt: string;
+}
+export type CorpusAddResult = {
+    ok: true;
+    entry: CorpusEntry;
+    droppedCount: number;
+    error?: never;
+    duplicate?: never;
+} | {
+    ok: false;
+    error: 'text_too_short';
+    entry?: never;
+    duplicate?: never;
+} | {
+    ok: false;
+    duplicate: true;
+    entry: CorpusEntry;
+    error?: never;
+};
+export type CorpusRemoveResult = {
+    ok: true;
+    entry: CorpusEntry;
+} | {
+    ok: false;
+    error: 'missing_id' | 'not_found';
+};
+export declare function adminRecord(value: unknown): Record<string, unknown>;
+export declare function adminError(value: unknown): string;
+export declare function requireAdminBot(ports: AdminPorts, event?: AdminEvent): AdminBot;
+export declare function decodeAdminEvent(value: unknown): AdminEvent;

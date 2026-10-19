@@ -1641,6 +1641,7 @@ const server = http.createServer(async (req, res) => {
       if (soupGenerationJob.running) return sendJson(res, 409, { error: "已有生成任务进行中", generating: soupGenerationJob })
       const body = await readJsonBody(req, 16 * 1024).catch(() => ({}) as Data)
       const count = Math.max(1, Math.min(10, Math.floor(Number(body.count) || 3)))
+      const difficulty = ["easy", "normal", "hard"].includes(String(body.difficulty || "")) ? String(body.difficulty) as "easy" | "normal" | "hard" : undefined
       const settings = loadPluginSettings()
       const chat = (settings.chatAiConfig || (settings.pluginSettings as Data | undefined)?.chatAiConfig || {}) as Data
       const apiKey = String(chat.chatApiKey || "")
@@ -1658,7 +1659,7 @@ const server = http.createServer(async (req, res) => {
       void (async () => {
         for (let index = 0; index < count; index++) {
           try {
-            const puzzle = await generator.generateOne()
+            const puzzle = await generator.generateOne(difficulty)
             soupGenerationJob.added++
             soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 已生成待审: ${puzzle.title}`)
           } catch (error) {
@@ -1735,6 +1736,16 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, saveSchemaConfig("riskControl", body))
       }
       return sendJson(res, 405, { error: "method not allowed" })
+    }
+    for (const gameKind of ["turtleSoup", "umaRace", "deltaForce"] as const) {
+      if (url.pathname === `/api/config/${gameKind}`) {
+        if (req.method === "GET") return sendJson(res, 200, schemaConfigView(gameKind))
+        if (req.method === "PUT") {
+          const body = await readJsonBody(req, 2 * 1024 * 1024)
+          return sendJson(res, 200, saveSchemaConfig(gameKind, body))
+        }
+        return sendJson(res, 405, { error: "method not allowed" })
+      }
     }
     if (url.pathname === "/api/pipeline/jobs" && req.method === "GET") {
       return sendJson(res, 200, await pipelineJobsView(Object.fromEntries(url.searchParams)))
