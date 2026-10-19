@@ -51,8 +51,17 @@ const host = createTurtleSoupModelHost({callModel, logger: globalThis.logger})
 const turtleSoupManager = new TurtleSoupManager({
   sendSmartReply, host, generator, logger: globalThis.logger, cwd, config: turtleSoupConfig,
   isOtherGameActive: groupId => umaRaceManager.rooms?.has(groupId),
-  sendPrivate: async (userId, message) => {
+  sendPrivate: async (userId, message, groupId) => {
     const bot = globalThis.Bot
+    // 未加好友也能收:NapCat 对带 group_id 的 send_private_msg 走群临时会话;失败再退回好友私聊
+    if (bot?.sendApi && groupId) {
+      try {
+        await bot.sendApi('send_private_msg', { user_id: Number(userId), group_id: Number(groupId), message: String(message) })
+        return
+      } catch (error) {
+        globalThis.logger?.warn?.(`[海龟汤] 临时会话私发失败,回退好友私聊: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
     const target = bot?.pickUser?.(Number(userId)) ?? bot?.pickFriend?.(Number(userId))
     if (!target?.sendMsg) throw new Error('私聊通道不可用')
     await target.sendMsg(String(message))

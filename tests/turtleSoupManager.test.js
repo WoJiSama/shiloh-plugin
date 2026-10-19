@@ -350,7 +350,7 @@ test("surrender removes the player, sends the answer privately and blocks furthe
     replyGroup: async () => null,
     host: harness.host, generator: {ensureFreshPool: async () => ({added: 0, failed: 0, lastError: undefined}), seed: async n => ({added: n, failed: 0, lastError: undefined})},
     cwd: harness.dir, config: () => ({...baseConfig}), now: harness.getNow,
-    sendPrivate: async (userId, message) => { privateMessages.push({userId, message}) }
+    sendPrivate: async (userId, message, groupId) => { privateMessages.push({userId, message, groupId}) }
   })
   try {
     await harness.seedPuzzles([puzzleOf("p1")])
@@ -361,6 +361,7 @@ test("surrender removes the player, sends the answer privately and blocks furthe
     assert.match(reply, /玩家u1已投降并退场,汤底已私发。剩余1人继续/)
     assert.equal(privateMessages.length, 1)
     assert.equal(privateMessages[0].userId, "u1")
+    assert.equal(privateMessages[0].groupId, "100", "私发需带群号供临时会话通道使用")
     assert.match(privateMessages[0].message, new RegExp(SOLUTION))
     assert.match(privateMessages[0].message, /请勿在群里剧透/)
     const session = soloManager.getSession("100")
@@ -395,7 +396,7 @@ test("surrender delivery failure keeps the retry path and everyone-surrendered e
 
     const failed = await manager.surrender(harness.event("u1", ".游戏 海龟汤 投降"))
     assert.match(failed, /私发失败/)
-    assert.match(failed, /加好友后再发一次/)
+    assert.match(failed, /可加机器人为好友后再发一次/)
     assert.equal(manager.getSession("100").surrendered.u1.delivered, false)
 
     deliverFails = false

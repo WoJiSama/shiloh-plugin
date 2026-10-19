@@ -17,7 +17,7 @@ export interface TurtleSoupManagerPorts {
   now?:() => number
   sweepIntervalMs?:number
   isOtherGameActive?:(groupId:string)=>boolean
-  sendPrivate?:(userId:string,message:string)=>Promise<unknown>
+  sendPrivate?:(userId:string,message:string,groupId?:string)=>Promise<unknown>
 }
 
 const HELP_TEXT = [
@@ -383,7 +383,7 @@ export class TurtleSoupManager {
     ].filter(line => line !== '').join('\n')
     try {
       if (!this.ports.sendPrivate) throw new Error('私聊通道未配置')
-      await this.ports.sendPrivate(userId, privateText)
+      await this.ports.sendPrivate(userId, privateText, session.groupId)
       record.delivered = true
       await this.persist(session)
       if (outcome === 'last_player') return await this.finishGame(session, 'all_surrendered')
@@ -391,7 +391,7 @@ export class TurtleSoupManager {
     } catch (error) {
       await this.persist(session)
       this.ports.logger?.warn?.(`[海龟汤] 汤底私发失败: ${error instanceof Error ? error.message : String(error)}`)
-      return `投降已记录,但私发失败(可能未加机器人为好友)。加好友后再发一次 ${SOUP_COMMAND} 投降 可重发汤底`
+      return `投降已记录,但汤底私发失败(已尝试群临时会话和好友私聊)。可加机器人为好友后再发一次 ${SOUP_COMMAND} 投降 重发汤底`
     }
   }
 
