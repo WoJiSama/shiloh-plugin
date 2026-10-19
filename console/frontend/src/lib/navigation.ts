@@ -2,6 +2,7 @@ import {
   MessageCircle,
   Bot,
   Users,
+  Gamepad2,
   Drama,
   BrainCircuit,
   Workflow,
@@ -33,7 +34,8 @@ export const navigation = [
       { path: '/persona', label: '人设与绑定', icon: Drama, hint: '人设库与身份分配' },
       { path: '/ai', label: 'AI 模型', icon: BrainCircuit, hint: '渠道与模型配置' },
       { path: '/commands', label: '命令 / 骰子', icon: Terminal, hint: '命令与规则管理' },
-      { path: '/semantic', label: '语义记忆', icon: Database, hint: '长期记忆与召回' }
+      { path: '/semantic', label: '语义记忆', icon: Database, hint: '长期记忆与召回' },
+      { path: '/games', label: '游戏', icon: Gamepad2, hint: '海龟汤题库审核与游戏参数' }
     ]
   },
   {

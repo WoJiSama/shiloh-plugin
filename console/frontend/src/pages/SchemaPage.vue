@@ -41,6 +41,9 @@ const props = defineProps<{
     | 'reasoning'
     | 'conversation'
     | 'groupAdmin'
+    | 'turtleSoup'
+    | 'umaRace'
+    | 'deltaForce'
     | PolicyKind
   embedded?: boolean
 }>()
@@ -59,6 +62,9 @@ const root = ref<HTMLElement | null>(null)
 let request: AbortController | undefined, saveRequest: AbortController | undefined
 let generation = 0
 const titles = {
+  turtleSoup: '海龟汤参数',
+  umaRace: '赛马娘参数',
+  deltaForce: '三角洲参数',
   dice: '骰子基础设置',
   tracking: '对话追踪',
   memory: '记忆策略',
@@ -70,6 +76,9 @@ const titles = {
   persona: '默认人设与画像'
 }
 const descriptions = {
+  turtleSoup: '报名窗口、提示与评分等海龟汤参数,保存后下一局生效。',
+  umaRace: '赛马娘比赛的人数、节奏与积分参数。',
+  deltaForce: '三角洲资料查询的 API 与缓存设置。',
   dice: '配置默认检定、掷骰上限、暗骰与团录行为。',
   tracking: '控制严格模式追踪与智能模式的群聊参与、续话和防刷屏策略。',
   memory: '配置记忆提取、召回、巩固、纠错和中期摘要。',

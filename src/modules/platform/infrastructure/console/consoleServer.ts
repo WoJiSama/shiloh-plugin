@@ -48,6 +48,10 @@ import riskControlSchema from "../../../config/domain/schemas/shared/riskControl
 import diceSchema from "../../../config/domain/schemas/shared/dice.js"
 import trackingSchema from "../../../config/domain/schemas/shared/tracking.js"
 import memorySchema from "../../../config/domain/schemas/shared/memory.js"
+import { turtleSoupSchema, umaRaceSchema, deltaForceSchema } from "../../../config/domain/schemas/shared/games.js"
+import { TurtleSoupStore, readTurtleSoupConfig } from "../../../games/infrastructure/turtleSoup/TurtleSoupStore.js"
+import { TurtleSoupGenerator } from "../../../games/infrastructure/turtleSoup/TurtleSoupGenerator.js"
+import type { TurtleSoupPuzzleStatus } from "../../../../contracts/turtleSoup.js"
 import { buildGroupAdminDefaultsView, prepareGroupAdminDefaultUpdates, buildGroupAdminView, prepareGroupAdminUpdates } from "../../../../adapters/config/groupAdminConfig.js"
 import { configuredGroupAdminIds, groupAdminRowId, groupAdminStatus } from "../../../groupAdmin/domain/groupAdminPolicy.js"
 
@@ -79,6 +83,7 @@ const FRONTEND_DIST = path.join(PLUGIN_ROOT, "console", "frontend", "dist")
 const PORT = Number(process.env.CONSOLE_PORT || 8787)
 const HOST = process.env.CONSOLE_HOST || "0.0.0.0"
 const MESSAGE_YAML = path.join(PLUGIN_ROOT, "config", "message.yaml")
+let soupGenerationJob = { running: false, total: 0, added: 0, failed: 0, startedAt: 0, log: [] as string[] }
 const configRepository = createConfigRepository({ file: MESSAGE_YAML })
 
 // ---------- 令牌(并存:供 curl/脚本自动化与 img 直链) ----------
@@ -1246,7 +1251,10 @@ const CONFIG_SCHEMAS:Record<string,import("../../../../adapters/config/schemaCon
   riskControl: { title: "风控管理", schema: riskControlSchema },
   dice: { title: "骰子基础设置", schema: diceSchema },
   tracking: { title: "对话追踪", schema: trackingSchema },
-  memory: { title: "记忆策略", schema: memorySchema }
+  memory: { title: "记忆策略", schema: memorySchema },
+  turtleSoup: { title: "海龟汤参数", schema: turtleSoupSchema },
+  umaRace: { title: "赛马娘参数", schema: umaRaceSchema },
+  deltaForce: { title: "三角洲参数", schema: deltaForceSchema }
 }
 
 function schemaConfigView(key:string) {
@@ -1545,6 +1553,102 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/apps") {
       return sendJson(res, 200, { apps: appPageEntryList() })
+    }
+    // ---------- 海龟汤题库管理(文件存储,与机器人进程共享 data 目录) ----------
+    if (url.pathname === "/api/games/turtle-soup/overview") {
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
+      const { puzzles } = store.readPuzzles()
+      const plays = store.readPlays().plays
+      const playCount = new Map<string, number>()
+      for (const play of plays) playCount.set(play.puzzleId, (playCount.get(play.puzzleId) || 0) + 1)
+      const sessions = Object.values(store.readSessions().sessions).map(session => ({
+        groupId: session.groupId,
+        phase: session.phase,
+        puzzleId: session.puzzleId,
+        players: (session.players || []).length,
+        startedAt: session.startedAt,
+        lastActivityAt: session.lastActivityAt
+      }))
+      return sendJson(res, 200, {
+        puzzles: puzzles.map(puzzle => ({
+          id: puzzle.id, title: puzzle.title, difficulty: puzzle.difficulty, tags: puzzle.tags,
+          status: puzzle.status, surface: puzzle.surface, solution: puzzle.solution,
+          keyPoints: puzzle.keyPoints, hints: puzzle.hints,
+          ratingCount: puzzle.ratingCount, ratingAverage: puzzle.ratingCount > 0 ? Number((puzzle.ratingSum / puzzle.ratingCount).toFixed(1)) : null,
+          plays: playCount.get(puzzle.id) || 0, createdAt: puzzle.createdAt
+        })),
+        sessions,
+        generating: soupGenerationJob,
+        freshPoolTarget: readTurtleSoupConfig(PLUGIN_ROOT).freshPoolTarget
+      })
+    }
+    const soupStatusRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)\/status$/)
+    if (soupStatusRoute && req.method === "PUT") {
+      const body = await readJsonBody(req, 64 * 1024)
+      const status = String(body.status || "")
+      if (!["active", "pending", "retired"].includes(status)) return sendJson(res, 400, { error: "status 需为 active/pending/retired" })
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
+      const puzzle = store.readPuzzles().puzzles.find(item => item.id === soupStatusRoute[1])
+      if (!puzzle) return sendJson(res, 404, { error: "题目不存在" })
+      await store.savePuzzle({ ...puzzle, status: status as TurtleSoupPuzzleStatus })
+      return sendJson(res, 200, { ok: true, id: puzzle.id, status })
+    }
+    if (url.pathname === "/api/games/turtle-soup/generate" && req.method === "POST") {
+      if (soupGenerationJob.running) return sendJson(res, 409, { error: "已有生成任务进行中", generating: soupGenerationJob })
+      const body = await readJsonBody(req, 16 * 1024).catch(() => ({}) as Data)
+      const count = Math.max(1, Math.min(10, Math.floor(Number(body.count) || 3)))
+      const settings = loadPluginSettings()
+      const chat = (settings.chatAiConfig || (settings.pluginSettings as Data | undefined)?.chatAiConfig || {}) as Data
+      const apiKey = String(chat.chatApiKey || "")
+      const apiUrl = String(chat.chatApiUrl || "")
+      const model = String(chat.chatApiModel || "")
+      if (!apiUrl || !apiKey || apiKey.includes("sk-xxx")) return sendJson(res, 400, { error: "chatAiConfig 未配置,无法调用生成模型" })
+      const soupSettings = readTurtleSoupConfig(PLUGIN_ROOT)
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, soupSettings.baseDir || "data/turtle_soup") })
+      const callModel = async (messages:unknown[], options:{temperature?:number|undefined;model?:string|undefined} = {}) => {
+        const response = await fetch(`${apiUrl.replace(/\/$/, "")}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model: options.model || model || undefined, messages, temperature: options.temperature ?? 0.7, top_p: 0.9 })
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const data = await response.json() as Data
+        const text = (data.choices as Data[] | undefined)?.[0] && ((data.choices as Data[])[0]!.message as Data | undefined)?.content
+        if (typeof text !== "string" || !text) throw new Error("模型空回复")
+        return text
+      }
+      const generator = new TurtleSoupGenerator({
+        store, config: () => soupSettings, callModel,
+        logger: { info: message => { soupGenerationJob.log.push(`[ok] ${message}`) }, warn: message => { soupGenerationJob.log.push(`[warn] ${message}`) } }
+      })
+      soupGenerationJob = { running: true, total: count, added: 0, failed: 0, startedAt: Date.now(), log: [`开始生成 ${count} 道(三道审核:结构/审题/逻辑审计)`] }
+      void (async () => {
+        for (let index = 0; index < count; index++) {
+          try {
+            const puzzle = await generator.generateOne()
+            soupGenerationJob.added++
+            soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 已生成待审: ${puzzle.title}`)
+          } catch (error) {
+            soupGenerationJob.failed++
+            soupGenerationJob.log.push(`(${soupGenerationJob.added + soupGenerationJob.failed}/${count}) 失败: ${error instanceof Error ? error.message : String(error)}`)
+          }
+        }
+        soupGenerationJob.running = false
+        soupGenerationJob.log.push("生成结束")
+      })()
+      return sendJson(res, 200, { ok: true, generating: soupGenerationJob })
+    }
+    const soupDeleteRoute = url.pathname.match(/^\/api\/games\/turtle-soup\/puzzles\/([^/]+)$/)
+    if (soupDeleteRoute && req.method === "DELETE") {
+      const store = new TurtleSoupStore({ cwd: PLUGIN_ROOT, baseDir: path.join(PLUGIN_ROOT, "data", "turtle_soup") })
+      const puzzle = store.readPuzzles().puzzles.find(item => item.id === soupDeleteRoute[1])
+      if (!puzzle) return sendJson(res, 404, { error: "题目不存在" })
+      const played = store.readPlays().plays.filter(play => play.puzzleId === puzzle.id).length
+      if (played > 0) return sendJson(res, 400, { error: `该汤已有 ${played} 局游玩记录,删除会丢失统计;建议改用"出池"` })
+      const file = store.readPuzzles()
+      file.puzzles = file.puzzles.filter(item => item.id !== puzzle.id)
+      await store.writePuzzles(file)
+      return sendJson(res, 200, { ok: true, id: puzzle.id })
     }
     if (url.pathname === "/api/config/groupAdmin") {
       if (req.method === "GET") return sendJson(res, 200, schemaConfigView("groupAdmin"))

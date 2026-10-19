@@ -20,6 +20,7 @@ export const router = createRouter({
       component: () => import('./pages/SchemaPage.vue'),
       props: { kind: 'riskControl' }
     },
+    { path: '/games', component: () => import('./pages/GamesPage.vue') },
     { path: '/draw', component: () => import('./pages/DrawPage.vue') },
     { path: '/observe', component: () => import('./pages/ObservePage.vue') },
     {
