@@ -61,11 +61,15 @@ export function resolveGroupAdminSettings(settings: Data, groupId?: GroupId): Da
       const others = Array.isArray(base.groupAdmins) ? base.groupAdmins.filter(item => groupAdminRowId(item) !== id) : []
       resolved.groupAdmins = [...others, { groupId: id, admins: list(local.admins) }]
     }
-    const enabled = typeof local.enabled === 'boolean' ? local.enabled : legacyGroupAdminEnabled(settings, key, id)
+    // 生效判定：本群显式开关优先于默认策略；未单独配置的群跟随总开关（默认值）。
+    // 总开关不再是我群启用的硬性前置——显式开启的群即使默认关闭也生效
+    const explicitOff = local.enabled === false
+    const explicitOn = local.enabled === true || legacyGroupAdminEnabled(settings, key, id)
+    const enabled = explicitOff ? false : explicitOn ? true : base.enabled === true
     const groups = list(base.enabledGroups).filter(item => item !== id)
     if (enabled) groups.push(id)
     resolved.enabledGroups = groups
-    resolved.enabled = base.enabled
+    resolved.enabled = enabled
     result[key] = resolved
   }
   return result

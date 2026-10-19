@@ -109,7 +109,7 @@ test('group administration HTTP isolates edits, enforces revisions, and preserve
   assert.equal(fields(savedA.data)['groupGuard.timeoutSeconds'].value, 90)
   assert.equal(fields(savedA.data)['groupGuard.timeoutSeconds'].inheritance, 'custom')
   assert.equal(fields(savedA.data)['groupNotice.welcomeMessage'].value, '')
-  assert.equal(savedA.data.masters.groupGuard, false)
+  assert.equal('masters' in savedA.data, false, '总开关不再作为按群生效前置')
   assert.equal((await f.getGroup('200002')).revision, savedB.data.revision)
   const stale = await f.request('/api/groups/100001/admin', {
     method: 'PUT', body: { revision: a.revision, values: { 'groupGuard.timeoutSeconds': 180 } }
@@ -460,8 +460,10 @@ test('HTTP persisted group policies drive compiled guard, notices, moderation, a
   assert.equal((await f.request('/api/config/groupAdmin', {
     method: 'PUT', body: { revision: defaults.revision, values: { 'groupGuard.enabled': false, 'groupModeration.enabled': false, 'groupNotice.enabled': false } }
   })).status, 200)
-  assert.equal(await guard.handleGroupIncrease(event('100001')), false)
-  assert.equal(await moderation.handleMessage({ ...ad, group_id: 200002 }), false)
-  assert.equal(await notice.handleGroupIncrease(event('100001')), false)
-  assert.equal(apiCalls.length, 0, 'local enabled=true cannot bypass a disabled module master')
+  // 新语义：总开关只是默认值——本群显式启用的模块不再被默认关闭拦截
+  assert.equal(await guard.handleGroupIncrease(event('100001')), true, '显式启用的入群验证无视默认总开关关闭')
+  assert.equal(await moderation.handleMessage({ ...ad, group_id: 200002 }), true, '显式启用的广告扫描无视默认总开关关闭')
+  assert.equal(apiCalls.at(-1).method, 'set_group_kick')
+  assert.equal(await notice.handleGroupIncrease(event('200002')), true)
+  assert.equal(sent.pop(), 'other welcome 800008')
 })

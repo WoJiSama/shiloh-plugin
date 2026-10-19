@@ -32,7 +32,6 @@ const fixture: GroupAdminView = {
   title: '群管理',
   groupId: '123456',
   revision: 'r1',
-  masters: { groupGuard: false, groupModeration: true, groupNotice: true },
   groups: [
     {
       label: '入群审核',
@@ -226,14 +225,13 @@ afterEach(() => {
 })
 
 describe('group administration draft lifecycle', () => {
-  it('renders module tabs, effective master warning and bidirectional group links', async () => {
+  it('renders module tabs and bidirectional group links', async () => {
     await createPage()
     expect(wrapper!.findAll('.n-tabs-tab').map((tab) => tab.text())).toEqual([
       '入群验证',
       '广告与刷屏',
       '欢迎与退群'
     ])
-    expect(wrapper!.text()).toContain('对应总开关关闭')
     expect(wrapper!.find('a[href="/group-admin?scope=defaults"]').exists()).toBe(true)
     expect(wrapper!.find('a[href="/groups?group=123456"]').exists()).toBe(true)
     expect(field('groupGuard.timeoutSeconds').props('modelValue')).toBe(300)

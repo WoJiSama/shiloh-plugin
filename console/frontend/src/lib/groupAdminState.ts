@@ -20,7 +20,6 @@ export interface GroupAdminField extends SchemaFieldDefinition {
 }
 export interface GroupAdminView extends SchemaView {
   groupId: string
-  masters: Record<GroupAdminModule, boolean>
   groups: Array<Omit<SchemaGroup, 'fields'> & { fields: GroupAdminField[] }>
 }
 export interface GroupAdminEntry {

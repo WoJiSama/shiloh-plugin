@@ -87,8 +87,7 @@ export function buildGroupAdminView(groupId: string, settings: Data) {
     return { ...field, value, defaultValue: fallback, inheritedValue: inherited,
       inheritance: getIn(row, field.field) !== undefined ? 'custom' : ((isEnabled && inherited) || legacyTemplate || legacyAdmins) ? 'legacy' : 'default' }
   }) }))
-  return { ...view, groupId: id, revision: groupRevision(id, settings),
-    masters: Object.fromEntries(GROUP_ADMIN_MODULES.map(key => [key, adminRecord(globals[key]).enabled === true])) }
+  return { ...view, groupId: id, revision: groupRevision(id, settings) }
 }
 
 function setPath(target: Data, field: string, value: unknown) {

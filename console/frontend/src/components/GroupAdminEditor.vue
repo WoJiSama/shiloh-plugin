@@ -95,12 +95,6 @@ function selectModule(id: string) {
   activeTab.value = id
   activeGroup.value = ''
 }
-const paused = computed(() =>
-  sections.value.filter(
-    (section) =>
-      draft.value[`${section.id}.enabled`]?.value === true && !view.value?.masters[section.id]
-  )
-)
 const customizationCount = computed(
   () =>
     fields.value.filter((field) => !isGroupEnabled(field.field) && draft.value[field.field]?.custom)
@@ -321,10 +315,6 @@ onBeforeUnmount(() => {
     >
     <PageState :loading="loading && !view" :error="!view ? error : ''" @retry="load()">
       <template v-if="view">
-        <NAlert v-if="paused.length" type="warning" :show-icon="false" title="部分功能尚未生效">
-          {{ paused.map((module) => module.label).join('、') }}已在本群启用，但对应总开关关闭。
-          <RouterLink to="/group-admin?scope=defaults">前往默认策略开启总开关 →</RouterLink>
-        </NAlert>
         <NTabs :value="activeTab" type="line" @update:value="selectModule">
           <NTab v-for="section in sections" :key="section.id" :name="section.id">
             {{ section.label
@@ -337,18 +327,8 @@ onBeforeUnmount(() => {
               <h2>{{ current.label }}</h2>
               <p>{{ current.description }}</p>
             </div>
-            <NTag
-              :type="currentEnabled && view.masters[current.id] ? 'success' : 'default'"
-              size="small"
-              :bordered="false"
-            >
-              {{
-                draft[`${current.id}.enabled`]?.value
-                  ? view.masters[current.id]
-                    ? '本群已启用'
-                    : '总开关关闭'
-                  : '本群未启用'
-              }}
+            <NTag :type="currentEnabled ? 'success' : 'default'" size="small" :bordered="false">
+              {{ currentEnabled ? '本群已启用' : '本群未启用' }}
             </NTag>
           </div>
           <div

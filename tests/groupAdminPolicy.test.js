@@ -237,13 +237,12 @@ test('restoring the last known policy field keeps unknown future row content', (
   assert.deepEqual(reset.groupAdmin.overrides, [{ groupId: '100001', futureRow: { retained: true }, futureModule: { opaque: 'retained' } }])
 })
 
-test('group activation cannot bypass module masters; malformed policies are rejected before producing updates', () => {
+test('group activation overrides module defaults; malformed policies are rejected before producing updates', () => {
   const settings = policy()
   settings.groupGuard.enabled = false
   settings.groupAdmin.overrides[0].groupGuard.enabled = true
   assert.equal(fields(buildGroupAdminView('100001', settings))['groupGuard.enabled'].value, true)
-  assert.equal(buildGroupAdminView('100001', settings).masters.groupGuard, false)
-  assert.equal(groupAdminStatus(settings, '100001').groupGuard, false)
+  assert.equal(groupAdminStatus(settings, '100001').groupGuard, true, '显式启用的群不再被默认总开关拦截')
   const revision = buildGroupAdminView('100001', settings).revision
   const stringFalse = prepareGroupAdminUpdates('100001', settings, { revision, values: { 'groupGuard.enabled': 'false' } })
   assert.equal(fields(buildGroupAdminView('100001', apply(settings, stringFalse.updates)))['groupGuard.enabled'].value, false)

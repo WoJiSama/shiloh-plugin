@@ -19,12 +19,12 @@ const MODULE_ENABLE_FIELDS = new Set(['groupGuard.enabled', 'groupModeration.ena
 const scopeFields = new Set(['groupGuard.enabledGroups', 'groupModeration.enabledGroups', 'groupModeration.groupAdmins', 'groupNotice.enabledGroups', 'groupNotice.groupRules'])
 export const groupAdminDefaultSchema: ConfigSchemaItem[] = [...guard, ...extra, ...notice].filter(item => !item.field || !scopeFields.has(item.field)).map(item => {
   if (!item.field || !MODULE_ENABLE_FIELDS.has(item.field)) return item
-  return { ...item, label: `${item.label?.replace(/总开关|开关/g, '')}总开关`, bottomHelpMessage: '控制所有群的此项功能；还需在按群配置中启用对应群。关闭后，本群配置会保留。' }
+  return { ...item, label: `${item.label?.replace(/总开关|开关/g, '')}默认启用`, bottomHelpMessage: '默认值：开启后未单独配置的群默认启用；单群可用「在本群启用」显式开启或关闭，优先于本默认' }
 })
 
 export const groupAdminGroupSchema: ConfigSchemaItem[] = groupAdminDefaultSchema.filter(item => item.field !== 'groupModeration.globalAdmins').map(item => {
   if (!item.field || !MODULE_ENABLE_FIELDS.has(item.field)) return item
-  return { ...item, label: '在本群启用', bottomHelpMessage: '仅控制当前群。对应默认策略的总开关开启后才会生效；入群验证和广告处理仍要求机器人拥有群管理权限。' }
+  return { ...item, label: '在本群启用', bottomHelpMessage: '显式控制当前群，优先于默认策略：开着就生效（默认关也生效），关闭则不生效（默认开也不生效）' }
 }).concat({
   component: 'Divider', label: '本群通知名单'
 }, {

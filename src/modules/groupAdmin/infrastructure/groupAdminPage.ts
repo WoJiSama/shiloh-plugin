@@ -507,7 +507,7 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
 export function buildGroupAdminPageText(data:GroupAdminPageData) {
   const lines = [`群 ${data.groupId} 群管面板`]
   for (const section of data.sections) {
-    const state = !section.masterOk ? "总开关未开" : section.enabled ? "本群已开启" : "本群未开启"
+    const state = section.enabled ? "本群已开启" : "本群未开启"
     lines.push(`\n【${section.label}】${state}`)
     for (const row of section.rows) {
       lines.push(`${row.on ? "✅" : "▫️"} ${row.label}：${row.detail}`)
@@ -528,11 +528,9 @@ function escapeHtml(value = "") {
 
 export function buildGroupAdminPageHtml(data:GroupAdminPageData) {
   const sections = data.sections.map(section => {
-    const state = !section.masterOk
-      ? '<i class="badge warn">总开关未开</i>'
-      : section.enabled
-        ? '<i class="badge ok">本群已开启</i>'
-        : '<i class="badge no">本群未开启</i>'
+    const state = section.enabled
+      ? '<i class="badge ok">本群已开启</i>'
+      : '<i class="badge no">本群未开启</i>'
     const rows = section.rows.map(row => `
       <div class="feature ${row.on ? "" : "off"}">
         <div class="f-main">

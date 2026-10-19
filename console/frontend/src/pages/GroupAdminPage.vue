@@ -138,8 +138,8 @@ const columns: DataTableColumns<Group> = [
       >
     </nav>
     <template v-if="defaults">
-      <NAlert type="info" :show-icon="false" title="先设置总开关，再按群启用">
-        总开关控制所有群的对应能力；每个群仍需单独启用。修改默认参数会同步用于继承默认的群，本群自定义参数继续保留。
+      <NAlert type="info" :show-icon="false" title="默认策略与按群配置">
+        总开关是默认值：开启后，未单独配置的群默认启用；本群的显式开启/关闭优先于默认。修改默认参数会同步用于继承默认的群，本群自定义参数继续保留。
       </NAlert>
       <SchemaPage ref="defaultEditor" kind="groupAdmin" embedded />
     </template>
@@ -221,7 +221,7 @@ const columns: DataTableColumns<Group> = [
           <div>
             <span>本群自定义</span><strong>{{ customizedCount }}</strong>
           </div>
-          <p>功能状态同时取决于默认策略总开关与本群启用状态。</p>
+          <p>本群显式启用/关闭优先于默认策略；未配置的群跟随默认总开关。</p>
         </div>
         <section class="panel admin-groups-panel">
           <div class="admin-list-toolbar">

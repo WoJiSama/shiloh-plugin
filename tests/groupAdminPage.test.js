@@ -84,10 +84,10 @@ test("面板数据：模块启用/总开关/规则明细正确", () => {
   const burst = moderation.rows.find(row => row.label === "连发消息折叠")
   assert.equal(burst.on, false)
   const guard = data.sections.find(section => section.label === "入群验证")
-  assert.equal(guard.enabled, false, "本群未启用入群验证")
+  assert.equal(guard.enabled, true, "未单独配置的群跟随默认总开关（groupGuard.enabled=true）")
   assert.ok(guard.rows[0].detail.includes("300 秒"))
   const notice = data.sections.find(section => section.label === "群通知")
-  assert.equal(notice.enabled, false)
+  assert.equal(notice.enabled, true, "跟随默认总开关")
 })
 
 test("面板文本与 HTML：包含模块与命令提示，HTML 转义", () => {
@@ -192,7 +192,7 @@ test("面板每行附带自己的配置命令，开关命令给可操作方向",
   assert.ok(flood.commands.includes(".群管 刷屏检测 条数 8"))
   const guard = data.sections.find(section => section.label === "入群验证")
   const verify = guard.rows.find(row => row.label === "入群答题验证")
-  assert.ok(verify.commands.includes(".群管 入群验证 开"), "未启用的功能展示开启命令")
+  assert.ok(verify.commands.includes(".群管 入群验证 关"), "已启用（跟随默认）的功能展示关闭命令")
   const html = buildGroupAdminPageHtml(data)
   assert.ok(html.includes("f-cmds"), "命令以独立行渲染在功能下方")
   assert.ok((html.match(/<code>/g) || []).length > 20, "整页命令示例数量充足")
@@ -306,4 +306,20 @@ test("面板展示复合规则分区", () => {
   const empty = buildGroupAdminPageData(serverLikeSettings(), GROUP_ID)
   const emptySection = empty.sections.find(item => item.label === "复合规则")
   assert.ok(emptySection.rows[0].detail.includes("未配置"))
+})
+
+test("新语义：本群显式开关优先于默认总开关", () => {
+  const base = { groupModeration: { enabled: true, enabledGroups: [] }, groupGuard: { enabled: false, enabledGroups: [] }, groupNotice: { enabled: false, enabledGroups: [] } }
+  // 显式开启的群：默认关也生效
+  const explicitOn = buildGroupAdminPageData({
+    ...base,
+    groupAdmin: { overrides: [{ groupId: String(GROUP_ID), groupModeration: { enabled: true } }] }
+  }, GROUP_ID)
+  assert.equal(explicitOn.sections.find(s => s.label === "广告与刷屏").enabled, true, "显式开 + 默认关 → 生效")
+  // 显式关闭的群：默认开也不生效
+  const explicitOff = buildGroupAdminPageData({
+    ...base,
+    groupAdmin: { overrides: [{ groupId: String(GROUP_ID), groupModeration: { enabled: false } }] }
+  }, GROUP_ID)
+  assert.equal(explicitOff.sections.find(s => s.label === "广告与刷屏").enabled, false, "显式关 + 默认开 → 不生效")
 })
