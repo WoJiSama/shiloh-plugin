@@ -459,6 +459,19 @@ async function submitAction() {
     actionSaving.value = false
   }
 }
+async function quickScore(row: SoupPuzzle, score: number) {
+  try {
+    await api(`/api/games/turtle-soup/puzzles/${row.id}/score`, {
+      method: 'PUT',
+      body: JSON.stringify({ score })
+    })
+    row.manualScore = score
+    message.success(`已标记 ${score} 分`)
+  } catch (cause: any) {
+    message.error(cause.message || '标记失败')
+  }
+}
+
 async function clearScore(row: SoupPuzzle) {
   try {
     await api(`/api/games/turtle-soup/puzzles/${encodeURIComponent(row.id)}/score`, {
@@ -857,12 +870,22 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
             >
           </div>
           <div class="detail-sec-title">管理员评价与玩家反馈</div>
-          <p>
-            {{
-              selected.manualScore
-                ? `管理员 ${selected.manualScore} 分：${selected.manualScoreReason || '未填写说明'}`
-                : '暂无管理员评价'
-            }}
+          <div class="manual-score-row">
+            <div class="star-row">
+              <button
+                v-for="star in 5"
+                :key="star"
+                type="button"
+                class="star-btn"
+                :class="{ active: selected.manualScore && star <= selected.manualScore }"
+                @click="quickScore(selected, star)"
+              >★</button>
+              <span v-if="selected.manualScore" class="star-value">{{ selected.manualScore }} 分</span>
+              <span v-else class="star-hint">点击星快速打分</span>
+            </div>
+          </div>
+          <p v-if="selected.manualScoreReason">
+            理由：{{ selected.manualScoreReason }}
           </p>
           <div class="audit-actions">
             <NButton size="small" @click="openAction('score', selected)">评价并说明原因</NButton
