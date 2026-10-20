@@ -636,10 +636,8 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
                 <p v-if="item.lastError || item.repairReason" class="hole">
                   {{ item.lastError || item.repairReason }}
                 </p>
-                <button v-if="item.versions.length" type="button" class="rejected-summary" @click="toggleVersions(item.id)">
-                  {{ expandedVersions.has(item.id) ? '▼' : '▶' }} 内容及修复历史（{{ item.versions.length }} 版）
-                </button>
-                <div v-if="item.versions.length && expandedVersions.has(item.id)">
+                <div v-if="item.versions.length" class="candidate-versions">
+                  <p class="rejected-summary">内容及修复历史（{{ item.versions.length }} 版）</p>
                   <div
                     v-for="version in item.versions"
                     :key="version.version"
