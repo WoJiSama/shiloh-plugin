@@ -124,6 +124,15 @@ const selected = computed(
 const parentPuzzle = computed(() =>
   overview.value?.puzzles.find((item) => item.id === selected.value?.parentPuzzleId)
 )
+const showCandidates = ref(true)
+const expandedVersions = ref(new Set<string>())
+function toggleVersions(id: string) {
+  const next = new Set(expandedVersions.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedVersions.value = next
+}
+
 const auditingId = ref('')
 const busy = computed(() => overview.value?.generating.running || false)
 const candidateError = ref('')
@@ -602,10 +611,10 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
             </p>
           </section>
           <section class="panel rejected-panel">
-            <details :open="unresolved.length > 0">
-              <summary class="rejected-summary">
-                候选回收区 · {{ unresolved.length }} 道待处理 / 共 {{ candidates.length }} 条
-              </summary>
+            <button type="button" class="rejected-summary" @click="showCandidates = !showCandidates">
+              {{ showCandidates ? '▼' : '▶' }} 候选回收区 · {{ unresolved.length }} 道待处理 / 共 {{ candidates.length }} 条
+            </button>
+            <div v-if="showCandidates">
               <p v-if="candidateError" class="operation-error" role="alert">{{ candidateError }}</p>
               <p v-else-if="!candidates.length" class="table-hint">
                 暂无失败或修复记录。技术失败可以重试，内容问题会带着原因修复后重新审核。
@@ -627,10 +636,10 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
                 <p v-if="item.lastError || item.repairReason" class="hole">
                   {{ item.lastError || item.repairReason }}
                 </p>
-                <details v-if="item.versions.length">
-                  <summary class="rejected-summary">
-                    内容及修复历史（{{ item.versions.length }} 版）
-                  </summary>
+                <button v-if="item.versions.length" type="button" class="rejected-summary" @click="toggleVersions(item.id)">
+                  {{ expandedVersions.has(item.id) ? '▼' : '▶' }} 内容及修复历史（{{ item.versions.length }} 版）
+                </button>
+                <div v-if="item.versions.length && expandedVersions.has(item.id)">
                   <div
                     v-for="version in item.versions"
                     :key="version.version"
@@ -641,7 +650,7 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
                     <p>汤底：{{ version.puzzle.solution }}</p>
                     <p v-for="(issue, i) in version.issues" :key="i" class="hole">{{ issue }}</p>
                   </div>
-                </details>
+                </div>
                 <NButton
                   v-if="candidateCanRecover(item)"
                   size="small"
@@ -651,7 +660,7 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
                   >{{ item.failureKind === 'technical' ? '继续重试' : '修复并重新审核' }}</NButton
                 >
               </div>
-            </details>
+            </div>
           </section>
           <section class="panel diagnostics">
             <span class="summary-label">游玩反馈</span>
