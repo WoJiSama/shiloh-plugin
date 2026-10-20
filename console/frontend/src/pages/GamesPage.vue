@@ -196,10 +196,15 @@ const difficultyStats = computed(() => {
   }))
 })
 
+const statusPriority: Record<string, number> = { active: 0, pending: 1, retired: 2 }
 const puzzles = computed(() =>
-  (overview.value?.puzzles || []).filter(
-    (item) => statusFilter.value === 'all' || item.status === statusFilter.value
-  )
+  (overview.value?.puzzles || [])
+    .filter((item) => statusFilter.value === 'all' || item.status === statusFilter.value)
+    .sort((a, b) => {
+      const statusDiff = (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9)
+      if (statusDiff !== 0) return statusDiff
+      return b.createdAt - a.createdAt
+    })
 )
 // 按版本(contentHash)分组的完整审计历史:当前版在最前,修复前版本按时间倒序
 const auditHistory = computed(() => {
