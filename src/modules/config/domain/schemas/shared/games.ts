@@ -19,7 +19,8 @@ export const turtleSoupSchema: ConfigSchemaItem[] = [
   { field: 'miniGames.turtleSoup.recapEveryQuestions', label: '进度卡频率', component: 'InputNumber', componentProps: { min: 0, max: 100, placeholder: '10' }, bottomHelpMessage: '每 N 次提问发一张进度卡;0 = 关闭' },
   { field: 'miniGames.turtleSoup.chooseWindowSeconds', label: '选汤窗口(秒)', component: 'InputNumber', componentProps: { min: 10, max: 300, placeholder: '60' }, bottomHelpMessage: '三选一超时自动随机开局' },
   { field: 'miniGames.turtleSoup.ratingWindowMinutes', label: '评分窗口(分钟)', component: 'InputNumber', componentProps: { min: 1, max: 120, placeholder: '5' } },
-  { field: 'miniGames.turtleSoup.contentPolicy', label: '出题题材尺度', component: 'InputTextArea', bottomHelpMessage: '喂给生成模型的题材边界说明；留空时使用默认推理题材尺度' }
+  { field: 'miniGames.turtleSoup.contentPolicy', label: '出题题材尺度', component: 'InputTextArea', bottomHelpMessage: '喂给生成模型的题材边界说明；留空时使用默认推理题材尺度' },
+  { field: 'miniGames.turtleSoup.generationCustomPrompt', label: '站长补充出题指示', component: 'InputTextArea', bottomHelpMessage: '追加在出题系统提示词末尾,优先级高于默认规则(输出格式和题材底线不变)。例:优先中国现代都市背景;避免动物题材;汤面结尾必须有数字线索。留空=不追加' }
 ].map(item => item.component === 'InputNumber' ? {...item, componentProps: {...item.componentProps, step: 1, precision: 0}} : item)
 
 export const umaRaceSchema: ConfigSchemaItem[] = [

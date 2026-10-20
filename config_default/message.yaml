@@ -207,6 +207,8 @@ pluginSettings:
       ratingWindowMinutes: 5
       # 生成题材尺度约束
       contentPolicy: "题材保持本格推理趣味,可以悬疑惊悚,但避免直白血腥、猎奇虐待细节与涉政内容"
+      # 站长补充出题指示:追加在系统提示词末尾,优先级高于默认规则;留空=不追加
+      generationCustomPrompt: ""
       baseDir: data/turtle_soup
   turnTrace:
     # 回合 trace NDJSON 落盘（观测页数据源）

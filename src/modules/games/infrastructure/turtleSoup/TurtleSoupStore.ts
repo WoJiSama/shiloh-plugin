@@ -31,6 +31,7 @@ export function resolveTurtleSoupConfig(settings:Record<string,unknown>):TurtleS
     recapEveryQuestions: Math.floor(safeNumber(turtleSoup.recapEveryQuestions, 10, 0, 100)),
     chooseWindowSeconds: Math.floor(safeNumber(turtleSoup.chooseWindowSeconds, 60, 10, 300)),
     contentPolicy: safeText(turtleSoup.contentPolicy, DEFAULT_CONTENT_POLICY),
+    generationCustomPrompt: safeText(turtleSoup.generationCustomPrompt, ""),
     baseDir: safeText(turtleSoup.baseDir, "data/turtle_soup"),
     hintCooldownSeconds: Math.floor(safeNumber(turtleSoup.hintCooldownSeconds,15,0,300)),
     generationCallBudget: Math.floor(safeNumber(turtleSoup.generationCallBudget,18,4,100)),
