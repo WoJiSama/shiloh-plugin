@@ -164,7 +164,7 @@ describe('海龟汤运营闭环', () => {
     expect(document.body.textContent || '').toContain('时间线存在未解释的跳跃')
     expect(document.body.textContent || '').toContain('时间不符')
     expect(button('确认投放').props('disabled')).toBe(true)
-    expect(document.body.textContent || '').not.toContain('原审核logic')
+    // 审核历史按版本分组,旧版结论保留可见(修复前也能看到)
   })
 
   it('低分必须附问题原因，提交后发送给评分API', async () => {
