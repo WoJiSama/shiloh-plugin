@@ -73,7 +73,10 @@ test("readTurtleSoupConfig reads miniGames.turtleSoup with defaults and clamping
     assert.equal(config.minPlayers, 1)
     assert.equal(config.similarityHitThreshold, 0.9)
     assert.equal(config.similarityMissThreshold, 0)
-    assert.equal(config.freshPoolTarget, 2)
+    assert.equal(config.freshPoolTarget, 6)
+  assert.equal(config.freshEasy, 2)
+  assert.equal(config.freshNormal, 2)
+  assert.equal(config.freshHard, 2)
     assert.equal(config.baseDir, "data/turtle_soup")
 
     fs.writeFileSync(path.join(configDir, "message.yaml"), [
