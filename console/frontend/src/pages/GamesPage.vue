@@ -327,7 +327,8 @@ const columns: DataTableColumns<SoupPuzzle> = [
               { default: () => '过审' }
             )
           : null,
-        row.status === 'active'
+        // 投放中和待审都可出池:待审出池=审核不通过但不删除,留档在"已出池"区
+        row.status === 'active' || row.status === 'pending'
           ? h(
               NButton,
               {
@@ -743,6 +744,43 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
               <p>提示：{{ selected.hints.join(' / ') }}</p>
             </div>
           </div>
+          <template v-if="parentPuzzle">
+            <div class="detail-sec-title">版本对比（修改了什么）</div>
+            <div class="version-compare">
+              <div class="version-col version-old">
+                <strong>修复前（第 {{ parentPuzzle.version || 1 }} 版）</strong>
+                <div class="compare-block">
+                  <span class="compare-label">汤面</span>
+                  <p>{{ parentPuzzle.surface }}</p>
+                </div>
+                <div class="compare-block">
+                  <span class="compare-label">汤底</span>
+                  <p>{{ parentPuzzle.solution }}</p>
+                </div>
+                <div class="compare-block">
+                  <span class="compare-label">关键点</span>
+                  <p>{{ parentPuzzle.keyPoints.join(' / ') }}</p>
+                </div>
+              </div>
+              <div class="version-arrow">→ 修复后 →</div>
+              <div class="version-col version-new">
+                <strong>当前（第 {{ selected.version || '?' }} 版）</strong>
+                <div class="compare-block">
+                  <span class="compare-label">汤面</span>
+                  <p>{{ selected.surface }}</p>
+                </div>
+                <div class="compare-block">
+                  <span class="compare-label">汤底</span>
+                  <p>{{ selected.solution }}</p>
+                </div>
+                <div class="compare-block">
+                  <span class="compare-label">关键点</span>
+                  <p>{{ selected.keyPoints.join(' / ') }}</p>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <div class="detail-sec-title">审核历史（按版本，修复前的也能看到）</div>
           <div v-for="group in auditHistory" :key="group.hash" class="audit-version-group" :class="{ 'audit-current': group.isCurrent }">
             <div class="audit-version-label">
@@ -783,6 +821,12 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
               :disabled="!selected.eligible"
               @click="openAction('status', selected, 'active')"
               >确认投放</NButton
+            ><NButton
+              v-if="selected.status === 'pending'"
+              size="small"
+              secondary
+              @click="openAction('status', selected, 'retired')"
+              >出池</NButton
             >
           </div>
           <div class="detail-sec-title">管理员评价与玩家反馈</div>
@@ -998,6 +1042,15 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
   color: var(--c-muted);
   margin: 10px 0 6px;
 }
+.version-compare { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; margin-bottom: 16px; }
+.version-col { border: 1px solid var(--c-border); border-radius: 8px; padding: 10px 14px; font-size: 12px; }
+.version-col.version-old { background: var(--c-soft); }
+.version-col.version-new { border-color: color-mix(in srgb, var(--c-accent) 40%, var(--c-border)); }
+.version-col strong { display: block; margin-bottom: 8px; font-size: 12px; }
+.version-arrow { display: flex; align-items: center; font-size: 11px; color: var(--c-muted); white-space: nowrap; }
+.compare-block { margin-bottom: 8px; }
+.compare-label { display: inline-block; font-size: 10px; color: var(--c-muted); margin-bottom: 2px; text-transform: uppercase; }
+.compare-block p { margin: 0; line-height: 1.5; word-break: break-all; }
 .audit-version-group { border-left: 3px solid var(--c-border); padding-left: 12px; margin-bottom: 12px; }
 .audit-version-group.audit-current { border-left-color: var(--c-accent); }
 .audit-version-label { font-size: 12px; font-weight: 550; color: var(--c-text); margin-bottom: 6px; }
