@@ -190,16 +190,35 @@ const puzzles = computed(() =>
     (item) => statusFilter.value === 'all' || item.status === statusFilter.value
   )
 )
-const latestAudits = computed(() =>
-  domains.map((domain) => ({
-    domain,
-    audit: selected.value?.audits
-      .filter(
-        (audit) => audit.domain === domain && audit.contentHash === selected.value?.contentHash
-      )
-      .at(-1)
-  }))
-)
+// 按版本(contentHash)分组的完整审计历史:当前版在最前,修复前版本按时间倒序
+const auditHistory = computed(() => {
+  if (!selected.value?.audits?.length) return []
+  const currentHash = selected.value?.contentHash
+  const groups = new Map<string, { label: string; isCurrent: boolean; audits: typeof selected.value.audits }>()
+  const sorted = [...selected.value.audits].sort((a, b) => a.at - b.at)
+  for (const audit of sorted) {
+    const hash = audit.contentHash || 'unknown'
+    if (!groups.has(hash)) {
+      const isCurrent = hash === currentHash
+      const versionNum = (audit as any).version || 0
+      groups.set(hash, {
+        label: isCurrent ? `当前版${versionNum ? ` (第${versionNum}版)` : ''}` : `修复前版本${versionNum ? ` (第${versionNum}版)` : ''}`,
+        isCurrent,
+        audits: []
+      })
+    }
+    groups.get(hash)!.audits.push(audit)
+  }
+  // 当前版排最前,其余按最后一审时间倒序
+  return [...groups.entries()]
+    .map(([hash, group]) => ({ hash, ...group }))
+    .sort((a, b) => {
+      if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1
+      const aTime = a.audits.at(-1)?.at || 0
+      const bTime = b.audits.at(-1)?.at || 0
+      return bTime - aTime
+    })
+})
 const unresolved = computed(() =>
   candidates.value.filter((item) => !['pending', 'recovered'].includes(item.status))
 )
@@ -724,20 +743,25 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
               <p>提示：{{ selected.hints.join(' / ') }}</p>
             </div>
           </div>
-          <div class="detail-sec-title">当前内容的审核结果</div>
-          <div v-for="{ domain, audit } in latestAudits" :key="domain" class="audit-row">
-            <div class="audit-head">
-              <NTag
-                size="small"
-                :bordered="false"
-                :type="audit?.pass ? 'success' : audit ? 'error' : 'warning'"
-                >{{ audit ? (audit.pass ? '通过' : '未过') : '待审核' }}</NTag
-              ><strong>{{ auditDomainLabel[domain] }}</strong
-              ><span v-if="audit" class="audit-meta">{{ formatTime(audit.at) }}</span>
+          <div class="detail-sec-title">审核历史（按版本，修复前的也能看到）</div>
+          <div v-for="group in auditHistory" :key="group.hash" class="audit-version-group" :class="{ 'audit-current': group.isCurrent }">
+            <div class="audit-version-label">
+              {{ group.isCurrent ? '✓ ' : '↩ ' }}{{ group.label }}
+              <span v-if="!group.isCurrent" class="audit-version-hint">（此版本的审核结论）</span>
             </div>
-            <p v-if="audit" class="audit-reason">{{ audit.reason }}</p>
-            <p v-for="(hole, i) in audit?.holes || []" :key="i" class="audit-hole">{{ hole }}</p>
+            <div v-for="audit in group.audits" :key="`${audit.domain}-${audit.at}`" class="audit-row">
+              <div class="audit-head">
+                <NTag size="small" :bordered="false" :type="audit.pass ? 'success' : 'error'">{{
+                  audit.pass ? '通过' : '未过'
+                }}</NTag>
+                <strong>{{ auditDomainLabel[audit.domain] || audit.domain }}</strong>
+                <span class="audit-meta">{{ formatTime(audit.at) }}</span>
+              </div>
+              <p class="audit-reason">{{ audit.reason }}</p>
+              <p v-for="(hole, i) in audit.holes || []" :key="i" class="audit-hole">{{ hole }}</p>
+            </div>
           </div>
+          <p v-if="!auditHistory.length" class="table-hint">尚无审核记录。点击"重新审核"可按当前标准补齐。</p>
           <div class="audit-actions">
             <NButton
               size="small"
@@ -974,6 +998,10 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
   color: var(--c-muted);
   margin: 10px 0 6px;
 }
+.audit-version-group { border-left: 3px solid var(--c-border); padding-left: 12px; margin-bottom: 12px; }
+.audit-version-group.audit-current { border-left-color: var(--c-accent); }
+.audit-version-label { font-size: 12px; font-weight: 550; color: var(--c-text); margin-bottom: 6px; }
+.audit-version-hint { font-weight: 400; color: var(--c-muted); font-size: 11px; }
 .audit-row {
   border: 1px solid var(--c-border);
   border-radius: 8px;
