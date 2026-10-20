@@ -187,7 +187,11 @@ pluginSettings:
       similarityHitThreshold: 0.9
       similarityMissThreshold: 0
       # 没有任何群玩过的不同题目目标;修复版本共享曝光史
-      freshPoolTarget: 2
+      freshPoolTarget: 6
+      # 按难度鲜汤保有量:各难度"没玩过"的汤少于该数时自动补货
+      freshEasy: 2
+      freshNormal: 2
+      freshHard: 2
       # 待审积压上限;不配置时取 max(4,鲜汤目标*2),达到上限暂停自动补货
       maxPending: 4
       # 每道候选从生成到审核/修复的模型调用上限,用尽后保留候选供人工重试

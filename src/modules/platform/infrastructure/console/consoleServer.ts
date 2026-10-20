@@ -1682,7 +1682,30 @@ const server = http.createServer(async (req, res) => {
       const availableFamilies = new Set(puzzles.filter(canServePuzzle).map(puzzleFamilyId))
       const fresh = [...availableFamilies].filter(id => !exposure.has(id)).length
       const available = availableFamilies.size
+      // 按难度统计鲜汤(未玩过的 active)
+      const soupConfig = readTurtleSoupConfig(PLUGIN_ROOT)
+      const difficultyFresh:Record<string, number> = {easy: 0, normal: 0, hard: 0}
+      for (const puzzle of puzzles) {
+        if (puzzle.status === 'active' && !playCount.get(puzzle.id)) {
+          if (puzzle.difficulty in difficultyFresh) difficultyFresh[puzzle.difficulty]!++
+        }
+      }
+      const difficultyTargets:Record<string, number> = {easy: soupConfig.freshEasy, normal: soupConfig.freshNormal, hard: soupConfig.freshHard}
+      // 自动补货:有难度缺货且没有生成任务在跑 → 自动触发
+      const shortages = Object.entries(difficultyTargets).filter(([difficulty, target]) => (difficultyFresh[difficulty] || 0) < target)
+      if (shortages.length && !soupGenerationJob.running) {
+        const [shortDifficulty, needed] = shortages[0]!
+        const shortageCount = Math.min(needed - (difficultyFresh[shortDifficulty] || 0), 5)
+        console.log(`[bl-console] 海龟汤自动补货: ${shortDifficulty} 缺 ${shortageCount} 道`)
+        void fetch(`http://127.0.0.1:${PORT}/api/games/turtle-soup/generate`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json", "x-console-token": loadOrCreateToken()},
+          body: JSON.stringify({count: shortageCount, difficulty: shortDifficulty})
+        }).catch(() => {})
+      }
       return sendJson(res, 200, {
+        difficultyFresh,
+        difficultyTargets,
         puzzles: puzzles.map(puzzle => ({
           ...puzzle, playable: canServePuzzle(puzzle), contentHash: puzzleContentHash(puzzle), eligible: hasCurrentPassingAudits(puzzle),
           ratingAverage: puzzle.ratingCount > 0 ? Number((puzzle.ratingSum / puzzle.ratingCount).toFixed(1)) : null,

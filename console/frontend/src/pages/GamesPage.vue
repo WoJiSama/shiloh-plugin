@@ -185,6 +185,17 @@ const statusOptions = [
   { value: 'all', label: '全部' },
   ...Object.entries(statusLabel).map(([value, label]) => ({ value, label }))
 ]
+const difficultyStats = computed(() => {
+  const fresh = (overview.value as any)?.difficultyFresh || {}
+  const targets = (overview.value as any)?.difficultyTargets || {}
+  return ['easy', 'normal', 'hard'].map((difficulty) => ({
+    difficulty,
+    current: (fresh as any)[difficulty] || 0,
+    target: (targets as any)[difficulty] || 0,
+    label: difficulty === 'easy' ? '简单' : difficulty === 'normal' ? '普通' : '困难'
+  }))
+})
+
 const puzzles = computed(() =>
   (overview.value?.puzzles || []).filter(
     (item) => statusFilter.value === 'all' || item.status === statusFilter.value
@@ -550,6 +561,17 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
                 ><strong>{{ overview.sessions.filter((s) => s.phase !== 'reveal').length }}</strong>
               </div>
             </div>
+            <div class="difficulty-progress">
+              <div v-for="item in difficultyStats" :key="item.difficulty" class="diff-item" :class="{ short: item.current < item.target }">
+                <span class="diff-label">{{ item.label }}</span>
+                <div class="diff-bar">
+                <div class="diff-fill" :style="{ width: Math.min(100, (item.target ? item.current / item.target : 0) * 100) + '%' }" />
+                </div>
+                <span class="diff-count" :class="{ shortage: item.current < item.target }">{{ item.current }}/{{ item.target }}</span>
+                <NTag v-if="item.current < item.target && overview?.generating.running" size="tiny" :bordered="false" type="info">补货中</NTag>
+              </div>
+            </div>
+
             <div class="summary-side">
               <div v-if="overview.inventory.pending" class="pending-hint">
                 待审汤尚不能投放，请审核当前版本后确认。
@@ -940,6 +962,14 @@ const formatTime = (at: number) => new Date(at).toLocaleString()
   font-size: 22px;
   font-weight: 550;
 }
+.difficulty-progress { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 0 4px; border-top: 1px solid var(--c-border); margin-top: 10px; width: 100%; }
+.diff-item { display: flex; align-items: center; gap: 8px; }
+.diff-label { font-size: 12px; color: var(--c-muted); }
+.diff-bar { width: 60px; height: 6px; background: var(--c-soft); border-radius: 3px; overflow: hidden; }
+.diff-fill { height: 100%; background: var(--c-accent); border-radius: 3px; transition: width 0.3s; }
+.diff-item.short .diff-fill { background: #e8a838; }
+.diff-count { font-size: 12px; font-variant-numeric: tabular-nums; }
+.diff-count.shortage { color: #d48806; font-weight: 550; }
 .stats strong.warn {
   color: #d48806;
 }
