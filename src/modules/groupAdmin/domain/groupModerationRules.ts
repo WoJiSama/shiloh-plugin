@@ -288,11 +288,20 @@ export function normalizeCompoundRules(value:unknown):CompoundRuleConfig[] {
       windowSeconds: Math.floor(normalizeNumber(raw.windowSeconds, 5, 2, 600)),
       maxLength: Math.floor(normalizeNumber(raw.maxLength, 0, 0, 20000)),
       totalLength: Math.floor(normalizeNumber(raw.totalLength, 0, 0, 50000)),
+      maxLines: Math.floor(normalizeNumber(raw.maxLines, 0, 0, 2000)),
+      totalLines: Math.floor(normalizeNumber(raw.totalLines, 0, 0, 20000)),
       recall: raw.recall !== false,
       forward: raw.forward !== false,
       muteSeconds: Math.floor(normalizeNumber(raw.muteSeconds, 0, 0, 2592000))
     }
   })
+}
+
+// 行数按换行符切分计(空文本=1行)。判定必须用未 trim 的原文:
+// 纯换行刷屏(几十个\n)trim 后成空串,按 trim 文本计行会恒为 1 行拦不住。
+export function countMessageLines(value:unknown) {
+  const text = String(value ?? "")
+  return text ? text.split(/\r\n|\r|\n/).length : 1
 }
 
 export function formatActionName(action:string) {

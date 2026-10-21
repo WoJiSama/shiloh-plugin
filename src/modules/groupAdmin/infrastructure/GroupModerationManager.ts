@@ -10,7 +10,7 @@ import {
   formatActionName,
   normalizeGroupModerationConfig,
   normalizeStringList
-} from "../domain/groupModerationRules.js"
+,countMessageLines} from "../domain/groupModerationRules.js"
 import type {CompoundRuleConfig} from "../../../contracts/groupAdmin.js"
 import { getMentionTargetId } from "../../conversation/domain/mentionTargets.js"
 import { safeTruncateUnicode, splitUnicodeText } from "../../models/domain/unicodeText.js"
@@ -80,7 +80,7 @@ export function isIgnoredBotUser(userId:unknown, config:Partial<ModerationConfig
 export class GroupModerationManager {
   floodTrackers = new Map<string,number[]>()
   burstTrackers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
-  compoundBuffers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
+  compoundBuffers = new Map<string,{messageId:GroupId|undefined;text:string;lines:number;at:number}[]>()
   constructor(private readonly ports:AdminPorts,private readonly corpus:AdCorpusStore) {}
   getConfig(groupId?:GroupId) {
     return normalizeGroupModerationConfig(resolveGroupAdminSettings(this.ports.readSettings(), groupId).groupModeration)
@@ -318,6 +318,15 @@ export class GroupModerationManager {
     return String(e?.msg || e?.raw_message || "").trim()
   }
 
+  // 行数判定用原文:与 extractVisibleText 同源但不 trim,纯换行消息才不会被折成空
+  extractVisibleTextRaw(e:AdminEvent) {
+    if (Array.isArray(e?.message)) {
+      const text = e.message.map(item => getSegmentText(adminRecord(item))).join("")
+      if (text.trim()) return text
+    }
+    return String(e?.msg || e?.raw_message || "")
+  }
+
   // 超长判定按码点计数（emoji 不重复计 2 个字符）
   checkOverlongMessage(text:string, config:ModerationConfig) {
     const overlong = config.overlongMessage
@@ -400,7 +409,7 @@ export class GroupModerationManager {
     const key = `${e.group_id}:${e.user_id}`
     this.compoundBuffers ||= new Map()
     const buffer = (this.compoundBuffers.get(key) || []).filter(item => now - item.at < 600000)
-    buffer.push({ messageId: e?.message_id || e?.seq, text: this.extractVisibleText(e), at: now })
+    buffer.push({ messageId: e?.message_id || e?.seq, text: this.extractVisibleText(e), lines: countMessageLines(this.extractVisibleTextRaw(e)), at: now })
     this.compoundBuffers.set(key, buffer)
 
     for (let index = rules.length - 1; index >= 0; index--) {
@@ -411,6 +420,9 @@ export class GroupModerationManager {
       const lengths = entries.map(item => Array.from(item.text || "").length)
       if (rule.maxLength > 0 && Math.max(...lengths) <= rule.maxLength) continue
       if (rule.totalLength > 0 && lengths.reduce((sum, length) => sum + length, 0) <= rule.totalLength) continue
+      const lineCounts = entries.map(item => (Number(item.lines) > 0 ? item.lines : countMessageLines(item.text)))
+      if (rule.maxLines > 0 && Math.max(...lineCounts) <= rule.maxLines) continue
+      if (rule.totalLines > 0 && lineCounts.reduce((sum, lines) => sum + lines, 0) <= rule.totalLines) continue
       this.compoundBuffers.delete(key)
       return { rule, index, messages: entries, windowSeconds: Math.round(windowMs / 1000) }
     }
@@ -419,10 +431,10 @@ export class GroupModerationManager {
   }
 
   // 复合规则处置：按规则自带动作撤回/转发/禁言；一条都没撤回成功时不做后续动作
-  async handleCompoundRule(e:AdminEvent, hit:{rule:CompoundRuleConfig;index:number;messages:{messageId:GroupId|undefined;text:string;at:number}[];windowSeconds:number}) {
+  async handleCompoundRule(e:AdminEvent, hit:{rule:CompoundRuleConfig;index:number;messages:{messageId:GroupId|undefined;text:string;lines?:number;at:number}[];windowSeconds:number}) {
     const { rule, messages } = hit
     const senderName = this.getSenderName(e)
-    this.ports.logger?.info?.(`[GroupModeration] 复合规则命中 group=${e.group_id} user=${e.user_id} rule=${rule.name} count=${messages.length}/${hit.windowSeconds}s maxLength=${rule.maxLength} totalLength=${rule.totalLength}`)
+    this.ports.logger?.info?.(`[GroupModeration] 复合规则命中 group=${e.group_id} user=${e.user_id} rule=${rule.name} count=${messages.length}/${hit.windowSeconds}s maxLength=${rule.maxLength} totalLength=${rule.totalLength} maxLines=${rule.maxLines} totalLines=${rule.totalLines}`)
     const bot = requireAdminBot(this.ports,e)
     const seen = new Set<GroupId>()
     let recalled = 0
@@ -459,7 +471,9 @@ export class GroupModerationManager {
       const summary = [
         `复合规则「${rule.name}」命中：${senderName} 在 ${hit.windowSeconds} 秒内发送 ${messages.length} 条`,
         rule.maxLength > 0 ? `（其中单条最长 ${Array.from(longest.text || "").length} 字 > ${rule.maxLength}）` : "",
-        rule.totalLength > 0 ? `（合计 ${messages.reduce((sum, item) => sum + Array.from(item.text || "").length, 0)} 字 > ${rule.totalLength}）` : ""
+        rule.totalLength > 0 ? `（合计 ${messages.reduce((sum, item) => sum + Array.from(item.text || "").length, 0)} 字 > ${rule.totalLength}）` : "",
+        rule.maxLines > 0 ? `（其中单条最多 ${Math.max(...messages.map(item => item.lines || 1))} 行 > ${rule.maxLines}）` : "",
+        rule.totalLines > 0 ? `（合计 ${messages.reduce((sum, item) => sum + (item.lines || 1), 0)} 行 > ${rule.totalLines}）` : ""
       ].join("")
       const nodes = [
         { user_id: botId, nickname: "群管助手", message: summary + (rule.muteSeconds > 0 ? `，已禁言 ${rule.muteSeconds} 秒` : "") + "：" },

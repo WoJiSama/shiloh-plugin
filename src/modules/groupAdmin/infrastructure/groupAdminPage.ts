@@ -182,6 +182,8 @@ const COMPOUND_NUMBER_PARAMS:{names:string[];field:string;label:string;min:numbe
   {names:["窗口"],field:"windowSeconds",label:"时间窗(秒)",min:2,max:600},
   {names:["单条字数","单条最长"],field:"maxLength",label:"单条最长字数",min:0,max:20000},
   {names:["总字数"],field:"totalLength",label:"窗口总字数",min:0,max:50000},
+  {names:["单条行数","单条最多行数"],field:"maxLines",label:"单条最多行数",min:0,max:2000},
+  {names:["总行数"],field:"totalLines",label:"窗口总行数",min:0,max:20000},
   {names:["禁言"],field:"muteSeconds",label:"禁言秒数",min:0,max:2592000}
 ]
 const COMPOUND_BOOL_PARAMS:{names:string[];field:string;label:string}[] = [
@@ -440,11 +442,14 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
               detail: `${rule.windowSeconds} 秒内连发 ≥${rule.burstCount} 条`
                 + (rule.maxLength > 0 ? `，且单条 >${rule.maxLength} 字` : "")
                 + (rule.totalLength > 0 ? `，且合计 >${rule.totalLength} 字` : "")
+                + (rule.maxLines > 0 ? `，且单条 >${rule.maxLines} 行` : "")
+                + (rule.totalLines > 0 ? `，且合计 >${rule.totalLines} 行` : "")
                 + ` → ${[rule.recall ? "撤回" : "", rule.forward ? "转发" : "", rule.muteSeconds > 0 ? `禁言${rule.muteSeconds}秒` : ""].filter(Boolean).join("+") || "仅提示"}`,
               commands: [
                 `.群管 复合规则 ${i + 1} ${rule.enabled ? "关" : "开"}`,
                 `.群管 复合规则 ${i + 1} 条数 ${rule.burstCount}`,
                 `.群管 复合规则 ${i + 1} 单条字数 ${rule.maxLength}`,
+                `.群管 复合规则 ${i + 1} 单条行数 ${rule.maxLines}`,
                 `.群管 复合规则 ${i + 1} 禁言 ${rule.muteSeconds}`
               ]
             }))
@@ -629,9 +634,9 @@ export function buildGroupAdminOverrideUpdates(settings:Data, groupId:unknown, c
 }
 
 /** 复合规则列表文本（.群管 复合规则） */
-const COMPOUND_EXAMPLE = "复合规则 = 条件组合，几件事同时发生才处理。例：『5 秒内连发 10 条，且单条超过 160 字 → 撤回全部 + 合并转发 + 禁言 60 秒』——单独刷短句、单发长文都不触发"
+const COMPOUND_EXAMPLE = "复合规则 = 条件组合，几件事同时发生才处理。例：『5 秒内连发 10 条，且单条超过 160 字 → 撤回全部 + 合并转发 + 禁言 60 秒』——单独刷短句、单发长文都不触发；也有行数条件（单条行数/总行数），可拦几十个换行符的刷屏"
 
-export function buildCompoundRulesText(rules:{name:string;enabled:boolean;burstCount:number;windowSeconds:number;maxLength:number;totalLength:number;recall:boolean;forward:boolean;muteSeconds:number}[]) {
+export function buildCompoundRulesText(rules:{name:string;enabled:boolean;burstCount:number;windowSeconds:number;maxLength:number;totalLength:number;maxLines:number;totalLines:number;recall:boolean;forward:boolean;muteSeconds:number}[]) {
   if (!rules.length) return [
     "还没有复合规则。",
     COMPOUND_EXAMPLE + "。",
@@ -646,11 +651,13 @@ export function buildCompoundRulesText(rules:{name:string;enabled:boolean;burstC
     const conditions = [
       `${rule.windowSeconds} 秒内连发 ≥${rule.burstCount} 条`,
       rule.maxLength > 0 ? `单条 >${rule.maxLength} 字` : "",
-      rule.totalLength > 0 ? `合计 >${rule.totalLength} 字` : ""
+      rule.totalLength > 0 ? `合计 >${rule.totalLength} 字` : "",
+      rule.maxLines > 0 ? `单条 >${rule.maxLines} 行` : "",
+      rule.totalLines > 0 ? `合计 >${rule.totalLines} 行` : ""
     ].filter(Boolean).join(" 且 ")
     const action = [rule.recall ? "撤回" : "", rule.forward ? "转发" : "", rule.muteSeconds > 0 ? `禁言${rule.muteSeconds}秒` : ""].filter(Boolean).join("+") || "仅提示"
     lines.push(`${i + 1}. ${rule.name} [${rule.enabled ? "开" : "关"}] ${conditions} → ${action}`)
-    lines.push(`   .群管 复合规则 ${i + 1} ${rule.enabled ? "关" : "开"} · .群管 复合规则 ${i + 1} 条数 ${rule.burstCount} · .群管 复合规则 ${i + 1} 单条字数 ${rule.maxLength}`)
+    lines.push(`   .群管 复合规则 ${i + 1} ${rule.enabled ? "关" : "开"} · .群管 复合规则 ${i + 1} 条数 ${rule.burstCount} · .群管 复合规则 ${i + 1} 单条字数 ${rule.maxLength} · .群管 复合规则 ${i + 1} 单条行数 ${rule.maxLines}`)
   })
   return lines.join("\n")
 }

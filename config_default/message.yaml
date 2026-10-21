@@ -606,9 +606,11 @@ pluginSettings:
       maxMessages: 6
       muteSeconds: 30
       forwardEnabled: true
-    # 复合规则：连发 + 单条最长字数/窗口总字数等条件全部满足才触发（与超长/连发折叠并集互不影响）。
+    # 复合规则：连发 + 单条最长字数/窗口总字数/单条行数/窗口总行数等条件全部满足才触发（与超长/连发折叠并集互不影响）。
+    # 行数按消息换行符计数（不裁首尾），可拦"几十个换行符"式刷屏；字数/行数条件填 0 = 不启用该条件。
     # 每条规则动作可配（撤回/合并转发/禁言秒数）；最多 5 条，同时命中时最新的（列表靠后）优先。
     # 例：{ name: 长文刷屏, enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, muteSeconds: 60 }
+    # 例：{ name: 换行刷屏, enabled: true, burstCount: 3, windowSeconds: 10, maxLines: 30, muteSeconds: 60 }
     compoundRules: []
     # 机器人豁免名单：官方 Q群管家已内置豁免；群里其他功能 bot（会发 markdown 卡片/入群须知）
     # 的 QQ 号填在这里，群管检测直接跳过，避免卡片里的链接/二维码误触广告规则。

@@ -262,6 +262,10 @@ test("复合规则命令：列表/开关/调参/错误引导", () => {
     { ok: true, type: "compound", action: "toggle", index: 1, enable: true })
   const setCount = parseGroupAdminCommand(".群管 复合规则 1 条数 8")
   assert.deepEqual({ action: setCount.action, field: setCount.field, value: setCount.value }, { action: "set", field: "burstCount", value: 8 })
+  const setLines = parseGroupAdminCommand(".群管 复合规则 1 单条行数 30")
+  assert.deepEqual({ action: setLines.action, field: setLines.field, value: setLines.value }, { action: "set", field: "maxLines", value: 30 })
+  const setTotalLines = parseGroupAdminCommand(".群管 复合规则 1 总行数 120")
+  assert.deepEqual({ field: setTotalLines.field, value: setTotalLines.value }, { field: "totalLines", value: 120 })
   const setName = parseGroupAdminCommand(".群管 复合规则 1 名称 长文刷屏")
   assert.deepEqual({ field: setName.field, value: setName.value }, { field: "name", value: "长文刷屏" })
   const setBool = parseGroupAdminCommand(".群管 复合规则 1 撤回 关")
@@ -277,10 +281,11 @@ test("复合规则命令：列表/开关/调参/错误引导", () => {
 
 test("复合规则列表文本与按序号写入", async () => {
   const { buildCompoundRulesText, buildCompoundRuleUpdate } = await import("../dist/backend/modules/groupAdmin/infrastructure/groupAdminPage.js")
-  const text = buildCompoundRulesText([{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }])
+  const text = buildCompoundRulesText([{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, maxLines: 30, totalLines: 0, recall: true, forward: true, muteSeconds: 60 }])
   assert.ok(text.includes("1. 长文刷屏 [开]"))
   assert.ok(text.includes("条件组合"), "列表头带例子解释")
   assert.ok(text.includes("5 秒内连发 ≥10 条") && text.includes("单条 >160 字"))
+  assert.ok(text.includes("单条 >30 行"), "行数条件进列表")
   assert.ok(text.includes("撤回+转发+禁言60秒"))
   assert.ok(buildCompoundRulesText([]).includes("还没有复合规则"))
 

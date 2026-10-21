@@ -381,6 +381,18 @@ const schema: ConfigSchemaItem[] = [
           component: "InputNumber",
           componentProps: { min: 0, max: 50000, placeholder: "0=不启用该条件" }
         },
+        {
+          field: "maxLines",
+          label: "单条最多行数>",
+          component: "InputNumber",
+          componentProps: { min: 0, max: 2000, placeholder: "30，0=不启用该条件" }
+        },
+        {
+          field: "totalLines",
+          label: "窗口总行数>",
+          component: "InputNumber",
+          componentProps: { min: 0, max: 20000, placeholder: "0=不启用该条件" }
+        },
         { field: "recall", label: "撤回", component: "Switch" },
         { field: "forward", label: "合并转发", component: "Switch" },
         {
@@ -392,7 +404,7 @@ const schema: ConfigSchemaItem[] = [
       ]
     },
     bottomHelpMessage:
-      "条件组合：几件事同时发生才处理。例：条数填 10、时间窗 5、单条最长字数 160、禁言 60，即『5 秒内连发 10 条且单条超过 160 字 → 撤回全部+合并转发+禁言 60 秒』——单独刷短句或单发长文都不触发。单条最长/总字数填 0 = 不启用该条件；最多 5 条；多条同时命中取列表靠后（最新）的"
+      "条件组合：几件事同时发生才处理。例：条数填 10、时间窗 5、单条最长字数 160、禁言 60，即『5 秒内连发 10 条且单条超过 160 字 → 撤回全部+合并转发+禁言 60 秒』——单独刷短句或单发长文都不触发。行数条件按消息换行计数（不裁剪首尾），可拦几十个换行符的刷屏，例：单条最多行数 30 即单条超过 30 行就计入条件。字数/行数条件填 0 = 不启用；最多 5 条；多条同时命中取列表靠后（最新）的"
   }
 ]
 

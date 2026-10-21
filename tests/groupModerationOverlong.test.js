@@ -427,14 +427,14 @@ test("复合规则归一化：上限 5 条、字段钳制、名称兜底", async
   const { normalizeCompoundRules } = await import("../dist/backend/modules/groupAdmin/domain/groupModerationRules.js")
   assert.deepEqual(normalizeCompoundRules(undefined), [])
   const rules = normalizeCompoundRules([
-    { name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 },
-    { enabled: true, burstCount: 1, windowSeconds: 1, maxLength: 99999, muteSeconds: -1, recall: false, forward: false },
+    { name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, maxLines: 30, totalLines: 0, recall: true, forward: true, muteSeconds: 60 },
+    { enabled: true, burstCount: 1, windowSeconds: 1, maxLength: 99999, maxLines: 99999, totalLines: -5, muteSeconds: -1, recall: false, forward: false },
     {}, {}, {}, {}
   ])
   assert.equal(rules.length, 5, "超过 5 条截断")
   assert.deepEqual(
-    { name: rules[1].name, burstCount: rules[1].burstCount, windowSeconds: rules[1].windowSeconds, maxLength: rules[1].maxLength, muteSeconds: rules[1].muteSeconds, recall: rules[1].recall },
-    { name: "规则2", burstCount: 2, windowSeconds: 2, maxLength: 20000, muteSeconds: 0, recall: false },
+    { name: rules[1].name, burstCount: rules[1].burstCount, windowSeconds: rules[1].windowSeconds, maxLength: rules[1].maxLength, maxLines: rules[1].maxLines, totalLines: rules[1].totalLines, muteSeconds: rules[1].muteSeconds, recall: rules[1].recall },
+    { name: "规则2", burstCount: 2, windowSeconds: 2, maxLength: 20000, maxLines: 2000, totalLines: 0, muteSeconds: 0, recall: false },
     "缺省与越界值被钳制，名称按序号兜底"
   )
 })
