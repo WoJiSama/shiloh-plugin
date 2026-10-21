@@ -174,7 +174,9 @@ export type GroupAdminCommand =
   | {ok:true;type:"compound";action:"list"}
   | {ok:true;type:"compound";action:"toggle";index:number;enable:boolean}
   | {ok:true;type:"compound";action:"set";index:number;field:string;value:unknown;label:string}
-  | {ok:false;type:"toggle"|"set"|"feature"|"compound";message:string}
+  | {ok:true;type:"whitelist";action:"list"}
+  | {ok:true;type:"whitelist";action:"add"|"remove";userId:string}
+  | {ok:false;type:"toggle"|"set"|"feature"|"compound"|"whitelist";message:string}
 
 // 复合规则的可调参数（按序号定位，新建/删除在控制台完成）
 const COMPOUND_NUMBER_PARAMS:{names:string[];field:string;label:string;min:number;max:number}[] = [
@@ -193,6 +195,38 @@ const COMPOUND_BOOL_PARAMS:{names:string[];field:string;label:string}[] = [
 const COMPOUND_TEXT_PARAMS:{names:string[];field:string;label:string;max:number}[] = [
   {names:["名称"],field:"name",label:"规则名",max:20}
 ]
+
+function parseWhitelistCommand(rest:string):GroupAdminCommand {
+  if (!rest) return {ok:true, type:"whitelist", action:"list"}
+  const match = rest.match(/^(添加|增加|移除|删除|删)\s*(\d{5,12})$/)
+  if (!match) {
+    if (/^(添加|增加|移除|删除|删)\s*\S+/.test(rest)) return {ok:false, type:"whitelist", message:"QQ 号需要是 5-12 位数字"}
+    return {ok:false, type:"whitelist", message:"用法：.群管 白名单 查看列表；.群管 白名单 添加 <QQ>；.群管 白名单 删除 <QQ>"}
+  }
+  return {ok:true, type:"whitelist", action:/^(添加|增加)/.test(match[1]!) ? "add" : "remove", userId: match[2]!}
+}
+
+/** 白名单是全局配置(pluginSettings.groupModeration.whitelist),跨群生效 */
+export function buildWhitelistUpdate(settings:Data, action:"add"|"remove", userId:string) {
+  const id = String(userId || "").trim()
+  if (!/^\d{5,12}$/.test(id)) return null
+  const moderation = adminRecord(settings.groupModeration)
+  const current = (Array.isArray(moderation.whitelist) ? moderation.whitelist : []).map(item => String(item).trim()).filter(Boolean)
+  const next = action === "add" ? [...new Set([...current, id])] : current.filter(item => item !== id)
+  return { "groupModeration.whitelist": next }
+}
+
+export function buildWhitelistText(whitelist:string[]) {
+  if (!whitelist.length) return [
+    "群管白名单：名单内成员的消息完全跳过群管检测（复合规则/连发/超长/刷屏/广告）。",
+    "添加：.群管 白名单 添加 <QQ>；删除：.群管 白名单 删除 <QQ>（群主/群管/群管管理员可操作）"
+  ].join("\n")
+  return [
+    `群管白名单（${whitelist.length} 人，完全跳过所有群管检测）：`,
+    ...whitelist.map((id, i) => `${i + 1}. ${id}`),
+    "删除：.群管 白名单 删除 <QQ>"
+  ].join("\n")
+}
 
 function parseCompoundCommand(rest:string):GroupAdminCommand {
   if (!rest) return {ok:true,type:"compound",action:"list"}
@@ -257,6 +291,9 @@ export function parseGroupAdminCommand(msg:unknown):GroupAdminCommand|null {
   const name = head[1]!
   const rest = (head[2] || "").trim()
   if (!rest && ["页面","面板","帮助","help"].includes(name)) return {ok:true,type:"view"}
+
+  // 白名单语法：.群管 白名单 [添加|删除 <QQ>]
+  if (name === "白名单") return parseWhitelistCommand(rest)
 
   // 复合规则语法：.群管 复合规则 [序号] [开|关|参数 值]
   if (name === "复合规则" || name === "复合") return parseCompoundCommand(rest)
@@ -414,6 +451,18 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
               `.群管 超长折叠 ${moderation.overlongMessage.enabled ? "关" : "开"}`,
               `.群管 超长折叠 字数 ${moderation.overlongMessage.maxLength}`,
               `.群管 超长折叠 转发 ${moderation.overlongMessage.forwardEnabled ? "关" : "开"}`
+            ]
+          },
+          {
+            label: "白名单",
+            on: moderation.whitelist.length > 0,
+            detail: moderation.whitelist.length
+              ? `${moderation.whitelist.length} 人完全跳过所有群管检测（${moderation.whitelist.slice(0, 5).join("、")}${moderation.whitelist.length > 5 ? " 等" : ""}）`
+              : "未配置；名单内成员的消息完全跳过复合规则/连发/超长/刷屏/广告检测",
+            commands: [
+              ".群管 白名单",
+              ".群管 白名单 添加 <QQ>",
+              ".群管 白名单 删除 <QQ>"
             ]
           },
           {
@@ -832,6 +881,29 @@ export function createGroupAdminPageMessage(Plugin:new(options:Record<string,unk
         const summary = changes.map(change => this.describeChange(command.feature, change)).join("、")
         ports.logger?.info?.(`[GroupAdminPage] ${e.group_id} user=${e.user_id} ${command.feature.label}: ${summary}`)
         await e.reply(`已设置「${command.feature.label}」：${summary}，发送 .群管 查看最新面板。`)
+        return true
+      }
+
+      // 白名单语法：.群管 白名单 [添加|删除 <QQ>] —— 列表所有人可见,修改需要权限
+      if (command.type === "whitelist") {
+        if (command.action === "list") {
+          const moderation = normalizeGroupModerationConfig(adminRecord(ports.readSettings().groupModeration))
+          await e.reply(buildWhitelistText(moderation.whitelist))
+          return true
+        }
+        if (!canManage(e)) {
+          await e.reply(notAllowedMessage())
+          return true
+        }
+        const update = buildWhitelistUpdate(ports.readSettings(), command.action, command.userId)
+        if (!update) {
+          await e.reply("QQ 号需要是 5-12 位数字")
+          return true
+        }
+        ports.applyUpdates(update)
+        const count = (update["groupModeration.whitelist"] as string[]).length
+        ports.logger?.info?.(`[GroupAdminPage] ${e.group_id} user=${e.user_id} 白名单${command.action === "add" ? "添加" : "删除"} ${command.userId}`)
+        await e.reply(`已${command.action === "add" ? "添加" : "删除"} ${command.userId}，当前白名单 ${count} 人。发送 .群管 白名单 查看列表。`)
         return true
       }
 

@@ -18,6 +18,7 @@ export const DEFAULT_GROUP_MODERATION_CONFIG:ModerationConfig = {
   adTemplateWeight: 0.55,
   adCorpusAutoCollect: true,
   ignoredBotIds: [],
+  whitelist: [],
   floodEnabled: true,
   floodMaxLevel: 5,
   floodWindowSeconds: 10,
@@ -240,6 +241,7 @@ export function normalizeGroupModerationConfig(input:unknown = {}):ModerationCon
   config.adTemplateWeight = normalizeNumber(config.adTemplateWeight, DEFAULT_GROUP_MODERATION_CONFIG.adTemplateWeight, 0, 1)
   config.adCorpusAutoCollect = config.adCorpusAutoCollect !== false
   config.ignoredBotIds = normalizeStringList(config.ignoredBotIds)
+  config.whitelist = normalizeStringList(config.whitelist)
   config.floodEnabled = config.floodEnabled !== false
   config.floodMaxLevel = Math.floor(normalizeNumber(config.floodMaxLevel, DEFAULT_GROUP_MODERATION_CONFIG.floodMaxLevel, 0, 100))
   config.floodWindowSeconds = Math.floor(normalizeNumber(config.floodWindowSeconds, DEFAULT_GROUP_MODERATION_CONFIG.floodWindowSeconds, 3, 600))

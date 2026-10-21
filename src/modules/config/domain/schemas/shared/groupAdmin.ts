@@ -5,6 +5,7 @@ import notice from './groupNotice.js'
 const extra: ConfigSchemaItem[] = [
   { component: 'Divider', label: '广告扫描高级设置' },
   { field: 'groupModeration.ignoredBotIds', label: '豁免机器人 QQ', component: 'GTags', bottomHelpMessage: '这些机器人不参与广告和刷屏检测。官方 Q 群管家已内置豁免。' },
+  { field: 'groupModeration.whitelist', label: '白名单 QQ', component: 'GTags', bottomHelpMessage: '白名单成员的消息完全跳过群管检测（复合规则/连发/超长/刷屏/广告）。群内可用 .群管 白名单 添加/删除 <QQ> 维护。' },
   { field: 'groupModeration.evidenceMaxChars', label: '证据文字上限', component: 'InputNumber', componentProps: { min: 200, max: 5000, step: 1 } },
   { field: 'groupModeration.modelThreshold', label: '模型复核置信度', component: 'InputNumber', componentProps: { min: 0, max: 1, step: 0.01 } },
   { field: 'groupModeration.floodConfidence', label: '刷屏命中置信度', component: 'InputNumber', componentProps: { min: 0, max: 1, step: 0.01 } },

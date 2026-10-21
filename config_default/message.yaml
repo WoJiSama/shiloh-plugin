@@ -612,6 +612,9 @@ pluginSettings:
     # 例：{ name: 长文刷屏, enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, muteSeconds: 60 }
     # 例：{ name: 换行刷屏, enabled: true, burstCount: 3, windowSeconds: 10, maxLines: 30, muteSeconds: 60 }
     compoundRules: []
+    # 白名单：名单内成员的消息完全跳过群管检测（复合规则/连发/超长/刷屏/广告全部忽略）。
+    # 群里可用 .群管 白名单 添加/删除 <QQ> 随时维护（群主/群管/群管管理员可用），跨群生效。
+    whitelist: []
     # 机器人豁免名单：官方 Q群管家已内置豁免；群里其他功能 bot（会发 markdown 卡片/入群须知）
     # 的 QQ 号填在这里，群管检测直接跳过，避免卡片里的链接/二维码误触广告规则。
     ignoredBotIds: []

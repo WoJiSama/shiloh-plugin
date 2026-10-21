@@ -77,6 +77,12 @@ export function isIgnoredBotUser(userId:unknown, config:Partial<ModerationConfig
   return normalizeStringList(config?.ignoredBotIds).includes(id)
 }
 
+// 白名单成员:所有群管检测(复合规则/连发/超长/刷屏/广告)全部跳过
+export function isWhitelistedUser(userId:unknown, config:Partial<ModerationConfig>) {
+  const id = String(userId || "").trim()
+  return Boolean(id) && normalizeStringList(config?.whitelist).includes(id)
+}
+
 export class GroupModerationManager {
   floodTrackers = new Map<string,number[]>()
   burstTrackers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
@@ -679,6 +685,10 @@ export class GroupModerationManager {
     const config = this.getConfig(groupId)
     if (isIgnoredBotUser(userId, config)) {
       this.ports.logger?.debug?.(`[GroupModer] 跳过白名单机器人 user=${userId}`)
+      return false
+    }
+    if (isWhitelistedUser(userId, config)) {
+      this.ports.logger?.debug?.(`[GroupModer] 跳过白名单成员 user=${userId}`)
       return false
     }
     if (!this.isGroupEnabled(config, groupId)) return false

@@ -299,6 +299,32 @@ test("复合规则列表文本与按序号写入", async () => {
   assert.equal(buildCompoundRuleUpdate(settings, GROUP_ID, settings.groupModeration.compoundRules, 5, "burstCount", 8), null, "越界序号返回 null")
 })
 
+test("白名单命令：列表/添加/删除/非法输入", () => {
+  assert.deepEqual(parseGroupAdminCommand(".群管 白名单"), { ok: true, type: "whitelist", action: "list" })
+  const add = parseGroupAdminCommand(".群管 白名单 添加 123456789")
+  assert.deepEqual({ ok: add.ok, type: add.type, action: add.action, userId: add.userId }, { ok: true, type: "whitelist", action: "add", userId: "123456789" })
+  const remove = parseGroupAdminCommand(".群管 白名单 删除 123456789")
+  assert.deepEqual({ action: remove.action, userId: remove.userId }, { action: "remove", userId: "123456789" })
+  const bad = parseGroupAdminCommand(".群管 白名单 添加 abc")
+  assert.equal(bad.ok, false)
+  assert.ok(bad.message.includes("5-12 位数字"))
+})
+
+test("白名单写入：新增去重、删除保留他人、非法返回 null", async () => {
+  const { buildWhitelistUpdate, buildWhitelistText } = await import("../dist/backend/modules/groupAdmin/infrastructure/groupAdminPage.js")
+  const settings = serverLikeSettings()
+  settings.groupModeration.whitelist = ["111111111"]
+  const add = buildWhitelistUpdate(settings, "add", "222222222")
+  assert.deepEqual(add, { "groupModeration.whitelist": ["111111111", "222222222"] })
+  const dedupe = buildWhitelistUpdate(settings, "add", "111111111")
+  assert.deepEqual(dedupe, { "groupModeration.whitelist": ["111111111"] }, "重复添加幂等")
+  const remove = buildWhitelistUpdate(settings, "remove", "111111111")
+  assert.deepEqual(remove, { "groupModeration.whitelist": [] })
+  assert.equal(buildWhitelistUpdate(settings, "add", "abc"), null)
+  assert.ok(buildWhitelistText(["111111111"]).includes("1. 111111111"))
+  assert.ok(buildWhitelistText([]).includes("完全跳过"))
+})
+
 test("面板展示复合规则分区", () => {
   const settings = serverLikeSettings()
   settings.groupModeration.compoundRules = [{ name: "长文刷屏", enabled: true, burstCount: 10, windowSeconds: 5, maxLength: 160, totalLength: 0, recall: true, forward: true, muteSeconds: 60 }]
