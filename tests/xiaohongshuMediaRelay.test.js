@@ -145,6 +145,45 @@ test("failed video downloads degrade to the cover gallery", async () => {
   }
 })
 
+test("image notes with a live-photo clip never attach the video body", async () => {
+  const previousFetch = globalThis.fetch
+  try {
+    globalThis.fetch = mockImageFetch()
+    const result = await buildXiaohongshuRelaySegments(
+      // 华为GT7 类笔记:type=normal 图文,页面里带 2 秒实况视频段
+      {type: "xiaohongshu", note_id: "live1", media_kind: "image", duration: 2,
+       play_url: "https://sns-video-v6.xhscdn.com/stream/live.mp4?sign=a",
+       images: [IMAGE_URL, IMAGE_URL.replace("ff371lb8", "aa11bb22"), IMAGE_URL.replace("ff371lb8", "cc22dd33"), IMAGE_URL.replace("ff371lb8", "ee44ff55")]},
+      { segmentApi: { image: file => ({type: "image", file}), video: file => ({type: "video", file}) }, logger: { warn() {}, info() {} } }
+    )
+    assert.ok(!result.segments.some(part => part?.type === "video"), "图文笔记不应发实况小视频")
+    assert.equal(result.imageNodes.length, 4, "4 张图应全部保留")
+    await cleanupXiaohongshuRelayFiles(result.tempFiles)
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+})
+
+test("full description goes into its own text node", async () => {
+  const result = await buildXiaohongshuRelaySegments(
+    {type: "xiaohongshu", note_id: "desc1", media_kind: "image", description: "gt5银色真的百搭…怎么搭都好美 gt7继续冲银色！！搭什么颜色表带都好看 虽然很喜欢金色，但银色胜在百搭呀～ #华为gt7#", images: [IMAGE_URL]},
+    { segmentApi: { image: file => ({type: "image", file}) }, logger: { warn() {}, info() {} } }
+  )
+  assert.equal(result.textNodes.length, 1)
+  assert.match(result.textNodes[0], /^gt5银色真的百搭/)
+  assert.match(result.textNodes[0], /#华为gt7#$/)
+  await cleanupXiaohongshuRelayFiles(result.tempFiles)
+})
+
+test("cards without a description produce no text node", async () => {
+  const result = await buildXiaohongshuRelaySegments(
+    {type: "xiaohongshu", note_id: "nodesc", media_kind: "image", title: "只有标题", images: [IMAGE_URL]},
+    { segmentApi: { image: file => ({type: "image", file}) }, logger: { warn() {}, info() {} } }
+  )
+  assert.equal(result.textNodes.length, 0)
+  await cleanupXiaohongshuRelayFiles(result.tempFiles)
+})
+
 test("unresolved cards without any image keep the note link only", async () => {
   const result = await buildXiaohongshuRelaySegments(
     {type: "xiaohongshu", note_id: "n3", title: "只有文字", page_url: "https://www.xiaohongshu.com/explore/n3"},

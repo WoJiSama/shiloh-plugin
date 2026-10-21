@@ -1,6 +1,6 @@
 import type {Browser,Page} from "puppeteer"
 import {record,errorText,type XiaohongshuCard,type MediaLogger} from "./xiaohongshuTypes.js"
-import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo} from "./xiaohongshuMessage.js"
+import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo,extractXiaohongshuDescription} from "./xiaohongshuMessage.js"
 import { createSingleFlightResolver } from "../../foundation/infrastructure/singleFlightResolver.js"
 
 const RESOLVE_TIMEOUT_MS = 25_000
@@ -29,12 +29,18 @@ export function extractFromDomPayload(payload:{
   const lines = String(payload.bodyText || "").split("\n").map(line => line.trim()).filter(Boolean)
   let author = ""
   const followIndex = lines.findIndex(line => line === "关注")
-  if (followIndex > 0) author = lines.slice(0, followIndex).join(" ").slice(0, 60)
+  if (followIndex > 0) {
+    // 作者行会混入轮播覆盖层噪音:实况角标 LIVE、"打开App查看更多"引导、图片计数 n/m
+    const authorLines = lines.slice(0, followIndex).filter(line =>
+      !/^(?:LIVE\s*)+$/i.test(line) && !/^打开App/.test(line) && !/^\d+\s*\/\s*\d+$/.test(line))
+    author = authorLines.join(" ").slice(0, 60).trim()
+  }
   let description = ""
-  const expandIndex = lines.findIndex(line => line === "展开")
+  // 移动端按钮文案随版本在「展开/展开全文」间漂移,两者都认
+  const expandIndex = lines.findIndex(line => /^(展开|展开全文)$/.test(line))
   if (expandIndex >= 0 && expandIndex + 1 < lines.length) {
-    const stopIndex = lines.findIndex((line, index) => index > expandIndex && /^(发弹幕|点击进入评论区?|\d+条精选评论)$/.test(line))
-    description = lines.slice(expandIndex + 1, stopIndex > 0 ? stopIndex : undefined).join(" ").slice(0, 600)
+    const stopIndex = lines.findIndex((line, index) => index > expandIndex && /^(发弹幕|点击进入评论区?|\d+条精选评论|昨天|刚刚|\d+分钟前|\d+小时前)$/.test(line))
+    description = lines.slice(expandIndex + 1, stopIndex > 0 ? stopIndex : undefined).join(" ").slice(0, 2000)
   }
   const isNoteImage = (url:string) => /(sns-webpic|sns-img|sns-video)[^/]*\.xhscdn\.com/i.test(url) && !/\/avatar\//i.test(url)
   const images = [...new Set((payload.imageUrls || []).map(String).filter(isNoteImage).map(normalizeXiaohongshuImageUrl).filter(Boolean))]
@@ -113,27 +119,37 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
       }
     } catch {}
     const domInfo = extractFromDomPayload(domPayload)
-    // 视频直链:移动端 state 深找 mp4(带签名,短时有效),优先 h264 保 QQ 兼容
+    // 视频直链:移动端 state 深找 mp4(带签名,短时有效),优先 h264 保 QQ 兼容;
+    // 简介全文同样从 state 深找(DOM 按钮文案漂移时会漏抓)
     let playUrl = ""
     let duration = 0
+    let stateDescription = ""
     try {
       if (domPayload.initialStateJson && domPayload.initialStateJson !== "null") {
         const parsed = JSON.parse(domPayload.initialStateJson)
         const video = extractXiaohongshuVideo(parsed)
         playUrl = video.playUrl
         duration = video.duration
+        stateDescription = extractXiaohongshuDescription(parsed)
       }
     } catch {}
     const images = stateCard?.images?.length ? stateCard.images : (domInfo.images || [])
+    // 媒体类型以分享链接自带 type 为准;无此信号时用时长启发式(实况照片是 2 秒左右的短视频段,
+    // 不能仅凭页面存在 video 元素就当视频笔记)
+    const resolvedMediaKind = stateCard?.media_kind
+      || card.media_kind
+      || (domInfo.media_kind === "video" && duration >= 10 ? "video" : domInfo.media_kind)
+    const isVideoNote = resolvedMediaKind === "video"
+    if (!isVideoNote) playUrl = ""
     const result:XiaohongshuCard = {
       ...card,
       title: stateCard?.title || domInfo.title || card.title || "",
-      description: stateCard?.description || domInfo.description || "",
+      description: stateCard?.description || stateDescription || domInfo.description || "",
       author: stateCard?.author || domInfo.author || "",
       liked: stateCard?.liked || 0,
       collected: stateCard?.collected || 0,
       comment_count: stateCard?.comment_count || 0,
-      media_kind: playUrl ? "video" : (stateCard?.media_kind || domInfo.media_kind),
+      media_kind: isVideoNote ? "video" : "image",
       cover_url: stateCard?.cover_url || domInfo.cover_url || "",
       images,
       play_url: playUrl || stateCard?.play_url || "",
@@ -145,7 +161,7 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
       logger?.warn?.(`[小红书] 浏览器解析未取得笔记内容 note=${result.note_id || "?"} 页面=${domPayload.noteUrl}`)
       return null
     }
-    logger?.info?.(`[小红书] 浏览器解析成功 note=${result.note_id || "?"} ${images.length ? `图${images.length}张` : "无图"} 视频=${result.media_kind === "video" ? 1 : 0}${playUrl ? `(直链${duration}s)` : ""} 来源=${stateCard ? "页面状态" : "DOM"}`)
+    logger?.info?.(`[小红书] 浏览器解析成功 note=${result.note_id || "?"} ${images.length ? `图${images.length}张` : "无图"} 视频=${isVideoNote ? 1 : 0}${isVideoNote && playUrl ? `(直链${duration}s)` : ""} 简介${(result.description || "").length}字 来源=${stateCard ? "页面状态" : "DOM"}`)
     return result
   } catch (error) {
     logger?.warn?.(`[小红书] 浏览器解析异常: ${errorText(error)}`)

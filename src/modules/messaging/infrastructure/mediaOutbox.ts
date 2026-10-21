@@ -5,7 +5,7 @@ import { LeaseLostError, startLeaseHeartbeat } from "./leaseHeartbeat.js"
 import type { DeliverySegment, ForwardNode, FileOptions } from './deliveryGateway.js'
 import type { RedisJobStore } from './redisJobStore.js'
 interface Card { type: string; bvid?: string; ep_id?: string; short_url?: string; page_url?: string; aweme_id?: string; video_id?: string; artwork_id?: string; note_id?: string; metadata_status?: string; metadata_failure_reason?: string; [key: string]: unknown }
-interface Relay { segments: (DeliverySegment | string)[]; tempFiles: string[]; artifactLeases?: { release(): Promise<unknown> }[]; sharedMediaFiles?: string[]; qualityOptions?: { label: string }[]; imageNodes?: DeliverySegment[] }
+interface Relay { segments: (DeliverySegment | string)[]; tempFiles: string[]; artifactLeases?: { release(): Promise<unknown> }[]; sharedMediaFiles?: string[]; qualityOptions?: { label: string }[]; imageNodes?: DeliverySegment[]; textNodes?: string[] }
 interface Timings { refresh: number; playback: number; download: number }
 interface Job { version: number; id: string; eventId: string; platform: string; botId: string; groupId: string; messageId: string; media: Card; state: string; attempts: number; createdAt: number; updatedAt: number; nextRetryAt: number; leaseUntil: number; ownerRunId: string; receipt: unknown; lastError: string; fallbackStatus?: string; fallbackReason?: string; lastMediaError?: string; timings?: object; lastRetcode?: unknown; uncertain?: boolean }
 export function isDeliveryJob(value: unknown): value is Job {
@@ -571,8 +571,14 @@ class MediaOutbox {
       const botRoot = ports.botIdentity(job.botId)
       const senderId = Number(job.botId || botRoot?.uin || 0) || 0
       const senderName = botRoot?.nickname || "希洛"
+      // 独立文本节点(如小红书简介全文):紧跟信息节点,不与媒体混排
+      const textOnlyNodes = (Array.isArray(relay.textNodes) ? relay.textNodes : [])
+        .map(text => String(text || "").trim())
+        .filter(Boolean)
+        .map(text => ({ user_id: senderId, nickname: senderName, message: [text] }))
       const nodes = [
         { user_id: senderId, nickname: senderName, message: [this.formatInfo(job, card), ...inlineSegments] },
+        ...textOnlyNodes,
         ...videos.map(video => ({ user_id: senderId, nickname: senderName, message: [video] })),
         ...galleryImages.map(image => ({ user_id: senderId, nickname: senderName, message: [image] }))
       ]

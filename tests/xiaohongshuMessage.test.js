@@ -9,7 +9,8 @@ import {
   buildCardFromNoteState,
   normalizeXiaohongshuImageUrl,
   decodeXiaohongshuCardEntities,
-  extractXiaohongshuVideo
+  extractXiaohongshuVideo,
+  extractXiaohongshuDescription
 } from "../utils/xiaohongshuMessage.js"
 
 // 生产归档里的真实 QQ 分享卡片 raw_message(群 763694201, 2026-10-19):
@@ -130,6 +131,23 @@ test("video extraction tolerates states without streams", () => {
   assert.equal(seconds.duration, 42)
 })
 
+test("extracts the full description from a hydrated mobile state", () => {
+  const state = {note: {detail: {desc: "gt5银色真的百搭…\ngt7继续冲银色！！\n#华为gt7[话题]#", extra: {desc: "短"}}}}
+  const description = extractXiaohongshuDescription(state)
+  assert.ok(description.startsWith("gt5银色真的百搭"))
+  assert.ok(description.includes("#华为gt7[话题]#"), "话题标签应保留")
+  assert.equal(extractXiaohongshuDescription({a: {b: {c: 1}}}), "")
+})
+
+test("share url type marks the media kind for live-photo disambiguation", () => {
+  const normal = extractXiaohongshuShareFromText("https://www.xiaohongshu.com/discovery/item/6ad73457000000000c0093d5?xsec_token=T%3D&type=normal&xsec_source=app_share")
+  assert.equal(normal.media_kind, "image")
+  const video = extractXiaohongshuShareFromText("https://www.xiaohongshu.com/discovery/item/6ad4a9c200000000290162d4?xsec_token=T%3D&type=video&xsec_source=app_share")
+  assert.equal(video.media_kind, "video")
+  const unknown = extractXiaohongshuShareFromText("http://xhslink.com/aBC123")
+  assert.equal(unknown.media_kind, undefined)
+})
+
 test("formats history text and links", () => {
   const card = {
     type: "xiaohongshu", note_id: "64f0a1b2000000001c00ed1a", title: "咖啡地图", author: "小柚",
@@ -142,6 +160,7 @@ test("formats history text and links", () => {
   assert.match(text, /作者:小柚/)
   assert.match(text, /点赞:12000/)
   assert.match(text, /图片:1张/)
+  assert.ok(!text.includes("简介"), "简介已移到独立转发节点,不再放头部")
   assert.match(formatXiaohongshuHistoryLinks(card), /笔记 URL:https:\/\/www\.xiaohongshu\.com/)
 })
 

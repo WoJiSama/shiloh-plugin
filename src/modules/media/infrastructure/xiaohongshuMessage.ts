@@ -4,6 +4,8 @@ import {record,errorText,type XiaohongshuCard,type XiaohongshuOptions,type Media
 // 按 ID 重建为 sns-img 无签名地址可长期复用(实测 2026-10 直连 200)。
 const XHS_IMAGE_CDN_HOST = "sns-img-qc.xhscdn.com"
 const XHS_MOBILE_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+// 简介全文单独成转发节点,不再在头部裁剪;上限只防异常超长
+const XHS_DESCRIPTION_MAX_CHARS = 2000
 
 export function decodeXiaohongshuCardEntities(text:unknown = "") {
   return String(text || "")
@@ -78,6 +80,13 @@ function extractXiaohongshuNoteRef(url = "") {
   return {noteId, xsecToken}
 }
 
+// 分享链接自带 type=video|normal:图文笔记也可能带 live-photo 短视频段,
+// 以此区分真实视频笔记与图文,避免把 2 秒实况当视频本体发出去。
+function mediaKindFromShareUrl(url = "") {
+  const type = String(url).match(/[?&]type=(video|normal)/i)?.[1]?.toLowerCase() || ""
+  return type === "video" ? "video" : type === "normal" ? "image" : ""
+}
+
 // QQ 分享卡片的 JSON 埋在 raw_message 的 [CQ:json,data={...}] 里,实体转义需先还原
 function extractCardJson(text = ""):unknown {
   const marker = "[CQ:json,data="
@@ -122,6 +131,7 @@ function buildBaseCard(pageUrl:string, card?:Partial<XiaohongshuCard>):Xiaohongs
     ...(isShort ? {short_url: pageUrl} : {}),
     note_id: noteId,
     ...(xsecToken ? {xsec_token: xsecToken} : {}),
+    ...(mediaKindFromShareUrl(pageUrl) ? {media_kind: mediaKindFromShareUrl(pageUrl)} : {}),
     ...(card?.title ? {title: card.title} : {}),
     ...(card?.description ? {description: card.description} : {}),
     ...(card?.cover_url ? {cover_url: card.cover_url} : {}),
@@ -200,8 +210,27 @@ export function parseXiaohongshuInitialState(html = "") {
 // QQ 客户端对 h265 兼容性差,取流优先 h264,再 av1,最后 h265。
 const XHS_VIDEO_CODEC_RANK:Record<string,number> = {h264: 0, av1: 1, h265: 2}
 
-export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>()):{playUrl:string;codec:string;duration:number} {
-  const mp4s:{url:string;codec:string;rank:number}[] = []
+// 移动端 state 的笔记正文挂在漂移路径下:深找最长的 desc 字符串作为全文简介。
+// 页面 DOM 的「展开/展开全文」行启发式会因按钮文案变化漏抓,以此兜底互备。
+export function extractXiaohongshuDescription(state:unknown, visited = new Set<object>()):string {
+  let best = ""
+  const walk = (value:unknown, depth:number) => {
+    if (!value || typeof value !== "object" || visited.has(value as object) || depth > 9) return
+    visited.add(value as object)
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, depth + 1)
+      return
+    }
+    for (const [key, child] of Object.entries(value as Record<string,unknown>)) {
+      if (key === "desc" && typeof child === "string" && child.trim().length > best.trim().length) best = child
+      else if (child && typeof child === "object") walk(child, depth + 1)
+    }
+  }
+  walk(state, 0)
+  return best.trim().slice(0, XHS_DESCRIPTION_MAX_CHARS)
+}
+
+export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>()):{playUrl:string;codec:string;duration:number} {  const mp4s:{url:string;codec:string;rank:number}[] = []
   let duration = 0
   const walk = (value:unknown, codecHint:string, depth:number) => {
     if (!value || typeof value !== "object" || visited.has(value as object) || depth > 9) return
@@ -338,7 +367,7 @@ async function enrichXiaohongshuShare(card:XiaohongshuCard = {}, options:Xiaohon
           return {
             ...card,
             title: cleanText(resolved.title || card.title || "小红书笔记", 300),
-            description: cleanText(resolved.description || card.description || "", 1000),
+            description: cleanText(resolved.description || card.description || "", XHS_DESCRIPTION_MAX_CHARS),
             author: cleanText(resolved.author || card.author || "", 120),
             liked: resolved.liked || card.liked || 0,
             collected: resolved.collected || card.collected || 0,
@@ -387,7 +416,6 @@ function formatXiaohongshuHistoryText(card:XiaohongshuCard = {}) {
   if (card.collected) stats.push(`收藏:${card.collected}`)
   if (card.comment_count) stats.push(`评论:${card.comment_count}`)
   if (stats.length) lines.push(`数据：${stats.join(" ")}`)
-  if (card.description && card.description !== card.title) lines.push(`简介：${cleanText(card.description, 240)}`)
   return lines.join("\n")
 }
 

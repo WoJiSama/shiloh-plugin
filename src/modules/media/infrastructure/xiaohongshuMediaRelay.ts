@@ -110,7 +110,11 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   const artifactLeases:Lease[] = []
   // 图集节点:每张图独立节点,由 MediaOutbox 放进同一条合并转发(与抖音图集一致)
   const imageNodes:unknown[] = []
-  if (!card || card.type !== "xiaohongshu") return { segments, imageNodes, tempFiles, artifactLeases }
+  // 简介全文单独成转发节点,不在信息头部裁剪展示
+  const textNodes:string[] = []
+  if (!card || card.type !== "xiaohongshu") return { segments, imageNodes, textNodes, tempFiles, artifactLeases }
+  const description = String(card.description || "").trim()
+  if (description && description !== card.title) textNodes.push(description)
   const maxImages = Math.min(XHS_NOTE_IMAGE_MAX_COUNT, Math.max(1, Number(xiaohongshuRelay.maxImages) || XHS_NOTE_IMAGE_MAX_COUNT))
   const maxImageBytes = Math.max(1, Number(xiaohongshuRelay.maxImageBytes) || XHS_NOTE_IMAGE_MAX_BYTES)
   const timeoutMs = Number(xiaohongshuRelay.downloadTimeoutMs) || XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS
@@ -122,13 +126,13 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
     .filter(url => /^https?:\/\//i.test(String(url || "")))
   const images = noteImages.length ? noteImages : (card.cover_url ? [normalizeXiaohongshuImageUrl(card.cover_url)].filter(Boolean) : [])
 
-  // 视频笔记优先搬视频本体(直链短时有效,组装阶段立即下载);
-  // 时长超限直接跳过,下载失败降级为封面图集
-  if (card.media_kind === "video" || card.play_url) {
+  // 真实视频笔记优先搬视频本体(直链短时有效,组装阶段立即下载);
+  // 时长超限直接跳过,下载失败降级为封面图集;图文笔记不走此路径
+  if (card.media_kind === "video" && card.play_url) {
     if (Number(card.duration || 0) > maxVideoSeconds) {
       segments.push(`\n（视频超过${Math.floor(maxVideoSeconds / 60)}分钟，未附带视频本体）`)
     } else if (shouldAttachXiaohongshuVideo(card, maxVideoSeconds)) {
-      if (!segmentApi?.video) return { segments, imageNodes, tempFiles, artifactLeases }
+      if (!segmentApi?.video) return { segments, imageNodes, textNodes, tempFiles, artifactLeases }
       const videoDownloadStartedAt = Date.now()
       const key = buildMediaArtifactKey("xiaohongshu", card)
       const useArtifactStore = Boolean(artifactStore && key)
@@ -141,7 +145,7 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
         if (lease) artifactLeases.push(lease)
         else tempFiles.push(filePath)
         segments.push("\n", segmentApi.video(filePath))
-        return { segments, imageNodes, tempFiles, artifactLeases }
+        return { segments, imageNodes, textNodes, tempFiles, artifactLeases }
       }
       if (lease) await lease.release?.().catch?.(() => {})
       segments.push("\n（视频本体暂时获取失败，附封面与原文）")
@@ -150,7 +154,7 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
 
   if (!images.length) {
     segments.push("\n（笔记图片暂时获取失败，已保留笔记页面）")
-    return { segments, imageNodes, tempFiles, artifactLeases }
+    return { segments, imageNodes, textNodes, tempFiles, artifactLeases }
   }
   const downloadStartedAt = Date.now()
   const capped = images.slice(0, maxImages)
@@ -178,7 +182,7 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   } else {
     segments.push("\n（笔记图片暂时获取失败，已保留笔记页面）")
   }
-  return { segments, imageNodes, tempFiles, artifactLeases }
+  return { segments, imageNodes, textNodes, tempFiles, artifactLeases }
 }
 
 async function cleanupXiaohongshuRelayFiles(tempFiles:string[] = []) {
