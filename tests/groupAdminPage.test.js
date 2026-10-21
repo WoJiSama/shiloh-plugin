@@ -336,6 +336,8 @@ test("白名单写入：新增去重、删除保留他人、非法返回 null", 
   assert.deepEqual(remove, { "groupModeration.whitelist": [] })
   assert.equal(buildWhitelistUpdate(settings, "add", "abc"), null)
   assert.ok(buildWhitelistText(["111111111"]).includes("1. 111111111"))
+  assert.ok(buildWhitelistText(["111111111", "222222222"], { "111111111": "小明" }).includes("1. 111111111（小明）"), "带昵称展示")
+  assert.ok(!buildWhitelistText(["222222222"], { "111111111": "小明" }).includes("小明"), "未命中昵称不展示")
   assert.ok(buildWhitelistText([]).includes("完全跳过"))
 })
 

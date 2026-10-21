@@ -222,14 +222,15 @@ export function buildWhitelistUpdate(settings:Data, action:"add"|"remove", userI
   return { "groupModeration.whitelist": next }
 }
 
-export function buildWhitelistText(whitelist:string[]) {
+// names 为本群成员映射里查到的昵称(群名片优先);不在本群的成员只展示 QQ 号
+export function buildWhitelistText(whitelist:string[], names:Record<string,string> = {}) {
   if (!whitelist.length) return [
     "群管白名单：名单内成员的消息完全跳过群管检测（复合规则/连发/超长/刷屏/广告）。",
     "添加：.群管 白名单 添加 <QQ>；删除：.群管 白名单 删除 <QQ>（群主/群管/群管管理员可操作）"
   ].join("\n")
   return [
     `群管白名单（${whitelist.length} 人，完全跳过所有群管检测）：`,
-    ...whitelist.map((id, i) => `${i + 1}. ${id}`),
+    ...whitelist.map((id, i) => `${i + 1}. ${id}${names[id] ? `（${names[id]}）` : ""}`),
     "删除：.群管 白名单 删除 <QQ>"
   ].join("\n")
 }
@@ -900,7 +901,19 @@ export function createGroupAdminPageMessage(Plugin:new(options:Record<string,unk
       if (command.type === "whitelist") {
         if (command.action === "list") {
           const moderation = normalizeGroupModerationConfig(adminRecord(ports.readSettings().groupModeration))
-          await e.reply(buildWhitelistText(moderation.whitelist))
+          const names:Record<string,string> = {}
+          try {
+            const group = await manager.getGroup(e, e.group_id!)
+            const memberMap = await group?.getMemberMap?.()
+            for (const id of moderation.whitelist) {
+              const member = memberMap?.get(id) || memberMap?.get(Number(id)) || memberMap?.get(String(id))
+              const name = String(member?.card || member?.nickname || "").trim()
+              if (name) names[id] = name
+            }
+          } catch (error) {
+            ports.logger?.warn?.(`[GroupAdminPage] 白名单昵称查询失败 group=${e.group_id}: ${adminError(error)}`)
+          }
+          await e.reply(buildWhitelistText(moderation.whitelist, names))
           return true
         }
         if (!canManage(e)) {
