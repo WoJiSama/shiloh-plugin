@@ -731,7 +731,8 @@ export class GroupModerationManager {
     const flood = burst ? null : this.checkFlood(groupId, userId, member?.level, config)
 
     const content = await this.extractContent(e, config)
-    if (!content.text && !content.imageCount && !content.forwardCount && !flood && !burst && !compound) return false
+    // 纯换行消息可见文本 trim 后为空,但行数条件已可判定超长,不能在空内容门提前返回
+    if (!content.text && !content.imageCount && !content.forwardCount && !flood && !burst && !compound && !overlong) return false
 
       const base = analyzeModerationRules({
         text: content.text,

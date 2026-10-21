@@ -500,6 +500,84 @@ test("复合规则：最新（靠后）优先、总字数条件、不撤回只�
   assert.ok(noRecall.calls.apis.some(call => call.method === "set_group_ban"), "仍禁言")
 })
 
+test("复合规则行数条件：几十个换行符的刷屏能命中", async () => {
+  const lineRule = { name: "换行刷屏", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 0, totalLength: 0, maxLines: 30, totalLines: 0, recall: true, forward: true, muteSeconds: 60 }
+  // 3 条都是 30 个换行(每条 31 行,字数远不超任何字数阈值) → 行数条件命中
+  const flood = createHarness({ settings: compoundSettings([lineRule]) })
+  for (let i = 0; i < 3; i++) {
+    await flood.manager.handleMessage(flood.makeEvent("\n".repeat(30), { message_id: 1000 + i }))
+  }
+  assert.equal(flood.calls.apis.filter(call => call.method === "delete_msg").length, 3, "纯换行消息按行数整批撤回")
+  assert.ok(flood.calls.forwards[0][0].message.includes("单条最多 31 行 > 30"), "转发说明带行数命中条件")
+
+  // 普通短消息不触发行数条件
+  const normal = createHarness({ settings: compoundSettings([lineRule]) })
+  for (let i = 0; i < 3; i++) {
+    await normal.manager.handleMessage(normal.makeEvent("正常消息", { message_id: 2000 + i }))
+  }
+  assert.equal(normal.calls.apis.filter(call => call.method === "delete_msg").length, 0, "行数不超不触发")
+
+  // 总行数条件:每条 15 行(单条不超 30),3 条合计 45 > 40 → 命中
+  const total = createHarness({ settings: compoundSettings([
+    { name: "总行数", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 0, totalLength: 0, maxLines: 0, totalLines: 40, recall: true, forward: true, muteSeconds: 0 }
+  ]) })
+  for (let i = 0; i < 3; i++) {
+    await total.manager.handleMessage(total.makeEvent("a\n".repeat(14) + "a", { message_id: 3000 + i }))
+  }
+  assert.equal(total.calls.apis.filter(call => call.method === "delete_msg").length, 3, "窗口总行数超限整批撤回")
+  assert.ok(total.calls.forwards[0][0].message.includes("合计 45 行 > 40"), "转发说明带总行数条件")
+})
+
+test("超长折叠加行数条件：单条几十个换行符直接折叠,无需连发", async () => {
+  const settings = baseSettings({
+    overlongMessage: { enabled: true, maxLength: 1500, maxLines: 30, forwardEnabled: true },
+    burstMessage: { enabled: false }
+  })
+  const harness = createHarness({ settings })
+  // 单条 40 个换行(41 行):字数远不超 1500,但行数超 30 → 折叠
+  const handled = await harness.manager.handleMessage(harness.makeEvent("\n".repeat(40), { message_id: 6000 }))
+  assert.equal(handled, true, "单条行数超限即折叠")
+  assert.equal(harness.calls.apis.filter(call => call.method === "delete_msg").length, 1, "撤回该条")
+  assert.ok(harness.calls.forwards[0][0].message.includes("41 行"), "折叠说明带行数")
+  // 正常多行消息(5 行)不折叠
+  const normal = createHarness({ settings })
+  await normal.manager.handleMessage(normal.makeEvent("第一行\n第二行\n第三行\n第四行\n第五行", { message_id: 6001 }))
+  assert.equal(normal.calls.apis.filter(call => call.method === "delete_msg").length, 0, "行数不超不折叠")
+})
+
+test("连发折叠加窗口总量:条数没凑满但合计行数超限也整批折叠", async () => {
+  const settings = baseSettings({
+    overlongMessage: { enabled: false },
+    burstMessage: { enabled: true, windowSeconds: 5, maxMessages: 6, totalLength: 0, totalLines: 30, muteSeconds: 30, forwardEnabled: true }
+  })
+  const harness = createHarness({ settings })
+  // 3 条,每条 12 行(合计 36 > 30),条数 3 < 6 → 靠总行数触发
+  for (let i = 0; i < 3; i++) {
+    await harness.manager.handleMessage(harness.makeEvent("a\n".repeat(11) + "a", { message_id: 6100 + i }))
+  }
+  assert.equal(harness.calls.apis.filter(call => call.method === "delete_msg").length, 3, "整批撤回")
+  assert.ok(harness.calls.forwards[0][0].message.includes("36 行"), "转发说明带合计行数")
+  const ban = harness.calls.apis.find(call => call.method === "set_group_ban")
+  assert.equal(ban.params.duration, 30, "按连发配置禁言")
+})
+
+test("白名单成员完全跳过群管检测（复合规则/连发/超长/行数/窗口总量都不处理）", async () => {
+  const settings = compoundSettings([
+    { name: "长文刷屏", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 10, totalLength: 0, maxLines: 5, totalLines: 5, recall: true, forward: true, muteSeconds: 60 }
+  ])
+  settings.groupModeration.overlongMessage = { enabled: true, maxLength: 10, maxLines: 5, forwardEnabled: true }
+  settings.groupModeration.burstMessage = { enabled: true, windowSeconds: 5, maxMessages: 3, totalLength: 10, totalLines: 5, muteSeconds: 30, forwardEnabled: true }
+  settings.groupModeration.whitelist = [String(USER_ID)]
+  const bypass = createHarness({ settings })
+  for (let i = 0; i < 3; i++) {
+    // 每条消息同时踩:超长字数/超长行数/连发条数/窗口总字数/窗口总行数/复合规则全部条件
+    await bypass.manager.handleMessage(bypass.makeEvent("这是一条很长很长超过十字的长消息\n".repeat(6), { message_id: 5000 + i }))
+  }
+  assert.equal(bypass.calls.apis.filter(call => call.method === "delete_msg").length, 0, "不撤回")
+  assert.equal(bypass.calls.apis.filter(call => call.method === "set_group_ban").length, 0, "不禁言")
+  assert.equal(bypass.calls.forwards.length, 0, "不转发")
+})
+
 test("复合规则与连发折叠并集互不影响", async () => {
   // 复合规则未命中时不抢占连发折叠
   const settings = baseSettings({
