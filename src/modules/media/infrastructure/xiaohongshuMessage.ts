@@ -230,6 +230,44 @@ export function extractXiaohongshuDescription(state:unknown, visited = new Set<o
   return best.trim().slice(0, XHS_DESCRIPTION_MAX_CHARS)
 }
 
+// 图文笔记的实况照片(live photo):imageList[i].livePhoto=true 标记,
+// stream.h264[0].masterUrl 是该图自己的实况视频直链(主备两个 CDN,毫秒时长)。
+// 图与实况按同一数组下标天然对齐。
+export function extractXiaohongshuGallery(state:unknown, visited = new Set<object>()):{imageUrl:string; liveUrl:string}[] {
+  let imageList:unknown[] | null = null
+  const findList = (value:unknown, depth:number) => {
+    if (imageList || !value || typeof value !== "object" || visited.has(value as object) || depth > 9) return
+    visited.add(value as object)
+    if (Array.isArray(value)) {
+      if (value.length && value.length <= 40 && value.every(item => item && typeof item === "object" && ("livePhoto" in item || "stream" in item) && ("infoList" in item || "traceId" in item || "url" in item))) {
+        imageList = value
+        return
+      }
+      for (const item of value) findList(item, depth + 1)
+      return
+    }
+    for (const child of Object.values(value as Record<string,unknown>)) findList(child, depth + 1)
+  }
+  findList(state, 0)
+  if (!imageList) return []
+  const firstStreamUrl = (stream:unknown):string => {
+    const data = record(stream)
+    for (const codec of ["h264", "av1", "h265", "h266"]) {
+      const entry = Array.isArray(data[codec]) ? record(data[codec][0]) : {}
+      const url = normalizeUrl(entry.masterUrl) || normalizeUrl(Array.isArray(entry.backupUrls) ? entry.backupUrls.find(Boolean) : "")
+      if (/^https?:\/\/[^"'\\\s]+\.mp4/i.test(url)) return url.replace(/^http:\/\//i, "https://")
+    }
+    return ""
+  }
+  return (imageList as Record<string,unknown>[]).map(entry => {
+    const info = record(entry)
+    const infoList = Array.isArray(info.infoList) ? info.infoList : []
+    const imageUrl = normalizeXiaohongshuImageUrl(record(infoList[0]).url || info.urlDefault || info.url)
+    const liveUrl = info.livePhoto === true ? firstStreamUrl(info.stream) : ""
+    return {imageUrl, liveUrl}
+  }).filter(entry => entry.imageUrl || entry.liveUrl)
+}
+
 export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>()):{playUrl:string;codec:string;duration:number} {  const mp4s:{url:string;codec:string;rank:number}[] = []
   let duration = 0
   const walk = (value:unknown, codecHint:string, depth:number) => {
@@ -363,7 +401,13 @@ async function enrichXiaohongshuShare(card:XiaohongshuCard = {}, options:Xiaohon
         const resolver = options.browserResolver || ports.browserResolver
         const resolved = await resolver?.(card, { logger: options.logger || ports.logger })
         if (resolved && (resolved.images?.length || resolved.title || resolved.cover_url)) {
-          const images = [...new Set((Array.isArray(resolved.images) ? resolved.images : []).map(url => normalizeXiaohongshuImageUrl(url)).filter(Boolean))]
+          const resolvedImages = Array.isArray(resolved.images) ? resolved.images : []
+          const resolvedLives = Array.isArray(resolved.live_photos) ? resolved.live_photos : []
+          // 实况与图按下标对齐:仅当两者等长时保留对齐原样传递,否则退化为去重图片
+          const aligned = resolvedLives.length > 0 && resolvedLives.length === resolvedImages.length
+          const images = aligned
+            ? resolvedImages.map(url => normalizeXiaohongshuImageUrl(url))
+            : [...new Set(resolvedImages.map(url => normalizeXiaohongshuImageUrl(url)).filter(Boolean))]
           return {
             ...card,
             title: cleanText(resolved.title || card.title || "小红书笔记", 300),
@@ -374,8 +418,9 @@ async function enrichXiaohongshuShare(card:XiaohongshuCard = {}, options:Xiaohon
             comment_count: resolved.comment_count || card.comment_count || 0,
             media_kind: resolved.media_kind || card.media_kind || "",
             note_id: String(resolved.note_id || card.note_id || "").trim(),
-            cover_url: images[0] || resolved.cover_url || card.cover_url || "",
+            cover_url: images.find(Boolean) || resolved.cover_url || card.cover_url || "",
             images,
+            ...(aligned ? {live_photos: resolvedLives.map(url => normalizeUrl(url))} : {}),
             play_url: resolved.play_url || card.play_url || "",
             duration: resolved.duration || card.duration || 0,
             final_url: resolved.final_url || card.final_url || "",

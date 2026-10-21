@@ -10,7 +10,8 @@ import {
   normalizeXiaohongshuImageUrl,
   decodeXiaohongshuCardEntities,
   extractXiaohongshuVideo,
-  extractXiaohongshuDescription
+  extractXiaohongshuDescription,
+  extractXiaohongshuGallery
 } from "../utils/xiaohongshuMessage.js"
 
 // 生产归档里的真实 QQ 分享卡片 raw_message(群 763694201, 2026-10-19):
@@ -121,6 +122,23 @@ test("extracts the preferred video stream from a hydrated mobile state", () => {
   assert.equal(video.codec, "h264")
   // 毫秒口径(>10分钟按毫秒折算): 42000ms → 42s
   assert.equal(video.duration, 42)
+})
+
+test("extracts per-image live photos aligned with the gallery", () => {
+  const image = (live, fileId) => ({
+    livePhoto: live,
+    stream: live ? {h264: [{masterUrl: `http://sns-video-qc.xhscdn.com/stream/${fileId}.mp4?sign=a`, backupUrls: [`http://sns-bak-v6.xhscdn.com/stream/${fileId}.mp4`]}]} : {},
+    url: `http://sns-webpic-qc.xhscdn.com/202610192230/sig/${fileId}!h5_1080jpg`,
+    infoList: [{url: `http://sns-webpic-qc.xhscdn.com/202610192230/sig/${fileId}!h5_1080jpg`}]
+  })
+  const state = {note: {detail: {imageList: [image(true, "1040g2sg0000000000000000000000aa1"), image(false, "1040g2sg0000000000000000000000aa2"), image(true, "1040g2sg0000000000000000000000aa3")]}}}
+  const gallery = extractXiaohongshuGallery(state)
+  assert.equal(gallery.length, 3)
+  assert.equal(gallery[0].imageUrl, "https://sns-img-qc.xhscdn.com/1040g2sg0000000000000000000000aa1")
+  assert.match(gallery[0].liveUrl, /sns-video-qc\.xhscdn\.com\/stream\/1040g2sg0000000000000000000000aa1\.mp4/)
+  assert.equal(gallery[1].liveUrl, "", "非实况图为空串,保下标对齐")
+  assert.equal(gallery[2].liveUrl.includes("aa3"), true)
+  assert.deepEqual(extractXiaohongshuGallery({a: 1}), [])
 })
 
 test("video extraction tolerates states without streams", () => {

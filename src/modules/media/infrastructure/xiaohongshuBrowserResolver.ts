@@ -1,6 +1,6 @@
 import type {Browser,Page} from "puppeteer"
 import {record,errorText,type XiaohongshuCard,type MediaLogger} from "./xiaohongshuTypes.js"
-import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo,extractXiaohongshuDescription} from "./xiaohongshuMessage.js"
+import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo,extractXiaohongshuDescription,extractXiaohongshuGallery} from "./xiaohongshuMessage.js"
 import { createSingleFlightResolver } from "../../foundation/infrastructure/singleFlightResolver.js"
 
 const RESOLVE_TIMEOUT_MS = 25_000
@@ -124,6 +124,7 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
     let playUrl = ""
     let duration = 0
     let stateDescription = ""
+    let gallery:{imageUrl:string; liveUrl:string}[] = []
     try {
       if (domPayload.initialStateJson && domPayload.initialStateJson !== "null") {
         const parsed = JSON.parse(domPayload.initialStateJson)
@@ -131,9 +132,15 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
         playUrl = video.playUrl
         duration = video.duration
         stateDescription = extractXiaohongshuDescription(parsed)
+        gallery = extractXiaohongshuGallery(parsed)
       }
     } catch {}
-    const images = stateCard?.images?.length ? stateCard.images : (domInfo.images || [])
+    // state 图集带实况对齐信息时优先;否则退到 DOM 图片(无实况)
+    const galleryImages = gallery.map(entry => entry.imageUrl)
+    const galleryLives = gallery.map(entry => entry.liveUrl)
+    const hasGalleryLive = galleryLives.some(Boolean)
+    const images = stateCard?.images?.length ? stateCard.images : (galleryImages.length ? galleryImages : (domInfo.images || []))
+    const livePhotos = hasGalleryLive && images === galleryImages ? galleryLives : []
     // 媒体类型以分享链接自带 type 为准;无此信号时用时长启发式(实况照片是 2 秒左右的短视频段,
     // 不能仅凭页面存在 video 元素就当视频笔记)
     const resolvedMediaKind = stateCard?.media_kind
@@ -152,6 +159,7 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
       media_kind: isVideoNote ? "video" : "image",
       cover_url: stateCard?.cover_url || domInfo.cover_url || "",
       images,
+      ...(livePhotos.length ? {live_photos: livePhotos} : {}),
       play_url: playUrl || stateCard?.play_url || "",
       duration: duration || stateCard?.duration || 0,
       note_id: stateCard?.note_id || card.note_id || "",
@@ -161,7 +169,7 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
       logger?.warn?.(`[小红书] 浏览器解析未取得笔记内容 note=${result.note_id || "?"} 页面=${domPayload.noteUrl}`)
       return null
     }
-    logger?.info?.(`[小红书] 浏览器解析成功 note=${result.note_id || "?"} ${images.length ? `图${images.length}张` : "无图"} 视频=${isVideoNote ? 1 : 0}${isVideoNote && playUrl ? `(直链${duration}s)` : ""} 简介${(result.description || "").length}字 来源=${stateCard ? "页面状态" : "DOM"}`)
+    logger?.info?.(`[小红书] 浏览器解析成功 note=${result.note_id || "?"} ${images.length ? `图${images.length}张` : "无图"}${livePhotos.filter(Boolean).length ? `实况${livePhotos.filter(Boolean).length}段` : ""} 视频=${isVideoNote ? 1 : 0}${isVideoNote && playUrl ? `(直链${duration}s)` : ""} 简介${(result.description || "").length}字 来源=${stateCard ? "页面状态" : "DOM"}`)
     return result
   } catch (error) {
     logger?.warn?.(`[小红书] 浏览器解析异常: ${errorText(error)}`)

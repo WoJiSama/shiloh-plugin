@@ -34,15 +34,15 @@ function shouldAttachXiaohongshuVideo(card:XiaohongshuCard = {}, maxSeconds = XH
 }
 
 // 视频直链带签名短时有效,解析后立即下载;走同一分片工具(Range 并发),失败由上层降级到封面图
-async function downloadXiaohongshuVideo(card:XiaohongshuCard = {}, { maxBytes = XHS_ARCHIVE_VIDEO_MAX_BYTES, timeoutMs = XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS, logger = ports.logger }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
-  if (!card.play_url) return null
+async function downloadXiaohongshuVideoUrl(playUrl:string, noteId = "video", { maxBytes = XHS_ARCHIVE_VIDEO_MAX_BYTES, timeoutMs = XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS, logger = ports.logger }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
+  if (!/^https?:\/\//i.test(String(playUrl || ""))) return null
   const dir = path.join(os.tmpdir(), "shiloh-plugin-xiaohongshu-video")
   await fs.promises.mkdir(dir, { recursive: true })
-  const safeId = String(card.note_id || "video").replace(/[^A-Za-z0-9_-]/g, "")
+  const safeId = String(noteId || "video").replace(/[^A-Za-z0-9_-]/g, "")
   const filePath = path.join(dir, `${safeId}-${Date.now()}-${Math.random().toString(16).slice(2)}.mp4`)
   let completed = false
   try {
-    await fetchDownloadToFile(card.play_url, filePath, {
+    await fetchDownloadToFile(playUrl, filePath, {
       headers: { Referer: "https://www.xiaohongshu.com/", "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36" },
       maxBytes,
       timeoutMs,
@@ -52,11 +52,15 @@ async function downloadXiaohongshuVideo(card:XiaohongshuCard = {}, { maxBytes = 
     completed = stat.size > 0 && stat.size <= maxBytes
     return completed ? filePath : null
   } catch (error) {
-    logger?.warn?.(`[小红书] 视频本体下载失败: ${errorText(error)}`)
+    logger?.warn?.(`[小红书] 视频下载失败(${String(playUrl).slice(0, 70)}): ${errorText(error)}`)
     return null
   } finally {
     if (!completed) await fs.promises.unlink(filePath).catch(() => {})
   }
+}
+
+function downloadXiaohongshuVideo(card:XiaohongshuCard = {}, options:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
+  return downloadXiaohongshuVideoUrl(String(card.play_url || ""), String(card.note_id || "video"), options)
 }
 
 async function downloadXiaohongshuImage(rawUrl = "", { maxBytes = XHS_NOTE_IMAGE_MAX_BYTES, timeoutMs = XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS, logger = ports.logger }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
@@ -159,8 +163,33 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   const downloadStartedAt = Date.now()
   const capped = images.slice(0, maxImages)
   const baseKey = artifactStore ? buildMediaArtifactKey("xiaohongshu", card) : ""
+  // 实况照片与图集同下标对齐:该槽位有实况直链则发实况视频,下载失败回退静态图
+  // 原位清洗保下标对齐:空槽/非法链接置 "" 而不是剔除
+  const livePhotos = (Array.isArray(card.live_photos) ? card.live_photos : []).map(url => {
+    const text = String(url || "").trim()
+    return /^https?:\/\//i.test(text) ? text : ""
+  })
+  let liveSent = 0
   for (let index = 0; index < capped.length; index++) {
+    const liveUrl = index < livePhotos.length ? livePhotos[index]! : ""
+    if (liveUrl && segmentApi?.video) {
+      const liveKey = baseKey ? `${baseKey}#live${index}` : ""
+      const useLiveStore = Boolean(artifactStore && liveKey)
+      const liveLease = useLiveStore
+        ? await artifactStore!.acquire(liveKey, () => downloadXiaohongshuVideoUrl(liveUrl, `${card.note_id || "note"}-live${index}`, { maxBytes: maxVideoBytes, timeoutMs: videoDownloadTimeoutMs, logger }))
+        : null
+      const livePath = useLiveStore ? liveLease?.filePath : await downloadXiaohongshuVideoUrl(liveUrl, `${card.note_id || "note"}-live${index}`, { maxBytes: maxVideoBytes, timeoutMs: videoDownloadTimeoutMs, logger })
+      if (livePath) {
+        if (liveLease) artifactLeases.push(liveLease)
+        else tempFiles.push(livePath)
+        segments.push("\n", segmentApi.video(livePath))
+        liveSent++
+        continue
+      }
+      if (liveLease) await liveLease.release?.().catch?.(() => {})
+    }
     const imageUrl = capped[index]!
+    if (!imageUrl) continue
     const key = baseKey ? `${baseKey}#img${index}` : ""
     const useArtifactStore = Boolean(artifactStore && key)
     const lease = useArtifactStore
@@ -177,8 +206,8 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   }
   onTiming?.("download", Date.now() - downloadStartedAt)
   if (images.length > capped.length) segments.push(`\n（笔记共${images.length}张图，仅附前${capped.length}张）`)
-  if (imageNodes.length) {
-    logger?.info?.(`[小红书] 已就绪 ${imageNodes.length}/${images.length} 张图片,将并入合并转发`)
+  if (imageNodes.length || liveSent) {
+    logger?.info?.(`[小红书] 已就绪 图${imageNodes.length}/${images.length} 实况${liveSent}段,将并入合并转发`)
   } else {
     segments.push("\n（笔记图片暂时获取失败，已保留笔记页面）")
   }

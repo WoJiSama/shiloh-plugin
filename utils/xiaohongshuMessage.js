@@ -1,6 +1,6 @@
 import {createXiaohongshuMessage} from '../dist/backend/modules/media/infrastructure/xiaohongshuMessage.js'
 import {resolveXiaohongshuShareViaBrowser} from './xiaohongshuBrowserResolver.js'
-export {parseXiaohongshuInitialState,buildCardFromNoteState,normalizeXiaohongshuImageUrl,decodeXiaohongshuCardEntities,extractXiaohongshuFileId,extractXiaohongshuVideo,extractXiaohongshuDescription} from '../dist/backend/modules/media/infrastructure/xiaohongshuMessage.js'
+export {parseXiaohongshuInitialState,buildCardFromNoteState,normalizeXiaohongshuImageUrl,decodeXiaohongshuCardEntities,extractXiaohongshuFileId,extractXiaohongshuVideo,extractXiaohongshuDescription,extractXiaohongshuGallery} from '../dist/backend/modules/media/infrastructure/xiaohongshuMessage.js'
 const runtime=createXiaohongshuMessage({browserResolver:resolveXiaohongshuShareViaBrowser,logger:globalThis.logger})
 export const extractXiaohongshuShareFromText=runtime.extractXiaohongshuShareFromText
 export const enrichXiaohongshuShare=runtime.enrichXiaohongshuShare
