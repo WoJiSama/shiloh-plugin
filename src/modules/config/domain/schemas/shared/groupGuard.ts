@@ -295,6 +295,13 @@ const schema: ConfigSchemaItem[] = [
     componentProps: { min: 100, max: 20000, step: 50, placeholder: "1500" }
   },
   {
+    field: "groupModeration.overlongMessage.maxLines",
+    label: "超长判定行数",
+    component: "InputNumber",
+    bottomHelpMessage: "单条消息换行行数超过该值即视为超长（按原文计不裁首尾），可拦几十个换行符的刷屏。0 = 不启用。默认 0",
+    componentProps: { min: 0, max: 2000, placeholder: "30" }
+  },
+  {
     field: "groupModeration.overlongMessage.forwardEnabled",
     label: "撤回后转发聊天记录",
     component: "Switch",
@@ -323,6 +330,20 @@ const schema: ConfigSchemaItem[] = [
     component: "InputNumber",
     bottomHelpMessage: "统计连发的滑动窗口长度。默认 5 秒",
     componentProps: { min: 2, max: 600, placeholder: "5" }
+  },
+  {
+    field: "groupModeration.burstMessage.totalLength",
+    label: "窗口总字数",
+    component: "InputNumber",
+    bottomHelpMessage: "时间窗内所有消息合计字数超过该值也触发折叠（不必等条数凑满）。0 = 不启用。默认 0",
+    componentProps: { min: 0, max: 50000, placeholder: "0" }
+  },
+  {
+    field: "groupModeration.burstMessage.totalLines",
+    label: "窗口总行数",
+    component: "InputNumber",
+    bottomHelpMessage: "时间窗内所有消息合计行数超过该值也触发折叠。0 = 不启用。默认 0",
+    componentProps: { min: 0, max: 20000, placeholder: "0" }
   },
   {
     field: "groupModeration.burstMessage.muteSeconds",

@@ -71,12 +71,13 @@ test("overlongMessage 配置归一化：默认值、类型与范围钳制", () =
   assert.deepEqual(normalizeGroupModerationConfig({}).overlongMessage, {
     enabled: false,
     maxLength: 1500,
+    maxLines: 0,
     forwardEnabled: true
   })
   const custom = normalizeGroupModerationConfig({
-    overlongMessage: { enabled: true, maxLength: "2500", forwardEnabled: false }
+    overlongMessage: { enabled: true, maxLength: "2500", maxLines: "30", forwardEnabled: false }
   })
-  assert.deepEqual(custom.overlongMessage, { enabled: true, maxLength: 2500, forwardEnabled: false })
+  assert.deepEqual(custom.overlongMessage, { enabled: true, maxLength: 2500, maxLines: 30, forwardEnabled: false })
   const clamped = normalizeGroupModerationConfig({ overlongMessage: { enabled: 1, maxLength: 5 } })
   assert.equal(clamped.overlongMessage.enabled, false, "开关必须是显式 true")
   assert.equal(clamped.overlongMessage.maxLength, 100, "字数下限 100")
@@ -206,7 +207,7 @@ test("按群覆盖对 overlongMessage 做浅合并，未覆盖字段沿用默认
     groupAdmin: { overrides: [{ groupId: String(GROUP_ID), groupModeration: { overlongMessage: { maxLength: 800 } } }] }
   }, GROUP_ID)
   const config = normalizeGroupModerationConfig(resolved.groupModeration)
-  assert.deepEqual(config.overlongMessage, { enabled: true, maxLength: 800, forwardEnabled: true })
+  assert.deepEqual(config.overlongMessage, { enabled: true, maxLength: 800, maxLines: 0, forwardEnabled: true })
 })
 
 test("burstMessage 配置归一化：默认值与范围钳制", () => {
@@ -214,6 +215,8 @@ test("burstMessage 配置归一化：默认值与范围钳制", () => {
     enabled: false,
     windowSeconds: 5,
     maxMessages: 6,
+    totalLength: 0,
+    totalLines: 0,
     muteSeconds: 30,
     forwardEnabled: true
   })
@@ -224,6 +227,8 @@ test("burstMessage 配置归一化：默认值与范围钳制", () => {
     enabled: true,
     windowSeconds: 10,
     maxMessages: 4,
+    totalLength: 0,
+    totalLines: 0,
     muteSeconds: 60,
     forwardEnabled: false
   })

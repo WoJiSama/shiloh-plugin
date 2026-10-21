@@ -596,6 +596,8 @@ pluginSettings:
     overlongMessage:
       enabled: false
       maxLength: 1500
+      # 单条行数上限:按原文换行计数(不裁首尾),拦"几十个换行符"式刷屏;0 = 不启用。
+      maxLines: 0
       forwardEnabled: true
     # 连发消息折叠：同一成员在 windowSeconds 秒内连发满 maxMessages 条，这批消息会被全部撤回，
     # 合并成一条聊天记录重新发出，并禁言 muteSeconds 秒（0 = 只折叠不禁言）。
@@ -604,6 +606,9 @@ pluginSettings:
       enabled: false
       windowSeconds: 5
       maxMessages: 6
+      # 窗口总量条件:时间窗内合计字数/行数超过也触发折叠,不必等条数凑满;0 = 不启用。
+      totalLength: 0
+      totalLines: 0
       muteSeconds: 30
       forwardEnabled: true
     # 复合规则：连发 + 单条最长字数/窗口总字数/单条行数/窗口总行数等条件全部满足才触发（与超长/连发折叠并集互不影响）。

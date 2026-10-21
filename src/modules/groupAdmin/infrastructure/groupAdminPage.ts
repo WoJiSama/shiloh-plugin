@@ -40,7 +40,10 @@ const TOGGLE_FEATURES:ToggleFeature[] = [
 
 const SET_RULES:SetRule[] = [
   {names:["超长字数","超长判定字数"],module:"groupModeration",path:"overlongMessage.maxLength",label:"超长判定字数",kind:"number",min:100,max:20000},
+  {names:["超长行数","超长判定行数"],module:"groupModeration",path:"overlongMessage.maxLines",label:"超长判定行数",kind:"number",min:0,max:2000},
   {names:["连发条数","连发条数上限"],module:"groupModeration",path:"burstMessage.maxMessages",label:"连发条数上限",kind:"number",min:3,max:100},
+  {names:["连发总字数","连发窗口总字数"],module:"groupModeration",path:"burstMessage.totalLength",label:"连发窗口总字数",kind:"number",min:0,max:50000},
+  {names:["连发总行数","连发窗口总行数"],module:"groupModeration",path:"burstMessage.totalLines",label:"连发窗口总行数",kind:"number",min:0,max:20000},
   {names:["连发窗口","连发时间窗","连发秒数"],module:"groupModeration",path:"burstMessage.windowSeconds",label:"连发时间窗(秒)",kind:"number",min:2,max:600},
   {names:["禁言秒数","禁言时长"],module:"groupModeration",path:"burstMessage.muteSeconds",label:"连发禁言秒数",kind:"number",min:0,max:2592000},
   {names:["超长转发"],module:"groupModeration",path:"overlongMessage.forwardEnabled",label:"超长折叠后转发",kind:"boolean"},
@@ -116,6 +119,7 @@ export const FEATURE_DEFS:FeatureDef[] = [
     togglePath:"overlongMessage.enabled",
     params:[
       {names:["字数"],path:"overlongMessage.maxLength",label:"超长判定字数",kind:"number",min:100,max:20000,help:"单条超过该字数即折叠"},
+      {names:["行数"],path:"overlongMessage.maxLines",label:"超长判定行数",kind:"number",min:0,max:2000,help:"单条超过该行数即折叠，可拦几十个换行符；0=不启用"},
       {names:["转发"],path:"overlongMessage.forwardEnabled",label:"折叠后转发",kind:"boolean",help:"开=撤回后转成聊天记录"}
     ],
     textParams:[]
@@ -127,6 +131,8 @@ export const FEATURE_DEFS:FeatureDef[] = [
     togglePath:"burstMessage.enabled",
     params:[
       {names:["条数"],path:"burstMessage.maxMessages",label:"连发条数上限",kind:"number",min:3,max:100,help:"窗口内发满该条数即折叠"},
+      {names:["总字数"],path:"burstMessage.totalLength",label:"连发窗口总字数",kind:"number",min:0,max:50000,help:"时间窗内合计字数超过即折叠；0=不启用"},
+      {names:["总行数"],path:"burstMessage.totalLines",label:"连发窗口总行数",kind:"number",min:0,max:20000,help:"时间窗内合计行数超过即折叠；0=不启用"},
       {names:["窗口"],path:"burstMessage.windowSeconds",label:"连发时间窗(秒)",kind:"number",min:2,max:600,help:"滑动窗口长度"},
       {names:["禁言"],path:"burstMessage.muteSeconds",label:"禁言秒数",kind:"number",min:0,max:2592000,help:"0=只折叠不禁言"},
       {names:["转发"],path:"burstMessage.forwardEnabled",label:"折叠后转发",kind:"boolean",help:"开=整批转成聊天记录"}
@@ -446,10 +452,11 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
           {
             label: "超长消息折叠",
             on: moderation.overlongMessage.enabled,
-            detail: `单条超过 ${moderation.overlongMessage.maxLength} 字撤回并转聊天记录${moderation.overlongMessage.forwardEnabled ? "" : "（不转发）"}`,
+            detail: `单条超过 ${moderation.overlongMessage.maxLength} 字${moderation.overlongMessage.maxLines > 0 ? `或 ${moderation.overlongMessage.maxLines} 行` : ""}撤回并转聊天记录${moderation.overlongMessage.forwardEnabled ? "" : "（不转发）"}`,
             commands: [
               `.群管 超长折叠 ${moderation.overlongMessage.enabled ? "关" : "开"}`,
               `.群管 超长折叠 字数 ${moderation.overlongMessage.maxLength}`,
+              `.群管 超长折叠 行数 ${moderation.overlongMessage.maxLines}`,
               `.群管 超长折叠 转发 ${moderation.overlongMessage.forwardEnabled ? "关" : "开"}`
             ]
           },
@@ -468,12 +475,17 @@ export function buildGroupAdminPageData(settings:Data, groupId:unknown):GroupAdm
           {
             label: "连发消息折叠",
             on: moderation.burstMessage.enabled,
-            detail: `${moderation.burstMessage.windowSeconds} 秒内连发 ${moderation.burstMessage.maxMessages} 条整批撤回转发`
+            detail: `${moderation.burstMessage.windowSeconds} 秒内连发 ${moderation.burstMessage.maxMessages} 条`
+              + (moderation.burstMessage.totalLength > 0 || moderation.burstMessage.totalLines > 0
+                ? `或合计超 ${moderation.burstMessage.totalLength > 0 ? `${moderation.burstMessage.totalLength} 字` : ""}${moderation.burstMessage.totalLength > 0 && moderation.burstMessage.totalLines > 0 ? "/" : ""}${moderation.burstMessage.totalLines > 0 ? `${moderation.burstMessage.totalLines} 行` : ""}` : "")
+              + `整批撤回转发`
               + (moderation.burstMessage.muteSeconds > 0 ? `，禁言 ${moderation.burstMessage.muteSeconds} 秒` : "（不禁言）"),
             commands: [
               `.群管 连发折叠 ${moderation.burstMessage.enabled ? "关" : "开"}`,
               `.群管 连发折叠 条数 ${moderation.burstMessage.maxMessages}`,
               `.群管 连发折叠 窗口 ${moderation.burstMessage.windowSeconds}`,
+              `.群管 连发折叠 总字数 ${moderation.burstMessage.totalLength}`,
+              `.群管 连发折叠 总行数 ${moderation.burstMessage.totalLines}`,
               `.群管 连发折叠 禁言 ${moderation.burstMessage.muteSeconds}`,
               `.群管 连发折叠 转发 ${moderation.burstMessage.forwardEnabled ? "关" : "开"}`
             ]

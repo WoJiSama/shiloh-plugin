@@ -299,6 +299,20 @@ test("复合规则列表文本与按序号写入", async () => {
   assert.equal(buildCompoundRuleUpdate(settings, GROUP_ID, settings.groupModeration.compoundRules, 5, "burstCount", 8), null, "越界序号返回 null")
 })
 
+test("超长/连发折叠加行数与总量参数命令", () => {
+  const lines = parseGroupAdminCommand(".群管 超长折叠 行数 30")
+  assert.deepEqual({ ok: lines.ok, type: lines.type, action: lines.action, changes: lines.changes },
+    { ok: true, type: "feature", action: "set", changes: [{ path: "overlongMessage.maxLines", value: 30 }] })
+  const legacy = parseGroupAdminCommand(".群管 设置 超长行数 40")
+  assert.deepEqual({ ok: legacy.ok, type: legacy.type, value: legacy.value, path: legacy.rule?.path },
+    { ok: true, type: "set", value: 40, path: "overlongMessage.maxLines" })
+  const burstTotal = parseGroupAdminCommand(".群管 连发折叠 总行数 60")
+  assert.deepEqual({ ok: burstTotal.ok, type: burstTotal.type, action: burstTotal.action, changes: burstTotal.changes },
+    { ok: true, type: "feature", action: "set", changes: [{ path: "burstMessage.totalLines", value: 60 }] })
+  const burstChars = parseGroupAdminCommand(".群管 连发折叠 总字数 800")
+  assert.deepEqual(burstChars.changes, [{ path: "burstMessage.totalLength", value: 800 }])
+})
+
 test("白名单命令：列表/添加/删除/非法输入", () => {
   assert.deepEqual(parseGroupAdminCommand(".群管 白名单"), { ok: true, type: "whitelist", action: "list" })
   const add = parseGroupAdminCommand(".群管 白名单 添加 123456789")

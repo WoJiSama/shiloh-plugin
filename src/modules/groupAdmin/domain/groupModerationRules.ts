@@ -27,12 +27,15 @@ export const DEFAULT_GROUP_MODERATION_CONFIG:ModerationConfig = {
   overlongMessage: {
     enabled: false,
     maxLength: 1500,
+    maxLines: 0,
     forwardEnabled: true
   },
   burstMessage: {
     enabled: false,
     windowSeconds: 5,
     maxMessages: 6,
+    totalLength: 0,
+    totalLines: 0,
     muteSeconds: 30,
     forwardEnabled: true
   },
@@ -251,6 +254,7 @@ export function normalizeGroupModerationConfig(input:unknown = {}):ModerationCon
   config.overlongMessage = {
     enabled: rawOverlong.enabled === true,
     maxLength: Math.floor(normalizeNumber(rawOverlong.maxLength, DEFAULT_GROUP_MODERATION_CONFIG.overlongMessage.maxLength, 100, 20000)),
+    maxLines: Math.floor(normalizeNumber(rawOverlong.maxLines, 0, 0, 2000)),
     forwardEnabled: rawOverlong.forwardEnabled !== false
   }
   const rawBurst = adminRecord(raw.burstMessage)
@@ -258,6 +262,8 @@ export function normalizeGroupModerationConfig(input:unknown = {}):ModerationCon
     enabled: rawBurst.enabled === true,
     windowSeconds: Math.floor(normalizeNumber(rawBurst.windowSeconds, DEFAULT_GROUP_MODERATION_CONFIG.burstMessage.windowSeconds, 2, 600)),
     maxMessages: Math.floor(normalizeNumber(rawBurst.maxMessages, DEFAULT_GROUP_MODERATION_CONFIG.burstMessage.maxMessages, 3, 100)),
+    totalLength: Math.floor(normalizeNumber(rawBurst.totalLength, 0, 0, 50000)),
+    totalLines: Math.floor(normalizeNumber(rawBurst.totalLines, 0, 0, 20000)),
     muteSeconds: Math.floor(normalizeNumber(rawBurst.muteSeconds, DEFAULT_GROUP_MODERATION_CONFIG.burstMessage.muteSeconds, 0, 2592000)),
     forwardEnabled: rawBurst.forwardEnabled !== false
   }

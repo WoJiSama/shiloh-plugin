@@ -85,7 +85,7 @@ export function isWhitelistedUser(userId:unknown, config:Partial<ModerationConfi
 
 export class GroupModerationManager {
   floodTrackers = new Map<string,number[]>()
-  burstTrackers = new Map<string,{messageId:GroupId|undefined;text:string;at:number}[]>()
+  burstTrackers = new Map<string,{messageId:GroupId|undefined;text:string;lines:number;at:number}[]>()
   compoundBuffers = new Map<string,{messageId:GroupId|undefined;text:string;lines:number;at:number}[]>()
   constructor(private readonly ports:AdminPorts,private readonly corpus:AdCorpusStore) {}
   getConfig(groupId?:GroupId) {
@@ -333,24 +333,27 @@ export class GroupModerationManager {
     return String(e?.msg || e?.raw_message || "")
   }
 
-  // 超长判定按码点计数（emoji 不重复计 2 个字符）
-  checkOverlongMessage(text:string, config:ModerationConfig) {
+  // 超长判定按码点计数（emoji 不重复计 2 个字符）;行数条件按未 trim 原文计,
+  // 纯换行消息(几十个\n)trim 后成空串,按原文计行才拦得住
+  checkOverlongMessage(text:string, config:ModerationConfig, rawText = "") {
     const overlong = config.overlongMessage
     if (!overlong?.enabled) return null
     const length = Array.from(String(text || "").trim()).length
     const maxLength = Math.floor(Number(overlong.maxLength) || 1500)
-    if (length < maxLength) return null
-    return { length, maxLength }
+    const maxLines = Math.floor(Number(overlong.maxLines) || 0)
+    const lines = countMessageLines(rawText || text)
+    if (length < maxLength && !(maxLines > 0 && lines > maxLines)) return null
+    return { length, maxLength, lines, maxLines }
   }
 
-  buildOverlongForwardNodes(e:AdminEvent, text:string, overlong:{length:number}) {
+  buildOverlongForwardNodes(e:AdminEvent, text:string, overlong:{length:number;lines?:number}) {
     const senderName = this.getSenderName(e)
     const botId = e?.self_id || e?.bot?.uin || this.ports.getBot()?.uin || 80000000
     return [
       {
         user_id: botId,
         nickname: "群管助手",
-        message: `已撤回 ${senderName} 的超长消息（约 ${overlong.length} 字），原内容如下：`
+        message: `已撤回 ${senderName} 的超长消息（约 ${overlong.length} 字${(Number(overlong.lines) || 0) > 1 ? `/${overlong.lines} 行` : ""}），原内容如下：`
       },
       ...splitUnicodeText(text, OVERLONG_FORWARD_CHUNK_CHARS).map(chunk => ({
         user_id: e.user_id,
@@ -387,14 +390,14 @@ export class GroupModerationManager {
     }
   }
 
-  async sendOverlongForward(e:AdminEvent, text:string, overlong:{length:number}) {
+  async sendOverlongForward(e:AdminEvent, text:string, overlong:{length:number;lines?:number}) {
     return await this.sendForwardNodes(e, this.buildOverlongForwardNodes(e, text, overlong))
   }
 
   // 超长消息折叠：撤回原消息后把内容转成一条合并聊天记录发出。
   // 撤回失败就不转发，避免原消息和转发卡片内容重复刷屏。
-  async handleOverlongMessage(e:AdminEvent, config:ModerationConfig, text:string, overlong:{length:number;maxLength:number}) {
-    this.ports.logger?.info?.(`[GroupModeration] 超长消息折叠 group=${e.group_id} user=${e.user_id} chars=${overlong.length}/${overlong.maxLength}`)
+  async handleOverlongMessage(e:AdminEvent, config:ModerationConfig, text:string, overlong:{length:number;maxLength:number;lines?:number;maxLines?:number}) {
+    this.ports.logger?.info?.(`[GroupModeration] 超长消息折叠 group=${e.group_id} user=${e.user_id} chars=${overlong.length}/${overlong.maxLength} lines=${overlong.lines || 1}/${overlong.maxLines || 0}`)
     const recalled = await this.applyAction(e, config, "recall")
     if (!recalled) return false
     if (!config.overlongMessage.forwardEnabled) return true
@@ -494,29 +497,37 @@ export class GroupModerationManager {
     }
     return true
   }
-  // 连发折叠：记录窗口内每条消息的 id 和文本，达到条数阈值返回全部待折叠消息并清空窗口。
-  // 命中后由连发分支统一撤回/转发/禁言，避免与刷屏风控重复处理同一批消息
+  // 连发折叠：记录窗口内每条消息的 id/文本/行数,条数或窗口总字数/总行数任一超限
+  // 即返回全部待折叠消息并清空窗口。命中后由连发分支统一撤回/转发/禁言,
+  // 避免与刷屏风控重复处理同一批消息
   trackBurstMessage(e:AdminEvent, config:ModerationConfig, now = Date.now()) {
     const burst = config.burstMessage
     if (!burst?.enabled) return null
     const windowMs = Math.max(2, Number(burst.windowSeconds) || 5) * 1000
     const maxMessages = Math.max(3, Math.floor(Number(burst.maxMessages) || 6))
+    const totalLengthLimit = Math.max(0, Math.floor(Number(burst.totalLength) || 0))
+    const totalLinesLimit = Math.max(0, Math.floor(Number(burst.totalLines) || 0))
     const key = `${e.group_id}:${e.user_id}`
     this.burstTrackers ||= new Map()
     const entries = (this.burstTrackers.get(key) || []).filter(item => now - item.at < windowMs)
-    entries.push({ messageId: e?.message_id || e?.seq, text: this.extractVisibleText(e), at: now })
-    if (entries.length < maxMessages) {
+    entries.push({ messageId: e?.message_id || e?.seq, text: this.extractVisibleText(e), lines: countMessageLines(this.extractVisibleTextRaw(e)), at: now })
+    const sumLength = entries.reduce((sum, item) => sum + Array.from(item.text || "").length, 0)
+    const sumLines = entries.reduce((sum, item) => sum + (item.lines || 1), 0)
+    const byCount = entries.length >= maxMessages
+    const byLength = totalLengthLimit > 0 && sumLength > totalLengthLimit
+    const byLines = totalLinesLimit > 0 && sumLines > totalLinesLimit
+    if (!byCount && !byLength && !byLines) {
       if (this.burstTrackers.size > 10000) this.burstTrackers.clear()
       this.burstTrackers.set(key, entries)
       return null
     }
     this.burstTrackers.delete(key)
-    return { messages: entries, windowSeconds: Math.round(windowMs / 1000) }
+    return { messages: entries, windowSeconds: Math.round(windowMs / 1000), stats: { sumLength, sumLines, byCount, byLength, byLines } }
   }
 
   // 连发折叠处理：撤回窗口内全部消息 → 禁言 → 把这批消息合并成一条聊天记录发出。
   // 一条都没撤回成功时不禁言不转发，避免原消息与转发卡片内容重复刷屏
-  async handleBurstMessage(e:AdminEvent, config:ModerationConfig, burst:{messages:{messageId:GroupId|undefined;text:string;at:number}[];windowSeconds:number}) {
+  async handleBurstMessage(e:AdminEvent, config:ModerationConfig, burst:{messages:{messageId:GroupId|undefined;text:string;lines?:number;at:number}[];windowSeconds:number;stats?:{sumLength:number;sumLines:number;byCount:boolean;byLength:boolean;byLines:boolean}}) {
     const senderName = this.getSenderName(e)
     const count = burst.messages.length
     this.ports.logger?.info?.(`[GroupModeration] 连发折叠 group=${e.group_id} user=${e.user_id} count=${count}/${burst.windowSeconds}s`)
@@ -557,7 +568,7 @@ export class GroupModerationManager {
         {
           user_id: botId,
           nickname: "群管助手",
-          message: `${senderName} 在 ${burst.windowSeconds} 秒内连发 ${count} 条消息，已全部撤回并折叠${muteSeconds > 0 ? `，禁言 ${muteSeconds} 秒` : ""}：`
+          message: `${senderName} 在 ${burst.windowSeconds} 秒内连发 ${count} 条消息${burst.stats && (burst.stats.byLength || burst.stats.byLines) ? `（合计 ${burst.stats.sumLength} 字/${burst.stats.sumLines} 行）` : ""}，已全部撤回并折叠${muteSeconds > 0 ? `，禁言 ${muteSeconds} 秒` : ""}：`
         },
         ...burst.messages.map(item => ({
           user_id: e.user_id,
@@ -706,7 +717,7 @@ export class GroupModerationManager {
     const burst = compound ? null : this.trackBurstMessage(e, config)
     // 超长折叠与广告风控并行判定：命中风控的消息优先按风控处理（不把广告内容再转发一遍）
     const visibleText = this.extractVisibleText(e)
-    const overlong = this.checkOverlongMessage(visibleText, config)
+    const overlong = this.checkOverlongMessage(visibleText, config, this.extractVisibleTextRaw(e))
 
     // 广告扫描关闭：跳过广告/刷屏判定，只保留超长/连发折叠（各自另有开关）
     if (config.adScan?.enabled === false) {
