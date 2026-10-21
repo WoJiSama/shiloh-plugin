@@ -186,6 +186,21 @@ async function sendCompleteLocalFile(e: DeliveryEvent, filePath: string, {
   throw new DeliveryError(reason, { retryable: true })
 }
 
+// OneBot 回执校验:与 sendGroupPayload 的内联校验同口径,抽出供消息段直发复用
+function verifyOneBotReceipt(result: Record<string, unknown>):{receipt?:unknown;error?:string;code?:string;retcode?:unknown;uncertain?:boolean} {
+  if (!result || typeof result !== "object" || result.retcode === undefined || result.retcode === null) {
+    return { error: "OneBot 未返回可验证的发送回执", code: "missing_receipt", uncertain: true }
+  }
+  const retcode = Number(result.retcode)
+  if (!Number.isFinite(retcode)) {
+    return { error: `OneBot 返回了非法 retcode: ${String(result.retcode).slice(0, 50)}`, code: "invalid_retcode", retcode: result.retcode, uncertain: true }
+  }
+  if (retcode !== 0) {
+    return { error: String(result?.wording || result?.msg || `OneBot retcode=${retcode}`), code: `retcode:${retcode}`, retcode }
+  }
+  return { receipt: compactReceipt(result) }
+}
+
 function compactReceipt(value: unknown) {
  const result = record(value)
   return {
@@ -245,6 +260,50 @@ class DeliveryGateway {
 
   async sendGroupText({ botId, groupId, text }: GroupPayload) {
     return forwardQueue.run(botId, () => this.sendGroupPayload({ botId, groupId, nodes: [], text }))
+  }
+
+  // 直接以消息段发群消息(如视频本体直发):合并转发资源上传失败时的中间降级,
+  // 走 send_group_msg 的另一条上传路径,对大视频比转发资源上传更宽容
+  async sendGroupSegments({ botId, groupId, segments }: GroupPayload & { segments: unknown[] }) {
+    const channel = "group_segments"
+    const statsChannel = "media_segments"
+    const root = typeof this.botRoot === "function" ? this.botRoot() : this.botRoot
+    const bot = this.resolveBot(botId)
+    if (typeof bot?.sendApi !== "function") {
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error: `missing_bot:${botId || "unknown"}` })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: `missing_bot:${botId || "unknown"}` })
+      throw new DeliveryError(`Bot ${botId || "unknown"} 当前没有可用的 OneBot sendApi`)
+    }
+    let result: Record<string, unknown>
+    try {
+      result = record(await withForwardMediaTimeout(root, () => bot.sendApi!("send_group_msg", {
+        group_id: Number(groupId),
+        message: toOneBotContent(segments)
+      })))
+    } catch (error) {
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: "send_api_error" })
+      throw new DeliveryError(String(record(error).message || "OneBot 调用异常"), {
+        retryable: false,
+        uncertain: !isForwardResourceFailure(error)
+      })
+    }
+    const checked = verifyOneBotReceipt(result)
+    if (checked.error) {
+      logDeliveryOutcome(this.logger, { status: "failed", channel, groupId, error: checked.error })
+      this.stats?.recordFailure({ botId, groupId, channel: statsChannel, code: checked.code })
+      throw new DeliveryError(checked.error, { retcode: checked.retcode === undefined ? null : Number(checked.retcode), uncertain: Boolean(checked.uncertain) })
+    }
+    const receipt = record(checked.receipt)
+    logDeliveryOutcome(this.logger, {
+      status: "sent",
+      channel,
+      groupId,
+      messageId: receipt.messageId,
+      parts: Array.isArray(segments) ? segments.length : 1
+    })
+    this.stats?.recordSend({ botId, groupId, channel: statsChannel })
+    return checked.receipt
   }
 
   async sendGroupPayload({ botId, groupId, nodes, text }: GroupPayload) {

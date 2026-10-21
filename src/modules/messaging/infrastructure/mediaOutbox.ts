@@ -29,7 +29,7 @@ type Build = (card: Card, options: object) => Promise<Relay>
 interface PlatformAdapter { stableId(card: Card): string | undefined; enrich: Enrich; build: Build; cleanup(files: string[]): Promise<unknown>; formatText(card: Card): string; formatLinks(card: Card): string; relayOptions: object; enrichOptions: object; enabled: boolean; resolvedStatuses: string[] }
 interface RelayConfig { enabled?: boolean; binary?: unknown; metadataTimeoutMs?: unknown; proxyUrl?: unknown; cookieHeader?: unknown; poToken?: unknown }
 interface OutboxOptions {
- store: RedisJobStore; gateway: { sendGroupForward(args: {botId:string;groupId:string;nodes:ForwardNode[]}): Promise<unknown>; sendGroupText?(args:{botId:string;groupId:string;text:string}):Promise<unknown> }; logger?: Logger
+ store: RedisJobStore; gateway: { sendGroupForward(args: {botId:string;groupId:string;nodes:ForwardNode[]}): Promise<unknown>; sendGroupText?(args:{botId:string;groupId:string;text:string}):Promise<unknown>; sendGroupSegments?(args:{botId:string;groupId:string;segments:DeliverySegment[]}):Promise<unknown> }; logger?: Logger
  enabled?: boolean; maxAttempts?: number; retryBaseMs?: number; leaseMs?: number; queue?: KeyedSerialQueue; concurrency?: number; prepareConcurrency?: number
  enrichBilibili?: Enrich; enrichDouyin?: Enrich; enrichYoutube?: Enrich; enrichPixiv?: Enrich; enrichXiaohongshu?: Enrich
  buildBilibili?: Build; buildDouyin?: Build; buildYoutube?: Build; buildPixiv?: Build; buildXiaohongshu?: Build
@@ -536,7 +536,7 @@ class MediaOutbox {
           : "视频详情暂时未解析完成")
         nonVideoSegments.push(`\n（${reason}，已保留当前卡片信息和页面）`)
       }
-      const videos = []
+      const videos:DeliverySegment[] = []
       const encodeStartedAt = Date.now()
       for (const video of videoSegments) {
         relay.sharedMediaFiles ||= []
@@ -597,6 +597,17 @@ class MediaOutbox {
         job = { ...job!, fallbackStatus: "link_sent", fallbackReason: /video_thumbnail_missing/.test(String(record(error).message)) ? "video_thumbnail_missing" : "forward_resource_upload_failed", lastMediaError: cleanError(error) }
         return result
       }
+      // 大视频在 napcat 的转发资源上传容易失败(实测 697s/百 MB 级):
+      // 先发信息文字,再把视频本体作为普通消息直发(send_group_msg 另一条上传路径),
+      // 直发也失败才退到纯文字链接
+      const directVideoFallback = async (error: unknown) => {
+        if (typeof this.gateway.sendGroupSegments !== "function" || !videos.length || typeof this.gateway.sendGroupText !== "function") throw error
+        await heartbeat.assertOwned()
+        await this.gateway.sendGroupText({ botId: job!.botId, groupId: job!.groupId, text: `${this.formatInfo(job!, card)}\n${card.page_url || job!.media?.page_url || ""}\n（合并转发上传失败，视频改为直接发送）` })
+        const result = await this.gateway.sendGroupSegments({ botId: job!.botId, groupId: job!.groupId, segments: videos })
+        job = { ...job!, fallbackStatus: "direct_video_sent", fallbackReason: "forward_resource_upload_failed", lastMediaError: cleanError(error) }
+        return result
+      }
       if (thumbnailFailure) {
         receipt = await fallback(new Error(thumbnailFailure))
       } else {
@@ -610,7 +621,12 @@ class MediaOutbox {
             receipt = await this.gateway.sendGroupForward({ botId: job.botId, groupId: job.groupId, nodes })
           } catch (retryError) {
             if (!isForwardResourceFailure(retryError) || record(retryError).uncertain) throw retryError
-            receipt = await fallback(retryError)
+            try {
+              receipt = await directVideoFallback(retryError)
+            } catch (directError) {
+              if (record(directError).uncertain) throw directError
+              receipt = await fallback(retryError)
+            }
           }
         }
       }

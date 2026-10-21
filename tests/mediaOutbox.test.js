@@ -215,6 +215,58 @@ test("same-group later media prepares while the prior delivery is still sending"
   outbox.stop()
 })
 
+test("转发资源上传失败时先视频直发降级,直发也失败才退纯文字", async () => {
+  const os = await import("node:os")
+  const path = await import("node:path")
+  const fs = await import("node:fs")
+  const videoFile = path.join(os.tmpdir(), `relay-fallback-${Date.now()}.mp4`)
+  fs.writeFileSync(videoFile, Buffer.from("mp4data"))
+  const store = new RedisJobStore({ redis: createFakeRedis() })
+  const calls = { forwards: 0, texts: [], segments: null }
+  let directFails = false
+  const outbox = new MediaOutbox({
+    prepareThumbnail: async () => ({ file: "base64://dGh1bWI=", cleanup: async () => {} }),
+    store,
+    enrichDouyin: async card => card,
+    buildDouyin: async (card, { segmentApi }) => ({ segments: ["\n（视频超过30分钟，未附带视频本体）".replace("（视频超过30分钟，未附带视频本体）", ""), segmentApi.video(videoFile)], tempFiles: [videoFile], artifactLeases: [] }),
+    gateway: {
+      sendGroupForward: async () => { calls.forwards++; throw Object.assign(new Error("上传转发消息资源失败：1/2"), { retryable: false }) },
+      sendGroupText: async args => { calls.texts.push(args.text); return { retcode: 0, messageId: 100 + calls.texts.length } },
+      sendGroupSegments: async args => {
+        if (directFails) throw Object.assign(new Error("video upload failed"), { retryable: false })
+        calls.segments = args.segments
+        return { retcode: 0, messageId: 999 }
+      }
+    },
+    logger: { info() {}, warn() {} }
+  })
+  try {
+    const job = await outbox.enqueue({ envelope: envelope(691626947, 77), media: { type: "douyin", aweme_id: "123", duration: 697, title: "大视频", page_url: "https://www.douyin.com/video/123", play_url: "ignored" } })
+    await outbox.process(job.id)
+    let saved = await store.get("delivery", job.id)
+    assert.equal(saved.state, "sent")
+    assert.equal(saved.fallbackStatus, "direct_video_sent", "走视频直发降级")
+    assert.equal(calls.forwards, 2, "转发重试一次")
+    assert.ok(calls.texts[0].includes("视频改为直接发送"), "先发信息文字")
+    assert.ok(calls.segments?.some(segment => segment?.type === "video"), "视频本体作为消息段直发")
+
+    // 直发也失败 → 退到纯文字链接(上一幕清理已删临时文件,重写一份)
+    fs.writeFileSync(videoFile, Buffer.from("mp4data"))
+    calls.forwards = 0
+    calls.texts = []
+    directFails = true
+    const job2 = await outbox.enqueue({ envelope: envelope(691626947, 78), media: { type: "douyin", aweme_id: "456", duration: 697, title: "大视频2", page_url: "https://www.douyin.com/video/456", play_url: "ignored" } })
+    await outbox.process(job2.id)
+    saved = await store.get("delivery", job2.id)
+    assert.equal(saved.state, "sent")
+    assert.equal(saved.fallbackStatus, "link_sent", "直发失败退纯文字")
+    assert.ok(calls.texts.some(text => text.includes("已改为发送原视频链接")), "最终纯文字带链接")
+  } finally {
+    outbox.stop()
+    try { fs.unlinkSync(videoFile) } catch {}
+  }
+})
+
 test("delivery job retries from persisted state without duplicating a successful job", async () => {
   const store = new RedisJobStore({ redis: createFakeRedis() })
   let fail = true
