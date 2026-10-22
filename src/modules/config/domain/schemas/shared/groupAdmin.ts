@@ -23,7 +23,8 @@ export const groupAdminDefaultSchema: ConfigSchemaItem[] = [...guard, ...extra, 
   return { ...item, label: `${item.label?.replace(/总开关|开关/g, '')}默认启用`, bottomHelpMessage: '默认值：开启后未单独配置的群默认启用；单群可用「在本群启用」显式开启或关闭，优先于本默认' }
 })
 
-export const groupAdminGroupSchema: ConfigSchemaItem[] = groupAdminDefaultSchema.filter(item => item.field !== 'groupModeration.globalAdmins').map(item => {
+// 白名单只认全局(按群覆盖里即使出现也被 resolve 忽略),单群页不再展示该字段避免改了不生效
+export const groupAdminGroupSchema: ConfigSchemaItem[] = groupAdminDefaultSchema.filter(item => item.field !== 'groupModeration.globalAdmins' && item.field !== 'groupModeration.whitelist').map(item => {
   if (!item.field || !MODULE_ENABLE_FIELDS.has(item.field)) return item
   return { ...item, label: '在本群启用', bottomHelpMessage: '显式控制当前群，优先于默认策略：开着就生效（默认关也生效），关闭则不生效（默认开也不生效）' }
 }).concat({

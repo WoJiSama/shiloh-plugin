@@ -95,6 +95,8 @@ async function composeDouyinNoteMusicSlideshow(imageFiles:string[], musicFile:st
     const stat = await fs.promises.stat(target).catch(() => null)
     return Boolean(stat && stat.size > 0)
   } catch {
+    // ffmpeg 被 timeout kill 时可能已写出半成品,清掉防临时目录堆积
+    await fs.promises.unlink(target).catch(() => {})
     return false
   }
 }

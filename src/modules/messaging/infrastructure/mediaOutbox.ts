@@ -603,6 +603,15 @@ class MediaOutbox {
       // 直发也失败才退到纯文字链接
       const directVideoFallback = async (error: unknown) => {
         if (typeof this.gateway.sendGroupSegments !== "function" || !videos.length || typeof this.gateway.sendGroupText !== "function") throw error
+        // 无 sharedMedia 部署下视频段被内联成 base64:百 MB 级字符串塞进 send_group_msg
+        // 的 JSON 只会把降级路径也拖死,超过阈值直接退纯文字
+        const inlineLimitBytes = 16 * 1024 * 1024
+        const oversized = videos.some(video => {
+          const data = record(video).data || video
+          const file = String(record(data).file || "")
+          return file.startsWith("base64://") && file.length > inlineLimitBytes * 1.4
+        })
+        if (oversized) throw error
         await heartbeat.assertOwned()
         await this.gateway.sendGroupText({ botId: job!.botId, groupId: job!.groupId, text: `${this.formatInfo(job!, card)}\n${card.page_url || job!.media?.page_url || ""}\n（合并转发上传失败，视频改为直接发送）` })
         const result = await this.gateway.sendGroupSegments({ botId: job!.botId, groupId: job!.groupId, segments: videos })

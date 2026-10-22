@@ -110,8 +110,8 @@ test("extracts the preferred video stream from a hydrated mobile state", () => {
       videoData: {
         media: {
           stream: {
-            h265: [{master_url: "http://sns-video-v6.xhscdn.com/stream/1/110/520/hevc_520.mp4?sign=b", duration: 42000}],
-            h264: [{master_url: "http://sns-video-v6.xhscdn.com/stream/1/110/259/h264_259.mp4?sign=a", duration: 42000}]
+            h265: [{master_url: "http://sns-video-v6.xhscdn.com/stream/1/110/520/hevc_520.mp4?sign=b", duration: 666}],
+            h264: [{master_url: "http://sns-video-v6.xhscdn.com/stream/1/110/259/h264_259.mp4?sign=a", duration: 42}]
           }
         }
       }
@@ -120,7 +120,7 @@ test("extracts the preferred video stream from a hydrated mobile state", () => {
   const video = extractXiaohongshuVideo(state)
   assert.equal(video.playUrl, "https://sns-video-v6.xhscdn.com/stream/1/110/259/h264_259.mp4?sign=a")
   assert.equal(video.codec, "h264")
-  // 毫秒口径(>10分钟按毫秒折算): 42000ms → 42s
+  // 时长取最优流条目自己的值(秒口径)
   assert.equal(video.duration, 42)
 })
 
@@ -144,9 +144,11 @@ test("extracts per-image live photos aligned with the gallery", () => {
 test("video extraction tolerates states without streams", () => {
   assert.deepEqual(extractXiaohongshuVideo({global: {appSettings: {}}}), {playUrl: "", codec: "", duration: 0})
   assert.equal(extractXiaohongshuVideo(null).playUrl, "")
-  // 秒口径不折算
+  // 秒口径不折算;毫秒兜底仅 >100s 量级
   const seconds = extractXiaohongshuVideo({stream: {h264: [{master_url: "https://sns-video.xhscdn.com/a.mp4", duration: 42}]}})
   assert.equal(seconds.duration, 42)
+  const msFallback = extractXiaohongshuVideo({stream: {h264: [{master_url: "https://sns-video.xhscdn.com/a.mp4"}]}, duration: 250000})
+  assert.equal(msFallback.duration, 250)
 })
 
 test("extracts the full description from a hydrated mobile state", () => {

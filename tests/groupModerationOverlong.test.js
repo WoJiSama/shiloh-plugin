@@ -578,6 +578,47 @@ test("白名单成员完全跳过群管检测（复合规则/连发/超长/行�
   assert.equal(bypass.calls.forwards.length, 0, "不转发")
 })
 
+test("复合规则命中后清连发窗口,残留消息不会二次触发连发折叠", async () => {
+  const settings = baseSettings({
+    overlongMessage: { enabled: false },
+    burstMessage: { enabled: true, windowSeconds: 5, maxMessages: 3, muteSeconds: 30, forwardEnabled: true },
+    compoundRules: [{ name: "长文", enabled: true, burstCount: 3, windowSeconds: 5, maxLength: 10, totalLength: 0, maxLines: 0, totalLines: 0, recall: true, forward: true, muteSeconds: 60 }]
+  })
+  const harness = createHarness({ settings })
+  // 3 条长消息命中复合规则,整批撤回
+  for (let i = 0; i < 3; i++) {
+    await harness.manager.handleMessage(harness.makeEvent("长消息超过十个字啦", { message_id: 7000 + i }))
+  }
+  assert.equal(harness.calls.apis.filter(call => call.method === "delete_msg").length, 3, "复合规则整批撤回")
+  // 再来一条普通消息:若连发窗口未清,窗口里残留 2 条+新 1 条=3 条会误触发连发折叠
+  const handled = await harness.manager.handleMessage(harness.makeEvent("普通消息", { message_id: 7010 }))
+  assert.equal(handled, false, "不二次触发")
+  assert.equal(harness.calls.apis.filter(call => call.method === "delete_msg").length, 3, "没有额外撤回")
+  assert.equal(harness.calls.apis.filter(call => call.method === "set_group_ban").length, 1, "只禁言一次")
+})
+
+test("刷屏窗口打满时超长折叠仍优先生效,不再被风控动作吞掉", async () => {
+  const settings = baseSettings({
+    overlongMessage: { enabled: true, maxLength: 100, maxLines: 0, forwardEnabled: true },
+    burstMessage: { enabled: false },
+    floodEnabled: true,
+    floodWindowSeconds: 10,
+    floodMaxMessages: 8,
+    floodConfidence: 0.9,
+    adScan: { enabled: true }
+  })
+  const harness = createHarness({ settings })
+  // 7 条短消息填满刷屏窗口(不触发任何规则)
+  for (let i = 0; i < 7; i++) {
+    await harness.manager.handleMessage(harness.makeEvent("短", { message_id: 7100 + i }))
+  }
+  // 第 8 条是超长消息:刷屏计数已满,但超长折叠应优先生效(撤回+转发),而非只发风控提醒
+  const handled = await harness.manager.handleMessage(harness.makeEvent("这".repeat(120) + "是一百二十字的超长消息", { message_id: 7108 }))
+  assert.equal(handled, true, "超长折叠仍处理")
+  assert.equal(harness.calls.apis.filter(call => call.method === "delete_msg").length, 1, "撤回该条")
+  assert.ok(harness.calls.forwards.length >= 1, "转发了原内容")
+})
+
 test("复合规则与连发折叠并集互不影响", async () => {
   // 复合规则未命中时不抢占连发折叠
   const settings = baseSettings({

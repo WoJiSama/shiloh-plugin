@@ -16,11 +16,15 @@ import { getMentionTargetId } from "../../conversation/domain/mentionTargets.js"
 import { safeTruncateUnicode, splitUnicodeText } from "../../models/domain/unicodeText.js"
 import { resolveChatCompletionUrl as normalizeChatCompletionUrl } from "../../models/domain/chatCompletionUrl.js"
 
+// CQ 码不是用户可见文本（视频码的 rkey URL 就有 200+ 字符），长度判定前剥掉
+function stripCqCodes(text:unknown) {
+  return String(text || "").replace(/\[CQ:[^\]]+\]/gi, " ")
+}
+
 // QQ 群里能发 markdown/json 卡片的基本只有机器人；卡片里的 mqqapi://、图片 URL
 // 会误触"包含外链"规则。取其可见文本并剥掉链接类 token，结构化卡片折叠成占位符。
 export function extractCardSegmentText(content:unknown) {
-  const text = String(content || "")
-    .replace(/\[CQ:[^\]]+\]/gi, " ")
+  const text = stripCqCodes(content)
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/(?:https?:\/\/|mqqapi:\/\/|www\.)\S+/gi, " ")
     .replace(/&#?\w+;/g, " ")
@@ -39,6 +43,10 @@ export function getSegmentText(input:unknown):string {
   if (segment.type === "image") return "[图片]"
   if (segment.type === "at") return `@${getMentionTargetId(segment) || ""}`
   if (segment.type === "forward") return "[合并转发]"
+  // 媒体段没有占位符时纯媒体消息会拼出空文本，回退到 raw_message 把整条 CQ 码当可见文本
+  if (segment.type === "video") return "[视频]"
+  if (segment.type === "record") return "[语音]"
+  if (segment.type === "file") return "[文件]"
   return ""
 }
 
@@ -321,7 +329,7 @@ export class GroupModerationManager {
       const text = e.message.map(item => getSegmentText(adminRecord(item))).join("").trim()
       if (text) return text
     }
-    return String(e?.msg || e?.raw_message || "").trim()
+    return stripCqCodes(e?.msg || e?.raw_message).trim()
   }
 
   // 行数判定用原文:与 extractVisibleText 同源但不 trim,纯换行消息才不会被折成空
@@ -330,7 +338,7 @@ export class GroupModerationManager {
       const text = e.message.map(item => getSegmentText(adminRecord(item))).join("")
       if (text.trim()) return text
     }
-    return String(e?.msg || e?.raw_message || "")
+    return stripCqCodes(e?.msg || e?.raw_message)
   }
 
   // 超长判定按码点计数（emoji 不重复计 2 个字符）;行数条件按未 trim 原文计,
@@ -353,7 +361,7 @@ export class GroupModerationManager {
       {
         user_id: botId,
         nickname: "群管助手",
-        message: `已撤回 ${senderName} 的超长消息（约 ${overlong.length} 字${(Number(overlong.lines) || 0) > 1 ? `/${overlong.lines} 行` : ""}），原内容如下：`
+        message: `已撤回 ${senderName} 的超长消息（约 ${overlong.length} 字${(Number(overlong.lines) || 0) > 1 ? `/${overlong.lines} 行` : ""}）${String(text || "").trim() ? "，原内容如下：" : "，内容为空行。"}`
       },
       ...splitUnicodeText(text, OVERLONG_FORWARD_CHUNK_CHARS).map(chunk => ({
         user_id: e.user_id,
@@ -400,6 +408,14 @@ export class GroupModerationManager {
     this.ports.logger?.info?.(`[GroupModeration] 超长消息折叠 group=${e.group_id} user=${e.user_id} chars=${overlong.length}/${overlong.maxLength} lines=${overlong.lines || 1}/${overlong.maxLines || 0}`)
     const recalled = await this.applyAction(e, config, "recall")
     if (!recalled) return false
+    // 该条已撤回:从连发/复合窗口剔除,不再参与后续窗口统计与二次处置
+    const messageId = e?.message_id || e?.seq
+    const windowKey = `${e.group_id}:${e.user_id}`
+    for (const [storeKey, store] of [[windowKey, this.burstTrackers], [windowKey, this.compoundBuffers]] as [string, Map<string,{messageId:GroupId|undefined;at:number}[]>][]) {
+      const kept = (store.get(storeKey) || []).filter(item => item.messageId !== messageId)
+      if (kept.length) store.set(storeKey, kept as {messageId:GroupId|undefined;at:number}[])
+      else store.delete(storeKey)
+    }
     if (!config.overlongMessage.forwardEnabled) return true
     if (await this.sendOverlongForward(e, text, overlong)) return true
     try {
@@ -472,7 +488,11 @@ export class GroupModerationManager {
         this.ports.logger?.warn?.(`[GroupModeration] 复合规则禁言失败 group=${e.group_id} user=${e.user_id}: ${adminError(error)}`)
       }
     }
-    if (rule.recall) this.floodTrackers.delete(`${e.group_id}:${e.user_id}`)
+    // 这批消息已处置完:清掉连发/刷屏窗口,避免残留的已撤回消息再次触发连发折叠或风控
+    const handledKey = `${e.group_id}:${e.user_id}`
+    this.floodTrackers.delete(handledKey)
+    this.burstTrackers.delete(handledKey)
+    this.compoundBuffers?.delete(handledKey)
 
     if (rule.forward) {
       const botId = e?.self_id || e?.bot?.uin || this.ports.getBot()?.uin || 80000000
@@ -559,8 +579,10 @@ export class GroupModerationManager {
         this.ports.logger?.warn?.(`[GroupModeration] 连发禁言失败 group=${e.group_id} user=${e.user_id}: ${adminError(error)}`)
       }
     }
-    // 这批消息已经处理完，清掉刷屏窗口避免随后再触发一次风控禁言
-    this.floodTrackers.delete(`${e.group_id}:${e.user_id}`)
+    // 这批消息已经处理完，清掉刷屏/复合窗口避免随后再触发一次风控禁言或复合误判
+    const handledKey = `${e.group_id}:${e.user_id}`
+    this.floodTrackers.delete(handledKey)
+    this.compoundBuffers?.delete(handledKey)
 
     if (config.burstMessage.forwardEnabled !== false) {
       const botId = e?.self_id || e?.bot?.uin || this.ports.getBot()?.uin || 80000000
@@ -727,8 +749,10 @@ export class GroupModerationManager {
       return false
     }
 
-    // 刷屏检测：独立等级门槛，与广告规则无关（纯表情/短消息刷屏也算）
-    const flood = burst ? null : this.checkFlood(groupId, userId, member?.level, config)
+    // 刷屏检测：独立等级门槛，与广告规则无关（纯表情/短消息刷屏也算）。
+    // 连发/复合/超长命中时跳过:这些处置本身已含撤回,flood 再抬高 action 会把
+    // 折叠/复合分支挤掉(只在 action==="ignore" 时可达),造成该条漏处置
+    const flood = (burst || compound || overlong) ? null : this.checkFlood(groupId, userId, member?.level, config)
 
     const content = await this.extractContent(e, config)
     // 纯换行消息可见文本 trim 后为空,但行数条件已可判定超长,不能在空内容门提前返回

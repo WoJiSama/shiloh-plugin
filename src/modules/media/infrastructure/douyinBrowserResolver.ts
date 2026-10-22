@@ -142,26 +142,39 @@ async function resolveAwemeId(page:Page, card:DouyinCard) {
  * 从 detail JSON 深找图文作品的背景音乐直链(music.play_url.url_list)。
  * 纯函数,便于单测;返回空串表示无音乐。
  */
-export function extractDouyinMusicFromJson(value:unknown, visited = new Set<object>()):string {
-  if (!value || typeof value !== "object" || visited.has(value)) return ""
-  visited.add(value)
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = extractDouyinMusicFromJson(item, visited)
+export function extractDouyinMusicFromJson(value:unknown, awemeId = ""):string {
+  // _ROUTER_DATA 里推荐流/相关作品也带 music:全局深找会配错 BGM。
+  // 先定位目标作品节点(aweme_id 匹配)在其子树内找,找不到匹配节点才退全局。
+  const extractFrom = (node:unknown, visited = new Set<object>()):string => {
+    if (!node || typeof node !== "object" || visited.has(node)) return ""
+    visited.add(node)
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = extractFrom(item, visited)
+        if (found) return found
+      }
+      return ""
+    }
+    const data = record(node)
+    const playUrl = record(record(data.music).play_url)
+    const urlList = Array.isArray(playUrl.url_list) ? playUrl.url_list : []
+    const url = String(urlList.find(Boolean) || playUrl.url || "")
+    if (/^https?:\/\//i.test(url) && /mp3|m4a|aac|audio|ies-music|douyinstatic/i.test(url)) return url.replace(/^http:\/\//i, "https://")
+    for (const child of Object.values(node)) {
+      const found = extractFrom(child, visited)
       if (found) return found
     }
     return ""
   }
-  const data = record(value)
-  const playUrl = record(record(data.music).play_url)
-  const urlList = Array.isArray(playUrl.url_list) ? playUrl.url_list : []
-  const url = String(urlList.find(Boolean) || playUrl.url || "")
-  if (/^https?:\/\//i.test(url) && /mp3|m4a|aac|audio|ies-music|douyinstatic/i.test(url)) return url.replace(/^http:\/\//i, "https://")
-  for (const child of Object.values(value)) {
-    const found = extractDouyinMusicFromJson(child, visited)
-    if (found) return found
+  const wanted = String(awemeId || "").trim()
+  if (wanted) {
+    const item = deepFind(value, node => String(node.aweme_id || "") === wanted)
+    if (item) {
+      const scoped = extractFrom(item)
+      if (scoped) return scoped
+    }
   }
-  return ""
+  return extractFrom(value)
 }
 
 export function createDouyinBrowserResolver(ports:{getSharedBrowser():Promise<Browser>;scheduleSharedBrowserClose():void;logger?:MediaLogger}) {
@@ -256,8 +269,12 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
     }
     mark("waits")
 
-    const domInfo = await page.evaluate(awemeId => {
-      const routerDataJson = JSON.stringify((window as Window & {_ROUTER_DATA?:unknown})._ROUTER_DATA || null)
+    // evaluate 前已知 detail 音乐与网络捕获:都不缺时跳过整页 _ROUTER_DATA 序列化(几百 KB 级)
+    const detailMusic = detailJson ? extractDouyinMusicFromJson(detailJson, awemeId) : ""
+    const needRouterData = !detailMusic && !musicFromNetwork
+    const domInfo = await Promise.race([
+      page.evaluate((awemeId, needRouterData) => {
+      const routerDataJson = needRouterData ? JSON.stringify((window as Window & {_ROUTER_DATA?:unknown})._ROUTER_DATA || null) : ""
       const video = document.querySelector("video")
       const sources = video ? [video.src, video.currentSrc, ...[...video.querySelectorAll("source")].map(s => s.src)] : []
       const src = sources.find(Boolean) || ""
@@ -286,7 +303,9 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
         : byMarker.length ? byMarker
         : douyinpicImages
       return { src: String(src || ""), poster: String(poster || ""), title: String(title || "").trim(), ogTitle: String(ogTitle || "").trim(), jsonLd, galleryImages, awemeId, routerDataJson }
-    }, awemeId).catch(() => null)
+      }, awemeId, needRouterData).catch(() => null),
+      new Promise<null>(resolve => { const timer = setTimeout(() => resolve(null), 10000); timer.unref?.() })
+    ]).catch(() => null)
 
     const domGalleryImages = dedupeByTosKey((domInfo?.galleryImages || []).map(String))
     const noteImages = detailJson
@@ -294,10 +313,10 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
       : domGalleryImages
     const playUrl = (domInfo && /^https?:\/\//i.test(domInfo.src) ? domInfo.src : "") || (detailJson ? extractPlayUrlFromJson(detailJson) : "")
     // 背景音乐三级来源:detail 响应 → 页面 _ROUTER_DATA → 网络层捕获的 media 请求
-    let musicUrl = detailJson ? extractDouyinMusicFromJson(detailJson) : ""
+    let musicUrl = detailMusic
     if (!musicUrl && domInfo?.routerDataJson && domInfo.routerDataJson !== "null") {
       try {
-        musicUrl = extractDouyinMusicFromJson(JSON.parse(domInfo.routerDataJson))
+        musicUrl = extractDouyinMusicFromJson(JSON.parse(domInfo.routerDataJson), awemeId)
       } catch {}
     }
     if (!musicUrl) musicUrl = musicFromNetwork

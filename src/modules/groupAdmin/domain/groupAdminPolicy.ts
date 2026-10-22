@@ -54,7 +54,7 @@ export function resolveGroupAdminSettings(settings: Data, groupId?: GroupId): Da
       resolved.groupRules = Array.isArray(base.groupRules) ? base.groupRules.filter(item => groupAdminRowId(item) !== id) : []
     }
     for (const [field, value] of Object.entries(local)) {
-      if (['enabled', 'enabledGroups', 'globalAdmins', 'groupAdmins', 'groupRules', 'admins', '__proto__', 'constructor', 'prototype'].includes(field)) continue
+      if (['enabled', 'enabledGroups', 'globalAdmins', 'groupAdmins', 'groupRules', 'admins', 'whitelist', '__proto__', 'constructor', 'prototype'].includes(field)) continue
       resolved[field] = ['thresholds', 'actions', 'overlongMessage', 'burstMessage', 'adScan'].includes(field) ? { ...adminRecord(base[field]), ...adminRecord(value) } : value
     }
     if (key === 'groupModeration' && own(local, 'admins')) {

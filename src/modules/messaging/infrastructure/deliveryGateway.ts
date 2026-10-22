@@ -264,7 +264,11 @@ class DeliveryGateway {
 
   // 直接以消息段发群消息(如视频本体直发):合并转发资源上传失败时的中间降级,
   // 走 send_group_msg 的另一条上传路径,对大视频比转发资源上传更宽容
-  async sendGroupSegments({ botId, groupId, segments }: GroupPayload & { segments: unknown[] }) {
+  async sendGroupSegments(args: GroupPayload & { segments: unknown[] }) {
+    return forwardQueue.run(args.botId, () => this.sendGroupSegmentsUnqueued(args))
+  }
+
+  async sendGroupSegmentsUnqueued({ botId, groupId, segments }: GroupPayload & { segments: unknown[] }) {
     const channel = "group_segments"
     const statsChannel = "media_segments"
     const root = typeof this.botRoot === "function" ? this.botRoot() : this.botRoot

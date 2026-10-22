@@ -271,7 +271,12 @@ function bdecode(source:Buffer|string, { maxDepth = 64, maxItems = 20_000 } = {}
         const key = parse(depth + 1)
         if (!Buffer.isBuffer(key)) throw new TorrentDownloadError("种子元数据字典键无效")
         const keyText = key.toString("utf8")
-        // aria2 的 bt-save-metadata 会写入空字符串键的私有字段(d0:...),宽容跳过
+        // aria2 的 bt-save-metadata 会写入空字符串键的私有字段(d0:...):
+        // 丢弃该键值对(值仍需解析以推进游标),重复空键也不再报错
+        if (!keyText) {
+          parse(depth + 1)
+          continue
+        }
         if (Object.hasOwn(value, keyText)) throw new TorrentDownloadError("种子元数据字典键无效")
         value[keyText] = parse(depth + 1)
       }

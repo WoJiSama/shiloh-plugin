@@ -87,17 +87,37 @@ function mediaKindFromShareUrl(url = "") {
   return type === "video" ? "video" : type === "normal" ? "image" : ""
 }
 
-// QQ 分享卡片的 JSON 埋在 raw_message 的 [CQ:json,data={...}] 里,实体转义需先还原
+// QQ 分享卡片的 JSON 埋在 raw_message 的 [CQ:json,data={...}] 里,实体转义需先还原。
+// 从 data= 后做花括号平衡扫描:卡片后若还跟着其他 CQ 码/文字,lastIndexOf("]")
+// 会把杂质带进 parse 导致整卡漏识别。
 function extractCardJson(text = ""):unknown {
   const marker = "[CQ:json,data="
   const start = text.indexOf(marker)
-  const end = text.lastIndexOf("]")
-  if (start < 0 || end <= start) return null
-  try {
-    return JSON.parse(text.slice(start + marker.length, end))
-  } catch {
-    return null
+  if (start < 0) return null
+  const objectStart = text.indexOf("{", start + marker.length)
+  if (objectStart < 0) return null
+  let depth = 0
+  let quoted = false
+  let escaped = false
+  for (let index = objectStart; index < text.length; index++) {
+    const char = text[index]
+    if (quoted) {
+      if (escaped) escaped = false
+      else if (char === "\\") escaped = true
+      else if (char === '"') quoted = false
+      continue
+    }
+    if (char === '"') quoted = true
+    else if (char === "{") depth += 1
+    else if (char === "}" && --depth === 0) {
+      try {
+        return JSON.parse(text.slice(objectStart, index + 1))
+      } catch {
+        return null
+      }
+    }
   }
+  return null
 }
 
 function findXiaohongshuUrlInJson(value:unknown):string {
@@ -268,7 +288,9 @@ export function extractXiaohongshuGallery(state:unknown, visited = new Set<objec
   }).filter(entry => entry.imageUrl || entry.liveUrl)
 }
 
-export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>()):{playUrl:string;codec:string;duration:number} {  const mp4s:{url:string;codec:string;rank:number}[] = []
+export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>()):{playUrl:string;codec:string;duration:number} {  // 主视频流条目 duration 口径是秒(实测 42s/697s);图集实况流同名字段是毫秒,
+  // 因此时长优先取最优流自己条目的值,全局兜底只信 >100s 的毫秒量级
+  const mp4s:{url:string;codec:string;rank:number;entryDuration:number}[] = []
   let duration = 0
   const walk = (value:unknown, codecHint:string, depth:number) => {
     if (!value || typeof value !== "object" || visited.has(value as object) || depth > 9) return
@@ -283,7 +305,8 @@ export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>
     for (const [key, child] of Object.entries(data)) {
       const codec = XHS_VIDEO_CODEC_RANK[key] !== undefined ? key : codecHint
       if (typeof child === "string" && /^https?:\/\/[^"'\\\s]+\.mp4([?#]|$)/i.test(child) && /xhscdn\.com/i.test(child)) {
-        mp4s.push({url: child, codec, rank: XHS_VIDEO_CODEC_RANK[codec] ?? 9})
+        const entryDuration = Number(data.videoDuration) > 0 ? Math.round(Number(data.videoDuration) / 1000) : Number(data.duration) || 0
+        mp4s.push({url: child, codec, rank: XHS_VIDEO_CODEC_RANK[codec] ?? 9, entryDuration})
         continue
       }
       if (child && typeof child === "object") walk(child, codec, depth + 1)
@@ -295,8 +318,7 @@ export function extractXiaohongshuVideo(state:unknown, visited = new Set<object>
   return {
     playUrl: best ? best.url.replace(/^http:\/\//i, "https://") : "",
     codec: best?.codec || "",
-    // 时长字段存在毫秒口径(>10分钟按毫秒折算)
-    duration: duration > 600 ? Math.round(duration / 1000) : duration
+    duration: best?.entryDuration || (duration > 100000 ? Math.round(duration / 1000) : duration)
   }
 }
 
@@ -320,8 +342,9 @@ export function buildCardFromNoteState(base:XiaohongshuCard = {}, noteDetailMap:
   const firstFrame = normalizeXiaohongshuImageUrl(record(video.image).firstFrameUrl || record(imageList[0]).urlDefault)
   return {
     ...base,
+    note_id: String(wantedId || entries[0]?.[0] || "").trim(),
     title: cleanText(note.title, 300) || "小红书笔记",
-    description: cleanText(note.desc, 1000),
+    description: cleanText(note.desc, XHS_DESCRIPTION_MAX_CHARS),
     author: cleanText(user.nickname, 120),
     liked: parseCount(interact.liked),
     collected: parseCount(interact.collected),

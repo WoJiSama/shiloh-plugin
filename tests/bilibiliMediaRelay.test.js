@@ -137,6 +137,9 @@ test("explicit high-quality relay forwards authorization only to playback and me
   try {
     globalThis.fetch = async (url, options = {}) => {
       seen.push({ playback: String(url).includes("x/player/playurl"), cookie: options.headers?.Cookie || "" })
+      if (String(url).includes("finger/spi")) {
+        return { ok: true, async json() { return { code: 0, data: {} } } }
+      }
       if (String(url).includes("x/player/playurl")) {
         assert.match(String(url), /[?&]qn=80(?:&|$)/)
         return { ok: true, async json() { return { code: 0, data: { quality: 80, durl: [{ url: "https://video.example/high.mp4?temporary=1", size: 4 }] } } } }
@@ -156,7 +159,8 @@ test("explicit high-quality relay forwards authorization only to playback and me
 
     assert.ok(result.segments.some(part => part?.type === "video"))
     assert.equal(result.actualQuality, 80)
-    assert.deepEqual(seen, [{ playback: true, cookie: "opaque-auth" }, { playback: false, cookie: "opaque-auth" }])
+    // spi 指纹(空数据→无 buvid) + 授权 playurl + 视频下载,均只带授权 cookie
+    assert.deepEqual(seen, [{ playback: false, cookie: "" }, { playback: true, cookie: "opaque-auth" }, { playback: false, cookie: "opaque-auth" }])
     await cleanupBilibiliArchiveRelayFiles(result.tempFiles)
   } finally {
     globalThis.fetch = previousFetch

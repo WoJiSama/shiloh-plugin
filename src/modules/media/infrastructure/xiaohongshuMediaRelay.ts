@@ -125,10 +125,13 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   const maxVideoSeconds = Math.max(1, Number(xiaohongshuRelay.maxVideoSeconds) || XHS_ARCHIVE_VIDEO_MAX_SECONDS)
   const maxVideoBytes = Math.max(1, Number(xiaohongshuRelay.maxVideoBytes) || XHS_ARCHIVE_VIDEO_MAX_BYTES)
   const videoDownloadTimeoutMs = Number(xiaohongshuRelay.videoDownloadTimeoutMs) || XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS
+  // 原位清洗保与 live_photos 的下标对齐:非法槽位置 "" 由循环跳过,不做剔除
   const noteImages = (Array.isArray(card.images) ? card.images : [])
-    .map(url => normalizeXiaohongshuImageUrl(url))
-    .filter(url => /^https?:\/\//i.test(String(url || "")))
-  const images = noteImages.length ? noteImages : (card.cover_url ? [normalizeXiaohongshuImageUrl(card.cover_url)].filter(Boolean) : [])
+    .map(url => {
+      const normalized = normalizeXiaohongshuImageUrl(url)
+      return /^https?:\/\//i.test(String(normalized || "")) ? normalized : ""
+    })
+  const images = noteImages.some(Boolean) ? noteImages : (card.cover_url ? [normalizeXiaohongshuImageUrl(card.cover_url)].filter(Boolean) : [])
 
   // 真实视频笔记优先搬视频本体(直链短时有效,组装阶段立即下载);
   // 时长超限直接跳过,下载失败降级为封面图集;图文笔记不走此路径

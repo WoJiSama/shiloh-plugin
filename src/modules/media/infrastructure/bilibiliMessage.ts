@@ -194,23 +194,40 @@ function normalizeBilibiliStats(value:unknown = {}) {
 // 先调 finger/spi 拿 buvid3/buvid4 匿名指纹 cookie 再请求即可通过;缓存 24h 复用。
 let bilibiliBuvidCookie = ""
 let bilibiliBuvidFetchedAt = 0
+let bilibiliBuvidInflight:Promise<string>|null = null
 const BILIBILI_BUVID_TTL_MS = 24 * 60 * 60 * 1000
+const BILIBILI_BUVID_FAIL_RETRY_MS = 60 * 1000
 export async function ensureBilibiliBuvidCookie(fetchImpl:MediaFetch, signal?:AbortSignal):Promise<string> {
-  if (bilibiliBuvidCookie && Date.now() - bilibiliBuvidFetchedAt < BILIBILI_BUVID_TTL_MS) return bilibiliBuvidCookie
+  const fresh = bilibiliBuvidCookie
+    ? Date.now() - bilibiliBuvidFetchedAt < BILIBILI_BUVID_TTL_MS
+    : Date.now() - bilibiliBuvidFetchedAt < BILIBILI_BUVID_FAIL_RETRY_MS
+  if (fresh) return bilibiliBuvidCookie
+  if (bilibiliBuvidInflight) return await bilibiliBuvidInflight
+  const promise = (async () => {
+    try {
+      const spi = await fetchJson(fetchImpl, "https://api.bilibili.com/x/frontend/finger/spi", {
+        headers: { "User-Agent": "Mozilla/5.0", Referer: "https://www.bilibili.com/" },
+        ...(signal ? { signal } : {})
+      })
+      const data = mediaRecord(mediaRecord(spi).data)
+      const b3 = mediaString(data.b_3)
+      const b4 = mediaString(data.b_4)
+      if (b3) {
+        bilibiliBuvidCookie = `buvid3=${b3}${b4 ? `; buvid4=${b4}` : ""}`
+        bilibiliBuvidFetchedAt = Date.now()
+        return bilibiliBuvidCookie
+      }
+    } catch {}
+    // 失败负缓存 60 秒,避免每个请求都多付一跳 spi 往返
+    bilibiliBuvidFetchedAt = Date.now() - BILIBILI_BUVID_TTL_MS + BILIBILI_BUVID_FAIL_RETRY_MS
+    return ""
+  })()
+  bilibiliBuvidInflight = promise
   try {
-    const spi = await fetchJson(fetchImpl, "https://api.bilibili.com/x/frontend/finger/spi", {
-      headers: { "User-Agent": "Mozilla/5.0", Referer: "https://www.bilibili.com/" },
-      ...(signal ? { signal } : {})
-    })
-    const data = mediaRecord(mediaRecord(spi).data)
-    const b3 = mediaString(data.b_3)
-    const b4 = mediaString(data.b_4)
-    if (b3) {
-      bilibiliBuvidCookie = `buvid3=${b3}${b4 ? `; buvid4=${b4}` : ""}`
-      bilibiliBuvidFetchedAt = Date.now()
-    }
-  } catch {}
-  return bilibiliBuvidCookie
+    return await promise
+  } finally {
+    if (bilibiliBuvidInflight === promise) bilibiliBuvidInflight = null
+  }
 }
 export function resetBilibiliBuvidCookie() {
   bilibiliBuvidCookie = ""
@@ -412,11 +429,10 @@ async function requestBilibiliPlaybackResources(card:MediaCard = {}, options:Bil
     "User-Agent": "Mozilla/5.0",
     Referer: "https://www.bilibili.com/"
   }
-  if (options.authCookie) headers.Cookie = String(options.authCookie)
-  else {
-    const buvidCookie = await ensureBilibiliBuvidCookie(fetchImpl, controller.signal)
-    if (buvidCookie) headers.Cookie = buvidCookie
-  }
+  // 授权 cookie 只有登录态没有设备指纹,机房 IP 上同样会被 412——统一补 buvid
+  const buvidCookie = await ensureBilibiliBuvidCookie(fetchImpl, controller.signal)
+  if (options.authCookie) headers.Cookie = buvidCookie ? `${String(options.authCookie)}; ${buvidCookie}` : String(options.authCookie)
+  else if (buvidCookie) headers.Cookie = buvidCookie
   const resources:BilibiliResource[] = []
   const qualityOptions:{quality:number;label:string}[] = []
   let failureReason = ""

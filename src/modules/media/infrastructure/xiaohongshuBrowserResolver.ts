@@ -143,9 +143,11 @@ async function resolveXiaohongshuInPage(card:XiaohongshuCard = {}, { timeoutMs =
     const livePhotos = hasGalleryLive && images === galleryImages ? galleryLives : []
     // 媒体类型以分享链接自带 type 为准;无此信号时用时长启发式(实况照片是 2 秒左右的短视频段,
     // 不能仅凭页面存在 video 元素就当视频笔记)
+    // 无分享类型信号时的兜底:页面有 video 元素且时长像正经视频(≥10s)才算视频笔记,
+    // 2 秒级的实况段不算——否则误判为视频会把整个图集丢掉只发实况
     const resolvedMediaKind = stateCard?.media_kind
       || card.media_kind
-      || (domInfo.media_kind === "video" && duration >= 10 ? "video" : domInfo.media_kind)
+      || (domInfo.media_kind === "video" && duration >= 10 ? "video" : "image")
     const isVideoNote = resolvedMediaKind === "video"
     if (!isVideoNote) playUrl = ""
     const result:XiaohongshuCard = {
