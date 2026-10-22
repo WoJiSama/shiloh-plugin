@@ -14,10 +14,17 @@ export const HARD_MAX_FILES = 3
 export const HARD_MAX_METADATA_BYTES = 2 * MEBIBYTE
 export const HARD_MAX_ARCHIVE_BYTES = 50 * MEGABYTE
 
-const DEFAULT_PUBLIC_TRACKERS = [
+export const DEFAULT_PUBLIC_TRACKERS = [
   "udp://tracker.opentrackr.org:1337/announce",
   "udp://open.stealth.si:80/announce",
-  "udp://tracker.torrent.eu.org:451/announce"
+  "udp://tracker.torrent.eu.org:451/announce",
+  // 机房网络下 DHT/UDP tracker 常被拦截,HTTP(S) tracker 可随代理走 TCP,
+  // 配合 aria2 --all-proxy 是 P2P 元数据获取的关键通路
+  "http://tracker.opentrackr.org:1337/announce",
+  "https://tracker.tamersunion.org:443/announce",
+  "http://tracker.dler.org:6969/announce",
+  "https://tracker.gbitt.info:443/announce",
+  "http://open.acgnxtracker.com:80/announce"
 ]
 
 const DEFAULT_METADATA_HTTP_SOURCES = [
@@ -56,6 +63,7 @@ export function normalizeTorrentDownloadConfig(raw:Record<string,unknown> = {}) 
   return {
     enabled: config.enabled === true,
     aria2Binary: String(config.aria2Binary || "aria2c").trim() || "aria2c",
+    proxyUrl: String(config.proxyUrl || "").trim(),
     zipBinary: String(config.zipBinary || "zip").trim() || "zip",
     downloadDir: String(config.downloadDir || "data/torrent_downloads").trim() || "data/torrent_downloads",
     maxTotalBytes,
@@ -263,7 +271,8 @@ function bdecode(source:Buffer|string, { maxDepth = 64, maxItems = 20_000 } = {}
         const key = parse(depth + 1)
         if (!Buffer.isBuffer(key)) throw new TorrentDownloadError("种子元数据字典键无效")
         const keyText = key.toString("utf8")
-        if (!keyText || Object.hasOwn(value, keyText)) throw new TorrentDownloadError("种子元数据字典键无效")
+        // aria2 的 bt-save-metadata 会写入空字符串键的私有字段(d0:...),宽容跳过
+        if (Object.hasOwn(value, keyText)) throw new TorrentDownloadError("种子元数据字典键无效")
         value[keyText] = parse(depth + 1)
       }
       consume()
@@ -543,7 +552,7 @@ export function formatBytes(bytes = 0) {
   return `${(value / MEGABYTE).toFixed(1)} MB`
 }
 
-export function buildAriaMetadataArgs({ directory, magnet }:{directory:string;magnet:string}) {
+export function buildAriaMetadataArgs({ directory, magnet, proxyUrl = "" }:{directory:string;magnet:string;proxyUrl?:string}) {
   return [
     "--bt-metadata-only=true",
     "--bt-save-metadata=true",
@@ -554,12 +563,13 @@ export function buildAriaMetadataArgs({ directory, magnet }:{directory:string;ma
     "--summary-interval=0",
     "--console-log-level=warn",
     "--download-result=hide",
+    ...(proxyUrl ? ["--all-proxy=" + proxyUrl] : []),
     `--dir=${directory}`,
     magnet
   ]
 }
 
-export function buildAriaDownloadArgs({ directory, torrentFile, selectedFileIndexes = [] }:{directory:string;torrentFile:string;selectedFileIndexes?:number[]}) {
+export function buildAriaDownloadArgs({ directory, torrentFile, selectedFileIndexes = [], proxyUrl = "" }:{directory:string;torrentFile:string;selectedFileIndexes?:number[];proxyUrl?:string}) {
   const selected = [...new Set((Array.isArray(selectedFileIndexes) ? selectedFileIndexes : [selectedFileIndexes])
     .map(value => Number(value))
     .filter(value => Number.isSafeInteger(value) && value >= 1))]
@@ -572,6 +582,7 @@ export function buildAriaDownloadArgs({ directory, torrentFile, selectedFileInde
     "--summary-interval=0",
     "--console-log-level=warn",
     "--download-result=hide",
+    ...(proxyUrl ? ["--all-proxy=" + proxyUrl] : []),
     `--dir=${directory}`,
     ...(selected.length ? [`--select-file=${selected.join(",")}`] : []),
     torrentFile

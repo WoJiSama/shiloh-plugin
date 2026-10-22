@@ -73,6 +73,33 @@ test("extracts only a valid BTIH magnet from a group message", () => {
   assert.equal(extractValidBtihMagnetUri("magnet:?xt=urn:btih:not-a-hash"), "")
 })
 
+test("aria2 元数据带空字典键(d0: 私有字段)可解析,aria2 参数支持代理", async () => {
+  const { parseTorrentMetadata, buildAriaMetadataArgs, buildAriaDownloadArgs } = await import("../dist/backend/modules/media/infrastructure/torrentDownload.js")
+  // aria2 bt-save-metadata 会写出 d0:d4:ed2k... 一类空键私有字段;程序化构造避免手写长度出错
+  const bstr = value => Buffer.concat([Buffer.from(`${Buffer.byteLength(value, "utf8")}:`), Buffer.from(value, "utf8")])
+  const bint = value => Buffer.from(`i${value}e`)
+  const torrent = Buffer.concat([
+    Buffer.from("d"),
+    bstr("announce-list"),
+    Buffer.from("ll"), bstr("http://tracker.opentrackr.org:1337/announce"), Buffer.from("ee"),
+    Buffer.from("0:"),
+    Buffer.concat([Buffer.from("d"), bstr("ed2k"), bstr("0123456789abcdef"), Buffer.from("e")]),
+    bstr("info"),
+    Buffer.concat([Buffer.from("d"), bstr("length"), bint(12345), bstr("name"), bstr("浅草名称"), bstr("piece length"), bint(262144), Buffer.from("e")]),
+    Buffer.from("e")
+  ])
+  const meta = parseTorrentMetadata(torrent)
+  assert.equal(meta.files.length, 1)
+  assert.equal(meta.totalBytes, 12345)
+  // 代理参数
+  assert.ok(buildAriaMetadataArgs({ directory: "/tmp/x", magnet: "magnet:?xt=urn:btih:A", proxyUrl: "http://127.0.0.1:7890" }).includes("--all-proxy=http://127.0.0.1:7890"))
+  assert.ok(!buildAriaMetadataArgs({ directory: "/tmp/x", magnet: "magnet:?xt=urn:btih:A" }).some(arg => String(arg).startsWith("--all-proxy")))
+  assert.ok(buildAriaDownloadArgs({ directory: "/tmp/x", torrentFile: "/tmp/x/a.torrent", proxyUrl: "http://127.0.0.1:7890" }).includes("--all-proxy=http://127.0.0.1:7890"))
+  // 默认公共 tracker 应包含 HTTP(S) 条目(机房 UDP 被拦时的 TCP 通路)
+  const { DEFAULT_PUBLIC_TRACKERS } = await import("../dist/backend/modules/media/infrastructure/torrentDownload.js")
+  assert.ok(DEFAULT_PUBLIC_TRACKERS.some(url => url.startsWith("http")))
+})
+
 test("reads v1 torrent metadata and rejects unsafe paths", () => {
   const metadata = parseTorrentMetadata(singleFileTorrent("safe.bin", 12))
   assert.equal(metadata.totalBytes, 12)

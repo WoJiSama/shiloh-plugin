@@ -956,6 +956,9 @@ pluginSettings:
     enabled: true
     autoDetect: true
     aria2Binary: aria2c
+    # 机房网络常拦截 DHT/UDP tracker;aria2 走该 HTTP 代理(L2 不代理 DHT,但 HTTP(S)
+    # tracker 与 peer 连接走 TCP 可被代理),配合下面的 HTTP tracker 是 P2P 元数据获取关键。
+    proxyUrl: http://127.0.0.1:7890
     zipBinary: zip
     downloadDir: data/torrent_downloads
     maxTotalMb: 50
@@ -970,6 +973,11 @@ pluginSettings:
       - udp://tracker.opentrackr.org:1337/announce
       - udp://open.stealth.si:80/announce
       - udp://tracker.torrent.eu.org:451/announce
+      - http://tracker.opentrackr.org:1337/announce
+      - https://tracker.tamersunion.org:443/announce
+      - http://tracker.dler.org:6969/announce
+      - https://tracker.gbitt.info:443/announce
+      - http://open.acgnxtracker.com:80/announce
     # 前两轮 P2P 都没有元数据时使用。仅接受 HTTPS，且 info 哈希必须匹配原磁链。
     metadataHttpTimeoutSeconds: 8
     metadataHttpSources:

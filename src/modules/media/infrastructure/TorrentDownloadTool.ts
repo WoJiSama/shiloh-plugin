@@ -460,7 +460,7 @@ class TorrentDownloadTool extends AbstractTool {
   async discoverAndLoadMetadata(metadataDir:string, magnet:ReturnType<typeof parseMagnetUri>, config:TorrentConfig) {
     const discoverMetadata = async (candidateMagnet:string, timeoutMs:number) => this.commandRunner(
       config.aria2Binary,
-      buildAriaMetadataArgs({ directory: metadataDir, magnet: candidateMagnet }),
+      buildAriaMetadataArgs({ directory: metadataDir, magnet: candidateMagnet, proxyUrl: config.proxyUrl }),
       { cwd: metadataDir, timeoutMs }
     )
     if (!await this.discoverMetadataFromCache(metadataDir, magnet, config)) {
@@ -557,7 +557,8 @@ class TorrentDownloadTool extends AbstractTool {
       await this.commandRunner(config.aria2Binary, buildAriaDownloadArgs({
         directory: payloadDir,
         torrentFile,
-        selectedFileIndexes: selection ? metadata.files.map(file => file.index) : []
+        selectedFileIndexes: selection ? metadata.files.map(file => file.index) : [],
+        proxyUrl: config.proxyUrl
       }), {
         cwd: payloadDir,
         timeoutMs: config.downloadTimeoutMs
