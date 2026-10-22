@@ -211,6 +211,7 @@ async function enrichDouyinShare(card:DouyinCard = {}, options:DouyinOptions = {
             cover_url: resolved.cover_url || card.cover_url || "",
             play_url: resolved.play_url || "",
             images: Array.isArray(resolved.images) ? resolved.images.filter(url => /^https?:\/\//i.test(String(url))) : [],
+            ...(resolved.music_url ? {music_url: resolved.music_url} : {}),
             media_kind: mediaKind,
             page_url: pageUrl,
             video_url: pageUrl,

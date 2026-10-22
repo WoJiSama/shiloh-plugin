@@ -3,6 +3,7 @@ import {shouldAttachDouyinVideo} from './douyinMessage.js'
 const runtime=createDouyinMediaRelay({segmentApi:globalThis.segment,logger:globalThis.logger,shouldAttachDouyinVideo})
 export const DOUYIN_ARCHIVE_VIDEO_MAX_BYTES=runtime.DOUYIN_ARCHIVE_VIDEO_MAX_BYTES
 export const downloadDouyinNoteImage=runtime.downloadDouyinNoteImage
+export const downloadDouyinNoteMusic=runtime.downloadDouyinNoteMusic
 export const downloadDouyinArchiveVideo=runtime.downloadDouyinArchiveVideo
 export const buildDouyinArchiveRelaySegments=runtime.buildDouyinArchiveRelaySegments
 export const cleanupDouyinArchiveRelayFiles=runtime.cleanupDouyinArchiveRelayFiles

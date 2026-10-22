@@ -190,6 +190,33 @@ function normalizeBilibiliStats(value:unknown = {}) {
   return Object.keys(result).length ? result : null
 }
 
+// 机房 IP 上 Node 请求 B站 API 会被 412 风控页拦截(实测 2026-10,curl 可过 node 不行)。
+// 先调 finger/spi 拿 buvid3/buvid4 匿名指纹 cookie 再请求即可通过;缓存 24h 复用。
+let bilibiliBuvidCookie = ""
+let bilibiliBuvidFetchedAt = 0
+const BILIBILI_BUVID_TTL_MS = 24 * 60 * 60 * 1000
+export async function ensureBilibiliBuvidCookie(fetchImpl:MediaFetch, signal?:AbortSignal):Promise<string> {
+  if (bilibiliBuvidCookie && Date.now() - bilibiliBuvidFetchedAt < BILIBILI_BUVID_TTL_MS) return bilibiliBuvidCookie
+  try {
+    const spi = await fetchJson(fetchImpl, "https://api.bilibili.com/x/frontend/finger/spi", {
+      headers: { "User-Agent": "Mozilla/5.0", Referer: "https://www.bilibili.com/" },
+      ...(signal ? { signal } : {})
+    })
+    const data = mediaRecord(mediaRecord(spi).data)
+    const b3 = mediaString(data.b_3)
+    const b4 = mediaString(data.b_4)
+    if (b3) {
+      bilibiliBuvidCookie = `buvid3=${b3}${b4 ? `; buvid4=${b4}` : ""}`
+      bilibiliBuvidFetchedAt = Date.now()
+    }
+  } catch {}
+  return bilibiliBuvidCookie
+}
+export function resetBilibiliBuvidCookie() {
+  bilibiliBuvidCookie = ""
+  bilibiliBuvidFetchedAt = 0
+}
+
 async function requestBilibiliMetadata(card:MediaCard, { fetchImpl, timeoutMs }:{fetchImpl:MediaFetch;timeoutMs:number}):Promise<MediaCard> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(500, Number(timeoutMs) || 5000))
@@ -210,6 +237,8 @@ async function requestBilibiliMetadata(card:MediaCard, { fetchImpl, timeoutMs }:
       if (!bvid && !epId && !response?.ok) throw new Error(`B站短链返回 ${response?.status || "未知状态"}`)
     }
     if (!bvid && !epId) return { ...card, metadata_status: "card" }
+    const buvidCookie = await ensureBilibiliBuvidCookie(fetchImpl, controller.signal)
+    if (buvidCookie && !headers.Cookie) headers.Cookie = buvidCookie
     if (epId && !bvid) {
       const season = await fetchJson(fetchImpl, `https://api.bilibili.com/pgc/view/web/season?ep_id=${encodeURIComponent(epId)}`, { headers, signal: controller.signal })
       const episodes=mediaRecords(mediaRecord(season.result).episodes)
@@ -384,6 +413,10 @@ async function requestBilibiliPlaybackResources(card:MediaCard = {}, options:Bil
     Referer: "https://www.bilibili.com/"
   }
   if (options.authCookie) headers.Cookie = String(options.authCookie)
+  else {
+    const buvidCookie = await ensureBilibiliBuvidCookie(fetchImpl, controller.signal)
+    if (buvidCookie) headers.Cookie = buvidCookie
+  }
   const resources:BilibiliResource[] = []
   const qualityOptions:{quality:number;label:string}[] = []
   let failureReason = ""

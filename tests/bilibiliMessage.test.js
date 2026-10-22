@@ -116,7 +116,8 @@ test("resolves short url and enriches stable Bilibili metadata", async () => {
   assert.equal(card.pages.length, 3)
   assert.equal(card.cover_url, "https://i0.hdslb.com/cover.jpg")
   assert.equal(card.video_url, "https://www.bilibili.com/video/BV1H7Gq6zEiC")
-  assert.equal(calls.length, 2)
+  // 三次 = buvid 指纹 + 短链解析 + view 元数据
+  assert.equal(calls.length, 3)
 })
 
 test("keeps card metadata when Bilibili network enrichment fails", async () => {
@@ -352,4 +353,26 @@ test("returns a Bangumi preview clip with an explicit preview marker", async () 
   assert.equal(result.resources[0].is_preview, true)
   assert.equal(result.previewNotice, "B站番剧仅提供约6:00试看，本体为试看片段")
   assert.equal(result.failureReason, "")
+})
+
+test("机房 412 风控:先取 buvid 指纹 cookie 再请求元数据接口", async () => {
+  const { resetBilibiliBuvidCookie, enrichBilibiliShare } = await import("../dist/backend/modules/media/infrastructure/bilibiliMessage.js")
+  resetBilibiliBuvidCookie()
+  const calls = []
+  const view = { code: 0, data: { bvid: "BV1oZAHeWEcs", title: "测试", duration: 334, cid: 1, owner: {name: "up"}, pages: [{ page: 1, cid: 1, part: "P1", duration: 334 }], pic: "https://i0.hdslb.com/bfs/archive/a.jpg", stat: { view: 1 } } }
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url: String(url), cookie: init.headers?.Cookie || "" })
+    if (String(url).includes("finger/spi")) {
+      return { ok: true, json: async () => ({ code: 0, data: { b_3: "BUVID3X", b_4: "BUVID4Y" } }) }
+    }
+    return { ok: true, url, json: async () => view }
+  }
+  const card = await enrichBilibiliShare({ type: "bilibili", bvid: "BV1oZAHeWEcs", page_url: "https://www.bilibili.com/video/BV1oZAHeWEcs" }, { fetchImpl, forceStaticParse: true })
+  assert.equal(card.duration, 334)
+  const spi = calls.find(call => call.url.includes("finger/spi"))
+  const viewCall = calls.find(call => call.url.includes("web-interface/view"))
+  assert.ok(spi, "先请求指纹接口")
+  assert.ok(viewCall.cookie.includes("buvid3=BUVID3X"), "view 接口带上 buvid cookie")
+  assert.ok(viewCall.cookie.includes("buvid4=BUVID4Y"))
+  resetBilibiliBuvidCookie()
 })

@@ -7,13 +7,95 @@ import type {DouyinCard,MediaLogger} from "./douyinTypes.js"
 import {errorText} from "./douyinTypes.js"
 import { buildMediaArtifactKey } from "../../messaging/infrastructure/mediaArtifactStore.js"
 import { fetchDownloadToFile } from "../../shared/infrastructure/parallelDownload.js"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
+
+export type MediaCommandRunner = (command:string, args:string[], options:{timeout:number;maxBuffer:number}) => Promise<unknown>
 
 interface Lease {filePath?:string;release?():Promise<unknown>}
 interface Store {acquire(key:string,download:()=>Promise<string|null>):Promise<Lease|null>}
 interface SegmentApi {image?(path:string):unknown;video?(path:string):unknown}
-export function createDouyinMediaRelay(ports:{segmentApi?:SegmentApi;logger?:MediaLogger;shouldAttachDouyinVideo(card:DouyinCard,seconds:number):boolean;fetchImpl?:typeof globalThis.fetch}) {
+const DOUYIN_NOTE_MUSIC_MAX_BYTES = 32 * 1024 * 1024
+const DOUYIN_NOTE_MUSIC_TIMEOUT_MS = 60 * 1000
+// 配乐视频上限:图集轮播配背景音乐,超出则放弃合成只发图片
+const DOUYIN_NOTE_MUSIC_SLIDESHOW_MAX_SECONDS = 300
+const DOUYIN_SLIDESHOW_ENCODE_TIMEOUT_MS = 180 * 1000
+
+async function downloadDouyinNoteMusic(rawUrl:string, { maxBytes = DOUYIN_NOTE_MUSIC_MAX_BYTES, timeoutMs = DOUYIN_NOTE_MUSIC_TIMEOUT_MS, logger = undefined }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
+  const url = String(rawUrl || "").replace(/^http:\/\//i, "https://")
+  if (!/^https?:\/\//i.test(url)) return null
+  const dir = path.join(os.tmpdir(), "shiloh-plugin-douyin-note")
+  await fs.promises.mkdir(dir, { recursive: true })
+  const filePath = path.join(dir, `music-${Date.now()}-${Math.random().toString(16).slice(2)}.mp3`)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let completed = false
+  try {
+    const response = await fetch(url, {
+      headers: { Referer: "https://www.douyin.com/", "User-Agent": "Mozilla/5.0 (Linux; Android 10; K)" },
+      signal: controller.signal
+    })
+    if (!response?.ok || !response.body) return null
+    let downloadedBytes = 0
+    const limitStream = new Transform({
+      transform(chunk, encoding, callback) {
+        downloadedBytes += chunk.length
+        if (downloadedBytes > maxBytes) return callback(new Error("抖音音乐超过大小上限"))
+        callback(null, chunk)
+      }
+    })
+    await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream<Uint8Array>), limitStream, fs.createWriteStream(filePath))
+    const stat = await fs.promises.stat(filePath)
+    completed = stat.size > 0
+    return completed ? filePath : null
+  } catch (error) {
+    logger?.warn?.(`[抖音图集] 背景音乐下载失败: ${errorText(error)}`)
+    return null
+  } finally {
+    clearTimeout(timer)
+    if (!completed) await fs.promises.unlink(filePath).catch(() => {})
+  }
+}
+
+export function createDouyinMediaRelay(ports:{segmentApi?:SegmentApi;logger?:MediaLogger;shouldAttachDouyinVideo(card:DouyinCard,seconds:number):boolean;fetchImpl?:typeof globalThis.fetch;runner?:MediaCommandRunner}) {
 const {shouldAttachDouyinVideo}=ports
 const fetch:typeof globalThis.fetch=(input,init)=>(ports.fetchImpl ?? globalThis.fetch)(input,init)
+// ffmpeg/ffprobe 注入点:单测 mock,线上走系统二进制
+const runner:MediaCommandRunner = ports.runner ?? promisify(execFile)
+
+async function probeAudioDurationSeconds(file:string):Promise<number> {
+  try {
+    const output = await runner("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { timeout: 15000, maxBuffer: 64 * 1024 })
+    const seconds = Number(String(output).trim().split("\n")[0])
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : 0
+  } catch {
+    return 0
+  }
+}
+
+// 图集轮播配乐合成:每张图等分音频时长(2~10s/张),竖版 720x1280 画布 pad 居中
+async function composeDouyinNoteMusicSlideshow(imageFiles:string[], musicFile:string, target:string, perImageSeconds:number):Promise<boolean> {
+  const inputs:string[] = []
+  for (const image of imageFiles) inputs.push("-loop", "1", "-t", Math.max(1, perImageSeconds).toFixed(2), "-i", image)
+  inputs.push("-i", musicFile)
+  const filters = imageFiles.map((_, index) =>
+    `[${index}:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[i${index}]`).join(";")
+  const concatInputs = imageFiles.map((_, index) => `[i${index}]`).join("")
+  const audioIndex = imageFiles.length
+  const args = ["-nostdin", "-hide_banner", "-loglevel", "error",
+    ...inputs,
+    "-filter_complex", `${filters};${concatInputs}concat=n=${imageFiles.length}:v=1:a=0[v]`,
+    "-map", "[v]", "-map", `${audioIndex}:a`,
+    "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-r", "30",
+    "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", "-y", target]
+  try {
+    await runner("ffmpeg", args, { timeout: DOUYIN_SLIDESHOW_ENCODE_TIMEOUT_MS, maxBuffer: 256 * 1024 })
+    const stat = await fs.promises.stat(target).catch(() => null)
+    return Boolean(stat && stat.size > 0)
+  } catch {
+    return false
+  }
+}
 const DOUYIN_ARCHIVE_VIDEO_MAX_SECONDS=1800
 const DOUYIN_ARCHIVE_VIDEO_MAX_BYTES = 512 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000
@@ -113,6 +195,7 @@ async function buildDouyinArchiveRelaySegments(card:DouyinCard = {}, {
     const downloadStartedAt = Date.now()
     const capped = noteImages.slice(0, DOUYIN_NOTE_IMAGE_MAX_COUNT)
     const baseKey = artifactStore ? buildMediaArtifactKey("douyin", card) : ""
+    const galleryFiles:string[] = []
     for (let index = 0; index < capped.length; index++) {
       const imageUrl = capped[index]!
       const key = baseKey ? `${baseKey}#img${index}` : ""
@@ -127,7 +210,30 @@ async function buildDouyinArchiveRelaySegments(card:DouyinCard = {}, {
       }
       if (lease) artifactLeases.push(lease)
       else tempFiles.push(filePath)
+      galleryFiles.push(filePath)
       if (segmentApi?.image) imageNodes.push(segmentApi.image(filePath))
+    }
+    // 图文作品的背景音乐:图片齐后 best-effort 合成轮播配乐视频追加在图集之后
+    if (card.music_url && galleryFiles.length && segmentApi?.video) {
+      const musicFile = await downloadDouyinNoteMusic(card.music_url, { logger })
+      if (musicFile) {
+        const audioSeconds = await probeAudioDurationSeconds(musicFile)
+        if (audioSeconds > 0 && audioSeconds <= DOUYIN_NOTE_MUSIC_SLIDESHOW_MAX_SECONDS) {
+          const target = path.join(path.dirname(musicFile), `slideshow-${Date.now()}-${Math.random().toString(16).slice(2)}.mp4`)
+          const perImageSeconds = Math.min(10, Math.max(2, audioSeconds / galleryFiles.length))
+          const composed = await composeDouyinNoteMusicSlideshow(galleryFiles, musicFile, target, perImageSeconds)
+          if (composed) {
+            tempFiles.push(target, musicFile)
+            segments.push("\n", segmentApi.video(target))
+            ports.logger?.info?.(`[抖音图集] 配乐视频已合成 ${galleryFiles.length} 图/${Math.round(audioSeconds)}s 音乐`)
+          } else {
+            await fs.promises.unlink(musicFile).catch(() => {})
+            ports.logger?.info?.("[抖音图集] 配乐视频合成失败,仅发图集")
+          }
+        } else {
+          await fs.promises.unlink(musicFile).catch(() => {})
+        }
+      }
     }
     onTiming?.("download", Date.now() - downloadStartedAt)
     if (noteImages.length > capped.length) segments.push(`\n（图集共${noteImages.length}张，仅附前${capped.length}张）`)
@@ -166,5 +272,5 @@ async function cleanupDouyinArchiveRelayFiles(tempFiles:string[] = []) {
   await Promise.all((Array.isArray(tempFiles) ? tempFiles : []).map(file => fs.promises.unlink(file).catch(() => {})))
 }
 
-return {DOUYIN_ARCHIVE_VIDEO_MAX_BYTES,downloadDouyinNoteImage,downloadDouyinArchiveVideo,buildDouyinArchiveRelaySegments,cleanupDouyinArchiveRelayFiles}
+return {DOUYIN_ARCHIVE_VIDEO_MAX_BYTES,downloadDouyinNoteImage,downloadDouyinArchiveVideo,downloadDouyinNoteMusic,buildDouyinArchiveRelaySegments,cleanupDouyinArchiveRelayFiles}
 }

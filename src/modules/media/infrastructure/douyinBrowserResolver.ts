@@ -138,6 +138,32 @@ async function resolveAwemeId(page:Page, card:DouyinCard) {
   }).catch(() => "") || ""
 }
 
+/**
+ * 从 detail JSON 深找图文作品的背景音乐直链(music.play_url.url_list)。
+ * 纯函数,便于单测;返回空串表示无音乐。
+ */
+export function extractDouyinMusicFromJson(value:unknown, visited = new Set<object>()):string {
+  if (!value || typeof value !== "object" || visited.has(value)) return ""
+  visited.add(value)
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = extractDouyinMusicFromJson(item, visited)
+      if (found) return found
+    }
+    return ""
+  }
+  const data = record(value)
+  const playUrl = record(record(data.music).play_url)
+  const urlList = Array.isArray(playUrl.url_list) ? playUrl.url_list : []
+  const url = String(urlList.find(Boolean) || playUrl.url || "")
+  if (/^https?:\/\//i.test(url) && /mp3|m4a|aac|audio|ies-music|douyinstatic/i.test(url)) return url.replace(/^http:\/\//i, "https://")
+  for (const child of Object.values(value)) {
+    const found = extractDouyinMusicFromJson(child, visited)
+    if (found) return found
+  }
+  return ""
+}
+
 export function createDouyinBrowserResolver(ports:{getSharedBrowser():Promise<Browser>;scheduleSharedBrowserClose():void;logger?:MediaLogger}) {
 const {getSharedBrowser,scheduleSharedBrowserClose}=ports
 const RESOLVE_RESULT_TTL_MS = 60_000
@@ -266,6 +292,7 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
     const result = {
       play_url: playUrl,
       images: noteImages,
+      music_url: detailJson ? extractDouyinMusicFromJson(detailJson) : "",
       media_kind: playUrl ? (isNoteShare ? "note" : "video") : (noteImages.length ? "note" : "video"),
       cover_url: domInfo?.poster || "",
       title: domInfo?.title || "",

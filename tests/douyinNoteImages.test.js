@@ -182,3 +182,11 @@ test("视频作品行为不变:时长有效时走视频路径,无图集节点", 
     globalThis.fetch = previousFetch
   }
 })
+
+test("extractDouyinMusicFromJson 深找图文作品的背景音乐直链", async () => {
+  const { extractDouyinMusicFromJson } = await import("../utils/douyinBrowserResolver.js")
+  const detail = { aweme_detail: { aweme_id: "123", music: { play_url: { url_list: ["http://sf3-cdn-tos.douyinstatic.com/obj/ies-music/abc.mp3"] } } } }
+  assert.equal(extractDouyinMusicFromJson(detail), "https://sf3-cdn-tos.douyinstatic.com/obj/ies-music/abc.mp3")
+  assert.equal(extractDouyinMusicFromJson({ no: "music" }), "")
+  assert.equal(extractDouyinMusicFromJson([{ music: { play_url: { url: "https://example/audio.m4a" } } }]), "https://example/audio.m4a")
+})

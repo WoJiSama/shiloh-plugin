@@ -49,6 +49,9 @@ test("concurrent groups reuse one Bilibili MP4 download while keeping separate r
   let downloadCalls = 0
   try {
     globalThis.fetch = async url => {
+      if (String(url).includes("finger/spi")) {
+        return { ok: true, async json() { return { code: 0, data: {} } } }
+      }
       if (String(url).includes("x/player/playurl")) {
         playbackCalls += 1
         return {
@@ -208,6 +211,9 @@ test("ordinary automatic relay never includes an authorization cookie", async ()
   try {
     globalThis.fetch = async (url, options = {}) => {
       seenCookies.push(options.headers?.Cookie || "")
+      if (String(url).includes("finger/spi")) {
+        return { ok: true, async json() { return { code: 0, data: {} } } }
+      }
       if (String(url).includes("x/player/playurl")) {
         return { ok: true, async json() { return { code: 0, data: { quality: 6, durl: [{ url: "https://video.example/ordinary.mp4?temporary=1", size: 4 }] } } } }
       }
@@ -223,7 +229,8 @@ test("ordinary automatic relay never includes an authorization cookie", async ()
       logger: { warn() {} }
     })
 
-    assert.deepEqual(seenCookies, ["", ""])
+    // 三次请求 = spi 指纹(无 cookie) + playurl(匿名 buvid 为空) + 视频下载,均无授权 cookie
+    assert.deepEqual(seenCookies, ["", "", ""])
     assert.equal(result.usedAuthorizedRetry, false)
     await cleanupBilibiliArchiveRelayFiles(result.tempFiles)
   } finally {

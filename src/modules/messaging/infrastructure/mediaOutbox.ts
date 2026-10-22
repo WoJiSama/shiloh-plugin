@@ -576,11 +576,12 @@ class MediaOutbox {
         .map(text => String(text || "").trim())
         .filter(Boolean)
         .map(text => ({ user_id: senderId, nickname: senderName, message: [text] }))
+      // 图集节点在前、视频节点在后:图文作品的配乐视频按预期排在图片之后
       const nodes = [
         { user_id: senderId, nickname: senderName, message: [this.formatInfo(job, card), ...inlineSegments] },
         ...textOnlyNodes,
-        ...videos.map(video => ({ user_id: senderId, nickname: senderName, message: [video] })),
-        ...galleryImages.map(image => ({ user_id: senderId, nickname: senderName, message: [image] }))
+        ...galleryImages.map(image => ({ user_id: senderId, nickname: senderName, message: [image] })),
+        ...videos.map(video => ({ user_id: senderId, nickname: senderName, message: [video] }))
       ]
       await heartbeat.assertOwned()
       this.logger?.info?.(`[MediaOutbox] 发送 group=${job.groupId} id=${job.id} attempt=${job.attempts} nodes=${nodes.length}`)
