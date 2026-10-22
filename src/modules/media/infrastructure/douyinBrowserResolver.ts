@@ -194,9 +194,12 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
     // 拦截纯浪费的流量:页面自播的视频流(media/m4s,MB级)、字体、埋点上报。
     // 播放地址只从 video 元素 src 属性与 detail 接口取,不依赖页面真的播放
     await page.setRequestInterception(true).catch(() => {})
+    let musicFromNetwork = ""
     page.on("request", request => {
       const type = request.resourceType()
       const url = request.url()
+      // 图文作品的背景音乐会以 media 类型请求:记录直链后照常拦截(不需要真的下载播放)
+      if (!musicFromNetwork && type === "media" && /^https?:\/\//i.test(url) && /(ies-music|\.mp3|\.m4a|\.aac|audio)/i.test(url)) musicFromNetwork = url
       if (type === "media" || type === "font") return request.abort("blockedbyclient").catch(() => {})
       if (/\.(woff2?|ttf|otf|m4s|ts|mp4)(\?|$)/i.test(url)) return request.abort("blockedbyclient").catch(() => {})
       if (/\/(webmssdk|mcs|slardar|tnc|collect|beacon|applog)[/?]|\/log\//i.test(url)) return request.abort("blockedbyclient").catch(() => {})
@@ -254,6 +257,7 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
     mark("waits")
 
     const domInfo = await page.evaluate(awemeId => {
+      const routerDataJson = JSON.stringify((window as Window & {_ROUTER_DATA?:unknown})._ROUTER_DATA || null)
       const video = document.querySelector("video")
       const sources = video ? [video.src, video.currentSrc, ...[...video.querySelectorAll("source")].map(s => s.src)] : []
       const src = sources.find(Boolean) || ""
@@ -281,7 +285,7 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
       const galleryImages = gallerySet.length ? gallerySet
         : byMarker.length ? byMarker
         : douyinpicImages
-      return { src: String(src || ""), poster: String(poster || ""), title: String(title || "").trim(), ogTitle: String(ogTitle || "").trim(), jsonLd, galleryImages, awemeId }
+      return { src: String(src || ""), poster: String(poster || ""), title: String(title || "").trim(), ogTitle: String(ogTitle || "").trim(), jsonLd, galleryImages, awemeId, routerDataJson }
     }, awemeId).catch(() => null)
 
     const domGalleryImages = dedupeByTosKey((domInfo?.galleryImages || []).map(String))
@@ -289,10 +293,18 @@ async function resolveDouyinShareInPage(card:DouyinCard = {}, { timeoutMs = RESO
       ? dedupeByTosKey(extractNoteImagesFromJson(detailJson))
       : domGalleryImages
     const playUrl = (domInfo && /^https?:\/\//i.test(domInfo.src) ? domInfo.src : "") || (detailJson ? extractPlayUrlFromJson(detailJson) : "")
+    // 背景音乐三级来源:detail 响应 → 页面 _ROUTER_DATA → 网络层捕获的 media 请求
+    let musicUrl = detailJson ? extractDouyinMusicFromJson(detailJson) : ""
+    if (!musicUrl && domInfo?.routerDataJson && domInfo.routerDataJson !== "null") {
+      try {
+        musicUrl = extractDouyinMusicFromJson(JSON.parse(domInfo.routerDataJson))
+      } catch {}
+    }
+    if (!musicUrl) musicUrl = musicFromNetwork
     const result = {
       play_url: playUrl,
       images: noteImages,
-      music_url: detailJson ? extractDouyinMusicFromJson(detailJson) : "",
+      music_url: musicUrl,
       media_kind: playUrl ? (isNoteShare ? "note" : "video") : (noteImages.length ? "note" : "video"),
       cover_url: domInfo?.poster || "",
       title: domInfo?.title || "",
