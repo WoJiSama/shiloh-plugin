@@ -66,7 +66,9 @@ const runner:MediaCommandRunner = ports.runner ?? promisify(execFile)
 async function probeAudioDurationSeconds(file:string):Promise<number> {
   try {
     const output = await runner("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { timeout: 15000, maxBuffer: 64 * 1024 })
-    const seconds = Number(String(output).trim().split("\n")[0])
+    // promisify(execFile) 返回 {stdout,stderr},兼容直接返回字符串的注入 runner
+    const text = output && typeof output === "object" && "stdout" in (output as Record<string,unknown>) ? String((output as Record<string,unknown>).stdout) : String(output)
+    const seconds = Number(text.trim().split("\n")[0])
     return Number.isFinite(seconds) && seconds > 0 ? seconds : 0
   } catch {
     return 0
@@ -232,6 +234,7 @@ async function buildDouyinArchiveRelaySegments(card:DouyinCard = {}, {
           }
         } else {
           await fs.promises.unlink(musicFile).catch(() => {})
+          logger?.info?.(`[抖音图集] 配乐时长异常(${audioSeconds}s),跳过合成`)
         }
       }
     }
