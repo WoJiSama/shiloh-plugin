@@ -95,7 +95,7 @@ test("parses __INITIAL_STATE__ note detail map", () => {
   assert.equal(card.comment_count, 42)
   assert.equal(card.media_kind, "image")
   assert.equal(card.metadata_status, "resolved")
-  assert.deepEqual(card.images, ["https://sns-img-qc.xhscdn.com/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8"])
+  assert.deepEqual(card.images, ["https://sns-webpic-qc.xhscdn.com/202610192230/aaa/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8!h5_1080jpg"], "infoList[0].url 原样保留")
 })
 
 test("state without note data returns null", () => {
@@ -134,7 +134,7 @@ test("extracts per-image live photos aligned with the gallery", () => {
   const state = {note: {detail: {imageList: [image(true, "1040g2sg0000000000000000000000aa1"), image(false, "1040g2sg0000000000000000000000aa2"), image(true, "1040g2sg0000000000000000000000aa3")]}}}
   const gallery = extractXiaohongshuGallery(state)
   assert.equal(gallery.length, 3)
-  assert.equal(gallery[0].imageUrl, "https://sns-img-qc.xhscdn.com/1040g2sg0000000000000000000000aa1")
+  assert.equal(gallery[0].imageUrl, "https://sns-webpic-qc.xhscdn.com/202610192230/sig/1040g2sg0000000000000000000000aa1!h5_1080jpg", "原样保留签名链")
   assert.match(gallery[0].liveUrl, /sns-video-qc\.xhscdn\.com\/stream\/1040g2sg0000000000000000000000aa1\.mp4/)
   assert.equal(gallery[1].liveUrl, "", "非实况图为空串,保下标对齐")
   assert.equal(gallery[2].liveUrl.includes("aa3"), true)
@@ -206,7 +206,7 @@ test("enrich falls back to the browser resolver when the static page has no note
     assert.equal(card.title, "浏览器标题")
     assert.equal(card.author, "作者A")
     assert.equal(card.media_kind, "video")
-    assert.deepEqual(card.images, ["https://sns-img-qc.xhscdn.com/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8"])
+    assert.deepEqual(card.images, ["https://sns-webpic-qc.xhscdn.com/202610192230/sig/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8!h5_1080jpg"])
   } finally {
     globalThis.fetch = previousFetch
   }

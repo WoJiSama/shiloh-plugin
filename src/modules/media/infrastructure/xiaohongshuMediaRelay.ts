@@ -63,9 +63,9 @@ function downloadXiaohongshuVideo(card:XiaohongshuCard = {}, options:{maxBytes?:
   return downloadXiaohongshuVideoUrl(String(card.play_url || ""), String(card.note_id || "video"), options)
 }
 
-async function downloadXiaohongshuImage(rawUrl = "", { maxBytes = XHS_NOTE_IMAGE_MAX_BYTES, timeoutMs = XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS, logger = ports.logger }:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
-  const url = normalizeXiaohongshuImageUrl(rawUrl)
-  if (!/^https?:\/\//i.test(String(url || ""))) return null
+// 新上传笔记(1040g3k8 段 fileid)已关闭无签名直链(404),老图仍开放:
+// 下载先按原始链接(带签名,短时效但投递期内可用),失败再试无签名重建
+async function downloadXiaohongshuImageOnce(url:string, { maxBytes, timeoutMs, logger }:{maxBytes:number;timeoutMs:number;logger?:MediaLogger|undefined}) {
   const dir = path.join(os.tmpdir(), "shiloh-plugin-xiaohongshu-note")
   await fs.promises.mkdir(dir, { recursive: true })
   const filePath = path.join(dir, `${Date.now()}-${Math.random().toString(16).slice(2)}${xiaohongshuImageExtension(url)}`)
@@ -102,6 +102,24 @@ async function downloadXiaohongshuImage(rawUrl = "", { maxBytes = XHS_NOTE_IMAGE
   }
 }
 
+async function downloadXiaohongshuImage(rawUrl = "", options:{maxBytes?:number;timeoutMs?:number;logger?:MediaLogger|undefined} = {}) {
+  const original = String(rawUrl || "").trim().replace(/^http:\/\//i, "https://")
+  if (!/^https:\/\//i.test(original)) return null
+  const direct = await downloadXiaohongshuImageOnce(original, {
+    maxBytes: options.maxBytes ?? XHS_NOTE_IMAGE_MAX_BYTES,
+    timeoutMs: options.timeoutMs ?? XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS,
+    logger: options.logger ?? ports.logger
+  })
+  if (direct) return direct
+  const rebuilt = normalizeXiaohongshuImageUrl(original)
+  if (!rebuilt || rebuilt === original) return null
+  return await downloadXiaohongshuImageOnce(rebuilt, {
+    maxBytes: options.maxBytes ?? XHS_NOTE_IMAGE_MAX_BYTES,
+    timeoutMs: options.timeoutMs ?? XHS_NOTE_IMAGE_DOWNLOAD_TIMEOUT_MS,
+    logger: options.logger ?? ports.logger
+  })
+}
+
 async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   segmentApi = ports.segmentApi,
   logger = ports.logger,
@@ -125,11 +143,12 @@ async function buildXiaohongshuRelaySegments(card:XiaohongshuCard = {}, {
   const maxVideoSeconds = Math.max(1, Number(xiaohongshuRelay.maxVideoSeconds) || XHS_ARCHIVE_VIDEO_MAX_SECONDS)
   const maxVideoBytes = Math.max(1, Number(xiaohongshuRelay.maxVideoBytes) || XHS_ARCHIVE_VIDEO_MAX_BYTES)
   const videoDownloadTimeoutMs = Number(xiaohongshuRelay.videoDownloadTimeoutMs) || XHS_ARCHIVE_VIDEO_DOWNLOAD_TIMEOUT_MS
-  // 原位清洗保与 live_photos 的下标对齐:非法槽位置 "" 由循环跳过,不做剔除
+  // 原位清洗保与 live_photos 的下标对齐:非法槽位置 "" 由循环跳过,不做剔除。
+  // 保留原始链接(新图已关闭无签名直链),重建兜底在下载函数内做
   const noteImages = (Array.isArray(card.images) ? card.images : [])
     .map(url => {
-      const normalized = normalizeXiaohongshuImageUrl(url)
-      return /^https?:\/\//i.test(String(normalized || "")) ? normalized : ""
+      const text = String(url || "").trim().replace(/^http:\/\//i, "https://")
+      return /^https:\/\//i.test(text) ? text : ""
     })
   const images = noteImages.some(Boolean) ? noteImages : (card.cover_url ? [normalizeXiaohongshuImageUrl(card.cover_url)].filter(Boolean) : [])
 

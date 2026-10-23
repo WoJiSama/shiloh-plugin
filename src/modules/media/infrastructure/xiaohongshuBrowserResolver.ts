@@ -1,6 +1,6 @@
 import type {Browser,Page} from "puppeteer"
 import {record,errorText,type XiaohongshuCard,type MediaLogger} from "./xiaohongshuTypes.js"
-import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo,extractXiaohongshuDescription,extractXiaohongshuGallery} from "./xiaohongshuMessage.js"
+import {normalizeXiaohongshuImageUrl,parseXiaohongshuInitialState,buildCardFromNoteState,extractXiaohongshuVideo,extractXiaohongshuDescription,extractXiaohongshuGallery,extractXiaohongshuFileId} from "./xiaohongshuMessage.js"
 import { createSingleFlightResolver } from "../../foundation/infrastructure/singleFlightResolver.js"
 
 const RESOLVE_TIMEOUT_MS = 25_000
@@ -43,12 +43,21 @@ export function extractFromDomPayload(payload:{
     description = lines.slice(expandIndex + 1, stopIndex > 0 ? stopIndex : undefined).join(" ").slice(0, 2000)
   }
   const isNoteImage = (url:string) => /(sns-webpic|sns-img|sns-video)[^/]*\.xhscdn\.com/i.test(url) && !/\/avatar\//i.test(url)
-  const images = [...new Set((payload.imageUrls || []).map(String).filter(isNoteImage).map(normalizeXiaohongshuImageUrl).filter(Boolean))]
+  // 保留原始(带签名)链接——新图已关闭无签名直链;同图多 CDN 变体按 fileId 去重
+  const seenIds = new Set<string>()
+  const images:string[] = []
+  for (const raw of (payload.imageUrls || []).map(String).filter(isNoteImage)) {
+    const fileId = extractXiaohongshuFileId(raw)
+    const dedupeKey = fileId || raw
+    if (seenIds.has(dedupeKey)) continue
+    seenIds.add(dedupeKey)
+    images.push(raw.replace(/^http:\/\//i, "https://"))
+  }
   return {
     title,
     author,
     description,
-    cover_url: images[0] || normalizeXiaohongshuImageUrl(payload.ogImage) || "",
+    cover_url: images[0] || String(payload.ogImage || "").replace(/^http:\/\//i, "https://"),
     images,
     media_kind: payload.hasVideo ? "video" : "image"
   }

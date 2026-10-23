@@ -282,7 +282,7 @@ export function extractXiaohongshuGallery(state:unknown, visited = new Set<objec
   return (imageList as Record<string,unknown>[]).map(entry => {
     const info = record(entry)
     const infoList = Array.isArray(info.infoList) ? info.infoList : []
-    const imageUrl = normalizeXiaohongshuImageUrl(record(infoList[0]).url || info.urlDefault || info.url)
+    const imageUrl = normalizeUrl(record(infoList[0]).url || info.urlDefault || info.url)
     const liveUrl = info.livePhoto === true ? firstStreamUrl(info.stream) : ""
     return {imageUrl, liveUrl}
   }).filter(entry => entry.imageUrl || entry.liveUrl)
@@ -333,13 +333,14 @@ export function buildCardFromNoteState(base:XiaohongshuCard = {}, noteDetailMap:
   const user = record(note.user)
   const interact = record(note.interactInfo)
   const imageList = Array.isArray(note.imageList) ? note.imageList : []
+  // 保留原始链接(新图已关闭无签名直链),仅统一 https;重建兜底在下载层
   const images = [...new Set(imageList.map(image => {
     const info = record(image)
     const infoList = Array.isArray(info.infoList) ? info.infoList : []
-    return normalizeXiaohongshuImageUrl(record(infoList[0]).url || info.urlDefault || info.url)
+    return normalizeUrl(record(infoList[0]).url || info.urlDefault || info.url)
   }).filter(Boolean))]
   const video = record(note.video)
-  const firstFrame = normalizeXiaohongshuImageUrl(record(video.image).firstFrameUrl || record(imageList[0]).urlDefault)
+  const firstFrame = normalizeUrl(record(video.image).firstFrameUrl || record(imageList[0]).urlDefault)
   return {
     ...base,
     note_id: String(wantedId || entries[0]?.[0] || "").trim(),
@@ -429,8 +430,8 @@ async function enrichXiaohongshuShare(card:XiaohongshuCard = {}, options:Xiaohon
           // 实况与图按下标对齐:仅当两者等长时保留对齐原样传递,否则退化为去重图片
           const aligned = resolvedLives.length > 0 && resolvedLives.length === resolvedImages.length
           const images = aligned
-            ? resolvedImages.map(url => normalizeXiaohongshuImageUrl(url))
-            : [...new Set(resolvedImages.map(url => normalizeXiaohongshuImageUrl(url)).filter(Boolean))]
+            ? resolvedImages.map(url => normalizeUrl(url))
+            : [...new Set(resolvedImages.map(url => normalizeUrl(url)).filter(Boolean))]
           return {
             ...card,
             title: cleanText(resolved.title || card.title || "小红书笔记", 300),

@@ -59,8 +59,9 @@ test("extracts title/author/description/images from mobile DOM payload", () => {
   assert.ok(!result.description.includes("发弹幕"))
   assert.equal(result.media_kind, "video")
   // 头像(avatar)与 UI 图被过滤,只剩笔记封面且已重建为无签名图床地址
-  assert.deepEqual(result.images, ["https://sns-img-qc.xhscdn.com/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8"])
-  assert.equal(result.cover_url, "https://sns-img-qc.xhscdn.com/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8")
+  // 新语义:保留原始(签名)链接仅统一 https
+  assert.deepEqual(result.images, ["https://sns-webpic-qc.xhscdn.com/202610192230/sig/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8!h5_1080jpg"])
+  assert.equal(result.cover_url, "https://sns-webpic-qc.xhscdn.com/202610192230/sig/1040g2sg326fbqndbk4e05q0i05bji0mff371lb8!h5_1080jpg")
 })
 
 test("DOM extraction tolerates imageless pages", () => {
