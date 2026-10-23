@@ -71,7 +71,8 @@ test("主回合防护合同:私聊门禁双验/无工具/心情键/成员图防�
   const testJs = readPluginSources()
 
   assert.ok(chatTurn.includes("evaluatePrivateChatGate({ config: host.config, e"), "主回合二次门禁(保护 #tool 直入)")
-  assert.ok(chatTurn.includes("isPrivateChat ? [] : host.tools"), "私聊回合不带群工具")
+  assert.ok(chatTurn.includes("isPrivateChat ? privateTools : host.tools"), "私聊回合只带私聊工具(默认仅表情包)")
+  assert.ok(chatTurn.includes("sendLocalEmojiTool"), "私聊开放表情包工具")
   assert.ok(chatTurn.includes("isPrivateChat ? `private:${userId}` : groupId"), "心情冷却私聊按用户")
   assert.ok(chatTurn.includes("isPrivateChat ? null : (memberMap || await e.bot.pickGroup(groupId).getMemberMap())"), "私聊跳过群成员表")
   assert.ok(readSource("src/modules/conversation/infrastructure/conversationEntryPolicy.ts").includes("markConversationInterrupted(scopeKey)"), "违禁词中断用作用域键")
@@ -82,4 +83,40 @@ test("compiled strict entry routes private events before touching group state", 
  const event={message_type:'private',user_id:7}
  const result=await createStrictConversation({}).handleRandomReply({handlePrivateChat:async incoming=>{assert.equal(incoming,event);return 'private'}},event)
  assert.equal(result,'private')
+})
+
+test("私聊体验优化:措辞/历史标题/引用概率/状态隔离", async () => {
+  // 1. 消息格式化:私聊不带群身份、不说"在群里说"
+  const formatting = readSource("src/modules/conversation/application/messageFormatting.ts")
+  assert.ok(formatting.includes('e?.message_type === "private"'), "格式化感知私聊")
+  assert.ok(formatting.includes('"在群里"}说:'), "私聊措辞去掉'在群里'")
+  // 2. 历史包装私聊标题
+  const intelligence = readSource("src/modules/conversation/domain/agentIntelligence.ts")
+  assert.ok(intelligence.includes("【私聊上下文】"), "历史标题有私聊变体")
+  // 3. 引用概率:finalReply 私聊分支
+  const finalReply = readSource("src/modules/conversation/application/finalReply.ts")
+  assert.ok(finalReply.includes("resolveReplyQuoteChance"), "回复引用走场景分支")
+  const { DEFAULT_PRIVATE_CHAT_CONFIG, normalizePrivateChatConfig } = await import("../dist/backend/modules/conversation/domain/privateChat.js")
+  assert.equal(DEFAULT_PRIVATE_CHAT_CONFIG.quoteChance, 0.05, "私聊引用默认 0.05")
+  assert.equal(normalizePrivateChatConfig({ quoteChance: 2 }).quoteChance, 1, "quoteChance 钳 0~1")
+  assert.equal(DEFAULT_PRIVATE_CHAT_CONFIG.mergeMs, 1200, "合并窗口默认 1.2s")
+  assert.equal(DEFAULT_PRIVATE_CHAT_CONFIG.cooldownSeconds, 0, "冷却默认 0(合并窗口替代静默吞)")
+  // 4. smartKey 私聊按用户隔离
+  const { smartConversationKey } = await import("../dist/backend/modules/conversation/domain/conversationIdentity.js")
+  const keyA = smartConversationKey("", { self_id: 10001, message_type: "private", user_id: "111" })
+  const keyB = smartConversationKey("", { self_id: 10001, message_type: "private", user_id: "222" })
+  assert.notEqual(keyA, keyB, "不同私聊用户的会话键不同")
+  assert.ok(String(keyA).includes("private:111"), "键含 private:userId")
+  assert.equal(smartConversationKey(123, { self_id: 10001 }), "bot:10001:group:123", "群聊键不变")
+  // 5. 情绪作用域私聊隔离
+  const finalReplySrc = readSource("src/modules/conversation/application/finalReply.ts")
+  assert.ok(finalReplySrc.includes("`private:${userId}` : groupId"), "情绪按 private:userId 隔离")
+  // 6. 合并调度:私聊可合并+专属窗口
+  const scheduling = readSource("src/modules/conversation/infrastructure/conversationScheduling.ts")
+  assert.ok(scheduling.includes('message_type === "private"'), "调度感知私聊")
+  const chatPluginSrc = readSource("src/modules/host/infrastructure/chatPlugin.ts")
+  assert.ok(chatPluginSrc.includes('e.message_type !== "private"'), "合并调度放行私聊")
+  // 7. 指认跳过 + 系统提示词措辞
+  const chatTurnSrc = readSource("src/modules/tools/infrastructure/chatTurn.ts")
+  assert.ok(chatTurnSrc.includes('isPrivateChat ? "" : buildAddresseePrompt'), "私聊跳过群向指认提示")
 })

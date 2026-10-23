@@ -14,6 +14,7 @@ import { randomUUID } from "crypto"
 import {createPersonaSnapshot} from "../../conversation/infrastructure/personaSnapshot.js"
 import {scheduleSkippedIntentShadow} from '../../conversation/application/intentShadow.js'
 import {MEMBER_INFO_PATTERNS, CHAT_HISTORY_PATTERNS} from '../domain/memberMemoryIntent.js'
+import {normalizePrivateChatConfig} from '../../conversation/domain/privateChat.js'
 
 // Only the quoted message's own text is eligible as a previous bot reply, not nested forwards.
 function quotedMessageText(reply: QuotedMessage | null): string {
@@ -92,8 +93,12 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     const { group_id: groupId, user_id: userId, msg } = e
     const sessionId = randomUUID()
     e.sessionId = sessionId
-    const session = host.getOrCreateSession(sessionId, isPrivateChat ? [] : host.tools)
-    const turnAvailableTools = [...(isPrivateChat ? [] : session.tools || [])]
+    // 私聊默认零工具;可配开放表情包,让一对一对话不至于全靠文字
+    const privateTools = normalizePrivateChatConfig((host.config && typeof host.config === "object" ? (host.config as {privateChat?:unknown}).privateChat : undefined) as never).allowEmojiTool
+      ? (host.tools || []).filter(tool => tool?.function?.name === "sendLocalEmojiTool")
+      : []
+    const session = host.getOrCreateSession(sessionId, isPrivateChat ? privateTools : host.tools)
+    const turnAvailableTools = [...(isPrivateChat ? [...privateTools] : session.tools || [])]
     session.tools = turnAvailableTools
     session.toolDecision = null
     delete session.executionTools
@@ -381,7 +386,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           sameUserAsLastReply: Boolean(smartStateForSignal?.lastBotReplyToUserId && String(userId) === String(smartStateForSignal.lastBotReplyToUserId)),
           prefilterKind: e?._prefilterKind || "regular"
         })
-        const addresseePrompt = buildAddresseePrompt(session.addresseeSignal)
+        // 私聊里"面向全群/回应群里其他人"的指认提示全部失真,直接不注入
+        const addresseePrompt = isPrivateChat ? "" : buildAddresseePrompt(session.addresseeSignal)
 
         // 分层画像：闲聊只喂保底层，任务/知识/带素材回合注入全部层（依据前置的意图判定）
         session.promptLayerProfile = resolvePromptLayerProfile({
@@ -687,7 +693,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
           runtimeData,
           enhancedPrompts,
           mcpPrompts,
-          personaName: resolvePersonaName(chatPersona)
+          personaName: resolvePersonaName(chatPersona),
+          isPrivateChat
         })
         // 获取历史记录
         if (host.config.groupHistory) {

@@ -12,7 +12,7 @@ export interface MergeMessage {event:ScheduledEvent;text:string;at:number}
 export type MergeMessages=MergeMessage[] & {droppedCount?:number}
 interface MergeEntry {timer:ReturnType<typeof setTimeout>;messages:MergeMessages;droppedCount:number;reason?:string}
 export interface SchedulingHost {
- config:{enabled?:unknown;chatTriggerMode?:string;smartTrigger?:{deferredGateEnabled?:boolean;avgLatencyDefaultMs?:number;minDeferredMs?:number;maxDeferredMs?:number;toolRequestMergeMs?:number;smartLockTimeoutMs?:number|string|null;replyDebounceMs?:number;maxConsecutiveInterrupts?:number}};
+ config:{enabled?:unknown;chatTriggerMode?:string;privateChat?:{mergeMs?:unknown};smartTrigger?:{deferredGateEnabled?:boolean;avgLatencyDefaultMs?:number;minDeferredMs?:number;maxDeferredMs?:number;toolRequestMergeMs?:number;smartLockTimeoutMs?:number|string|null;replyDebounceMs?:number;maxConsecutiveInterrupts?:number}};
  tools?:{function?:{name?:string}}[];
  resolveTalkValue(groupId:string|number):number;computeAvgReplyLatency(state:ConversationState):number;checkGroupPermission(e:ScheduledEvent):boolean;
  isUserBlacklisted(e:ScheduledEvent):boolean;isMutedInGroup(e:ScheduledEvent):Promise<boolean>;handleRandomReplySmart(e:ScheduledEvent):Promise<unknown>;handleTool(e:ScheduledEvent):Promise<unknown>;
@@ -78,6 +78,12 @@ function scheduleDeferredGateCheck(host:SchedulingHost,e:ScheduledEvent,state:Co
   }
 
 function getMergeMsForEvent(host:SchedulingHost,e:ScheduledEvent) {
+    // 私聊连发合并窗口:并成一次回复,替代原先 3s 冷却内静默吞掉
+    if ((e as {message_type?:string}).message_type === "private") {
+      const raw = (host.config as {privateChat?:{mergeMs?:unknown}} | undefined)?.privateChat
+      const ms = Math.max(0, Number(raw?.mergeMs ?? 1200))
+      return Math.min(5000, ms)
+    }
     const availableToolNames = (host.tools || []).flatMap(tool => tool?.function?.name ? [tool.function.name] : [])
     return resolveToolRequestMergeMs(e.msg || "", availableToolNames, {
       defaultMs: host.getDirectTriggerMergeMs(),
@@ -184,7 +190,8 @@ function scheduleMergedDirectTrigger(host:SchedulingHost,e:ScheduledEvent,handle
   }
 
 function isMergeableToolRequest(host:SchedulingHost,e:ScheduledEvent) {
-    if (!e?.group_id || !e?.user_id || e?._toolRequestMerged || e?._directTriggerMerged || e?._smartWaitRerun || e?._smartQueuedRerun || e?._proactiveReply) return false
+    const isPrivateChat = (e as {message_type?:string}).message_type === "private"
+    if ((!e?.group_id && !isPrivateChat) || !e?.user_id || e?._toolRequestMerged || e?._directTriggerMerged || e?._smartWaitRerun || e?._smartQueuedRerun || e?._proactiveReply) return false
     if (e.forceGrabRedBag || host.isCommand(e)) return false
     const text = String(e.msg || "").trim()
     if (!text || isDrawTaskStatusInquiry(text)) return false

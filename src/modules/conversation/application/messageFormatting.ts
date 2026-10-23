@@ -7,7 +7,7 @@ import { ROLE_MAP as roleMap } from "../domain/messageContext.js"
 interface Segment {type?:string;text?:string;qq?:unknown;user_id?:unknown;url?:unknown;file_url?:unknown;file?:unknown;name?:unknown;data?:{url?:unknown;file_url?:unknown;file?:unknown;name?:unknown;qq?:unknown;user_id?:unknown}}
 interface Reply {sender?:ChatMember;message?:Segment[];raw_message?:string;message_id?:string|number}
 export interface Group {getMemberMap():Promise<Map<number,ChatMember>>}
-export interface FormatEvent {message_id?:unknown;group?:Group;message?:Segment[];getReply?():Promise<unknown>;_groupContextAssets?:unknown;_groupContextImagePrompt?:string;_quotedPromptContext?:{senderName?:string;messageId?:unknown;text?:string;mediaSummary?:string}}
+export interface FormatEvent {message_id?:unknown;message_type?:string;group?:Group;message?:Segment[];getReply?():Promise<unknown>;_groupContextAssets?:unknown;_groupContextImagePrompt?:string;_quotedPromptContext?:{senderName?:string;messageId?:unknown;text?:string;mediaSummary?:string}}
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' ? Object.fromEntries(Object.entries(value)) : {}
 }
@@ -57,7 +57,11 @@ async function buildMessageContent(host:MessageFormattingPort, sender:ChatMember
         senderMember = memberMap.get(Number(sender.user_id)) || sender
       } catch {}
     }
-    const senderInfo = `${formatMemberDisplayName(senderMember, sender.card || sender.nickname)}(qq号: ${sender.user_id})[群身份: ${senderRole}]${messageId}`
+    // 私聊是两人对话:去掉群身份标记,避免"私聊里她在群里"的心智错位
+    const isPrivateChat = e?.message_type === "private"
+    const senderInfo = isPrivateChat
+      ? `${formatMemberDisplayName(senderMember, sender.card || sender.nickname)}(qq号: ${sender.user_id})${messageId}`
+      : `${formatMemberDisplayName(senderMember, sender.card || sender.nickname)}(qq号: ${sender.user_id})[群身份: ${senderRole}]${messageId}`
 
     let atContent = ""
     if (atQq.length > 0 && group) {
@@ -194,7 +198,7 @@ async function buildMessageContent(host:MessageFormattingPort, sender:ChatMember
           }).join('').replace(/^#tool\s*/, '').trim()
         } catch {}
       }
-      content.push(`在群里说: ${fullMsg}`)
+      content.push(`${e?.message_type === "private" ? "" : "在群里"}说: ${fullMsg}`)
     }
     const currentForwardPromptText = (typeof assets.currentForwardText === 'string' ? assets.currentForwardText : '') ||
       await host.resolveForwardPromptFromSegments(e?.message || [], group)
@@ -219,7 +223,7 @@ function formatMessages(host:unknown, messages:Parameters<typeof buildStructured
     const middle = messages
       .slice(systemMsgs.length, messages.length - lastUser.length)
       .filter(message => !String(message?.content || "").startsWith("【系统提示】"))
-    const historyContext = buildStructuredHistoryMessage(middle)
+    const historyContext = buildStructuredHistoryMessage(middle, { isPrivateChat: (e as {message_type?:string} | null)?.message_type === "private" })
 
     return [
       ...systemMsgs,

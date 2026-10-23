@@ -59,6 +59,16 @@ interface FinalPorts {
  getActiveConversation(event:FinalEvent):{chatHistory?:Message[]}|undefined;trackingKey(event:FinalEvent):string;
  rememberPersonaReply(event:FinalEvent & {message_id?:unknown},text:string,source?:PersonaScope):unknown;rememberStyleReply(event:FinalEvent,text:string,config:unknown):unknown;
 }
+// 私聊一对一对话引用基本无意义(群聊引用是为了让旁人知道在回谁),
+// 用私聊专属低概率 quoteChance;群聊维持 0.5
+function resolveReplyQuoteChance(e:unknown, config:unknown) {
+  const event = e as {message_type?:string} | null
+  if (event?.message_type !== "private") return 0.5
+  const raw = (config && typeof config === "object" ? (config as {privateChat?:unknown}).privateChat : null) || {}
+  const chance = Number((raw as {quoteChance?:unknown}).quoteChance)
+  return Number.isFinite(chance) ? Math.min(1, Math.max(0, chance)) : 0.05
+}
+
 export function createFinalReply(ports:FinalPorts) {
 const {logger,extractModrinthForwardItems,stripModrinthForwardMarkers,applyOutputPersonaGuards,findRecentBotImage,recordEpisode,recordTurnContinuity}=ports
 function buildInternalStatusSafeReply(toolName = '', session:FinalSession = {}) {
@@ -187,7 +197,7 @@ async function handleTextResponse(host:FinalReplyHost, content:string, e:FinalEv
         ? await host.sendFinalReplyAsTextImage(e, output, "document")
         : textImageTemplate || markdownFallback
         ? await host.sendFinalReplyAsTextImage(e, output, textImageTemplate || "document")
-        : await host.sendSegmentedMessage(e, output, 0.5, { alreadyGuarded: true })
+        : await host.sendSegmentedMessage(e, output, resolveReplyQuoteChance(e, host.config), { alreadyGuarded: true })
 
     const deliveredMessageId = typeof botMessageId === 'string' || typeof botMessageId === 'number' ? botMessageId : extractDeliveryMessageId(botMessageId)
     if (deliveredMessageId === null) {
@@ -334,7 +344,9 @@ async function updateEnhancedSystems(host:FinalReplyHost, e:FinalEvent, userMess
     // 1. 更新情感系统
     if (host.config.emotionSystem?.enabled) {
       const isAtBot = messageMentionsUser(e, e?.bot?.uin || e?.self_id || ports.bot().uin)
-      emotionState = await host.emotionManager.updateEmotionFromMessage(groupId, userMessage, isAtBot, String(e.self_id || ports.bot().uin || ""))
+      // 私聊按用户隔离情绪:此前 groupId=undefined,所有私聊用户共享一份 bot 情绪互相串台
+      const emotionScope = (e as {message_type?:string}).message_type === "private" ? `private:${userId}` : groupId
+      emotionState = await host.emotionManager.updateEmotionFromMessage(emotionScope, userMessage, isAtBot, String(e.self_id || ports.bot().uin || ""))
     }
 
     // 2. 提取并保存长期记忆（后台异步）

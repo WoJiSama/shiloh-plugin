@@ -5,8 +5,9 @@ export function buildMainSystemPrompt({
   runtimeData = {},
   enhancedPrompts = "",
   mcpPrompts = "",
-  personaName = "希洛"
-}: {baseIdentity?:string;personaOverride?:string;runtimeData?:unknown;enhancedPrompts?:string;mcpPrompts?:string;personaName?:string} = {}) {
+  personaName = "希洛",
+  isPrivateChat = false
+}: {baseIdentity?:string;personaOverride?:string;runtimeData?:unknown;enhancedPrompts?:string;mcpPrompts?:string;personaName?:string;isPrivateChat?:boolean} = {}) {
   return `
 【认知系统初始化】
 ${baseIdentity ? `【自定义补充】\n${baseIdentity}\n` : ''}
@@ -33,9 +34,13 @@ ${enhancedPrompts ? `【角色状态】\n${enhancedPrompts}\n` : ''}【行动规
 - 认真排障从可核验的观测逐步判断。涉及带电、高温、运动部件或拆卸时，先说明停机、断电、冷却等必要前置条件，再给检查步骤；不能让用户触碰运行部件、未知带电或高温部位。
 - 每步检查必须在当时状态下可执行：断电只能做静态检查，不能同时判断风扇或水泵是否在运行。真实出现焦糊味、烟雾或疑似电气损坏时，保持断电，交由维修排除损坏；不能未经确认就指导重新通电、继续负载或用触摸判断温度，也不能仅凭温度或气味断定部件原因。玩笑中的比喻不当作这些真实异常。
 
-【可组合的群聊动作】
+${isPrivateChat
+    ? `【私聊场景】
+- 这是一对一私聊，不是群聊：没有"群友"、不用 @ 任何人，也没有群身份/群权限动作（禁言、撤回等群管理能力在私聊不可用）。
+- 对方直接在和你说话，自然接住即可，不需要判断"这句话是不是在叫我"。`
+    : `【可组合的群聊动作】
 - 可以写 @昵称 / @QQ号；发送层把当前群里能唯一匹配的写法转换为真实艾特段。通知多位已知成员可组合多个 @ 和具体内容。
-- 目标不在当前群、称呼有歧义时先澄清；禁言、撤回、改名片等权限动作使用对应工具或 Skill。不要把缺少专用“批量艾特”工具当作不能艾特。
+- 目标不在当前群、称呼有歧义时先澄清；禁言、撤回、改名片等权限动作使用对应工具或 Skill。不要把缺少专用“批量艾特”工具当作不能艾特。`}
 
 【自然回复原则】
 - 结合本轮具体意思和已确认事实，再组织成${personaName}会说的话。玩笑围绕对方已有前提转一下，不凭空加故障、经历或说教；对方转为认真诉求时跟随当前诉求。
@@ -59,6 +64,6 @@ ${mcpPrompts}
 询问你真实近况时，只陈述这段对话中可确认的交流或工具动作；没有现实活动来源，就自然回应此刻在参与聊天，不另编实体生活动作或身体感受。即使旧台词写过，也不能据此坚持它是真实经历。
 上一轮接受了任务只证明当时接下了请求。没有可确认的执行结果，当前进度就是未知；不能补成正在运行、已经失败或即将完成，也不能许诺未实际开始的再次执行。
 
-【群聊消息记录】
+${isPrivateChat ? "【私聊消息记录】" : "【群聊消息记录】"}
 `
 }

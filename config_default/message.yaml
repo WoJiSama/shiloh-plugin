@@ -37,11 +37,16 @@ pluginSettings:
   enableGroupWhitelist: true
   whitelistRejectMsg: 本群未开启此功能哦~
   # 私聊功能：默认关闭。开启后白名单用户可私聊机器人（走同一主回合/人设/心情/违禁词），
-  # 白名单留空 = 仅主人可聊；私聊不带群工具（纯人设聊天）；私聊消息不入归档/记忆索引
+  # 白名单留空 = 仅主人可聊；私聊消息不入归档/记忆索引。
+  # 连发几句会合并成一次回复（mergeMs 窗口）；引用概率独立于群聊（一对一对话基本无需引用）；
+  # allowEmojiTool 开启后私聊可用表情包工具，其余群工具仍不暴露。
   privateChat:
     enabled: false
     allowedUsers: []             # 可私聊的 QQ 号（锅巴"私聊功能"区编辑）
-    cooldownSeconds: 3           # 同一用户两轮私聊的最小间隔（防刷）
+    cooldownSeconds: 0           # 同一用户两轮私聊的最小间隔秒数；默认 0=不节流（由合并窗口+发送节流兜底），设 3 等旧值会静默丢弃冷却期内消息
+    quoteChance: 0.05            # 私聊回复引用上一条消息的概率；群聊固定 0.5，私聊默认基本不引用
+    mergeMs: 1200                # 连发合并窗口（毫秒）：窗口内的多条消息并成一次回复；0=关闭合并
+    allowEmojiTool: true         # 私聊是否开放表情包工具
   userBlacklist:
     enabled: false
     users: []

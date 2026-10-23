@@ -748,11 +748,12 @@ class ExamplePlugin extends ports.Plugin {
   buildMergedToolRequestEvent(...args: Tail<Parameters<typeof conversationScheduling.buildMergedToolRequestEvent>>) { return conversationScheduling.buildMergedToolRequestEvent(this,...args) }
 
   scheduleMergedToolRequest(e:ChatTurnEvent, handler:(event:ChatTurnEvent)=>Promise<void>) {
-    if (e.group_id === undefined) return null
-    const event=Object.assign(normalizeHostChatEvent(e,ports.getBot()),{group_id:e.group_id})
-    const {_triggerContext,reply,...scope}=event
-    const scheduled={...scope,...(typeof reply==='function'?{reply:(...args:unknown[])=>reply(args[0],typeof args[1]==='boolean'?args[1]:undefined)}:{}),...(_triggerContext?.mode?{_triggerContext:{mode:_triggerContext.mode}}:{})}
-    return conversationScheduling.scheduleMergedToolRequest(this,scheduled,async merged=>handler(normalizeHostChatEvent(merged,ports.getBot())))
+    if (e.group_id === undefined && e.message_type !== "private") return null
+    const normalized=normalizeHostChatEvent(e,ports.getBot())
+    const {_triggerContext,reply,group_id,...scope}=normalized
+    // 私聊(无私聊群号)不写 group_id,exactOptionalPropertyTypes 下不允许显式 undefined
+    const scheduled={...scope,...(group_id!==undefined?{group_id}:{}),...(typeof reply==='function'?{reply:(...args:unknown[])=>reply(args[0],typeof args[1]==='boolean'?args[1]:undefined)}:{}),...(_triggerContext?.mode?{_triggerContext:{mode:_triggerContext.mode}}:{})}
+    return conversationScheduling.scheduleMergedToolRequest(this,scheduled as unknown as Parameters<typeof conversationScheduling.scheduleMergedToolRequest>[1],async merged=>handler(normalizeHostChatEvent(merged,ports.getBot())))
   }
 
   /**

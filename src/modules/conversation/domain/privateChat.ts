@@ -1,4 +1,4 @@
-export interface PrivateConfig {enabled?:boolean;allowedUsers?:unknown[];cooldownSeconds?:number}
+export interface PrivateConfig {enabled?:boolean;allowedUsers?:unknown[];cooldownSeconds?:number;quoteChance?:number;mergeMs?:number;allowEmojiTool?:boolean}
 export interface PrivateEvent {message_type?:string;user_id?:string|number;self_id?:string|number;bot?:{uin?:string|number}}
 let acceptedEvents = new WeakMap<PrivateEvent,{key:string;at:number}>()
 // 私聊门禁与节流:纯函数 + 每用户冷却表,供 test.js 私聊入口与 chatTurn 双重校验共用。
@@ -7,7 +7,16 @@ let acceptedEvents = new WeakMap<PrivateEvent,{key:string;at:number}>()
 export const DEFAULT_PRIVATE_CHAT_CONFIG = {
   enabled: false,
   allowedUsers: [],
-  cooldownSeconds: 3
+  // 冷却默认 0:连发节流交给主回合合并窗口(mergeMs)+发送节流器;
+  // 3s 静默吞消息的旧行为是私聊体验硬伤(用户连发第二句石沉大海)
+  cooldownSeconds: 0,
+  // 私聊是一对一对话,引用基本无意义(群聊引用是为了让旁人知道在回谁);
+  // 仅保留极低概率应对长间隔后的回顾式回复
+  quoteChance: 0.05,
+  // 连发合并窗口:用户连发几句并成一次回复,替代冷却静默吞掉
+  mergeMs: 1200,
+  // 私聊默认零工具,可开放表情包让对话不那么干
+  allowEmojiTool: true
 }
 
 export function normalizePrivateChatConfig(raw:PrivateConfig = {}) {
@@ -15,6 +24,9 @@ export function normalizePrivateChatConfig(raw:PrivateConfig = {}) {
   config.enabled = config.enabled === true
   config.allowedUsers = Array.isArray(config.allowedUsers) ? config.allowedUsers.map(String) : []
   config.cooldownSeconds = Math.max(0, Number(config.cooldownSeconds) || 0)
+  config.quoteChance = Math.min(1, Math.max(0, Number(config.quoteChance ?? DEFAULT_PRIVATE_CHAT_CONFIG.quoteChance)))
+  config.mergeMs = Math.min(5000, Math.max(0, Number(config.mergeMs ?? DEFAULT_PRIVATE_CHAT_CONFIG.mergeMs)))
+  config.allowEmojiTool = config.allowEmojiTool !== false
   return config
 }
 
