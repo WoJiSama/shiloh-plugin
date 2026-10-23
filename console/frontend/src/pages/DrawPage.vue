@@ -6,6 +6,7 @@ import {
   NSelect,
   NInputNumber,
   NImage,
+  NImageGroup,
   NEmpty,
   NAlert,
   NSpin,
@@ -145,6 +146,18 @@ function fill(meta: any) {
   mode.value = meta.mode === 'edit' ? 'edit' : 'generate'
   if (meta.mode === 'edit') message.info('参数已回填，请重新上传参考图')
   else message.info('参数已回填')
+}
+function formatHistoryTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  return date.toLocaleString('zh-CN', {
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 async function generate() {
   if (busy.value || cancelBusy.value) return
@@ -421,17 +434,38 @@ onBeforeUnmount(() => {
     </div>
     <section class="panel">
       <div class="panel-heading">
-        <h2>最近生成</h2>
-        <small class="muted">历史参考图不保留，图生图需重新上传</small>
+        <h2>生成历史</h2>
+        <small class="muted">按每次生成分组 · 历史参考图不保留，图生图需重新上传</small>
       </div>
       <NAlert v-if="historyError" type="error">{{ historyError }}</NAlert
       ><NEmpty v-else-if="!history.length" description="暂无历史作品" />
-      <div v-else class="history-grid">
-        <article v-for="item in history" :key="item.file">
-          <NImage :src="imageUrl('/img/' + item.file)" :alt="item.meta?.prompt || item.file" />
-          <p>{{ item.meta?.prompt || item.file }}</p>
-          <small class="muted">{{ item.meta?.provider }}</small
-          ><NButton size="small" quaternary @click="fill(item.meta || {})">使用参数</NButton>
+      <div v-else class="history-batches">
+        <article v-for="batch in history" :key="batch.id" class="history-batch">
+          <div class="history-batch-head">
+            <div class="gallery-meta">
+              <strong>{{ batch.provider || '未知渠道' }}</strong>
+              <span>
+                {{ formatHistoryTime(batch.at) }} · {{ batch.count }} 张<template
+                  v-if="batch.mode === 'edit'"
+                  >· 图生图</template
+                >
+              </span>
+            </div>
+            <NButton size="tiny" quaternary @click="fill(batch)">使用参数</NButton>
+          </div>
+          <p class="history-prompt">{{ batch.prompt || '（无提示词）' }}</p>
+          <!-- NImageGroup 隐藏态不渲染 DOM,网格类放在外层 div 上;组内图片点击后可整批翻看 -->
+          <div class="history-grid">
+            <NImageGroup>
+              <figure v-for="image in batch.images" :key="image.file">
+                <NImage
+                  :src="imageUrl('/img/' + image.file)"
+                  :alt="batch.prompt || image.file"
+                  object-fit="cover"
+                />
+              </figure>
+            </NImageGroup>
+          </div>
         </article>
       </div>
     </section>
@@ -561,28 +595,52 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   font-size: 12px;
 }
+.history-batches {
+  display: grid;
+  gap: 18px;
+}
+.history-batch {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--c-border);
+}
+.history-batch:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.history-batch-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.history-prompt {
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: 13px;
+  color: var(--c-text);
+}
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
 }
-.history-grid article {
-  display: grid;
-  gap: 7px;
+.history-grid figure {
+  margin: 0;
   min-width: 0;
+}
+.history-grid :deep(.n-image) {
+  width: 100%;
 }
 .history-grid :deep(img) {
   width: 100%;
   height: 140px;
   object-fit: cover;
   border-radius: 9px;
-}
-.history-grid p {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  font-size: 12px;
 }
 .reference-zone .section-title {
   margin: 0;

@@ -80,7 +80,7 @@ export interface ExecutionSession {
  outboundArbiter?:{resolveToolOutcomes():void}
 }
 export interface LocalExecutableTool {execute(params:Record<string,unknown>,event:ExecutionEvent):unknown}
-export interface ExecutionConfig {emoji?:{perTurnMax?:number};emojiSystem?:{emojiCooldownMs?:number};taskAiConfig?:{translation?:{model?:string}};chatAiConfig?:{chatApiModel?:string};[key:string]:unknown}
+export interface ExecutionConfig {emoji?:{perTurnMax?:number};emojiSystem?:{emojiCooldownMs?:number;postSendCooldownMs?:number};taskAiConfig?:{translation?:{model?:string}};chatAiConfig?:{chatApiModel?:string};[key:string]:unknown}
 export interface ExecutionFailureContext {e:ExecutionEvent;session:ExecutionSession;stage:string;error:unknown}
 export interface ToolExecutionHost {
  config:ExecutionConfig;toolInstances:Record<string,LocalExecutableTool>;memoryManager?:unknown;

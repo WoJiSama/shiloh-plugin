@@ -214,4 +214,52 @@ test('console image HTTP uses compiled shared service with multiple provider ima
   assert.equal(requests[0].n, 2)
   assert.equal(requests[0].quality, 'high')
   assert.deepEqual(Buffer.from(result.images[0].dataUri.split(',')[1], 'base64'), bytes)
+  const historyResponse = await fetch(`${base}/api/image/history`, { headers: { 'x-console-token': token } })
+  const history = await historyResponse.json()
+  assert.equal(historyResponse.status, 200)
+  assert.equal(history.length, 1)
+  assert.equal(history[0].prompt, 'fixture')
+  assert.equal(history[0].mode, 'generate')
+  assert.equal(history[0].provider, result.provider)
+  assert.equal(history[0].n, 2)
+  assert.equal(history[0].count, 2)
+  assert.deepEqual(history[0].images.map(image => image.file), result.images.map(image => image.file))
+})
+
+test('console image history groups legacy files without batch field by params and time window', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'console-history-fixture-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(root, 'config'), { recursive: true })
+  const token = 'history-fixture-token'
+  fs.writeFileSync(path.join(root, 'config', 'console.json'), JSON.stringify({ token }))
+  const drawDir = path.join(root, 'draw')
+  fs.mkdirSync(drawDir)
+  const bytes = Buffer.from('png')
+  const legacyMeta = { at: '2026-01-01T00:00:00.000Z', mode: 'generate', prompt: 'legacy batch', provider: 'old-provider', aspectRatio: 'auto', size: '', quality: '', n: 3, format: 'png' }
+  const singleMeta = { ...legacyMeta, prompt: 'legacy single', n: 1 }
+  // 更早的一次单图生成 + 较近的一次 3 连发(旧格式无 batch 字段)
+  const files = [
+    ['2025-12-31T23-59-00-000Z_old-other.png', singleMeta],
+    ['2026-01-01T00-00-00-000Z_old-provider.png', legacyMeta],
+    ['2026-01-01T00-00-00-000Z_old-provider_2.png', legacyMeta],
+    ['2026-01-01T00-00-01-000Z_old-provider_3.png', legacyMeta]
+  ]
+  for (const [file, meta] of files) {
+    fs.writeFileSync(path.join(drawDir, file), bytes)
+    fs.writeFileSync(path.join(drawDir, `${file}.json`), JSON.stringify(meta))
+  }
+  const base = await startFixtureServer(root, t, { CONSOLE_DRAW_DIR: drawDir })
+  const response = await fetch(`${base}/api/image/history`, { headers: { 'x-console-token': token } })
+  const history = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(history.length, 2)
+  assert.equal(history[0].prompt, 'legacy batch')
+  assert.equal(history[0].count, 3)
+  assert.deepEqual(history[0].images.map(image => image.file), [
+    '2026-01-01T00-00-00-000Z_old-provider.png',
+    '2026-01-01T00-00-00-000Z_old-provider_2.png',
+    '2026-01-01T00-00-01-000Z_old-provider_3.png'
+  ])
+  assert.equal(history[1].prompt, 'legacy single')
+  assert.equal(history[1].count, 1)
 })

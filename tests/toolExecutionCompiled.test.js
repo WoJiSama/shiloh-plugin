@@ -30,7 +30,7 @@ test('compiled executor rejects malformed argument JSON before executing',async(
 
 test('compiled emoji-only personal question continues to grounded text without undefined locals',async()=>{
  let text=''
- const api=createToolExecution({logger,resolveToolRoundLimit:()=>2,resolveEmojiTurnSkips:()=>[false],looksLikeDirectPersonalQuestion:value=>value==='在干嘛\n在干嘛',recordTurnPlanToolOutcome(){},buildChatRequestData:()=>({}),collectThinking(){}})
+ const api=createToolExecution({logger,resolveToolRoundLimit:()=>2,resolveEmojiTurnSkips:()=>[false],looksLikeDirectPersonalQuestion:value=>value==='在干嘛\n在干嘛',recordEmojiOnlySend(){},recordTurnPlanToolOutcome(){},buildChatRequestData:()=>({}),collectThinking(){}})
  const call={id:'one',type:'function',function:{name:'sendLocalEmojiTool',arguments:'{}'}}
  const host={config:{},dedupeToolCalls:c=>c,getToolCallName:c=>c.function.name,normalizeAssistantToolMessage:m=>m,shouldRunTerminalToolsInBackground:()=>false,runToolCall:async c=>({toolCall:c,toolName:'sendLocalEmojiTool',result:'已发送表情'}),isToolResultError:()=>false,buildImageVerificationSearchToolCall:()=>null,retryRequest:async()=>({choices:[{message:{role:'assistant',content:'在陪你聊天'}}]}),handleTextResponse:async value=>{text=value}}
  await api.processToolCalls(host,{tool_calls:[call]},{group_id:'123',msg:'在干嘛'},{rawArgs:'在干嘛'},[],[])

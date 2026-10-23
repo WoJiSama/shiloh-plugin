@@ -817,10 +817,9 @@ const imageService = createImageService({
   }
 })
 
-function saveDrawResult(buffer:Uint8Array, mime:string, provider:string, seq = 0) {
+function saveDrawResult(buffer:Uint8Array, mime:string, provider:string, seq = 0, stamp = new Date().toISOString().replace(/[:.]/g, "-")) {
   fs.mkdirSync(DRAW_DIR, { recursive: true })
   const ext = EXT_BY_MIME[mime] || "png"
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-")
   const safeProvider = String(provider || "unknown").replace(/[^\w.-]+/g, "_").slice(0, 40) || "unknown"
   const file = `${stamp}_${safeProvider}${seq > 0 ? `_${seq + 1}` : ""}.${ext}`
   fs.writeFileSync(path.join(DRAW_DIR, file), buffer)
@@ -853,17 +852,68 @@ function readDrawMeta(file:string) {
   } catch { return null }
 }
 
+// 旧版成图没有 batch 字段,按"完全相同的生成参数 + 落盘时间相邻"兜底归为一批
+const LEGACY_BATCH_WINDOW_MS = 30_000
+
 function listDrawHistory() {
   try {
-    return fs.readdirSync(DRAW_DIR)
+    const entries = fs.readdirSync(DRAW_DIR)
       .filter(name => IMAGE_FILE_RE.test(name))
       .sort()
       .reverse()
-      .slice(0, DRAW_HISTORY_LIST)
       .map(name => {
         const stat = fs.statSync(path.join(DRAW_DIR, name))
-        return { file: name, bytes: stat.size, at: stat.mtimeMs, meta: readDrawMeta(name) }
+        return { file: name, bytes: stat.size, atMs: stat.mtimeMs, meta: readDrawMeta(name) }
       })
+    const batches:any[] = []
+    const byBatchId = new Map<string, any>()
+    for (const entry of entries) {
+      const meta = entry.meta || {}
+      const image = { file: entry.file, bytes: entry.bytes, at: entry.atMs }
+      const batchId = String(meta.batch || "")
+      if (batchId) {
+        const existing = byBatchId.get(batchId)
+        if (existing) existing.images.push(image)
+        else {
+          const batch = { id: batchId, meta, images: [image] }
+          byBatchId.set(batchId, batch)
+          batches.push(batch)
+        }
+        continue
+      }
+      // 旧数据兜底:与最近一批参数完全一致且时间相邻就并入,否则另起一批(新格式批没有 legacySignature,不会被并入)
+      const signature = [meta.mode, meta.prompt, meta.provider, meta.aspectRatio, meta.size, meta.quality, meta.n].join("|")
+      const latest = batches[batches.length - 1]
+      if (
+        latest && latest.legacySignature === signature &&
+        latest.newestAtMs - entry.atMs <= LEGACY_BATCH_WINDOW_MS
+      ) {
+        latest.images.push(image)
+        continue
+      }
+      batches.push({
+        id: `legacy:${entry.file}`,
+        meta,
+        images: [image],
+        legacySignature: signature,
+        newestAtMs: entry.atMs
+      })
+    }
+    return batches.slice(0, DRAW_HISTORY_LIST).map(batch => ({
+      id: batch.id,
+      at: String(batch.meta.at || "") || new Date(Math.max(...batch.images.map((image:any) => image.at))).toISOString(),
+      mode: batch.meta.mode || "",
+      prompt: String(batch.meta.prompt || ""),
+      provider: String(batch.meta.provider || ""),
+      aspectRatio: batch.meta.aspectRatio || "",
+      size: batch.meta.size || "",
+      quality: batch.meta.quality || "",
+      n: Number(batch.meta.n) || batch.images.length,
+      format: batch.meta.format || "",
+      count: batch.images.length,
+      // 批内按文件名升序 = 生成顺序(第 1 张在前)
+      images: [...batch.images].sort((a:any, b:any) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+    }))
   } catch { return [] }
 }
 
@@ -904,14 +954,18 @@ async function handleImageDraw(payload:Data = {}, mode:"generate"|"edit", owner 
   try {
     const { images: rawImages, format, provider: usedProvider, attempts } =
       await imageService.run(configs, { operation: mode, prompt, images, count, quality, signal: cancelSignal.signal })
+    // 同一次生成的 n 张共用批次 id 与文件名时间戳前缀(尾缀防并发撞名),历史页按批分组展示
+    const batchId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${Math.random().toString(36).slice(2, 6)}`
+    const batchAt = new Date().toISOString()
     const results = []
     for (let index = 0; index < rawImages.length; index++) {
       if (cancelSignal.signal.aborted) throw new Error("已取消")
       const { buffer, mime } = await materializeImageResult(rawImages[index]!, cancelSignal.signal)
       if (cancelSignal.signal.aborted) throw new Error("已取消")
-      const file = saveDrawResult(buffer, mime, usedProvider, rawImages.length > 1 ? index : 0)
+      const file = saveDrawResult(buffer, mime, usedProvider, rawImages.length > 1 ? index : 0, batchId)
       saveDrawMeta(file, {
-        at: new Date().toISOString(),
+        at: batchAt,
+        batch: batchId,
         mode,
         prompt,
         provider: usedProvider,

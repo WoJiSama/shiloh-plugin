@@ -10,7 +10,7 @@ import type {SmartDynamicsConfig} from '../../conversation/domain/smartDynamics.
 export type HostConfig=ChatTurnConfig & ToolAssemblyConfig & HostSharedConfig & EntryHost['config'] & PrefilterHost['config'] & SchedulingHost['config'] & StrictConversationHost['config'] & SmartConversationHost['config'] & {
  enableGroupWhitelist?:boolean;allowedGroups:string[];triggerPrefixes:string[];excludeMessageTypes:string[];
  smartTrigger?:SmartDynamicsConfig & {activeChatTtlHours?:number};observabilityLog?:{enabled?:boolean;retentionDays?:number};chatTurnDurability?:{enabled?:boolean;staleSeconds?:number;recoverDelayMs?:number;ttlSeconds?:number};longRunningToolStaleMinutes?:number;
- intentAiConfig?:{intentAiUrl?:string;intentAiModel?:string;intentAiApikey?:string};emojiSystem?:{forcedReplyTextEnabled?:boolean;forcedReplyTextRate?:number};
+ intentAiConfig?:{intentAiUrl?:string;intentAiModel?:string;intentAiApikey?:string};emojiSystem?:{forcedReplyTextEnabled?:boolean;forcedReplyTextRate?:number;emojiCooldownMs?:number;postSendCooldownMs?:number};
 }
 function object(value:unknown):Record<string,unknown>{if(value===undefined||value===null)return {};if(typeof value!=='object'||Array.isArray(value))throw new Error('配置应为对象');return value as Record<string,unknown>}
 function strings(value:unknown,fallback:string[]=[]):string[]{if(value===undefined)return fallback;if(!Array.isArray(value)||!value.every(v=>typeof v==='string'))throw new Error('配置应为字符串数组');return value}

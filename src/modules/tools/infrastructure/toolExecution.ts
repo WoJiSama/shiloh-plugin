@@ -537,6 +537,11 @@ async function processToolCalls(host: ToolExecutionHost, message: ExecutionMessa
           })
         })
       )).filter((result): result is ExecutionResult => result !== null)
+      // 跨回合连甩防护:表情发送成功后开一个较短冷却(默认90s,explicit 请求不受限),
+      // 避免 30 秒内两个回合各甩一张的刷屏节奏
+      if (validResults.some(result => result.toolName === "sendLocalEmojiTool" && !/^error:|跳过本次表情/.test(String(result.result || "")))) {
+        recordEmojiOnlySend(e.group_id ?? "", Number(host.config?.emojiSystem?.postSendCooldownMs ?? 90000))
+      }
 
       if (validResults.length === 0) break
 
