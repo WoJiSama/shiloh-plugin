@@ -28,8 +28,28 @@ const schema: ConfigSchemaItem[] = [
     field: "privateChat.cooldownSeconds",
     label: "私聊冷却(秒)",
     component: "InputNumber",
-    bottomHelpMessage: "同一用户两轮私聊的最小间隔，防刷屏",
-    componentProps: { min: 0, max: 60, step: 1, placeholder: "3" }
+    bottomHelpMessage: "同一用户两轮私聊的最小间隔；默认 0 = 不节流（由连发合并+发送节奏兜底），设大于 0 会丢弃冷却期内的消息",
+    componentProps: { min: 0, max: 60, step: 1, placeholder: "0" }
+  },
+  {
+    field: "privateChat.quoteChance",
+    label: "引用概率",
+    component: "InputNumber",
+    bottomHelpMessage: "私聊回复引用上一条消息的概率（0~1）；一对一对话基本无需引用，默认 0.05",
+    componentProps: { min: 0, max: 1, step: 0.05, placeholder: "0.05" }
+  },
+  {
+    field: "privateChat.mergeMs",
+    label: "连发合并窗口(毫秒)",
+    component: "InputNumber",
+    bottomHelpMessage: "窗口内连发的多条私聊消息并成一次回复；0 = 不合并（连发逐条回）",
+    componentProps: { min: 0, max: 5000, step: 100, placeholder: "1200" }
+  },
+  {
+    field: "privateChat.allowEmojiTool",
+    label: "私聊表情包",
+    component: "Switch",
+    bottomHelpMessage: "私聊开放表情包工具（其余群工具仍不可用）；关闭后私聊纯文字"
   },
   {
     field: "groupHistory",
