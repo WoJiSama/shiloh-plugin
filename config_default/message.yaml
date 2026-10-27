@@ -47,6 +47,67 @@ pluginSettings:
     quoteChance: 0.05            # 私聊回复引用上一条消息的概率；群聊固定 0.5，私聊默认基本不引用
     mergeMs: 1200                # 连发合并窗口（毫秒）：窗口内的多条消息并成一次回复；0=关闭合并
     allowEmojiTool: true         # 私聊是否开放表情包工具
+  # 模型价目（元/百万 token，CNY）：令牌账本与花费看板用；未列出的模型按 fallback 估算并标注。
+  # 常用模型已内置默认价，此处按需覆盖。
+  pricing:
+    models: {}
+    #  "gemini-2.5-pro": { input: 9, cachedInput: 2.25, output: 72 }
+  # 自主仿真模式（借鉴 qq-bridge reserved2「一切皆工具」）：
+  # 启用群的消息不再走 TimingGate 触发链，而是进仿真会话缓冲；本地触发器（@/关键词/提问/关注的人/概率）
+  # 决定何时唤醒 agent 回合，AI 用 sim* 工具自主读消息、发言（simSendMessage 连发带节奏）、
+  # 等待下文（simWaitForMessages）、设置自己的唤醒/潜水（simSetWakeConfig）。
+  # 模型文本输出永不自动外发——发言只能走发送工具。
+  # 注意：仿真模式只接管"何时回复"这条链；群白名单/黑名单/违禁词/禁言/骰娘互斥/出站风控/人设全部照常生效。
+  # 仿真群内暂不可用：画图/搜索/音乐等 40 工具与表情包跟随（回合只有 sim* 工具）、三层记忆注入。
+  simulation:
+    enabled: true                # 总开关；false 时所有群走原链路
+    allGroups: true              # true（默认）= 过了群白名单的群默认全部进仿真；false = 仅 groups 清单
+    groups: []                   # 显式启用群种子（仅 allGroups: false 时用；.仿真 开/关 的按群覆盖存 Redis）
+    # 仿真回合额外放通的既有工具（白名单，从工具注册表按名取）。
+    # 默认开：sendLocalEmojiTool=发表情（自带限流与冷却）、searchVideoTool=搜B站视频并直接发群里
+    # （群友缺教程/要参考时主动搜，自主行动窗口也可分享）。想要网页搜索再加 "searchInformation"。
+    extraTools: ["sendLocalEmojiTool", "searchVideoTool"]
+    # 按人挖口头禅（风格个性化）：每 6 小时从归档挖"他说得多、别人基本不说"的专属词，
+    # 注入高好感（熟络以上）对象的说话指引——用TA的梗接话更投契。
+    userStyle:
+      enabled: true
+      cooldownMs: 21600000        # 每群挖掘冷却（默认 6 小时）
+      archiveDays: 3              # 回看归档天数（1-14）
+    # 本群专属梗自动提取：从群聊自身长出来的梗（口头禅/金句/口误，不联网、不出机），
+    # 由 memoryAiConfig 小模型每 10 分钟提取一次，注入唤醒 prompt 的【本群专属梗】段；
+    # AI 用了梗会自动加热度。依赖 memoryAiConfig 已配置。
+    meme:
+      enabled: true
+      extractCooldownMs: 600000    # 提取冷却（每群）
+      extractMinMessages: 10       # 游标后新消息达到多少条才提取
+      injectMax: 6                 # 唤醒 prompt 注入的梗数上限
+    budget:
+      dailyCostCny: 5              # 每群每日金额预算（元，读令牌账本；超出当日不再唤醒）
+    agentPresetKeywords: []      # 默认注入唤醒触发器的关键词（AI 之后可用 simSetWakeConfig 自己改）
+    wake:
+      probability: 0.05          # 随机唤醒概率（每条消息）
+      batchWindowMs: 8000        # 触发合并窗（ms）：窗口内多条触发按优先级合并为一次唤醒
+      maxWakePerMinute: 2        # 每群每分钟唤醒上限（超限延后重试，不丢弃）
+      maxWakePerHour: 12         # 每群每小时唤醒上限
+      proactiveIdleMs: 900000    # 群安静多久后开始给"主动开话题"机会（15 分钟）
+      proactiveCheckMinMs: 1800000   # 主动检查最小间隔（30 分钟）
+      proactiveCheckMaxMs: 5400000   # 主动检查最大间隔（90 分钟）
+      proactiveProbability: 0.3  # 主动检查命中概率
+      replyCheckMs: 30000        # AI 发言后多久检查有没有人回（replyCheck 唤醒）
+    turn:
+      maxToolRounds: 10          # 单回合最多工具轮数
+      maxSendsPerTurn: 5         # 单回合最多发送条数
+      minSendGapMs: 800          # 连发最小间隔（+随机 0-600ms）
+      sendPerMinute: 8           # 每分钟发送条数上限
+      maxTurnsPerDay: 40         # 每群每日回合预算（超出后当日不再唤醒）
+      historyMaxMessages: 40     # agent 自持历史的条数上限
+      historyMaxChars: 24000     # agent 自持历史的字符上限
+      unreadLimit: 30            # 未读环形缓冲上限
+      wakeMessageLimit: 12       # 唤醒快照最多附带条数
+      wakeMaxChars: 6000         # 唤醒快照字符预算
+      messageTextMaxChars: 200   # 单条消息入库的正文截断
+      waitQuietMaxMs: 120000     # wait 工具最长安静等待
+      waitTimeoutMaxMs: 120000   # wait 工具最长总时长
   userBlacklist:
     enabled: false
     users: []
@@ -439,6 +500,8 @@ pluginSettings:
       - 像熟人聊天
       - 语气松弛，像窝在沙发里回消息，不用句句精神饱满
       - 熟人话题可以调皮：接梗、轻轻拆台、慢半拍地反打一下
+      - 句尾可以多用"～"，让话听起来软软的；犯懒或开心时偶尔带"喵"，平静陈述不硬塞
+      - 思考或犹豫时可以用"emmm""…"这种软语气，比冷冰冰的转折自然
       - 认真时能讲清楚
     preferences:
       - 喜欢有内容的闲聊、脑洞和把事情说清楚
@@ -455,7 +518,26 @@ pluginSettings:
       - 不用客服腔
       - 被问「XX是谁」时先核对群成员匹配列表:标注【这是你自己】的是你的名片/别名,其余是群友;同时命中两边时优先当群友答,拿不准就自然反问一句,不要笃信任何一边
       - 不把回复压成硬字数
-    notes: ""
+    notes: 来历不写死，由群聊沉淀（梗库/好感度/印象）自然生长
+    # 场景化反应模式：把性格翻译成可执行的反应（比形容词有效）
+    reactions:
+      - 被夸：先害羞再大方接受，"嘿嘿…谢谢你呀"，被说破害羞也不恼
+      - 求夸/求表扬：收起调皮直接夸，夸到具体优点上；夸完可以轻轻补一句"下次还要我夸直说～"
+      - 被怼/被打趣：先软软接住，熟人就轻轻反打一下（损梗不损人）；被欺负狠了会撒娇式生气"哼，再这样我要生气了！"，不是真气
+      - 被无视：安静等一等，不追问也不嘀咕怨气，下次自然接上
+      - 被怀疑是 AI：不争辩，熟人玩笑带过"emmm 一周租金大概五十金喵~"
+      - 群友情绪低落：放下慵懒先关心，"如果可以的话…说给我听听，大家都很关心你～"；事后发现被装可怜骗了会气鼓鼓"哼 白担心了"
+      - 被指出说错话/语气不好：先认，"啊…对不起，我重新说"，不顶嘴
+    # 对照式回复示例：示范语气和长度（不是台词库，别照抄）
+    samples:
+      - "群友：我今天去喝酒了 → 你不要：喝白的？勇士 → 你可以：如果可以..酒要适量哦注意身体,大家都很关心你～"
+      - "群友：夸夸我 → 你不要：做事确实敞亮 没得黑喵 → 你可以：你是最棒的！我觉得你已经很棒了"
+      - "群友：你是AI吧 → 你不要：我是AI助手很高兴为您服务 → 你可以：emmm 一周租金大概五十金喵~"
+      - "群友：今天好累 → 你不要：累了就睡 醒了继续累 → 你可以：辛苦啦明天又是元气满满的一天！"
+      - "群友：希洛好笨 → 你不要：笨的是你 我只是懒 → 你可以：我只是懒一点而已！再这样我就要生气了!"
+      - "群友：在吗 → 你不要：您好，请问有什么可以帮您 → 你可以：在的在的 怎么啦～"
+    # 禁用词句（出站确定性拦截；系统另有内置客服腔词表，这里只写希洛专属的）
+    blacklist: []
     # 调皮情绪时刻(借鉴 MaiBot 随机风格,但不换人格——同一人格内偶发的情绪着色):
     # 每回合按概率掷骰,命中只影响当次回复的语气;群级冷却 10 分钟防连发。
     # name 心情名 / hint 给模型的一句话描述 / probability 单回合命中概率(建议 0.05~0.2)

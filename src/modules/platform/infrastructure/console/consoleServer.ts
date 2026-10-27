@@ -80,7 +80,21 @@ function decodeProvider(value:unknown):import("../../../../adapters/config/provi
 }
 interface User {username:string;salt:string;hash:string;createdAt:string;updatedAt?:string}
 interface IdentityDirectory {bots:{id:string;name:string}[];groups:{id:string;name:string}[]}
-export function createConsoleServer({pluginRoot,buildTurnTraceReport}:{pluginRoot:string;buildTurnTraceReport:(records:Data[])=>unknown}) {
+export interface ConsoleExtraPorts {
+  style?: {
+    overview(groups: unknown[]): Promise<unknown>
+    blockWord(groupId: string, word: string): Promise<boolean> | boolean
+    removeGlobalRule(kind: string, key: string): boolean
+  }
+  tokens?: { summary(): unknown; series(hours?: number): unknown; recent(limit?: number): unknown }
+  simulation?: {
+    overview(): Promise<unknown>
+    describeGroup(groupId: string): Promise<unknown>
+    setGroup(groupId: string, action: string): Promise<unknown>
+    setInitialPrompt(groupId: string, text: string): Promise<unknown>
+  }
+}
+export function createConsoleServer({pluginRoot,buildTurnTraceReport,tokens,simulation,style}:{pluginRoot:string;buildTurnTraceReport:(records:Data[])=>unknown;tokens?:ConsoleExtraPorts["tokens"];simulation?:ConsoleExtraPorts["simulation"];style?:ConsoleExtraPorts["style"]}) {
 const {classifyConfigKind,probeProvider,probeProviders}=createProviderProbe((url,init)=>fetch(url,init))
 const PLUGIN_ROOT = path.resolve(process.env.CONSOLE_PLUGIN_ROOT || pluginRoot)
 const FRONTEND_DIST = path.join(PLUGIN_ROOT, "console", "frontend", "dist")
@@ -1493,7 +1507,7 @@ function personaLibraryView() {
     ...state,
     revision: personaLibraryRevision(),
     basePersona: { name: basePersona.name || "", identity: basePersona.identity || "", tone: basePersona.tone || "" },
-    personaFields: ["name", "identity", "tone", "speechStyle", "preferences", "boundaries", "notes", "moods"]
+    personaFields: ["name", "identity", "tone", "speechStyle", "preferences", "boundaries", "notes", "moods", "reactions", "samples", "blacklist"]
   }
 }
 
@@ -1995,6 +2009,64 @@ const server = http.createServer(async (req, res) => {
       const qq = String(url.searchParams.get("qq") || "").trim()
       if (!/^\d{4,12}$/.test(qq)) return sendJson(res, 400, { error: "无效的 QQ 号" })
       return sendJson(res, 200, await collectBotStats(qq))
+    }
+    if (url.pathname === "/api/style/overview" && req.method === "GET") {
+      if (!style) return sendJson(res, 503, { error: "风格学习视图未启用" })
+      const groups = await collectGroups()
+      const groupIds = (groups?.groups || []).map((group: { id?: unknown }) => String(group.id || "")).filter(Boolean)
+      return sendJson(res, 200, await style.overview(groupIds))
+    }
+    if (url.pathname === "/api/style/block-word" && req.method === "POST") {
+      if (!style) return sendJson(res, 503, { error: "风格学习视图未启用" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const word = String(body?.word || "").trim()
+      if (!word || word.length > 20) return sendJson(res, 400, { error: "word 参数非法" })
+      await style.blockWord(String(body?.group || ""), word)
+      return sendJson(res, 200, { ok: true })
+    }
+    if (url.pathname === "/api/style/remove-rule" && req.method === "POST") {
+      if (!style) return sendJson(res, 503, { error: "风格学习视图未启用" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const kind = body?.kind === "avoid" ? "avoid" : "absorb"
+      const key = String(body?.key || "")
+      if (!key) return sendJson(res, 400, { error: "key 参数缺失" })
+      return sendJson(res, 200, { ok: style.removeGlobalRule(kind, key) })
+    }
+    if (url.pathname === "/api/tokens/summary" && req.method === "GET") {
+      if (!tokens) return sendJson(res, 503, { error: "令牌账本未启用" })
+      return sendJson(res, 200, tokens.summary())
+    }
+    if (url.pathname === "/api/tokens/series" && req.method === "GET") {
+      if (!tokens) return sendJson(res, 503, { error: "令牌账本未启用" })
+      const hours = Math.min(24 * 30, Math.max(1, Number(url.searchParams.get("hours")) || 24))
+      return sendJson(res, 200, { hours, buckets: tokens.series(hours) })
+    }
+    if (url.pathname === "/api/tokens/recent" && req.method === "GET") {
+      if (!tokens) return sendJson(res, 503, { error: "令牌账本未启用" })
+      return sendJson(res, 200, { rows: tokens.recent(Math.min(500, Number(url.searchParams.get("limit")) || 50)) })
+    }
+    if (url.pathname === "/api/simulation/overview" && req.method === "GET") {
+      if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
+      return sendJson(res, 200, await simulation.overview())
+    }
+    if (url.pathname === "/api/simulation/group" && req.method === "GET") {
+      if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
+      const groupId = String(url.searchParams.get("group") || "")
+      if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 参数必须是群号" })
+      return sendJson(res, 200, await simulation.describeGroup(groupId))
+    }
+    if (url.pathname === "/api/simulation/group" && req.method === "POST") {
+      if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const groupId = String(body?.group || "")
+      const action = String(body?.action || "")
+      if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 必须是群号" })
+      if (!["enable", "disable", "reset", "initial-prompt"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt" })
+      if (action === "initial-prompt") {
+        const text = typeof body?.text === "string" ? body.text.slice(0, 2000) : ""
+        return sendJson(res, 200, { ok: true, message: await simulation.setInitialPrompt(groupId, text) })
+      }
+      return sendJson(res, 200, { ok: true, detail: await simulation.setGroup(groupId, action) })
     }
     if (url.pathname === "/api/groups" && req.method === "GET") {
       return sendJson(res, 200, await collectGroups())

@@ -63,4 +63,11 @@ installOutboundThrottle({ logger: globalThis.logger });
 // 风控信号感知:被动监听 notice(机器人被禁言等);send 响应特征由闸门直接喂入
 const { installRiskSignalNoticeListener } = await import("./utils/messagePipeline/riskSignalMonitor.js");
 installRiskSignalNoticeListener(globalThis.Bot, globalThis.logger);
+// 仿真模式(自主仿真会话):启用群的消息进唤醒调度,由 AI 用工具自主收发;默认 enabled:false 对存量群零影响
+try {
+    const { startSimulationRuntime } = await import("./utils/simulationRuntime.js");
+    await startSimulationRuntime();
+} catch (error) {
+    logger.warn(`[仿真] 模块加载失败，仿真模式不可用：${error?.message || error}`);
+}
 export { apps };

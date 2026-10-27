@@ -395,7 +395,7 @@ export const bootstrapEntries = [
     "legacy": "index.js",
     "kind": "composition",
     "reason": "Host module loader and runtime assembly",
-    "reviewedSha256": "d362a6c2f5667d3df716fafe32b7b1ea6c448381afe580f0de49428a0a15b415"
+    "reviewedSha256": "67a2b4170fb88e550b052ca137adb3a1c337fb789395625867f3d0dcddf59f8e"
   },
   {
     "legacy": "standalone/bl-dice-plugin/apps/dice.js",

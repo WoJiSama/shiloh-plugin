@@ -1,4 +1,5 @@
 import {
+  Sparkles,
   MessageCircle,
   Bot,
   Users,
@@ -11,7 +12,9 @@ import {
   Terminal,
   Activity,
   Database,
-  ImagePlus
+  ImagePlus,
+  Waves,
+  Coins
 } from 'lucide-vue-next'
 export const navigation = [
   {
@@ -35,6 +38,7 @@ export const navigation = [
       { path: '/ai', label: 'AI 模型', icon: BrainCircuit, hint: '渠道与模型配置' },
       { path: '/commands', label: '命令 / 骰子', icon: Terminal, hint: '命令与规则管理' },
       { path: '/semantic', label: '语义记忆', icon: Database, hint: '长期记忆与召回' },
+      { path: '/simulation', label: '自主仿真', icon: Waves, hint: 'AI 自主收发与唤醒管理' },
       { path: '/games', label: '游戏', icon: Gamepad2, hint: '海龟汤题库审核与游戏参数' }
     ]
   },
@@ -43,7 +47,9 @@ export const navigation = [
     items: [
       { path: '/pipeline', label: '消息与搬运', icon: Workflow, hint: '可靠管道与平台授权' },
       { path: '/risk', label: '风控策略', icon: ShieldCheck, hint: '审查、限流与通知' },
-      { path: '/observe', label: '运行观测', icon: Activity, hint: '请求轨迹与失败原因' }
+      { path: '/observe', label: '运行观测', icon: Activity, hint: '请求轨迹与失败原因' },
+      { path: '/tokens', label: '令牌与花费', icon: Coins, hint: '模型用量与金额' },
+      { path: '/style', label: '风格学习', icon: Sparkles, hint: '学到的表达策略与修剪' }
     ]
   },
   {

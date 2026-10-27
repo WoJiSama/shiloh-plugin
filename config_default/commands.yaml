@@ -615,3 +615,28 @@ domains:
         desc: 查看 P4 影子判定统计（模型 vs 正则一致率）
         perm: master
         src: "apps/CommandHelp.js showShadowStats"
+  - key: simulation
+    name: 自主仿真
+    icon: "🌊"
+    desc: 仿真模式（AI 自主收发群消息）开关与状态
+    commands:
+      - usage: ".仿真 开 / .仿真 关"
+        desc: 本群切换仿真/普通模式（AI 自主决定何时读消息、发言、等待、潜水）
+        perm: admin
+        src: "apps/Simulation.js handleSimulation"
+      - usage: ".仿真 状态"
+        desc: 查看唤醒配置、未读水位、今日回合预算
+        perm: admin
+        src: "apps/Simulation.js handleSimulation"
+      - usage: ".仿真 重置"
+        desc: 清空本群仿真会话（历史/水位/预算；长期记忆与好感度保留）
+        perm: admin
+        src: "apps/Simulation.js handleSimulation"
+      - usage: ".仿真 记忆"
+        desc: 查看 AI 的长期记忆（待跟进/记事/印象）
+        perm: admin
+        src: "apps/Simulation.js handleSimulation"
+      - usage: ".好感度"
+        desc: 查看群友好感排行（AI 对群友的熟络度，自己的标注在末尾）
+        perm: all
+        src: "apps/Simulation.js handleAffinity"
