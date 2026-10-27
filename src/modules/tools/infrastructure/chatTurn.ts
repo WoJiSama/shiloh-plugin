@@ -28,7 +28,7 @@ function quotedMessageText(reply: QuotedMessage | null): string {
   return typeof reply?.raw_message === 'string' ? reply.raw_message : ''
 }
 export function createChatTurn(ports:ChatTurnPorts) {
-const {resolveConversationContext,collectThinking,sendThinkingForward,globalStyleLearnerManager,personProfileInjector,personaFeedbackManager,formatGroupKnowledgeTeachingPrompt,formatGroupWorkflowTeachingPrompt,getMidtermMemoryManager,getSemanticMemoryRuntime,mcpManager,recordActionOutcomes,buildAddresseePrompt,computeAddresseeSignal,resolveHistorySelectionBudget,selectRelevantGroupHistory,isAiConversationEnabled,evaluatePrivateChatGate,buildDrawFailureNoteMessage,recordDrawTextFallback,takeDrawFailureNote,prepareImageEditAssets,resolveAvatarEditBase,classifyEmojiToolExposure,buildEpisodicPrompt,buildUserCallbackPrompt,hasTemporalDeixis,recallEpisodes,recallUserEpisodes,buildExcelToolParams,hasExcelWorkbookContext,shouldUseExcelWorkbookTool,TakeImages,formatGroupContextImagePrompt,resolveGroupContextAssets,getGroupSocialPrompt,getGroupTopicPrompt,buildImageFailureReply,buildMissingImageAnalysisReply,shouldAskForMissingImageForVisualRequest,shouldRequireImageEditBase,shouldSkipIntentModel,containsInternalStatusLeak,noteInjectedChunks,resolveSingularOwnerMention,createOutboundArbiter,buildChatRequestData,rollPersonaMood,hasRecentPixivSearch,resolvePromptLayerProfile,resolveRecentBotImage,resolveRecentUserImage,resolveToolRoute,buildMainSystemPrompt,buildToolIntentDisclosure,resolveDeterministicToolIntent,selectToolIntentCandidates,extractEmbeddedToolCalls,buildCommittedActionReply,buildTurnContinuityPrompt,loadTurnContinuity,recordTurnDiagnostics,createTurnPlan,deriveTurnPlanRequest,formatTurnPlanLog,isEducationalExplanationRequest,resolveCardPresentation,composeTurnPromptLayers,createTurnTrace,resolveTurnTraceArchiveDir,resolveAvatarDrawReference,resolveAvatarInspectionTargets,formatIdentityBindingsPrompt,cardAcknowledgement,delay,getOrCreateGroupLimiter,filterToolsForMessageIntent,logger,botIdentity,cacheGroupName}=ports
+const {resolveConversationContext,collectThinking,sendThinkingForward,globalStyleLearnerManager,personProfileInjector,personaFeedbackManager,formatGroupKnowledgeTeachingPrompt,formatGroupWorkflowTeachingPrompt,getMidtermMemoryManager,getSemanticMemoryRuntime,mcpManager,recordActionOutcomes,buildAddresseePrompt,computeAddresseeSignal,resolveHistorySelectionBudget,selectRelevantGroupHistory,isAiConversationEnabled,evaluatePrivateChatGate,buildDrawFailureNoteMessage,recordDrawTextFallback,takeDrawFailureNote,prepareImageEditAssets,resolveAvatarEditBase,classifyEmojiToolExposure,buildEpisodicPrompt,buildUserCallbackPrompt,hasTemporalDeixis,recallEpisodes,recallUserEpisodes,buildExcelToolParams,hasExcelWorkbookContext,shouldUseExcelWorkbookTool,TakeImages,formatGroupContextImagePrompt,resolveGroupContextAssets,getGroupSocialPrompt,getGroupTopicPrompt,buildImageFailureReply,buildMissingImageAnalysisReply,shouldAskForMissingImageForVisualRequest,shouldRequireImageEditBase,shouldSkipIntentModel,containsInternalStatusLeak,noteInjectedChunks,resolveSingularOwnerMention,createOutboundArbiter,buildChatRequestData,rollPersonaMood,hasRecentPixivSearch,resolvePromptLayerProfile,resolveRecentBotImage,resolveRecentUserImage,resolveToolRoute,buildMainSystemPrompt,buildToolIntentDisclosure,resolveDeterministicToolIntent,selectToolIntentCandidates,extractEmbeddedToolCalls,buildCommittedActionReply,buildTurnContinuityPrompt,loadTurnContinuity,recordTurnDiagnostics,createTurnPlan,deriveTurnPlanRequest,formatTurnPlanLog,isEducationalExplanationRequest,resolveCardPresentation,composeTurnPromptLayers,createTurnTrace,resolveTurnTraceArchiveDir,resolveAvatarDrawReference,resolveAvatarInspectionTargets,formatIdentityBindingsPrompt,cardAcknowledgement,delay,getOrCreateGroupLimiter,filterToolsForMessageIntent,logger,botIdentity,cacheGroupName,recordMainTurnUsage}=ports
 async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     e._receivedAt ||= Date.now()
     if (!isAiConversationEnabled(host.config)) return false
@@ -991,6 +991,8 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
 	        const mainElapsedMs = Date.now() - initialModelStartedAt
 	        const mainTokens = Number(response?.usage?.total_tokens) || 0
 	        session?.turnTrace?.addModelCall("main", mainElapsedMs, mainTokens ? { tokens: mainTokens } : undefined)
+	        // 令牌账本归组采集（群维度花费下钻的来源；失败不影响回合）
+	        try { recordMainTurnUsage?.(String(groupId || ''), response?.usage, String((requestData as {model?:unknown}).model || ""), mainElapsedMs, "main") } catch { /* 账本不可用 */ }
 	        logger.info(`[模型耗时] group=${groupId} stage=initial ${formatTurnPlanLog(session.turnPlan)} toolChoice=${typeof toolChoice === "string" ? toolChoice : toolChoice?.function?.name || "auto"} history=${session.selectedGroupHistoryCount || 0} mode=${session.historySelectionMode || "full"} elapsed=${mainElapsedMs}ms${mainTokens ? ` tokens=${mainTokens}` : ""}`)
 
 	        if (!response?.choices?.[0]) {
@@ -1088,11 +1090,13 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
         } else if (turnPlanRequest.requestOptions?.taskBackend) {
           logger.warn(`[回复失败] group=${groupId} user=${userId} stage=initial_message_empty backend=${turnPlanRequest.requestOptions.taskBackend} reason=no_content_or_tool_calls 换主模型重试`)
           const retryStartedAt = Date.now()
+          const retryUsageMark = { startedAt: Date.now() }
           const retryResponse = await host.retryRequest(requestData, session.toolContent, 1, undefined, {
             forceChatBackend: true,
             routeLabel: "空消息重试主模型"
           })
           session?.turnTrace?.addModelCall("main_retry", Date.now() - retryStartedAt)
+          try { recordMainTurnUsage?.(String(groupId || ''), retryResponse?.usage, String((requestData as {model?:unknown}).model || ""), Date.now() - retryUsageMark.startedAt, "main_retry") } catch { /* 账本不可用 */ }
           const retryMessage = retryResponse?.choices?.[0]?.message || {}
           if (retryMessage.tool_calls?.length || retryMessage.content) {
             await dispatchAssistantMessage(retryMessage)

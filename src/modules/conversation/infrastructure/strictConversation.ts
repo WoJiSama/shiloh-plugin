@@ -28,12 +28,20 @@ export interface StrictConversationHost {
 export interface StrictConversationPorts {
  logger:{info(message:string):void;warn(message:string):void;error(message:string,error?:unknown):void};bot():{uin?:string|number;nickname?:string};now?():number;
  fetch?:typeof fetch;random?():number;
+ /** 自主仿真模式（可选）：命中仿真群时消息只进仿真会话缓冲，不走 smart/strict 触发链 */
+ simulation?:{isCapture(e:ConversationEvent):boolean;ingest(e:ConversationEvent):Promise<boolean>};
  diceManager:{isLogActive(groupId:string|number,config:unknown):boolean};
  globalStyleLearnerManager:{observeMessage(e:ConversationEvent,config:unknown,embedding:unknown,source?:PersonaScope):unknown;maybeAutoSummarize(config:unknown,memory:unknown):Promise<unknown>};
  anchorEventConversation(e:ConversationEvent):unknown;getRedBagType(wallet:unknown):{type:string;name:string};isExclusiveForUser(wallet:unknown,botId:string|number|undefined):boolean;
  toolConfigHasName(config:ConversationTool[]|undefined,name:string):boolean;
 }
 function record(value:unknown):Record<string,unknown> {return value!==null && typeof value==='object' ? value as Record<string,unknown> : {}}
+/** uin 可能是单值或数组（多号）；统一成字符串 id 列表 */
+function toIdList(uin:unknown):string[] {
+  if (Array.isArray(uin)) return uin.map(item=>String(item ?? '')).filter(Boolean)
+  if (uin===undefined||uin===null||uin==='') return []
+  return [String(uin)]
+}
 function responseContent(value:unknown):string {const data=record(value);const choices=Array.isArray(data.choices)?data.choices:[];return String(record(record(choices[0]).message).content || '')}
 function errorText(error:unknown):string {return error instanceof Error ? error.message : String(error)}
 export function createStrictConversation(ports:StrictConversationPorts) {
@@ -428,7 +436,7 @@ async function handleRandomReply(host:StrictConversationHost, e:ConversationEven
     // 必须和全局风格观察一样放在本处理函数的第一个 await 之前。
     // 否则高并发群消息会因异步检查返回顺序不同而重排，把 A-B-A 误学成 A 的连续两句。
     if (host.config.expressionLearning?.enabled &&
-      String(e.user_id || '') !== String(e.bot?.uin || ports.bot().uin || '') &&
+      ![...toIdList(e.bot?.uin), ...toIdList(ports.bot().uin)].includes(String(e.user_id || '')) &&
       (e.msg || e.raw_message || Array.isArray(e.message))) {
       host.expressionLearner.updateGroupExpressions(e.group_id, e.msg || e.raw_message || '', {
         userId: e.user_id,
@@ -487,6 +495,12 @@ async function handleRandomReply(host:StrictConversationHost, e:ConversationEven
           logger.info(`[自动抢红包] 检测到${redBagType.name}，未命中概率 ${(probability * 100).toFixed(1)}%，跳过`)
         }
       }
+    }
+
+    // 仿真模式分流：命中仿真群时消息只进仿真会话缓冲（归档/统计/风格观察等数据通道不受影响），
+    // 由本地触发器 + 唤醒调度决定何时启动 agent 回合；本条消息不再交给 smart/strict 触发链。
+    if (ports.simulation && ports.simulation.isCapture(e)) {
+      return await ports.simulation.ingest(e)
     }
 
     // smart 模式分发

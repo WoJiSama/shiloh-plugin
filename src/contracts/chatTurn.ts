@@ -64,6 +64,8 @@ export interface ChatTurnHost {
 export interface ChatTurnRoute {warn?:string;aborted?:string;toolChoice:ToolChoice;forcedToolCall:ToolCall|null;toolScopeLocked:boolean;toolDecision?:SemanticDecision|null;applied:string[]}
 export interface ChatTurnPorts {
  logger:{info(message:string,meta?:unknown):void;warn(message:string):void;error(message:string,error?:unknown):void;debug(message:string):void};
+ /** 令牌账本归组采集（可选）：主回合/重试的 usage 按群落账 */
+ recordMainTurnUsage?(groupId:string,usage:unknown,model:string,ms:number,stage:'main'|'main_retry'):void;
  botIdentity(e:ChatTurnEvent):{uin:ChatId;nickname:string};cacheGroupName(groupId:ChatId,name:string):Promise<void>;loadTurnContinuity(context:{groupId:ChatId|undefined;userId:ChatId|undefined;botId:ChatId;persona?:PersonaIdentity}):Promise<{botId?:string;persona?:PersonaIdentity;lastReply?:string;intent?:string;tools?:unknown[];social?:SocialContinuity}|null>;
  resolveConversationContext(e:ChatTurnEvent):unknown;collectThinking(session:ChatTurnSession,message:ExecutionMessage,e:ChatTurnEvent):void;sendThinkingForward(host:ChatTurnHost,e:ChatTurnEvent,session:ChatTurnSession):Promise<unknown>;
  globalStyleLearnerManager:unknown;personProfileInjector:unknown;personaFeedbackManager:unknown;getMidtermMemoryManager():unknown;
