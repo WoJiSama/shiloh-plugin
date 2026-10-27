@@ -1,4 +1,4 @@
-export interface PersonaText { name?: unknown; tone?: unknown; speechStyle?: unknown; identity?: unknown; preferences?: unknown; boundaries?: unknown; notes?: unknown }
+export interface PersonaText { name?: unknown; tone?: unknown; speechStyle?: unknown; identity?: unknown; preferences?: unknown; boundaries?: unknown; notes?: unknown; moods?: unknown; reactions?: unknown; samples?: unknown; blacklist?: unknown }
 // 人设单一数据源的代码侧投影:所有提示词里的 bot 名字必须经 resolvePersonaName
 // 取自 persona 配置,禁止在提示词文本里硬编码名字(改名即漏改)。
 // 稳定人格只在这里投影；当前回合的表达目的由 personaTonePolicy 提供。
@@ -63,6 +63,17 @@ export function buildPersonaStyleOverride(persona: PersonaText = {}) {
   if (boundaries.length) lines.push(`固定边界：${boundaries.join("；")}`)
   const notes = String(persona.notes || "").trim()
   if (notes) lines.push(`补充设定：${notes}。备注中与明确身份、语气或边界冲突的描述不覆盖这些字段，也不证明现实经历。`)
+  // 场景化反应模式（被夸/被怼/被无视怎么反应）——比形容词描述更可执行
+  const reactions = personaLines(persona.reactions)
+  if (reactions.length) lines.push(`反应模式（按场景对号入座，语气照此拿捏）：${reactions.join("；")}`)
+  // 对照式回复示例（"你不要 vs 你可以"）——直接钉死语气与长度
+  const samples = personaLines(persona.samples)
+  if (samples.length) {
+    lines.push(`回复示例（示范语气和长度，不是台词库，别照抄）：`)
+    for (const sample of samples.slice(0, 6)) lines.push(`- ${sample}`)
+  }
+  const blacklist = personaLines(persona.blacklist)
+  if (blacklist.length) lines.push(`禁用词句（出现即失败，说了会被系统拦掉）：${blacklist.join("；")}`)
   lines.push(
     "人格决定态度和措辞，不要求每轮声明自己的性格，也不规定通用台词。明确任务照常完成，批评或纠正按当前意思回应，不把它演成调情。",
     "上面是当前会话实际生效的人设。自定义补充中的示例只供理解语气，不是你此刻的状态或必须复述的答案；与本轮明确诉求、事实及交付约束冲突时，以本轮为准。"

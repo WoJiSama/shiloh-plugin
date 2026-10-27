@@ -2,10 +2,80 @@
 // [tool_code]/print(...)/JSON 片段,这组函数负责识别并剥出其中真正要发给用户的文本。
 import { PSEUDO_TOOL_MARKER_SET, PSEUDO_TOOL_TEXT_KEYS, isPseudoToolMarker } from "./messageIntent.js"
 import { ThinkingProcessor } from "../../models/domain/thinkingProcessor.js"
+import { redactInternalStatusLeaks } from "./internalStatusLeak.js"
 
 const CHAT_LOG_TIME_PREFIX_RE = /^[\[【]\s*(?:\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*[\]】]\s*/
 const CHAT_LOG_SPEAKER_PREFIX_RE = /^.{1,80}?\((?:QQ号|qq号|QQ|qq)[:：]\s*\d{4,12}\)\s*(?:\[[^\]\n]{1,40}\]\s*)*[:：]\s*(?:在群里说[:：]\s*)?/i
 const CHAT_LOG_SPEAKER_WITH_TIME_RE = /^(?:\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2}(?::\d{2})?\s+.{1,80}?\((?:QQ号|qq号|QQ|qq)[:：]\s*\d{4,12}\)\s*(?:\[[^\]\n]{1,40}\]\s*)*[:：]\s*(?:在群里说[:：]\s*)?/i
+
+/**
+ * 工具参数形状识别（唯一权威实现；仿真侧 paramTolerance 由此再导出）：
+ * 模型想要一个当前回合不存在的工具时，会把该工具的参数 JSON 当正文/聊天内容发出
+ * （实测案例：sendLocalEmojiTool 的 tags/useCases/leadText/followUpText 整包外发）。
+ * 命中词表 ≥2 键（或 ≥1 键且总键数 ≥3）判定为工具参数。
+ */
+const TOOL_ARG_VOCAB = new Set([
+  'tags', 'useCases', 'leadText', 'followUpText', 'query', 'messages', 'purpose', 'quietMs', 'timeoutMs',
+  'minNewMessages', 'minQuietAfterNewMs', 'throughSeq', 'action', 'kind', 'content', 'dueInMinutes', 'aboutUser',
+  'id', 'delta', 'reason', 'userId', 'mode', 'sleepMinutes', 'keywords', 'speakerIds', 'probability', 'atMention',
+  'nameMention', 'question', 'anyMessage', 'poke', 'replyToSeq', 'atUserIds', 'limit', 'afterSeq', 'offset', 'seq',
+  'config', 'triggers', 'batchWindowMs', 'steps', 'images', 'prompt', 'replyToMessageId',
+])
+
+/**
+ * AI 味短语黑名单（借鉴 qq-bridge 人格卡"出现即失败"词表，落到出站确定性过滤）：
+ * 客服腔整句删除；句首论述标记（首先/其次/综上）剥掉标记保留正文。
+ * persona.blacklist 的自定义词句同样整句删除（出站时由调用方合并传入）。
+ */
+const AI_FLAVOR_SENTENCE_RES: RegExp[] = [
+  /(?:希望|希望这些)(?:这个)?(?:回答|内容|信息|整理)[^\n。！？!?]{0,12}(?:对你有帮助|对你有用|能帮到你|有所帮助)[。！？!?~～]*/g,
+  /(?:还)?有(?:什么|任何)(?:可以|需要|随时)(?:帮(?:您|你)|帮忙|找我|吩咐)[。！？!?~～吗呀呢]*/g,
+  /(?:作为)(?:一个)?(?:AI|人工智能|语言模型|助手)[，,。！？!?]?[^\n。！？!?]{0,30}[。！？!?]?/g,
+  /这(?:真|是)?(?:个)?(?:好|不错的)问题[，,。！？!?][^\n。！？!?]{0,20}[。！？!?]?/g,
+  /我(?:很)?理解(?:你|您)的(?:感受|心情)[，,。！？!?][^\n。！？!?]{0,20}[。！？!?]?/g,
+  /(?:综上(?:所述)?|总而言之)[，,：:]?/g,
+  /值得(?:注意的是|注意的是)[，,：:]/g,
+  /(?:随时|欢迎)(?:找我|联系我|问我)[。！？!?~～]*/g,
+]
+
+const AI_FLAVOR_LINE_START_RES: RegExp[] = [
+  // 行首或句末标点之后的论述标记（带分隔符才算，"最后一次机会"这类正常用语不受影响）
+  /(?<=[。！？!?\n]|^)\s*(?:首先|其次|再次|最后|然后|接下来)[，,、：:]+/gm,
+]
+
+export function stripAIFlavorPhrases(text = "", extraPhrases: string[] = []): string {
+  let output = String(text || "")
+  for (const re of AI_FLAVOR_SENTENCE_RES) {
+    re.lastIndex = 0
+    output = output.replace(re, "")
+  }
+  for (const re of AI_FLAVOR_LINE_START_RES) {
+    re.lastIndex = 0
+    output = output.replace(re, "")
+  }
+  for (const phrase of extraPhrases) {
+    const trimmed = String(phrase || "").trim()
+    if (trimmed.length < 2) continue
+    output = output.replace(new RegExp(escapeRegExpForFlavor(trimmed), 'g'), "")
+  }
+  return output.replace(/[ \t]*\n[ \t]*\n+/g, "\n").trim()
+}
+
+function escapeRegExpForFlavor(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+export function looksLikeToolArguments(text: string): boolean {
+  const trimmed = String(text || '').trim()
+  if (trimmed.length < 8 || !trimmed.startsWith('{') || !trimmed.endsWith('}')) return false
+  let parsed: unknown
+  try { parsed = JSON.parse(trimmed) } catch { return false }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
+  const keys = Object.keys(parsed as Record<string, unknown>)
+  if (!keys.length || keys.length > 8) return false
+  const hits = keys.filter(key => TOOL_ARG_VOCAB.has(key)).length
+  return hits >= 2 || (hits >= 1 && keys.length >= 3)
+}
 
 export function stripChatLogSpeakerPrefix(text = "") {
   let output = String(text || "").trim()
@@ -178,7 +248,7 @@ function expandLiteralNewlines(text: string) {
   return out
 }
 
-export function sanitizeFinalReplyText(content: unknown) {
+export function sanitizeFinalReplyText(content: unknown, options: { aiFlavorPhrases?: string[] } = {}) {
   let output = String(content || "").replace(/\r\n/g, "\n")
   output = expandLiteralNewlines(output).trim()
   if (!output) return ""
@@ -199,6 +269,9 @@ export function sanitizeFinalReplyText(content: unknown) {
   for (const line of lines) {
     const cleaned = sanitizePseudoToolLine(line)
     if (cleaned === null) continue
+    // 整行是工具参数形状 JSON（模型把不存在工具的调用参数当正文）→ 丢弃该行；
+    // 整条回复只有这一行时结果为空，调用方按"无可发送内容"自然跳过。
+    if (looksLikeToolArguments(cleaned)) continue
     const stripped = stripChatLogSpeakerPrefix(cleaned)
     if (!String(stripped).trim()) {
       if (!previousWasBlank) sanitizedLines.push("")
@@ -209,5 +282,9 @@ export function sanitizeFinalReplyText(content: unknown) {
     previousWasBlank = false
   }
 
-  return polishHumanReplyText(sanitizedLines.join("\n").replace(/\n{3,}/g, "\n").trim())
+  // 内部状态与凭据形状脱敏（与 finalReply 同源；在所有回复路径的统一出口执行，幂等）
+  const redacted = redactInternalStatusLeaks(sanitizedLines.join("\n").replace(/\n{3,}/g, "\n").trim())
+  // AI 味黑名单（默认词表 + persona.blacklist）：确定性出站过滤
+  const deFlavored = redacted.text ? stripAIFlavorPhrases(redacted.text, options.aiFlavorPhrases || []) : redacted.text
+  return polishHumanReplyText(deFlavored)
 }

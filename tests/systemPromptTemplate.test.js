@@ -68,3 +68,13 @@ test("自述与操作前置条件不从人设示例推断，认真任务先给�
   assert.match(prompt, /不能未经确认就指导重新通电/)
   assert.match(prompt, /玩笑中的比喻不当作这些真实异常/)
 })
+
+test('system prompt carries platform capability self-knowledge (auto media relay / commands)', async () => {
+  const { buildMainSystemPrompt } = await import('../utils/systemPromptTemplate.js')
+  const prompt = buildMainSystemPrompt({ baseIdentity: '', personaOverride: 'test persona' })
+  assert.ok(prompt.includes('平台能力自我认知'), '能力清单必须在主链路 system prompt 里')
+  assert.ok(prompt.includes('.高清搬运'), '必须提到高清搬运命令')
+  assert.ok(prompt.includes('自动解析并发送汇总卡片'), '必须说明链接是系统自动搬运的')
+  assert.ok(prompt.includes(`不要把"我没这个工具"说成"这事做不了"`), '必须纠正自我认知口径')
+  assert.ok(prompt.includes('#tool'), '必须说明 #tool 是完整工具链入口')
+})

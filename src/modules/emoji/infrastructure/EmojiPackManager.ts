@@ -20,6 +20,7 @@ export const DEFAULT_EMOJI_CONFIG = {
   maxItems: 200,
   autoCollect: false,
   visionTagOnAdd: true,
+  vlmGifStrip: true,
   useEmbedding: true,
   selectionTopK: 5,
   embeddingThreshold: 0.55,
@@ -452,13 +453,24 @@ export class EmojiPackManager {
     return await sharp(buffer, { animated: false, failOn: "none" }).png().toBuffer()
   }
 
+  // GIF 帧条（借鉴 qq-bridge 的动图抽帧拼图）：取前 6 帧拼竖条缩到 240 宽，
+  // VLM 能看到动作序列而不只是首帧；压不动/单帧 GIF 回退首帧。
+  async gifToFrameStrip(buffer:Buffer): Promise<Buffer> {
+    const frames = await sharp(buffer, { animated: true, pages: 6, failOn: "none" })
+      .resize({ width: 240 })
+      .png({ compressionLevel: 9 })
+      .toBuffer()
+    return frames.byteLength > 3 * 1024 * 1024 ? await this.gifToStaticPng(buffer) : frames
+  }
+
   async prepareVLMImage(buffer:Buffer, ext:string) {
     if (ext.toLowerCase() === ".gif") {
+      const useStrip = this.config?.vlmGifStrip !== false
       try {
-        const png = await this.gifToStaticPng(buffer)
+        const png = useStrip ? await this.gifToFrameStrip(buffer) : await this.gifToStaticPng(buffer)
         return { buffer: png, mime: "image/png" }
       } catch (err) {
-        this.logInfo(`GIF 首帧提取失败已回退原图（不影响功能，VLM 仍可识别）: ${emojiError(err).split(":")[0]}`)
+        this.logInfo(`GIF 帧条提取失败已回退原图（不影响功能，VLM 仍可识别）: ${emojiError(err).split(":")[0]}`)
       }
     }
     return { buffer, mime: this.detectMimeFromExt(ext) }

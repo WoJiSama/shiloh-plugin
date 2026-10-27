@@ -455,6 +455,22 @@ class ExpressionLearner {
     return prompts.join("\n")
   }
 
+  /** 控制台风设学习视图：原始数据（常用词/句式/场景表达/节奏计数），不改学习状态 */
+  async getGroupExpressionsSnapshot(groupId: string) {
+    const expressions = normalizeExpressionData(await this.getGroupExpressions(groupId))
+    const words = Object.entries(expressions.words)
+      .filter(([, count]) => Number(count) >= this.config.minWordFrequency)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 15)
+      .map(([word, count]) => ({ word, count: Number(count) }))
+    return {
+      words,
+      patterns: (expressions.patterns || []).slice(0, 8),
+      styleExpressions: (expressions.styleExpressions || []).slice(0, 6).map(style => ({ situation: style.situation, expressions: (style.expressions || []).slice(0, 5) })),
+      rhythmPatterns: Object.entries(expressions.rhythmPatterns || {}).map(([layout, count]) => ({ layout, count: Number(count) })),
+    }
+  }
+
   async getExpressionPromptForGroup(groupId: string) {
     return this.formatExpressionPrompt(await this.getGroupExpressions(groupId))
   }

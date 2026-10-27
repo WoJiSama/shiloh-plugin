@@ -27,7 +27,11 @@ const STRUCTURAL_PATTERNS = [
   // 工具调用语法
   { kind: "tool_syntax", re: /\[(?:tool(?:_code)?)\]|<tool(?:_code)?>|\btool_call|\bfunction_call/gi },
   // 本插件工具名 + 调用括号(裸提工具名不算,带调用形式才算)
-  { kind: "tool_invoke", re: /\b(?:banana|googleImageAnalysis|googleImageEdit|textImage|sendLocalEmoji|searchInformation|webParser|deltaForce|torrentDownload|mentionAdmins|mentionMembers|forgetGroupKnowledge|excelWorkbook)Tool\s*\(/gi }
+  { kind: "tool_invoke", re: /\b(?:banana|googleImageAnalysis|googleImageEdit|textImage|sendLocalEmoji|searchInformation|webParser|deltaForce|torrentDownload|mentionAdmins|mentionMembers|forgetGroupKnowledge|excelWorkbook)Tool\s*\(/gi },
+  // 凭据形状(qq-bridge 教训:不做裸 32-hex,表情 md5/图片 URL 全是 32-hex必误伤)
+  { kind: "credential", re: /\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|gho_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|xoxb-[A-Za-z0-9-]{10,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,})/g },
+  // 凭据赋值形态: api key/token/密码/密钥/口令 + 分隔 + 值(中英都拦;群聊里基本不会合法出现)
+  { kind: "credential", re: /(?:api[_-]?key|apikey|access[_-]?key|secret|password|passwd|token|authorization|bearer\s+[A-Za-z0-9]{16,}|密钥|密码|口令|秘钥)["']?\s*[:=：]\s*["']?[A-Za-z0-9_\-.+/]{6,}/gi }
 ]
 
 const HEAVY_RATIO = 0.3

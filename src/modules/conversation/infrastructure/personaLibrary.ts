@@ -23,7 +23,11 @@ export const PERSONA_ENTRY_FIELDS = [
   "preferences",
   "boundaries",
   "notes",
-  "moods"
+  "moods",
+  // 借鉴 qq-bridge 人格卡：场景化反应模式 / 对照式回复示例 / AI味黑名单
+  "reactions",
+  "samples",
+  "blacklist"
 ]
 
 const PRIVATE_BINDING_KEY = "__private__" // 兼容旧 bindings() 平铺形态的私聊键,现仅作历史标识保留

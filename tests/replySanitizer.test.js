@@ -52,3 +52,59 @@ test('math segments are masked from newline expansion entirely', () => {
   const output = sanitizeFinalReplyText(input)
   assert.ok(output.includes('\\[ a\\nb \\]'))
 })
+
+test('tool-argument JSON as whole reply is dropped entirely', () => {
+  const incident = '{"tags":["害羞","开心"],"useCases":["被群友贴贴","接住亲昵"],"leadText":"好啦好啦，贴贴","followUpText":"今天这么乖，稀奇喵"}'
+  assert.equal(sanitizeFinalReplyText(incident), '')
+})
+
+test('tool-argument JSON line inside a multi-line reply is dropped, normal lines kept', () => {
+  const input = '来了来了\n{"tags":["害羞"],"leadText":"贴贴","query":"猫猫"}\n你们又搞什么'
+  assert.equal(sanitizeFinalReplyText(input), '来了来了\n你们又搞什么')
+})
+
+test('code-fenced tool-argument JSON is also dropped', () => {
+  const input = '```json\n{"messages":["在吗"],"purpose":"reply","quietMs":8000}\n```'
+  assert.equal(sanitizeFinalReplyText(input), '')
+})
+
+test('normal JSON-ish chat content is not affected', () => {
+  assert.equal(sanitizeFinalReplyText('今晚菜单：红烧肉、鱼香肉丝'), '今晚菜单：红烧肉、鱼香肉丝')
+})
+
+test('credential-shaped content is redacted, hashes are not', () => {
+  // 长句中嵌 key：局部脱敏，周围文字保留
+  const embedded = '这个我没办法直接给你看啦，不过我的密钥: sk-abc123def456ghi789jkl012 这种东西还是别发的好'
+  const result = sanitizeFinalReplyText(embedded)
+  assert.ok(!result.includes('sk-abc123def456ghi789jkl012'), 'API key 必须被脱敏')
+  assert.ok(result.includes('这个我没办法'), '周围文字保留')
+  // 整条几乎全是密钥：heavy 整条回退（正确行为）
+  const mostly = '我的密钥: sk-abc123def456ghi789jkl012'
+  const heavy = sanitizeFinalReplyText(mostly)
+  assert.ok(!heavy.includes('sk-abc123'), '密钥为主的文本整条处理')
+  // 32-hex（表情 md5/图片 URL）不误伤
+  assert.ok(sanitizeFinalReplyText('这张图的md5是 3f2b8a9c4d5e6f7a8b9c0d1e2f3a4b5c 呢').includes('3f2b8a9c'), '32-hex 不误伤')
+  const jwt = 'token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4'
+  assert.ok(!sanitizeFinalReplyText(jwt).includes('eyJhbGciOiJIUz'), 'JWT 形状必须被脱敏')
+})
+
+test('AI-flavor phrases are stripped deterministically', () => {
+  assert.equal(sanitizeFinalReplyText('希望这个回答对你有帮助！还有什么可以帮您吗'), '')
+  assert.equal(
+    sanitizeFinalReplyText('首先，这个方案分两步。其次，要测试。最后，上线'),
+    '这个方案分两步。要测试。上线'
+  )
+  // 无分隔符的"最后一次机会"这类正常用语不受影响
+  assert.equal(sanitizeFinalReplyText('最后一次机会，好好把握'), '最后一次机会，好好把握')
+  const mixed = '综上，今天是周五。作为一个AI，我理解你的感受。但下班还是要下的'
+  const out = sanitizeFinalReplyText(mixed)
+  assert.ok(!out.includes('作为'), 'AI 自称必须删除')
+  assert.ok(!out.includes('综上'), '论述标记必须删除')
+  assert.ok(out.includes('下班还是要下的'), '正文保留')
+})
+
+test('persona blacklist phrases are stripped when provided', () => {
+  const out = sanitizeFinalReplyText('本小姐今天心情不错，保证解压哦', { aiFlavorPhrases: ['本小姐', '保证解压'] })
+  assert.ok(!out.includes('本小姐') && !out.includes('保证解压'), out)
+  assert.ok(out.includes('今天心情不错'), '正文保留')
+})

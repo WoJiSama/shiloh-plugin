@@ -166,7 +166,7 @@ async function sendSegmentedMessage(host:ReplyDeliveryPort, e:ReplyEvent, output
           personaGuard: hasPersonaSnapshot ? personaConfig.personaGuard : host.config.personaGuard
         })
       }
-      output = sanitizeFinalReplyText(output)
+      output = sanitizeFinalReplyText(output, { aiFlavorPhrases: personaBlacklistOf(personaConfig.persona) })
       // QQ 不渲染围栏代码块，会把 ```bash 拆成 `` bash、游离反引号等碎片；
       // 走纯文本兜底时先压平成逐行行内代码胶囊。
       if (containsCodeFence(output)) {
@@ -293,6 +293,12 @@ async function sendSegmentedMessage(host:ReplyDeliveryPort, e:ReplyEvent, output
       try {return extractDeliveryMessageId(await host.sendObservedReply(e, String(output || "").trim(), false, "agent_text_fallback"))} catch {return null}
     }
   }
+
+/** persona.blacklist → AI 味附加词句（出站确定性删除） */
+function personaBlacklistOf(persona: { blacklist?: unknown; [key: string]: unknown } | undefined): string[] {
+  const raw = persona && typeof persona === 'object' ? (persona as { blacklist?: unknown }).blacklist : undefined
+  return Array.isArray(raw) ? raw.map(item => String(item || '').trim()).filter(item => item.length >= 2).slice(0, 40) : []
+}
 
 function splitMessage(host:Pick<ReplyDeliveryPort,"config"|"splitLongMessageByPunctuation">, text:string) {
     const maxChars = Math.max(300, Number(host.config?.messageSplitMaxChars) || 900)

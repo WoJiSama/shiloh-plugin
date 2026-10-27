@@ -801,6 +801,23 @@ return class GlobalStyleLearnerManager {
     return this.memory
   }
 
+  /** 控制台修剪：删除一条 AI 总结规则（absorb/avoid）；立即落盘 */
+  removeAiRule(kind: "absorb" | "avoid", key: unknown, config: ConfigInput = {}) {
+    const cfg = normalizeConfig(config)
+    const memory = this.readMemory(cfg)
+    const target = kind === "avoid" ? memory.aiRules?.avoid : memory.aiRules?.absorb
+    if (!Array.isArray(target)) return false
+    const before = target.length
+    const kept = target.filter(row => String((row as { key?: unknown }).key || "") !== String(key ?? ""))
+    if (kind === "avoid") memory.aiRules.avoid = kept
+    else memory.aiRules.absorb = kept
+    if (kept.length === before) return false
+    this.dirty = true
+    this.writeMemory(cfg)
+    this.logger?.info?.(`[全局表达学习] 已删除规则 ${kind}/${String(key ?? "")}`)
+    return true
+  }
+
   writeMemory(config: ConfigInput = {}) {
     if (!this.memory) return
     try {
@@ -834,7 +851,9 @@ return class GlobalStyleLearnerManager {
     })?.sample || ""
     if ((!text || text.length < 2) && !sequenceText) return
     if (/^[#＃.。]\S+/.test(text)) return
-    if (String(e?.user_id || "") === String(ports.botId() || "")) return
+    // 自过滤：多号实例的 botId 可能是逗号串（数组被 shell join）；任何一个自己号的消息都不学，防自我模仿漂移
+    const selfIds = String(ports.botId() || "").split(",").map(id => id.trim()).filter(Boolean)
+    if (selfIds.includes(String(e?.user_id || ""))) return
 
     const memory = this.readMemory(cfg)
     this.prepareSemanticMemory(memory, cfg)

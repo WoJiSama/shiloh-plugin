@@ -41,40 +41,40 @@ keywords:string[];intent:string;examples:string[];
    */
   async searchBilibili(name:string) {
     try {
-      // 初始请求，获取cookie
-      let biliRes = await fetch('https://www.bilibili.com', {
-        // 可以根据需要添加headers
-      });
-
-      // 手动收集所有 'set-cookie' 头部
-      const setCookieHeaders = biliRes.headers.getSetCookie?.() || [];
-      for (const [key, value] of biliRes.headers) {
-        if (!setCookieHeaders.length && key.toLowerCase() === 'set-cookie') {
-          setCookieHeaders.push(value);
-        }
-      }
-
+      // B站风控：无设备指纹 cookie 的搜索请求会被 412/HTML 拦截（访问首页拿不到 cookie）。
+      // 标准姿势：先从 finger/spi 拿 buvid3/buvid4 再搜索（实测可过，生产同理加固）。
+      const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
       let cookieHeader = '';
-      if (setCookieHeaders.length > 0) {
-        // 只取第一个 'set-cookie' 头部，如果需要多个，可以根据需求进行拼接
-        cookieHeader = setCookieHeaders.map(cookie => cookie.split(';')[0]).join('; ');
+      try {
+        const spi = await fetch('https://api.bilibili.com/x/frontend/finger/spi', {
+          headers: { 'user-agent': UA, Referer: 'https://www.bilibili.com' },
+        })
+        const spiData = record(record(await spi.json()).data)
+        const b3 = String(spiData.b_3 || ''), b4 = String(spiData.b_4 || '')
+        if (b3 && b4) cookieHeader = `buvid3=${b3}; buvid4=${b4}`
+      } catch { /* 拿不到指纹就裸搜，部分环境仍可过 */ }
+
+      const searchUrl = `https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(name)}&search_type=video`;
+      const buildHeaders = (referer: string) => ({
+        accept: 'application/json, text/plain, */*',
+        'accept-language': 'zh-CN,zh;q=0.9',
+        Referer: referer,
+        'user-agent': UA,
+        ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      })
+
+      // 发送搜索请求（被风控页拦住时换 Referer 重试一次）
+      let response = await fetch(searchUrl, { headers: buildHeaders('https://www.bilibili.com') })
+      let raw = await response.text()
+      if (!response.ok || raw.trimStart().startsWith('<!DOCTYPE') || raw.includes('request was banned')) {
+        response = await fetch(searchUrl, { headers: buildHeaders('https://search.bilibili.com') })
+        raw = await response.text()
       }
-
-      // 构建请求头
-      let requestHeaders = {
-        accept: 'application/json, text/javascript, */*; q=0.01',
-        'accept-language': 'zh-US,en;q=0.9',
-        Referer: 'https://www.bilibili.com',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-        cookie: cookieHeader
-      };
-
-      // 发送搜索请求
-      let response = await fetch(`https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(name)}&search_type=video`, {
-        headers: requestHeaders
-      });
-      if(!response.ok)throw new Error(`视频搜索 HTTP ${response.status}`);
-      const json=record(await response.json());const data=record(json.data),results=Array.isArray(data.result)?data.result.map(record):[];
+      if (!response.ok) throw new Error(`视频搜索 HTTP ${response.status}`)
+      if (raw.trimStart().startsWith('<!DOCTYPE')) throw new Error('B站搜索被风控拦截（稍后再试）')
+      const json = record(JSON.parse(raw))
+      if (Number(json.code) === -412) throw new Error('B站搜索触发风控（稍后再试）')
+      const data=record(json.data),results=Array.isArray(data.result)?data.result.map(record):[];
 
       if (results.length > 0) {
         // 随机选择一个视频
