@@ -240,6 +240,7 @@ export const simulationRuntime = createSimulationRuntime({
         total: rendered.total,
         ...(rendered.truncated ? { truncated: true } : {}),
         ...(rendered.nestedForwardIds.length ? { nestedForwardIds: rendered.nestedForwardIds } : {}),
+        ...(rendered.imageUrls.length ? { imageUrls: rendered.imageUrls } : {}),
       }
     } catch (error) {
       return { lines: [], error: error?.message || String(error) }

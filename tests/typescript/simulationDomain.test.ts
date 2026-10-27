@@ -654,14 +654,16 @@ test('renderForwardNodes：媒体标记化、内嵌转发可展开、不静默�
   const r = renderForwardNodes(nodes)
   // 每条记录都有行——图片记录显式带 [图片] 标记（不再是"没读出来"）
   assert.equal(r.lines.length, 6, '所有记录都渲染')
-  assert.ok(r.lines[0]!.includes('你看这个聊天记录') && r.lines[0]!.includes('[图片]'), '文本+图片标记共存')
-  assert.ok(r.lines[1]!.includes('[图片]'), '纯图记录有标记')
+  assert.ok(r.lines[0]!.includes('你看这个聊天记录') && r.lines[0]!.includes('[图片#1]'), '文本+图片编号标记共存')
+  assert.ok(r.lines[1]!.includes('[图片#2]'), '纯图记录带编号')
   assert.ok(r.lines[2]!.includes('内嵌转发 id=nested_1'), '内嵌转发带 id 提示')
   assert.deepEqual(r.nestedForwardIds, ['nested_1'], '内嵌 id 提取供递归')
   assert.ok(r.lines[3]!.includes('[卡片:哔哩哔哩视频]'), '卡片带描述')
   assert.ok(r.lines[4]!.includes('纯字符串消息'), '字符串 message 兼容')
   assert.ok(r.lines[5]!.includes('[无可读内容]'), '空记录显式标注而非丢弃')
   assert.equal(r.total, 6)
+  // 图片 URL 按编号顺序收集
+  assert.deepEqual(r.imageUrls, ['https://x', 'https://y'], 'URL 顺序与编号对应')
   // 长文截断 200
   const long = renderForwardNodes([{ sender: { nickname: 'x' }, message: [{ type: 'text', data: { text: '长'.repeat(500) } }] }])
   assert.ok(long.lines[0]!.length <= 210, '截断到 ~200 字')

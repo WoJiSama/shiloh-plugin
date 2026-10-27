@@ -10,10 +10,17 @@ export interface RenderedForward {
   total: number
   truncated: boolean
   nestedForwardIds: string[]
+  /** 按出现顺序收集的图片 URL（≤maxImages 张；标记编号与 lines 里的 [图片#N] 对应） */
+  imageUrls: string[]
 }
 
-/** 单个消息段 → 可读标记（text 原样，媒体给标记让模型知道"有东西但看不见"） */
-export function renderForwardSegment(seg: ForwardSegment): string {
+/** 单条展开最多给模型看的图片数（成本护栏；其余标 [图片#N(未展示)]） */
+export const FORWARD_MAX_MODEL_IMAGES = 3
+/** 渲染期最多收集的图片 URL（超出标记但不收集） */
+const MAX_COLLECTED_IMAGE_URLS = 8
+
+/** 单个消息段 → 可读标记（text 原样，媒体给标记；图片带编号与收集列表对应） */
+export function renderForwardSegment(seg: ForwardSegment, collector?: { urls: string[] }): string {
   const type = String(seg?.type || '')
   const data = (seg && typeof seg === 'object' ? (seg.data as Record<string, unknown> | undefined) : undefined) || (seg as Record<string, unknown>)
   switch (type) {
@@ -22,8 +29,16 @@ export function renderForwardSegment(seg: ForwardSegment): string {
       return String(data?.text ?? seg?.text ?? '')
     case 'at':
       return `@${String(data?.qq ?? '')}`
-    case 'image':
-      return '[图片]'
+    case 'image': {
+      const url = String(data?.url ?? seg?.url ?? '')
+      if (!collector) return '[图片]'
+      if (collector.urls.length >= MAX_COLLECTED_IMAGE_URLS) return `[图片(未展示)]`
+      if (/^https?:\/\//.test(url) && url.length <= 1024) {
+        collector.urls.push(url)
+        return `[图片#${collector.urls.length}]`
+      }
+      return '[图片(无有效链接)]'
+    }
     case 'mface':
       return `[表情包:${String(data?.summary || data?.name || '').slice(0, 20)}]`
     case 'face':
@@ -57,6 +72,7 @@ export function renderForwardNodes(nodes: unknown[], opts: { maxNodes?: number; 
   const list = Array.isArray(nodes) ? nodes : []
   const lines: string[] = []
   const nestedForwardIds: string[] = []
+  const collector = { urls: [] as string[] }
   for (const raw of list.slice(0, maxNodes)) {
     const node = (raw && typeof raw === 'object' ? raw : {}) as ForwardNode
     const name = String(node.sender?.card || node.sender?.nickname || '群友')
@@ -64,7 +80,7 @@ export function renderForwardNodes(nodes: unknown[], opts: { maxNodes?: number; 
     if (typeof node.message === 'string') {
       text = node.message
     } else if (Array.isArray(node.message)) {
-      text = (node.message as ForwardSegment[]).map(seg => renderForwardSegment(seg)).join('').trim()
+      text = (node.message as ForwardSegment[]).map(seg => renderForwardSegment(seg, collector)).join('').trim()
       // 提取内嵌转发 id 供模型递归展开
       for (const seg of node.message as ForwardSegment[]) {
         if (seg?.type === 'forward') {
@@ -76,5 +92,5 @@ export function renderForwardNodes(nodes: unknown[], opts: { maxNodes?: number; 
     text = text.replace(/\s+/g, ' ').trim()
     lines.push(`${name}：${text ? text.slice(0, maxChars) : '[无可读内容]'}`)
   }
-  return { lines, total: list.length, truncated: list.length > maxNodes, nestedForwardIds }
+  return { lines, total: list.length, truncated: list.length > maxNodes, nestedForwardIds, imageUrls: collector.urls }
 }

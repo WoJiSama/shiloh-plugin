@@ -46,8 +46,8 @@ export interface SimulationRuntimePorts {
   pokeMember?(groupId: string, userId: string): Promise<{ ok: boolean; error?: string }>
   /** 群成员列表（B3）：[{userId, nick}] */
   getGroupMembers?(groupId: string): Promise<{ userId: string; nick: string }[]>
-  /** 合并转发内容（B4）：逐条正文 + 内嵌转发 id 列表（可递归展开） */
-  getForwardContent?(forwardId: string): Promise<{ lines: string[]; error?: string; total?: number; truncated?: boolean; nestedForwardIds?: string[] }>
+  /** 合并转发内容（B4）：逐条正文 + 图片 URL 列表（按 [图片#N] 编号）+ 内嵌转发 id 列表（可递归展开） */
+  getForwardContent?(forwardId: string): Promise<{ lines: string[]; error?: string; total?: number; truncated?: boolean; nestedForwardIds?: string[]; imageUrls?: string[] }>
   /** 精选收藏表情（B6）：把消息附图收进表情包库（走完整 VLM 审核打标管线） */
   collectStickerImage?(groupId: string, url: string): Promise<{ ok: boolean; error?: string }>
   /** 仿真回合结束补记情节（仿真群不走主链路，情节记忆会断档） */
@@ -127,10 +127,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     try { return Number(resolve() || 0) || 0 } catch { return 0 }
   }
 
-  function parseSimImages(resultText: string): { mime: string; base64: string }[] {
+  function parseSimImages(resultText: string, max = 2): { mime: string; base64: string }[] {
     try {
       const parsed = JSON.parse(resultText) as { images?: { mime?: string; base64?: string }[] }
-      return (parsed?.images || []).filter((image): image is { mime: string; base64: string } => Boolean(image?.mime && image?.base64)).slice(0, 2)
+      return (parsed?.images || []).filter((image): image is { mime: string; base64: string } => Boolean(image?.mime && image?.base64)).slice(0, Math.max(1, max))
     } catch { return [] }
   }
 
@@ -520,13 +520,17 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             }
           }
           // simGetMessageImages 的结果带回图片：tool 结果之后追加视觉消息，让模型真的"看到图"
-          if (name === 'simGetMessageImages' && !resultText.startsWith('error:')) {
-            const images = parseSimImages(resultText)
+          if ((name === 'simGetMessageImages' || name === 'simGetForward') && !resultText.startsWith('error:')) {
+            const images = parseSimImages(resultText, name === 'simGetForward' ? 3 : 2)
             if (images.length) {
               history.push({ role: 'tool', tool_call_id: String(callRecord.id || ''), name, content: '已把图片附在本条消息下方。' })
-              let seqLabel = ''
-              try { seqLabel = String(record(JSON.parse(resultText)).seq ?? '') } catch { /* 忽略 */ }
-              history.push({ role: 'user', content: [{ type: 'text', text: `【消息 ${seqLabel} 的图片】` }, ...images.map(image => ({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.base64}` } }))] })
+              let label = '【转发里的图片】（对应转发记录里的 [图片#N] 编号）'
+              if (name === 'simGetMessageImages') {
+                let seqLabel = ''
+                try { seqLabel = String(record(JSON.parse(resultText)).seq ?? '') } catch { /* 忽略 */ }
+                label = `【消息 ${seqLabel} 的图片】`
+              }
+              history.push({ role: 'user', content: [{ type: 'text', text: label }, ...images.map(image => ({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.base64}` } }))] })
               continue
             }
           }
@@ -694,7 +698,24 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       getForward: async (forwardId: string) => {
         if (typeof ports.getForwardContent !== 'function') return { lines: [], error: '合并转发查看不可用' }
         const result = await ports.getForwardContent(String(forwardId || '').slice(0, 64))
-        return { lines: result.lines || [], ...(result.error ? { error: result.error } : {}) }
+        // 转发里的图片真实取回（≤FORWARD_MAX_MODEL_IMAGES 张）→ 以 vision 消息注入，模型能"看见"
+        const urls = (result.imageUrls || []).slice(0, 3)
+        const images: { mime: string; base64: string }[] = []
+        if (urls.length && typeof ports.fetchImageBase64 === 'function') {
+          for (const url of urls) {
+            try {
+              const fetched = await ports.fetchImageBase64(url)
+              if ('base64' in fetched && fetched.base64) images.push({ mime: fetched.mime, base64: fetched.base64 })
+            } catch { /* 单张失败不影响 */ }
+          }
+        }
+        return {
+          lines: result.lines || [],
+          ...(images.length ? { images } : {}),
+          ...((result.imageUrls || []).length > urls.length ? { imagesNotShown: (result.imageUrls || []).length - urls.length } : {}),
+          ...(Array.isArray(result.nestedForwardIds) && result.nestedForwardIds.length ? { nestedForwardIds: result.nestedForwardIds } : {}),
+          ...(result.error ? { error: result.error } : {}),
+        }
       },
       collectSticker: async (seq: number) => {
         if (typeof ports.collectStickerImage !== 'function') return { ok: false, error: '收藏不可用' }
