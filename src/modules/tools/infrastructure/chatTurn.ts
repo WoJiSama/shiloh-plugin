@@ -93,10 +93,14 @@ async function handleToolInner(host:ChatTurnHost, e:ChatTurnEvent) {
     const { group_id: groupId, user_id: userId, msg } = e
     const sessionId = randomUUID()
     e.sessionId = sessionId
-    // 私聊默认零工具;可配开放表情包,让一对一对话不至于全靠文字
-    const privateTools = normalizePrivateChatConfig((host.config && typeof host.config === "object" ? (host.config as {privateChat?:unknown}).privateChat : undefined) as never).allowEmojiTool
-      ? (host.tools || []).filter(tool => tool?.function?.name === "sendLocalEmojiTool")
-      : []
+    // 私聊工具面：默认识图（googleImageAnalysisTool——图片素材已收集，没工具就"认不得图"）；
+    // 表情包由 allowEmojiTool 开；allowTools 白名单可再加（画图/搜索等）
+    const privateConfig = normalizePrivateChatConfig((host.config && typeof host.config === "object" ? (host.config as {privateChat?:unknown}).privateChat : undefined) as never)
+    const privateAllowed = new Set<string>([
+      ...(privateConfig.allowTools as string[]),
+      ...(privateConfig.allowEmojiTool ? ['sendLocalEmojiTool'] : []),
+    ])
+    const privateTools = (host.tools || []).filter(tool => privateAllowed.has(String(tool?.function?.name || '')))
     const session = host.getOrCreateSession(sessionId, isPrivateChat ? privateTools : host.tools)
     const turnAvailableTools = [...(isPrivateChat ? [...privateTools] : session.tools || [])]
     session.tools = turnAvailableTools

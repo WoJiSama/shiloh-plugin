@@ -49,7 +49,14 @@ const schema: ConfigSchemaItem[] = [
     field: "privateChat.allowEmojiTool",
     label: "私聊表情包",
     component: "Switch",
-    bottomHelpMessage: "私聊开放表情包工具（其余群工具仍不可用）；关闭后私聊纯文字"
+    bottomHelpMessage: "私聊开放表情包工具；关闭后私聊无表情"
+  },
+  {
+    field: "privateChat.allowTools",
+    label: "私聊工具白名单",
+    component: "GTags",
+    bottomHelpMessage: "私聊额外开放的工具名。识图默认已开放；可加 bananaTool（画图）/searchInformationTool（搜索）/videoAnalysisTool（识视频）等",
+    componentProps: { allowAdd: true, allowDel: true }
   },
   {
     field: "groupHistory",

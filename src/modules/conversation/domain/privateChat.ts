@@ -1,4 +1,4 @@
-export interface PrivateConfig {enabled?:boolean;allowedUsers?:unknown[];cooldownSeconds?:number;quoteChance?:number;mergeMs?:number;allowEmojiTool?:boolean}
+export interface PrivateConfig {enabled?:boolean;allowedUsers?:unknown[];cooldownSeconds?:number;quoteChance?:number;mergeMs?:number;allowEmojiTool?:boolean;allowTools?:unknown[]}
 export interface PrivateEvent {message_type?:string;user_id?:string|number;self_id?:string|number;bot?:{uin?:string|number}}
 let acceptedEvents = new WeakMap<PrivateEvent,{key:string;at:number}>()
 // 私聊门禁与节流:纯函数 + 每用户冷却表,供 test.js 私聊入口与 chatTurn 双重校验共用。
@@ -16,7 +16,8 @@ export const DEFAULT_PRIVATE_CHAT_CONFIG = {
   // 连发合并窗口:用户连发几句并成一次回复,替代冷却静默吞掉
   mergeMs: 1200,
   // 私聊默认零工具,可开放表情包让对话不那么干
-  allowEmojiTool: true
+  allowEmojiTool: true,
+  allowTools: [] as unknown[]
 }
 
 export function normalizePrivateChatConfig(raw:PrivateConfig = {}) {
@@ -27,6 +28,12 @@ export function normalizePrivateChatConfig(raw:PrivateConfig = {}) {
   config.quoteChance = Math.min(1, Math.max(0, Number(config.quoteChance ?? DEFAULT_PRIVATE_CHAT_CONFIG.quoteChance)))
   config.mergeMs = Math.min(5000, Math.max(0, Number(config.mergeMs ?? DEFAULT_PRIVATE_CHAT_CONFIG.mergeMs)))
   config.allowEmojiTool = config.allowEmojiTool !== false
+  // 私聊工具白名单：识图默认开放（修"私聊认不得图"——素材已收集但无工具可用）；
+  // 表情包由 allowEmojiTool 开关并入同一张白名单（chatTurn 只看 allowTools）
+  const userTools = Array.isArray(config.allowTools) ? config.allowTools : []
+  const defaults = ['googleImageAnalysisTool']
+  const emoji = config.allowEmojiTool !== false ? ['sendLocalEmojiTool'] : []
+  config.allowTools = [...new Set([...userTools, ...defaults, ...emoji])] as unknown[]
   return config
 }
 

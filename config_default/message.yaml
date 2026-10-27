@@ -47,6 +47,9 @@ pluginSettings:
     quoteChance: 0.05            # 私聊回复引用上一条消息的概率；群聊固定 0.5，私聊默认基本不引用
     mergeMs: 1200                # 连发合并窗口（毫秒）：窗口内的多条消息并成一次回复；0=关闭合并
     allowEmojiTool: true         # 私聊是否开放表情包工具
+    # 私聊额外工具白名单。识图(googleImageAnalysisTool)始终默认开放（私聊发图必回"认不得图"就是缺它）；
+    # 想让私聊也能画图/搜索/识视频，往这里加：["bananaTool","searchInformationTool","videoAnalysisTool"] 等
+    allowTools: []
   # 模型价目（元/百万 token，CNY）：令牌账本与花费看板用；未列出的模型按 fallback 估算并标注。
   # 常用模型已内置默认价，此处按需覆盖。
   pricing:

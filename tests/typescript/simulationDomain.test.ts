@@ -668,3 +668,18 @@ test('renderForwardNodes：媒体标记化、内嵌转发可展开、不静默�
   const long = renderForwardNodes([{ sender: { nickname: 'x' }, message: [{ type: 'text', data: { text: '长'.repeat(500) } }] }])
   assert.ok(long.lines[0]!.length <= 210, '截断到 ~200 字')
 })
+
+// ── 私聊识图（实测："私聊认不得图"）──
+
+test('私聊工具白名单：识图默认开放', async () => {
+  const { normalizePrivateChatConfig } = await import('../../src/modules/conversation/domain/privateChat.js')
+  const cfg = normalizePrivateChatConfig({})
+  assert.ok((cfg.allowTools as string[]).includes('googleImageAnalysisTool'), '识图默认在白名单')
+  // 用户追加不减默认
+  const cfg2 = normalizePrivateChatConfig({ allowTools: ['bananaTool'] })
+  const tools = cfg2.allowTools as string[]
+  assert.ok(tools.includes('bananaTool') && tools.includes('googleImageAnalysisTool'), '追加与默认合并')
+  // 表情包独立开关
+  assert.ok((normalizePrivateChatConfig({ allowEmojiTool: true }).allowTools as string[]).includes('sendLocalEmojiTool'))
+  assert.ok(!(normalizePrivateChatConfig({ allowEmojiTool: false }).allowTools as string[]).includes('sendLocalEmojiTool'))
+})
