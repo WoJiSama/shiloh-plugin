@@ -209,12 +209,6 @@ const schema: ConfigSchemaItem[] = [
     bottomHelpMessage: "调节分段回复的段间延迟（两种模式都生效）；0=默认公式（1s起步+字符延展），>0=按字符/秒计算延迟，建议 8-25",
     componentProps: { min: 0, max: 100, step: 1, placeholder: "0" }
   },
-  {
-    field: "smartTrigger.waitToolEnabled",
-    label: "启用 wait 工具",
-    component: "Switch",
-    bottomHelpMessage: "smart 模式: LLM 可调 waitTool 主动安排 N 秒后续话（拟人化打字停顿）"
-  },
 
   // ===== 智能模式 - 对话焦点状态机 (FOCUS/FADING/COLD) =====
   { component: "Divider", label: "智能模式 - 对话焦点状态机" },

@@ -14,10 +14,10 @@ function setup(extra={}){
 test('compiled tool assembly enforces emoji/wait gates and refreshes session tool lists',()=>{
  const {api,host,calls}=setup()
  api.updateToolsList(host)
- assert.deepEqual(host.tools.map(t=>t.function.name),['test'])
+ assert.deepEqual(host.tools.map(t=>t.function.name),['test','waitTool'])
  assert.deepEqual([...host.dedupeToolNames],['test'])
  assert.equal(calls[0][0],'refresh')
- host.config.emojiSystem.enabled=true;host.config.chatTriggerMode='smart';host.config.smartTrigger={waitToolEnabled:true}
+ host.config.emojiSystem.enabled=true
  api.updateToolsList(host)
  assert.equal(host.tools.length,3)
 })

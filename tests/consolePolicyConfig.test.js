@@ -15,7 +15,7 @@ import { buildSchemaConfigView, getIn, prepareSchemaUpdates, schemaFieldGroups, 
 const defaults = YAML.parse(fs.readFileSync(new URL("../config_default/message.yaml", import.meta.url), "utf8")).pluginSettings
 const policies = {
   dice: { title: "骰子基础设置", schema: dice, count: 11 },
-  tracking: { title: "对话追踪", schema: tracking, count: 55 },
+  tracking: { title: "对话追踪", schema: tracking, count: 54 },
   memory: { title: "记忆策略", schema: memory, count: 35 }
 }
 const allFields = entry => schemaFieldGroups(entry.schema).flatMap(group => group.fields)

@@ -71,10 +71,6 @@ function getToolsByName(host:ToolAssemblyHost, toolNames:unknown[], options:{for
         if (name === 'sendLocalEmojiTool' && !host.config?.emojiSystem?.enabled) {
           return null
         }
-        if (name === 'waitTool') {
-          const mode = String(host.config?.chatTriggerMode || 'strict').toLowerCase()
-          if (mode !== 'smart' || !host.config?.smartTrigger?.waitToolEnabled) return null
-        }
         const func = host.functionMap.get(name)
         if (!func) {
           if (warnMissing) console.warn(`未找到工具 "${name}"`)

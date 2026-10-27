@@ -24,7 +24,6 @@ import { GrabRedBagTool } from "../functions/functions_tools/GrabRedBagTool.js"
 import { ReminderTool } from "../functions/functions_tools/ReminderTool.js"
 import { TextImageTool } from "../functions/functions_tools/TextImageTool.js"
 import { SendLocalEmojiTool } from "../functions/functions_tools/SendLocalEmojiTool.js"
-import { WaitTool } from "../functions/functions_tools/WaitTool.js"
 import { SendGiftTool } from "../functions/functions_tools/SendGiftTool.js"
 import { DeltaForceTool } from "../functions/functions_tools/DeltaForceTool.js"
 import { ExcelWorkbookTool } from "../functions/functions_tools/ExcelWorkbookTool.js"
@@ -64,7 +63,6 @@ const BUILT_IN_TOOL_FACTORIES = [
   () => new ReminderTool(),
   () => new TextImageTool(),
   () => new SendLocalEmojiTool(),
-  () => new WaitTool(),
   () => new SendGiftTool(),
   () => new DeltaForceTool(),
   () => new ExcelWorkbookTool(),

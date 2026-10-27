@@ -67,9 +67,12 @@ pluginSettings:
     allGroups: true              # true（默认）= 过了群白名单的群默认全部进仿真；false = 仅 groups 清单
     groups: []                   # 显式启用群种子（仅 allGroups: false 时用；.仿真 开/关 的按群覆盖存 Redis）
     # 仿真回合额外放通的既有工具（白名单，从工具注册表按名取）。
-    # 默认开：sendLocalEmojiTool=发表情（自带限流与冷却）、searchVideoTool=搜B站视频并直接发群里
-    # （群友缺教程/要参考时主动搜，自主行动窗口也可分享）。想要网页搜索再加 "searchInformation"。
-    extraTools: ["sendLocalEmojiTool", "searchVideoTool"]
+    # 默认开四件套：
+    #   sendLocalEmojiTool=发表情（自带限流与冷却）
+    #   searchVideoTool=搜B站视频并直接发群里（缺教程/要参考时主动搜）
+    #   bananaTool=画图（群友说"画一张X"直接画，不需要 #tool）
+    #   searchInformationTool=联网搜索
+    extraTools: ["sendLocalEmojiTool", "searchVideoTool", "bananaTool", "searchInformationTool"]
     # 按人挖口头禅（风格个性化）：每 6 小时从归档挖"他说得多、别人基本不说"的专属词，
     # 注入高好感（熟络以上）对象的说话指引——用TA的梗接话更投契。
     userStyle:
@@ -407,6 +410,9 @@ pluginSettings:
   conversationTrackingThrottle: 3
   batchJudgmentDelay: 10
   # 对话触发模式：strict=严格模式（必须 @/前缀才回，默认）；smart=智能模式（按 talkValue 频率让 Gate 子代理判断是否插话）
+  # 触发模式——【遗留】：仿真是主模式（见 simulation 段，默认全群开启）。
+  # 仅在仿真未覆盖的群/未启用 simulation 时生效；`.仿真 关` 可按群回退到此处配置的模式。
+  # strict = 触发前缀/@/会话追踪；smart = TimingGate 轻量 LLM 判定（智能但按消息计费）。
   chatTriggerMode: strict
   # smart 模式专属配置
   smartTrigger:
@@ -1115,7 +1121,6 @@ pluginSettings:
     - textImageTool
     - torrentDownloadTool(dedupe)
     - sendLocalEmojiTool
-    - waitTool                            # 拟人化"稍后再说一句"；仅 chatTriggerMode=smart 且 smartTrigger.waitToolEnabled=true 时才会暴露给 LLM
     - sendGiftTool
   githubToken: ""
   qqMusicToken: ""
