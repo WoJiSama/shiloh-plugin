@@ -46,8 +46,8 @@ export interface SimulationRuntimePorts {
   pokeMember?(groupId: string, userId: string): Promise<{ ok: boolean; error?: string }>
   /** 群成员列表（B3）：[{userId, nick}] */
   getGroupMembers?(groupId: string): Promise<{ userId: string; nick: string }[]>
-  /** 合并转发内容（B4）：文本行列表（含发言人） */
-  getForwardContent?(forwardId: string): Promise<{ lines: string[]; error?: string }>
+  /** 合并转发内容（B4）：逐条正文 + 内嵌转发 id 列表（可递归展开） */
+  getForwardContent?(forwardId: string): Promise<{ lines: string[]; error?: string; total?: number; truncated?: boolean; nestedForwardIds?: string[] }>
   /** 精选收藏表情（B6）：把消息附图收进表情包库（走完整 VLM 审核打标管线） */
   collectStickerImage?(groupId: string, url: string): Promise<{ ok: boolean; error?: string }>
   /** 仿真回合结束补记情节（仿真群不走主链路，情节记忆会断档） */

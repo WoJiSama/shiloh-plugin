@@ -226,20 +226,21 @@ export const simulationRuntime = createSimulationRuntime({
     }
     return out
   },
-  // 合并转发内容（OneBot get_forward_msg → 逐条文本行）
+  // 合并转发内容（OneBot get_forward_msg → 纯函数渲染：媒体标记化、内嵌转发可递归）
   getForwardContent: async forwardId => {
     try {
       const Bot = globalThis.Bot
       const raw = await (Bot?.getForwardMsg?.(forwardId) ?? Bot?.pickFriend?.(0)?.getForwardMsg?.(forwardId))
       const nodes = Array.isArray(raw) ? raw : Array.isArray(raw?.message) ? raw.message : []
-      const lines = []
-      for (const node of nodes.slice(0, 40)) {
-        const name = String(node?.sender?.card || node?.sender?.nickname || '群友')
-        const segs = Array.isArray(node?.message) ? node.message : []
-        const text = segs.filter(seg => seg?.type === 'text').map(seg => String(seg.data?.text || '')).join('').trim()
-        if (text) lines.push(`${name}：${text.slice(0, 120)}`)
+      if (!nodes.length) return { lines: [], error: '转发内容为空或解析失败' }
+      const { renderForwardNodes } = await import('../dist/backend/modules/simulation/domain/forwardView.js')
+      const rendered = renderForwardNodes(nodes)
+      return {
+        lines: rendered.lines,
+        total: rendered.total,
+        ...(rendered.truncated ? { truncated: true } : {}),
+        ...(rendered.nestedForwardIds.length ? { nestedForwardIds: rendered.nestedForwardIds } : {}),
       }
-      return lines.length ? { lines } : { lines: [], error: '转发内容为空或解析失败' }
     } catch (error) {
       return { lines: [], error: error?.message || String(error) }
     }

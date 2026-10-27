@@ -489,7 +489,11 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     constructor() {
       super()
       this.name = 'simGetForward'
-      this.description = '查看合并转发消息的内容（快照里标了 [合并转发，可用 simGetForward 查看] 的那条）。返回逐条正文（带发言人）。'
+      this.description = [
+        '查看合并转发消息的内容（快照里标了 [合并转发，可用 simGetForward 查看] 的那条）。返回逐条正文（带发言人）。',
+        '返回里的 [图片]/[表情包]/[视频] 表示那条有媒体但看不到内容；[内嵌转发 id=xxx] 可以再调本工具继续展开（一层一层挖）。',
+        '读不全时如实告诉群友缺什么（"有两张图我看不见"），但不要让群友"重新打一遍字"——能展开的展开，实在缺的说明缺的部分就行。',
+      ].join('\n')
       this.parameters = {
         type: 'object',
         properties: { forwardId: { type: 'string', description: '消息里标注的转发 id。' } },

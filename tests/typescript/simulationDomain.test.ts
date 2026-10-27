@@ -635,3 +635,34 @@ test('引用解析入快照（B1）：非自引用带被引用人+原文', () =>
   const forward = msg({ seq: 3, text: '看看这个', forwardId: 'fwd123', at: 5_000 })
   assert.ok(compactSimMessage(forward, now).includes('simGetForward'), '转发查看提示')
 })
+
+// ── 转发渲染（实测事故："两份记录没读出来，让群友重新打字"）──
+
+test('renderForwardNodes：媒体标记化、内嵌转发可展开、不静默丢记录', async () => {
+  const { renderForwardNodes } = await import('../../src/modules/simulation/domain/forwardView.js')
+  const nodes = [
+    { sender: { nickname: '愚士' }, message: [
+      { type: 'text', data: { text: '你看这个聊天记录' } },
+      { type: 'image', data: { url: 'https://x' } },
+    ] },
+    { sender: { nickname: '阿明' }, message: [{ type: 'image', data: { url: 'https://y' } }] },
+    { sender: { nickname: '波波' }, message: [{ type: 'forward', data: { id: 'nested_1' } }] },
+    { sender: { nickname: '小美' }, message: [{ type: 'json', data: { desc: '哔哩哔哩视频' } }] },
+    { sender: { nickname: '路人' }, message: '我是纯字符串消息' },
+    { sender: { nickname: '空空' }, message: [] },
+  ]
+  const r = renderForwardNodes(nodes)
+  // 每条记录都有行——图片记录显式带 [图片] 标记（不再是"没读出来"）
+  assert.equal(r.lines.length, 6, '所有记录都渲染')
+  assert.ok(r.lines[0]!.includes('你看这个聊天记录') && r.lines[0]!.includes('[图片]'), '文本+图片标记共存')
+  assert.ok(r.lines[1]!.includes('[图片]'), '纯图记录有标记')
+  assert.ok(r.lines[2]!.includes('内嵌转发 id=nested_1'), '内嵌转发带 id 提示')
+  assert.deepEqual(r.nestedForwardIds, ['nested_1'], '内嵌 id 提取供递归')
+  assert.ok(r.lines[3]!.includes('[卡片:哔哩哔哩视频]'), '卡片带描述')
+  assert.ok(r.lines[4]!.includes('纯字符串消息'), '字符串 message 兼容')
+  assert.ok(r.lines[5]!.includes('[无可读内容]'), '空记录显式标注而非丢弃')
+  assert.equal(r.total, 6)
+  // 长文截断 200
+  const long = renderForwardNodes([{ sender: { nickname: 'x' }, message: [{ type: 'text', data: { text: '长'.repeat(500) } }] }])
+  assert.ok(long.lines[0]!.length <= 210, '截断到 ~200 字')
+})
