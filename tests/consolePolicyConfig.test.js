@@ -26,7 +26,7 @@ const prepare = (key, values, settings = defaults) => {
   return prepareSchemaUpdates(key, entry, settings, { revision, values })
 }
 
-test("policy schemas expose 101 unique controls independently of Guoba and deduplicate memory sections", () => {
+test("policy schemas expose 100 unique controls independently of Guoba and deduplicate memory sections", () => {
   assert.equal(fs.existsSync(new URL("../standalone/bl-dice-plugin/guoba.support.js", import.meta.url)), false, "Standalone dice must not import the retired Guoba schema")
   const migrated = []
   for (const [key, entry] of Object.entries(policies)) {
@@ -37,7 +37,7 @@ test("policy schemas expose 101 unique controls independently of Guoba and dedup
     assert.equal(fs.existsSync(new URL(`../models/Guoba/schemas/${key}.js`, import.meta.url)), false)
     assert.equal(fs.existsSync(new URL(`../src/modules/config/domain/schemas/guoba/${key}.ts`, import.meta.url)), false)
   }
-  assert.equal(new Set(migrated).size, 101)
+  assert.equal(new Set(migrated).size, 100)
   const remaining = new Set(guoba.flatMap(item => item.field ? [item.field] : []))
   for (const name of migrated) assert.equal(remaining.has(name), false, name)
   assert.equal(policyFields.tracking.some(field => field.field === "chatTriggerMode"), false)
