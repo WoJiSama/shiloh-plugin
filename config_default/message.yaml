@@ -839,9 +839,12 @@ pluginSettings:
     searchApiUrl: https://api.openai.com/v1/chat/completions
     # 搜索后端域名被墙/DNS污染时填本地代理,例如 http://127.0.0.1:7890;留空走直连
     searchApiProxy: ""
+    # 智谱(bigmodel.cn)端点必须带 web_search 工具才会真联网,域名命中时自动开启;on/off 可强制开关,其他供应商保持默认不发送
+    searchApiWebSearch: ""
     searchApiModel: deepseek-r1-search
     searchApiKey: sk-xxxxx
-    timeoutMs: 20000
+    # 联网搜索服务端要「搜+读+总结」,比普通对话慢,别配得太短
+    timeoutMs: 40000
 
   memoryAiConfig:
     memoryAiUrl: https://api.openai.com/v1/chat/completions

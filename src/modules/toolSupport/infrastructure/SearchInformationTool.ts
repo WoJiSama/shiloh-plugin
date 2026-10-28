@@ -195,15 +195,26 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
     let timeoutMs = 20000;
     try {
       const config = this.loadConfig();
-      
-      const apiUrl = resolveChatCompletionUrl(text(record(config.searchAiConfig).searchApiUrl) || 'https://api.openai.com/v1/chat/completions')
-      const apiKey = record(config.searchAiConfig).searchApiKey || 'sk-xxxxxx'
-      // 搜索后端域名被墙/DNS污染时,可配 searchApiProxy: http://127.0.0.1:7890 走本地代理
-      const proxyUrl = String(record(config.searchAiConfig).searchApiProxy || "").trim()
-      const proxyFetch = proxyUrl ? await this.getProxyFetch(proxyUrl) : null
+      const searchConfig = record(config.searchAiConfig)
 
-      const requestData = { "model": record(config.searchAiConfig).searchApiModel || 'deepseek-r1-search', "messages": [{ "role": "user", "content": query }], "temperature": 1, "top_p": 0.1 }
-      timeoutMs = Math.max(3000, Number(record(config.searchAiConfig).timeoutMs) || 20000)
+      const apiUrl = resolveChatCompletionUrl(text(searchConfig.searchApiUrl) || 'https://api.openai.com/v1/chat/completions')
+      const apiKey = searchConfig.searchApiKey || 'sk-xxxxxx'
+      // 搜索后端域名被墙/DNS污染时,可配 searchApiProxy: http://127.0.0.1:7890 走本地代理
+      const proxyUrl = String(searchConfig.searchApiProxy || "").trim()
+      const proxyFetch = proxyUrl ? await this.getProxyFetch(proxyUrl) : null
+      // 普通对话模型(glm-5.3/glm-5.3-flash)不带联网,智谱端点必须在请求体声明 web_search 工具才会真搜索。
+      // searchApiWebSearch: on/off 显式控制;未配置时仅 bigmodel.cn 域名自动开启,不影响其他供应商自带的搜索模型。
+      const webSearchFlag = String(searchConfig.searchApiWebSearch || "").trim().toLowerCase()
+      const webSearchEnabled = ["on", "true", "1"].includes(webSearchFlag) || (!["off", "false", "0"].includes(webSearchFlag) && /bigmodel\.cn/i.test(apiUrl))
+
+      const requestData = {
+        model: searchConfig.searchApiModel || 'deepseek-r1-search',
+        messages: [{ role: "user", content: query }],
+        temperature: 1, top_p: 0.1,
+        ...(webSearchEnabled ? { tools: [{ type: "web_search", web_search: { enable: true, search_result: true } }] } : {})
+      }
+      // 联网搜索在服务端要完成「搜+读+总结」,实测 30s 上下,默认超时比普通对话放宽
+      timeoutMs = Math.max(3000, Number(searchConfig.timeoutMs) || 40000)
       controller = new AbortController()
       requestTimeout = setTimeout(() => controller?.abort(), timeoutMs)
       if(canReply)progressTimer = setTimeout(() => {
