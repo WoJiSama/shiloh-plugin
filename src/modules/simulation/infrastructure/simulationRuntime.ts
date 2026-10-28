@@ -29,6 +29,8 @@ export interface SimulationRuntimePorts {
   /** 当前 bot 身份（多号时以事件的 self_id 为准） */
   getSelf(selfIdHint?: string | number): { id: string; name: string }
   YTapi(requestData: ChatRequestData, config: unknown): Promise<ChatResponse>
+  /** 视觉侧模型把图片转成文字描述（主模型纯文本时 simGetMessageImages 的看图走这里）；返回 null/空 表示描述不可用 */
+  describeImages?(images: { mime: string; base64: string }[], context: { groupId: string; label: string }): Promise<string | null>
   /** 出站发送：segments 为 OneBot 消息段数组（经全局出站闸门）；成功时尽量带回 message_id 供回执校验 */
   sendGroupMessage(groupId: string, segments: unknown[]): Promise<{ ok: boolean; error?: string; messageId?: string | number }>
   getPersona(groupId: string, selfId: string): { persona: PersonaText; systemContent: string }
@@ -519,18 +521,21 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
               resultText = await runSimTool(tool, args, groupId, self.id)
             }
           }
-          // simGetMessageImages 的结果带回图片：tool 结果之后追加视觉消息，让模型真的"看到图"
+          // simGetMessageImages 的结果带回图片：主模型多为纯文本(实测 glm-5.3 收 image_url 直接 400，
+          // 且带图历史会持久化毒化后续每个回合)。图片改经视觉侧模型转成文字描述注入，主模型保持纯文本请求。
           if ((name === 'simGetMessageImages' || name === 'simGetForward') && !resultText.startsWith('error:')) {
             const images = parseSimImages(resultText, name === 'simGetForward' ? 3 : 2)
             if (images.length) {
-              history.push({ role: 'tool', tool_call_id: String(callRecord.id || ''), name, content: '已把图片附在本条消息下方。' })
               let label = '【转发里的图片】（对应转发记录里的 [图片#N] 编号）'
               if (name === 'simGetMessageImages') {
                 let seqLabel = ''
                 try { seqLabel = String(record(JSON.parse(resultText)).seq ?? '') } catch { /* 忽略 */ }
                 label = `【消息 ${seqLabel} 的图片】`
               }
-              history.push({ role: 'user', content: [{ type: 'text', text: label }, ...images.map(image => ({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.base64}` } }))] })
+              let described = ''
+              try { described = ports.describeImages ? String(await ports.describeImages(images, { groupId, label })) || '' : '' } catch { described = '' }
+              history.push({ role: 'tool', tool_call_id: String(callRecord.id || ''), name, content: `已获取 ${images.length} 张图片，视觉侧模型的描述见下一条消息。` })
+              history.push({ role: 'user', content: `${label}\n【视觉模型描述】${described || '（图片描述暂不可用，可请群友用文字说明图片内容）'}` })
               continue
             }
           }

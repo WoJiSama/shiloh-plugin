@@ -436,7 +436,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     constructor() {
       super()
       this.name = 'simGetMessageImages'
-      this.description = '查看某条消息附带的图片（你要"看到"图就调它）。返回后图片会直接出现在你的上下文里，然后用一句话描述你看到了什么、怎么接。'
+      this.description = '查看某条消息附带的图片（你要"看到"图就调它）。返回后图片会由视觉模型转成文字描述附在你的上下文里，基于描述接话即可。'
       this.parameters = {
         type: 'object',
         properties: { seq: { type: 'number', description: '消息的 seq（视图里 [附图×N] 的那条）。' } },
@@ -491,7 +491,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.name = 'simGetForward'
       this.description = [
         '查看合并转发消息的内容（快照里标了 [合并转发，可用 simGetForward 查看] 的那条）。返回逐条正文（带发言人）。',
-        '返回里的 [图片#N] 会直接给你看（每次展开最多 3 张，更多的标 [图片(未展示)]）。读不全时如实告诉群友缺什么，但不要让群友"重新打一遍字"——能展开的展开，实在缺的说明缺的部分就行。',
+        '返回里的 [图片#N] 会以视觉模型的文字描述给你（每次展开最多 3 张，更多的标 [图片(未展示)]）。读不全时如实告诉群友缺什么，但不要让群友"重新打一遍字"——能展开的展开，实在缺的说明缺的部分就行。',
       ].join('\n')
       this.parameters = {
         type: 'object',

@@ -73,6 +73,17 @@ export const simulationRuntime = createSimulationRuntime({
     return { id: bot.id, name: bot.name || String(readPluginSettings().persona?.name || '') }
   },
   YTapi: (requestData, execConfig) => YTapi(requestData, execConfig),
+  // 看图转述：仿真主模型多为纯文本(实测 glm-5.3 收 image_url 直接 400),图片经视觉模型(analysisApiConfig)转文字注入
+  describeImages: async (images, context) => {
+    const cfg = readPluginSettings().analysisAiConfig || {}
+    if (!cfg.analysisApiUrl || !cfg.analysisApiKey || cfg.analysisApiKey === 'sk-xxxxx' || !cfg.analysisApiModel) return null
+    const content = [
+      { type: 'text', text: `用中文简洁描述这几张图片的关键信息(每张一行,总共不超过120字),供群聊机器人接话参考:${context?.label || ''}` },
+      ...images.map(image => ({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.base64}` } }))
+    ]
+    const result = await sideLLMCall({ url: cfg.analysisApiUrl, apikey: cfg.analysisApiKey, model: cfg.analysisApiModel, messages: [{ role: 'user', content }], temperature: 0.2, maxTokens: 300, timeoutMs: 30000 })
+    return result.ok ? result.content : null
+  },
   sendGroupMessage: async (groupId, segments) => {
     const Bot = globalThis.Bot
     try {

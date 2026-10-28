@@ -1,3 +1,5 @@
+import { resolveChatCompletionUrl } from '../modules/models/domain/chatCompletionUrl.js'
+
 export interface SideLLMOptions {
   url?: string
   apikey?: string
@@ -16,7 +18,9 @@ function record(value: unknown): Record<string, unknown> {
 /** Transport errors are values so each caller retains its own fallback policy. */
 export async function sideLLMCall({ url, apikey, model, messages, temperature = 0.2, maxTokens,
   timeoutMs = 30000, signal = null, fetchImpl = null }: SideLLMOptions = {}): Promise<SideLLMResult> {
-  const endpoint = String(url || '').trim()
+  // 调用方给的多是渠道基址(如 .../api/coding/paas/v4),统一补全 /chat/completions;
+  // 已经是完整地址的保持不变。曾因裸 POST 到 /v4 导致梗提取/表达学习全线 404。
+  const endpoint = resolveChatCompletionUrl(url)
   if (!endpoint || !apikey || !model || !Array.isArray(messages) || !messages.length) {
     return { ok: false, error: 'sideLLMCall 缺少 url/apikey/model/messages' }
   }
