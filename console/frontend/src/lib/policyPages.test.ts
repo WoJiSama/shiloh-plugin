@@ -127,7 +127,7 @@ afterEach(() => {
 describe('migrated policy settings', () => {
   it.each([
     ['dice', 11],
-    ['tracking', 55],
+    ['tracking', 54],
     ['memory', 35]
   ] as const)(
     'makes all %s fields reachable once, including advanced fields',
