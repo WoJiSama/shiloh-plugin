@@ -22,6 +22,14 @@ test('仿真协议教模型先判定说话对象，判断不了默认旁听', ()
   assert.doesNotMatch(protocol, /和进行中话题或你的记忆自然相关/)
 })
 
+test('仿真协议要求多话题线分线接话，不跨线混接', () => {
+  const protocol = buildSimulationProtocol('希洛')
+  assert.match(protocol, /多条话题线并行/)
+  assert.match(protocol, /同一个人的相邻消息也可能是两件事/)
+  assert.match(protocol, /绝不把两条线的元素混着接/)
+  assert.match(protocol, /分不清这条消息属于哪条线/)
+})
+
 test('对话延续指引不再偏向「大概率是对我说的」，要求先判定、猜不中就安静', () => {
   const tail = wake({ kind: 'continuation', seq: 1, detail: '某人' })
   assert.match(tail, /对话延续/)
