@@ -347,6 +347,17 @@ function pickSendBot(deliveries:ReportJob[] = []) {
   return typeof root.sendApi === "function" ? root : null
 }
 
+/**
+ * 是否值得打扰管理群：真有失败、采集异常、或有账号掉线才推。
+ * 「一切正常」以及启动初期的模糊状态（待扫码/未连接/未知/未采集到）都保持沉默——
+ * 避免每次重启和每个周期都发一张没有信息量的"运行正常"卡。
+ */
+function shouldPushHealthReport(view:ReturnType<typeof buildHealthReportView>, context:Pick<HealthContext, "healthError"|"statsError"|"bots"> = {}) {
+  if (view.statusTone === "danger") return true
+  if (context.healthError || context.statsError) return true
+  return (Array.isArray(context.bots) ? context.bots : []).some(bot => bot.loginState === "掉线")
+}
+
 async function pushReport({ store, logger, groupId, windowMs }:{store:ReportStore;logger?:ReportLogger|undefined;groupId:string;windowMs:number}) {
   const now = Date.now()
   const [deliveries, events] = await Promise.all([store.list("delivery"), store.list("event")])
@@ -371,14 +382,19 @@ async function pushReport({ store, logger, groupId, windowMs }:{store:ReportStor
     healthError: health.error,
     statsError: usage.error
   }
+  const view = buildHealthReportView(context)
+  if (!shouldPushHealthReport(view, context)) {
+    logger?.info?.(`[健康报告] 无失败且账号都在线，跳过推送 group=${groupId}`)
+    return { sent: false, reason: "healthy" }
+  }
   const bot = pickSendBot(deliveries)
   if (!bot) {
     logger?.warn?.(`[健康报告] 没有可用的 OneBot sendApi，跳过本次推送 group=${groupId}`)
-    return
+    return { sent: false, reason: "no_send_api" }
   }
   let message: string | {type:string;data:{file:string}}[] | null = null
   try {
-    message = await renderHealthReportCard(buildHealthReportView(context))
+    message = await renderHealthReportCard(view)
   } catch (error) {
     logger?.warn?.(`[健康报告] 卡面渲染失败，回退纯文本：${compactError(error)}`)
   }
@@ -387,9 +403,10 @@ async function pushReport({ store, logger, groupId, windowMs }:{store:ReportStor
   const result = record(await bot.sendApi!("send_group_msg", { group_id: Number(groupId), message }))
   if (Number(result?.retcode) !== 0) {
     logger?.warn?.(`[健康报告] 推送失败 group=${groupId} retcode=${result?.retcode ?? "?"} ${String(result?.wording || result?.msg || "").slice(0, 120)}`)
-    return
+    return { sent: false, reason: "send_failed" }
   }
   logger?.info?.(`[健康报告] 已推送 format=${format} group=${groupId} message=${record(result.data).message_id || result?.message_id || ""}`)
+  return { sent: true }
 }
 
 function readReportConfig() {
@@ -404,7 +421,8 @@ function readReportConfig() {
 /**
  * 定时向管理群推送健康报告卡面：机器人登录态与内存、今日收发统计、失败汇总。
  * 每次触发时重读配置（控制台"消息管道"页保存即生效，无需重启）；
- * 推送失败只记日志，一小时后重试，不影响下一周期。
+ * 只有真出事才打扰（见 shouldPushHealthReport）——启动 2 分钟的首查与周期检查在
+ * 「无失败且账号都在线」时静默跳过；推送失败只记日志，一小时后重试，不影响下一周期。
  */
 function startMediaRelayAdminReport({ store, logger = ports.logger }: {store?:ReportStore;logger?:ReportLogger|undefined} = {}) {
   if (!store) return null
@@ -436,5 +454,5 @@ function startMediaRelayAdminReport({ store, logger = ports.logger }: {store?:Re
   }
 }
 
-return { describeRelayError,parseLoginState,collectBotHealth,extractRelayFailures,extractEventFailures,extractSendFailures,buildFailureRows,buildHealthReportView,healthReportImageMessage,renderHealthReportCard,startMediaRelayAdminReport }
+return { describeRelayError,parseLoginState,collectBotHealth,extractRelayFailures,extractEventFailures,extractSendFailures,buildFailureRows,buildHealthReportView,shouldPushHealthReport,healthReportImageMessage,renderHealthReportCard,startMediaRelayAdminReport }
 }

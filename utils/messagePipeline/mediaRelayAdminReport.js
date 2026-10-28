@@ -19,6 +19,7 @@ export const extractEventFailures = report.extractEventFailures
 export const extractSendFailures = report.extractSendFailures
 export const buildFailureRows = report.buildFailureRows
 export const buildHealthReportView = report.buildHealthReportView
+export const shouldPushHealthReport = report.shouldPushHealthReport
 export const healthReportImageMessage = report.healthReportImageMessage
 export const renderHealthReportCard = report.renderHealthReportCard
 export const startMediaRelayAdminReport = report.startMediaRelayAdminReport

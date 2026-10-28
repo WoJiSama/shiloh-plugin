@@ -11,7 +11,8 @@ import {
   extractSendFailures,
   parseLoginState,
   healthReportImageMessage,
-  renderHealthReportCard
+  renderHealthReportCard,
+  shouldPushHealthReport
 } from "../utils/messagePipeline/mediaRelayAdminReport.js"
 
 const NOW = new Date("2026-10-10T15:00:00+08:00").getTime()
@@ -230,4 +231,34 @@ test('uncertain delivery is visible in report and marked for manual inspection',
  assert.equal(failures.length,1)
  assert.equal(failures[0].uncertain,true)
  assert.match(buildHealthReportView({failures}).failuresHtml,/结果不确定/)
+})
+
+test("健康一切正常时保持沉默：无失败、无采集异常、账号在线都不推", () => {
+  const bots = [{ account: "100001", nickname: "在线号", connected: true, loginState: "已登录", memory: "100MiB" }]
+  const context = { bots, statsByBot: { "100001": { recv: 10, send: 5, fail: 0 } }, failures: [] }
+  assert.equal(shouldPushHealthReport(buildHealthReportView(context), context), false)
+})
+
+test("启动初期的模糊状态不触发推送：待扫码、未连接、未知、未采集到", () => {
+  for (const bots of [
+    [{ account: "1", nickname: "扫码中", connected: false, loginState: "待扫码" }],
+    [{ account: "1", nickname: "刚启动", connected: false, loginState: "已登录" }],
+    [{ account: "1", nickname: "未知", connected: true, loginState: "未知" }],
+    []
+  ]) {
+    const context = { bots, statsByBot: {}, failures: [] }
+    assert.equal(shouldPushHealthReport(buildHealthReportView(context), context), false, JSON.stringify(bots))
+  }
+})
+
+test("真出事才推：有失败任务、今日发送失败、采集异常、账号掉线", () => {
+  const okBots = [{ account: "1", nickname: "在线", connected: true, loginState: "已登录" }]
+  const withFailures = { bots: okBots, statsByBot: {}, failures: buildFailureRows({ relayFailures: extractRelayFailures([delivery({ state: "failed", lastError: "send_api_error" })], { now: NOW }) }) }
+  assert.equal(shouldPushHealthReport(buildHealthReportView(withFailures), withFailures), true)
+  const withSendFail = { bots: okBots, statsByBot: { "1": { fail: 3 } }, failures: [] }
+  assert.equal(shouldPushHealthReport(buildHealthReportView(withSendFail), withSendFail), true)
+  const withHealthError = { bots: okBots, statsByBot: {}, failures: [], healthError: "docker unavailable" }
+  assert.equal(shouldPushHealthReport(buildHealthReportView(withHealthError), withHealthError), true)
+  const withOffline = { bots: [...okBots, { account: "2", nickname: "掉线号", connected: true, loginState: "掉线" }], statsByBot: {}, failures: [] }
+  assert.equal(shouldPushHealthReport(buildHealthReportView(withOffline), withOffline), true)
 })
