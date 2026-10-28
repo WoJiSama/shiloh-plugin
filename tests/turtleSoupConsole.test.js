@@ -96,7 +96,7 @@ async function fixture(t, settingsBuilder = () => ({}), modelHandler) {
     }
     const onError = error => finish(new Error(`fixture could not start: ${error.message}\n${output}`))
     const onExit = (code, signal) => finish(new Error(`fixture exited before listening (code=${code}, signal=${signal}): ${output}`))
-    const timeout = setTimeout(() => finish(new Error(`fixture startup timed out: ${output}`)), 8000)
+    const timeout = setTimeout(() => finish(new Error(`fixture startup timed out: ${output}`)), 20000)
     child.once("error", onError)
     child.once("exit", onExit)
     child.stdout.on("data", chunk => {

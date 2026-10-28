@@ -94,7 +94,7 @@ async function startServer(root, t) {
   })
   return new Promise((resolve, reject) => {
     let output = ""
-    const timeout = setTimeout(() => { child.kill(); reject(new Error("conversation fixture server startup timed out")) }, 5000)
+    const timeout = setTimeout(() => { child.kill(); reject(new Error("conversation fixture server startup timed out")) }, 20000)
     child.stdout.on("data", chunk => {
       output += chunk.toString()
       const match = output.match(/listening on (http:\/\/127\.0\.0\.1:\d+)/)

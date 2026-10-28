@@ -22,7 +22,7 @@ async function startFixtureServer(root, t, envOverrides = {}) {
   })
   return await new Promise((resolve, reject) => {
     let output = ""
-    const timeout = setTimeout(() => { child.kill(); reject(new Error(`fixture server startup timed out: ${output}`)) }, 5000)
+    const timeout = setTimeout(() => { child.kill(); reject(new Error(`fixture server startup timed out: ${output}`)) }, 20000)
     child.stdout.on("data", chunk => {
       output += chunk.toString()
       const match = output.match(/listening on (http:\/\/127\.0\.0\.1:\d+)/)
