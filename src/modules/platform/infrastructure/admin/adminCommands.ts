@@ -5,7 +5,7 @@ type PersonaDetail=ReturnType<PersonaLibrary['resolve']>
 export interface AdminEvent {msg?:string;isMaster?:boolean;user_id?:string|number;group_id?:string|number;message_type?:string;sender?:{role?:string}}
 type Target={error:string;groupId?:never}|{groupId:string;error?:never}
 export interface AdminCommandHost {
- config:{forbiddenWords?:{words?:unknown;enabled?:boolean};persona?:Record<string,unknown>};personaLibrary:PersonaLibrary;
+ config:{forbiddenWords?:{words?:unknown;enabled?:boolean};persona?:Record<string,unknown>;userBlacklist?:{enabled?:boolean;users?:unknown};allowedGroups?:unknown};personaLibrary:PersonaLibrary;
  replyLongForward(event:AdminEvent,title:string,message:unknown):Promise<unknown>;
  sendObservedReply(event:AdminEvent,message:string):Promise<unknown>;
  forbiddenWordList():string[];isChatManager(event:AdminEvent):boolean;resolvePersonaTargetGroup(event:AdminEvent,explicit:unknown):Target;formatPersonaDetail(detail:PersonaDetail):string;
@@ -79,6 +79,90 @@ async function handleForbiddenList(host:AdminCommandHost, e:AdminEvent) {
     ]
     await host.sendObservedReply(e, lines.join("\n"))
     return true
+}
+
+
+/** 主人命令:用户黑名单/群白名单快捷维护(热更新,写 message.yaml,与控制台同源) */
+function userBlacklistOf(host:AdminCommandHost):string[] {
+  const raw = host.config?.userBlacklist?.users
+  return (Array.isArray(raw) ? raw : []).map(v => String(v)).filter(v => /^\d{5,12}$/.test(v))
+}
+function allowedGroupsOf(host:AdminCommandHost):string[] {
+  const raw = host.config?.allowedGroups
+  return (Array.isArray(raw) ? raw : []).map(v => String(v)).filter(v => /^\d{5,12}$/.test(v))
+}
+function extractTargetId(text:string):string {
+  const at = /qq=(\d{5,12})/.exec(text)
+  if (at) return at[1]!
+  const digits = /(\d{5,12})/.exec(text)
+  return digits?.[1] || ""
+}
+
+async function handleUserBlacklistAdd(host:AdminCommandHost, e:AdminEvent) {
+  if (!e?.isMaster) { await host.sendObservedReply(e, "只有主人才能拉黑"); return true }
+  const target = extractTargetId(String(e.msg || "").replace(/^#拉黑\s+/, ""))
+  if (!target) { await host.sendObservedReply(e, "用法：#拉黑 <QQ 或 @某人>"); return true }
+  const users = userBlacklistOf(host)
+  if (users.includes(target)) { await host.sendObservedReply(e, `QQ ${target} 已在黑名单`); return true }
+  const updates: Record<string, unknown> = { "userBlacklist.users": [...users, target] }
+  if (host.config?.userBlacklist?.enabled !== true) updates["userBlacklist.enabled"] = true
+  applyFlatUpdates(updates)
+  logger.mark(`[黑名单] 拉黑 ${target} by=${e?.user_id}(热更新生效)`)
+  await host.sendObservedReply(e, `已拉黑 ${target},它的消息将被静默忽略(对话/工具/记忆全部跳过)`)
+  return true
+}
+
+async function handleUserBlacklistRemove(host:AdminCommandHost, e:AdminEvent) {
+  if (!e?.isMaster) { await host.sendObservedReply(e, "只有主人才能取消拉黑"); return true }
+  const target = extractTargetId(String(e.msg || "").replace(/^#取消拉黑\s+/, ""))
+  const users = userBlacklistOf(host)
+  const index = users.indexOf(target)
+  if (index === -1) { await host.sendObservedReply(e, `QQ ${target} 不在黑名单`); return true }
+  users.splice(index, 1)
+  applyFlatUpdates({ "userBlacklist.users": users })
+  logger.mark(`[黑名单] 取消拉黑 ${target} by=${e?.user_id}`)
+  await host.sendObservedReply(e, `已取消拉黑 ${target}`)
+  return true
+}
+
+async function handleUserBlacklistList(host:AdminCommandHost, e:AdminEvent) {
+  if (!e?.isMaster) { await host.sendObservedReply(e, "只有主人才能查看黑名单"); return true }
+  const users = userBlacklistOf(host)
+  const enabled = host.config?.userBlacklist?.enabled === true
+  await host.sendObservedReply(e, `用户黑名单(${enabled ? "开" : "关"})：${users.length ? users.join("、") : "空"}`)
+  return true
+}
+
+async function handleAllowedGroupAdd(host:AdminCommandHost, e:AdminEvent) {
+  if (!e?.isMaster) { await host.sendObservedReply(e, "只有主人才能添加白名单群"); return true }
+  const target = extractTargetId(String(e.msg || "").replace(/^#加群\s+/, ""))
+  if (!target) { await host.sendObservedReply(e, "用法：#加群 <群号>"); return true }
+  const groups = allowedGroupsOf(host)
+  if (groups.includes(target)) { await host.sendObservedReply(e, `群 ${target} 已在白名单`); return true }
+  applyFlatUpdates({ allowedGroups: [...groups, target] })
+  logger.mark(`[群白名单] 添加 ${target} by=${e?.user_id}(热更新生效)`)
+  await host.sendObservedReply(e, `已把群 ${target} 加入白名单`)
+  return true
+}
+
+async function handleAllowedGroupRemove(host:AdminCommandHost, e:AdminEvent) {
+  if (!e?.isMaster) { await host.sendObservedReply(e, "只有主人才能移除白名单群"); return true }
+  const target = extractTargetId(String(e.msg || "").replace(/^#移除群\s+/, ""))
+  const groups = allowedGroupsOf(host)
+  const index = groups.indexOf(target)
+  if (index === -1) { await host.sendObservedReply(e, `群 ${target} 不在白名单`); return true }
+  groups.splice(index, 1)
+  applyFlatUpdates({ allowedGroups: groups })
+  logger.mark(`[群白名单] 移除 ${target} by=${e?.user_id}`)
+  await host.sendObservedReply(e, `已把群 ${target} 移出白名单(该群即刻不再响应)`)
+  return true
+}
+
+async function handleAllowedGroupList(host:AdminCommandHost, e:AdminEvent) {
+  if (!e?.isMaster) { await host.sendObservedReply(e, "只有主人才能查看群白名单"); return true }
+  const groups = allowedGroupsOf(host)
+  await host.sendObservedReply(e, `群白名单(${groups.length} 个)：${groups.join("、") || "空"}`)
+  return true
 }
 
 async function handleForbiddenAdd(host:AdminCommandHost, e:AdminEvent) {
@@ -331,5 +415,5 @@ async function handlePersonaBindings(host:AdminCommandHost, e:AdminEvent) {
     return true
 }
 
-return {mcpStatus,testMCPTool,isChatManager,forbiddenWordList,handleForbiddenList,handleForbiddenAdd,handleForbiddenRemove,resolvePersonaTargetGroup,formatPersonaDetail,handlePersonaList,handlePersonaCurrent,handlePersonaDetail,handlePersonaSwitch,handlePersonaReset,handlePersonaSave,handlePersonaDelete,handlePersonaReload,handlePersonaBindings}
+return {mcpStatus,testMCPTool,isChatManager,forbiddenWordList,handleForbiddenList,handleForbiddenAdd,handleForbiddenRemove,handleUserBlacklistAdd,handleUserBlacklistRemove,handleUserBlacklistList,handleAllowedGroupAdd,handleAllowedGroupRemove,handleAllowedGroupList,resolvePersonaTargetGroup,formatPersonaDetail,handlePersonaList,handlePersonaCurrent,handlePersonaDetail,handlePersonaSwitch,handlePersonaReset,handlePersonaSave,handlePersonaDelete,handlePersonaReload,handlePersonaBindings}
 }

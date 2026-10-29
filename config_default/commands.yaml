@@ -162,6 +162,30 @@ domains:
         perm: master
         src: "apps/test.js handleForbiddenRemove"
 
+      - usage: "#拉黑 <QQ|@某人>"
+        desc: 拉黑用户，消息被静默忽略（对话/工具/记忆全跳过），热更新生效
+        perm: master
+        src: "apps/test.js handleUserBlacklistAdd"
+      - usage: "#取消拉黑 <QQ>"
+        desc: 解除用户黑名单
+        perm: master
+        src: "apps/test.js handleUserBlacklistRemove"
+      - usage: "#拉黑列表"
+        desc: 查看用户黑名单与开关状态
+        perm: master
+        src: "apps/test.js handleUserBlacklistList"
+      - usage: "#加群 <群号>"
+        desc: 把群加入白名单（机器人可用群），热更新生效
+        perm: master
+        src: "apps/test.js handleAllowedGroupAdd"
+      - usage: "#移除群 <群号>"
+        desc: 把群移出白名单，该群即刻不再响应
+        perm: master
+        src: "apps/test.js handleAllowedGroupRemove"
+      - usage: "#群白名单"
+        desc: 查看群白名单列表
+        perm: master
+        src: "apps/test.js handleAllowedGroupList"
   - key: dice
     name: 骰子
     icon: "🎲"

@@ -2,4 +2,4 @@ import {createAdminCommands} from '../../dist/backend/modules/platform/infrastru
 import {mcpManager} from '../../utils/MCPClient.js'
 import {applyFlatUpdates} from '../../utils/configWriter.js'
 const commands=createAdminCommands({mcpManager,applyFlatUpdates,logger:globalThis.logger})
-export const {mcpStatus,testMCPTool,isChatManager,forbiddenWordList,handleForbiddenList,handleForbiddenAdd,handleForbiddenRemove,resolvePersonaTargetGroup,formatPersonaDetail,handlePersonaList,handlePersonaCurrent,handlePersonaDetail,handlePersonaSwitch,handlePersonaReset,handlePersonaSave,handlePersonaDelete,handlePersonaReload,handlePersonaBindings}=commands
+export const {mcpStatus,testMCPTool,isChatManager,forbiddenWordList,handleForbiddenList,handleForbiddenAdd,handleForbiddenRemove,handleUserBlacklistAdd,handleUserBlacklistRemove,handleUserBlacklistList,handleAllowedGroupAdd,handleAllowedGroupRemove,handleAllowedGroupList,resolvePersonaTargetGroup,formatPersonaDetail,handlePersonaList,handlePersonaCurrent,handlePersonaDetail,handlePersonaSwitch,handlePersonaReset,handlePersonaSave,handlePersonaDelete,handlePersonaReload,handlePersonaBindings}=commands
