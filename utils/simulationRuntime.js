@@ -13,17 +13,29 @@ import { YTapi } from './apiClient.js'
 import { tokenLedger } from './tokenLedger.js'
 import { sideLLMCall } from '../dist/backend/adapters/sideLLM.js'
 import path from 'node:path'
+import fs from 'node:fs'
+import YAML from 'yaml'
 
 const logger = globalThis.logger
-const config = (await import('../model/config.js')).default
-const pluginRoot = path.resolve('./plugins/shiloh-plugin')
+// 插件根目录:优先环境变量,其次按本文件位置定位——独立控制台进程 cwd 不是云崽根,不能依赖 process.cwd()
+const pluginRoot = process.env.CONSOLE_PLUGIN_ROOT
+  || path.resolve(path.dirname(new URL('.', import.meta.url).pathname), '..')
+// bot 进程内走 model/config.js(带云崽配置联动);独立控制台进程没有云崽 cwd,导入会失败——降级直读 yaml(默认值+用户值合并)
+let modelConfig = null
+try { modelConfig = (await import('../model/config.js')).default } catch { modelConfig = null }
 
 const expressionLearner = new ExpressionLearner()
 let styleDigestCache = { key: '', at: 0, text: '' }
 
-function readPluginSettings() {
-  const raw = config.getConfig('message')
-  return raw && typeof raw === 'object' ? raw.pluginSettings || {} : {}
+export function readPluginSettings() {
+  if (modelConfig) {
+    const raw = modelConfig.getConfig('message')
+    return raw && typeof raw === 'object' ? raw.pluginSettings || {} : {}
+  }
+  try {
+    const read = file => YAML.parse(fs.readFileSync(file, 'utf8'))?.pluginSettings || {}
+    return { ...read(path.join(pluginRoot, 'config_default/message.yaml')), ...read(path.join(pluginRoot, 'config/message.yaml')) }
+  } catch { return {} }
 }
 
 const personaLibrary = createPersonaLibrary({

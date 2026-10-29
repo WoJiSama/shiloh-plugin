@@ -1,7 +1,8 @@
 import {BananaTool as TypedBananaTool} from '../../dist/backend/modules/toolSupport/infrastructure/BananaTool.js'
 import {createImageResource} from '../../dist/backend/modules/image/infrastructure/imageResource.js'
 import {getBase64Image,normalizeImageUrls} from '../../utils/fileUtils.js'
-import {dependencies} from '../../dependence/dependencies.js'
+// 只需要 form-data 构造器:直接依赖插件自身的 form-data 包,不再静态拖整个云崽 dependence 链(独立控制台进程会 ENOENT)
+import FormData from 'form-data'
 import {pluginBridge} from '../../utils/pluginBridge.js'
 import {personaFeedbackManager} from '../../domains/memory/PersonaFeedbackManager.js'
 import {serializeMultipartFormData} from '../../utils/multipartFormData.js'
