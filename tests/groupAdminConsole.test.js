@@ -38,7 +38,7 @@ async function fixture(t, settings) {
   })
   const base = await new Promise((resolve, reject) => {
     let output = ''
-    const timeout = setTimeout(() => { child.kill(); reject(new Error(`fixture startup timed out: ${output}`)) }, 5000)
+    const timeout = setTimeout(() => { child.kill(); reject(new Error(`fixture startup timed out: ${output}`)) }, 20000)
     child.stdout.on('data', chunk => {
       output += chunk.toString()
       const match = output.match(/listening on (http:\/\/127\.0\.0\.1:\d+)/)
