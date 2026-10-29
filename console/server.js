@@ -4,6 +4,8 @@ await ensureBackendArtifacts()
 const { createConsoleServer } = await import("../dist/backend/modules/platform/infrastructure/console/consoleServer.js")
 const { buildTurnTraceReport } = await import("../dist/backend/scripts/turnTraceReport.js")
 const pluginRoot = process.env.CONSOLE_PLUGIN_ROOT || new URL("..", import.meta.url).pathname.replace(/\/$/, "")
+// 尽早固定插件根:令牌账本/仿真 shim 都按此环境变量解析数据目录,独立进程 cwd 不可靠
+process.env.CONSOLE_PLUGIN_ROOT = pluginRoot
 // 可选装配：令牌账本与仿真运行时依赖 Yunzai 运行环境（model/config 等），
 // 在测试夹具/独立部署目录下可能不可用——降级为不接（对应控制台路由返回 503）。
 let tokens = null

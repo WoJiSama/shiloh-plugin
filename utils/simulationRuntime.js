@@ -22,7 +22,10 @@ const pluginRoot = process.env.CONSOLE_PLUGIN_ROOT
   || path.resolve(path.dirname(new URL('.', import.meta.url).pathname), '..')
 // bot 进程内走 model/config.js(带云崽配置联动);独立控制台进程没有云崽 cwd,导入会失败——降级直读 yaml(默认值+用户值合并)
 let modelConfig = null
-try { modelConfig = (await import('../model/config.js')).default } catch { modelConfig = null }
+if (globalThis.Bot) {
+  // 仅 bot 进程走 model/config.js(带云崽配置联动);控制台进程导入虽不抛错但内部路径按错误 cwd 解析,会读到空配置
+  try { modelConfig = (await import('../model/config.js')).default } catch { modelConfig = null }
+}
 
 const expressionLearner = new ExpressionLearner()
 let styleDigestCache = { key: '', at: 0, text: '' }
