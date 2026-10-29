@@ -390,7 +390,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       liveStates.set(groupId, state)
       rollBudgetDay(state, now())
       const todayCost = safeNumber(() => ports.getTodaySpendCny?.(groupId))
-      const verdict = checkWakeBudget(state, cfg, now(), todayCost, reason)
+      const verdict = checkWakeBudget(state, cfg, now(), todayCost, reason, String(groupId))
       if (!verdict.allowed) {
         // 限频类延后重试（丢弃会让 timeout 唤醒停在无定时器静默态）；预算类今日不再试
         if (!verdict.reason.startsWith('dailyTurns')) {
@@ -979,7 +979,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     for (const groupId of known.slice(0, 60)) {
       try { groups.push(await describeGroup(groupId)) } catch { /* 单群失败不影响总览 */ }
     }
-    return { enabled: cfg.enabled, allGroups: cfg.allGroups, disabled: overridesCache?.disabled || [], explicitEnabled: overridesCache?.explicitEnabled || [], budgetDefaultCny: cfg.budget.dailyCostCny, groups }
+    return { enabled: cfg.enabled, allGroups: cfg.allGroups, disabled: overridesCache?.disabled || [], explicitEnabled: overridesCache?.explicitEnabled || [], budgetDefaultCny: cfg.budget.dailyCostCny, budgetGroupsCny: cfg.budget.groups, groups }
   }
 
   /** 控制台 JSON 视图 */

@@ -49,3 +49,18 @@ test('点名豁免不豁免预算：每日回合与金额闸仍然拦截', () =>
   assert.equal(costly.allowed, false)
   assert.match(costly.reason, /dailyCost/)
 })
+
+test('按群金额上限：覆盖的群用本群上限，未覆盖的用默认，非法项被丢弃', () => {
+  const base = defaultSimRuntimeConfig({ budget: { dailyCostCny: 5, groups: { '725902146': 30, '981339693': 15, abc: 99, '123': 1, '725902146x': 2 } } })
+  assert.deepEqual(base.budget.groups, { '725902146': 30, '981339693': 15 })
+  const at = { kind: 'atMention', seq: 1 }
+  // 瓦尔哈拉覆盖 30：花 5 元仍在限内
+  assert.equal(checkWakeBudget(state(), base, now, 5.0, at, '725902146').allowed, true)
+  assert.equal(checkWakeBudget(state(), base, now, 5.0, at, '725902146').allowed, true)
+  assert.match(checkWakeBudget(state(), base, now, 30.0, at, '725902146').reason, /30\.00\/30/)
+  // 未覆盖的群仍按默认 5 拦
+  assert.match(checkWakeBudget(state(), base, now, 5.0, at, '295708427').reason, /5\.00\/5/)
+  // 覆盖 15 的群介于两者之间
+  assert.equal(checkWakeBudget(state(), base, now, 5.0, at, '981339693').allowed, true)
+  assert.match(checkWakeBudget(state(), base, now, 15.0, at, '981339693').reason, /15\.00\/15/)
+})

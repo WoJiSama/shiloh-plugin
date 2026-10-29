@@ -89,6 +89,10 @@ pluginSettings:
       injectMax: 6                 # 唤醒 prompt 注入的梗数上限
     budget:
       dailyCostCny: 5              # 每群每日金额预算（元，读令牌账本；超出当日不再唤醒）
+      # 活跃群可单独放宽（键=群号，值=该群每日上限元）；未列出的群用上面的默认值
+      groups: {}
+        # "725902146": 30
+        # "981339693": 15
     agentPresetKeywords: []      # 默认注入唤醒触发器的关键词（AI 之后可用 simSetWakeConfig 自己改）
     wake:
       probability: 0.05          # 随机唤醒概率（每条消息）

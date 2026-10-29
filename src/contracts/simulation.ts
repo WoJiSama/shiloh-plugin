@@ -172,6 +172,8 @@ export interface SimulationSection {
   }
   budget?: {
     dailyCostCny?: number
+    /** 按群消耗上限覆盖（键=群号，值=该群每日金额上限元）；未列出的群用 dailyCostCny */
+    groups?: Record<string, number>
   }
   /** 按人挖口头禅（风格个性化）：从归档挖每个群友的专属说法，注入高好感对象的风格指引 */
   userStyle?: {
@@ -216,6 +218,6 @@ export interface SimRuntimeConfig {
   agentPresetKeywords: string[]
   extraTools: string[]
   meme: { enabled: boolean; extractCooldownMs: number; extractMinMessages: number; injectMax: number }
-  budget: { dailyCostCny: number }
+  budget: { dailyCostCny: number; groups: Record<string, number> }
   userStyle: { enabled: boolean; cooldownMs: number; archiveDays: number }
 }

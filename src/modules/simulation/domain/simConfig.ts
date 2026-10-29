@@ -25,6 +25,18 @@ export const DEFAULT_SIM_WAKE_CONFIG: SimWakeConfig = {
   confirmedBy: 'default',
 }
 
+/** 按群每日金额上限覆盖：键=群号(5-12位数字)，值=该群上限(元)。非法项静默丢弃。 */
+function normalizeGroupBudgetOverrides(raw: unknown): Record<string, number> {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
+  const out: Record<string, number> = {}
+  for (const [key, value] of Object.entries(source)) {
+    if (!/^\d{5,12}$/.test(key)) continue
+    const cap = Number(value)
+    if (Number.isFinite(cap) && cap > 0) out[key] = Math.min(10_000, cap)
+  }
+  return out
+}
+
 export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRuntimeConfig {
   const wake = section.wake || {}
   const turn = section.turn || {}
@@ -63,6 +75,7 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
     extraTools: Array.isArray(section.extraTools) ? [...new Set(section.extraTools.map(n => String(n || '').trim()).filter(Boolean))] : [],
     budget: {
       dailyCostCny: Math.max(0, Number((section.budget || {}).dailyCostCny ?? 5)),
+      groups: normalizeGroupBudgetOverrides((section.budget || {}).groups),
     },
     userStyle: {
       enabled: (section.userStyle || {}).enabled !== false,

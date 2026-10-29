@@ -19,7 +19,7 @@ export interface WakeBudgetVerdict { allowed: boolean; reason: string }
 const DIRECT_ADDRESS_WAKE_KINDS: readonly string[] = ['admin', 'atMention', 'nameMention', 'question']
 
 /** 唤醒限频（1 分钟/1 小时两窗）+ 每群每日回合预算 + 当日金额预算（读令牌账本）。超限只能延后不能丢弃（由调用方重试）。 */
-export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig, now: number, todayCostCny = 0, reason: SimWakeReason | null = null): WakeBudgetVerdict {
+export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig, now: number, todayCostCny = 0, reason: SimWakeReason | null = null, groupId = ''): WakeBudgetVerdict {
   rollBudgetDay(state, now)
   if (!DIRECT_ADDRESS_WAKE_KINDS.includes(String(reason?.kind || ''))) {
     const minuteWindow = pruneWindow(state.wakeTimes, now, 60_000, 200)
@@ -34,8 +34,9 @@ export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig
   if (state.budget.turns >= config.turn.maxTurnsPerDay) {
     return { allowed: false, reason: `dailyTurns:${state.budget.turns}/${config.turn.maxTurnsPerDay}` }
   }
-  if (config.budget.dailyCostCny > 0 && todayCostCny >= config.budget.dailyCostCny) {
-    return { allowed: false, reason: `dailyCost:${todayCostCny.toFixed(2)}/${config.budget.dailyCostCny}元` }
+  const dailyCap = config.budget.groups?.[groupId] ?? config.budget.dailyCostCny
+  if (dailyCap > 0 && todayCostCny >= dailyCap) {
+    return { allowed: false, reason: `dailyCost:${todayCostCny.toFixed(2)}/${dailyCap}元` }
   }
   return { allowed: true, reason: 'ok' }
 }
