@@ -30,6 +30,7 @@ try {
         : simulationRuntime.resetGroup(groupId),
     setInitialPrompt: (groupId, text) => simulationRuntime.setInitialPrompt(groupId, text),
     setGroupBudget: (groupId, cap) => simulationRuntime.setGroupBudget(groupId, cap),
+    setGroupTurnsCap: (groupId, cap) => simulationRuntime.setGroupTurnsCap(groupId, cap),
     setDefaultBudget: (cny) => simulationRuntime.setDefaultBudget(cny),
   }
 } catch (error) {

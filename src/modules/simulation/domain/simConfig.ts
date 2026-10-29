@@ -25,13 +25,14 @@ export const DEFAULT_SIM_WAKE_CONFIG: SimWakeConfig = {
   confirmedBy: 'default',
 }
 
-/** 按群每日金额上限覆盖：键=群号(5-12位数字)，值=该群上限(元)。非法项静默丢弃。 */
-function normalizeGroupBudgetOverrides(raw: unknown): Record<string, number> {
+/** 按群每日上限覆盖（金额/回合通用）：键=群号(5-12位数字)，值=上限；-1=不限；非法项静默丢弃。 */
+function normalizeGroupCapOverrides(raw: unknown): Record<string, number> {
   const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}
   const out: Record<string, number> = {}
   for (const [key, value] of Object.entries(source)) {
     if (!/^\d{5,12}$/.test(key)) continue
     const cap = Number(value)
+    if (cap === -1) { out[key] = -1; continue }
     if (Number.isFinite(cap) && cap > 0) out[key] = Math.min(10_000, cap)
   }
   return out
@@ -70,12 +71,13 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       messageTextMaxChars: Math.max(50, Math.floor(turn.messageTextMaxChars ?? 200)),
       waitQuietMaxMs: Math.max(1000, Math.floor(turn.waitQuietMaxMs ?? 120_000)),
       waitTimeoutMaxMs: Math.max(1000, Math.floor(turn.waitTimeoutMaxMs ?? 120_000)),
+      groups: normalizeGroupCapOverrides(turn.groups),
     },
     agentPresetKeywords: (section.agentPresetKeywords || []).map(k => String(k || '').trim()).filter(Boolean).slice(0, SIM_KEYWORDS_LIMIT),
     extraTools: Array.isArray(section.extraTools) ? [...new Set(section.extraTools.map(n => String(n || '').trim()).filter(Boolean))] : [],
     budget: {
       dailyCostCny: Math.max(0, Number((section.budget || {}).dailyCostCny ?? 5)),
-      groups: normalizeGroupBudgetOverrides((section.budget || {}).groups),
+      groups: normalizeGroupCapOverrides((section.budget || {}).groups),
     },
     userStyle: {
       enabled: (section.userStyle || {}).enabled !== false,

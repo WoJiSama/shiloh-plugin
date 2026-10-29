@@ -64,3 +64,16 @@ test('按群金额上限：覆盖的群用本群上限，未覆盖的用默认�
   assert.equal(checkWakeBudget(state(), base, now, 5.0, at, '981339693').allowed, true)
   assert.match(checkWakeBudget(state(), base, now, 15.0, at, '981339693').reason, /15\.00\/15/)
 })
+
+test('按群上限支持不限(-1):回合与金额都不再拦截', () => {
+  const cfg = defaultSimRuntimeConfig({ budget: { dailyCostCny: 5, groups: { '725902146': -1 } }, turn: { groups: { '725902146': -1 } } })
+  const at = { kind: 'atMention', seq: 1 }
+  // 回合 999、花费 999 元都不拦
+  assert.equal(checkWakeBudget(state({ turns: 999 }), cfg, now, 999, at, '725902146').allowed, true)
+  // 其他群照常受限
+  assert.match(checkWakeBudget(state({ turns: 40 }), cfg, now, 0, at, '295708427').reason, /dailyTurns/)
+  // 回合按群具体值生效
+  const cfg50 = defaultSimRuntimeConfig({ turn: { groups: { '933253375': 50 } } })
+  assert.equal(checkWakeBudget(state({ turns: 49 }), cfg50, now, 0, at, '933253375').allowed, true)
+  assert.match(checkWakeBudget(state({ turns: 50 }), cfg50, now, 0, at, '933253375').reason, /50/)
+})

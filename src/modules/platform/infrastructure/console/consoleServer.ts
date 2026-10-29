@@ -93,6 +93,7 @@ export interface ConsoleExtraPorts {
     setGroup(groupId: string, action: string): Promise<unknown>
     setInitialPrompt(groupId: string, text: string): Promise<unknown>
     setGroupBudget?(groupId: string, cap: number): Promise<string>
+    setGroupTurnsCap?(groupId: string, cap: number): Promise<string>
     setDefaultBudget?(cny: number): Promise<string>
   }
 }
@@ -2063,16 +2064,18 @@ const server = http.createServer(async (req, res) => {
       const groupId = String(body?.group || "")
       const action = String(body?.action || "")
       if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 必须是群号" })
-      if (!["enable", "disable", "reset", "initial-prompt", "budget"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget" })
+      if (!["enable", "disable", "reset", "initial-prompt", "budget", "turns"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget|turns" })
       if (action === "initial-prompt") {
         const text = typeof body?.text === "string" ? body.text.slice(0, 2000) : ""
         return sendJson(res, 200, { ok: true, message: await simulation.setInitialPrompt(groupId, text) })
       }
-      if (action === "budget") {
-        if (typeof simulation.setGroupBudget !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持预算编辑" })
+      if (action === "budget" || action === "turns") {
+        if (action === "budget" && typeof simulation.setGroupBudget !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持预算编辑" })
+        if (action === "turns" && typeof simulation.setGroupTurnsCap !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持回合上限编辑" })
         const cap = Number(body?.cap)
-        if (!Number.isFinite(cap) || cap < 0 || cap > 10000) return sendJson(res, 400, { error: "cap 必须是 0~10000 的金额（0=清除按群覆盖）" })
-        return sendJson(res, 200, { ok: true, message: await simulation.setGroupBudget(groupId, cap) })
+        if (!Number.isFinite(cap) || cap < -1 || cap > 10000) return sendJson(res, 400, { error: "cap 必须是 -1~10000（-1=不限，0=清除按群覆盖）" })
+        const message = action === "budget" ? await simulation.setGroupBudget!(groupId, cap) : await simulation.setGroupTurnsCap!(groupId, cap)
+        return sendJson(res, 200, { ok: true, message })
       }
       return sendJson(res, 200, { ok: true, detail: await simulation.setGroup(groupId, action) })
     }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { NAlert, NButton, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSwitch, NTag, type DataTableColumns } from 'naive-ui'
+import { NAlert, NButton, NCheckbox, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSwitch, NTag, type DataTableColumns } from 'naive-ui'
 import PageHeader from '../components/PageHeader.vue'
 import PageState from '../components/PageState.vue'
 import { api } from '../lib/api'
@@ -11,7 +11,7 @@ interface GroupRow {
   running: boolean
   mode: string
   unreadCount: number
-  budget: { turns: number; maxTurnsPerDay: number; tokens: number; dailyCostCny: number; capOverridden?: boolean; todayCostCny: number }
+  budget: { turns: number; maxTurnsPerDay: number; tokens: number; dailyCostCny: number; capOverridden?: boolean; turnsCapOverridden?: boolean; todayCostCny: number }
   lastWakeReason: string | null
   historyLength: number
   pendingEvents: { id: string; content: string; dueAt?: number }[]
@@ -36,6 +36,10 @@ const defaultCapMessage = ref('')
 const capDraft = ref<number | null>(null)
 const savingCap = ref(false)
 const capMessage = ref('')
+const turnsDraft = ref<number | null>(null)
+const turnsUnlimited = ref(false)
+const savingTurns = ref(false)
+const turnsMessage = ref('')
 let timer: number | null = null
 
 async function load() {
@@ -80,6 +84,10 @@ async function openDetail(groupId: string) {
   promptMessage.value = ''
   capDraft.value = detail.value?.budget?.dailyCostCny ?? null
   capMessage.value = ''
+  const turnsCap = detail.value?.budget?.maxTurnsPerDay ?? null
+  turnsUnlimited.value = turnsCap === -1
+  turnsDraft.value = turnsUnlimited.value ? 40 : turnsCap
+  turnsMessage.value = ''
   drawerOpen.value = true
 }
 async function savePrompt() {
@@ -107,6 +115,22 @@ async function saveDefaultCap() {
     savingDefaultCap.value = false
   }
 }
+async function saveTurns() {
+  if (!detailId.value) return
+  savingTurns.value = true
+  turnsMessage.value = ''
+  try {
+    const cap = turnsUnlimited.value ? -1 : (turnsDraft.value || 0)
+    const result = await api<{ message: string }>('/api/simulation/group', { method: 'POST', body: JSON.stringify({ group: detailId.value, action: 'turns', cap }) })
+    await openDetail(detailId.value)
+    await load()
+    turnsMessage.value = result.message
+  } catch (e: any) {
+    turnsMessage.value = e?.message || '保存失败'
+  } finally {
+    savingTurns.value = false
+  }
+}
 async function saveCap() {
   if (!detailId.value) return
   savingCap.value = true
@@ -127,7 +151,7 @@ const columns: DataTableColumns<GroupRow> = [
   { title: '群号', key: 'groupId', width: 130 },
   { title: '模式', key: 'active', width: 90, render: row => row.active ? (row.running ? '仿真·回合中' : '仿真') : '普通' },
   { title: '未读', key: 'unreadCount', width: 70 },
-  { title: '今日回合', key: 'budget', width: 100, render: row => `${row.budget.turns}/${row.budget.maxTurnsPerDay}` },
+  { title: '今日回合', key: 'budget', width: 110, render: row => `${row.budget.turns}/${row.budget.maxTurnsPerDay === -1 ? '∞' : row.budget.maxTurnsPerDay}${row.budget.turnsCapOverridden ? ' *' : ''}` },
   { title: '今日花费', key: 'cost', width: 130, render: row => `¥${Number(row.budget.todayCostCny || 0).toFixed(2)} / ¥${row.budget.dailyCostCny}${row.budget.capOverridden ? ' *' : ''}` },
   { title: '最近唤醒', key: 'lastWakeReason', width: 110, render: row => row.lastWakeReason || '—' },
   { title: '梗/待办', key: 'memes', width: 90, render: row => `${row.memes.length}/${row.pendingEvents.length}` },
@@ -171,6 +195,16 @@ const rows = computed(() => overview.value?.groups || [])
               <NButton size="small" quaternary @click="() => { capDraft = 0; void saveCap() }">清除覆盖</NButton>
             </div>
             <div v-if="capMessage" class="msg">{{ capMessage }}</div>
+          </div>
+          <div class="block">
+            <h4>本群每日回合上限 <small v-if="detail.budget.turnsCapOverridden">（按群覆盖）</small><small v-else>（跟随默认）</small></h4>
+            <div class="row">
+              <NInputNumber v-model:value="turnsDraft" :min="1" :max="10000" :step="1" size="small" style="width: 130px" :disabled="turnsUnlimited" placeholder="回合数" />
+              <NCheckbox size="small" :checked="turnsUnlimited" @update:checked="(v: boolean) => (turnsUnlimited = v)">不限（永不耗尽）</NCheckbox>
+              <NButton size="small" type="primary" :loading="savingTurns" @click="saveTurns">保存</NButton>
+              <NButton size="small" quaternary @click="() => { turnsUnlimited = false; turnsDraft = 0; void saveTurns() }">清除覆盖</NButton>
+            </div>
+            <div v-if="turnsMessage" class="msg">{{ turnsMessage }}</div>
           </div>
           <div class="block">
             <h4>会话初始提示词 <small>（会话重置后的首次唤醒注入一次）</small></h4>

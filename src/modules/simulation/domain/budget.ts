@@ -31,8 +31,10 @@ export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig
       return { allowed: false, reason: `wakePerHour:${hourWindow.length}/${config.wake.maxWakePerHour}` }
     }
   }
-  if (state.budget.turns >= config.turn.maxTurnsPerDay) {
-    return { allowed: false, reason: `dailyTurns:${state.budget.turns}/${config.turn.maxTurnsPerDay}` }
+  // 按群覆盖(-1=不限)优先于全局默认:回合与金额同规则
+  const turnsCap = config.turn.groups?.[groupId] ?? config.turn.maxTurnsPerDay
+  if (turnsCap >= 0 && state.budget.turns >= turnsCap) {
+    return { allowed: false, reason: `dailyTurns:${state.budget.turns}/${turnsCap}` }
   }
   const dailyCap = config.budget.groups?.[groupId] ?? config.budget.dailyCostCny
   if (dailyCap > 0 && todayCostCny >= dailyCap) {

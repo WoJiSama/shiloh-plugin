@@ -172,7 +172,7 @@ export interface SimulationSection {
   }
   budget?: {
     dailyCostCny?: number
-    /** 按群消耗上限覆盖（键=群号，值=该群每日金额上限元）；未列出的群用 dailyCostCny */
+    /** 按群消耗上限覆盖（键=群号，值=该群每日金额上限元，-1=不限）；未列出的群用 dailyCostCny */
     groups?: Record<string, number>
   }
   /** 按人挖口头禅（风格个性化）：从归档挖每个群友的专属说法，注入高好感对象的风格指引 */
@@ -195,6 +195,8 @@ export interface SimulationSection {
     messageTextMaxChars?: number
     waitQuietMaxMs?: number
     waitTimeoutMaxMs?: number
+    /** 按群每日回合上限覆盖（键=群号，-1=不限）；未列出的群用 maxTurnsPerDay */
+    groups?: Record<string, number>
   }
   agentPresetKeywords?: string[]
   /** 仿真回合额外放通的既有工具名（白名单：不在此列的 40 工具仍不可用） */
@@ -214,7 +216,7 @@ export interface SimRuntimeConfig {
   /** 所有过了群白名单的群默认进仿真（.仿真 关 可按群退出） */
   allGroups: boolean
   wake: Required<Pick<NonNullable<SimulationSection['wake']>, 'probability' | 'batchWindowMs' | 'maxWakePerMinute' | 'maxWakePerHour' | 'proactiveIdleMs' | 'proactiveCheckMinMs' | 'proactiveCheckMaxMs' | 'proactiveProbability' | 'replyCheckMs' | 'continuationWindowMs'>>
-  turn: Required<Pick<NonNullable<SimulationSection['turn']>, 'maxToolRounds' | 'maxSendsPerTurn' | 'minSendGapMs' | 'sendPerMinute' | 'maxTurnsPerDay' | 'historyMaxMessages' | 'historyMaxChars' | 'unreadLimit' | 'wakeMessageLimit' | 'wakeMaxChars' | 'messageTextMaxChars' | 'waitQuietMaxMs' | 'waitTimeoutMaxMs'>>
+  turn: Required<Pick<NonNullable<SimulationSection['turn']>, 'maxToolRounds' | 'maxSendsPerTurn' | 'minSendGapMs' | 'sendPerMinute' | 'maxTurnsPerDay' | 'historyMaxMessages' | 'historyMaxChars' | 'unreadLimit' | 'wakeMessageLimit' | 'wakeMaxChars' | 'messageTextMaxChars' | 'waitQuietMaxMs' | 'waitTimeoutMaxMs'>> & { groups: Record<string, number> }
   agentPresetKeywords: string[]
   extraTools: string[]
   meme: { enabled: boolean; extractCooldownMs: number; extractMinMessages: number; injectMax: number }

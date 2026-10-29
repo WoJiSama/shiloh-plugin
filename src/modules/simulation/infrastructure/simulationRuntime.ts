@@ -86,8 +86,10 @@ export interface SimulationRuntime {
   describeGroup(groupId: string): Promise<Record<string, unknown>>
   getInitialPrompt(groupId: string): Promise<string>
   setInitialPrompt(groupId: string, text: string): Promise<string>
-  /** 控制台：设置/清除按群每日金额上限（cap<=0 清除，回落 yaml 或默认） */
+  /** 控制台：设置/清除按群每日金额上限（-1=不限，0=清除回落，>0=上限） */
   setGroupBudget(groupId: string, cap: number): Promise<string>
+  /** 控制台：设置/清除按群每日回合上限（-1=不限，0=清除回落，>0=上限） */
+  setGroupTurnsCap(groupId: string, cap: number): Promise<string>
   /** 控制台：设置/清除全局默认每日金额上限（cny<=0 清除，回落 yaml） */
   setDefaultBudget(cny: number): Promise<string>
 }
@@ -179,9 +181,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     // 控制台/.仿真 写的 redis 覆盖优先于 yaml：按群上限 → 默认上限
     if (overridesCache) {
       const caps = { ...cfg.budget.groups }
-      for (const [groupId, cap] of Object.entries(overridesCache.budgetCaps || {})) if (Number(cap) > 0) caps[groupId] = Number(cap)
+      for (const [groupId, cap] of Object.entries(overridesCache.budgetCaps || {})) if (Number(cap) === -1 || Number(cap) > 0) caps[groupId] = Number(cap)
+      const turnCaps = { ...cfg.turn.groups }
+      for (const [groupId, cap] of Object.entries(overridesCache.turnCaps || {})) if (Number(cap) === -1 || Number(cap) > 0) turnCaps[groupId] = Number(cap)
       const defaultOverride = Number(overridesCache.budgetDefaultCny)
       cfg.budget = { ...cfg.budget, groups: caps, ...(Number.isFinite(defaultOverride) && defaultOverride > 0 ? { dailyCostCny: defaultOverride } : {}) }
+      cfg.turn = { ...cfg.turn, groups: turnCaps }
     }
     return cfg
   }
@@ -196,7 +201,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     if (overrides === null) {
       const section = ports.getSection()
       const seeded = Array.isArray(section.groups) ? section.groups.map(g => String(g)) : []
-      overrides = { explicitEnabled: seeded, disabled: [], budgetCaps: {} }
+      overrides = { explicitEnabled: seeded, disabled: [], budgetCaps: {}, turnCaps: {} }
       await store.saveOverrides(overrides)
     }
     overridesCache = overrides
@@ -892,11 +897,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
   /** 覆盖表结构演进时保住已有字段：启停群不能把预算覆盖弄丢 */
   function nextOverrides(edit: { explicitEnabled?: string[]; disabled?: string[] }): SimGroupOverrides {
-    const current = overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {} }
+    const current = overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }
     return {
       explicitEnabled: edit.explicitEnabled ?? [...(current.explicitEnabled || [])],
       disabled: edit.disabled ?? [...(current.disabled || [])],
       budgetCaps: { ...(current.budgetCaps || {}) },
+      turnCaps: { ...(current.turnCaps || {}) },
       ...(current.budgetDefaultCny !== undefined ? { budgetDefaultCny: current.budgetDefaultCny } : {}),
     }
   }
@@ -1027,7 +1033,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       unreadCount: state.unread.length,
       recentCount: state.recent.length,
       lastReadThroughSeq: state.lastReadThroughSeq,
-      budget: { ...state.budget, maxTurnsPerDay: cfg.turn.maxTurnsPerDay, dailyCostCny: cfg.budget.groups[groupId] ?? cfg.budget.dailyCostCny, capOverridden: Boolean(overridesCache?.budgetCaps?.[groupId]), todayCostCny: safeNumber(() => ports.getTodaySpendCny?.(groupId)) },
+      budget: { ...state.budget, maxTurnsPerDay: cfg.turn.groups[groupId] ?? cfg.turn.maxTurnsPerDay, turnsCapOverridden: Boolean(overridesCache?.turnCaps?.[groupId]), dailyCostCny: cfg.budget.groups[groupId] ?? cfg.budget.dailyCostCny, capOverridden: Boolean(overridesCache?.budgetCaps?.[groupId]), todayCostCny: safeNumber(() => ports.getTodaySpendCny?.(groupId)) },
       lastWakeReason: state.lastWakeReason?.kind || null,
       lastWakeAtAgo: state.lastWakeAt ? Math.round((now() - state.lastWakeAt) / 1000) : null,
       lastAiSendAtAgo: state.lastAiSendAt ? Math.round((now() - state.lastAiSendAt) / 1000) : null,
@@ -1051,9 +1057,16 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   async function setGroupBudget(groupId: string, cap: number): Promise<string> {
     if (!/^\d{5,12}$/.test(groupId)) return '群号格式无效'
     await refreshGroupState(true)
-    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {} }) }
+    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }) }
+    overrides.turnCaps = { ...(overrides.turnCaps || {}) }
     overrides.budgetCaps = { ...(overrides.budgetCaps || {}) }
     const value = Math.floor(Number(cap) * 100) / 100
+    if (value === -1) {
+      overrides.budgetCaps[groupId] = -1
+      await store.saveOverrides(overrides)
+      overridesCache = overrides
+      return `群 ${groupId} 每日消耗上限已设为不限`
+    }
     if (Number.isFinite(value) && value > 0) {
       overrides.budgetCaps[groupId] = Math.min(10_000, value)
       await store.saveOverrides(overrides)
@@ -1066,9 +1079,35 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `群 ${groupId} 已清除按群上限，回落到默认配置`
   }
 
+  async function setGroupTurnsCap(groupId: string, cap: number): Promise<string> {
+    if (!/^\d{5,12}$/.test(groupId)) return '群号格式无效'
+    await refreshGroupState(true)
+    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }) }
+    overrides.budgetCaps = { ...(overrides.budgetCaps || {}) }
+    overrides.turnCaps = { ...(overrides.turnCaps || {}) }
+    const value = Math.floor(Number(cap))
+    if (value === -1) {
+      overrides.turnCaps[groupId] = -1
+      await store.saveOverrides(overrides)
+      overridesCache = overrides
+      return `群 ${groupId} 每日回合上限已设为不限`
+    }
+    if (Number.isFinite(value) && value > 0) {
+      overrides.turnCaps[groupId] = Math.min(10_000, value)
+      await store.saveOverrides(overrides)
+      overridesCache = overrides
+      return `群 ${groupId} 每日回合上限已设为 ${overrides.turnCaps[groupId]}`
+    }
+    delete overrides.turnCaps[groupId]
+    await store.saveOverrides(overrides)
+    overridesCache = overrides
+    return `群 ${groupId} 已清除按群回合上限，回落到默认配置`
+  }
+
   async function setDefaultBudget(cny: number): Promise<string> {
     await refreshGroupState(true)
-    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {} }) }
+    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }) }
+    overrides.turnCaps = { ...(overrides.turnCaps || {}) }
     const value = Math.floor(Number(cny) * 100) / 100
     if (Number.isFinite(value) && value > 0) {
       overrides.budgetDefaultCny = Math.min(10_000, value)
@@ -1115,5 +1154,5 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setDefaultBudget }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
 }
