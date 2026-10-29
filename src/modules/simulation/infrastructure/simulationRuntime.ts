@@ -315,7 +315,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const text = String(e.msg || e.raw_message || '').trim()
     const images = (e.message || []).filter(seg => seg?.type === 'image' || seg?.type === 'mface').length
     if (!text && images === 0) return true
-    if (text && /^[#./\\]/.test(text)) return true // 命令前缀不入会话流
+    // 命令前缀不入会话流;例外:@ 了机器人或引用机器人消息的(「#抱抱希洛@这里是希洛!」是点名不是命令)
+    const quoteToSelf = !!e.source?.user_id && String(e.source.user_id) === self.id
+    if (text && /^[#./\\]/.test(text) && e.at !== true && !quoteToSelf) return true
 
     const cfg = runtimeConfig()
     const live = liveStates.get(groupId)
@@ -334,7 +336,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       at: e.time && Number(e.time) > 0 ? Number(e.time) * 1000 : now(),
       atSelf: e.at === true,
       ...(atOther ? { atOther: true } : {}),
-      quoteToSelf: !!e.source?.user_id && String(e.source.user_id) === self.id,
+      quoteToSelf,
       ...(quote && !quote.isSelf ? { quoteAuthor: quote.author, quoteText: quote.text } : {}),
       ...(forwardId ? { forwardId } : {}),
       imageCount: images,
