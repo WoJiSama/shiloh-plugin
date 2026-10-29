@@ -86,6 +86,10 @@ export interface SimulationRuntime {
   describeGroup(groupId: string): Promise<Record<string, unknown>>
   getInitialPrompt(groupId: string): Promise<string>
   setInitialPrompt(groupId: string, text: string): Promise<string>
+  /** 控制台：设置/清除按群每日金额上限（cap<=0 清除，回落 yaml 或默认） */
+  setGroupBudget(groupId: string, cap: number): Promise<string>
+  /** 控制台：设置/清除全局默认每日金额上限（cny<=0 清除，回落 yaml） */
+  setDefaultBudget(cny: number): Promise<string>
 }
 
 export interface SimIngestEvent {
@@ -170,7 +174,17 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   let overridesLoadedAt = 0
   let knownGroupsCache: string[] = []
 
-  function runtimeConfig(): SimRuntimeConfig { return defaultSimRuntimeConfig(ports.getSection()) }
+  function runtimeConfig(): SimRuntimeConfig {
+    const cfg = defaultSimRuntimeConfig(ports.getSection())
+    // 控制台/.仿真 写的 redis 覆盖优先于 yaml：按群上限 → 默认上限
+    if (overridesCache) {
+      const caps = { ...cfg.budget.groups }
+      for (const [groupId, cap] of Object.entries(overridesCache.budgetCaps || {})) if (Number(cap) > 0) caps[groupId] = Number(cap)
+      const defaultOverride = Number(overridesCache.budgetDefaultCny)
+      cfg.budget = { ...cfg.budget, groups: caps, ...(Number.isFinite(defaultOverride) && defaultOverride > 0 ? { dailyCostCny: defaultOverride } : {}) }
+    }
+    return cfg
+  }
 
   /**
    * 群覆盖状态（.仿真 开/关 写 Redis）：60s 缓存 + 强制刷新。
@@ -182,7 +196,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     if (overrides === null) {
       const section = ports.getSection()
       const seeded = Array.isArray(section.groups) ? section.groups.map(g => String(g)) : []
-      overrides = { explicitEnabled: seeded, disabled: [] }
+      overrides = { explicitEnabled: seeded, disabled: [], budgetCaps: {} }
       await store.saveOverrides(overrides)
     }
     overridesCache = overrides
@@ -876,10 +890,21 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     retryTimers.clear()
   }
 
+  /** 覆盖表结构演进时保住已有字段：启停群不能把预算覆盖弄丢 */
+  function nextOverrides(edit: { explicitEnabled?: string[]; disabled?: string[] }): SimGroupOverrides {
+    const current = overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {} }
+    return {
+      explicitEnabled: edit.explicitEnabled ?? [...(current.explicitEnabled || [])],
+      disabled: edit.disabled ?? [...(current.disabled || [])],
+      budgetCaps: { ...(current.budgetCaps || {}) },
+      ...(current.budgetDefaultCny !== undefined ? { budgetDefaultCny: current.budgetDefaultCny } : {}),
+    }
+  }
+
   async function enableGroup(groupId: string): Promise<string> {
     await refreshGroupState(true)
     const cfg = runtimeConfig()
-    const overrides = { explicitEnabled: [...(overridesCache?.explicitEnabled || [])], disabled: (overridesCache?.disabled || []).filter(g => g !== groupId) }
+    const overrides = nextOverrides({ disabled: (overridesCache?.disabled || []).filter(g => g !== groupId) })
     if (!cfg.allGroups && !overrides.explicitEnabled.includes(groupId)) overrides.explicitEnabled.push(groupId)
     await store.saveOverrides(overrides)
     overridesCache = overrides
@@ -890,10 +915,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
   async function disableGroup(groupId: string): Promise<string> {
     await refreshGroupState(true)
-    const overrides = {
-      explicitEnabled: (overridesCache?.explicitEnabled || []).filter(g => g !== groupId),
-      disabled: [...(overridesCache?.disabled || [])],
-    }
+    const overrides = nextOverrides({ explicitEnabled: (overridesCache?.explicitEnabled || []).filter(g => g !== groupId) })
     if (!overrides.disabled.includes(groupId)) overrides.disabled.push(groupId)
     await store.saveOverrides(overrides)
     overridesCache = overrides
@@ -1005,7 +1027,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       unreadCount: state.unread.length,
       recentCount: state.recent.length,
       lastReadThroughSeq: state.lastReadThroughSeq,
-      budget: { ...state.budget, maxTurnsPerDay: cfg.turn.maxTurnsPerDay, dailyCostCny: cfg.budget.dailyCostCny, todayCostCny: safeNumber(() => ports.getTodaySpendCny?.(groupId)) },
+      budget: { ...state.budget, maxTurnsPerDay: cfg.turn.maxTurnsPerDay, dailyCostCny: cfg.budget.groups[groupId] ?? cfg.budget.dailyCostCny, capOverridden: Boolean(overridesCache?.budgetCaps?.[groupId]), todayCostCny: safeNumber(() => ports.getTodaySpendCny?.(groupId)) },
       lastWakeReason: state.lastWakeReason?.kind || null,
       lastWakeAtAgo: state.lastWakeAt ? Math.round((now() - state.lastWakeAt) / 1000) : null,
       lastAiSendAtAgo: state.lastAiSendAt ? Math.round((now() - state.lastAiSendAt) / 1000) : null,
@@ -1024,6 +1046,40 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   async function setInitialPrompt(groupId: string, text: string): Promise<string> {
     await store.setInitPrompt(groupId, text)
     return text.trim() ? '初始提示词已保存（下次该群会话重置后的首次唤醒生效）' : '初始提示词已清空'
+  }
+
+  async function setGroupBudget(groupId: string, cap: number): Promise<string> {
+    if (!/^\d{5,12}$/.test(groupId)) return '群号格式无效'
+    await refreshGroupState(true)
+    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {} }) }
+    overrides.budgetCaps = { ...(overrides.budgetCaps || {}) }
+    const value = Math.floor(Number(cap) * 100) / 100
+    if (Number.isFinite(value) && value > 0) {
+      overrides.budgetCaps[groupId] = Math.min(10_000, value)
+      await store.saveOverrides(overrides)
+      overridesCache = overrides
+      return `群 ${groupId} 每日消耗上限已设为 ${overrides.budgetCaps[groupId]} 元`
+    }
+    delete overrides.budgetCaps[groupId]
+    await store.saveOverrides(overrides)
+    overridesCache = overrides
+    return `群 ${groupId} 已清除按群上限，回落到默认配置`
+  }
+
+  async function setDefaultBudget(cny: number): Promise<string> {
+    await refreshGroupState(true)
+    const overrides = { ...(overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {} }) }
+    const value = Math.floor(Number(cny) * 100) / 100
+    if (Number.isFinite(value) && value > 0) {
+      overrides.budgetDefaultCny = Math.min(10_000, value)
+      await store.saveOverrides(overrides)
+      overridesCache = overrides
+      return `默认每日消耗上限已设为 ${overrides.budgetDefaultCny} 元`
+    }
+    delete overrides.budgetDefaultCny
+    await store.saveOverrides(overrides)
+    overridesCache = overrides
+    return '已恢复使用配置文件的默认每日消耗上限'
   }
 
   async function listMemories(groupId: string): Promise<string> {
@@ -1059,5 +1115,5 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setDefaultBudget }
 }

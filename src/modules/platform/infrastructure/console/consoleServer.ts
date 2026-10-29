@@ -92,6 +92,8 @@ export interface ConsoleExtraPorts {
     describeGroup(groupId: string): Promise<unknown>
     setGroup(groupId: string, action: string): Promise<unknown>
     setInitialPrompt(groupId: string, text: string): Promise<unknown>
+    setGroupBudget?(groupId: string, cap: number): Promise<string>
+    setDefaultBudget?(cny: number): Promise<string>
   }
 }
 export function createConsoleServer({pluginRoot,buildTurnTraceReport,tokens,simulation,style}:{pluginRoot:string;buildTurnTraceReport:(records:Data[])=>unknown;tokens?:ConsoleExtraPorts["tokens"];simulation?:ConsoleExtraPorts["simulation"];style?:ConsoleExtraPorts["style"]}) {
@@ -2061,12 +2063,26 @@ const server = http.createServer(async (req, res) => {
       const groupId = String(body?.group || "")
       const action = String(body?.action || "")
       if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 必须是群号" })
-      if (!["enable", "disable", "reset", "initial-prompt"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt" })
+      if (!["enable", "disable", "reset", "initial-prompt", "budget"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget" })
       if (action === "initial-prompt") {
         const text = typeof body?.text === "string" ? body.text.slice(0, 2000) : ""
         return sendJson(res, 200, { ok: true, message: await simulation.setInitialPrompt(groupId, text) })
       }
+      if (action === "budget") {
+        if (typeof simulation.setGroupBudget !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持预算编辑" })
+        const cap = Number(body?.cap)
+        if (!Number.isFinite(cap) || cap < 0 || cap > 10000) return sendJson(res, 400, { error: "cap 必须是 0~10000 的金额（0=清除按群覆盖）" })
+        return sendJson(res, 200, { ok: true, message: await simulation.setGroupBudget(groupId, cap) })
+      }
       return sendJson(res, 200, { ok: true, detail: await simulation.setGroup(groupId, action) })
+    }
+    if (url.pathname === "/api/simulation/budget-default" && req.method === "POST") {
+      if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
+      if (typeof simulation.setDefaultBudget !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持预算编辑" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const cny = Number(body?.cny)
+      if (!Number.isFinite(cny) || cny < 0 || cny > 10000) return sendJson(res, 400, { error: "cny 必须是 0~10000 的金额（0=恢复配置文件默认）" })
+      return sendJson(res, 200, { ok: true, message: await simulation.setDefaultBudget(cny) })
     }
     if (url.pathname === "/api/groups" && req.method === "GET") {
       return sendJson(res, 200, await collectGroups())

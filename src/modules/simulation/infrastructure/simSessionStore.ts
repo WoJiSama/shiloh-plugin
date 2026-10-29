@@ -28,7 +28,8 @@ const BUSY_KEY = (groupId: string) => `shiloh:sim:busy:${groupId}`
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 export const SIM_TURN_BUSY_LEASE_MS = 15 * 60_000
 
-export interface SimGroupOverrides { explicitEnabled: string[]; disabled: string[] }
+/** 群级覆盖（.仿真 开/关 与控制台预算编辑都写这里）：budgetCaps 键=群号 值=每日金额上限；budgetDefaultCny 为空表示用 yaml 默认 */
+export interface SimGroupOverrides { explicitEnabled: string[]; disabled: string[]; budgetCaps: Record<string, number>; budgetDefaultCny?: number }
 
 export interface SimSessionStore {
   load(groupId: string): Promise<SimSessionState>
@@ -92,15 +93,23 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       if (raw === null || raw === undefined) return null
       try {
         const parsed = record(JSON.parse(raw))
-        return { explicitEnabled: parseStringList(parsed.explicitEnabled), disabled: parseStringList(parsed.disabled) }
+        const budgetCaps: Record<string, number> = {}
+        for (const [key, value] of Object.entries(record(parsed.budgetCaps))) {
+          const cap = Number(value)
+          if (/^\d{5,12}$/.test(key) && Number.isFinite(cap) && cap > 0) budgetCaps[key] = Math.min(10_000, cap)
+        }
+        const rawDefault = Number(parsed.budgetDefaultCny)
+        return { explicitEnabled: parseStringList(parsed.explicitEnabled), disabled: parseStringList(parsed.disabled), budgetCaps, ...(Number.isFinite(rawDefault) && rawDefault > 0 ? { budgetDefaultCny: Math.min(10_000, rawDefault) } : {}) }
       } catch {
-        return { explicitEnabled: [], disabled: [] }
+        return { explicitEnabled: [], disabled: [], budgetCaps: {} }
       }
     },
     async saveOverrides(overrides) {
       await redis.set(OVERRIDES_KEY, JSON.stringify({
         explicitEnabled: [...new Set(overrides.explicitEnabled)],
         disabled: [...new Set(overrides.disabled)],
+        budgetCaps: overrides.budgetCaps || {},
+        ...(overrides.budgetDefaultCny !== undefined ? { budgetDefaultCny: overrides.budgetDefaultCny } : {}),
       }))
     },
     async loadKnownGroups() {

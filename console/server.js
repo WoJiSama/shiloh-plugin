@@ -27,6 +27,8 @@ try {
       : action === "disable" ? simulationRuntime.disableGroup(groupId)
         : simulationRuntime.resetGroup(groupId),
     setInitialPrompt: (groupId, text) => simulationRuntime.setInitialPrompt(groupId, text),
+    setGroupBudget: (groupId, cap) => simulationRuntime.setGroupBudget(groupId, cap),
+    setDefaultBudget: (cny) => simulationRuntime.setDefaultBudget(cny),
   }
 } catch (error) {
   console.warn?.(`[console] 仿真运行时不可用（相关页面将显示未启用）：${error?.message || error}`)
