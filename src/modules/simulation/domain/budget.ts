@@ -1,4 +1,4 @@
-import type { SimRuntimeConfig, SimSessionState } from '../../../contracts/simulation.js'
+import type { SimRuntimeConfig, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
 import { dayKey } from './simConfig.js'
 
 function pruneWindow(times: number[], now: number, windowMs: number, limit: number): number[] {
@@ -14,16 +14,22 @@ export function rollBudgetDay(state: SimSessionState, now: number): void {
 
 export interface WakeBudgetVerdict { allowed: boolean; reason: string }
 
+/** 直接点名类唤醒：被@/被引用、叫名字、明确向 AI 提问、管理员指令。
+ *  社交上"被点名不回"最伤——限频只管旁观型唤醒(关键词/随机/延续等),这几类直接放行;金额与每日回合预算仍生效。 */
+const DIRECT_ADDRESS_WAKE_KINDS: readonly string[] = ['admin', 'atMention', 'nameMention', 'question']
+
 /** 唤醒限频（1 分钟/1 小时两窗）+ 每群每日回合预算 + 当日金额预算（读令牌账本）。超限只能延后不能丢弃（由调用方重试）。 */
-export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig, now: number, todayCostCny = 0): WakeBudgetVerdict {
+export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig, now: number, todayCostCny = 0, reason: SimWakeReason | null = null): WakeBudgetVerdict {
   rollBudgetDay(state, now)
-  const minuteWindow = pruneWindow(state.wakeTimes, now, 60_000, 200)
-  if (minuteWindow.length >= config.wake.maxWakePerMinute) {
-    return { allowed: false, reason: `wakePerMinute:${minuteWindow.length}/${config.wake.maxWakePerMinute}` }
-  }
-  const hourWindow = pruneWindow(state.wakeTimes, now, 3600_000, 200)
-  if (hourWindow.length >= config.wake.maxWakePerHour) {
-    return { allowed: false, reason: `wakePerHour:${hourWindow.length}/${config.wake.maxWakePerHour}` }
+  if (!DIRECT_ADDRESS_WAKE_KINDS.includes(String(reason?.kind || ''))) {
+    const minuteWindow = pruneWindow(state.wakeTimes, now, 60_000, 200)
+    if (minuteWindow.length >= config.wake.maxWakePerMinute) {
+      return { allowed: false, reason: `wakePerMinute:${minuteWindow.length}/${config.wake.maxWakePerMinute}` }
+    }
+    const hourWindow = pruneWindow(state.wakeTimes, now, 3600_000, 200)
+    if (hourWindow.length >= config.wake.maxWakePerHour) {
+      return { allowed: false, reason: `wakePerHour:${hourWindow.length}/${config.wake.maxWakePerHour}` }
+    }
   }
   if (state.budget.turns >= config.turn.maxTurnsPerDay) {
     return { allowed: false, reason: `dailyTurns:${state.budget.turns}/${config.turn.maxTurnsPerDay}` }

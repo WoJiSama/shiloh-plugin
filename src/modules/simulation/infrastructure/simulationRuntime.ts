@@ -390,7 +390,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       liveStates.set(groupId, state)
       rollBudgetDay(state, now())
       const todayCost = safeNumber(() => ports.getTodaySpendCny?.(groupId))
-      const verdict = checkWakeBudget(state, cfg, now(), todayCost)
+      const verdict = checkWakeBudget(state, cfg, now(), todayCost, reason)
       if (!verdict.allowed) {
         // 限频类延后重试（丢弃会让 timeout 唤醒停在无定时器静默态）；预算类今日不再试
         if (!verdict.reason.startsWith('dailyTurns')) {
