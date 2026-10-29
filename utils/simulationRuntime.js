@@ -100,14 +100,18 @@ export const simulationRuntime = createSimulationRuntime({
       return readPluginSettings()
     }
   },
+  // 人设名优先:QQ 昵称常是"这里是希洛!"这类长句,而群友只叫"希洛"——
+  // nameMention 按 name 做 includes 匹配,用长昵称会导致点名永远唤不醒(实测 11-29 瓦尔哈拉哑火)。
+  // 短名匹配同时覆盖全名场景(包含关系)。
   getSelf: (selfIdHint) => {
+    const personaName = String(readPluginSettings().persona?.name || '').trim()
     const hint = String(selfIdHint ?? '')
     if (hint) {
       const entry = botById(hint)
-      return { id: hint, name: String(entry?.nickname || currentBot().name || readPluginSettings().persona?.name || '') }
+      return { id: hint, name: personaName || String(entry?.nickname || currentBot().name || '') }
     }
     const bot = currentBot()
-    return { id: bot.id, name: bot.name || String(readPluginSettings().persona?.name || '') }
+    return { id: bot.id, name: personaName || bot.name || '' }
   },
   YTapi: (requestData, execConfig) => YTapi(requestData, execConfig),
   // 看图转述：仿真主模型多为纯文本(实测 glm-5.3 收 image_url 直接 400),图片经视觉模型(analysisApiConfig)转文字注入
