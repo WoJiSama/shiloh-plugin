@@ -77,3 +77,14 @@ test('按群上限支持不限(-1):回合与金额都不再拦截', () => {
   assert.equal(checkWakeBudget(state({ turns: 49 }), cfg50, now, 0, at, '933253375').allowed, true)
   assert.match(checkWakeBudget(state({ turns: 50 }), cfg50, now, 0, at, '933253375').reason, /50/)
 })
+
+test('限额提示:预算类原因有人话描述,同群 30 分钟节流', async () => {
+  const { describeBudgetLimit, limitNoticeDue } = await import('../dist/backend/modules/simulation/domain/budget.js')
+  assert.match(describeBudgetLimit('dailyTurns:40/40'), /回合/)
+  assert.match(describeBudgetLimit('dailyCost:5.00/5元'), /消耗/)
+  assert.equal(describeBudgetLimit('wakePerHour:12/12'), '')
+  const t = 1770000000000
+  assert.equal(limitNoticeDue(0, t), true, '首次必发')
+  assert.equal(limitNoticeDue(t - 60_000, t), false, '冷却内不发')
+  assert.equal(limitNoticeDue(t - 31 * 60_000, t), true, '过期再发')
+})

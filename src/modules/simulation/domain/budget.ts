@@ -90,3 +90,15 @@ export function markPreSleepSatisfied(state: SimSessionState, now: number): void
 export function invalidatePreSleepWaitByParticipation(state: SimSessionState): void {
   state.preSleepWait = { accumMs: 0 }
 }
+
+/** 每日限额的人话描述;非预算类原因返回空串 */
+export function describeBudgetLimit(reason: string): string {
+  if (reason.startsWith("dailyTurns")) return "今日对话回合已达上限"
+  if (reason.startsWith("dailyCost")) return "今日消耗额度已达上限"
+  return ""
+}
+
+/** 限额提示节流:同一群冷却窗口内只提醒一次(默认 30 分钟) */
+export function limitNoticeDue(lastAt: number, now: number, cooldownMs = 30 * 60_000): boolean {
+  return !(lastAt > 0 && now - lastAt < cooldownMs)
+}

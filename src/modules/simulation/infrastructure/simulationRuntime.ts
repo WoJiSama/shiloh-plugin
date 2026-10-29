@@ -8,7 +8,7 @@ import { evaluateWakeTrigger, mergeWakeReason, messageReasonStillPending, pushPe
 import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
-import { checkSendAllowance, checkWakeBudget, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
+import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
@@ -173,6 +173,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   const pokeTimes = new Map<string, number[]>()
   let sweeper: ReturnType<typeof setInterval> | null = null
   let overridesCache: SimGroupOverrides | null = null
+  // 每日限额触发时的群内提示:同群 30 分钟最多一条,避免刷屏
+  const limitNoticeAt = new Map<string, number>()
   let overridesLoadedAt = 0
   let knownGroupsCache: string[] = []
 
@@ -413,17 +415,25 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const todayCost = safeNumber(() => ports.getTodaySpendCny?.(groupId))
       const verdict = checkWakeBudget(state, cfg, now(), todayCost, reason, String(groupId))
       if (!verdict.allowed) {
-        // 限频类延后重试（丢弃会让 timeout 唤醒停在无定时器静默态）；预算类今日不再试
-        if (!verdict.reason.startsWith('dailyTurns')) {
-          if (!retryTimers.has(groupId)) {
-            const timer = setTimeout(() => {
-              retryTimers.delete(groupId)
-              void startTurn(groupId, reason)
-            }, 60_000)
-            retryTimers.set(groupId, { timer, reason })
-          }
-        } else {
+        // 预算类(回合/金额)今日不会再放行:群内提示一次后不再重试;
+        // 限频类延后重试（丢弃会让 timeout 唤醒停在无定时器静默态）
+        const limitText = describeBudgetLimit(verdict.reason)
+        if (limitText) {
           logger.warn(`[仿真] 群 ${groupId} 唤醒被预算拦截：${verdict.reason}（今日剩余唤醒不再重试）`)
+          if (limitNoticeDue(limitNoticeAt.get(groupId) || 0, now())) {
+            limitNoticeAt.set(groupId, now())
+            void ports.sendGroupMessage(groupId, [{ type: 'text', data: { text: `（${limitText}，调用已限额，明天自动恢复喵）` } }])
+              .then(receipt => { if (!receipt.ok) logger.warn(`[仿真] 群 ${groupId} 限额提示发送失败: ${receipt.error || ''}`) })
+              .catch(() => { /* 提示失败不影响主流程 */ })
+          }
+          return
+        }
+        if (!retryTimers.has(groupId)) {
+          const timer = setTimeout(() => {
+            retryTimers.delete(groupId)
+            void startTurn(groupId, reason)
+          }, 60_000)
+          retryTimers.set(groupId, { timer, reason })
         }
         return
       }
