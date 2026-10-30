@@ -49,3 +49,9 @@ test('关键词/随机/关注群友唤醒给出旁观型指引：话题沾边不
     assert.match(tail, /"话题相关"本身不是插嘴的理由/, reason.kind)
   }
 })
+
+test('被@点名必须给出回应的指引存在', () => {
+  const tail = wake({ kind: 'atMention', seq: 1 })
+  assert.match(tail, /被点名/)
+  assert.match(tail, /几乎总要给出回应/)
+})
