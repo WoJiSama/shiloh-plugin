@@ -157,7 +157,7 @@ async function requestYoutubeMetadata(card:MediaCard = {}, options:YoutubeOption
   const sourceUrl = card.page_url || card.short_url
   if (!sourceUrl || !allowedYoutubeUrl(sourceUrl)) throw new Error("YouTube 链接不受支持")
   const result = await withYoutubeYtDlpAuth(options, async authArgs => await runYtDlp([
-    "--dump-single-json", "--skip-download", "--no-playlist", "--no-warnings", "--retries", "0", "--socket-timeout", "8",
+    "--dump-single-json", "--skip-download", "--no-playlist", "--no-warnings", "--retries", "3", "--extractor-retries", "3", "--socket-timeout", "10",
     ...authArgs, ...ytDlpProxyArgs(options.proxyUrl), sourceUrl
   ], options))
   const stdout = typeof result === "string" ? result : result?.stdout

@@ -69,7 +69,7 @@ export async function downloadYoutubeArchiveVideo(card:MediaCard = {}, options:Y
   try {
     await withYoutubeYtDlpAuth(options, async authArgs => await runYtDlp([
       "--no-playlist", "--no-warnings", "--no-progress", "--max-filesize", String(maxBytes),
-      "--retries", "0", "--socket-timeout", "8",
+      "--retries", "3", "--extractor-retries", "3", "--socket-timeout", "10",
       "--concurrent-fragments", "4",
       "-f", "worst[ext=mp4][vcodec!=none][acodec!=none]",
       "-o", template, ...authArgs, ...ytDlpProxyArgs(options.proxyUrl), sourceUrl
