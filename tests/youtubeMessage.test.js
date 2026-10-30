@@ -211,3 +211,48 @@ test("passes YouTube authorization through temporary files without exposing it i
   await cleanupYoutubeArchiveRelayFiles(relay.tempFiles)
   assert.equal(fs.existsSync(outputPath), false)
 })
+
+test("人机墙概率失败:第一发失败立即重试,第二发成功则解析成功", async () => {
+  clearYoutubeMetadataCache()
+  let runs = 0
+  const card = await enrichYoutubeShare(extractYoutubeShareFromText("https://youtu.be/flaky123"), {
+    runCommand: async () => {
+      runs += 1
+      if (runs === 1) throw new Error("ERROR: [youtube] flaky123: Sign in to confirm you're not a bot")
+      return { stdout: JSON.stringify({ id: "flaky123", title: "flaky ok", duration: 33 }) }
+    }
+  })
+  assert.equal(runs, 2)
+  assert.equal(card.metadata_status, "resolved")
+  assert.equal(card.duration, 33)
+})
+
+test("两次都失败:返回不可用且不进缓存,下一条消息会重新尝试", async () => {
+  clearYoutubeMetadataCache()
+  let runs = 0
+  const options = {
+    runCommand: async () => {
+      runs += 1
+      throw new Error("ERROR: [youtube] x: Sign in to confirm you're not a bot")
+    }
+  }
+  const first = await enrichYoutubeShare(extractYoutubeShareFromText("https://youtu.be/blocked123"), options)
+  assert.equal(first.metadata_status, "unavailable")
+  assert.equal(runs, 2)
+  const second = await enrichYoutubeShare(extractYoutubeShareFromText("https://youtu.be/blocked123"), options)
+  assert.equal(second.metadata_status, "unavailable")
+  assert.equal(runs, 4, "失败结果未被缓存,每次重新尝试")
+})
+
+test("超时类失败不重试(避免拖慢回合)", async () => {
+  clearYoutubeMetadataCache()
+  let runs = 0
+  const card = await enrichYoutubeShare(extractYoutubeShareFromText("https://youtu.be/slowtimeout123"), {
+    runCommand: async () => {
+      runs += 1
+      throw Object.assign(new Error("timed out"), { killed: true, signal: "SIGTERM" })
+    }
+  })
+  assert.equal(card.metadata_status, "unavailable")
+  assert.equal(runs, 1)
+})

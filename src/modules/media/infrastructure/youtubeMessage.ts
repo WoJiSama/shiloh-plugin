@@ -176,16 +176,27 @@ export async function enrichYoutubeShare(card:MediaCard = {}, options:YoutubeOpt
   if (cached && cached.expiresAt > Date.now()) return await cached.promise
   const inflight = inflightEnrichments.get(key)
   if (inflight) return await inflight.promise
-  const promise = requestYoutubeMetadata(card, options).catch(error => ({
-    ...card,
-    metadata_status: "unavailable",
-    metadata_failure_reason: metadataFailureReason(error)
-  }))
+  // 机房 IP 撞 YouTube 人机墙是按请求概率的(实测 1/3~1/5 概率失败,且"第一发失败、紧接着重试大多能过"):
+  // 失败先立刻重试一次;仍失败才作罢,且失败结果不进缓存——否则一条失败卡住 30 分钟,群里怎么发都只有链接卡
+  const attempt = () => requestYoutubeMetadata(card, options)
+  const promise = attempt()
+    .catch(async error => {
+      if (error?.code === "youtube_downloader_unavailable" || error?.code === "youtube_metadata_timeout" || error?.killed || error?.signal === "SIGTERM") throw error
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      return await attempt()
+    })
+    .catch(error => ({
+      ...card,
+      metadata_status: "unavailable",
+      metadata_failure_reason: metadataFailureReason(error)
+    }))
   const inflightRecord = { promise }
   inflightEnrichments.set(key, inflightRecord)
   metadataCache.set(key, { promise, expiresAt: Date.now() + cacheTtlMs })
   try {
-    return await promise
+    const result = await promise
+    if (result?.metadata_status === "unavailable" && metadataCache.get(key)?.promise === promise) metadataCache.delete(key)
+    return result
   } finally {
     if (inflightEnrichments.get(key) === inflightRecord) inflightEnrichments.delete(key)
   }
