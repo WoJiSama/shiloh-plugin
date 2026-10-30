@@ -122,12 +122,26 @@ export const simulationRuntime = createSimulationRuntime({
       const baseHeaders = { 'user-agent': UA, referer: 'https://www.bilibili.com', accept: 'application/json' }
       let bvid = input?.url ? extractBilibiliBvid(String(input.url)) : ''
       if (!bvid && input?.query) {
-        const cookie = await ensureBilibiliBuvidCookie(fetch)
-        const searchRes = await fetch(`https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(String(input.query).slice(0, 60))}&search_type=video`, {
-          headers: { ...baseHeaders, cookie }, signal: AbortSignal.timeout(15000)
-        }).then(r => r.json()).catch(() => null)
-        const first = searchRes?.data?.result?.find?.(item => item?.bvid)
-        if (!first) return { ok: false, error: `B站没搜到「${input.query}」相关的视频` }
+        // B站风控:无设备指纹 cookie 的搜索会被 412/HTML 拦——先 finger/spi 拿 buvid3/4 再搜(与 SearchVideoTool 同姿势)
+        let cookieHeader = ''
+        try {
+          const spi = await fetch('https://api.bilibili.com/x/frontend/finger/spi', { headers: { 'user-agent': UA, Referer: 'https://www.bilibili.com' }, signal: AbortSignal.timeout(10000) })
+          const spiData = (await spi.json())?.data || {}
+          if (spiData.b_3 && spiData.b_4) cookieHeader = `buvid3=${spiData.b_3}; buvid4=${spiData.b_4}`
+        } catch { /* 拿不到指纹就裸搜 */ }
+        const searchUrl = `https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(String(input.query).slice(0, 60))}&search_type=video`
+        const searchHeaders = referer => ({ accept: 'application/json, text/plain, */*', 'accept-language': 'zh-CN,zh;q=0.9', Referer: referer, 'user-agent': UA, ...(cookieHeader ? { cookie: cookieHeader } : {}) })
+        let raw = await fetch(searchUrl, { headers: searchHeaders('https://www.bilibili.com'), signal: AbortSignal.timeout(15000) }).then(r => r.text()).catch(() => '')
+        if (raw.trimStart().startsWith('<!DOCTYPE') || raw.includes('request was banned')) {
+          raw = await fetch(searchUrl, { headers: searchHeaders('https://search.bilibili.com'), signal: AbortSignal.timeout(15000) }).then(r => r.text()).catch(() => '')
+        }
+        let first = null
+        try {
+          const json = JSON.parse(raw)
+          if (Number(json.code) === -412) return { ok: false, error: 'B站搜索触发风控,稍后再试' }
+          first = (json.data?.result || []).find?.(item => item?.bvid)
+        } catch { /* 非JSON=风控页 */ }
+        if (!first) return { ok: false, error: `B站没搜到「${input.query}」相关的视频(或被风控拦截)` }
         bvid = String(first.bvid)
       }
       if (!bvid) return { ok: false, error: '无法从输入解析出B站视频' }
