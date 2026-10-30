@@ -114,6 +114,44 @@ export const simulationRuntime = createSimulationRuntime({
     return { id: bot.id, name: personaName || bot.name || '' }
   },
   YTapi: (requestData, execConfig) => YTapi(requestData, execConfig),
+  // B站卡片分享:按关键词或链接解析视频并生成 QQ 卡片 JSON(搜索走 B站开放接口,图片由 QQ 客户端自行加载)
+  resolveBilibiliCard: async (input) => {
+    try {
+      const { extractBilibiliBvid, ensureBilibiliBuvidCookie } = await import('../dist/backend/modules/media/infrastructure/bilibiliMessage.js')
+      const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+      const baseHeaders = { 'user-agent': UA, referer: 'https://www.bilibili.com', accept: 'application/json' }
+      let bvid = input?.url ? extractBilibiliBvid(String(input.url)) : ''
+      if (!bvid && input?.query) {
+        const cookie = await ensureBilibiliBuvidCookie(fetch)
+        const searchRes = await fetch(`https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(String(input.query).slice(0, 60))}&search_type=video`, {
+          headers: { ...baseHeaders, cookie }, signal: AbortSignal.timeout(15000)
+        }).then(r => r.json()).catch(() => null)
+        const first = searchRes?.data?.result?.find?.(item => item?.bvid)
+        if (!first) return { ok: false, error: `B站没搜到「${input.query}」相关的视频` }
+        bvid = String(first.bvid)
+      }
+      if (!bvid) return { ok: false, error: '无法从输入解析出B站视频' }
+      const view = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, {
+        headers: baseHeaders, signal: AbortSignal.timeout(15000)
+      }).then(r => r.json()).catch(() => null)
+      const data = view?.data
+      if (Number(view?.code) !== 0 || !data?.bvid) return { ok: false, error: 'B站视频信息获取失败' }
+      const title = String(data.title || 'B站视频').replace(/[\n\r\[\]]/g, ' ').slice(0, 40)
+      const owner = String(data.owner?.name || '')
+      const views = Number(data.stat?.view) || 0
+      const desc = `${owner}${views ? ` · ${views >= 10000 ? (views / 10000).toFixed(1) + '万' : views}播放` : ''}`.slice(0, 40)
+      const card = {
+        app: 'com.tencent.structmsg', view: 'news', ver: '0.0.0.1',
+        prompt: `[分享] ${title}`,
+        meta: { news: { appid: '100951776', style: 2, cta: '去看看', title, desc, preview: String(data.pic || ''), jump_url: `https://www.bilibili.com/video/${data.bvid}`, tag: '哔哩哔哩', app_type: 1 } },
+        config: { type: 'normal', forward: true, autosize: true },
+      }
+      return { ok: true, title, cardJson: JSON.stringify(card) }
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) }
+    }
+  },
+
   // 看图转述：仿真主模型多为纯文本(实测 glm-5.3 收 image_url 直接 400),图片经视觉模型(analysisApiConfig)转文字注入
   describeImages: async (images, context) => {
     const cfg = readPluginSettings().analysisAiConfig || {}

@@ -29,6 +29,8 @@ export interface SimulationRuntimePorts {
   /** 当前 bot 身份（多号时以事件的 self_id 为准） */
   getSelf(selfIdHint?: string | number): { id: string; name: string }
   YTapi(requestData: ChatRequestData, config: unknown): Promise<ChatResponse>
+  /** B站卡片分享:按关键词或链接解析视频并生成 QQ 卡片 JSON(发送由 runtime 统一出站) */
+  resolveBilibiliCard?(input: { query?: string; url?: string }): Promise<{ ok: boolean; error?: string; title?: string; cardJson?: string }>
   /** 视觉侧模型把图片转成文字描述（主模型纯文本时 simGetMessageImages 的看图走这里）；返回 null/空 表示描述不可用 */
   describeImages?(images: { mime: string; base64: string }[], context: { groupId: string; label: string }): Promise<string | null>
   /** 出站发送：segments 为 OneBot 消息段数组（经全局出站闸门）；成功时尽量带回 message_id 供回执校验 */
@@ -175,6 +177,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   let overridesCache: SimGroupOverrides | null = null
   // 每日限额触发时的群内提示:同群 30 分钟最多一条,避免刷屏
   const limitNoticeAt = new Map<string, number>()
+  // B站卡片分享冷却:同群 20 分钟一张,保持「偶尔甩一张」的克制感
+  const videoCardAt = new Map<string, number>()
   let overridesLoadedAt = 0
   let knownGroupsCache: string[] = []
 
@@ -761,6 +765,21 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const url = message?.imageUrls?.[0]
         if (!url) return { ok: false, error: '这条消息没有可收藏的图片' }
         return await ports.collectStickerImage(groupId, url)
+      },
+      shareVideoCard: async (input: { query?: string; url?: string }) => {
+        if (typeof ports.resolveBilibiliCard !== 'function') return { ok: false, error: 'B站卡片分享不可用' }
+        const last = videoCardAt.get(groupId) || 0
+        if (now() - last < 20 * 60_000) {
+          const waitSec = Math.ceil((20 * 60_000 - (now() - last)) / 1000)
+          return { ok: false, error: `B站卡片冷却中（还要 ${waitSec} 秒）。别刷屏，本回合换文字说。` }
+        }
+        const resolved = await ports.resolveBilibiliCard(input || {})
+        if (!resolved.ok) return { ok: false, error: resolved.error || '没找到合适的视频' }
+        const receipt = await ports.sendGroupMessage(groupId, [{ type: 'json', data: { data: resolved.cardJson || '' } }])
+        if (!receipt.ok) return { ok: false, error: receipt.error || '卡片发送失败' }
+        videoCardAt.set(groupId, now())
+        addSends(1)
+        return { ok: true, title: resolved.title || '' }
       },
       getMessageImages: async (seq: number) => {
         const message = [...state.unread, ...state.recent].find(m => m.seq === seq)
