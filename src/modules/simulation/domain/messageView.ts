@@ -22,7 +22,7 @@ export function compactSimMessage(message: SimMessage, now: number): string {
   // 引用标记：引用你的话 vs 引用别人的话（带被引用人+原文——判断"这句话对谁说"的关键信号，引用第三方时别抢话）
   const quoted = message.quoteToSelf
     ? '[引用你的话]'
-    : message.quoteAuthor ? `[引用 ${message.quoteAuthor}${message.quoteText ? `：${message.quoteText}` : ''}]` : ''
+    : message.quoteAuthor ? `[引用 ${message.quoteAuthor}${message.quoteText ? `：${message.quoteText}` : ''}${message.quoteImageUrls?.length ? `（附${message.quoteImageUrls.length}张图，可用 simGetMessageImages 看）` : ''}]` : ''
   const self = message.atSelf ? '[@你]' : ''
   return `${atClock(message.at)}(${agoText(message.at, now)}) ${message.name}${self}: ${quoted}${message.text}${media}${forward}`
 }

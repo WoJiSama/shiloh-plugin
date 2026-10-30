@@ -64,6 +64,8 @@ export interface SimMessage {
   imageCount: number
   /** 图片 URL（≤2 条，供 simGetMessageImages 取图进多模态回合） */
   imageUrls?: string[]
+  /** 被引用消息里的图片 URL（引用别人带图的旧消息时，图在这里；模型经 simGetMessageImages 查看） */
+  quoteImageUrls?: string[]
   kind: 'text' | 'poke'
 }
 

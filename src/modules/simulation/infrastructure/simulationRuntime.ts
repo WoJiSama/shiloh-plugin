@@ -255,23 +255,24 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return urls
   }
 
-  /** 引用解析：被引用人 + 原文截断（qq-bridge 的"判断对谁说"关键信号；引用自己仍由 quoteToSelf 表达） */
-  function extractQuote(e: SimIngestEvent, selfId: string): { author: string; text: string; isSelf: boolean } | null {
+  /** 引用解析：被引用人 + 原文截断 + 被引消息里的图片 URL（qq-bridge 的"判断对谁说"关键信号；引用自己仍由 quoteToSelf 表达） */
+  function extractQuote(e: SimIngestEvent, selfId: string): { author: string; text: string; isSelf: boolean; imageUrls: string[] } | null {
     const source = e.source
     if (!source?.user_id) return null
     const isSelf = String(source.user_id) === selfId
-    if (isSelf) return { author: '', text: '', isSelf: true }
+    if (isSelf) return { author: '', text: '', isSelf: true, imageUrls: [] }
     const author = String(source.card || source.nickname || `群友${String(source.user_id).slice(-4)}`)
     let text = ''
+    const imageUrls: string[] = []
     if (typeof source.text === 'string') text = source.text
-    else if (Array.isArray(source.message)) {
-      text = (source.message as { type?: string; data?: { text?: unknown } }[])
-        .filter(seg => seg?.type === 'text')
-        .map(seg => String(seg.data?.text ?? ''))
-        .join('')
+    if (Array.isArray(source.message)) {
+      for (const seg of source.message as { type?: string; data?: { text?: unknown; url?: unknown } }[]) {
+        if (seg?.type === 'text') text += String(seg.data?.text ?? '')
+        if ((seg?.type === 'image' || seg?.type === 'mface') && typeof seg.data?.url === 'string' && seg.data.url) imageUrls.push(seg.data.url)
+      }
     }
     text = text.replace(/\s+/g, ' ').trim().slice(0, 60)
-    return { author, text, isSelf: false }
+    return { author, text, isSelf: false, imageUrls: imageUrls.slice(0, 3) }
   }
 
   /** 合并转发 id（Yunzai 转发段） */
@@ -339,7 +340,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       atSelf: e.at === true,
       ...(atOther ? { atOther: true } : {}),
       quoteToSelf,
-      ...(quote && !quote.isSelf ? { quoteAuthor: quote.author, quoteText: quote.text } : {}),
+      ...(quote && !quote.isSelf ? { quoteAuthor: quote.author, quoteText: quote.text, ...(quote.imageUrls.length ? { quoteImageUrls: quote.imageUrls } : {}) } : {}),
       ...(forwardId ? { forwardId } : {}),
       imageCount: images,
       ...(imageUrls.length ? { imageUrls } : {}),
@@ -764,7 +765,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       getMessageImages: async (seq: number) => {
         const message = [...state.unread, ...state.recent].find(m => m.seq === seq)
         if (!message) return { seq, images: [], error: '该消息不在近期缓冲里' }
-        const urls = (message.imageUrls || []).slice(0, 2)
+        // 引用别人的带图消息是常见的"给你看"信号:本消息的图优先,没有则回落被引消息的图
+        const urls = [...(message.imageUrls || []).slice(0, 2), ...(message.imageUrls || []).length ? [] : (message.quoteImageUrls || []).slice(0, 2)]
         if (!urls.length) return { seq, images: [], error: '这条消息没有可取的图片（或图片 URL 已过期）' }
         if (typeof ports.fetchImageBase64 !== 'function') return { seq, images: [], error: '图片读取不可用' }
         const images: { mime: string; base64: string }[] = []
