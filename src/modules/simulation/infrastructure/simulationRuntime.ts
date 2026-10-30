@@ -8,7 +8,7 @@ import { evaluateWakeTrigger, mergeWakeReason, messageReasonStillPending, pushPe
 import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
-import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
+import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
@@ -420,7 +420,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const limitText = describeBudgetLimit(verdict.reason)
         if (limitText) {
           logger.warn(`[仿真] 群 ${groupId} 唤醒被预算拦截：${verdict.reason}（今日剩余唤醒不再重试）`)
-          if (limitNoticeDue(limitNoticeAt.get(groupId) || 0, now())) {
+          const hasAudience = shouldAnnounceBudgetLimit(String(reason?.kind || ""), Number(state.lastIncomingAt) || 0, now())
+          if (hasAudience && limitNoticeDue(limitNoticeAt.get(groupId) || 0, now())) {
             limitNoticeAt.set(groupId, now())
             void ports.sendGroupMessage(groupId, [{ type: 'text', data: { text: `（${limitText}，调用已限额，明天自动恢复喵）` } }])
               .then(receipt => { if (!receipt.ok) logger.warn(`[仿真] 群 ${groupId} 限额提示发送失败: ${receipt.error || ''}`) })

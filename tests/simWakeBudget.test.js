@@ -88,3 +88,15 @@ test('限额提示:预算类原因有人话描述,同群 30 分钟节流', async
   assert.equal(limitNoticeDue(t - 60_000, t), false, '冷却内不发')
   assert.equal(limitNoticeDue(t - 31 * 60_000, t), true, '过期再发')
 })
+
+test('限额提示只在有人在场时发:死群的定时器唤醒被拦不冒泡', async () => {
+  const { shouldAnnounceBudgetLimit } = await import('../dist/backend/modules/simulation/domain/budget.js')
+  const t = 1770000000000
+  assert.equal(shouldAnnounceBudgetLimit('proactiveCheck', 0, t), false, '死群无人说话')
+  assert.equal(shouldAnnounceBudgetLimit('proactiveCheck', t - 3600_000, t), false, '一小时前有人说话已离场')
+  assert.equal(shouldAnnounceBudgetLimit('proactiveCheck', t - 5 * 60_000, t), true, '刚有人说话')
+  assert.equal(shouldAnnounceBudgetLimit('replyCheck', t - 5 * 60_000, t), true, '回音检查且刚有人说话')
+  for (const kind of ['atMention', 'nameMention', 'question', 'admin']) {
+    assert.equal(shouldAnnounceBudgetLimit(kind, 0, t), true, `${kind} 被点名必提示`)
+  }
+})

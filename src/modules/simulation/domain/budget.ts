@@ -102,3 +102,10 @@ export function describeBudgetLimit(reason: string): string {
 export function limitNoticeDue(lastAt: number, now: number, cooldownMs = 30 * 60_000): boolean {
   return !(lastAt > 0 && now - lastAt < cooldownMs)
 }
+
+/** 限额提示是否值得发:死群里定时器自主唤醒被拦时没人看着,突然冒一句"调用已限额"很瘆人——
+ *  只有被点名(@/叫名/提问/管理员)或近 30 分钟内有人说过话才提示,其余静默记日志。 */
+export function shouldAnnounceBudgetLimit(reasonKind: string, lastIncomingAt: number, now: number, recentWindowMs = 30 * 60_000): boolean {
+  if (["admin", "atMention", "nameMention", "question"].includes(reasonKind)) return true
+  return lastIncomingAt > 0 && now - lastIncomingAt < recentWindowMs
+}
