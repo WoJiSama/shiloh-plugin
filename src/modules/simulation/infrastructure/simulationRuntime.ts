@@ -14,6 +14,7 @@ import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
+import { messageMentionsUser } from '../../conversation/domain/mentionTargets.js'
 import { createSimTools, simToolsAsFunctions, type SimSendResult, type SimWaitResult, type SimToolContext } from './simTools.js'
 
 export const SIM_RECENT_LIMIT = 60
@@ -105,6 +106,8 @@ export interface SimIngestEvent {
   msg?: string
   raw_message?: string
   at?: boolean | unknown
+  /** TRSS-Yunzai 系适配器 @机器人时设 atBot；e.at 只在 @ 别人时才被赋值 */
+  atBot?: boolean
   time?: number
   message?: { type?: string }[]
   sender?: { user_id?: string | number; nickname?: string; card?: string }
@@ -322,9 +325,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const text = String(e.msg || e.raw_message || '').trim()
     const images = (e.message || []).filter(seg => seg?.type === 'image' || seg?.type === 'mface').length
     if (!text && images === 0) return true
-    // 命令前缀不入会话流;例外:@ 了机器人或引用机器人消息的(「#抱抱希洛@这里是希洛!」是点名不是命令)
+    // 命令前缀不入会话流;例外:@ 了机器人或引用机器人消息的(「#抱抱希洛@这里是希洛!」是点名不是命令)。
+    // atSelf 必须用段级检测:TRSS-Yunzai @机器人设的是 e.atBot,e.at===true 永远不成立,
+    // 只看 e.at 会把「@机器人 .r10」这类点名静默吞掉、atMention 唤醒也永不触发。
     const quoteToSelf = !!e.source?.user_id && String(e.source.user_id) === self.id
-    if (text && /^[#./\\]/.test(text) && e.at !== true && !quoteToSelf) return true
+    const atSelf = messageMentionsUser(e, self.id)
+    if (text && /^[#./\\]/.test(text) && !atSelf && !quoteToSelf) return true
 
     const cfg = runtimeConfig()
     const live = liveStates.get(groupId)
@@ -341,7 +347,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       name: String(e.sender?.card || e.sender?.nickname || userId || '群友'),
       text: text.slice(0, cfg.turn.messageTextMaxChars),
       at: e.time && Number(e.time) > 0 ? Number(e.time) * 1000 : now(),
-      atSelf: e.at === true,
+      atSelf,
       ...(atOther ? { atOther: true } : {}),
       quoteToSelf,
       ...(quote && !quote.isSelf ? { quoteAuthor: quote.author, quoteText: quote.text, ...(quote.imageUrls.length ? { quoteImageUrls: quote.imageUrls } : {}) } : {}),
@@ -522,11 +528,23 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           // reserved2 语义：模型文本永不外发，只留在回合记忆里（外发只能走 simSendMessage）
           if (text) history.push({ role: 'assistant', content: text })
           // 兜底：写了像"要说的话"的文本但本回合一条都没发过 → 提醒一次（模型惯性问题，实测高发）
-          if (text.length >= 6 && sends === 0 && !nudgedForUnsent && !/^\[(?:不发了|SILENT|沉默)\]$/.test(text)) {
-            nudgedForUnsent = true
-            logger.info(`[仿真] 群 ${groupId} 检测到未外发文本（${text.length} 字，本回合 0 发送），已提醒模型用 simSendMessage 发出`)
-            history.push({ role: 'user', content: '【系统提醒】你刚才写的这段话群友看不到——本模式下只有 simSendMessage 发出的内容才会出现在群里，群里刚才只能看到你发的表情/动作。如果那段话就是你想说的，现在用 simSendMessage 原样（或更口语化、可拆几条）发出去；如果改变主意不想说了，直接结束回合，不要再输出纯文本。' })
-            continue
+          if (text.length >= 6 && sends === 0 && !/^\[(?:不发了|SILENT|沉默)\]$/.test(text)) {
+            if (!nudgedForUnsent) {
+              nudgedForUnsent = true
+              logger.info(`[仿真] 群 ${groupId} 检测到未外发文本（${text.length} 字，本回合 0 发送），已提醒模型用 simSendMessage 发出`)
+              history.push({ role: 'user', content: '【系统提醒】你刚才写的这段话群友看不到——本模式下只有 simSendMessage 发出的内容才会出现在群里，群里刚才只能看到你发的表情/动作。如果那段话就是你想说的，现在用 simSendMessage 原样（或更口语化、可拆几条）发出去；如果改变主意不想说了，直接结束回合，不要再输出纯文本。' })
+              continue
+            }
+            // 提醒过一次还是把话写在文本里(实测高发:连续多轮 6 字文本 0 发送,群里看着就是已读不回)——
+            // 直接替它发出去。内容照原样,不走模型再加工,避免又一轮哑火。
+            logger.info(`[仿真] 群 ${groupId} 提醒后仍未发送，兜底直发 ${text.length} 字`)
+            history.push({ role: 'user', content: '【系统】已替你把上面那段话发出去了。以后想说的话必须自己调 simSendMessage。' })
+            try {
+              const sendCtx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity })
+              await sendCtx.sendMessage([text.slice(0, cfg.turn.messageTextMaxChars)], {})
+            } catch (error) {
+              logger.warn(`[仿真] 群 ${groupId} 兜底直发失败: ${error instanceof Error ? error.message : String(error)}`)
+            }
           }
           break
         }
