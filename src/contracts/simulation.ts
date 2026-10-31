@@ -11,6 +11,7 @@ export type SimWakeReasonKind =
   | 'anyMessage'
   | 'probability'
   | 'continuation'
+  | 'session'
   | 'timeout'
   | 'replyCheck'
   | 'proactiveCheck'
@@ -150,6 +151,8 @@ export interface SimSessionState {
   bootstrapSent: boolean
   /** 会话延续状态：机器人最近参与过对话 → 对话对象的新消息即使不点名也值得醒来看（模型自行决定接不接） */
   conversation: { activeUntil: number; interlocutorIds: string[]; lastTriggerUserId?: string }
+  /** 陪玩模式上次主动唤醒时间（epoch ms）——冷却节奏控制，避免跑团期间刷屏/烧钱 */
+  lastPlayAlongWakeAt?: number
   /** 群梗自动提取游标：已提取到哪条消息（seq）、上次提取时间 */
   memeCursor?: { seq: number; at: number }
 }
@@ -171,6 +174,8 @@ export interface SimulationSection {
     proactiveProbability?: number
     replyCheckMs?: number
     continuationWindowMs?: number
+    /** 陪玩模式主动唤醒的最小间隔（ms，默认 5 分钟）：跑团等持续活动期间的跟进节奏 */
+    playAlongGapMs?: number
   }
   budget?: {
     dailyCostCny?: number
@@ -217,7 +222,7 @@ export interface SimRuntimeConfig {
   enabled: boolean
   /** 所有过了群白名单的群默认进仿真（.仿真 关 可按群退出） */
   allGroups: boolean
-  wake: Required<Pick<NonNullable<SimulationSection['wake']>, 'probability' | 'batchWindowMs' | 'maxWakePerMinute' | 'maxWakePerHour' | 'proactiveIdleMs' | 'proactiveCheckMinMs' | 'proactiveCheckMaxMs' | 'proactiveProbability' | 'replyCheckMs' | 'continuationWindowMs'>>
+  wake: Required<Pick<NonNullable<SimulationSection['wake']>, 'probability' | 'batchWindowMs' | 'maxWakePerMinute' | 'maxWakePerHour' | 'proactiveIdleMs' | 'proactiveCheckMinMs' | 'proactiveCheckMaxMs' | 'proactiveProbability' | 'replyCheckMs' | 'continuationWindowMs' | 'playAlongGapMs'>>
   turn: Required<Pick<NonNullable<SimulationSection['turn']>, 'maxToolRounds' | 'maxSendsPerTurn' | 'minSendGapMs' | 'sendPerMinute' | 'maxTurnsPerDay' | 'historyMaxMessages' | 'historyMaxChars' | 'unreadLimit' | 'wakeMessageLimit' | 'wakeMaxChars' | 'messageTextMaxChars' | 'waitQuietMaxMs' | 'waitTimeoutMaxMs'>> & { groups: Record<string, number> }
   agentPresetKeywords: string[]
   extraTools: string[]

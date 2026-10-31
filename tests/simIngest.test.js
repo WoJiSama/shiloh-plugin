@@ -6,11 +6,11 @@ const SELF_ID = '3094088525'
 const GROUP = '10086'
 const SESSION_KEY = `shiloh:sim:g:${GROUP}`
 
-function buildRuntime({ atOnly = [], randomValue = 0.99, responses } = {}) {
+function buildRuntime({ atOnly = [], playAlong = [], randomValue = 0.99, responses, now = () => 1770000000000 } = {}) {
   const kv = new Map()
-  // 预置 overrides（atOnly 用）；留空则运行时按 groups 种子
-  if (atOnly.length) {
-    kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {}, atOnly }))
+  // 预置 overrides（atOnly/playAlong 用）；留空则运行时按 groups 种子
+  if (atOnly.length || playAlong.length) {
+    kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {}, atOnly, playAlong }))
   }
   const modelCalls = []
   const sent = []
@@ -34,7 +34,7 @@ function buildRuntime({ atOnly = [], randomValue = 0.99, responses } = {}) {
       : async () => { throw new Error('ingest 路径不应触达模型') },
     sendGroupMessage: async (_groupId, segments) => { sent.push(segments); return { ok: true, messageId: 'm1' } },
     getPersona: () => ({ persona: {}, systemContent: '' }),
-    now: () => 1770000000000,
+    now,
     random: () => randomValue,
   })
   return { runtime, kv, modelCalls, sent }
@@ -169,6 +169,47 @@ test('真内容提醒一次仍哑火则兜底直发（不被沉默识别误伤�
     assert.ok(await waitFor(() => r.modelCalls.length >= 2), '提醒后应有第二次调用')
     assert.ok(await waitFor(() => r.sent.length >= 1), '兜底应直发第二次文本')
     assert.ok(JSON.stringify(r.sent[0]).includes('今天也要加油鸭！呀'), `直发内容应为第二次文本: ${JSON.stringify(r.sent[0])}`)
+  } finally {
+    r.runtime.stop()
+  }
+})
+
+test('陪玩模式：群里有动静按节奏主动唤醒，冷却期内不重复，仅@优先于陪玩', async () => {
+  let clock = 1770000000000
+  const r = buildRuntime({ playAlong: [GROUP], randomValue: 0.99, now: () => clock })
+  try {
+    await seedConversation(r.runtime)
+    // 无任何触发器命中的普通消息：陪玩唤醒接手（首条必过冷却，lastPlayAlongWakeAt 初始为 0）
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: 'kp：你们坐上了开往帕佩里欧的火车', message: [], sender: { nickname: 'KP' } })
+    assert.ok(interlocutors(r.kv).includes('30000'), '陪玩开启时普通剧情消息也唤醒')
+
+    // 冷却期内（同一时刻）的下一条消息不再触发陪玩唤醒
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '40000', msg: '我看向窗外', message: [], sender: { nickname: '队友' } })
+    assert.ok(!interlocutors(r.kv).includes('40000'), '冷却期内不重复唤醒')
+
+    // 冷却期过（默认 5 分钟）后恢复主动跟进
+    clock += 6 * 60_000
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '40000', msg: '火车进站了', message: [], sender: { nickname: '队友' } })
+    assert.ok(interlocutors(r.kv).includes('40000'), '冷却期过后恢复陪玩唤醒')
+
+    // 命令往返
+    assert.match(await r.runtime.setGroupPlayAlong(GROUP, 'query'), /陪玩模式：开启/)
+    assert.match(await r.runtime.setGroupPlayAlong(GROUP, 'on'), /已是「开启」/)
+    assert.match(await r.runtime.setGroupPlayAlong(GROUP, 'off'), /已关闭陪玩模式/)
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '50000', msg: '继续赶路', message: [], sender: { nickname: '队友' } })
+    assert.ok(!interlocutors(r.kv).includes('50000'), '关闭陪玩后普通消息不再主动唤醒')
+  } finally {
+    r.runtime.stop()
+  }
+})
+
+test('仅@模式与陪玩同开时，陪玩唤醒被压掉', async () => {
+  const r = buildRuntime({ atOnly: [GROUP], playAlong: [GROUP], randomValue: 0.99 })
+  try {
+    await seedConversation(r.runtime)
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '剧情推进中', message: [], sender: { nickname: 'KP' } })
+    assert.ok(!interlocutors(r.kv).includes('30000'), '仅@优先：陪玩唤醒被压掉')
+    assert.match(await r.runtime.setGroupPlayAlong(GROUP, 'query'), /仅@才回.*陪玩唤醒会被压掉/)
   } finally {
     r.runtime.stop()
   }

@@ -7,6 +7,7 @@ export const WAKE_PRIORITY: Record<SimWakeReasonKind, number> = {
   question: 80,
   continuation: 78,
   speaker: 75,
+  session: 72,
   nameMention: 70,
   keyword: 60,
   anyMessage: 50,

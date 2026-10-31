@@ -56,6 +56,7 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       proactiveProbability: clamp(wake.proactiveProbability ?? 0.3, 0, 1),
       replyCheckMs: Math.max(5000, Math.floor(wake.replyCheckMs ?? 30_000)),
       continuationWindowMs: Math.max(30_000, Math.floor(wake.continuationWindowMs ?? 300_000)),
+      playAlongGapMs: Math.max(60_000, Math.floor(wake.playAlongGapMs ?? 300_000)),
     },
     turn: {
       maxToolRounds: Math.max(1, Math.floor(turn.maxToolRounds ?? 10)),
