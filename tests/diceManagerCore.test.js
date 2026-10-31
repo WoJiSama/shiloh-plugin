@@ -814,7 +814,7 @@ test("official default skills judge without recording; unknown skills roll with 
   }
 })
 
-test("bot quit requires a leading @bot mention plus admin permission", async () => {
+test("bot off toggles the per-group switch while bye keeps the quit semantics", async () => {
   const runtime = createRuntime()
   try {
     const api = []
@@ -825,28 +825,48 @@ test("bot quit requires a leading @bot mention plus admin permission", async () 
       bot: { uin: "10001", sendApi: async (action, params) => { api.push({ action, params }); return { retcode: 0 } } },
       reply: async text => text
     }
-    const atBot = [{ type: "at", data: { qq: "10001" } }, { type: "text", data: { text: ".bot off" } }]
-    const atOther = [{ type: "at", data: { qq: "99999" } }, { type: "text", data: { text: ".bot off" } }]
+    const atBot = [{ type: "at", data: { qq: "10001" } }, { type: "text", data: { text: ".bot bye" } }]
+    const atOther = [{ type: "at", data: { qq: "99999" } }, { type: "text", data: { text: ".bot bye" } }]
 
-    // 裸命令：不退群，给引导
-    const bare = await runtime.manager.handleBotControl({ ...base, msg: ".bot off" }, "off")
+    // .bot off 是按群总开关（sealdice 语义）：不需要艾特，关掉后命令静默放行
+    const off = await runtime.manager.handleBotControl({ ...base, msg: ".bot off" }, "off")
+    assert.match(off, /已关闭，骰点命令将不再响应/)
+    assert.equal(runtime.manager.isGroupEnabled(base), false)
+    assert.equal(api.length, 0, ".bot off 不再退群")
+    assert.deepEqual(
+      getDiceCommandGate({ manager: runtime.manager, e: base, commandName: "roll" }),
+      { allowed: false, consume: false, response: "" }
+    )
+    // .bot on 在已关闭的群里仍可豁免放行，把骰娘开回来
+    assert.equal(getDiceCommandGate({ manager: runtime.manager, e: base, commandName: "botControl" }).allowed, true)
+    const on = await runtime.manager.handleBotControl({ ...base, msg: ".bot on" }, "on")
+    assert.match(on, /已开启/)
+    assert.equal(runtime.manager.isGroupEnabled(base), true)
+    // 普通成员改不动开关
+    assert.match(
+      await runtime.manager.handleBotControl({ ...base, msg: ".bot off", sender: { card: "路人", role: "member" } }, "off"),
+      /只有主人、群主或管理员/
+    )
+
+    // 裸命令 .bot bye：不退群，给引导
+    const bare = await runtime.manager.handleBotControl({ ...base, msg: ".bot bye" }, "bye")
     assert.match(bare, /退群命令需要先艾特我/)
     assert.equal(api.length, 0)
 
     // @机器人 + 管理员：告别并调用退群 API
-    const quit = await runtime.manager.handleBotControl({ ...base, msg: ".bot off", message: atBot }, "off")
+    const quit = await runtime.manager.handleBotControl({ ...base, msg: ".bot bye", message: atBot }, "bye")
     assert.equal(quit, "")
     assert.deepEqual(api, [{ action: "set_group_leave", params: { group_id: 4321 } }])
 
     // @机器人但普通成员：权限拒绝且不退
     api.length = 0
-    const denied = await runtime.manager.handleBotControl({ ...base, msg: ".bot off", message: atBot, sender: { card: "路人", role: "member" } }, "off")
+    const denied = await runtime.manager.handleBotControl({ ...base, msg: ".bot bye", message: atBot, sender: { card: "路人", role: "member" } }, "bye")
     assert.match(denied, /只有主人或群主\/管理员/)
     assert.equal(api.length, 0)
 
     // 艾特别人：不构成退群指令
     api.length = 0
-    const other = await runtime.manager.handleBotControl({ ...base, msg: ".bot off", message: atOther }, "off")
+    const other = await runtime.manager.handleBotControl({ ...base, msg: ".bot bye", message: atOther }, "bye")
     assert.match(other, /退群命令需要先艾特我/)
     assert.equal(api.length, 0)
   } finally {

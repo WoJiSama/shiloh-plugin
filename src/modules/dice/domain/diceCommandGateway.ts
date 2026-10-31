@@ -55,7 +55,8 @@ export function sanitizeDiceCommandError(error:unknown) {
 // 旁观者仍可用的自身管理命令（.obon/.oboff/.ob list）
 const OBSERVER_SELF_COMMANDS = new Set(["observer"])
 // 按群开关自身永远可用（.骰娘 开/关/状态）：关掉的群里管理员还能把它开回来
-const GROUP_SELF_COMMANDS = new Set(["groupControl"])
+// .bot on/off 是同一开关的 sealdice 同义命令，同样豁免；.bot bye（退群）也顺带可用
+const GROUP_SELF_COMMANDS = new Set(["groupControl", "botControl"])
 
 export function getDiceCommandGate({ manager, e, commandName = "", fallbackBotId }: GateInput = {}) {
   if (startsWithMentionOfOtherMember(e, fallbackBotId)) {

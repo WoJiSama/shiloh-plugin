@@ -747,11 +747,11 @@ export class DiceManager {
   async handleBotControl(e:DiceEvent, raw = "") {
     const text = String(raw || "").trim().toLowerCase()
 
-    // .bot bye / .bot dismiss / .bot off:真正退群(仅主人或群主/管理员)
-    // 安全约束:必须首位艾特机器人才执行(@希洛 .bot off),防止群里裸发命令误触
-    if (/^(bye|dismiss|退出|off)$/.test(text)) {
+    // .bot bye / .bot dismiss / .bot 退出:真正退群(仅主人或群主/管理员)
+    // 安全约束:必须首位艾特机器人才执行(@希洛 .bot bye),防止群里裸发命令误触
+    if (/^(bye|dismiss|退出)$/.test(text)) {
       if (!startsWithBotMention(e,this.bot)) {
-        return "退群命令需要先艾特我，例如：@我 .bot off（仅主人或群主/管理员），防止误触。"
+        return "退群命令需要先艾特我，例如：@我 .bot bye（仅主人或群主/管理员），防止误触。"
       }
       const isMaster = Boolean(e?.isMaster)
       const senderRole = String(e?.sender?.role || "").toLowerCase()
@@ -781,10 +781,10 @@ export class DiceManager {
       }
     }
 
-    if (/^(on|开启)/.test(text) || !text) {
-      return "希洛不是独立骰娘实例，`.bot on` 已做兼容响应。\n退群：艾特我后发 `.bot off` 或 `.bot bye`（仅主人或群主/管理员）。"
-    }
-    return "bot 命令：.bot on（兼容响应）/ @我 .bot off 或 .bot bye（退群，需主人或管理员）"
+    // sealdice 语义:.bot on/off = 关/开本群骰娘全部功能——不是退群,与 .骰娘 开/关 同一状态
+    if (/^(on|开启)$/.test(text)) return await this.handleGroupControl(e, "on")
+    if (/^(off|关闭)$/.test(text)) return await this.handleGroupControl(e, "off")
+    return "bot 命令：.bot on/off - 开/关本群骰娘功能（需主人或群管理，同 .骰娘 开/关）；@我 .bot bye - 真正退群（需主人或群管理）"
   }
 
   async replyText(e:DiceEvent, text:string) {
@@ -2876,7 +2876,7 @@ ${rows}
       ".nn 昵称 - 设置骰娘显示名并同步QQ群名片（需 .sn on 开启同步）",
       ".sn on/off - 开/关自动群名片同步：把角色卡名/骰娘昵称同步为自己的QQ群名片",
       ".reply on/off - 管理员开启或关闭当前群骰娘回复",
-      ".骰娘 开/关/状态 - 管理员按群开关骰娘功能（关闭后本群骰命令静默放行）",
+      ".骰娘 开/关/状态（.bot on/off 同义）- 管理员按群开关骰娘功能，关闭后本群骰命令静默放行",
       ".jrrp - 今日人品；.db [STR SIZ] - 伤害加值",
       ".ti / .li - 临时疯狂 / 总结疯狂",
       ".setcoc [规则] - 查看或设置当前群规则",

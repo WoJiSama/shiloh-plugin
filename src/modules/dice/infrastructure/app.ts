@@ -448,7 +448,8 @@ class DicePlugin extends plugin {
   }
 
   async botControl(e:AppEvent) {
-    await this.reply(e, await diceManager.handleBotControl(e, this.strip(e, "(bot|dismiss|bye)")))
+    // on/off 走按群开关的状态写入，bye 是退群——统一进状态事务
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleBotControl(e, this.strip(e, "(bot|dismiss|bye)"))))
     return true
   }
 
