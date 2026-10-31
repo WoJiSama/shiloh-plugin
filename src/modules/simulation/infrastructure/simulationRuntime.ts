@@ -10,6 +10,7 @@ import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
 import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
+import { isSilentDeclaration } from '../domain/silentDeclaration.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
@@ -535,12 +536,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           const text = String(message.content || '').trim()
           // reserved2 语义：模型文本永不外发，只留在回合记忆里（外发只能走 simSendMessage）
           if (text) history.push({ role: 'assistant', content: text })
-          // 兜底：写了像"要说的话"的文本但本回合一条都没发过 → 提醒一次（模型惯性问题，实测高发）
-          if (text.length >= 6 && sends === 0 && !/^\[(?:不发了|SILENT|沉默)\]$/.test(text)) {
+          // 兜底：写了像"要说的话"的文本但本回合一条都没发过 → 提醒一次（模型惯性问题，实测高发）。
+          // 沉默声明（「旁听，结束回合。」「无需发送，结束回合。」）除外：那是模型在宣布不说话，
+          // 提醒/直发都会把元话术漏进群里——按其意愿安静结束。
+          if (text.length >= 6 && sends === 0 && !/^\[(?:不发了|SILENT|沉默)\]$/.test(text) && !isSilentDeclaration(text)) {
             if (!nudgedForUnsent) {
               nudgedForUnsent = true
               logger.info(`[仿真] 群 ${groupId} 检测到未外发文本（${text.length} 字，本回合 0 发送），已提醒模型用 simSendMessage 发出`)
-              history.push({ role: 'user', content: '【系统提醒】你刚才写的这段话群友看不到——本模式下只有 simSendMessage 发出的内容才会出现在群里，群里刚才只能看到你发的表情/动作。如果那段话就是你想说的，现在用 simSendMessage 原样（或更口语化、可拆几条）发出去；如果改变主意不想说了，直接结束回合，不要再输出纯文本。' })
+              history.push({ role: 'user', content: '【系统提醒】你刚才写的这段话群友看不到——本模式下只有 simSendMessage 发出的内容才会出现在群里，群里刚才只能看到你发的表情/动作。如果那段话就是你想说的，现在用 simSendMessage 原样（或更口语化、可拆几条）发出去；如果改变主意不想说了，从此不要再输出任何文字（也不要写「无需发送」「结束回合」这类说明），直接停下即可。' })
               continue
             }
             // 提醒过一次还是把话写在文本里(实测高发:连续多轮 6 字文本 0 发送,群里看着就是已读不回)——
@@ -553,6 +556,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             } catch (error) {
               logger.warn(`[仿真] 群 ${groupId} 兜底直发失败: ${error instanceof Error ? error.message : String(error)}`)
             }
+          } else if (text.length >= 6 && sends === 0) {
+            logger.info(`[仿真] 群 ${groupId} 模型以沉默声明收尾（${text.slice(0, 24)}），按其意愿安静结束回合`)
           }
           break
         }

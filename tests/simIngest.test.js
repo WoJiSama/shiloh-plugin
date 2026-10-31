@@ -6,12 +6,19 @@ const SELF_ID = '3094088525'
 const GROUP = '10086'
 const SESSION_KEY = `shiloh:sim:g:${GROUP}`
 
-function buildRuntime({ atOnly = [], randomValue = 0.99 } = {}) {
+function buildRuntime({ atOnly = [], randomValue = 0.99, responses } = {}) {
   const kv = new Map()
   // 预置 overrides（atOnly 用）；留空则运行时按 groups 种子
   if (atOnly.length) {
     kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {}, atOnly }))
   }
+  const modelCalls = []
+  const sent = []
+  const reply = (content) => ({
+    choices: [{ message: { role: 'assistant', content }, finish_reason: 'stop' }],
+    usage: { total_tokens: 10 },
+    model: 'test',
+  })
   const runtime = createSimulationRuntime({
     redis: {
       async get(key) { return kv.has(key) ? kv.get(key) : null },
@@ -22,13 +29,25 @@ function buildRuntime({ atOnly = [], randomValue = 0.99 } = {}) {
     getSection: () => ({ enabled: true, allGroups: false, groups: [GROUP] }),
     getExecutionConfig: () => ({}),
     getSelf: () => ({ id: SELF_ID, name: '希洛' }),
-    YTapi: async () => { throw new Error('ingest 路径不应触达模型') },
-    sendGroupMessage: async () => ({ ok: true }),
+    YTapi: responses
+      ? async () => { modelCalls.push(modelCalls.length); return reply(responses[Math.min(modelCalls.length - 1, responses.length - 1)]) }
+      : async () => { throw new Error('ingest 路径不应触达模型') },
+    sendGroupMessage: async (_groupId, segments) => { sent.push(segments); return { ok: true, messageId: 'm1' } },
     getPersona: () => ({ persona: {}, systemContent: '' }),
     now: () => 1770000000000,
     random: () => randomValue,
   })
-  return { runtime, kv }
+  return { runtime, kv, modelCalls, sent }
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+async function waitFor(check, timeoutMs = 6000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (check()) return true
+    await sleep(50)
+  }
+  return check()
 }
 
 function recent(kv) {
@@ -127,5 +146,30 @@ test('仅@才回：非点名消息入库但不唤醒，被@照常唤醒，可切
     assert.match(await atOnly.runtime.setGroupReplyMode(GROUP, 'query'), /自主/)
   } finally {
     atOnly.runtime.stop()
+  }
+})
+
+test('沉默声明不提醒不外发：一次模型调用安静结束回合', async () => {
+  const r = buildRuntime({ responses: ['无需发送，结束回合。'] })
+  try {
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', message: [], sender: { nickname: '群友' } })
+    assert.ok(await waitFor(() => r.modelCalls.length >= 1), '回合应启动并调用模型')
+    await sleep(300)
+    assert.equal(r.modelCalls.length, 1, '沉默声明不触发二次提醒调用')
+    assert.equal(r.sent.length, 0, '沉默声明绝不外发进群')
+  } finally {
+    r.runtime.stop()
+  }
+})
+
+test('真内容提醒一次仍哑火则兜底直发（不被沉默识别误伤）', async () => {
+  const r = buildRuntime({ responses: ['今天也要加油鸭！', '今天也要加油鸭！呀'] })
+  try {
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', message: [], sender: { nickname: '群友' } })
+    assert.ok(await waitFor(() => r.modelCalls.length >= 2), '提醒后应有第二次调用')
+    assert.ok(await waitFor(() => r.sent.length >= 1), '兜底应直发第二次文本')
+    assert.ok(JSON.stringify(r.sent[0]).includes('今天也要加油鸭！呀'), `直发内容应为第二次文本: ${JSON.stringify(r.sent[0])}`)
+  } finally {
+    r.runtime.stop()
   }
 })
