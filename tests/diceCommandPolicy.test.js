@@ -93,6 +93,20 @@ test("dice command parsing normalizes the Chinese period before extracting argum
   assert.deepEqual(numbered?.slice(1), ["+1", "力量"])
 })
 
+test("whitespace between the period and the command head routes identically", () => {
+  assert.equal(route(". r10#d100"), "roll", "实拍形态：点后带空格")
+  assert.equal(route(".  r 1d100"), "roll")
+  assert.equal(route("。 r10#d100"), "roll")
+  assert.equal(route(". ra 侦查60"), "seaCocCheck")
+  assert.equal(route(". rabc"), null, "前缀空白不放松拉丁紧贴边界")
+
+  assert.equal(normalizeDiceCommandText(". r10#d100"), ".r10#d100")
+  assert.equal(stripDiceCommand(". r10#d100", "(?:r(?![A-Za-z])|roll)"), "10#d100")
+
+  const rollArgs = matchDiceCommand(". r10#d100", "(?:r(?![A-Za-z])|roll)\\s*([\\s\\S]*)")
+  assert.equal(rollArgs?.[1], "10#d100", "roll 处理器按紧贴形态解析参数")
+})
+
 test("all dice routing rules compile as JavaScript regular expressions", () => {
   for (const rule of DICE_COMMAND_RULES) assert.doesNotThrow(() => new RegExp(rule.reg), rule.reg)
 })

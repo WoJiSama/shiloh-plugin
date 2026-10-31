@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url"
 
-export const DICE_COMMAND_PREFIX_PATTERN = "[.。]"
+// 前缀与命令字之间允许空白：`. r10#d100` 与 `.r10#d100` 是同一命令（实拍群里常带空格）。
+// normalizeDiceCommandText 把这段空白折叠掉，strip/match 的参数解析仍按紧贴形态工作。
+export const DICE_COMMAND_PREFIX_PATTERN = "[.。]\\s*"
 
 function exactRule(headPattern:string) {
   return `^${DICE_COMMAND_PREFIX_PATTERN}(?:${headPattern})\\s*$`
@@ -19,11 +21,13 @@ function knownCompactLatinRule(headPattern:string, compactArgs:string[] = []) {
 /**
  * Dice command routing policy shared by the plugin entry and regression tests.
  *
- * Rules accept both ASCII/full-width Chinese periods. Arguments may be joined
- * directly to a command when they start with Chinese text, a number or normal
- * dice punctuation. Latin text can still be supplied after whitespace. Known
- * compact subcommands such as `.pcnew` are explicitly allowed so a short
- * command cannot accidentally consume another Latin command such as `.rabc`.
+ * Rules accept both ASCII/full-width Chinese periods. Whitespace between the
+ * period and the command head is tolerated (`. r10` = `.r10`). Arguments may
+ * be joined directly to a command when they start with Chinese text, a number
+ * or normal dice punctuation. Latin text can still be supplied after
+ * whitespace. Known compact subcommands such as `.pcnew` are explicitly
+ * allowed so a short command cannot accidentally consume another Latin command
+ * such as `.rabc`.
  */
 export const DICE_COMMAND_RULES = Object.freeze([
   { reg: exactRule("dice"), fnc: "diceHubMenu" },
@@ -91,7 +95,7 @@ export const DICE_COMMAND_RULES = Object.freeze([
 
 export function normalizeDiceCommandText(input = "") {
   const text = String(input || "")
-  return text.startsWith("。") ? `.${text.slice(1)}` : text
+  return (text.startsWith("。") ? `.${text.slice(1)}` : text).replace(/^\.\s+/, ".")
 }
 
 export function stripDiceCommand(input:string|undefined, headPattern:string) {
