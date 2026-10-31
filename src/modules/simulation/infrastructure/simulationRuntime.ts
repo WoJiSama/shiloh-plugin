@@ -83,10 +83,8 @@ export interface SimulationRuntime {
   sweepOnce(): Promise<void>
   enableGroup(groupId: string): Promise<string>
   disableGroup(groupId: string): Promise<string>
-  /** 按群回复模式：atOnly=仅被@才回（消息照常入库），auto=自主；缺省=query 查询当前模式 */
-  setGroupReplyMode(groupId: string, mode?: 'atOnly' | 'auto' | 'query'): Promise<string>
-  /** 跑团陪玩模式：群里持续有动静时按节奏主动跟进；缺省=query 查询 */
-  setGroupPlayAlong(groupId: string, mode?: 'on' | 'off' | 'query'): Promise<string>
+  /** 按群回复模式：atOnly=仅被@才回（消息照常入库），auto=自主，active=自主·活跃（持续活动按节奏主动跟进）；缺省=query 查询 */
+  setGroupReplyMode(groupId: string, mode?: 'atOnly' | 'auto' | 'active' | 'query'): Promise<string>
   groupStatus(groupId: string): Promise<string>
   resetGroup(groupId: string): Promise<string>
   listMemories(groupId: string): Promise<string>
@@ -382,8 +380,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     // 消息照常入库——AI 被点名醒来后仍可读到全部内容；定时器/管理类唤醒是被点名后的延伸，不受影响。
     const atOnlyGroup = (overridesCache?.atOnly || []).includes(groupId)
     if (reason && atOnlyGroup && !AT_ONLY_WAKE_KINDS.has(reason.kind)) reason = null
-    // 陪玩模式（跑团当玩家）：群里持续有动静时按节奏主动醒来跟进剧情，不等点名。
-    // 节奏由 lastPlayAlongWakeAt 冷却（默认 5 分钟）控制，防刷屏/烧钱；仅@模式优先于陪玩，两者同开时陪玩被压掉。
+    // 自主·活跃档：群里持续有动静时按节奏主动醒来跟进剧情，不等点名。
+    // 节奏由 lastPlayAlongWakeAt 冷却（默认 5 分钟）控制，防刷屏/烧钱；仅@模式优先于活跃档，两者同开时主动跟进被压掉。
     if (!reason && !atOnlyGroup && (overridesCache?.playAlong || []).includes(groupId)
       && message.at - (state.lastPlayAlongWakeAt || 0) >= cfg.wake.playAlongGapMs) {
       reason = { kind: 'session', seq: message.seq }
@@ -1009,49 +1007,39 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `群 ${groupId} 已切回普通模式（.仿真 开 可再切回）`
   }
 
-  /** .仿真 模式 仅@/自主：管理员设定的按群回复模式（优先于 AI 自设触发器）。mode='query' 或缺省 = 查询。 */
-  async function setGroupReplyMode(groupId: string, mode: 'atOnly' | 'auto' | 'query' = 'query'): Promise<string> {
+  /** .仿真 模式 仅@/自主/活跃：按群回复模式（管理员设定，优先于 AI 自设触发器）。
+   *  自主档的主动程度：自主=触发器命中才说；活跃=群里持续有动静时按节奏主动跟进（跑团当玩家）。
+   *  mode 缺省=query。 */
+  async function setGroupReplyMode(groupId: string, mode: 'atOnly' | 'auto' | 'active' | 'query' = 'query'): Promise<string> {
     await refreshGroupState(true)
-    const isAtOnly = (overridesCache?.atOnly || []).includes(groupId)
+    const atOnlyList = overridesCache?.atOnly || []
+    const playAlongList = overridesCache?.playAlong || []
+    const isAtOnly = atOnlyList.includes(groupId)
+    const isPlayAlong = playAlongList.includes(groupId)
+    const gapMin = Math.round(runtimeConfig().wake.playAlongGapMs / 60_000)
     if (mode === 'query') {
-      return isAtOnly
-        ? `本群回复模式：仅被@才回（AI 仍在看全部消息，只有被@或引用时才说话；.仿真 模式 自主 可恢复）`
-        : `本群回复模式：自主（观察全部消息，自行决定何时插话；.仿真 模式 仅@ 可改为只被@才回）`
+      if (isAtOnly) return `本群回复模式：仅被@才回（AI 仍在看全部消息，只有被@或引用时才说话；.仿真 模式 自主 可恢复）`
+      if (isPlayAlong) return `本群回复模式：自主·活跃（群里持续有动静时，每 ${gapMin} 分钟最多主动跟进一次，跑团当玩家用；.仿真 模式 自主 调回普通档）`
+      return `本群回复模式：自主（观察全部消息，触发器命中/@点名时说话；.仿真 模式 活跃 可提高主动程度）`
     }
-    const wantAtOnly = mode === 'atOnly'
-    if (wantAtOnly === isAtOnly) return `本群回复模式已是「${wantAtOnly ? '仅被@才回' : '自主'}」，无需修改`
-    const overrides = nextOverrides({ atOnly: wantAtOnly ? [...new Set([...(overridesCache?.atOnly || []), groupId])] : (overridesCache?.atOnly || []).filter(g => g !== groupId) })
+    const current = isAtOnly ? 'atOnly' : isPlayAlong ? 'active' : 'auto'
+    if (mode === current) return `本群回复模式已是「${mode === 'atOnly' ? '仅被@才回' : mode === 'active' ? '自主·活跃' : '自主'}」，无需修改`
+    const overrides = nextOverrides({
+      atOnly: mode === 'atOnly' ? [...new Set([...atOnlyList, groupId])] : atOnlyList.filter(g => g !== groupId),
+      playAlong: mode === 'active' ? [...new Set([...playAlongList, groupId])] : playAlongList.filter(g => g !== groupId),
+    })
     await store.saveOverrides(overrides)
     overridesCache = overrides
-    if (wantAtOnly) {
+    if (mode === 'atOnly') {
       // 切到仅@时，已排期的自主类唤醒立即取消，避免切换后还突然冒一次泡
       const pending = pendingWakes.get(groupId)
       if (pending && !AT_ONLY_WAKE_KINDS.has(pending.reason.kind)) { clearTimeout(pending.timer); pendingWakes.delete(groupId) }
       return `群 ${groupId} 已设为「仅被@才回」：消息照常看、照常记忆，但只有被@或引用时才说话（.仿真 模式 自主 可恢复）`
     }
-    return `群 ${groupId} 已恢复「自主模式」：AI 观察全部消息，自行决定何时插话`
-  }
-
-  /** .仿真 陪玩 开/关：跑团陪玩模式——群里持续有动静时按节奏主动醒来跟进（接不接由模型判断）。mode 缺省=query。 */
-  async function setGroupPlayAlong(groupId: string, mode: 'on' | 'off' | 'query' = 'query'): Promise<string> {
-    await refreshGroupState(true)
-    const isOn = (overridesCache?.playAlong || []).includes(groupId)
-    const atOnly = (overridesCache?.atOnly || []).includes(groupId)
-    const gapMin = Math.round(runtimeConfig().wake.playAlongGapMs / 60_000)
-    if (mode === 'query') {
-      return isOn
-        ? `本群陪玩模式：开启（群里持续有动静时，每 ${gapMin} 分钟最多主动跟进一次；跑团当玩家用）${atOnly ? '\n注意：本群同时开着「仅@才回」，陪玩唤醒会被压掉，建议 .仿真 模式 自主' : ''}`
-        : `本群陪玩模式：关闭（只在触发器命中/@点名时说话；.仿真 陪玩 开 可开启）`
+    if (mode === 'active') {
+      return `群 ${groupId} 已设为「自主·活跃」：群里持续聊天/跑团时，AI 每 ${gapMin} 分钟最多主动醒来一次跟进，接不接由它自己判断（.仿真 模式 自主 调回普通档；跑团若开了骰娘 log，记得 .骰娘 跑团AI 开）`
     }
-    const want = mode === 'on'
-    if (want === isOn) return `本群陪玩模式已是「${want ? '开启' : '关闭'}」，无需修改`
-    const overrides = nextOverrides({ playAlong: want ? [...new Set([...(overridesCache?.playAlong || []), groupId])] : (overridesCache?.playAlong || []).filter(g => g !== groupId) })
-    await store.saveOverrides(overrides)
-    overridesCache = overrides
-    if (want) {
-      return `群 ${groupId} 已开启陪玩模式：群里持续聊天/跑团时，AI 每 ${gapMin} 分钟最多主动醒来一次跟进剧情，接不接由它自己判断${atOnly ? '。⚠ 本群开着「仅@才回」，陪玩会被压制，请先 .仿真 模式 自主' : ''}（跑团若开了骰娘 log，记得 .骰娘 跑团AI 开）`
-    }
-    return `群 ${groupId} 已关闭陪玩模式：恢复只在触发器命中/@点名时说话`
+    return `群 ${groupId} 已设为「自主」：观察全部消息，触发器命中/@点名时说话（.仿真 模式 活跃 可提高主动程度）`
   }
 
   async function groupStatus(groupId: string): Promise<string> {
@@ -1062,7 +1050,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const state = live ?? await store.load(groupId)
     return [
       `模式：${active ? '仿真（AI 自主收发）' : '普通'}${running.has(groupId) ? '（回合进行中）' : ''}`,
-      `回复模式：${(overridesCache?.atOnly || []).includes(groupId) ? '仅被@才回（管理员设定，优先于 AI 自设触发器）' : '自主'}${(overridesCache?.playAlong || []).includes(groupId) ? '，陪玩开启（持续活动时按节奏主动跟进）' : ''}`,
+      `回复模式：${(overridesCache?.atOnly || []).includes(groupId) ? '仅被@才回（管理员设定，优先于 AI 自设触发器）' : (overridesCache?.playAlong || []).includes(groupId) ? '自主·活跃（持续活动时按节奏主动跟进）' : '自主'}`,
       `范围：${cfg.enabled ? (cfg.allGroups ? '默认全群开启，可按群 .仿真 关' : '仅显式清单') : '总开关关闭'}`,
       `唤醒配置：mode=${state.wakeConfig.mode}${state.wakeConfig.sleepUntil ? `（${Math.max(0, Math.ceil((state.wakeConfig.sleepUntil - now()) / 60_000))} 分钟后到期）` : ''}`,
       `触发器：${JSON.stringify(state.wakeConfig.triggers)}`,
@@ -1279,5 +1267,5 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, setGroupPlayAlong, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
 }

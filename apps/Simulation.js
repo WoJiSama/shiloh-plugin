@@ -28,12 +28,8 @@ export class SimulationCommandPlugin extends plugin {
       if (parsed.action === '开') await e.reply(await simulationRuntime.enableGroup(groupId), true)
       else if (parsed.action === '关') await e.reply(await simulationRuntime.disableGroup(groupId), true)
       else if (parsed.action === '模式') {
-        const mode = parsed.arg === '仅@' ? 'atOnly' : parsed.arg === '自主' ? 'auto' : 'query'
+        const mode = parsed.arg === '仅@' ? 'atOnly' : parsed.arg === '自主' ? 'auto' : parsed.arg === '活跃' ? 'active' : 'query'
         await e.reply(await simulationRuntime.setGroupReplyMode(groupId, mode), true)
-      }
-      else if (parsed.action === '陪玩') {
-        const mode = /^(开|开启|on)$/i.test(parsed.arg || '') ? 'on' : /^(关|关闭|off)$/i.test(parsed.arg || '') ? 'off' : 'query'
-        await e.reply(await simulationRuntime.setGroupPlayAlong(groupId, mode), true)
       }
       else if (parsed.action === '状态') await e.reply(await simulationRuntime.groupStatus(groupId), true)
       else if (parsed.action === '记忆') await e.reply(await simulationRuntime.listMemories(groupId), true)
