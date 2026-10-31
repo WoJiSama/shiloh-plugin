@@ -572,7 +572,11 @@ export class DiceManager {
 
   isLogActive(groupId:unknown, config = this.getConfig()) {
     if (!groupId || !config.enabled || config.logAiSilent === false) return false
-    return this.isLogRecording(groupId, config)
+    // 按群覆盖（.骰娘 跑团AI 开）：logAiSilent===false 时跑团记录期间 AI 不静音
+    const state = this.readState(config)
+    const group = state.groups?.[String(groupId)]
+    if (group?.logAiSilent === false) return false
+    return Boolean(group?.log?.active)
   }
 
   isLogRecording(groupId:unknown, config = this.getConfig()) {
@@ -815,13 +819,35 @@ export class DiceManager {
     const groupId = String(e.group_id)
     state.groups[groupId] ||= {}
     const text = String(raw || "").trim().toLowerCase()
-    if (text && !this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改骰娘开关。"
-    // 开/关 短词与路由规则同口径：状态提示里推荐的就是 .骰娘 开 / .骰娘 关
-    if (/^(on|开|开启)$/.test(text)) state.groups[groupId].enabled = true
-    else if (/^(off|关|关闭)$/.test(text)) state.groups[groupId].enabled = false
+    // 状态/空 = 查询（人人可用）；只有改开关才验权
+    const action = /^(on|开|开启)$/.test(text) ? "on" : /^(off|关|关闭)$/.test(text) ? "off" : ""
+    if (action && !this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改骰娘开关。"
+    if (action === "on") state.groups[groupId].enabled = true
+    else if (action === "off") state.groups[groupId].enabled = false
     else return `本群骰娘状态：${state.groups[groupId].enabled === false ? "关闭" : "开启"}（修改需主人或群管理：.骰娘 开 / .骰娘 关）`
     await this.writeState(state, config)
     return `本群骰娘已${state.groups[groupId].enabled === false ? "关闭，骰点命令将不再响应" : "开启"}。`
+  }
+
+  /** .骰娘 跑团AI 开/关/状态：骰娘 log 记录期间 AI 是否静音（开=继续活动，关=静音即默认） */
+  async handleLogAiControl(e:DiceEvent, raw = "") {
+    if (!e?.group_id) return "跑团AI开关按群生效，请在群里使用：.骰娘 跑团AI 开 / .骰娘 跑团AI 关"
+    const config = this.getConfig()
+    const state = this.readState(config)
+    const groupId = String(e.group_id)
+    state.groups[groupId] ||= {}
+    const text = String(raw || "").replace(/^\s*跑团AI\s*/i, "").trim().toLowerCase()
+    // 状态/空 = 查询（人人可用）；只有改开关才验权
+    const action = /^(on|开|开启)$/.test(text) ? "on" : /^(off|关|关闭)$/.test(text) ? "off" : ""
+    if (action && !this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改跑团AI开关。"
+    // 命令方向：开 = 跑团期间 AI 继续活动（存 logAiSilent=false）；关 = 恢复静音（默认）
+    if (action === "on") state.groups[groupId].logAiSilent = false
+    else if (action === "off") state.groups[groupId].logAiSilent = true
+    else return `本群跑团AI：${state.groups[groupId].logAiSilent === false ? "继续活动（骰娘 log 期间 AI 不静音）" : "静音（骰娘 log 期间 AI 暂停，默认）"}（修改需主人或群管理：.骰娘 跑团AI 开 / 关）`
+    await this.writeState(state, config)
+    return state.groups[groupId].logAiSilent === false
+      ? "本群跑团AI已设为继续活动：骰娘 log 期间 AI 照常看消息、照常说话。"
+      : "本群跑团AI已恢复静音：骰娘 log 期间 AI 暂停活动（默认）。"
   }
 
   handleSendToMaster(e:DiceEvent, raw = "") {
@@ -2877,6 +2903,7 @@ ${rows}
       ".sn on/off - 开/关自动群名片同步：把角色卡名/骰娘昵称同步为自己的QQ群名片",
       ".reply on/off - 管理员开启或关闭当前群骰娘回复",
       ".骰娘 开/关/状态（.bot on/off 同义）- 管理员按群开关骰娘功能，关闭后本群骰命令静默放行",
+      ".骰娘 跑团AI 开/关/状态 - 跑团记录(.log)期间 AI 是否静音；开=AI 继续活动（当玩家围观跑团用）",
       ".jrrp - 今日人品；.db [STR SIZ] - 伤害加值",
       ".ti / .li - 临时疯狂 / 总结疯狂",
       ".setcoc [规则] - 查看或设置当前群规则",

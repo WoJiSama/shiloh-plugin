@@ -180,8 +180,7 @@ test("reply off silences commands while reply on remains reachable", async () =>
   }
 })
 
-test("per-group switch disables dice silently and stays reachable to re-enable", async () => {
-  const runtime = createRuntime()
+test("per-group switch disables dice silently and stays reachable to re-enable", async () => {  const runtime = createRuntime()
   try {
     const admin = event("admin")
     const member = event("member")
@@ -210,6 +209,37 @@ test("per-group switch disables dice silently and stays reachable to re-enable",
     assert.equal(runtime.manager.isGroupEnabled(member), true)
     // 私聊不受群开关约束
     assert.equal(runtime.manager.isGroupEnabled({ user_id: "20002" }), true)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
+test("跑团AI开关：log 期间默认 AI 静音，按群开后继续活动，路由与群开关互不影响", async () => {
+  const runtime = createRuntime()
+  try {
+    const admin = event("admin")
+    const member = event("member")
+    // 开团记录：默认 log 期间 AI 静音（isLogActive=true → strictConversation 跳过 AI）
+    await runtime.manager.startLog(admin, "测试团")
+    assert.equal(runtime.manager.isLogRecording("10001"), true)
+    assert.equal(runtime.manager.isLogActive("10001"), true)
+
+    // .骰娘 跑团AI 开：isLogActive=false → AI 在 log 期间继续活动
+    assert.match(await runtime.manager.handleLogAiControl(admin, "跑团AI 开"), /继续活动/)
+    assert.equal(runtime.manager.isLogActive("10001"), false)
+    assert.equal(runtime.manager.isLogRecording("10001"), true, "团录本身不受影响")
+    // 状态查询对所有人开放；普通成员改不动
+    assert.match(await runtime.manager.handleLogAiControl(member, "跑团AI 状态"), /继续活动/)
+    assert.match(await runtime.manager.handleLogAiControl(member, "跑团AI 关"), /只有主人、群主或管理员可以修改跑团AI开关/)
+
+    // .骰娘 跑团AI 关：恢复默认静音
+    assert.match(await runtime.manager.handleLogAiControl(admin, "跑团AI 关"), /恢复静音/)
+    assert.equal(runtime.manager.isLogActive("10001"), true)
+
+    // 命令豁免：骰娘群开关关掉时跑团AI命令仍可路由执行
+    await runtime.manager.handleGroupControl(admin, "off")
+    assert.equal(getDiceCommandGate({ manager: runtime.manager, e: admin, commandName: "logAiControl" }).allowed, true)
+    await runtime.manager.handleGroupControl(admin, "on")
   } finally {
     runtime.cleanup()
   }

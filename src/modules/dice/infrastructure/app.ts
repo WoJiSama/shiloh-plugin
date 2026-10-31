@@ -464,6 +464,12 @@ class DicePlugin extends plugin {
     return true
   }
 
+  // .骰娘 跑团AI 开/关/状态：骰娘 log 记录期间 AI 是否静音（开=继续活动）
+  async logAiControl(e:AppEvent) {
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleLogAiControl(e, this.strip(e, "骰娘|dice"))))
+    return true
+  }
+
   async sendToMaster(e:AppEvent) {
     await this.reply(e, diceManager.handleSendToMaster(e, this.strip(e, "send")))
     return true

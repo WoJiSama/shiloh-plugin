@@ -135,6 +135,15 @@ test(".骰娘 开/关/状态 路由到按群开关", () => {
   assert.equal(route(".骰娘 开心"), null, "开心等日常词不误吞")
 })
 
+test(".骰娘 跑团AI 开/关/状态 路由到跑团AI开关", () => {
+  assert.equal(route(".骰娘 跑团AI 开"), "logAiControl")
+  assert.equal(route(".骰娘跑团ai关"), "logAiControl", "大小写不敏感")
+  assert.equal(route(".骰娘 跑团AI 状态"), "logAiControl")
+  assert.equal(route(".dice 跑团AI off"), "logAiControl")
+  assert.equal(route(".骰娘 跑团AI 开启"), "logAiControl")
+  assert.equal(route(".骰娘 跑团"), null, "裸「跑团」不误吞")
+})
+
 test(".dice import 文档与示例文件在仓库内真实存在", async () => {
   const { resolveDiceDocPath } = await import("../domains/dice/diceCommandPolicy.js")
   const { existsSync } = await import("node:fs")
