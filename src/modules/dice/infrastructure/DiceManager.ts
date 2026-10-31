@@ -559,6 +559,13 @@ export class DiceManager {
     return currentState.groups?.[String(e.group_id)]?.replyEnabled !== false
   }
 
+  /** 按群骰娘开关：groups[gid].enabled（缺省=开启）。私聊不受群开关约束。 */
+  isGroupEnabled(e:DiceEvent, config = this.getConfig(), state:DiceState|null = null) {
+    if (!e?.group_id) return true
+    const currentState = state || this.readState(config)
+    return currentState.groups?.[String(e.group_id)]?.enabled !== false
+  }
+
   getTodayKey(date = new Date(), config = this.getConfig()) {
     return todayKey(date, config.timeZone || DEFAULT_CONFIG.timeZone)
   }
@@ -798,6 +805,22 @@ export class DiceManager {
     else return `reply 状态：${state.groups[groupId].replyEnabled === false ? "关闭" : "开启"}`
     await this.writeState(state, config)
     return `reply 已${state.groups[groupId].replyEnabled === false ? "关闭" : "开启"}。`
+  }
+
+  /** .骰娘 开/关/状态：按群开关（查询人人可用，修改需主人/群主/管理员） */
+  async handleGroupControl(e:DiceEvent, raw = "") {
+    if (!e?.group_id) return "骰娘开关按群生效，请在群里使用：.骰娘 开 / .骰娘 关 / .骰娘 状态"
+    const config = this.getConfig()
+    const state = this.readState(config)
+    const groupId = String(e.group_id)
+    state.groups[groupId] ||= {}
+    const text = String(raw || "").trim().toLowerCase()
+    if (text && !this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改骰娘开关。"
+    if (/^(on|开启)$/.test(text)) state.groups[groupId].enabled = true
+    else if (/^(off|关闭)$/.test(text)) state.groups[groupId].enabled = false
+    else return `本群骰娘状态：${state.groups[groupId].enabled === false ? "关闭" : "开启"}（修改需主人或群管理：.骰娘 开 / .骰娘 关）`
+    await this.writeState(state, config)
+    return `本群骰娘已${state.groups[groupId].enabled === false ? "关闭，骰点命令将不再响应" : "开启"}。`
   }
 
   handleSendToMaster(e:DiceEvent, raw = "") {
@@ -2852,6 +2875,7 @@ ${rows}
       ".nn 昵称 - 设置骰娘显示名并同步QQ群名片（需 .sn on 开启同步）",
       ".sn on/off - 开/关自动群名片同步：把角色卡名/骰娘昵称同步为自己的QQ群名片",
       ".reply on/off - 管理员开启或关闭当前群骰娘回复",
+      ".骰娘 开/关/状态 - 管理员按群开关骰娘功能（关闭后本群骰命令静默放行）",
       ".jrrp - 今日人品；.db [STR SIZ] - 伤害加值",
       ".ti / .li - 临时疯狂 / 总结疯狂",
       ".setcoc [规则] - 查看或设置当前群规则",

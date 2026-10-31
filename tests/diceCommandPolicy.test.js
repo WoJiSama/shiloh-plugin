@@ -123,6 +123,18 @@ test(".dice 一级菜单与 .dice import 二级教程路由", () => {
   assert.equal(route(".diceimport"), null, "紧贴前缀不误吞")
 })
 
+test(".骰娘 开/关/状态 路由到按群开关", () => {
+  assert.equal(route(".骰娘 开"), "groupControl")
+  assert.equal(route(".骰娘关"), "groupControl")
+  assert.equal(route(".骰娘 关闭"), "groupControl")
+  assert.equal(route(".骰娘状态"), "groupControl")
+  assert.equal(route(".dice on"), "groupControl")
+  assert.equal(route(".dice off"), "groupControl")
+  assert.equal(route(".dice status"), "groupControl")
+  assert.equal(route(".骰娘 帮助"), "showHelp", "帮助不进开关")
+  assert.equal(route(".骰娘 开心"), null, "开心等日常词不误吞")
+})
+
 test(".dice import 文档与示例文件在仓库内真实存在", async () => {
   const { resolveDiceDocPath } = await import("../domains/dice/diceCommandPolicy.js")
   const { existsSync } = await import("node:fs")

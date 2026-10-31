@@ -16,7 +16,7 @@ type PluginBase=new(options:{name:string;dsc:string;event:string;priority:number
 export function createDicePlugin(plugin:PluginBase,ports:{diceManager:DiceManager;deckManager:DeckManager;sendSmartReply:ReplySender;pluginRoot:string;logger:DiceLogger;fallbackBot?:DiceBot;ruleManager?:DiceRulePackManager}){
 const {diceManager,deckManager,sendSmartReply,pluginRoot}=ports
 const diceRulePackManager=ports.ruleManager ?? new DiceRulePackManager({diceManager,logger:ports.logger})
-const gateManager={getConfig:()=>diceManager.getConfig(),isObserver:(e:DiceEvent={})=>diceManager.isObserver(e),isReplyEnabled:(e:DiceEvent={})=>diceManager.isReplyEnabled(e)}
+const gateManager={getConfig:()=>diceManager.getConfig(),isObserver:(e:DiceEvent={})=>diceManager.isObserver(e),isReplyEnabled:(e:DiceEvent={})=>diceManager.isReplyEnabled(e),isGroupEnabled:(e:DiceEvent={})=>diceManager.isGroupEnabled?.(e) ?? true}
 function parseRuleReference(value = "") {
   const match = String(value || "").trim().match(/^([a-z][a-z0-9-]{2,47})(?:@(\d+))?$/)
   if (!match) return null
@@ -454,6 +454,12 @@ class DicePlugin extends plugin {
 
   async replyControl(e:AppEvent) {
     await this.reply(e, await this.runStateCommand(e, () => diceManager.handleReplyControl(e, this.strip(e, "reply"))))
+    return true
+  }
+
+  // .骰娘 开/关/状态：按群骰娘开关——关掉的群骰命令静默放行（不执行也不占用消息）
+  async groupControl(e:AppEvent) {
+    await this.reply(e, await this.runStateCommand(e, () => diceManager.handleGroupControl(e, this.strip(e, "骰娘|dice"))))
     return true
   }
 

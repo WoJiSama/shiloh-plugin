@@ -1,7 +1,7 @@
 import type {DiceEvent} from "../../../contracts/dice.js"
 export type GateEvent=DiceEvent
 export interface GateConfig {enabled?:boolean;customRulesEnabled?:boolean}
-export interface GateInput {manager?:{getConfig?():GateConfig;isObserver?(e:GateEvent|undefined):boolean;isReplyEnabled?(e:GateEvent|undefined,config:GateConfig):boolean}|undefined;e?:GateEvent|undefined;commandName?:string|undefined;fallbackBotId?:unknown;ruleManager?:{findInvocation?(groupId:string|number,text:string|undefined):unknown;matchesSealExtCommand?(groupId:string|number,text:string|undefined):boolean}}
+export interface GateInput {manager?:{getConfig?():GateConfig;isObserver?(e:GateEvent|undefined):boolean;isReplyEnabled?(e:GateEvent|undefined,config:GateConfig):boolean;isGroupEnabled?(e:GateEvent|undefined):boolean}|undefined;e?:GateEvent|undefined;commandName?:string|undefined;fallbackBotId?:unknown;ruleManager?:{findInvocation?(groupId:string|number,text:string|undefined):unknown;matchesSealExtCommand?(groupId:string|number,text:string|undefined):boolean}}
 import { getMentionTargetId } from "../../conversation/domain/mentionTargets.js"
 
 function isGroupManagerRole(role = "") {
@@ -54,6 +54,8 @@ export function sanitizeDiceCommandError(error:unknown) {
 
 // 旁观者仍可用的自身管理命令（.obon/.oboff/.ob list）
 const OBSERVER_SELF_COMMANDS = new Set(["observer"])
+// 按群开关自身永远可用（.骰娘 开/关/状态）：关掉的群里管理员还能把它开回来
+const GROUP_SELF_COMMANDS = new Set(["groupControl"])
 
 export function getDiceCommandGate({ manager, e, commandName = "", fallbackBotId }: GateInput = {}) {
   if (startsWithMentionOfOtherMember(e, fallbackBotId)) {
@@ -62,6 +64,10 @@ export function getDiceCommandGate({ manager, e, commandName = "", fallbackBotId
   const config = manager?.getConfig?.() || {}
   if (config.enabled === false) {
     return { allowed: false, consume: true, response: "骰娘模块现在没开。" }
+  }
+  // 本群关闭：不执行、不回复、不占用消息——多骰娘群里不抢话，消息照常落给其他链路
+  if (!GROUP_SELF_COMMANDS.has(commandName) && manager?.isGroupEnabled?.(e) === false) {
+    return { allowed: false, consume: false, response: "" }
   }
   // 旁观模式下静默吞掉其他骰点命令（sealdice .obon 语义）
   if (!OBSERVER_SELF_COMMANDS.has(commandName) && manager?.isObserver?.(e) === true) {
@@ -85,6 +91,10 @@ export function getCustomDiceCommandGate({ manager, ruleManager, e, fallbackBotI
   const config = manager?.getConfig?.() || {}
   if (config.enabled === false) {
     return { matched: true, allowed: false, consume: true, response: "骰娘模块现在没开。" }
+  }
+  // 本群关闭：自定义规则命令同样静默放行（与内置命令一个口径）
+  if (manager?.isGroupEnabled?.(e) === false) {
+    return { matched: true, allowed: false, consume: false, response: "" }
   }
   if (config.customRulesEnabled === false) {
     return { matched: true, allowed: false, consume: true, response: "自定义骰娘规则包当前没有启用。" }

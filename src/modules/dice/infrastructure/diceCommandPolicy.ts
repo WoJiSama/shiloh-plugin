@@ -34,6 +34,8 @@ export const DICE_COMMAND_RULES = Object.freeze([
   { reg: `^${DICE_COMMAND_PREFIX_PATTERN}dice\\s+(?:import|导入|教程)(?:\\s+(\\S+))?\\s*$`, fnc: "diceImportHub" },
   { reg: exactRule("骰娘|dice"), fnc: "showHelp" },
   { reg: `^${DICE_COMMAND_PREFIX_PATTERN}(?:骰娘|dice)\\s*(?:帮助|help)\\s*$`, fnc: "showHelp" },
+  // 按群骰娘开关：查询人人可用，修改需主人/群管理（handler 内再验权）
+  { reg: `^${DICE_COMMAND_PREFIX_PATTERN}(?:骰娘|dice)\\s*(?:开启?|关闭?|状态|on|off|status)\\s*$`, fnc: "groupControl" },
   { reg: argumentRule("骰规则|dice\\s*rule", { allowCompactLatin: true }), fnc: "manageDiceRules" },
   { reg: argumentRule("help|帮助", { allowCompactLatin: true }), fnc: "help" },
   { reg: knownCompactLatinRule("bot|dismiss|bye", ["on", "off", "bye", "dismiss"]), fnc: "botControl" },

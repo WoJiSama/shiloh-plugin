@@ -180,6 +180,38 @@ test("reply off silences commands while reply on remains reachable", async () =>
   }
 })
 
+test("per-group switch disables dice silently and stays reachable to re-enable", async () => {
+  const runtime = createRuntime()
+  try {
+    const admin = event("admin")
+    const member = event("member")
+    assert.match(await runtime.manager.handleGroupControl(admin, ""), /骰娘状态：开启/)
+    assert.match(await runtime.manager.handleGroupControl(member, "off"), /只有主人、群主或管理员可以修改骰娘开关/)
+    assert.equal(runtime.manager.isGroupEnabled(member), true)
+
+    assert.match(await runtime.manager.handleGroupControl(admin, "off"), /已关闭，骰点命令将不再响应/)
+    assert.equal(runtime.manager.isGroupEnabled(member), false)
+    // 关闭后：内置/自定义骰命令静默放行（不执行、不回复、不占用消息）
+    assert.deepEqual(
+      getDiceCommandGate({ manager: runtime.manager, e: member, commandName: "roll" }),
+      { allowed: false, consume: false, response: "" }
+    )
+    const ruleManager = { findInvocation: () => ({ pack: "p" }), matchesSealExtCommand: () => false }
+    assert.equal(getCustomDiceCommandGate({ manager: runtime.manager, ruleManager, e: { group_id: "10001", msg: ".p cmd" } }).consume, false)
+    // 开关命令本身豁免，管理员仍能把它开回来；查询对所有人开放
+    assert.equal(getDiceCommandGate({ manager: runtime.manager, e: admin, commandName: "groupControl" }).allowed, true)
+    assert.match(await runtime.manager.handleGroupControl(member, ""), /骰娘状态：关闭/)
+
+    assert.match(await runtime.manager.handleGroupControl(admin, "on"), /已开启/)
+    assert.equal(getDiceCommandGate({ manager: runtime.manager, e: member, commandName: "roll" }).allowed, true)
+    assert.equal(runtime.manager.isGroupEnabled(member), true)
+    // 私聊不受群开关约束
+    assert.equal(runtime.manager.isGroupEnabled({ user_id: "20002" }), true)
+  } finally {
+    runtime.cleanup()
+  }
+})
+
 test("ordinary members cannot mutate group-wide dice state", async () => {
   const runtime = createRuntime()
   try {

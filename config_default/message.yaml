@@ -307,6 +307,7 @@ pluginSettings:
     recallDays: 7
     proactiveEnabled: true
   diceSystem:
+    # 总开关（全局）。按群开关在群里用 .骰娘 开/关/状态 管理（群管理/主人），存 data/dice/state.json
     enabled: true
     customRulesEnabled: true
     # JS 规则包：主人可引用 .js 文件用 .dice rule <名称> 导入，JS 导出的规则对象与 YAML 同 schema，
