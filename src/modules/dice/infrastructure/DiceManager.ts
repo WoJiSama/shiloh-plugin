@@ -816,8 +816,9 @@ export class DiceManager {
     state.groups[groupId] ||= {}
     const text = String(raw || "").trim().toLowerCase()
     if (text && !this.canManageGroupDice(e)) return "只有主人、群主或管理员可以修改骰娘开关。"
-    if (/^(on|开启)$/.test(text)) state.groups[groupId].enabled = true
-    else if (/^(off|关闭)$/.test(text)) state.groups[groupId].enabled = false
+    // 开/关 短词与路由规则同口径：状态提示里推荐的就是 .骰娘 开 / .骰娘 关
+    if (/^(on|开|开启)$/.test(text)) state.groups[groupId].enabled = true
+    else if (/^(off|关|关闭)$/.test(text)) state.groups[groupId].enabled = false
     else return `本群骰娘状态：${state.groups[groupId].enabled === false ? "关闭" : "开启"}（修改需主人或群管理：.骰娘 开 / .骰娘 关）`
     await this.writeState(state, config)
     return `本群骰娘已${state.groups[groupId].enabled === false ? "关闭，骰点命令将不再响应" : "开启"}。`

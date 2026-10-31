@@ -191,6 +191,9 @@ test("per-group switch disables dice silently and stays reachable to re-enable",
 
     assert.match(await runtime.manager.handleGroupControl(admin, "off"), /已关闭，骰点命令将不再响应/)
     assert.equal(runtime.manager.isGroupEnabled(member), false)
+    // 短词 开/关 与路由同口径（状态提示推荐的就是短词形态）
+    assert.match(await runtime.manager.handleGroupControl(admin, "开"), /已开启/)
+    assert.match(await runtime.manager.handleGroupControl(admin, "关"), /已关闭，骰点命令将不再响应/)
     // 关闭后：内置/自定义骰命令静默放行（不执行、不回复、不占用消息）
     assert.deepEqual(
       getDiceCommandGate({ manager: runtime.manager, e: member, commandName: "roll" }),
