@@ -6,6 +6,9 @@
 const SILENT_TERMS = [
   '无需发送', '不用发送', '不用发', '不发了', '不再发言', '本轮不发言', '无话可说',
   '保持沉默', '结束回合', '回合结束', '本回合结束', '旁听结束', '旁听', '沉默', 'SILENT', '已读',
+  // 实拍补充（295708427 群）：模型自创的变体——静默/结束/「不是对我说的」
+  '静默', '静默结束', '已静默结束', '已沉默', '沉默结束', '已沉默结束', '结束',
+  '不是对我说的', '与我无关',
 ]
 
 export function isSilentDeclaration(text: string): boolean {
@@ -21,4 +24,13 @@ export function isSilentDeclaration(text: string): boolean {
     }
   }
   return reachable[stripped.length] === true
+}
+
+/** 兜底直发前的最后防线：文本只要沾到元话语词汇（子串级）就按沉默处理。
+ *  提醒过一次后还输出含元词的纯文本，几乎必然是又一次沉默声明而非想发的内容——
+ *  漏发可以下轮补，误发进群里收不回。 */
+const SILENT_HINT_RE = /旁听|沉默|静默|无需发送|不用发送|不用发|不发了|不再发言|本轮不发言|结束回合|回合结束|本回合结束|不是对我说的|与我无关|已读|SILENT/i
+
+export function mentionsSilenceVocabulary(text: string): boolean {
+  return SILENT_HINT_RE.test(String(text || ''))
 }

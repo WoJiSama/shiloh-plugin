@@ -214,3 +214,17 @@ test('仅@模式与活跃档状态并存时，主动跟进唤醒被压掉', asyn
     r.runtime.stop()
   }
 })
+
+test('提醒后输出自创沉默变体：不直发进群（295708427 实拍回归）', async () => {
+  // 第一响应是真内容（触发提醒），第二响应含元词但不是完整沉默声明——由直发前子串防线拦下
+  const r = buildRuntime({ responses: ['这车怎么还没开', '这轮我就先旁听吧'] })
+  try {
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', message: [], sender: { nickname: '群友' } })
+    assert.ok(await waitFor(() => r.modelCalls.length >= 2), '提醒后应有第二次调用')
+    await sleep(300)
+    assert.equal(r.modelCalls.length, 2)
+    assert.equal(r.sent.length, 0, '含元话术的文本绝不兜底直发')
+  } finally {
+    r.runtime.stop()
+  }
+})
