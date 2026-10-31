@@ -6,8 +6,12 @@ const SELF_ID = '3094088525'
 const GROUP = '10086'
 const SESSION_KEY = `shiloh:sim:g:${GROUP}`
 
-function buildRuntime() {
+function buildRuntime({ atOnly = [], randomValue = 0.99 } = {}) {
   const kv = new Map()
+  // 预置 overrides（atOnly 用）；留空则运行时按 groups 种子
+  if (atOnly.length) {
+    kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {}, atOnly }))
+  }
   const runtime = createSimulationRuntime({
     redis: {
       async get(key) { return kv.has(key) ? kv.get(key) : null },
@@ -22,13 +26,17 @@ function buildRuntime() {
     sendGroupMessage: async () => ({ ok: true }),
     getPersona: () => ({ persona: {}, systemContent: '' }),
     now: () => 1770000000000,
-    random: () => 0.99,
+    random: () => randomValue,
   })
   return { runtime, kv }
 }
 
 function recent(kv) {
   return JSON.parse(kv.get(SESSION_KEY) || '{"recent":[]}').recent
+}
+
+function interlocutors(kv) {
+  return JSON.parse(kv.get(SESSION_KEY) || '{"conversation":{}}').conversation.interlocutorIds || []
 }
 
 async function seedConversation(runtime) {
@@ -80,5 +88,44 @@ test('未被点名的命令前缀消息仍不入会话流', async () => {
     assert.ok(!recent(kv).some(m => m.text === '.r10#d100' && m.atSelf), '@别人不算被机器人点名')
   } finally {
     runtime.stop()
+  }
+})
+
+test('仅@才回：非点名消息入库但不唤醒，被@照常唤醒，可切回自主', async () => {
+  // 对照组：random<概率触发阈值(0.05) 时普通消息必然唤醒（登记对话对象）
+  const control = buildRuntime({ randomValue: 0.001 })
+  try {
+    await seedConversation(control.runtime)
+    await control.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '围观聊天', message: [], sender: { nickname: '路人甲' } })
+    assert.ok(interlocutors(control.kv).includes('30000'), '自主模式下普通消息会唤醒')
+  } finally {
+    control.runtime.stop()
+  }
+
+  // 仅@群：同样随机命中概率触发，普通消息唤醒被管理员设定压掉，消息照常入库
+  const atOnly = buildRuntime({ atOnly: [GROUP], randomValue: 0.001 })
+  try {
+    await seedConversation(atOnly.runtime)
+    await atOnly.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '围观聊天', message: [], sender: { nickname: '路人甲' } })
+    assert.ok(recent(atOnly.kv).some(m => m.text === '围观聊天'), '仅@模式消息照常入库（AI 醒来后可读）')
+    assert.ok(!interlocutors(atOnly.kv).includes('30000'), '仅@模式普通消息不唤醒、不算对话对象')
+
+    await atOnly.runtime.ingest({
+      group_id: GROUP, message_type: 'group', user_id: '40000',
+      msg: '在吗', atBot: true,
+      message: [{ type: 'at', data: { qq: SELF_ID } }, { type: 'text', data: { text: ' 在吗' } }],
+      sender: { nickname: '点名的人' },
+    })
+    assert.ok(interlocutors(atOnly.kv).includes('40000'), '被@照常唤醒')
+
+    // 模式切换与查询
+    assert.match(await atOnly.runtime.setGroupReplyMode(GROUP, 'query'), /仅被@才回/)
+    assert.match(await atOnly.runtime.setGroupReplyMode(GROUP, 'atOnly'), /已是/)
+    assert.match(await atOnly.runtime.setGroupReplyMode(GROUP, 'auto'), /已恢复「自主模式」/)
+    await atOnly.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '50000', msg: '又来围观', message: [], sender: { nickname: '路人乙' } })
+    assert.ok(interlocutors(atOnly.kv).includes('50000'), '切回自主后普通消息恢复唤醒')
+    assert.match(await atOnly.runtime.setGroupReplyMode(GROUP, 'query'), /自主/)
+  } finally {
+    atOnly.runtime.stop()
   }
 })

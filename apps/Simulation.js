@@ -27,6 +27,7 @@ export class SimulationCommandPlugin extends plugin {
     try {
       if (parsed.action === '开') await e.reply(await simulationRuntime.enableGroup(groupId), true)
       else if (parsed.action === '关') await e.reply(await simulationRuntime.disableGroup(groupId), true)
+      else if (parsed.action === '模式') await e.reply(await simulationRuntime.setGroupReplyMode(groupId, parsed.mode || 'query'), true)
       else if (parsed.action === '状态') await e.reply(await simulationRuntime.groupStatus(groupId), true)
       else if (parsed.action === '记忆') await e.reply(await simulationRuntime.listMemories(groupId), true)
       else if (parsed.action === '重置') await e.reply(await simulationRuntime.resetGroup(groupId), true)

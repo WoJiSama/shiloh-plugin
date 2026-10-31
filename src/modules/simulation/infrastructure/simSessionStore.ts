@@ -28,8 +28,8 @@ const BUSY_KEY = (groupId: string) => `shiloh:sim:busy:${groupId}`
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 export const SIM_TURN_BUSY_LEASE_MS = 15 * 60_000
 
-/** 群级覆盖（.仿真 开/关 与控制台预算编辑都写这里）：budgetCaps 键=群号 值=每日金额上限；budgetDefaultCny 为空表示用 yaml 默认 */
-export interface SimGroupOverrides { explicitEnabled: string[]; disabled: string[]; budgetCaps: Record<string, number>; turnCaps: Record<string, number>; budgetDefaultCny?: number }
+/** 群级覆盖（.仿真 开/关 与控制台预算编辑都写这里）：budgetCaps 键=群号 值=每日金额上限；budgetDefaultCny 为空表示用 yaml 默认；atOnly=「仅被@才回」群清单（管理员设定，优先于 AI 自设触发器） */
+export interface SimGroupOverrides { explicitEnabled: string[]; disabled: string[]; budgetCaps: Record<string, number>; turnCaps: Record<string, number>; atOnly?: string[]; budgetDefaultCny?: number }
 
 export interface SimSessionStore {
   load(groupId: string): Promise<SimSessionState>
@@ -106,7 +106,7 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
         const budgetCaps = normalizeCaps(parsed.budgetCaps)
         const turnCaps = normalizeCaps(parsed.turnCaps)
         const rawDefault = Number(parsed.budgetDefaultCny)
-        return { explicitEnabled: parseStringList(parsed.explicitEnabled), disabled: parseStringList(parsed.disabled), budgetCaps, turnCaps, ...(Number.isFinite(rawDefault) && rawDefault > 0 ? { budgetDefaultCny: Math.min(10_000, rawDefault) } : {}) }
+        return { explicitEnabled: parseStringList(parsed.explicitEnabled), disabled: parseStringList(parsed.disabled), budgetCaps, turnCaps, atOnly: parseStringList(parsed.atOnly), ...(Number.isFinite(rawDefault) && rawDefault > 0 ? { budgetDefaultCny: Math.min(10_000, rawDefault) } : {}) }
       } catch {
         return { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }
       }
@@ -117,6 +117,7 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
         disabled: [...new Set(overrides.disabled)],
         budgetCaps: overrides.budgetCaps || {},
         turnCaps: overrides.turnCaps || {},
+        atOnly: overrides.atOnly || [],
         ...(overrides.budgetDefaultCny !== undefined ? { budgetDefaultCny: overrides.budgetDefaultCny } : {}),
       }))
     },

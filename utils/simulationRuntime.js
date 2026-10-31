@@ -391,6 +391,7 @@ export const SIMULATION_COMMAND_HELP = [
   '【仿真模式命令】（群管理/主人）',
   '.仿真 开 —— 本群切换为仿真模式（AI 自主收发消息）',
   '.仿真 关 —— 本群切回普通模式',
+  '.仿真 模式 仅@ / 自主 —— 回复模式：仅被@才回（仍看全部消息）或观察全部消息自主插话',
   '.仿真 状态 —— 查看唤醒配置/水位/预算',
   '.仿真 记忆 —— 查看 AI 的长期记忆（待跟进/记事/印象）',
   '.仿真 重置 —— 清空本群仿真会话（历史/水位/预算；记忆与好感度保留）',
@@ -398,9 +399,9 @@ export const SIMULATION_COMMAND_HELP = [
 ].join('\n')
 
 export function parseSimulationCommand(text) {
-  const match = String(text || '').trim().match(/^\.仿真\s*(开|关|状态|重置|记忆|帮助)?/)
+  const match = String(text || '').trim().match(/^\.仿真\s*(开|关|状态|重置|记忆|帮助|模式)?(?:\s+(仅@|自主))?/)
   if (!match) return null
-  return { action: match[1] || '帮助' }
+  return { action: match[1] || '帮助', mode: match[2] }
 }
 
 export function isSimulationManager(e) {

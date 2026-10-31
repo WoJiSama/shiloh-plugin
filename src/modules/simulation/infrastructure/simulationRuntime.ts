@@ -20,6 +20,9 @@ import { createSimTools, simToolsAsFunctions, type SimSendResult, type SimWaitRe
 export const SIM_RECENT_LIMIT = 60
 export const SIM_SWEEP_INTERVAL_MS = 30_000
 
+/** 仅@才回模式下仍放行的唤醒：点名（@/引用）、一次性开场、被点名后的定时延伸（等待超时/回合补发）、管理指令。主动冒泡(proactiveCheck)不放行。 */
+const AT_ONLY_WAKE_KINDS = new Set<SimWakeReason['kind']>(['atMention', 'bootstrap', 'timeout', 'replyCheck', 'admin'])
+
 export interface SimulationRuntimePorts {
   redis: Parameters<typeof createSimSessionStore>[0]['redis']
   logger: { info(message: string): void; warn(message: string): void; error(message: string, error?: unknown): void }
@@ -79,6 +82,8 @@ export interface SimulationRuntime {
   sweepOnce(): Promise<void>
   enableGroup(groupId: string): Promise<string>
   disableGroup(groupId: string): Promise<string>
+  /** 按群回复模式：atOnly=仅被@才回（消息照常入库），auto=自主；缺省=query 查询当前模式 */
+  setGroupReplyMode(groupId: string, mode?: 'atOnly' | 'auto' | 'query'): Promise<string>
   groupStatus(groupId: string): Promise<string>
   resetGroup(groupId: string): Promise<string>
   listMemories(groupId: string): Promise<string>
@@ -370,6 +375,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     } else {
       reason = evaluateWakeTrigger(message, state.wakeConfig, { selfId: self.id, selfName: self.name, random, conversation: state.conversation })
     }
+    // 管理员设定的「仅@才回」优先于一切触发器（含 AI 自设唤醒）：非点名类唤醒压掉。
+    // 消息照常入库——AI 被点名醒来后仍可读到全部内容；定时器/管理类唤醒是被点名后的延伸，不受影响。
+    if (reason && (overridesCache?.atOnly || []).includes(groupId) && !AT_ONLY_WAKE_KINDS.has(reason.kind)) reason = null
     const busy = running.has(groupId) || live !== undefined
     if (busy && reason) {
       state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, reason)
@@ -862,7 +870,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         state.nextReplyCheckAt = 0
         reasons.push({ kind: 'replyCheck' })
       }
-      if (state.lastIncomingAt > 0 && at - state.lastIncomingAt >= cfg.wake.proactiveIdleMs && at >= state.nextProactiveCheckAt) {
+      // 仅@才回的群不主动冒泡：静默期检查照常排期，但不产生 proactiveCheck 唤醒
+      const atOnly = (overridesCache?.atOnly || []).includes(groupId)
+      if (!atOnly && state.lastIncomingAt > 0 && at - state.lastIncomingAt >= cfg.wake.proactiveIdleMs && at >= state.nextProactiveCheckAt) {
         state.nextProactiveCheckAt = at + cfg.wake.proactiveCheckMinMs + Math.floor(random() * Math.max(1, cfg.wake.proactiveCheckMaxMs - cfg.wake.proactiveCheckMinMs))
         if (random() < cfg.wake.proactiveProbability) reasons.push({ kind: 'proactiveCheck' })
       }
@@ -948,13 +958,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   }
 
   /** 覆盖表结构演进时保住已有字段：启停群不能把预算覆盖弄丢 */
-  function nextOverrides(edit: { explicitEnabled?: string[]; disabled?: string[] }): SimGroupOverrides {
+  function nextOverrides(edit: { explicitEnabled?: string[]; disabled?: string[]; atOnly?: string[] }): SimGroupOverrides {
     const current = overridesCache || { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }
     return {
       explicitEnabled: edit.explicitEnabled ?? [...(current.explicitEnabled || [])],
       disabled: edit.disabled ?? [...(current.disabled || [])],
       budgetCaps: { ...(current.budgetCaps || {}) },
       turnCaps: { ...(current.turnCaps || {}) },
+      atOnly: edit.atOnly ?? [...(current.atOnly || [])],
       ...(current.budgetDefaultCny !== undefined ? { budgetDefaultCny: current.budgetDefaultCny } : {}),
     }
   }
@@ -982,6 +993,29 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `群 ${groupId} 已切回普通模式（.仿真 开 可再切回）`
   }
 
+  /** .仿真 模式 仅@/自主：管理员设定的按群回复模式（优先于 AI 自设触发器）。mode='query' 或缺省 = 查询。 */
+  async function setGroupReplyMode(groupId: string, mode: 'atOnly' | 'auto' | 'query' = 'query'): Promise<string> {
+    await refreshGroupState(true)
+    const isAtOnly = (overridesCache?.atOnly || []).includes(groupId)
+    if (mode === 'query') {
+      return isAtOnly
+        ? `本群回复模式：仅被@才回（AI 仍在看全部消息，只有被@或引用时才说话；.仿真 模式 自主 可恢复）`
+        : `本群回复模式：自主（观察全部消息，自行决定何时插话；.仿真 模式 仅@ 可改为只被@才回）`
+    }
+    const wantAtOnly = mode === 'atOnly'
+    if (wantAtOnly === isAtOnly) return `本群回复模式已是「${wantAtOnly ? '仅被@才回' : '自主'}」，无需修改`
+    const overrides = nextOverrides({ atOnly: wantAtOnly ? [...new Set([...(overridesCache?.atOnly || []), groupId])] : (overridesCache?.atOnly || []).filter(g => g !== groupId) })
+    await store.saveOverrides(overrides)
+    overridesCache = overrides
+    if (wantAtOnly) {
+      // 切到仅@时，已排期的自主类唤醒立即取消，避免切换后还突然冒一次泡
+      const pending = pendingWakes.get(groupId)
+      if (pending && !AT_ONLY_WAKE_KINDS.has(pending.reason.kind)) { clearTimeout(pending.timer); pendingWakes.delete(groupId) }
+      return `群 ${groupId} 已设为「仅被@才回」：消息照常看、照常记忆，但只有被@或引用时才说话（.仿真 模式 自主 可恢复）`
+    }
+    return `群 ${groupId} 已恢复「自主模式」：AI 观察全部消息，自行决定何时插话`
+  }
+
   async function groupStatus(groupId: string): Promise<string> {
     await refreshGroupState(true)
     const cfg = runtimeConfig()
@@ -990,6 +1024,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const state = live ?? await store.load(groupId)
     return [
       `模式：${active ? '仿真（AI 自主收发）' : '普通'}${running.has(groupId) ? '（回合进行中）' : ''}`,
+      `回复模式：${(overridesCache?.atOnly || []).includes(groupId) ? '仅被@才回（管理员设定，优先于 AI 自设触发器）' : '自主'}`,
       `范围：${cfg.enabled ? (cfg.allGroups ? '默认全群开启，可按群 .仿真 关' : '仅显式清单') : '总开关关闭'}`,
       `唤醒配置：mode=${state.wakeConfig.mode}${state.wakeConfig.sleepUntil ? `（${Math.max(0, Math.ceil((state.wakeConfig.sleepUntil - now()) / 60_000))} 分钟后到期）` : ''}`,
       `触发器：${JSON.stringify(state.wakeConfig.triggers)}`,
@@ -1206,5 +1241,5 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
 }
