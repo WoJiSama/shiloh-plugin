@@ -10,6 +10,7 @@ interface ModelRow extends StageRow { estimated: boolean }
 interface Summary {
   today: { tokens: number; cost: number; calls: number; byStage: Record<string, StageRow>; byModel: Record<string, ModelRow>; byScopeTop: { scope: string; tokens: number; cost: number }[] }
   priceTable: { currency: string; models: string[]; peakEnabled: boolean }
+  groupNames?: Record<string, string>
 }
 interface Bucket { start: number; tokens: number; cost: number; calls: number }
 
@@ -52,7 +53,15 @@ const modelColumns: DataTableColumns<[string, ModelRow]> = [
   { title: '花费(元)', key: '1.cost', render: row => row[1].cost.toFixed(4) },
 ]
 const scopeColumns: DataTableColumns<{ scope: string; tokens: number; cost: number }> = [
-  { title: '群/范围', key: 'scope', render: row => row.scope === 'global' ? '全局（未归组）' : row.scope },
+  {
+    title: '群/范围',
+    key: 'scope',
+    render: row => {
+      if (row.scope === 'global') return '全局（未归组）'
+      const name = summary.value?.groupNames?.[row.scope]
+      return name ? `${name}（${row.scope}）` : row.scope
+    },
+  },
   { title: 'tokens', key: 'tokens', render: row => row.tokens.toLocaleString() },
   { title: '花费(元)', key: 'cost', render: row => row.cost.toFixed(4) },
 ]

@@ -2037,7 +2037,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/tokens/summary" && req.method === "GET") {
       if (!tokens) return sendJson(res, 503, { error: "令牌账本未启用" })
-      return sendJson(res, 200, tokens.summary())
+      // 附带群号→群名映射：令牌页的"按群/范围"直接显示群名（identity 目录 30s 缓存）
+      const groupNames: Record<string, string> = {}
+      try {
+        for (const group of (await collectIdentityDirectory()).groups) groupNames[group.id] = group.name
+      } catch {}
+      return sendJson(res, 200, { ...record(tokens.summary()), groupNames })
     }
     if (url.pathname === "/api/tokens/series" && req.method === "GET") {
       if (!tokens) return sendJson(res, 503, { error: "令牌账本未启用" })
