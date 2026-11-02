@@ -1148,6 +1148,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       enabled: cfg.enabled,
       allGroups: cfg.allGroups,
       mode: state.wakeConfig.mode,
+      /** 管理员设定的回复模式（三档）：atOnly=仅被@才回，active=自主·活跃，auto=自主 */
+      replyMode: (overridesCache?.atOnly || []).includes(groupId) ? 'atOnly' : (overridesCache?.playAlong || []).includes(groupId) ? 'active' : 'auto',
       wakeConfig: state.wakeConfig,
       unreadCount: state.unread.length,
       recentCount: state.recent.length,

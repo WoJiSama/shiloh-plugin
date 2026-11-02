@@ -31,6 +31,7 @@ try {
     setInitialPrompt: (groupId, text) => simulationRuntime.setInitialPrompt(groupId, text),
     setGroupBudget: (groupId, cap) => simulationRuntime.setGroupBudget(groupId, cap),
     setGroupTurnsCap: (groupId, cap) => simulationRuntime.setGroupTurnsCap(groupId, cap),
+    setReplyMode: (groupId, mode) => simulationRuntime.setGroupReplyMode(groupId, mode),
     setDefaultBudget: (cny) => simulationRuntime.setDefaultBudget(cny),
   }
 } catch (error) {

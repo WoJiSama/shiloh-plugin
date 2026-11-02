@@ -94,6 +94,7 @@ export interface ConsoleExtraPorts {
     setInitialPrompt(groupId: string, text: string): Promise<unknown>
     setGroupBudget?(groupId: string, cap: number): Promise<string>
     setGroupTurnsCap?(groupId: string, cap: number): Promise<string>
+    setReplyMode?(groupId: string, mode: 'atOnly' | 'auto' | 'active'): Promise<string>
     setDefaultBudget?(cny: number): Promise<string>
   }
 }
@@ -2069,10 +2070,16 @@ const server = http.createServer(async (req, res) => {
       const groupId = String(body?.group || "")
       const action = String(body?.action || "")
       if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 必须是群号" })
-      if (!["enable", "disable", "reset", "initial-prompt", "budget", "turns"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget|turns" })
+      if (!["enable", "disable", "reset", "initial-prompt", "budget", "turns", "reply-mode"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget|turns|reply-mode" })
       if (action === "initial-prompt") {
         const text = typeof body?.text === "string" ? body.text.slice(0, 2000) : ""
         return sendJson(res, 200, { ok: true, message: await simulation.setInitialPrompt(groupId, text) })
+      }
+      if (action === "reply-mode") {
+        if (typeof simulation.setReplyMode !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持回复模式编辑" })
+        const mode = String(body?.mode || "")
+        if (!["atOnly", "auto", "active"].includes(mode)) return sendJson(res, 400, { error: "mode 必须是 atOnly|auto|active" })
+        return sendJson(res, 200, { ok: true, message: await simulation.setReplyMode!(groupId, mode as "atOnly" | "auto" | "active") })
       }
       if (action === "budget" || action === "turns") {
         if (action === "budget" && typeof simulation.setGroupBudget !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持预算编辑" })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { NAlert, NButton, NCheckbox, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSwitch, NTag, type DataTableColumns } from 'naive-ui'
+import { NAlert, NButton, NCheckbox, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSelect, NSwitch, NTag, type DataTableColumns } from 'naive-ui'
 import PageHeader from '../components/PageHeader.vue'
 import PageState from '../components/PageState.vue'
 import { api } from '../lib/api'
@@ -10,6 +10,7 @@ interface GroupRow {
   active: boolean
   running: boolean
   mode: string
+  replyMode?: 'atOnly' | 'auto' | 'active'
   unreadCount: number
   budget: { turns: number; maxTurnsPerDay: number; tokens: number; dailyCostCny: number; capOverridden?: boolean; turnsCapOverridden?: boolean; todayCostCny: number }
   lastWakeReason: string | null
@@ -66,6 +67,21 @@ async function toggle(row: GroupRow) {
     await load()
   } catch (e: any) {
     error.value = e?.message || '操作失败'
+  }
+}
+const replyModeOptions = [
+  { label: '仅@', value: 'atOnly' },
+  { label: '自主', value: 'auto' },
+  { label: '活跃', value: 'active' },
+]
+const replyModeLabels: Record<string, string> = { atOnly: '仅@', auto: '自主', active: '活跃' }
+async function setReplyMode(row: GroupRow, value: string) {
+  try {
+    await api('/api/simulation/group', { method: 'POST', body: JSON.stringify({ group: row.groupId, action: 'reply-mode', mode: value }) })
+    await load()
+  } catch (e: any) {
+    error.value = e?.message || '切换回复模式失败'
+    await load()
   }
 }
 async function resetGroup(groupId: string) {
@@ -150,6 +166,7 @@ async function saveCap() {
 const columns: DataTableColumns<GroupRow> = [
   { title: '群号', key: 'groupId', width: 130 },
   { title: '模式', key: 'active', width: 90, render: row => row.active ? (row.running ? '仿真·回合中' : '仿真') : '普通' },
+  { title: '回复模式', key: 'replyMode', width: 110, render: row => h(NSelect, { value: row.replyMode || 'auto', options: replyModeOptions, size: 'tiny', onUpdateValue: (value: string) => void setReplyMode(row, value) }) },
   { title: '未读', key: 'unreadCount', width: 70 },
   { title: '今日回合', key: 'budget', width: 110, render: row => `${row.budget.turns}/${row.budget.maxTurnsPerDay === -1 ? '∞' : row.budget.maxTurnsPerDay}${row.budget.turnsCapOverridden ? ' *' : ''}` },
   { title: '今日花费', key: 'cost', width: 130, render: row => `¥${Number(row.budget.todayCostCny || 0).toFixed(2)} / ¥${row.budget.dailyCostCny}${row.budget.capOverridden ? ' *' : ''}` },
@@ -185,7 +202,8 @@ const rows = computed(() => overview.value?.groups || [])
     <NDrawer v-model:show="drawerOpen" :width="420">
       <NDrawerContent :title="`群 ${detailId} · 仿真详情`" closable>
         <div v-if="detail" class="detail">
-          <div class="kv"><span>唤醒模式</span><b>{{ detail.mode }}</b></div>
+          <div class="kv"><span>回复模式（管理员设定）</span><b>{{ replyModeLabels[detail.replyMode || 'auto'] || '自主' }}</b></div>
+          <div class="kv"><span>AI 自设潜水模式</span><b>{{ detail.mode }}</b></div>
           <div class="kv"><span>回合历史</span><b>{{ detail.historyLength }} 条</b></div>
           <div class="block">
             <h4>本群每日消耗上限（元） <small v-if="detail.budget.capOverridden">（按群覆盖）</small><small v-else>（跟随默认）</small></h4>
