@@ -14,6 +14,38 @@ export interface DeliveryGatewayOptions { botRoot?: (() => BotRoot | null | unde
 export interface DeliveryEvent { bot?: BotClient; group_id?: string | number; user_id?: string | number; _turnId?: string; group?: { sendFile?(file: string, name: string): Promise<unknown> }; friend?: { sendFile?(file: string, name: string): Promise<unknown> } }
 export interface GroupPayload { botId: string | number; groupId: string | number; nodes?: ForwardNode[]; text?: string | undefined }
 function record(value: unknown): Record<string, unknown> { return value && typeof value === 'object' ? value as Record<string, unknown> : {} }
+export async function inlineForwardLocalFileSegment(segment: DeliverySegment = {}, { artifactStore = null, sharedMedia = null, sharedMediaFiles = null }: FileOptions = {}) {
+  const data = segment?.data && typeof segment.data === "object" ? segment.data : segment
+  const file = data?.file || ""
+  if (!file || String(file).startsWith("base64://") || /^https?:\/\//i.test(String(file))) return segment
+  if (sharedMedia?.hostDir && sharedMedia?.containerDir) {
+    const hostDir = path.resolve(String(sharedMedia.hostDir))
+    const containerDir = String(sharedMedia.containerDir).replace(/\/+$/, "")
+    const extension = path.extname(String(file)) || ".mp4"
+    const targetName = `${Date.now()}-${randomUUID()}${extension}`
+    const target = path.join(hostDir, targetName)
+    await fs.promises.mkdir(hostDir, { recursive: true })
+    await fs.promises.copyFile(String(file), target)
+    if (Array.isArray(sharedMediaFiles)) sharedMediaFiles.push(target)
+    const staged = `file://${containerDir}/${targetName}`
+    return segment?.data ? { ...segment, data: { ...segment.data, file: staged } } : { ...segment, file: staged }
+  }
+  const base64File = artifactStore?.encodeFile
+    ? await artifactStore.encodeFile(String(file))
+    : `base64://${(await fs.promises.readFile(String(file))).toString("base64")}`
+  return segment?.data
+    ? { ...segment, data: { ...segment.data, file: base64File } }
+    : { ...segment, file: base64File }
+}
+
+export async function inlineForwardVideoSegment(video: DeliverySegment = {}, options: FileOptions = {}) {
+  const output = await inlineForwardLocalFileSegment(video, options)
+  const data = video?.data || video
+  if (!data?.thumb) return output
+  const thumb = await inlineForwardLocalFileSegment({ type: "image", file: String(data.thumb) }, options)
+  return output?.data ? { ...output, data: { ...output.data, thumb: thumb.file } } : { ...output, thumb: thumb.file }
+}
+
 export function createDeliveryGatewayModule(ports: { botRoot(): BotRoot | undefined; logger?: DeliveryLogger; logDeliveryOutcome(logger: DeliveryLogger | undefined, outcome: object): void; isForwardResourceFailure(error: unknown): boolean }) {
 const { logDeliveryOutcome, isForwardResourceFailure } = ports
 const forwardQueue = new KeyedSerialQueue()
@@ -52,38 +84,6 @@ function buildOneBotForwardNodes(nodes: ForwardNode[] = []) {
       content: toOneBotContent(node.message)
     }
   }))
-}
-
-async function inlineForwardLocalFileSegment(segment: DeliverySegment = {}, { artifactStore = null, sharedMedia = null, sharedMediaFiles = null }: FileOptions = {}) {
-  const data = segment?.data && typeof segment.data === "object" ? segment.data : segment
-  const file = data?.file || ""
-  if (!file || String(file).startsWith("base64://") || /^https?:\/\//i.test(String(file))) return segment
-  if (sharedMedia?.hostDir && sharedMedia?.containerDir) {
-    const hostDir = path.resolve(String(sharedMedia.hostDir))
-    const containerDir = String(sharedMedia.containerDir).replace(/\/+$/, "")
-    const extension = path.extname(String(file)) || ".mp4"
-    const targetName = `${Date.now()}-${randomUUID()}${extension}`
-    const target = path.join(hostDir, targetName)
-    await fs.promises.mkdir(hostDir, { recursive: true })
-    await fs.promises.copyFile(String(file), target)
-    if (Array.isArray(sharedMediaFiles)) sharedMediaFiles.push(target)
-    const staged = `file://${containerDir}/${targetName}`
-    return segment?.data ? { ...segment, data: { ...segment.data, file: staged } } : { ...segment, file: staged }
-  }
-  const base64File = artifactStore?.encodeFile
-    ? await artifactStore.encodeFile(String(file))
-    : `base64://${(await fs.promises.readFile(String(file))).toString("base64")}`
-  return segment?.data
-    ? { ...segment, data: { ...segment.data, file: base64File } }
-    : { ...segment, file: base64File }
-}
-
-async function inlineForwardVideoSegment(video: DeliverySegment = {}, options: FileOptions = {}) {
-  const output = await inlineForwardLocalFileSegment(video, options)
-  const data = video?.data || video
-  if (!data?.thumb) return output
-  const thumb = await inlineForwardLocalFileSegment({ type: "image", file: String(data.thumb) }, options)
-  return output?.data ? { ...output, data: { ...output.data, thumb: thumb.file } } : { ...output, thumb: thumb.file }
 }
 
 function deliveryFailure(value: unknown) {

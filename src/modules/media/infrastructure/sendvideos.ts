@@ -8,6 +8,8 @@ export interface SendVideosPorts {
  parse(answer:string):Promise<BilibiliParseResult[]>;
  video(file:string):MediaSegment;
  download?:(url:string,file:string,options:{maxBytes:number;timeoutMs:number})=>Promise<unknown>;
+ /** 本地文件段出站前的暂存改写（共享目录/base64）——NapCat 跑在独立容器时，宿主机 /tmp 路径它读不到（实测 ENOENT 静默丢视频） */
+ stageSegment?:(segment:MediaSegment)=>Promise<MediaSegment>;
  log?:(message:string)=>void;
 }
 /** Each invocation owns its temporary directory; never remove another concurrent request's files. */
@@ -24,7 +26,9 @@ export function createSendVideos(ports:SendVideosPorts) {
     const file=path.join(directory,`video-${sent}.mp4`)
     try{
      await (ports.download||fetchDownloadToFile)(result.videoUrl,file,{maxBytes:30*1024*1024,timeoutMs:40000})
-     await event.reply(ports.video(file));sent++
+     const raw=ports.video(file)
+     const staged=ports.stageSegment?await ports.stageSegment(raw):raw
+     await event.reply(staged);sent++
     }catch(error){ports.log?.(`视频处理失败，跳过: ${mediaError(error).message}`)}
     finally{await fs.unlink(file).catch(()=>{})}
    }
