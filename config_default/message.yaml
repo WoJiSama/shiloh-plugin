@@ -97,6 +97,13 @@ pluginSettings:
         # "725902146": 30
         # "981339693": 15
     agentPresetKeywords: []      # 默认注入唤醒触发器的关键词（AI 之后可用 simSetWakeConfig 自己改）
+    # 唤醒预判闸：低信号唤醒（关键词/概率/延续/旁观类）先用便宜模型小上下文预判值不值得进完整回合。
+    # 被群友@、开场、活跃档等高价值唤醒不经过闸。预判失败自动放行（宁多花不错杀）。
+    wakeGate:
+      enabled: true              # 设 false 关闭预判闸（恢复每次唤醒都进完整回合）
+      # model: glm-5.3-flash     # 缺省用 memoryAiModel
+    # 仿真回合模型：不设则沿用 toolsAiModel（当前旗舰 glm-5.3）；设为 glm-5.3-flash 可整体降档省 token
+    # turnModel: glm-5.3
     wake:
       probability: 0.05          # 随机唤醒概率（每条消息）
       batchWindowMs: 8000        # 触发合并窗（ms）：窗口内多条触发按优先级合并为一次唤醒

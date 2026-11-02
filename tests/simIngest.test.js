@@ -6,7 +6,7 @@ const SELF_ID = '3094088525'
 const GROUP = '10086'
 const SESSION_KEY = `shiloh:sim:g:${GROUP}`
 
-function buildRuntime({ atOnly = [], playAlong = [], randomValue = 0.99, responses, now = () => 1770000000000 } = {}) {
+function buildRuntime({ atOnly = [], playAlong = [], randomValue = 0.99, responses, now = () => 1770000000000, judge, batchWindowMs } = {}) {
   const kv = new Map()
   // 预置 overrides（atOnly/playAlong 用）；留空则运行时按 groups 种子
   if (atOnly.length || playAlong.length) {
@@ -26,7 +26,7 @@ function buildRuntime({ atOnly = [], playAlong = [], randomValue = 0.99, respons
       async del(...keys) { let n = 0; for (const key of keys) if (kv.delete(key)) n += 1; return n },
     },
     logger: { info() {}, warn() {}, error() {} },
-    getSection: () => ({ enabled: true, allGroups: false, groups: [GROUP] }),
+    getSection: () => ({ enabled: true, allGroups: false, groups: [GROUP], ...(batchWindowMs ? { wake: { batchWindowMs } } : {}) }),
     getExecutionConfig: () => ({}),
     getSelf: () => ({ id: SELF_ID, name: '希洛' }),
     YTapi: responses
@@ -34,6 +34,7 @@ function buildRuntime({ atOnly = [], playAlong = [], randomValue = 0.99, respons
       : async () => { throw new Error('ingest 路径不应触达模型') },
     sendGroupMessage: async (_groupId, segments) => { sent.push(segments); return { ok: true, messageId: 'm1' } },
     getPersona: () => ({ persona: {}, systemContent: '' }),
+    ...(judge ? { wakeGateJudge: judge } : {}),
     now,
     random: () => randomValue,
   })
@@ -226,5 +227,74 @@ test('提醒后输出自创沉默变体：不直发进群（295708427 实拍回�
     assert.equal(r.sent.length, 0, '含元话术的文本绝不兜底直发')
   } finally {
     r.runtime.stop()
+  }
+})
+
+test('唤醒预判闸：拦截低信号唤醒不进完整回合；被@旁路；预判失败放行', async () => {
+  const judgeCalls = []
+  // 1) 概率唤醒（低信号）被闸拦截：无模型调用、未读清空、水位推进
+  const blocked = buildRuntime({
+    randomValue: 0.001, batchWindowMs: 100,
+    judge: async input => { judgeCalls.push(input); return { engage: false, reason: '与机器人无关的闲聊' } },
+  })
+  try {
+    await seedConversation(blocked.runtime)
+    await blocked.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '今天中午吃什么好', message: [], sender: { nickname: '路人' } })
+    assert.ok(await waitFor(() => judgeCalls.length >= 1), '预判闸应被调用')
+    await sleep(400)
+    assert.equal(blocked.modelCalls.length, 0, '拦截后不进完整回合')
+    const st = JSON.parse(blocked.kv.get(SESSION_KEY))
+    assert.equal(st.unread.length, 0, '拦截时等价 simMarkRead：清未读')
+    assert.ok(st.lastReadThroughSeq > 0, '水位推进')
+    assert.equal(st.budget.turns, 1, '拦截回合仍计入预算')
+    assert.ok(judgeCalls[0].messages.length >= 1, '预判输入带未读消息')
+  } finally {
+    blocked.runtime.stop()
+  }
+
+  // 2) 预判放行 → 进完整回合
+  const passed = buildRuntime({
+    randomValue: 0.001, batchWindowMs: 100, responses: ['[SILENT]'],
+    judge: async () => ({ engage: true, reason: '有人找它' }),
+  })
+  try {
+    await seedConversation(passed.runtime)
+    await passed.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '希洛在吗，帮个忙', message: [], sender: { nickname: '路人' } })
+    assert.ok(await waitFor(() => passed.modelCalls.length >= 1), '放行后应进完整回合')
+  } finally {
+    passed.runtime.stop()
+  }
+
+  // 3) 被@旁路：不问预判直接进回合
+  let atJudge = 0
+  const atBypass = buildRuntime({
+    batchWindowMs: 100, responses: ['[SILENT]'],
+    judge: async () => { atJudge += 1; return { engage: false, reason: '' } },
+  })
+  try {
+    await seedConversation(atBypass.runtime)
+    await atBypass.runtime.ingest({
+      group_id: GROUP, message_type: 'group', user_id: '40000', msg: '在吗', atBot: true,
+      message: [{ type: 'at', data: { qq: SELF_ID } }, { type: 'text', data: { text: ' 在吗' } }],
+      sender: { nickname: '点名的人' },
+    })
+    assert.ok(await waitFor(() => atBypass.modelCalls.length >= 1), '被@直达完整回合')
+    await sleep(300)
+    assert.equal(atJudge, 0, '被@不经预判闸')
+  } finally {
+    atBypass.runtime.stop()
+  }
+
+  // 4) 预判异常 → fail-open 放行
+  const failOpen = buildRuntime({
+    randomValue: 0.001, batchWindowMs: 100, responses: ['[SILENT]'],
+    judge: async () => { throw new Error('judge down') },
+  })
+  try {
+    await seedConversation(failOpen.runtime)
+    await failOpen.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '随便聊聊', message: [], sender: { nickname: '路人' } })
+    assert.ok(await waitFor(() => failOpen.modelCalls.length >= 1), '预判失败应放行')
+  } finally {
+    failOpen.runtime.stop()
   }
 })

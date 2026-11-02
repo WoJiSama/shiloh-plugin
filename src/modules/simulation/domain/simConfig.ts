@@ -85,6 +85,9 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       cooldownMs: Math.max(600_000, Math.floor((section.userStyle || {}).cooldownMs ?? 6 * 3600_000)),
       archiveDays: Math.min(14, Math.max(1, Math.floor((section.userStyle || {}).archiveDays ?? 3))),
     },
+    wakeGate: {
+      enabled: (section.wakeGate || {}).enabled !== false,
+    },
     meme: {
       enabled: (section.meme || {}).enabled !== false,
       extractCooldownMs: Math.max(60_000, Math.floor((section.meme || {}).extractCooldownMs ?? 600_000)),

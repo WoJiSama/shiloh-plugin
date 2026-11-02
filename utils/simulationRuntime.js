@@ -103,7 +103,13 @@ export const simulationRuntime = createSimulationRuntime({
   getSection: () => readPluginSettings().simulation || {},
   getExecutionConfig: () => {
     try {
-      return decodeHostConfig(readPluginSettings())
+      const decoded = decodeHostConfig(readPluginSettings())
+      // 仿真回合模型降档开关：simulation.turnModel 覆盖 tools 后端的模型（agent 回合实际读 toolsAiModel）
+      const turnModel = String((readPluginSettings().simulation || {}).turnModel || '').trim()
+      if (turnModel && decoded.toolsAiConfig) {
+        return { ...decoded, toolsAiConfig: { ...decoded.toolsAiConfig, toolsAiModel: turnModel } }
+      }
+      return decoded
     } catch (error) {
       logger?.warn?.(`[仿真] 宿主配置解码失败，使用原始配置：${error?.message || error}`)
       return readPluginSettings()
@@ -325,6 +331,44 @@ export const simulationRuntime = createSimulationRuntime({
       return { ok: true }
     } catch (error) {
       return { ok: false, error: error?.message || String(error) }
+    }
+  },
+  // 唤醒预判闸：便宜模型（缺省 memoryAi 的 flash 档）+ 紧凑上下文判断低信号唤醒值不值得进完整回合。
+  // 返回 null = 预判不可用 → runtime fail-open 放行。
+  wakeGateJudge: async ({ reason, messages }) => {
+    try {
+      const settings = readPluginSettings()
+      const mem = settings.memoryAiConfig || {}
+      const gate = (settings.simulation || {}).wakeGate || {}
+      const model = String(gate.model || mem.memoryAiModel || '').trim()
+      if (!mem.memoryAiUrl || !mem.memoryAiApikey || !model) return null
+      const result = await sideLLMCall({
+        url: mem.memoryAiUrl,
+        apikey: mem.memoryAiApikey,
+        model,
+        temperature: 0.1,
+        maxTokens: 64,
+        timeoutMs: 8000,
+        messages: [
+          {
+            role: 'system',
+            content: [
+              '你是群聊机器人的唤醒预判器。主模型进入完整回合开销大，你用极小上下文判断这次唤醒值不值得。',
+              '判定值得（engage=true）：有人@机器人/引用它、明确向它提问、话题明显需要它参与（跑团剧情推进到它的角色、有人找它帮忙）。',
+              '判定不值得（engage=false）：群友互相闲聊与机器人无关、只是蹭到关键词、旁观型随机唤醒。',
+              '拿不准时一律 engage=true（宁放过不错杀）。只输出严格 JSON：{"engage": true 或 false, "reason": "不超过15字"}',
+            ].join('\n'),
+          },
+          { role: 'user', content: JSON.stringify({ 唤醒原因: reason, 未读消息: messages }) },
+        ],
+      })
+      if (!result.ok) return null
+      const match = String(result.content || '').match(/\{[\s\S]*\}/)
+      if (!match) return null
+      const parsed = JSON.parse(match[0])
+      return { engage: parsed.engage !== false, reason: String(parsed.reason || '').slice(0, 20) }
+    } catch {
+      return null
     }
   },
   // 群成员列表（TRSS pickGroup.getMemberMap）

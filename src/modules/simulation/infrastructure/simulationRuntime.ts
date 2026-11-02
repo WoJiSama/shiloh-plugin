@@ -4,7 +4,7 @@ import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMes
 import { defaultSimRuntimeConfig } from '../domain/simConfig.js'
 import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
 import { mineUserCatchphrases } from '../domain/userStyle.js'
-import { evaluateWakeTrigger, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
+import { evaluateWakeTrigger, formatWakeReason, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
 import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
@@ -23,6 +23,12 @@ export const SIM_SWEEP_INTERVAL_MS = 30_000
 
 /** 仅@才回模式下仍放行的唤醒：点名（@/引用）、一次性开场、被点名后的定时延伸（等待超时/回合补发）、管理指令。主动冒泡(proactiveCheck)不放行。 */
 const AT_ONLY_WAKE_KINDS = new Set<SimWakeReason['kind']>(['atMention', 'bootstrap', 'timeout', 'replyCheck', 'admin'])
+
+/**
+ * 唤醒预判闸旁路：这些唤醒不经便宜模型预判、直达完整回合——
+ * 被@/开场/管理天然高价值；session(活跃档)是管理员明确要的参与；timeout/replyCheck 是已参与回合的收尾延伸。
+ */
+const WAKE_GATE_BYPASS_KINDS = new Set<SimWakeReason['kind']>([...AT_ONLY_WAKE_KINDS, 'session'])
 
 export interface SimulationRuntimePorts {
   redis: Parameters<typeof createSimSessionStore>[0]['redis']
@@ -55,6 +61,8 @@ export interface SimulationRuntimePorts {
   getStyleBotUserIds?(): string[]
   /** 戳群成员（B2：回应拍一拍/主动逗熟人） */
   pokeMember?(groupId: string, userId: string): Promise<{ ok: boolean; error?: string }>
+  /** 唤醒预判闸：低信号唤醒先判断值不值得进完整回合；返回 null = 预判不可用（fail-open 放行） */
+  wakeGateJudge?(input: { reason: string; messages: { name: string; text: string; atSelf: boolean }[] }): Promise<{ engage: boolean; reason?: string } | null>
   /** 群成员列表（B3）：[{userId, nick}] */
   getGroupMembers?(groupId: string): Promise<{ userId: string; nick: string }[]>
   /** 合并转发内容（B4）：逐条正文 + 图片 URL 列表（按 [图片#N] 编号）+ 内嵌转发 id 列表（可递归展开） */
@@ -421,8 +429,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     // 定时器类唤醒到点即醒（不再等合并窗），消息类按 batchWindowMs 合并可能更高优先级的触发
     const delay = TIMER_WAKE_REASONS.includes(reason.kind) ? 1_000 : config.wake.batchWindowMs
     const timer = setTimeout(() => {
+      // 读 map 里的最新 reason：合并窗口内高优先级触发会替换 map 条目，闭包里的旧值会把它降级（实测抓到的潜伏 bug）
+      const entry = pendingWakes.get(groupId)
       pendingWakes.delete(groupId)
-      void startTurn(groupId, reason)
+      void startTurn(groupId, entry?.reason ?? reason)
     }, delay)
     pendingWakes.set(groupId, { timer, reason })
   }
@@ -470,6 +480,27 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       }
       recordWake(state, now())
       state.lastWakeReason = reason
+
+      // 唤醒预判闸：低信号唤醒（关键词/概率/延续/旁观类）先由便宜模型小上下文预判；
+      // 判定不值得 → 等价 simMarkRead 静默收尾（推进水位、清未读），不进完整回合。
+      // 预判不可用/异常 → 放行（fail-open，宁多花一次也不丢回复）。
+      if (cfg.wakeGate.enabled && typeof ports.wakeGateJudge === 'function' && !WAKE_GATE_BYPASS_KINDS.has(reason.kind)) {
+        let verdict: { engage: boolean; reason?: string } | null = null
+        try {
+          verdict = await ports.wakeGateJudge({
+            reason: formatWakeReason(reason),
+            messages: [...state.unread].sort((a, b) => a.seq - b.seq).slice(-10)
+              .map(m => ({ name: String(m.name || ''), text: String(m.text || '').slice(0, 80), atSelf: Boolean(m.atSelf || m.quoteToSelf) })),
+          })
+        } catch { verdict = null }
+        if (verdict && verdict.engage === false) {
+          state.lastReadThroughSeq = state.unread.reduce((max, m) => Math.max(max, m.seq), state.lastReadThroughSeq)
+          state.unread = []
+          await store.save(groupId, state)
+          logger.info(`[仿真] 群 ${groupId} 预判闸拦截 wake=${reason.kind}${verdict.reason ? `（${verdict.reason}）` : ''}，省一次完整回合`)
+          return
+        }
+      }
 
       const snapshot = buildWakeSnapshot(state, { limit: cfg.turn.wakeMessageLimit, maxChars: cfg.turn.wakeMaxChars, now: now() })
       const snapshotSeqs = [...state.unread].sort((a, b) => a.seq - b.seq).slice(0, snapshot.included).map(m => m.seq)

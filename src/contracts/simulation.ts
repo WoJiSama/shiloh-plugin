@@ -177,6 +177,10 @@ export interface SimulationSection {
     /** 陪玩模式主动唤醒的最小间隔（ms，默认 5 分钟）：跑团等持续活动期间的跟进节奏 */
     playAlongGapMs?: number
   }
+  /** 唤醒预判闸：低信号唤醒先由便宜模型小上下文预判值不值得进完整回合（被@/开场/活跃档等直达）；model 缺省用 memoryAiModel */
+  wakeGate?: { enabled?: boolean; model?: string }
+  /** 仿真回合模型：缺省沿用 toolsAiModel；设为 glm-5.3-flash 等可整体降档（省 token） */
+  turnModel?: string
   budget?: {
     dailyCostCny?: number
     /** 按群消耗上限覆盖（键=群号，值=该群每日金额上限元，-1=不限）；未列出的群用 dailyCostCny */
@@ -228,5 +232,7 @@ export interface SimRuntimeConfig {
   extraTools: string[]
   meme: { enabled: boolean; extractCooldownMs: number; extractMinMessages: number; injectMax: number }
   budget: { dailyCostCny: number; groups: Record<string, number> }
+  /** 唤醒预判闸开关（模型与凭证在装配层解析） */
+  wakeGate: { enabled: boolean }
   userStyle: { enabled: boolean; cooldownMs: number; archiveDays: number }
 }
