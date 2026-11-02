@@ -94,3 +94,89 @@ export function renderForwardNodes(nodes: unknown[], opts: { maxNodes?: number; 
   }
   return { lines, total: list.length, truncated: list.length > maxNodes, nestedForwardIds, imageUrls: collector.urls }
 }
+
+/**
+ * 递归展开整棵合并转发（实测事故：嵌套转发要模型一层层手动调工具，且适配器对内层
+ * resid 常拉取失败，模型最后对群友说"只能看最外面一层"）。自动跟随内嵌 id 展开：
+ * 深度 ≤maxDepth、防环、总行数护栏；拉不到的层明确标注——模型要么读全，要么准确说缺什么。
+ */
+export async function renderForwardTree(
+  fetchOne: (id: string) => Promise<unknown[]>,
+  rootId: string,
+  opts: { maxDepth?: number; maxNodes?: number; maxChars?: number; maxLines?: number } = {}
+): Promise<RenderedForward & { failedNested?: number }> {
+  const maxDepth = Math.min(4, Math.max(1, opts.maxDepth ?? 3))
+  const maxNodes = Math.min(80, Math.max(10, opts.maxNodes ?? 50))
+  const maxChars = Math.min(500, Math.max(60, opts.maxChars ?? 200))
+  const maxLines = Math.min(400, Math.max(30, opts.maxLines ?? 120))
+  const lines: string[] = []
+  const nestedForwardIds: string[] = []
+  const collector = { urls: [] as string[] }
+  const visited = new Set<string>()
+  let total = 0
+  let truncated = false
+  let failedNested = 0
+
+  const walk = async (id: string, depth: number): Promise<void> => {
+    if (lines.length >= maxLines) { truncated = true; return }
+    if (visited.has(id)) {
+      lines.push(`${'  '.repeat(depth)}[嵌套转发重复，已跳过]`)
+      return
+    }
+    visited.add(id)
+    let nodes: unknown[]
+    try {
+      nodes = await fetchOne(id)
+    } catch (error) {
+      if (depth === 0) throw error
+      failedNested += 1
+      lines.push(`${'  '.repeat(depth)}[内嵌转发展开失败：适配器拉不到这层]`)
+      return
+    }
+    const list = Array.isArray(nodes) ? nodes : []
+    total += list.length
+    if (list.length > maxNodes) truncated = true
+    const indent = '  '.repeat(depth)
+    const pending: string[] = []
+    for (const raw of list.slice(0, maxNodes)) {
+      if (lines.length >= maxLines) { truncated = true; break }
+      const node = (raw && typeof raw === 'object' ? raw : {}) as ForwardNode
+      const name = String(node.sender?.card || node.sender?.nickname || '群友')
+      let text = ''
+      if (typeof node.message === 'string') {
+        text = node.message
+      } else if (Array.isArray(node.message)) {
+        const parts: string[] = []
+        for (const seg of node.message as ForwardSegment[]) {
+          if (seg?.type === 'forward') {
+            const nestedId = String((seg.data as Record<string, unknown> | undefined)?.id ?? (seg.data as Record<string, unknown> | undefined)?.resid ?? seg?.id ?? seg?.resid ?? '')
+            if (nestedId && pending.length < 4) {
+              pending.push(nestedId)
+              parts.push('[内嵌转发，内容见本层之后的缩进段]')
+              continue
+            }
+            parts.push('[内嵌转发]')
+          } else {
+            parts.push(renderForwardSegment(seg, collector))
+          }
+        }
+        text = parts.join('').trim()
+      }
+      text = text.replace(/\s+/g, ' ').trim()
+      lines.push(`${indent}${name}：${text ? text.slice(0, maxChars) : '[无可读内容]'}`)
+    }
+    for (const nestedId of pending) {
+      if (lines.length >= maxLines) { truncated = true; break }
+      if (depth + 1 >= maxDepth) {
+        lines.push(`${indent}  [更深一层未自动展开，id=${nestedId}]`)
+        if (!nestedForwardIds.includes(nestedId)) nestedForwardIds.push(nestedId)
+        truncated = true
+        continue
+      }
+      await walk(nestedId, depth + 1)
+    }
+  }
+
+  await walk(String(rootId || '').trim(), 0)
+  return { lines, total, truncated, nestedForwardIds, imageUrls: collector.urls, ...(failedNested ? { failedNested } : {}) }
+}

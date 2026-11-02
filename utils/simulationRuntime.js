@@ -343,17 +343,21 @@ export const simulationRuntime = createSimulationRuntime({
   getForwardContent: async forwardId => {
     try {
       const Bot = globalThis.Bot
-      const raw = await (Bot?.getForwardMsg?.(forwardId) ?? Bot?.pickFriend?.(0)?.getForwardMsg?.(forwardId))
-      const nodes = Array.isArray(raw) ? raw : Array.isArray(raw?.message) ? raw.message : []
-      if (!nodes.length) return { lines: [], error: '转发内容为空或解析失败' }
-      const { renderForwardNodes } = await import('../dist/backend/modules/simulation/domain/forwardView.js')
-      const rendered = renderForwardNodes(nodes)
+      const { renderForwardTree } = await import('../dist/backend/modules/simulation/domain/forwardView.js')
+      // 递归展开整棵转发（≤3 层）：内嵌 id 自动跟随，适配器拉不到的层在结果里明确标注
+      const rendered = await renderForwardTree(async id => {
+        const raw = await (Bot?.getForwardMsg?.(id) ?? Bot?.pickFriend?.(0)?.getForwardMsg?.(id))
+        const nodes = Array.isArray(raw) ? raw : Array.isArray(raw?.message) ? raw.message : []
+        if (!nodes.length) throw new Error('转发内容为空或解析失败')
+        return nodes
+      }, String(forwardId || ''))
       return {
         lines: rendered.lines,
         total: rendered.total,
         ...(rendered.truncated ? { truncated: true } : {}),
         ...(rendered.nestedForwardIds.length ? { nestedForwardIds: rendered.nestedForwardIds } : {}),
         ...(rendered.imageUrls.length ? { imageUrls: rendered.imageUrls } : {}),
+        ...(rendered.failedNested ? { failedNested: rendered.failedNested } : {}),
       }
     } catch (error) {
       return { lines: [], error: error?.message || String(error) }
