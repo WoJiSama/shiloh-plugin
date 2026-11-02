@@ -118,27 +118,39 @@ export function createTokenLedger(ports: TokenLedgerPorts) {
   function summary(): TokenSummary {
     rollDay(now())
     const rows = todayRows
+    // 记账双轨：apiClient 钩子给每笔模型调用记一条 stage='api'/scope='global' 镜像（恰好一次），
+    // 带群上下文的调用点再记归组行（stage='sim' 等）。总额/走势只数镜像行，否则显示翻倍；
+    // 归组行只进"按群/按链路"，未归组部分 = 总额 − 归群合计。
+    const mirrorRows = rows.filter(row => row.stage === "api")
+    const attributedRows = rows.filter(row => row.stage !== "api")
     const byStage: TokenSummary['today']['byStage'] = {}
     const byModel: TokenSummary['today']['byModel'] = {}
     const byScope: Record<string, { tokens: number; cost: number }> = {}
     let tokens = 0
     let cost = 0
-    for (const row of rows) {
+    for (const row of mirrorRows) {
       tokens += row.u.total
       cost += row.cny
-      const stage = byStage[row.stage] || (byStage[row.stage] = { tokens: 0, cost: 0, calls: 0 })
-      stage.tokens += row.u.total; stage.cost += row.cny; stage.calls += 1
       const model = byModel[row.model] || (byModel[row.model] = { tokens: 0, cost: 0, calls: 0, estimated: row.estimated })
       model.tokens += row.u.total; model.cost += row.cny; model.calls += 1
+    }
+    for (const row of attributedRows) {
+      const stage = byStage[row.stage] || (byStage[row.stage] = { tokens: 0, cost: 0, calls: 0 })
+      stage.tokens += row.u.total; stage.cost += row.cny; stage.calls += 1
       const scope = byScope[row.scope] || (byScope[row.scope] = { tokens: 0, cost: 0 })
       scope.tokens += row.u.total; scope.cost += row.cny
     }
     const round = (value: number) => Math.round(value * 10000) / 10000
+    const attributedCost = Object.values(byScope).reduce((sum, value) => sum + value.cost, 0)
+    const attributedTokens = Object.values(byScope).reduce((sum, value) => sum + value.tokens, 0)
+    if (cost - attributedCost > 0.00005 || tokens - attributedTokens > 0) {
+      byScope.global = { tokens: tokens - attributedTokens, cost: Math.max(0, cost - attributedCost) }
+    }
     for (const key of Object.keys(byStage)) { byStage[key]!.cost = round(byStage[key]!.cost) }
     for (const key of Object.keys(byModel)) { byModel[key]!.cost = round(byModel[key]!.cost) }
     return {
       today: {
-        tokens, cost: round(cost), calls: rows.length, byStage, byModel,
+        tokens, cost: round(cost), calls: mirrorRows.length, byStage, byModel,
         byScopeTop: Object.entries(byScope)
           .map(([scope, value]) => ({ scope, tokens: value.tokens, cost: round(value.cost) }))
           .sort((a, b) => b.cost - a.cost)
@@ -158,6 +170,8 @@ export function createTokenLedger(ports: TokenLedgerPorts) {
     for (const key of lastDayKeys(Math.ceil(spanMs / 86_400_000) + 1)) {
       for (const row of loadDay(key)) {
         if (row.t < start) continue
+        // 走势只数 api 镜像行：归组行是同一调用的归账副本，重复累加会让柱状图翻倍
+        if (row.stage !== "api") continue
         const index = Math.min(count - 1, Math.floor((row.t - start) / widthMs))
         const bucket = out[index]
         if (!bucket) continue
