@@ -2056,7 +2056,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === "/api/simulation/overview" && req.method === "GET") {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
-      return sendJson(res, 200, await simulation.overview())
+      // 附带群号→群名映射：群表直接显示群名（identity 目录 30s 缓存）
+      const groupNames: Record<string, string> = {}
+      try {
+        for (const group of (await collectIdentityDirectory()).groups) groupNames[group.id] = group.name
+      } catch {}
+      return sendJson(res, 200, { ...record(await simulation.overview()), groupNames })
     }
     if (url.pathname === "/api/simulation/group" && req.method === "GET") {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })

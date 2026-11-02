@@ -20,7 +20,7 @@ interface GroupRow {
   affinity: { userId: string; score: number }[]
   initialPrompt: string
 }
-interface Overview { enabled: boolean; allGroups: boolean; disabled: string[]; budgetDefaultCny: number; groups: GroupRow[] }
+interface Overview { enabled: boolean; allGroups: boolean; disabled: string[]; budgetDefaultCny: number; groups: GroupRow[]; groupNames?: Record<string, string> }
 
 const overview = ref<Overview | null>(null)
 const loading = ref(false)
@@ -164,7 +164,15 @@ async function saveCap() {
 }
 
 const columns: DataTableColumns<GroupRow> = [
-  { title: '群号', key: 'groupId', width: 130 },
+  {
+    title: '群号',
+    key: 'groupId',
+    width: 200,
+    render: row => {
+      const name = overview.value?.groupNames?.[row.groupId]
+      return name ? `${name}（${row.groupId}）` : row.groupId
+    },
+  },
   { title: '模式', key: 'active', width: 90, render: row => row.active ? (row.running ? '仿真·回合中' : '仿真') : '普通' },
   { title: '回复模式', key: 'replyMode', width: 110, render: row => h(NSelect, { value: row.replyMode || 'auto', options: replyModeOptions, size: 'tiny', onUpdateValue: (value: string) => void setReplyMode(row, value) }) },
   { title: '未读', key: 'unreadCount', width: 70 },
@@ -177,6 +185,10 @@ const columns: DataTableColumns<GroupRow> = [
 ]
 import { h } from 'vue'
 const rows = computed(() => overview.value?.groups || [])
+const detailTitle = computed(() => {
+  const name = overview.value?.groupNames?.[detailId.value]
+  return name ? `${name}（${detailId.value}）· 仿真详情` : `群 ${detailId.value} · 仿真详情`
+})
 </script>
 
 <template>
@@ -200,7 +212,7 @@ const rows = computed(() => overview.value?.groups || [])
       <NDataTable :columns="columns" :data="rows" size="small" />
     </template>
     <NDrawer v-model:show="drawerOpen" :width="420">
-      <NDrawerContent :title="`群 ${detailId} · 仿真详情`" closable>
+      <NDrawerContent :title="detailTitle" closable>
         <div v-if="detail" class="detail">
           <div class="kv"><span>回复模式（管理员设定）</span><b>{{ replyModeLabels[detail.replyMode || 'auto'] || '自主' }}</b></div>
           <div class="kv"><span>AI 自设潜水模式</span><b>{{ detail.mode }}</b></div>
