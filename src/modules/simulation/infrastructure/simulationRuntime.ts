@@ -500,6 +500,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           logger.info(`[仿真] 群 ${groupId} 预判闸拦截 wake=${reason.kind}${verdict.reason ? `（${verdict.reason}）` : ''}，省一次完整回合`)
           return
         }
+        if (verdict) logger.info(`[仿真] 群 ${groupId} 预判闸放行 wake=${reason.kind}${verdict.reason ? `（${verdict.reason}）` : ''}`)
       }
 
       const snapshot = buildWakeSnapshot(state, { limit: cfg.turn.wakeMessageLimit, maxChars: cfg.turn.wakeMaxChars, now: now() })
