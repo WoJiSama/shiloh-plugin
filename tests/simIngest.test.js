@@ -6,11 +6,12 @@ const SELF_ID = '3094088525'
 const GROUP = '10086'
 const SESSION_KEY = `shiloh:sim:g:${GROUP}`
 
-function buildRuntime({ atOnly = [], playAlong = [], randomValue = 0.99, responses, now = () => 1770000000000, judge, batchWindowMs } = {}) {
+const BASE_AT = 1770000000000
+function buildRuntime({ atOnly = [], activeUntil = 0, randomValue = 0.99, responses, now = () => BASE_AT, judge, batchWindowMs } = {}) {
   const kv = new Map()
-  // 预置 overrides（atOnly/playAlong 用）；留空则运行时按 groups 种子
-  if (atOnly.length || playAlong.length) {
-    kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {}, atOnly, playAlong }))
+  // 预置 overrides（atOnly/活跃助推用）；留空则运行时按 groups 种子
+  if (atOnly.length || activeUntil) {
+    kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {}, atOnly, ...(activeUntil ? { playAlongUntil: { [GROUP]: activeUntil } } : {}) }))
   }
   const modelCalls = []
   const sent = []
@@ -175,9 +176,9 @@ test('真内容提醒一次仍哑火则兜底直发（不被沉默识别误伤�
   }
 })
 
-test('活跃档：群里有动静按节奏主动唤醒，冷却期内不重复', async () => {
-  let clock = 1770000000000
-  const r = buildRuntime({ playAlong: [GROUP], randomValue: 0.99, now: () => clock })
+test('活跃助推：窗口内群里有动静按节奏兜底唤醒，冷却期内不重复', async () => {
+  let clock = BASE_AT
+  const r = buildRuntime({ activeUntil: BASE_AT + 3 * 3600_000, randomValue: 0.99, now: () => clock })
   try {
     await seedConversation(r.runtime)
     // 无任何触发器命中的普通消息：活跃档接手（首条必过冷却，lastPlayAlongWakeAt 初始为 0）
@@ -194,7 +195,7 @@ test('活跃档：群里有动静按节奏主动唤醒，冷却期内不重复',
     assert.ok(interlocutors(r.kv).includes('40000'), '冷却期过后恢复主动唤醒')
 
     // 命令往返（三档：仅@/自主/活跃）
-    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主·活跃/)
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主·活跃助推中/)
     assert.match(await r.runtime.setGroupReplyMode(GROUP, 'active'), /已是「自主·活跃」/)
     assert.match(await r.runtime.setGroupReplyMode(GROUP, 'auto'), /已设为「自主」/)
     await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '50000', msg: '继续赶路', message: [], sender: { nickname: '队友' } })
@@ -205,7 +206,7 @@ test('活跃档：群里有动静按节奏主动唤醒，冷却期内不重复',
 })
 
 test('仅@模式与活跃档状态并存时，主动跟进唤醒被压掉', async () => {
-  const r = buildRuntime({ atOnly: [GROUP], playAlong: [GROUP], randomValue: 0.99 })
+  const r = buildRuntime({ atOnly: [GROUP], activeUntil: BASE_AT + 3 * 3600_000, randomValue: 0.99 })
   try {
     await seedConversation(r.runtime)
     await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '剧情推进中', message: [], sender: { nickname: 'KP' } })
@@ -296,5 +297,28 @@ test('唤醒预判闸：拦截低信号唤醒不进完整回合；被@旁路；�
     assert.ok(await waitFor(() => failOpen.modelCalls.length >= 1), '预判失败应放行')
   } finally {
     failOpen.runtime.stop()
+  }
+})
+
+test('活跃助推到期自动回落：过期后普通消息不再兜底唤醒，档位查询回自主', async () => {
+  let clock = BASE_AT
+  const r = buildRuntime({ activeUntil: BASE_AT + 10 * 60_000, randomValue: 0.99, now: () => clock })
+  try {
+    await seedConversation(r.runtime)
+    // 窗口内：兜底唤醒生效
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '剧情推进', message: [], sender: { nickname: 'KP' } })
+    assert.ok(interlocutors(r.kv).includes('30000'), '窗口内兜底唤醒生效')
+    // 时间前进越过到期点：不再兜底
+    clock = BASE_AT + 11 * 60_000
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '40000', msg: '剧情继续推进', message: [], sender: { nickname: '队友' } })
+    assert.ok(!interlocutors(r.kv).includes('40000'), '到期后不再兜底唤醒')
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主（/, '档位回落自主')
+    // 再次设活跃 → 新窗口生效，主动档文案含助推说明
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'active'), /活跃助推.*simSetWakeConfig.*自动回落/s)
+    clock = BASE_AT + 12 * 60_000
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '50000', msg: '还在跑团', message: [], sender: { nickname: '队友' } })
+    assert.ok(interlocutors(r.kv).includes('50000'), '续期后兜底恢复')
+  } finally {
+    r.runtime.stop()
   }
 })

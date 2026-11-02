@@ -179,6 +179,8 @@ export interface SimulationSection {
   }
   /** 唤醒预判闸：低信号唤醒先由便宜模型小上下文预判值不值得进完整回合（被@/开场/活跃档等直达）；model 缺省用 memoryAiModel */
   wakeGate?: { enabled?: boolean; model?: string }
+  /** 活跃助推窗口时长（ms，默认 3 小时）：.仿真 模式 活跃 的系统兜底节奏只在该窗口内生效，过期回落自主、AI 自设配置接管 */
+  activeBoostMs?: number
   /** 仿真回合模型：缺省沿用 toolsAiModel；设为 glm-5.3-flash 等可整体降档（省 token） */
   turnModel?: string
   budget?: {
@@ -234,5 +236,7 @@ export interface SimRuntimeConfig {
   budget: { dailyCostCny: number; groups: Record<string, number> }
   /** 唤醒预判闸开关（模型与凭证在装配层解析） */
   wakeGate: { enabled: boolean }
+  /** 活跃助推窗口时长（ms） */
+  activeBoostMs: number
   userStyle: { enabled: boolean; cooldownMs: number; archiveDays: number }
 }

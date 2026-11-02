@@ -28,8 +28,8 @@ const BUSY_KEY = (groupId: string) => `shiloh:sim:busy:${groupId}`
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 export const SIM_TURN_BUSY_LEASE_MS = 15 * 60_000
 
-/** 群级覆盖（.仿真 开/关 与控制台预算编辑都写这里）：budgetCaps 键=群号 值=每日金额上限；budgetDefaultCny 为空表示用 yaml 默认；atOnly=「仅被@才回」群清单（管理员设定，优先于 AI 自设触发器）；playAlong=「陪玩模式」群清单（群里持续有动静时按节奏主动跟进） */
-export interface SimGroupOverrides { explicitEnabled: string[]; disabled: string[]; budgetCaps: Record<string, number>; turnCaps: Record<string, number>; atOnly?: string[]; playAlong?: string[]; budgetDefaultCny?: number }
+/** 群级覆盖（.仿真 开/关 与控制台预算编辑都写这里）：budgetCaps 键=群号 值=每日金额上限；budgetDefaultCny 为空表示用 yaml 默认；atOnly=「仅被@才回」群清单（管理员设定，优先于 AI 自设触发器）；playAlongUntil=「活跃助推」到期表（epoch ms，助推窗口内系统兜底节奏，过期回落自主档、由 AI 自设配置接管） */
+export interface SimGroupOverrides { explicitEnabled: string[]; disabled: string[]; budgetCaps: Record<string, number>; turnCaps: Record<string, number>; atOnly?: string[]; playAlongUntil?: Record<string, number>; budgetDefaultCny?: number }
 
 export interface SimSessionStore {
   load(groupId: string): Promise<SimSessionState>
@@ -106,7 +106,12 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
         const budgetCaps = normalizeCaps(parsed.budgetCaps)
         const turnCaps = normalizeCaps(parsed.turnCaps)
         const rawDefault = Number(parsed.budgetDefaultCny)
-        return { explicitEnabled: parseStringList(parsed.explicitEnabled), disabled: parseStringList(parsed.disabled), budgetCaps, turnCaps, atOnly: parseStringList(parsed.atOnly), playAlong: parseStringList(parsed.playAlong), ...(Number.isFinite(rawDefault) && rawDefault > 0 ? { budgetDefaultCny: Math.min(10_000, rawDefault) } : {}) }
+        const playAlongUntil: Record<string, number> = {}
+        for (const [key, value] of Object.entries(record(parsed.playAlongUntil))) {
+          const until = Number(value)
+          if (/^\d{5,12}$/.test(key) && Number.isFinite(until) && until > 0) playAlongUntil[key] = Math.floor(until)
+        }
+        return { explicitEnabled: parseStringList(parsed.explicitEnabled), disabled: parseStringList(parsed.disabled), budgetCaps, turnCaps, atOnly: parseStringList(parsed.atOnly), playAlongUntil, ...(Number.isFinite(rawDefault) && rawDefault > 0 ? { budgetDefaultCny: Math.min(10_000, rawDefault) } : {}) }
       } catch {
         return { explicitEnabled: [], disabled: [], budgetCaps: {}, turnCaps: {} }
       }
@@ -118,7 +123,7 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
         budgetCaps: overrides.budgetCaps || {},
         turnCaps: overrides.turnCaps || {},
         atOnly: overrides.atOnly || [],
-        playAlong: overrides.playAlong || [],
+        playAlongUntil: overrides.playAlongUntil || {},
         ...(overrides.budgetDefaultCny !== undefined ? { budgetDefaultCny: overrides.budgetDefaultCny } : {}),
       }))
     },

@@ -88,6 +88,7 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
     wakeGate: {
       enabled: (section.wakeGate || {}).enabled !== false,
     },
+    activeBoostMs: Math.min(12 * 3600_000, Math.max(10 * 60_000, Math.floor(section.activeBoostMs ?? 3 * 3600_000))),
     meme: {
       enabled: (section.meme || {}).enabled !== false,
       extractCooldownMs: Math.max(60_000, Math.floor((section.meme || {}).extractCooldownMs ?? 600_000)),
