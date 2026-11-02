@@ -13,7 +13,7 @@ keywords:string[];intent:string;examples:string[];
   constructor() {
     super();
     this.name = 'searchVideoTool';
-    this.description = '搜索视频并返回详细信息，当用户想要查找视频、了解视频内容时使用。';
+    this.description = '搜索 B 站视频并返回候选列表（按相关度排序）。仿真模式下只返回结果、不直接发送——把选中的链接交给 simShareVideoCard 发分享卡片，或用自己的话介绍。';
     this.keywords = ['搜视频', '找视频', 'B站搜索', '视频搜索', '查找视频'];
     this.intent = '用户想要搜索或查找B站视频相关内容时的意图';
     this.examples = [
@@ -77,8 +77,8 @@ keywords:string[];intent:string;examples:string[];
       const data=record(json.data),results=Array.isArray(data.result)?data.result.map(record):[];
 
       if (results.length > 0) {
-        // 随机选择一个视频
-        const randomVideo = results[Math.floor(Math.random() * results.length)] || {};
+        // B 站搜索结果按相关度排序：取第一条，不再随机抽（实测事故：随机抽+擦边结果＝群里收到猎奇视频）
+        const video = results[0] || {};
 
         // 格式化数据
         const formatData = {
@@ -102,19 +102,19 @@ keywords:string[];intent:string;examples:string[];
         };
 
         // 构建返回结果
-        return `🎬 随机推荐视频：
+        return `🎬 搜索结果：
 
-📺 ${text(randomVideo.title).replace(/<[^>]+>/g, '')}
-👤 UP主：${randomVideo.author}
-🔢 BV号：${randomVideo.bvid}
-🎯 分区：${randomVideo.typename || '未知分区'}
-⏱️ 时长：${randomVideo.duration}
-👁️ 播放：${formatData.formatPlay(randomVideo.play)}
-💖 点赞：${formatData.formatPlay(randomVideo.like)}
-📅 发布：${formatData.formatDate(randomVideo.pubdate)}
+📺 ${text(video.title).replace(/<[^>]+>/g, '')}
+👤 UP主：${video.author}
+🔢 BV号：${video.bvid}
+🎯 分区：${video.typename || '未知分区'}
+⏱️ 时长：${video.duration}
+👁️ 播放：${formatData.formatPlay(video.play)}
+💖 点赞：${formatData.formatPlay(video.like)}
+📅 发布：${formatData.formatDate(video.pubdate)}
 
-🔗 视频链接：https://www.bilibili.com/video/${randomVideo.bvid}
-🖼️ 封面：${text(randomVideo.pic).startsWith('//') ? 'https:' + randomVideo.pic : randomVideo.pic}`;
+🔗 视频链接：https://www.bilibili.com/video/${video.bvid}
+🖼️ 封面：${text(video.pic).startsWith('//') ? 'https:' + video.pic : video.pic}`;
       } else {
         return `❌ 未找到与"${name}"相关的视频`;
       }
@@ -132,6 +132,15 @@ keywords:string[];intent:string;examples:string[];
    */
   async func(opts:Record<string,unknown>, event:unknown) {
     const e=parseDrawEvent(event),keyword=text(opts.keyword);
+    // 仿真模式：只搜不发。工具直接往群里发 emoji 海报会抢走 AI 的发言权（实测事故），
+    // 分享卡片有专门的 simShareVideoCard——结果交回模型，由它决定怎么分享。
+    if (record(event).simulation === true) {
+      const result = await this.searchBilibili(keyword)
+      const guided = result.includes('未找到') || result.includes('搜索失败')
+        ? result
+        : `${result.split('🖼️ 封面：')[0]!.trim()}\n\n（这是相关度最高的一条；分享时把链接交给 simShareVideoCard 发卡片，或用自己的话介绍，别直接复读这份文本）`
+      return { result: guided }
+    }
     try {
       const result = await this.searchBilibili(keyword);
 

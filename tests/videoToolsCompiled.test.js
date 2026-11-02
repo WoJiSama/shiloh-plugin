@@ -24,3 +24,27 @@ test('compiled video search decodes absent optional counts and removes HTML titl
  let requests=0;const Tool=createSearchVideoTool({image:x=>x,sendvideos:async()=>{},fetch:async()=>++requests===1?new Response('',{headers:{'set-cookie':'bili=ok; Path=/'}}):new Response(JSON.stringify({data:{result:[{title:'<em>cat</em>',bvid:'BV123',pic:'//i.example/a.jpg',author:'me',pubdate:0}]}}))})
  const result=await new Tool().searchBilibili('cat');assert.match(result,/📺 cat/);assert.match(result,/点赞：0/);assert.match(result,/https:\/\/i.example\/a.jpg/)
 })
+
+test('仿真模式只搜不发：不自动回复、不拖视频，结果带分享指引且取相关度首位', async () => {
+  const replies = []
+  let sendvideosCalls = 0
+  let requests = 0
+  const Tool = createSearchVideoTool({
+    image: x => x,
+    sendvideos: async () => { sendvideosCalls += 1 },
+    fetch: async () => ++requests === 1
+      ? new Response('', { headers: { 'set-cookie': 'bili=ok; Path=/' } })
+      : new Response(JSON.stringify({ data: { result: [
+        { title: '<em>最相关</em>', bvid: 'BVTop1', pic: '//i.example/top.jpg', author: 'a', pubdate: 0, play: 10, like: 2, duration: '1:00' },
+        { title: '次相关', bvid: 'BVTop2', pic: '//i.example/2.jpg', author: 'b', pubdate: 0, play: 5, like: 1, duration: '2:00' }
+      ] } })),
+  })
+  const event = { reply: async s => replies.push(s), simulation: true }
+  const out = await new Tool().func({ keyword: 'cat' }, event)
+  const result = JSON.stringify(out)
+  assert.equal(replies.length, 0, '仿真模式不自动往群里发')
+  assert.equal(sendvideosCalls, 0, '仿真模式不自动拖视频')
+  assert.ok(result.includes('BVTop1'), '取相关度首位而非随机')
+  assert.ok(!result.includes('BVTop2') || result.includes('simShareVideoCard'), '')
+  assert.ok(result.includes('simShareVideoCard'), '结果带分享指引')
+})
