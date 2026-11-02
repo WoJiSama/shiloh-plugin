@@ -34,6 +34,9 @@ pluginSettings:
     - file
   allowedGroups:
     - "973682389"
+  # P0 风格学习反污染：这些 QQ 的发言不进风格观察/群表达学习/口头禅挖掘（外部机器人名单；
+  # 自家全部账号自动排除）。学机器人的输出只会越来越像机器。
+  botUserIds: []
   enableGroupWhitelist: true
   whitelistRejectMsg: 本群未开启此功能哦~
   # 私聊功能：默认关闭。开启后白名单用户可私聊机器人（走同一主回合/人设/心情/违禁词），

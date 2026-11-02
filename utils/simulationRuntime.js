@@ -91,6 +91,15 @@ export function lazyRedis() {
 export const simulationRuntime = createSimulationRuntime({
   logger,
   redis: lazyRedis(),
+  getStyleBotUserIds: () => {
+    try {
+      const ids = [...(readPluginSettings().botUserIds || [])]
+      const bots = globalThis.Bot?.bots || {}
+      for (const key of Object.keys(bots)) if (/^\d+$/.test(key)) ids.push(key)
+      if (globalThis.Bot?.uin) ids.push(String(globalThis.Bot.uin))
+      return ids
+    } catch { return [] }
+  },
   getSection: () => readPluginSettings().simulation || {},
   getExecutionConfig: () => {
     try {

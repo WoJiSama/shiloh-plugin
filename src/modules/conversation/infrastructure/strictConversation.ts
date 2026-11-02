@@ -1,5 +1,6 @@
 import type { ConversationEvent, ConversationState } from '../application/smartConversation.js'
 import { extractChatKeywords } from '../domain/messageIntent.js'
+import { collectBotStyleIds, isBotStyleSource } from '../domain/styleSourceFilter.js'
 import { isAiConversationEnabled } from '../domain/aiConversationGate.js'
 import { ROLE_MAP as roleMap, summarizeForLog } from '../domain/messageContext.js'
 import type { ConversationTool } from '../infrastructure/conversationUtils.js'
@@ -9,7 +10,7 @@ export interface Tracking {lastActiveTime:number;chatHistory:HistoryItem[];timer
 export interface Judgment {conversationKey:string;userMessage:string;chatHistory:HistoryItem[];e:ConversationEvent;resolve(value:boolean):void}
 export interface StrictConversationHost {
  getPersonaSnapshotFor?(e:ConversationEvent):PersonaSnapshot;
- config:{enabled?:unknown;conversationTrackingTimeout?:number;batchJudgmentDelay?:number;conversationTrackingThrottle?:number;conversationTrackingEnabled?:boolean;
+ config:{enabled?:unknown;conversationTrackingTimeout?:number;batchJudgmentDelay?:number;conversationTrackingThrottle?:number;conversationTrackingEnabled?:boolean;botUserIds?:string[];
  chatTriggerMode?:string;trackAiConfig:{trackAiUrl:string;trackAiApikey:string;trackAiModel:string};
  smartTrigger?:{maxRepliesPer10Min?:number;continuationKeywordMaxCount?:number;repeatJoinEnabled?:boolean;repeatMaxTextLength?:number;repeatDetectionWindow?:number;repeatMinCount?:number;repeatJoinCooldownMs?:number;repeatJoinProbability?:number};
  diceSystem?:unknown;excludeMessageTypes:string[];globalStyleLearning?:{enabled?:boolean};embeddingAiConfig?:unknown;memoryAiConfig?:unknown;expressionLearning?:{enabled?:boolean};oneapi_tools?:ConversationTool[]};
@@ -419,31 +420,35 @@ async function handleRandomReply(host:StrictConversationHost, e:ConversationEven
     const messageTypes = e.message?.map(m => m.type) || []
     if (host.config.excludeMessageTypes.some(t => messageTypes.includes(t))) return false
 
-    if (host.config.globalStyleLearning?.enabled !== false) {
-      try {
-        globalStyleLearnerManager.observeMessage(e, host.config.globalStyleLearning, host.config.embeddingAiConfig, host.getPersonaSnapshotFor?.(e))
-        globalStyleLearnerManager.maybeAutoSummarize(
-          host.config.globalStyleLearning,
-          host.config.memoryAiConfig
-        ).catch(error => {
-          logger.warn(`[全局表达学习] 自动总结调度失败: ${errorText(error)}`)
-        })
-      } catch (error) {
-        logger.warn(`[全局表达学习] 记录失败: ${errorText(error)}`)
+    // P0 反污染：外部 bot 名单 + 自家全部账号的消息不进任何风格学习——学机器人的输出只会更像机器
+    const styleBotIds = collectBotStyleIds(host.config.botUserIds || [], (globalThis as { Bot?: unknown }).Bot)
+    if (!isBotStyleSource(e.user_id, styleBotIds)) {
+      if (host.config.globalStyleLearning?.enabled !== false) {
+        try {
+          globalStyleLearnerManager.observeMessage(e, host.config.globalStyleLearning, host.config.embeddingAiConfig, host.getPersonaSnapshotFor?.(e))
+          globalStyleLearnerManager.maybeAutoSummarize(
+            host.config.globalStyleLearning,
+            host.config.memoryAiConfig
+          ).catch(error => {
+            logger.warn(`[全局表达学习] 自动总结调度失败: ${errorText(error)}`)
+          })
+        } catch (error) {
+          logger.warn(`[全局表达学习] 记录失败: ${errorText(error)}`)
+        }
       }
-    }
 
-    // 必须和全局风格观察一样放在本处理函数的第一个 await 之前。
-    // 否则高并发群消息会因异步检查返回顺序不同而重排，把 A-B-A 误学成 A 的连续两句。
-    if (host.config.expressionLearning?.enabled &&
-      ![...toIdList(e.bot?.uin), ...toIdList(ports.bot().uin)].includes(String(e.user_id || '')) &&
-      (e.msg || e.raw_message || Array.isArray(e.message))) {
-      host.expressionLearner.updateGroupExpressions(e.group_id, e.msg || e.raw_message || '', {
-        userId: e.user_id,
-        messageId: e.message_id,
-        at: Number(e.time) > 0 ? Number(e.time) * 1000 : now(),
-        message: e.message
-      }).catch(() => {})
+      // 必须和全局风格观察一样放在本处理函数的第一个 await 之前。
+      // 否则高并发群消息会因异步检查返回顺序不同而重排，把 A-B-A 误学成 A 的连续两句。
+      if (host.config.expressionLearning?.enabled &&
+        ![...toIdList(e.bot?.uin), ...toIdList(ports.bot().uin)].includes(String(e.user_id || '')) &&
+        (e.msg || e.raw_message || Array.isArray(e.message))) {
+        host.expressionLearner.updateGroupExpressions(e.group_id, e.msg || e.raw_message || '', {
+          userId: e.user_id,
+          messageId: e.message_id,
+          at: Number(e.time) > 0 ? Number(e.time) * 1000 : now(),
+          message: e.message
+        }).catch(() => {})
+      }
     }
 
     // 禁言检测：bot 在该群被禁言（个人/全员）时不触发任何回复，避免发送失败 + 表情/red 包等也无意义

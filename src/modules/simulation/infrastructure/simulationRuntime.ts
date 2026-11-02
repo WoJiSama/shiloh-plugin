@@ -51,6 +51,8 @@ export interface SimulationRuntimePorts {
   getStyleDigest?(groupId: string): Promise<string> | string
   /** 读归档消息（按人挖口头禅的数据源）：近 N 天该群消息（userId+text） */
   readArchiveMessages?(groupId: string, days: number): Promise<{ userId: string; text: string }[]>
+  /** P0 反污染：风格学习要跳过的机器人 QQ（pluginSettings.botUserIds + 自家账号） */
+  getStyleBotUserIds?(): string[]
   /** 戳群成员（B2：回应拍一拍/主动逗熟人） */
   pokeMember?(groupId: string, userId: string): Promise<{ ok: boolean; error?: string }>
   /** 群成员列表（B3）：[{userId, nick}] */
@@ -711,7 +713,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           recordSend(state, now(), 1)
           state.lastAiSendAt = now()
           invalidatePreSleepWaitByParticipation(state)
-          if (i < messages.length - 1) await sleep(cfg.turn.minSendGapMs + Math.floor(random() * 600))
+          // 拟人节奏：连发间隔带长抖动（0.4~3 秒额外停顿），避免固定节拍的机器感
+          if (i < messages.length - 1) await sleep(cfg.turn.minSendGapMs + 400 + Math.floor(random() * 2600))
         }
         await store.save(groupId, state)
         // 强化过的梗库必须落盘（发送路径只存会话状态，不存记忆库）
@@ -944,7 +947,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     try {
       const current = await store.loadUserStyle(groupId)
       if (now() - current.updatedAt < cfg.userStyle.cooldownMs) return
-      const messages = await ports.readArchiveMessages(groupId, cfg.userStyle.archiveDays)
+      // P0 反污染：机器人发言不进口头禅挖掘——学 AI 的口头禅只会更像机器
+      const botIds = new Set(ports.getStyleBotUserIds?.() || [])
+      const messages = (await ports.readArchiveMessages(groupId, cfg.userStyle.archiveDays)).filter(item => !botIds.has(String(item.userId || '')))
       if (messages.length < 50) return
       const catchphrases = mineUserCatchphrases(messages)
       const users: Record<string, string[]> = {}

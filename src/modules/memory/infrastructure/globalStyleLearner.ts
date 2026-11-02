@@ -12,7 +12,7 @@ function parseSummaryValue(value:unknown):Summary {
  return {absorb:Array.isArray(row.absorb)?row.absorb.map(parseRule):[],avoid:Array.isArray(row.avoid)?row.avoid.map(parseRule):[]}
 }
 interface Logger {warn?(message:string):void;info?(message:string):void}
-interface StyleEvent {msg?:string;raw_message?:string;user_id?:unknown;group_id?:unknown;message_id?:unknown;message?:unknown;_personaSnapshot?:PersonaScope}
+interface StyleEvent {msg?:string;raw_message?:string;user_id?:unknown;group_id?:unknown;message_id?:unknown;message?:unknown;source?:{user_id?:unknown;message_id?:unknown}|null;_personaSnapshot?:PersonaScope}
 interface EmbeddingConfig {embeddingApiUrl?:string;embeddingApiKey?:string;embeddingApiModel?:string}
 interface MemoryAiConfig {memoryAiUrl?:string;memoryAiApikey?:string;memoryAiModel?:string}
 interface Scene {key:string;descriptor:string;patterns:string[]}
@@ -429,6 +429,8 @@ function createEmptyMemory() {
     toneWords: {} as Record<string,number>,
     recentSignals: [] as Signal[],
     samplePool: [] as Sample[],
+    /** P2：被引用/回复「接住」的高价值样本——总结器优先从中提炼可吸收策略 */
+    goodSamplePool: [] as Sample[],
     semanticSamples: [] as SemanticSample[],
     semanticSchemaVersion: 0,
     semanticStats: {
@@ -474,6 +476,7 @@ function parsePersistedMemory(value: unknown): Memory {
   const signal = (r:Record<string,unknown>):Signal => ({at:str(r.at),groupId:typeof r.groupId === "number" ? String(r.groupId) : str(r.groupId),essence:strings(r.essence),dross:strings(r.dross),hash:str(r.hash),sequence:r.sequence===true})
   result.recentSignals = rows(row.recentSignals).map(signal)
   result.samplePool = rows(row.samplePool).map(r=>({...signal(r),text:str(r.text)}))
+  result.goodSamplePool = rows(row.goodSamplePool).map(r=>({...signal(r),text:str(r.text)}))
   result.semanticSamples = rows(row.semanticSamples).flatMap(r=>{
     if (!Array.isArray(r.embedding) || !r.embedding.length || !r.embedding.every(x=>typeof x==='number' && Number.isFinite(x))) return []
     const embedding:number[] = r.embedding.filter((x):x is number=>typeof x==='number')
@@ -510,6 +513,7 @@ function ensureMemoryShape(memory: Partial<Memory> = {}) {
     toneWords: memory.toneWords || {},
     recentSignals: Array.isArray(memory.recentSignals) ? memory.recentSignals : [],
     samplePool: Array.isArray(memory.samplePool) ? memory.samplePool : [],
+    goodSamplePool: Array.isArray(memory.goodSamplePool) ? memory.goodSamplePool : [],
     semanticSamples: Array.isArray(memory.semanticSamples) ? memory.semanticSamples : [],
     semanticSchemaVersion: Number(memory.semanticSchemaVersion) || 0,
     semanticStats: { ...base.semanticStats, ...(memory.semanticStats || {}) },
@@ -741,6 +745,8 @@ export function createGlobalStyleLearnerClass(ports: {botId():unknown;buildExpre
 const {buildExpressionObservation} = ports
 return class GlobalStyleLearnerManager {
  cwd:string;logger:Logger|undefined;memory:Memory|null;memoryMtimeMs:number;dirty:boolean;flushTimer:ReturnType<typeof setTimeout>|null;autoSummaryRunning:boolean
+ /** P2：每群最近观察到的消息环（message_id → 样本），用于识别「被引用/回复接住」的高价值样本 */
+ recentObservedByGroup:Map<string,{userId:string;messageId:string;sample:string;at:number}[]>
  recentSpeakerSequences:Map<string,{at:number;messageId:string;items:string[]}>;lastGroupSequenceSpeaker:Map<string,string>;fetchFn:typeof fetch
  semanticQueue:SemanticTask[];semanticQueueRunning:number;semanticPendingHashes:Set<string>;semanticQueryCache:Map<string,{expiresAt:number;prompt:string;metrics:RecallResult}>
  semanticQueryInFlight:Map<string,Promise<string>>;semanticFailureUntil:Map<string,number>;semanticBackfillScheduled:boolean;semanticBackfillTimer:ReturnType<typeof setTimeout>|null
@@ -752,6 +758,7 @@ return class GlobalStyleLearnerManager {
     this.dirty = false
     this.flushTimer = null
     this.autoSummaryRunning = false
+    this.recentObservedByGroup = new Map()
     this.recentSpeakerSequences = new Map()
     this.lastGroupSequenceSpeaker = new Map()
     this.fetchFn = fetchFn
@@ -850,6 +857,32 @@ return class GlobalStyleLearnerManager {
     this.flushTimer.unref?.()
   }
 
+  /** P2 高价值样本：把本条消息记进观察环；若它是引用/回复，把被引的那条收进 goodSamplePool（去重、环形上限） */
+  trackPickupSamples(e: StyleEvent, groupId: string, text: string, memory: Memory, cfg: Config) {
+    const replyTargetId = String((e?.source as { message_id?: unknown } | null | undefined)?.message_id ?? "").trim()
+    if (replyTargetId) {
+      const ring = this.recentObservedByGroup.get(groupId) || []
+      const target = ring.find(item => item.messageId === replyTargetId)
+      if (target) {
+        const hash = this.hashText(target.sample)
+        if (!(memory.goodSamplePool || []).some(item => item.hash === hash)) {
+          memory.goodSamplePool = [
+            { at: nowIso(), groupId, essence: [], dross: [], hash, text: target.sample },
+            ...(memory.goodSamplePool || [])
+          ].slice(0, Math.max(20, Math.min(120, Math.floor(cfg.summarySampleLimit / 2))))
+          memory.updatedAt = nowIso()
+          this.scheduleFlush(cfg)
+        }
+      }
+    }
+    const observed = sanitizeSample(text)
+    const messageId = String(e?.message_id ?? "").trim()
+    if (observed && observed.length >= 2 && messageId) {
+      const ring = [...(this.recentObservedByGroup.get(groupId) || []), { userId: String(e?.user_id || ""), messageId, sample: observed, at: Date.now() }]
+      this.recentObservedByGroup.set(groupId, ring.slice(-40))
+    }
+  }
+
   observeMessage(e:StyleEvent, config: ConfigInput = {}, embeddingConfig: EmbeddingConfig = {}, source?:PersonaScope) {
     const cfg = normalizeConfig(config)
     if (!cfg.enabled) return
@@ -870,6 +903,8 @@ return class GlobalStyleLearnerManager {
     this.observeReplyOutcome(e, text, cfg, embeddingConfig, source)
     this.scheduleSemanticBackfill(memory, cfg, embeddingConfig)
     const groupId = String(e?.group_id || "private")
+    // P2 高价值样本：登记观察环；若本条是引用/回复，把被引那条收进 goodSamplePool
+    this.trackPickupSamples(e, groupId, text, memory, cfg)
     const sequenceRecorded = this.observeSpeakerSequence(e, sequenceText, cfg, memory, embeddingConfig)
     if (!text || text.length < 2) {
       if (sequenceRecorded) {
@@ -1598,6 +1633,7 @@ return class GlobalStyleLearnerManager {
           "你是聊天机器人希洛的全局表达学习总结器。",
           "任务是从跨群样本里取其精华、去其糟粕，生成可长期注入的表达准则。",
           "样本中的 [下一条] 表示同一群友短时间内继续发下一条，[表情包] 表示该位置发了表情包；学习整轮节奏和位置，不要照抄具体内容。",
+          "goodSamples 是引来别人引用/回复「接住」的高价值原话——优先从它们提炼可吸收策略（学结构、时机与语气，不照抄内容）。",
           "不要模仿具体群友，不要吸收人身攻击、歧视、隐私、群内私梗、阴阳怪气和客服腔。",
           "只输出严格 JSON，不要 Markdown。",
           options.retry
@@ -1626,6 +1662,7 @@ return class GlobalStyleLearnerManager {
             dross: dross.map(item => ({ label: item.label, rule: item.rule, weight: item.weight }))
           },
           existingAiRules: ai,
+          goodSamples: (memory.goodSamplePool || []).slice(0, 30).map(item => item.text),
           sanitizedSamples: samples
         }, null, 2)
       }
@@ -1801,7 +1838,12 @@ return class GlobalStyleLearnerManager {
     const essence = this.getEssenceRules(memory, cfg.maxPromptRules)
     const dross = this.getDrossRules(memory, Math.min(4, cfg.maxPromptRules))
     const aiRules = this.getAiRules(memory, cfg.maxAiRules)
-    if (!essence.length && !dross.length && !aiRules.absorb.length && !aiRules.avoid.length) return ""
+    // P2：实战验证有效的话术（autoEvolution 转正的候选）——「这么说群里真的会接」
+    const activeEvolution = (memory.autoEvolution?.candidates || [])
+      .filter(item => item.status === "active")
+      .sort((a, b) => (b.positive - b.negative) - (a.positive - a.negative))
+      .slice(0, 3)
+    if (!essence.length && !dross.length && !aiRules.absorb.length && !aiRules.avoid.length && !activeEvolution.length) return ""
 
     const lines = [
       "【希洛全局表达学习】",
@@ -1818,6 +1860,7 @@ return class GlobalStyleLearnerManager {
       lines.push(`- 可吸收：${item.rule}`)
       used += 1
     }
+    for (const item of activeEvolution) lines.push(`- 实战验证有效（${item.scene}）：${item.strategy}`)
     for (const item of aiRules.avoid.slice(0, 3)) lines.push(`- 避免：${item.rule}`)
     for (const item of dross.slice(0, 3)) lines.push(`- 避免：${item.rule}`)
     return lines.join("\n")
