@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import path from "node:path"
 import { ensureBackendArtifacts } from "../utils/backendArtifactGuard.js"
 await ensureBackendArtifacts()
 const { createConsoleServer } = await import("../dist/backend/modules/platform/infrastructure/console/consoleServer.js")
@@ -39,16 +40,21 @@ try {
 }
 let style = null
 try {
-  const { globalStyleLearnerManager } = await import("../domains/memory/GlobalStyleLearnerManager.js")
+  const { GlobalStyleLearnerManager } = await import("../domains/memory/GlobalStyleLearnerManager.js")
   const { ExpressionLearner } = await import("../domains/memory/ExpressionLearner.js")
-  const { readPluginSettings } = await import("../utils/simulationRuntime.js")
+  const { readPluginSettings, lazyRedis } = await import("../utils/simulationRuntime.js")
+  // 控制台是独立进程，cwd 是插件目录：
+  // 1) 全局风格学习的文件路径按「cwd/plugins/shiloh-plugin/...」拼接——必须用云崽根构造实例才能与 bot 进程读写同一文件
+  // 2) ExpressionLearner 走 globalThis.redis——独立进程没有，按需自建本机连接（与仿真端口同款惰性代理）
+  if (!globalThis.redis) globalThis.redis = lazyRedis()
+  const styleLearner = new GlobalStyleLearnerManager({ cwd: path.resolve(pluginRoot, "..", "..") })
   const expressionLearner = new ExpressionLearner()
   style = {
     overview: async (groups) => {
       const settings = readPluginSettings()
       const cfg = settings.globalStyleLearning || {}
-      const prompt = globalStyleLearnerManager.buildPrompt(cfg)
-      const memory = globalStyleLearnerManager.readMemory(cfg)
+      const prompt = styleLearner.buildPrompt(cfg)
+      const memory = styleLearner.readMemory(cfg)
       return {
         enabled: cfg.enabled !== false,
         autoSummaryEnabled: cfg.autoSummaryEnabled !== false,
@@ -70,7 +76,7 @@ try {
       return true
     },
     removeGlobalRule: (kind, key) => {
-      globalStyleLearnerManager.removeAiRule(kind, key)
+      styleLearner.removeAiRule(kind, key)
       return true
     },
   }

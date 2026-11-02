@@ -68,7 +68,7 @@ function botById(hint) {
 
 // bot 进程用 Yunzai 全局 redis;独立控制台进程没有 globalThis.redis——按需自建本机连接(与 bot 同实例,键互通)。
 // 代理按方法名惰性转发,避免装配期就连 redis;连接失败时各调用自行报错,不炸控制台进程。
-function lazyRedis() {
+export function lazyRedis() {
   if (globalThis.redis) return globalThis.redis
   let client = null
   const connect = async () => {

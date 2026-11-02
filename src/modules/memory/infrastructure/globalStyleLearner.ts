@@ -740,7 +740,7 @@ function normalizeSummaryRequestError(value:unknown, timeoutMs:number) {
 export function createGlobalStyleLearnerClass(ports: {botId():unknown;buildExpressionObservation(text:string, options:{userId?:unknown;messageId?:unknown;message?:unknown}):{sample?:string}|null|undefined;logger?:Logger}) {
 const {buildExpressionObservation} = ports
 return class GlobalStyleLearnerManager {
- cwd:string;logger:Logger|undefined;memory:Memory|null;dirty:boolean;flushTimer:ReturnType<typeof setTimeout>|null;autoSummaryRunning:boolean
+ cwd:string;logger:Logger|undefined;memory:Memory|null;memoryMtimeMs:number;dirty:boolean;flushTimer:ReturnType<typeof setTimeout>|null;autoSummaryRunning:boolean
  recentSpeakerSequences:Map<string,{at:number;messageId:string;items:string[]}>;lastGroupSequenceSpeaker:Map<string,string>;fetchFn:typeof fetch
  semanticQueue:SemanticTask[];semanticQueueRunning:number;semanticPendingHashes:Set<string>;semanticQueryCache:Map<string,{expiresAt:number;prompt:string;metrics:RecallResult}>
  semanticQueryInFlight:Map<string,Promise<string>>;semanticFailureUntil:Map<string,number>;semanticBackfillScheduled:boolean;semanticBackfillTimer:ReturnType<typeof setTimeout>|null
@@ -748,6 +748,7 @@ return class GlobalStyleLearnerManager {
     this.cwd = cwd
     this.logger = logger
     this.memory = null
+    this.memoryMtimeMs = 0
     this.dirty = false
     this.flushTimer = null
     this.autoSummaryRunning = false
@@ -786,12 +787,20 @@ return class GlobalStyleLearnerManager {
   }
 
   readMemory(config: ConfigInput = {}) {
-    if (this.memory) return this.memory
+    if (this.memory) {
+      // 跨进程一致性：独立控制台进程会直接改写记忆文件（删规则）——mtime 变了就重读，
+      // 避免 bot 用启动时的旧缓存把已删除的规则在下次落盘时写回去（代价：丢掉未落盘的 ≤flush 窗口观察）
+      try {
+        if (this.memoryMtimeMs !== fs.statSync(this.getMemoryPath(config)).mtimeMs) this.memory = null
+      } catch { /* 文件暂时不可读：沿用缓存 */ }
+      if (this.memory) return this.memory
+    }
     const file = this.getMemoryPath(config)
     try {
       if (fs.existsSync(file)) {
         const data: unknown = JSON.parse(fs.readFileSync(file, "utf8"))
         this.memory = data && typeof data === "object" ? ensureMemoryShape(parsePersistedMemory(data)) : createEmptyMemory()
+        this.memoryMtimeMs = fs.statSync(file).mtimeMs
         return this.memory
       }
     } catch (error) {
@@ -824,6 +833,7 @@ return class GlobalStyleLearnerManager {
       const file = this.getMemoryPath(config)
       ensureDir(path.dirname(file))
       fs.writeFileSync(file, JSON.stringify(this.memory, null, 2), "utf8")
+      this.memoryMtimeMs = fs.statSync(file).mtimeMs
       this.dirty = false
     } catch (error) {
       this.logger?.warn?.(`[全局表达学习] 写入失败: ${asError(error).message}`)
