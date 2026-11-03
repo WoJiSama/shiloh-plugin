@@ -153,6 +153,8 @@ export interface SimSessionState {
   conversation: { activeUntil: number; interlocutorIds: string[]; lastTriggerUserId?: string }
   /** 陪玩模式上次主动唤醒时间（epoch ms）——冷却节奏控制，避免跑团期间刷屏/烧钱 */
   lastPlayAlongWakeAt?: number
+  /** QQ空间互动记账：上次逛空间时间 + 当日点赞/评论数（day=yyyymmdd 滚动） */
+  qzone?: { lastVisitAt?: number; likes?: { day?: string; count?: number }; comments?: { day?: string; count?: number }; visitedTids?: string[] }
   /** 群梗自动提取游标：已提取到哪条消息（seq）、上次提取时间 */
   memeCursor?: { seq: number; at: number }
 }
@@ -181,6 +183,8 @@ export interface SimulationSection {
   wakeGate?: { enabled?: boolean; model?: string }
   /** 活跃助推窗口时长（ms，默认 3 小时）：.仿真 模式 活跃 的系统兜底节奏只在该窗口内生效，过期回落自主、AI 自设配置接管 */
   activeBoostMs?: number
+  /** QQ空间互动（偷偷逛群友空间点赞/评论）：开关、冷却、日限额与好感门槛 */
+  qzone?: { enabled?: boolean; visitCooldownMs?: number; maxLikesPerDay?: number; maxCommentsPerDay?: number; minAffinity?: number }
   /** 仿真回合模型：缺省沿用 toolsAiModel；设为 glm-5.3-flash 等可整体降档（省 token） */
   turnModel?: string
   budget?: {
@@ -238,5 +242,6 @@ export interface SimRuntimeConfig {
   wakeGate: { enabled: boolean }
   /** 活跃助推窗口时长（ms） */
   activeBoostMs: number
+  qzone: { enabled: boolean; visitCooldownMs: number; maxLikesPerDay: number; maxCommentsPerDay: number; minAffinity: number }
   userStyle: { enabled: boolean; cooldownMs: number; archiveDays: number }
 }

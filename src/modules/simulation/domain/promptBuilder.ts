@@ -153,7 +153,7 @@ function reasonTail(reason: SimWakeReason | null, hasDue: boolean): string {
   const base = `【接下来】基于以上信息决定：现在回话（simSendMessage）/ 再等等（simWaitForMessages）/ 只标记已读并调整唤醒配置（simMarkRead + simSetWakeConfig）后结束回合。没有动作也可以直接结束。`
   switch (reason?.kind) {
     case 'proactiveCheck':
-      return `【接下来 · 自主行动窗口】没人叫你，这是系统给你的主动机会。可选：${hasDue ? '跟进上面到期的待办（最优先）；' : ''}开一个和新近动态相关的新话题；（有额外工具时）查点有意思的东西来分享；或者什么都不做直接结束。主动行动别超过两条消息，别@生疏的人。`
+      return `【接下来 · 自主行动窗口】没人叫你，这是系统给你的主动机会。可选：${hasDue ? '跟进上面到期的待办（最优先）；' : ''}开一个和新近动态相关的新话题；（有额外工具时）查点有意思的东西来分享；（有 simQzoneInteract 时）去某位熟群友的空间逛逛、看到有意思的说说点个赞或随口留句评论——像真人刷到好友动态那样自然，别刻意；或者什么都不做直接结束。主动行动别超过两条消息，别@生疏的人。`
     case 'continuation':
       return `【接下来 · 对话延续】刚才和你聊过的人又说话了，但没有 @ 你。第一步先判断这条是不是对你说的：他在回你、接你的话、内容明显延续你们刚才的话题才算；上下文里他在跟别人一问一答、或你判断不了，就 markRead 后安静结束。别抱着"可能是在跟我说"的心态接话——猜错比漏接尴尬得多。`
     case 'session':

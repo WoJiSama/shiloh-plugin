@@ -1,6 +1,6 @@
 
 
-interface RequestOptions {headers?:Record<string,string>;params?:Record<string,unknown>;data?:unknown;responseType?:'json'}
+interface RequestOptions {headers?:Record<string,string>;params?:Record<string,unknown>;data?:unknown;responseType?:'json'|'text'}
 export interface QQBot {uin?:string|number;cookies?:Record<string,string>;sendApi?(name:string,params:Record<string,unknown>):Promise<unknown>}
 interface QQEvent {bot?:QQBot}
 interface Cookie {name:string;value:string;domain:string;path:string;expires:number}
@@ -171,6 +171,94 @@ class QQApi {
         format: "json"
       },
       responseType: "json"
+    })
+  }
+
+  /** 看他人（或自己）的空间说说列表：目标是 hostUin，凭据仍是机器人自己的 */
+  async getQzoneFeed(targetUin: string | number, num = 10, pos = 0) {
+    const url = "https://user.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_msglist_v6"
+    const tokenInfo = await this.getToken()
+    return await request.get(url, {
+      headers: { Cookie: tokenInfo.cookies },
+      params: {
+        uin: this.Bot.uin,
+        hostUin: targetUin,
+        ftype: 0,
+        sort: 0,
+        pos,
+        num,
+        replynum: 20,
+        g_tk: tokenInfo.token,
+        code_version: 1,
+        format: "json",
+        need_private_comment: 1
+      },
+      responseType: "json"
+    })
+  }
+
+  /** 给指定说说点赞（curkey 指向该条说说） */
+  async likeQzoneFeed(targetUin: string | number, tid: string) {
+    const url = "https://user.qzone.qq.com/proxy/domain/w.qzone.qq.com/cgi-bin/likes/internal_dolike_appbar"
+    const tokenInfo = await this.getToken()
+    const botUin = String(this.Bot.uin || "")
+    return request.post(url, {
+      headers: {
+        Cookie: tokenInfo.cookies,
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      params: { g_tk: tokenInfo.token },
+      data: {
+        qzreferrer: `https://user.qzone.qq.com/${botUin}/main`,
+        opuin: botUin,
+        unikey: tid,
+        curkey: `https://user.qzone.qq.com/${targetUin}/mood/${tid}`,
+        appid: 311,
+        typename: 0,
+        abstime: 0,
+        fid: tid,
+        active: 0,
+        fupdatever: 0,
+        format: "json"
+      },
+      responseType: "json"
+    })
+  }
+
+  /** 评论指定说说（内容为纯文本） */
+  async commentQzoneFeed(targetUin: string | number, tid: string, content: string) {
+    const url = "https://user.qzone.qq.com/proxy/domain/taotao.qq.com/cgi-bin/emotion_cgi_re_feeds"
+    const tokenInfo = await this.getToken()
+    return request.post(url, {
+      headers: {
+        Cookie: tokenInfo.cookies,
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      params: { g_tk: tokenInfo.token },
+      data: {
+        uin: this.Bot.uin,
+        hostuin: targetUin,
+        tid,
+        topicid: tid,
+        commentid: "",
+        content,
+        feedstype: 100,
+        to_uin: 0,
+        replyid: 0,
+        ver: 1,
+        face: 0,
+        fontsize: "",
+        richval: "",
+        weibo: 0,
+        need_feed: 0,
+        appid: 311,
+        cb: "sharrpCallback",
+        code_version: 1,
+        format: "fs",
+        inCharset: "utf-8",
+        outCharset: "utf-8"
+      },
+      responseType: "text"
     })
   }
 

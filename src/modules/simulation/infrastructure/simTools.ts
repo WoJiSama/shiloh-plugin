@@ -7,6 +7,7 @@ import { normalizeSimWakeConfig, ensureWakeable } from '../domain/simConfig.js'
 import { activeMemories, applyAffinityDelta, capMemories, defaultAffinityEntry, dueMemories, normalizeSimMemoryEntry, SIM_MEMORY_LIMIT } from '../domain/simMemory.js'
 import type { SimWaitPlan } from '../domain/waitGate.js'
 import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
+import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
 
 export type SimSendResult = { ok: true; sent: number } | { ok: false; error: string }
 export interface SimWaitResult { hint: string; canSleepNow: boolean; newMessagesText: string; newCount: number; readThroughSeq: number; partial: boolean }
@@ -37,6 +38,10 @@ export interface SimToolContext {
   getMessageImages(seq: number): Promise<{ seq: number; images: { mime: string; base64: string }[]; error?: string }>
   /** 戳群成员（带频率护栏：每群每小时 ≤6 次） */
   pokeMember(userId: string): Promise<{ ok: boolean; error?: string }>
+  /** QQ空间互动：visit 看说说 / like 点赞 / comment 评论（内容已脱敏） */
+  qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
+  /** 空间互动的运行时配置（开关/冷却/日限额/好感门槛） */
+  qzoneConfig(): { enabled: boolean; visitCooldownMs: number; maxLikesPerDay: number; maxCommentsPerDay: number; minAffinity: number }
   /** 群成员列表（活跃者优先） */
   getGroupMembers(): Promise<{ userId: string; nick: string; active?: boolean }[] | { error: string }>
   /** 查看合并转发内容 */
@@ -487,6 +492,102 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     }
   }
 
+  // QQ空间互动（偷偷逛群友空间）：visit=看最近说说(带冷却与好感门槛), like=点赞, comment=评论(过脱敏+日限额)
+  class SimQzoneInteractTool extends AbstractTool {
+    constructor() {
+      super()
+      this.name = 'simQzoneInteract'
+      this.description = [
+        '偷偷去群友的QQ空间看看、点赞或留评论（像真人刷空间）。三种用法：',
+        'visit（看空间）:可选 userId（不给则从好感较高的群友里随机挑一位），返回该成员最近的几条说说。',
+        'like（点赞）:对 visit 结果里某条说说点赞（参数 userId + tid）。',
+        'comment（评论）:对某条说说留一句自然的评论（参数 userId + tid + text，要像熟人路过随口一句，别客套别舔）。',
+        '节奏要求：这是"偶尔路过"的行为，不是任务——一次主动机会最多逛一位群友，点赞或评论其中一两条就好，别刷屏。',
+        '只对好感较高、确实说过话的群友用；看完觉得没什么好互动的就安静返回，不用勉强。',
+      ].join('\n')
+      this.parameters = {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: 'visit | like | comment' },
+          userId: { type: 'string', description: '目标群友 QQ（visit 可省略）' },
+          tid: { type: 'string', description: '说说 id（like/comment 必填，来自 visit 结果）' },
+          text: { type: 'string', description: '评论内容（comment 必填，一句自然的短评）' },
+        },
+        required: ['action'],
+        additionalProperties: false,
+      }
+    }
+
+    async func(opts: Record<string, unknown>) {
+      const qzCfg = ctx.qzoneConfig()
+      if (!qzCfg.enabled) return 'error: 空间互动未开启（simulation.qzone.enabled）'
+      if (typeof ctx.qzoneInteract !== 'function') return 'error: 当前环境不支持空间互动'
+      const action = String(opts.action || '')
+      const userId = String(opts.userId || '').trim()
+      const tid = String(opts.tid || '').trim()
+      const state = ctx.getState()
+
+      const bumpDay = (box: { day?: string; count?: number }, delta: number, cap: number) => {
+        const today = new Date(ctx.now() + 8 * 3600_000).toISOString().slice(0, 10)
+        if (box.day !== today) { box.day = today; box.count = 0 }
+        box.count = Number(box.count || 0) + delta
+        return Number(box.count) <= cap
+      }
+
+      if (action === 'visit') {
+        let target = userId
+        if (!target) {
+          const candidates = Object.entries(ctx.getAffinity()).filter(([, v]) => v.score >= qzCfg.minAffinity).map(([k]) => k)
+          if (!candidates.length) return 'error: 还没有好感达标的群友（门槛 ' + qzCfg.minAffinity + '），先在群里多聊聊吧'
+          target = candidates[Math.floor(Math.random() * candidates.length)] || ''
+        } else {
+          const entry = ctx.getAffinity()[target]
+          if (!entry || entry.score < qzCfg.minAffinity) return `error: 和 ${target} 还不够熟（好感门槛 ${qzCfg.minAffinity}），先在群里多聊聊`
+        }
+        const lastVisit = Number(state.qzone?.lastVisitAt || 0)
+        if (ctx.now() - lastVisit < qzCfg.visitCooldownMs) {
+          const waitMin = Math.ceil((qzCfg.visitCooldownMs - (ctx.now() - lastVisit)) / 60_000)
+          return `error: 逛空间冷却中（还要 ${waitMin} 分钟），别太勤快`
+        }
+        const result = await ctx.qzoneInteract({ action: 'visit', userId: target })
+        if (!result.ok) return `error: ${result.error || '看空间失败'}`
+        state.qzone = { ...(state.qzone || {}), lastVisitAt: ctx.now() }
+        await ctx.mutate(() => {})
+        const feedLines = (result.feeds || []).slice(0, 5).map((f: { tid: string; time: string; text: string; likes: number }) => `- [tid=${f.tid}] ${f.time}：${f.text.slice(0, 120)}（${f.likes} 赞）`)
+        return [`这是群友 ${target} 最近的空间动态：`, ...(feedLines.length ? feedLines : ['（最近没有说说）'])].join('\n') + '\n（想互动就用 like/comment 传对应 tid；不感兴趣就到此为止）'
+      }
+
+      if (action === 'like') {
+        if (!userId || !tid) return 'error: like 需要 userId 和 tid'
+        if ((state.qzone?.visitedTids || []).includes(tid)) return '这条已经点过赞了'
+        if (!bumpDay(state.qzone?.likes || (state.qzone = { ...(state.qzone || {}), likes: {} }, state.qzone.likes!), 1, qzCfg.maxLikesPerDay)) {
+          return `error: 今日点赞已达上限（${qzCfg.maxLikesPerDay}），留点明天`
+        }
+        const result = await ctx.qzoneInteract({ action: 'like', userId, tid })
+        if (!result.ok) return `error: ${result.error || '点赞失败'}`
+        state.qzone = { ...(state.qzone || {}), visitedTids: [...(state.qzone?.visitedTids || []), tid].slice(-60) }
+        await ctx.mutate(() => {})
+        return `已给群友 ${userId} 的这条说说点赞`
+      }
+
+      if (action === 'comment') {
+        if (!userId || !tid || !String(opts.text || '').trim()) return 'error: comment 需要 userId、tid 和 text'
+        const text = String(opts.text).trim().slice(0, 120)
+        const redacted = redactInternalStatusLeaks(text)
+        if (redacted.heavy) return 'error: 评论内容包含内部状态特征被拦截，换一句自然的说法'
+        if (!bumpDay(state.qzone?.comments || (state.qzone = { ...(state.qzone || {}), comments: {} }, state.qzone.comments!), 1, qzCfg.maxCommentsPerDay)) {
+          return `error: 今日评论已达上限（${qzCfg.maxCommentsPerDay}），留点明天`
+        }
+        const result = await ctx.qzoneInteract({ action: 'comment', userId, tid, text: redacted.text })
+        if (!result.ok) return `error: ${result.error || '评论失败'}`
+        await ctx.mutate(() => {})
+        return `已在群友 ${userId} 的说说下留言：「${redacted.text}」`
+      }
+
+      return 'error: action 必须是 visit | like | comment'
+    }
+  }
+
   class SimGetForwardTool extends AbstractTool {
     constructor() {
       super()
@@ -573,7 +674,8 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     new SimGetMessageImagesTool(),
     new SimSendPokeTool(),
     new SimGetGroupMembersTool(),
-    new SimGetForwardTool(),
+    new SimQzoneInteractTool(),
+  new SimGetForwardTool(),
     new SimCollectStickerTool(),
   ]
 }

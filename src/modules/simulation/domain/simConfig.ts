@@ -89,6 +89,16 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       enabled: (section.wakeGate || {}).enabled !== false,
     },
     activeBoostMs: Math.min(12 * 3600_000, Math.max(10 * 60_000, Math.floor(section.activeBoostMs ?? 3 * 3600_000))),
+    qzone: (() => {
+      const raw = section.qzone || {}
+      return {
+        enabled: raw.enabled === true,
+        visitCooldownMs: Math.min(24 * 3600_000, Math.max(30 * 60_000, Math.floor(raw.visitCooldownMs ?? 2 * 3600_000))),
+        maxLikesPerDay: Math.min(50, Math.max(0, Math.floor(raw.maxLikesPerDay ?? 6))),
+        maxCommentsPerDay: Math.min(20, Math.max(0, Math.floor(raw.maxCommentsPerDay ?? 3))),
+        minAffinity: Math.min(100, Math.max(0, Math.floor(raw.minAffinity ?? 55)))
+      }
+    })(),
     meme: {
       enabled: (section.meme || {}).enabled !== false,
       extractCooldownMs: Math.max(60_000, Math.floor((section.meme || {}).extractCooldownMs ?? 600_000)),

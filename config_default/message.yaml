@@ -98,6 +98,13 @@ pluginSettings:
         # "981339693": 15
     agentPresetKeywords: []      # 默认注入唤醒触发器的关键词（AI 之后可用 simSetWakeConfig 自己改）
     # 「活跃」为长期档：管理员切到活跃后一直生效，直到切回自主/仅@；AI 每次活跃唤醒都会被引导自调自己的触发器
+    # QQ空间互动（偷偷逛群友空间点赞/评论）：默认关——打开后 AI 可在主动机会里去熟群友的空间互动
+    qzone:
+      enabled: false             # 打开后 simQzoneInteract 工具可用
+      # visitCooldownMs: 7200000 # 逛空间冷却（默认 2 小时）
+      # maxLikesPerDay: 6        # 每群每日点赞上限
+      # maxCommentsPerDay: 3     # 每群每日评论上限
+      # minAffinity: 55          # 好感门槛（只对聊得来的群友用）
     # 唤醒预判闸：低信号唤醒（关键词/概率/延续/旁观类）先用便宜模型小上下文预判值不值得进完整回合。
     # 被群友@、开场、活跃档等高价值唤醒不经过闸。预判失败自动放行（宁多花不错杀）。
     wakeGate:

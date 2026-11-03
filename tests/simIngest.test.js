@@ -333,3 +333,63 @@ test('活跃为长期档：设置后一直生效不回落；临时短窗口到�
     r.runtime.stop()
   }
 })
+
+test('空间互动工具：未开启/好感门槛/冷却/日限额/评论脱敏拦截', async () => {
+  const { createSimTools } = await import('../dist/backend/modules/simulation/infrastructure/simTools.js')
+  const calls = []
+  const state = { qzone: {}, affinity: {} }
+  const baseCtx = {
+    groupId: GROUP, now: () => BASE_AT, getState: () => state,
+    mutate: async fn => fn(state),
+    sendMessage: async () => ({ ok: true, sent: [] }),
+    waitForMessages: async () => ({ outcome: 'quiet' }),
+    applyWakeConfig: () => {}, sendsThisTurn: () => 0, maxSendItems: () => 5, messageTextMaxChars: () => 200,
+    getMemories: () => [], saveMemories: () => {}, getAffinity: () => state.affinity, saveAffinity: () => {},
+    getMessageImages: async () => ({ seq: 0, images: [] }),
+    qzoneConfig: () => ({ enabled: true, visitCooldownMs: 60_000, maxLikesPerDay: 1, maxCommentsPerDay: 1, minAffinity: 55 }),
+    qzoneInteract: async input => { calls.push(input); return { ok: true, feeds: [{ tid: 't1', time: '2026-11-03 10:00', text: '今天天气不错', likes: 3 }] } },
+    pokeMember: async () => ({ ok: true }),
+    getGroupMembers: async () => [],
+  }
+  const tools = createSimTools(baseCtx)
+  const tool = tools.find(t => t.name === 'simQzoneInteract')
+  assert.ok(tool, '工具应注册')
+
+  // 未指定 userId 且无好感达标群友
+  let out = await tool.func({ action: 'visit' }, {})
+  assert.match(out, /好感达标/)
+
+  // 好感达标 → visit 成功
+  state.affinity = { '1000': { score: 70 } }
+  out = await tool.func({ action: 'visit', userId: '1000' }, {})
+  assert.match(out, /今天天气不错/)
+  assert.match(out, /tid=t1/)
+
+  // 冷却期内再 visit 被拦
+  out = await tool.func({ action: 'visit', userId: '1000' }, {})
+  assert.match(out, /冷却中/)
+
+  // like：第一条成功，第二条超日限额
+  out = await tool.func({ action: 'like', userId: '1000', tid: 't1' }, {})
+  assert.match(out, /点赞/)
+  out = await tool.func({ action: 'like', userId: '1000', tid: 't2' }, {})
+  assert.match(out, /上限/)
+
+  // 同一条重复点赞被拦
+  state.qzone.likes.count = 0
+  out = await tool.func({ action: 'like', userId: '1000', tid: 't1' }, {})
+  assert.match(out, /已经点过/)
+
+  // comment：含内部路径被脱敏拦截
+  out = await tool.func({ action: 'comment', userId: '1000', tid: 't1', text: '看下 /opt/trss-yunzai/plugins 里的配置' }, {})
+  assert.match(out, /拦截|自然/)
+
+  // comment：正常内容通过
+  out = await tool.func({ action: 'comment', userId: '1000', tid: 't1', text: '这条说说我喜欢' }, {})
+  assert.match(out, /留言/)
+
+  // 关闭开关
+  baseCtx.qzoneConfig = () => ({ enabled: false, visitCooldownMs: 60_000, maxLikesPerDay: 1, maxCommentsPerDay: 1, minAffinity: 55 })
+  out = await tool.func({ action: 'visit', userId: '1000' }, {})
+  assert.match(out, /未开启/)
+})

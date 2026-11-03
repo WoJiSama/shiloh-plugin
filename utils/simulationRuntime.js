@@ -333,6 +333,42 @@ export const simulationRuntime = createSimulationRuntime({
       return { ok: false, error: error?.message || String(error) }
     }
   },
+  // QQ空间互动：QQApi 走 NapCat get_credentials 拿 qzone 域凭据（与发说说同链路）。
+  // visit 返回紧凑说说列表（tid/时间/文本/赞数），like/comment 直通。
+  qzoneInteract: async ({ action, userId, tid, text }) => {
+    try {
+      const { QQApi } = await import('./QQApi.js')
+      const api = new QQApi({})
+      if (action === 'visit') {
+        const raw = await api.getQzoneFeed(String(userId || ''), 10, 0)
+        const msglist = (raw && typeof raw === 'object' ? raw.msglist : null) || []
+        const feeds = (Array.isArray(msglist) ? msglist : []).slice(0, 8).map(item => {
+          const row = item && typeof item === 'object' ? item : {}
+          const tid = String(row.tid || '')
+          const ts = Number(row.created_time || 0)
+          const time = ts > 0 ? new Date(ts * 1000 + 8 * 3600_000).toISOString().replace('T', ' ').slice(0, 16) : '未知时间'
+          const content = row.content || (Array.isArray(row.pic) ? '[图片说说]' : '')
+          return { tid, time, text: String(content).slice(0, 200), likes: Number((row.fwd || {}).cntlike || 0) }
+        }).filter(f => f.tid)
+        return { ok: true, feeds }
+      }
+      if (action === 'like') {
+        const raw = await api.likeQzoneFeed(String(userId || ''), String(tid || ''))
+        const code = Number(raw && typeof raw === 'object' ? (raw.ret || raw.code) : -1)
+        return Number(code) === 0 ? { ok: true } : { ok: false, error: `点赞返回 ${JSON.stringify(raw).slice(0, 120)}` }
+      }
+      if (action === 'comment') {
+        const raw = await api.commentQzoneFeed(String(userId || ''), String(tid || ''), String(text || ''))
+        const body = String(raw || '')
+        // 该接口返回 fs 格式（回调包裹）——成功时含 "code":0 或 ret=0
+        return /(?:\"code\":0|"code":0|ret=0|code=0)/.test(body) ? { ok: true } : { ok: false, error: `评论返回异常 ${body.slice(0, 120)}` }
+      }
+      return { ok: false, error: `未知 action ${action}` }
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error) }
+    }
+  },
+
   // 唤醒预判闸：便宜模型（缺省 memoryAi 的 flash 档）+ 紧凑上下文判断低信号唤醒值不值得进完整回合。
   // 返回 null = 预判不可用 → runtime fail-open 放行。
   wakeGateJudge: async ({ reason, messages }) => {

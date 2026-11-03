@@ -64,6 +64,8 @@ export interface SimulationRuntimePorts {
   pokeMember?(groupId: string, userId: string): Promise<{ ok: boolean; error?: string }>
   /** 唤醒预判闸：低信号唤醒先判断值不值得进完整回合；返回 null = 预判不可用（fail-open 放行） */
   wakeGateJudge?(input: { reason: string; messages: { name: string; text: string; atSelf: boolean }[] }): Promise<{ engage: boolean; reason?: string } | null>
+  /** QQ空间互动：看指定成员的最近说说 / 点赞 / 评论（凭据由装配层处理；内容已在上层脱敏） */
+  qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
   /** 群成员列表（B3）：[{userId, nick}] */
   getGroupMembers?(groupId: string): Promise<{ userId: string; nick: string }[]>
   /** 合并转发内容（B4）：逐条正文 + 图片 URL 列表（按 [图片#N] 编号）+ 内嵌转发 id 列表（可递归展开） */
@@ -802,6 +804,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       saveMemories: memories => { memoryBox.list = memories; void store.saveMemories(groupId, memories) },
       getAffinity: () => affinityBox.map,
       saveAffinity: map => { affinityBox.map = map; void store.saveAffinity(groupId, map) },
+      qzoneConfig: () => cfg.qzone,
+      ...(typeof ports.qzoneInteract === 'function' ? { qzoneInteract: (input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }) => ports.qzoneInteract!(input) } : {}),
       pokeMember: async (userId: string) => {
         if (typeof ports.pokeMember !== 'function') return { ok: false, error: '戳一戳不可用' }
         if (!/^\d{1,12}$/.test(userId)) return { ok: false, error: 'userId 必须是 QQ 号' }
