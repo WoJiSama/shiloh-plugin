@@ -1027,6 +1027,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
   }
 
+  /** 永久活跃档的到期哨兵值（2100-01-01）：活跃=长期生效，不自动回落 */
+  const ACTIVE_FOREVER_MS = 4102444800000
+
   /** 活跃助推是否生效（窗口未过期） */
   function playAlongActive(groupId: string): boolean {
     const until = Number(overridesCache?.playAlongUntil?.[groupId])
@@ -1065,19 +1068,19 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const isAtOnly = atOnlyList.includes(groupId)
     const isBoosted = playAlongActive(groupId)
     const gapMin = Math.round(runtimeConfig().wake.playAlongGapMs / 60_000)
-    const boostHour = Math.round(runtimeConfig().activeBoostMs / 3600_000)
     if (mode === 'query') {
       if (isAtOnly) return `本群回复模式：仅被@才回（AI 仍在看全部消息，只有被@或引用时才说话；.仿真 模式 自主 可恢复）`
       if (isBoosted) {
-        const leftMin = Math.max(1, Math.ceil((Number(overridesCache?.playAlongUntil?.[groupId]) - now()) / 60_000))
-        return `本群回复模式：自主·活跃助推中（还剩约 ${leftMin >= 60 ? `${Math.round(leftMin / 60)} 小时` : `${leftMin} 分钟`}；窗口内每 ${gapMin} 分钟最多兜底跟进一次，AI 会同时收到自调引导；到期自动回落自主档）`
+        const until = Number(overridesCache?.playAlongUntil?.[groupId])
+        const left = until >= ACTIVE_FOREVER_MS ? '长期' : `剩约 ${Math.max(1, Math.ceil((until - now()) / 60_000))} 分钟`
+        return `本群回复模式：自主·活跃（${left}；群里持续有动静时每 ${gapMin} 分钟最多兜底跟进一次，AI 会同步收到自调引导）`
       }
-      return `本群回复模式：自主（观察全部消息，触发器命中/@点名时说话；.仿真 模式 活跃 可开启 ${boostHour} 小时活跃助推）`
+      return `本群回复模式：自主（观察全部消息，触发器命中/@点名时说话；.仿真 模式 活跃 可切换为长期活跃档）`
     }
     const current = isAtOnly ? 'atOnly' : isBoosted ? 'active' : 'auto'
     if (mode === current) return `本群回复模式已是「${mode === 'atOnly' ? '仅被@才回' : mode === 'active' ? '自主·活跃' : '自主'}」，无需修改`
     const playAlongUntil = { ...(overridesCache?.playAlongUntil || {}) }
-    if (mode === 'active') playAlongUntil[groupId] = now() + runtimeConfig().activeBoostMs
+    if (mode === 'active') playAlongUntil[groupId] = ACTIVE_FOREVER_MS
     else delete playAlongUntil[groupId]
     const overrides = nextOverrides({
       atOnly: mode === 'atOnly' ? [...new Set([...atOnlyList, groupId])] : atOnlyList.filter(g => g !== groupId),
@@ -1092,7 +1095,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       return `群 ${groupId} 已设为「仅被@才回」：消息照常看、照常记忆，但只有被@或引用时才说话（.仿真 模式 自主 可恢复）`
     }
     if (mode === 'active') {
-      return `群 ${groupId} 已开启 ${boostHour} 小时活跃助推：窗口内群里持续有动静时每 ${gapMin} 分钟最多兜底跟进一次，AI 会收到引导并用 simSetWakeConfig 自调触发器——到期自动回落自主档，由它自己的配置接管（跑团若开了骰娘 log，记得 .骰娘 跑团AI 开）`
+      return `群 ${groupId} 已设为「自主·活跃」（长期生效）：群里持续有动静时每 ${gapMin} 分钟最多兜底跟进一次，AI 会同步用 simSetWakeConfig 调自己的触发器；.仿真 模式 自主 可调回（跑团若开了骰娘 log，记得 .骰娘 跑团AI 开）`
     }
     return `群 ${groupId} 已设为「自主」：观察全部消息，触发器命中/@点名时说话（.仿真 模式 活跃 可再开助推）`
   }
@@ -1105,7 +1108,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const state = live ?? await store.load(groupId)
     return [
       `模式：${active ? '仿真（AI 自主收发）' : '普通'}${running.has(groupId) ? '（回合进行中）' : ''}`,
-      `回复模式：${(overridesCache?.atOnly || []).includes(groupId) ? '仅被@才回（管理员设定，优先于 AI 自设触发器）' : playAlongActive(groupId) ? `自主·活跃助推中（剩 ${Math.max(1, Math.ceil((Number(overridesCache?.playAlongUntil?.[groupId]) - now()) / 60_000))} 分钟）` : '自主'}`,
+      `回复模式：${(overridesCache?.atOnly || []).includes(groupId) ? '仅被@才回（管理员设定，优先于 AI 自设触发器）' : playAlongActive(groupId) ? (Number(overridesCache?.playAlongUntil?.[groupId]) >= 4102444800000 ? '自主·活跃（长期）' : `自主·活跃（剩 ${Math.max(1, Math.ceil((Number(overridesCache?.playAlongUntil?.[groupId]) - now()) / 60_000))} 分钟）`) : '自主'}`,
       `范围：${cfg.enabled ? (cfg.allGroups ? '默认全群开启，可按群 .仿真 关' : '仅显式清单') : '总开关关闭'}`,
       `唤醒配置：mode=${state.wakeConfig.mode}${state.wakeConfig.sleepUntil ? `（${Math.max(0, Math.ceil((state.wakeConfig.sleepUntil - now()) / 60_000))} 分钟后到期）` : ''}`,
       `触发器：${JSON.stringify(state.wakeConfig.triggers)}`,

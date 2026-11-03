@@ -195,7 +195,7 @@ test('活跃助推：窗口内群里有动静按节奏兜底唤醒，冷却期�
     assert.ok(interlocutors(r.kv).includes('40000'), '冷却期过后恢复主动唤醒')
 
     // 命令往返（三档：仅@/自主/活跃）
-    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主·活跃助推中/)
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主·活跃/)
     assert.match(await r.runtime.setGroupReplyMode(GROUP, 'active'), /已是「自主·活跃」/)
     assert.match(await r.runtime.setGroupReplyMode(GROUP, 'auto'), /已设为「自主」/)
     await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '50000', msg: '继续赶路', message: [], sender: { nickname: '队友' } })
@@ -300,24 +300,35 @@ test('唤醒预判闸：拦截低信号唤醒不进完整回合；被@旁路；�
   }
 })
 
-test('活跃助推到期自动回落：过期后普通消息不再兜底唤醒，档位查询回自主', async () => {
+test('活跃为长期档：设置后一直生效不回落；临时短窗口到期仍兜底（历史数据兼容）', async () => {
   let clock = BASE_AT
-  const r = buildRuntime({ activeUntil: BASE_AT + 10 * 60_000, randomValue: 0.99, now: () => clock })
+  // 场景一：历史短窗口数据到期后不再兜底（存量兼容）
+  const legacy = buildRuntime({ activeUntil: BASE_AT + 10 * 60_000, randomValue: 0.99, now: () => clock })
+  try {
+    await seedConversation(legacy.runtime)
+    await legacy.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '剧情推进', message: [], sender: { nickname: 'KP' } })
+    assert.ok(interlocutors(legacy.kv).includes('30000'), '短窗口内兜底唤醒生效')
+    clock = BASE_AT + 11 * 60_000
+    await legacy.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '40000', msg: '剧情继续', message: [], sender: { nickname: '队友' } })
+    assert.ok(!interlocutors(legacy.kv).includes('40000'), '短窗口到期后不再兜底')
+  } finally {
+    legacy.runtime.stop()
+  }
+
+  // 场景二：命令设置的活跃 = 长期档，跨"到期点"仍持续兜底
+  clock = BASE_AT
+  const r = buildRuntime({ randomValue: 0.99, now: () => clock })
   try {
     await seedConversation(r.runtime)
-    // 窗口内：兜底唤醒生效
-    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '30000', msg: '剧情推进', message: [], sender: { nickname: 'KP' } })
-    assert.ok(interlocutors(r.kv).includes('30000'), '窗口内兜底唤醒生效')
-    // 时间前进越过到期点：不再兜底
-    clock = BASE_AT + 11 * 60_000
-    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '40000', msg: '剧情继续推进', message: [], sender: { nickname: '队友' } })
-    assert.ok(!interlocutors(r.kv).includes('40000'), '到期后不再兜底唤醒')
-    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主（/, '档位回落自主')
-    // 再次设活跃 → 新窗口生效，主动档文案含助推说明
-    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'active'), /活跃助推.*simSetWakeConfig.*自动回落/s)
-    clock = BASE_AT + 12 * 60_000
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'active'), /长期生效/)
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'query'), /自主·活跃（长期/, '查询显示长期')
+    clock = BASE_AT + 48 * 3600_000 // 两天后
     await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '50000', msg: '还在跑团', message: [], sender: { nickname: '队友' } })
-    assert.ok(interlocutors(r.kv).includes('50000'), '续期后兜底恢复')
+    assert.ok(interlocutors(r.kv).includes('50000'), '长期活跃跨天仍兜底')
+    assert.match(await r.runtime.setGroupReplyMode(GROUP, 'auto'), /已设为「自主」/, '可手动调回')
+    clock = BASE_AT + 49 * 3600_000
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '60000', msg: '继续', message: [], sender: { nickname: '队友' } })
+    assert.ok(!interlocutors(r.kv).includes('60000'), '调回自主后不再兜底')
   } finally {
     r.runtime.stop()
   }
