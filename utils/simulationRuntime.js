@@ -134,16 +134,13 @@ export const simulationRuntime = createSimulationRuntime({
     try {
       const { extractBilibiliBvid, ensureBilibiliBuvidCookie } = await import('../dist/backend/modules/media/infrastructure/bilibiliMessage.js')
       const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-      const baseHeaders = { 'user-agent': UA, referer: 'https://www.bilibili.com', accept: 'application/json' }
+      // B站风控收紧(实测 2026-11-03):view 详情接口裸请求也 -412——统一取 finger/spi 指纹
+      // (ensureBilibiliBuvidCookie 自带 TTL 缓存与并发去重)，搜索与详情共用同一 cookie。
+      let cookieHeader = ''
+      try { cookieHeader = String(await ensureBilibiliBuvidCookie(fetch) || '') } catch { /* 拿不到指纹就裸试 */ }
+      const baseHeaders = { 'user-agent': UA, referer: 'https://www.bilibili.com', accept: 'application/json', ...(cookieHeader ? { cookie: cookieHeader } : {}) }
       let bvid = input?.url ? extractBilibiliBvid(String(input.url)) : ''
       if (!bvid && input?.query) {
-        // B站风控:无设备指纹 cookie 的搜索会被 412/HTML 拦——先 finger/spi 拿 buvid3/4 再搜(与 SearchVideoTool 同姿势)
-        let cookieHeader = ''
-        try {
-          const spi = await fetch('https://api.bilibili.com/x/frontend/finger/spi', { headers: { 'user-agent': UA, Referer: 'https://www.bilibili.com' }, signal: AbortSignal.timeout(10000) })
-          const spiData = (await spi.json())?.data || {}
-          if (spiData.b_3 && spiData.b_4) cookieHeader = `buvid3=${spiData.b_3}; buvid4=${spiData.b_4}`
-        } catch { /* 拿不到指纹就裸搜 */ }
         const searchUrl = `https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(String(input.query).slice(0, 60))}&search_type=video`
         const searchHeaders = referer => ({ accept: 'application/json, text/plain, */*', 'accept-language': 'zh-CN,zh;q=0.9', Referer: referer, 'user-agent': UA, ...(cookieHeader ? { cookie: cookieHeader } : {}) })
         let raw = await fetch(searchUrl, { headers: searchHeaders('https://www.bilibili.com'), signal: AbortSignal.timeout(15000) }).then(r => r.text()).catch(() => '')
@@ -160,9 +157,12 @@ export const simulationRuntime = createSimulationRuntime({
         bvid = String(first.bvid)
       }
       if (!bvid) return { ok: false, error: '无法从输入解析出B站视频' }
-      const view = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`, {
-        headers: baseHeaders, signal: AbortSignal.timeout(15000)
-      }).then(r => r.json()).catch(() => null)
+      const viewUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`
+      let view = await fetch(viewUrl, { headers: baseHeaders, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => null)
+      // -412 兜底：换 search 域 Referer 重试一次（指纹缓存过期或风控抖动时仍有机会过）
+      if (Number(view?.code) === -412) {
+        view = await fetch(viewUrl, { headers: { ...baseHeaders, referer: 'https://search.bilibili.com' }, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => null)
+      }
       const data = view?.data
       if (Number(view?.code) !== 0 || !data?.bvid) return { ok: false, error: 'B站视频信息获取失败' }
       const title = String(data.title || 'B站视频').replace(/[\n\r\[\]]/g, ' ').slice(0, 40)
