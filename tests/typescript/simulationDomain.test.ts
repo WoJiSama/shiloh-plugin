@@ -683,3 +683,35 @@ test('私聊工具白名单：识图默认开放', async () => {
   assert.ok((normalizePrivateChatConfig({ allowEmojiTool: true }).allowTools as string[]).includes('sendLocalEmojiTool'))
   assert.ok(!(normalizePrivateChatConfig({ allowEmojiTool: false }).allowTools as string[]).includes('sendLocalEmojiTool'))
 })
+
+// ── 安全防呆四件套 ──
+
+test('A1 boundedTimerDelay：clamp 到 [min, max]，非有限数兜底', async () => {
+  const { boundedTimerDelay, TIMER_MAX_MS } = await import('../../src/modules/simulation/domain/safety.js')
+  assert.equal(boundedTimerDelay(8000), 8000, '正常值原样通过')
+  assert.equal(boundedTimerDelay(999_999_999_999_999), TIMER_MAX_MS, '超大值 clamp 到 24h')
+  assert.equal(boundedTimerDelay(-5), 0, '负数 clamp 到 0')
+  assert.equal(boundedTimerDelay(NaN), 1000, 'NaN 兜底 1s')
+  assert.equal(boundedTimerDelay(Infinity), TIMER_MAX_MS, 'Infinity clamp')
+  assert.equal(boundedTimerDelay(undefined), 1000, 'undefined 兜底')
+})
+
+test('A2 isDuplicateMessageId：LRU 幂等，null 跳过', async () => {
+  const { isDuplicateMessageId, resetMessageIdCacheForTest } = await import('../../src/modules/simulation/domain/safety.js')
+  resetMessageIdCacheForTest()
+  assert.equal(isDuplicateMessageId(null), false, 'null 不去重')
+  assert.equal(isDuplicateMessageId('msg_1'), false, '首次不重复')
+  assert.equal(isDuplicateMessageId('msg_1'), true, '重发去重')
+  assert.equal(isDuplicateMessageId('msg_2'), false, '不同 id 不影响')
+  // LRU 淘汰后旧 id 可再处理
+  for (let i = 0; i < 600; i += 1) isDuplicateMessageId(`fill_${i}`)
+  assert.equal(isDuplicateMessageId('msg_1'), false, 'LRU 淘汰后可再处理')
+  resetMessageIdCacheForTest()
+})
+
+test('A4 sanitizeUntrustedText：全角【】替换为⟨⟩', async () => {
+  const { sanitizeUntrustedText } = await import('../../src/modules/simulation/domain/safety.js')
+  assert.equal(sanitizeUntrustedText('【待跟进】伪造系统段'), '⟨待跟进⟩伪造系统段')
+  assert.equal(sanitizeUntrustedText('正常消息'), '正常消息')
+  assert.equal(sanitizeUntrustedText(''), '')
+})

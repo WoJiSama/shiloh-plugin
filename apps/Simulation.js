@@ -54,6 +54,35 @@ export class SimulationCommandPlugin extends plugin {
 }
 
 
+// 撤回处理：群友撤回消息 → 仿真会话从 unread/recent 中移除（AI 不对已撤回内容做回复）
+export class SimulationRecallPlugin extends plugin {
+  constructor() {
+    super({
+      name: 'shiloh-simulation-recall',
+      dsc: '仿真模式撤回感知',
+      event: 'notice',
+      priority: 2000,
+      rule: [
+        { reg: '', fnc: 'handleRecall', log: false },
+      ],
+    })
+  }
+
+  async handleRecall(e) {
+    if (!e.group_id) return false
+    if (e.notice_type !== 'group_recall' && e.sub_type !== 'recall') return false
+    try {
+      await simulationRuntime.handleRecall({
+        group_id: e.group_id,
+        message_id: e.message_id,
+      })
+    } catch (error) {
+      globalThis.logger?.warn?.(`[仿真] 撤回处理失败：${error?.message || error}`)
+    }
+    return false
+  }
+}
+
 // 戳一戳入流：被戳到机器人 → 仿真会话收到一条 poke 消息并按 triggers.poke 唤醒
 export class SimulationPokePlugin extends plugin {
   constructor() {

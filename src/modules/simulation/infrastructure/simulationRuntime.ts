@@ -4,6 +4,7 @@ import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMes
 import { defaultSimRuntimeConfig } from '../domain/simConfig.js'
 import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
 import { mineUserCatchphrases } from '../domain/userStyle.js'
+import { boundedTimerDelay, safeSetTimeout, isDuplicateMessageId, sanitizeUntrustedText } from '../domain/safety.js'
 import { evaluateWakeTrigger, formatWakeReason, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
 import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
@@ -100,6 +101,8 @@ export interface SimulationRuntime {
   listMemories(groupId: string): Promise<string>
   listAffinity(groupId: string, askerId?: string): Promise<string>
   ingestPoke(e: { group_id?: string | number; user_id?: string | number; self_id?: string | number; target_id?: string | number }): Promise<boolean>
+  /** A3 撤回处理：从 unread/recent 里移除已撤回的消息 */
+  handleRecall(e: { group_id?: string | number; message_id?: string | number }): Promise<boolean>
   /** 控制台总览：全部生效群的状态列表 */
   overview(): Promise<Record<string, unknown>>
   describeGroup(groupId: string): Promise<Record<string, unknown>>
@@ -132,7 +135,7 @@ export interface SimIngestEvent {
 
 interface PendingWake { timer: ReturnType<typeof setTimeout>; reason: SimWakeReason }
 
-function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)) }
+function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, boundedTimerDelay(ms))) }
 function record(value: unknown): Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {} }
 function safeText(resolve: () => string | undefined): string {
   try { return String(resolve() || '') } catch { return '' }
@@ -332,6 +335,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   async function ingest(e: SimIngestEvent): Promise<boolean> {
     const groupId = String(e.group_id || '')
     if (!groupId) return false
+    // A2 messageId 幂等：适配器重发同一条消息时跳过（防 seq 跳号 + 重复触发唤醒）
+    if (isDuplicateMessageId(e.message_id)) return true
     await refreshGroupState()
     if (!isCapture(e)) return false
     void store.addKnownGroup(groupId).catch(() => { /* 登记失败不影响本条消息 */ })
@@ -361,7 +366,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       messageId: e.message_id ?? null,
       userId,
       name: String(e.sender?.card || e.sender?.nickname || userId || '群友'),
-      text: text.slice(0, cfg.turn.messageTextMaxChars),
+      text: sanitizeUntrustedText(text).slice(0, cfg.turn.messageTextMaxChars),
       at: e.time && Number(e.time) > 0 ? Number(e.time) * 1000 : now(),
       atSelf,
       ...(atOther ? { atOther: true } : {}),
@@ -428,12 +433,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
     // 定时器类唤醒到点即醒（不再等合并窗），消息类按 batchWindowMs 合并可能更高优先级的触发
     const delay = TIMER_WAKE_REASONS.includes(reason.kind) ? 1_000 : config.wake.batchWindowMs
-    const timer = setTimeout(() => {
+    const timer = safeSetTimeout(() => {
       // 读 map 里的最新 reason：合并窗口内高优先级触发会替换 map 条目，闭包里的旧值会把它降级（实测抓到的潜伏 bug）
       const entry = pendingWakes.get(groupId)
       pendingWakes.delete(groupId)
       void startTurn(groupId, entry?.reason ?? reason)
-    }, delay)
+    }, delay, 3_600_000)
     pendingWakes.set(groupId, { timer, reason })
   }
 
@@ -470,7 +475,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           return
         }
         if (!retryTimers.has(groupId)) {
-          const timer = setTimeout(() => {
+          const timer = safeSetTimeout(() => {
             retryTimers.delete(groupId)
             void startTurn(groupId, reason)
           }, 60_000)
@@ -746,7 +751,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           state.lastAiSendAt = now()
           invalidatePreSleepWaitByParticipation(state)
           // 拟人节奏：连发间隔带长抖动（0.4~3 秒额外停顿），避免固定节拍的机器感
-          if (i < messages.length - 1) await sleep(cfg.turn.minSendGapMs + 400 + Math.floor(random() * 2600))
+          if (i < messages.length - 1) await sleep(boundedTimerDelay(cfg.turn.minSendGapMs + 400 + Math.floor(random() * 2600), 60_000))
         }
         await store.save(groupId, state)
         // 强化过的梗库必须落盘（发送路径只存会话状态，不存记忆库）
@@ -895,7 +900,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       let set = waiters.get(groupId)
       if (!set) { set = new Set(); waiters.set(groupId, set) }
       set.add(finish)
-      const timer = setTimeout(finish, Math.max(20, timeoutMs))
+      const timer = safeSetTimeout(finish, timeoutMs, 120_000)
     })
   }
 
@@ -996,7 +1001,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   async function start() {
     if (sweeper) return
     await refreshGroupState(true)
-    sweeper = setInterval(() => { void sweepOnce() }, SIM_SWEEP_INTERVAL_MS)
+    sweeper = setInterval(() => { void sweepOnce() }, boundedTimerDelay(SIM_SWEEP_INTERVAL_MS, 3_600_000, 5_000))
     sweeper.unref?.()
     const cfg = runtimeConfig()
     const scope = !cfg.enabled ? '总开关关闭，全部群走普通模式'
@@ -1125,6 +1130,26 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const cfg = runtimeConfig()
     await store.reset(groupId, cfg.agentPresetKeywords)
     return `群 ${groupId} 的仿真会话已重置（历史/水位/预算清空，启用状态保留；长期记忆与好感度不受影响）`
+  }
+
+  /** A3 撤回：从 unread/recent 移除对应消息，水位只增不减 */
+  async function handleRecall(e: { group_id?: string | number; message_id?: string | number }): Promise<boolean> {
+    const groupId = String(e.group_id || '')
+    const messageId = String(e.message_id ?? '')
+    if (!groupId || !messageId) return false
+    await refreshGroupState()
+    if (!groupActive(runtimeConfig(), groupId)) return false
+    const state = liveStates.get(groupId) ?? await store.load(groupId)
+    const removeMsg = (list: SimMessage[]) => list.filter(m => String(m.messageId ?? '') !== messageId)
+    const beforeUnread = state.unread.length
+    const beforeRecent = state.recent.length
+    state.unread = removeMsg(state.unread)
+    state.recent = removeMsg(state.recent)
+    if (state.unread.length < beforeUnread || state.recent.length < beforeRecent) {
+      await store.save(groupId, state)
+      logger.info(`[仿真] 群 ${groupId} 消息已撤回（messageId=${messageId.slice(0, 12)}），从未读/近期中移除`)
+    }
+    return true
   }
 
   /** 戳一戳入流：被戳 = 一条 kind='poke' 消息 + triggers.poke 唤醒（qq-bridge 的拍一拍机制） */
@@ -1327,5 +1352,5 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
 }
