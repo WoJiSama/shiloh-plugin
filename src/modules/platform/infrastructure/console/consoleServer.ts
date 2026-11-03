@@ -95,6 +95,9 @@ export interface ConsoleExtraPorts {
     setGroupBudget?(groupId: string, cap: number): Promise<string>
     setGroupTurnsCap?(groupId: string, cap: number): Promise<string>
     setReplyMode?(groupId: string, mode: 'atOnly' | 'auto' | 'active'): Promise<string>
+    listPersonProfiles?(): Promise<unknown>
+    deletePersonProfile?(userId: string): Promise<boolean>
+    deletePersonProfileField?(userId: string, field: string, value?: string): Promise<unknown>
     setDefaultBudget?(cny: number): Promise<string>
   }
 }
@@ -2100,6 +2103,27 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { ok: true, message })
       }
       return sendJson(res, 200, { ok: true, detail: await simulation.setGroup(groupId, action) })
+    }
+    if (url.pathname === "/api/person-profiles" && req.method === "GET") {
+      if (!simulation || typeof simulation.listPersonProfiles !== "function") return sendJson(res, 503, { error: "仿真运行时未接入或版本过旧" })
+      return sendJson(res, 200, { profiles: await simulation.listPersonProfiles() })
+    }
+    if (url.pathname === "/api/person-profiles/delete" && req.method === "POST") {
+      if (!simulation || typeof simulation.deletePersonProfile !== "function") return sendJson(res, 503, { error: "仿真运行时未接入或版本过旧" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const userId = String(body?.userId || "")
+      if (!/^\d{4,12}$/.test(userId)) return sendJson(res, 400, { error: "userId 必须是 QQ 号" })
+      return sendJson(res, 200, { ok: true, message: await simulation.deletePersonProfile(userId) ? `已删除 ${userId} 的全部跨群记忆（档案+全局好感）` : "删除失败" })
+    }
+    if (url.pathname === "/api/person-profiles/delete-field" && req.method === "POST") {
+      if (!simulation || typeof simulation.deletePersonProfileField !== "function") return sendJson(res, 503, { error: "仿真运行时未接入或版本过旧" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const userId = String(body?.userId || "")
+      const field = String(body?.field || "")
+      if (!/^\d{4,12}$/.test(userId)) return sendJson(res, 400, { error: "userId 必须是 QQ 号" })
+      if (!["name", "interests", "taboos", "traits", "facts"].includes(field)) return sendJson(res, 400, { error: "field 必须是 name|interests|taboos|traits|facts" })
+      const result = await simulation.deletePersonProfileField(userId, field, body?.value === undefined ? undefined : String(body.value))
+      return sendJson(res, 200, { ok: true, profile: result })
     }
     if (url.pathname === "/api/simulation/budget-default" && req.method === "POST") {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })

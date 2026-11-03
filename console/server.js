@@ -34,6 +34,9 @@ try {
     setGroupTurnsCap: (groupId, cap) => simulationRuntime.setGroupTurnsCap(groupId, cap),
     setReplyMode: (groupId, mode) => simulationRuntime.setGroupReplyMode(groupId, mode),
     setDefaultBudget: (cny) => simulationRuntime.setDefaultBudget(cny),
+    listPersonProfiles: () => simulationRuntime.listPersonProfiles(),
+    deletePersonProfile: (userId) => simulationRuntime.deletePersonProfile(userId),
+    deletePersonProfileField: (userId, field, value) => simulationRuntime.deletePersonProfileField(userId, field, value),
   }
 } catch (error) {
   console.warn?.(`[console] 仿真运行时不可用（相关页面将显示未启用）：${error?.message || error}`)

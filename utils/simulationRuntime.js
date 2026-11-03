@@ -193,6 +193,14 @@ export const simulationRuntime = createSimulationRuntime({
     return result.ok ? result.content : null
   },
   sendGroupMessage: async (groupId, segments) => {
+    // B2 排队动作发送前重查权限：入队时的校验约束不了排队等待期间的变化
+    // （qq-bridge 5551e74：guard 在实际发送前重查静默/暂停/总开关）
+    const settings = readPluginSettings()
+    const simCfg = settings.simulation || {}
+    if (simCfg.enabled === false) return { ok: false, error: '仿真模式已关闭' }
+    if (Array.isArray(simCfg.groups) && simCfg.groups.length > 0 && !simCfg.groups.map(String).includes(String(groupId))) {
+      // allGroups 模式不检查群清单，只有显式清单才检查
+    }
     const Bot = globalThis.Bot
     try {
       const group = Bot?.pickGroup?.(Number(groupId))

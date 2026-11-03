@@ -119,6 +119,10 @@ export interface SimulationRuntime {
   setGroupTurnsCap(groupId: string, cap: number): Promise<string>
   /** 控制台：设置/清除全局默认每日金额上限（cny<=0 清除，回落 yaml） */
   setDefaultBudget(cny: number): Promise<string>
+  /** 控制台「人物记忆」：列出/删除跨群人物档案（透明化与被遗忘权） */
+  listPersonProfiles(): Promise<{ userId: string; name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[]; globalAffinity?: number; updatedAt?: number }[]>
+  deletePersonProfile(userId: string): Promise<boolean>
+  deletePersonProfileField(userId: string, field: string, value?: string): Promise<unknown>
 }
 
 export interface SimIngestEvent {
@@ -735,6 +739,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         return value
       },
       sendMessage: async (messages, opts): Promise<SimSendResult> => {
+        // B2 排队动作发送前重查：回合可能已持续数十秒，期间管理员可能关了仿真/切了群
+        if (!groupActive(runtimeConfig(), groupId)) {
+          return { ok: false, error: '仿真模式已对本群关闭，本轮不再发送消息' }
+        }
         const verdict = checkSendAllowance(state, cfg, now(), sendsThisTurn)
         if (!verdict.allowed) return { ok: false, error: verdict.reason }
         let sent = 0
@@ -1050,6 +1058,15 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   async function start() {
     if (sweeper) return
     await refreshGroupState(true)
+    // B4 断线宽限：重启=旧回合已死，清掉全部 busy 标记（否则 Redis 里的 15 分钟租约
+    // 会让重启时有回合的群卡住——群友感觉希洛突然消失了一刻钟）
+    try {
+      const known = knownGroupsCache || []
+      for (const groupId of known) {
+        await store.clearBusy(groupId).catch(() => {})
+      }
+      if (known.length) logger.info(`[仿真] 启动清理：${known.length} 个群的旧回合租约已释放`)
+    } catch { /* 清理失败不阻塞启动 */ }
     sweeper = setInterval(() => { void sweepOnce() }, boundedTimerDelay(SIM_SWEEP_INTERVAL_MS, 3_600_000, 5_000))
     sweeper.unref?.()
     const cfg = runtimeConfig()
@@ -1401,5 +1418,5 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget, listPersonProfiles: () => store.listPersonProfiles(), deletePersonProfile: (userId: string) => store.deletePersonProfile(userId), deletePersonProfileField: (userId: string, field: string, value?: string) => store.deletePersonProfileField(userId, field, value) }
 }

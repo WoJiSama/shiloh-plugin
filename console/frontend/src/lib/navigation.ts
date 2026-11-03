@@ -1,5 +1,6 @@
 import {
   Sparkles,
+  IdCard,
   MessageCircle,
   Bot,
   Users,
@@ -39,6 +40,7 @@ export const navigation = [
       { path: '/commands', label: '命令 / 骰子', icon: Terminal, hint: '命令与规则管理' },
       { path: '/semantic', label: '语义记忆', icon: Database, hint: '长期记忆与召回' },
       { path: '/simulation', label: '自主仿真', icon: Waves, hint: 'AI 自主收发与唤醒管理' },
+      { path: '/person-profiles', label: '人物记忆', icon: IdCard, hint: '跨群档案与全局好感' },
       { path: '/games', label: '游戏', icon: Gamepad2, hint: '海龟汤题库审核与游戏参数' }
     ]
   },

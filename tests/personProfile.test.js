@@ -72,3 +72,17 @@ test('好感分层：有效分=群60%+全局40%；跨群熟秘标注阈值', asy
   assert.ok(section.includes('在别的群和你更熟'), '跨群标注')
   assert.ok(section.indexOf('友1001') < section.indexOf('友1002'), '排序按有效分（1001=62 > 1002=55）')
 })
+
+test('档案扩展字段：traits/facts 解析、注入与提示词', async () => {
+  const { parsePersonProfilePatches, buildPersonProfileExtractPrompt, formatPersonProfile } = await import('../dist/backend/modules/simulation/domain/personProfile.js')
+  const patches = parsePersonProfilePatches('[{"userId":"10001","traits":["爱玩梗","技术宅"],"facts":["养了两只猫"]}]')
+  assert.equal(patches.length, 1)
+  assert.deepEqual(patches[0].traits, ['爱玩梗', '技术宅'])
+  assert.deepEqual(patches[0].facts, ['养了两只猫'])
+  const line = formatPersonProfile({ name: '小鱼', interests: ['明日方舟'], taboos: [], traits: ['爱玩梗'], facts: ['养了两只猫'] }, '小鱼')
+  assert.match(line, /爱玩梗/)
+  assert.match(line, /养了两只猫/)
+  const { system } = buildPersonProfileExtractPrompt([])
+  assert.match(system, /traits/)
+  assert.match(system, /facts/)
+})

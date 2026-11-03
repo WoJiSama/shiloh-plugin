@@ -24,6 +24,7 @@ export const router = createRouter({
     { path: '/draw', component: () => import('./pages/DrawPage.vue') },
     { path: '/observe', component: () => import('./pages/ObservePage.vue') },
     { path: '/simulation', component: () => import('./pages/SimulationPage.vue') },
+    { path: '/person-profiles', component: () => import('./pages/PersonProfilesPage.vue') },
     { path: '/tokens', component: () => import('./pages/TokensPage.vue') },
     { path: '/style', component: () => import('./pages/StylePage.vue') },
     {

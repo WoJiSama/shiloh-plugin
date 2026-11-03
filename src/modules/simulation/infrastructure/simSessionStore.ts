@@ -6,6 +6,8 @@ export interface SimRedisLike {
   get(key: string): Promise<string | null>
   set(key: string, value: string, opts?: { PX?: number; NX?: boolean }): Promise<unknown>
   del(...keys: string[]): Promise<unknown>
+  /** 控制台人物记忆页列出全部档案用（SCAN）；不可用时列表为空 */
+  keys?(pattern: string): Promise<string[]>
 }
 
 export interface SimSessionStorePorts {
@@ -30,6 +32,11 @@ const PERSON_KEY = (userId: string) => `shiloh:sim:person:${userId}`
 /** 全局好感底分（跨群）：群内每次好感变动按 30% 权重镜像，作为关系的"本钱" */
 const GLOBAL_AFFINITY_KEY = (userId: string) => `shiloh:sim:person:${userId}:affinity`
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
+/**
+ * 回合忙租约：正常运行时 15 分钟（防并发回合），但进程重启后不应阻塞群这么久。
+ * 修法（qq-bridge 176433a）：正常回合仍用完整租约，但 runtime 启动时主动清掉
+ * 所有 busy 标记（重启=旧回合已死，不存在真并发），等效于"断线宽限≈启动时间"。
+ */
 export const SIM_TURN_BUSY_LEASE_MS = 15 * 60_000
 
 /** 群级覆盖（.仿真 开/关 与控制台预算编辑都写这里）：budgetCaps 键=群号 值=每日金额上限；budgetDefaultCny 为空表示用 yaml 默认；atOnly=「仅被@才回」群清单（管理员设定，优先于 AI 自设触发器）；playAlongUntil=「活跃助推」到期表（epoch ms，助推窗口内系统兜底节奏，过期回落自主档、由 AI 自设配置接管） */
@@ -57,11 +64,17 @@ export interface SimSessionStore {
   loadUserStyle(groupId: string): Promise<{ users: Record<string, string[]>; updatedAt: number }>
   saveUserStyle(groupId: string, users: Record<string, string[]>): Promise<void>
   /** 人物核心档案（跨群）：读取 + 合并去重（name 最新优先，interests/taboos 并集截断） */
-  loadPersonProfile(userId: string): Promise<{ name?: string; interests: string[]; taboos: string[]; updatedAt?: number }>
-  mergePersonProfile(userId: string, patch: { name?: string; interests?: string[]; taboos?: string[] }, maxFields: number): Promise<{ name?: string; interests: string[]; taboos: string[] }>
+  loadPersonProfile(userId: string): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[]; updatedAt?: number }>
+  mergePersonProfile(userId: string, patch: { name?: string; interests?: string[]; taboos?: string[]; traits?: string[]; facts?: string[] }, maxFields: number): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[] }>
   /** 全局好感底分：批量读 + 变动镜像（delta×权重，EMA 不需要——简单累积即长期均值） */
   loadGlobalAffinity(userIds: string[]): Promise<Record<string, number>>
   bumpGlobalAffinity(userId: string, delta: number): Promise<number>
+  /** 控制台：列出全部人物档案（跨群数据透明化） */
+  listPersonProfiles(): Promise<{ userId: string; name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[]; globalAffinity?: number; updatedAt?: number }[]>
+  /** 控制台：整人删除（档案 + 全局好感） */
+  deletePersonProfile(userId: string): Promise<boolean>
+  /** 控制台：删单条字段（field: name|interests|taboos|traits|facts；value 省略=清空 name） */
+  deletePersonProfileField(userId: string, field: string, value?: string): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[] }>
 }
 
 function parseStringList(value: unknown): string[] {
@@ -217,6 +230,8 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
           ...(typeof parsed.name === 'string' && parsed.name.trim() ? { name: parsed.name.trim().slice(0, 20) } : {}),
           interests: parseStringList(parsed.interests).slice(0, 12),
           taboos: parseStringList(parsed.taboos).slice(0, 12),
+          ...(parseStringList(parsed.traits).length ? { traits: parseStringList(parsed.traits).slice(0, 12) } : {}),
+          ...(parseStringList(parsed.facts).length ? { facts: parseStringList(parsed.facts).slice(0, 12) } : {}),
           ...(typeof parsed.updatedAt === 'number' ? { updatedAt: parsed.updatedAt } : {})
         }
       } catch { return { interests: [], taboos: [] } }
@@ -240,6 +255,8 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
         ...(name ? { name } : {}),
         interests: uniq([...(patch.interests || []), ...current.interests]).slice(0, maxFields),
         taboos: uniq([...(patch.taboos || []), ...current.taboos]).slice(0, maxFields),
+        ...(uniq([...(patch.traits || []), ...(current.traits || [])]).length ? { traits: uniq([...(patch.traits || []), ...(current.traits || [])]).slice(0, 4) } : {}),
+        ...(uniq([...(patch.facts || []), ...(current.facts || [])]).length ? { facts: uniq([...(patch.facts || []), ...(current.facts || [])]).slice(0, maxFields) } : {}),
         updatedAt: now()
       }
       await redis.set(PERSON_KEY(id), JSON.stringify(merged))
@@ -265,6 +282,51 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       const next = Math.max(0, Math.min(100, Math.round(current + (Number(delta) || 0) * 0.3)))
       await redis.set(GLOBAL_AFFINITY_KEY(id), JSON.stringify({ score: next, updatedAt: Date.now() }))
       return next
+    },
+    async listPersonProfiles() {
+      if (typeof redis.keys !== 'function') return []
+      let ids: string[] = []
+      try {
+        const keysList = await redis.keys('shiloh:sim:person:*')
+        const idSet = new Set<string>()
+        for (const key of keysList || []) {
+          const match = String(key).match(/^shiloh:sim:person:(\d+)/)
+          if (match) idSet.add(match[1]!)
+        }
+        ids = [...idSet]
+      } catch { return [] }
+      const out = []
+      for (const id of ids.slice(0, 500)) {
+        const profile = await this.loadPersonProfile(id)
+        const globalAffinity = (await this.loadGlobalAffinity([id]))[id]
+        const isEmpty = !profile.name && !profile.interests.length && !profile.taboos.length && !(profile.traits?.length) && !(profile.facts?.length) && globalAffinity === undefined
+        if (isEmpty) continue
+        out.push({ userId: id, ...profile, ...(globalAffinity !== undefined ? { globalAffinity } : {}) })
+      }
+      return out.sort((a, b) => (b.globalAffinity ?? 50) - (a.globalAffinity ?? 50))
+    },
+    async deletePersonProfile(userId) {
+      const id = String(userId || '').replace(/[^0-9]/g, '')
+      if (!id) return false
+      await redis.del(PERSON_KEY(id), GLOBAL_AFFINITY_KEY(id))
+      return true
+    },
+    async deletePersonProfileField(userId, field, value) {
+      const id = String(userId || '').replace(/[^0-9]/g, '')
+      if (!id) return { interests: [], taboos: [] }
+      const current = await this.loadPersonProfile(id)
+      const name = field === 'name' ? undefined : current.name
+      const filter = (list: string[] | undefined) => value === undefined ? [] : (list || []).filter(item => item !== value)
+      const merged = {
+        ...(name ? { name } : {}),
+        interests: field === 'interests' ? filter(current.interests) : current.interests,
+        taboos: field === 'taboos' ? filter(current.taboos) : current.taboos,
+        ...(field === 'traits' || current.traits?.length ? { traits: field === 'traits' ? filter(current.traits) : current.traits } : {}),
+        ...(field === 'facts' || current.facts?.length ? { facts: field === 'facts' ? filter(current.facts) : current.facts } : {}),
+        updatedAt: now()
+      }
+      await redis.set(PERSON_KEY(id), JSON.stringify(merged))
+      return merged
     },
   }
 }
