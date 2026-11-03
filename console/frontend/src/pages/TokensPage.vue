@@ -92,8 +92,8 @@ function timeLabel(start: number) {
           <div class="card-value">{{ summary.today.tokens.toLocaleString() }}</div>
         </div>
         <div class="card">
-          <div class="card-label">今日花费</div>
-          <div class="card-value">¥{{ summary.today.cost.toFixed(4) }}</div>
+          <div class="card-label">今日花费（估算参考）</div>
+          <div class="card-value">¥{{ summary.today.cost.toFixed(2) }}</div>
         </div>
         <div class="card">
           <div class="card-label">今日调用</div>
@@ -113,7 +113,7 @@ function timeLabel(start: number) {
           <NSelect v-model:value="seriesHours" :options="hourOptions" size="small" style="width: 120px" @update:value="load" />
         </div>
         <div class="bars">
-          <div v-for="b in buckets" :key="b.start" class="bar-col" :title="`${timeLabel(b.start)} · ${b.tokens} tokens · ¥${b.cost.toFixed(4)}`">
+          <div v-for="b in buckets" :key="b.start" class="bar-col" :title="`${timeLabel(b.start)} · ${b.tokens} tokens · ¥${b.cost.toFixed(2)}`">
             <div class="bar" :style="{ height: `${Math.max(2, (b.cost / maxCost) * 100)}%` }" />
             <div class="bar-label">{{ timeLabel(b.start) }}</div>
           </div>

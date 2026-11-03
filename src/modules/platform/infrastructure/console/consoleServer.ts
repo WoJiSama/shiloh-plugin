@@ -2018,7 +2018,12 @@ const server = http.createServer(async (req, res) => {
       if (!style) return sendJson(res, 503, { error: "风格学习视图未启用" })
       const groups = await collectGroups()
       const groupIds = (groups?.groups || []).map((group: { id?: unknown }) => String(group.id || "")).filter(Boolean)
-      return sendJson(res, 200, await style.overview(groupIds))
+      // 附带群号→群名映射（与令牌/仿真页同一 identity 目录），风格页 tab 显示「群名（群号）」
+      const groupNames: Record<string, string> = {}
+      try {
+        for (const group of (await collectIdentityDirectory()).groups) groupNames[group.id] = group.name
+      } catch {}
+      return sendJson(res, 200, { ...record(await style.overview(groupIds)), groupNames })
     }
     if (url.pathname === "/api/style/block-word" && req.method === "POST") {
       if (!style) return sendJson(res, 503, { error: "风格学习视图未启用" })

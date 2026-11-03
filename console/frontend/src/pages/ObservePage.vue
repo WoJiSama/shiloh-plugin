@@ -335,7 +335,7 @@ const columns: DataTableColumns<RecentTurn> = [
               <p v-if="!report.routes.length" class="muted">暂无记录</p>
             </div>
           </div>
-          <p class="field-help">快速路径跳过 {{ count(report.fastPathSkipCount) }} 次。</p>
+          <p class="field-help">轻量消息直达 {{ count(report.fastPathSkipCount) }} 次（无需完整模型回合的消息被直接处理，如纯命令、媒体事件）。</p>
         </details>
       </div>
     </PageState>

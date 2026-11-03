@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { NAlert, NButton, NCheckbox, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSelect, NSwitch, NTag, type DataTableColumns } from 'naive-ui'
+import { NAlert, NButton, NCheckbox, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSelect, NSwitch, NTag, useDialog, type DataTableColumns } from 'naive-ui'
 import PageHeader from '../components/PageHeader.vue'
 import PageState from '../components/PageState.vue'
 import { api } from '../lib/api'
@@ -23,6 +23,7 @@ interface GroupRow {
 interface Overview { enabled: boolean; allGroups: boolean; disabled: string[]; budgetDefaultCny: number; groups: GroupRow[]; groupNames?: Record<string, string> }
 
 const overview = ref<Overview | null>(null)
+const dialog = useDialog()
 const loading = ref(false)
 const error = ref('')
 const detailId = ref('')
@@ -85,6 +86,15 @@ async function setReplyMode(row: GroupRow, value: string) {
   }
 }
 async function resetGroup(groupId: string) {
+  dialog.warning({
+    title: '重置仿真会话',
+    content: `将清空群 ${groupId} 的回合历史、未读水位与今日预算（长期记忆与好感度保留）。此操作不可撤销，确定继续吗？`,
+    positiveText: '重置',
+    negativeText: '取消',
+    onPositiveClick: () => doResetGroup(groupId),
+  })
+}
+async function doResetGroup(groupId: string) {
   try {
     await api('/api/simulation/group', { method: 'POST', body: JSON.stringify({ group: groupId, action: 'reset' }) })
     await openDetail(groupId)
@@ -215,7 +225,7 @@ const detailTitle = computed(() => {
       <NDrawerContent :title="detailTitle" closable>
         <div v-if="detail" class="detail">
           <div class="kv"><span>回复模式（管理员设定）</span><b>{{ replyModeLabels[detail.replyMode || 'auto'] || '自主' }}</b></div>
-          <div class="kv"><span>AI 自设潜水模式</span><b>{{ detail.mode }}</b></div>
+          <div class="kv"><span>AI 自设状态（它给自己定的）</span><b>{{ detail.mode === 'active' ? '活跃观察期' : '潜水（低主动）' }}</b></div>
           <div class="kv"><span>回合历史</span><b>{{ detail.historyLength }} 条</b></div>
           <div class="block">
             <h4>本群每日消耗上限（元） <small v-if="detail.budget.capOverridden">（按群覆盖）</small><small v-else>（跟随默认）</small></h4>

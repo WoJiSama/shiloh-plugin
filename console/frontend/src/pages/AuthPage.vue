@@ -82,7 +82,25 @@ async function submit() {
           >{{ setup ? '创建账号' : '登录控制台'
           }}<template #icon><ArrowRight :size="17" /></template
         ></NButton>
+        <p class="token-hint">
+          没有账号？支持令牌直入：在本页地址末尾加
+          <code>?token=访问令牌</code> 即可进入（令牌见服务器 config/console.json）。
+        </p>
       </form>
     </section>
   </main>
 </template>
+
+<style scoped>
+.token-hint {
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+.token-hint code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.14);
+}
+</style>

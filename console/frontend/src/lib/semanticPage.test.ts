@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { NButton, NInput, NPagination } from 'naive-ui'
+import { NButton, NInput, NSelect, NPagination } from 'naive-ui'
 import SemanticPage from '../pages/SemanticPage.vue'
 import { api } from './api'
 
@@ -31,13 +31,14 @@ beforeEach(() => {
 })
 afterEach(() => wrapper.unmount())
 async function setGroup(value: string) {
-  wrapper.findAllComponents(NInput)[0]!.vm.$emit('update:value', value)
+  const groupInput = wrapper.findAllComponents(NSelect)[0] ?? wrapper.findAllComponents(NInput)[0]
+  groupInput!.vm.$emit('update:value', value)
   await flushPromises()
 }
 async function search() {
   await flushPromises()
   await setGroup('100001')
-  wrapper.findAllComponents(NInput)[1]!.vm.$emit('update:value', 'original query')
+  wrapper.findAllComponents(NInput)[0]!.vm.$emit('update:value', 'original query')
   await flushPromises()
   await wrapper.find('form').trigger('submit')
   await flushPromises()
@@ -63,7 +64,7 @@ describe('semantic result ownership', () => {
   it('refreshes reinforcement with the query that produced the displayed result', async () => {
     await search()
     await setGroup('200002')
-    wrapper.findAllComponents(NInput)[1]!.vm.$emit('update:value', 'different query')
+    wrapper.findAllComponents(NInput)[0]!.vm.$emit('update:value', 'different query')
     await button('强化').trigger('click')
     await flushPromises()
     const calls = vi.mocked(api).mock.calls

@@ -15,8 +15,11 @@ interface StyleOverview {
   enabled: boolean
   autoSummaryEnabled: boolean
   totalSamples: number
+  lastSummaryAt?: string
+  memoryUpdatedAt?: string
   aiRules: { absorb: RuleRow[]; avoid: RuleRow[] }
   promptPreview: string
+  groupNames?: Record<string, string>
   groups: GroupStyle[]
 }
 
@@ -66,6 +69,33 @@ async function blockWord(groupId: string, word: string) {
   }
 }
 
+function timeAgo(iso?: string) {
+  if (!iso) return '从未'
+  const ms = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return '未知'
+  const minutes = Math.floor(ms / 60000)
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  return `${Math.floor(hours / 24)} 天前`
+}
+const groupLabel = (groupId: string) => {
+  const name = overview.value?.groupNames?.[groupId]
+  return name ? `${name}（${groupId}）` : `群 ${groupId}`
+}
+const RHYTHM_LABELS: Record<string, string> = {
+  single: '完整单条',
+  twoBeat: '短反应→补话',
+  multiBeat: '连续多条',
+  emojiOnly: '纯表情包',
+  textEmoji: '文字→表情',
+  emojiText: '表情→补话',
+  textEmojiText: '短反应→表情→补话',
+  mixedTwoBeat: '两段混合',
+  mixedMultiBeat: '多段混合',
+}
+
 const absorbColumns: DataTableColumns<RuleRow> = [
   { title: '规则', key: 'rule' },
   { title: '置信度', key: 'confidence', width: 90, render: row => row.confidence ? `${Math.round(row.confidence * 100)}%` : '—' },
@@ -96,22 +126,26 @@ import { h } from 'vue'
       </NAlert>
       <div class="cards">
         <div class="card"><div class="card-label">累计观察样本</div><div class="card-value">{{ overview.totalSamples.toLocaleString() }}</div></div>
-        <div class="card"><div class="card-label">自动总结</div><div class="card-value small">{{ overview.autoSummaryEnabled ? '开启（每 300 条新样本触发）' : '关闭' }}</div></div>
-        <div class="card"><div class="card-label">可吸收规则</div><div class="card-value">{{ overview.aiRules.absorb.length }}</div></div>
-        <div class="card"><div class="card-label">避开规则</div><div class="card-value">{{ overview.aiRules.avoid.length }}</div></div>
+        <div class="card"><div class="card-label">最近 AI 总结</div><div class="card-value small" :title="overview.lastSummaryAt || ''">{{ timeAgo(overview.lastSummaryAt) }}</div></div>
+        <div class="card"><div class="card-label">最近观察落盘</div><div class="card-value small" :title="overview.memoryUpdatedAt || ''">{{ timeAgo(overview.memoryUpdatedAt) }}</div></div>
+        <div class="card"><div class="card-label">可吸收 / 避开规则</div><div class="card-value">{{ overview.aiRules.absorb.length }} / {{ overview.aiRules.avoid.length }}</div></div>
       </div>
       <NTabs type="line" style="margin-top: 8px">
         <NTabPane name="global" tab="全局表达策略">
           <h4>可吸收（学习到值得用的说话方式）</h4>
-          <NDataTable :columns="absorbColumns" :data="overview.aiRules.absorb" size="small" :bordered="false" />
+          <NAlert v-if="!overview.aiRules.absorb.length" type="default" :show-icon="false" style="margin-bottom: 8px">
+            还没有总结出可吸收规则——观察在积累，达到总结阈值后会自动生成（看上方「最近 AI 总结」确认节奏）。
+          </NAlert>
+          <NDataTable v-else :columns="absorbColumns" :data="overview.aiRules.absorb" size="small" :bordered="false" />
           <h4>避开（学习到要避免的）</h4>
-          <NDataTable :columns="avoidColumns" :data="overview.aiRules.avoid" size="small" :bordered="false" />
+          <NDataTable v-if="overview.aiRules.avoid.length" :columns="avoidColumns" :data="overview.aiRules.avoid" size="small" :bordered="false" />
+          <div v-else class="line">暂无</div>
           <details style="margin-top: 12px">
             <summary>当前注入提示词预览</summary>
             <pre class="preview">{{ overview.promptPreview }}</pre>
           </details>
         </NTabPane>
-        <NTabPane v-for="g in overview.groups.filter(g => g.expressions)" :key="g.groupId" :name="g.groupId" :tab="`群 ${g.groupId}`">
+        <NTabPane v-for="g in overview.groups.filter(g => g.expressions)" :key="g.groupId" :name="g.groupId" :tab="groupLabel(g.groupId)">
           <h4>常用词（点屏蔽后不再学习/注入该词）</h4>
           <NDataTable :columns="wordColumns(g.groupId)" :data="g.expressions!.words" size="small" :bordered="false" />
           <template v-if="g.expressions!.styleExpressions?.length">
@@ -123,9 +157,9 @@ import { h } from 'vue'
             <div class="line">{{ g.expressions!.patterns.join('、') }}</div>
           </template>
           <template v-if="g.expressions!.rhythmPatterns?.length">
-            <h4>分条节奏</h4>
+            <h4>分条节奏（群友整轮回复的形态分布）</h4>
             <div class="line">
-              <NTag v-for="r in g.expressions!.rhythmPatterns" :key="r.layout" size="small" style="margin-right: 6px">{{ r.layout }} ×{{ r.count }}</NTag>
+              <NTag v-for="r in g.expressions!.rhythmPatterns" :key="r.layout" size="small" style="margin-right: 6px">{{ RHYTHM_LABELS[r.layout] || r.layout }} ×{{ r.count }}</NTag>
             </div>
           </template>
         </NTabPane>

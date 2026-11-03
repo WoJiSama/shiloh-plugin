@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import {
   NButton,
   NInput,
+  NSelect,
   NSwitch,
   NAlert,
   NEmpty,
@@ -220,7 +221,16 @@ function pct(value: any) {
 const items = computed(() =>
   tab.value === 'browse' ? chunks.value?.chunks || [] : result.value?.items || []
 )
-onMounted(load)
+const groupOptions = ref<{ label: string; value: string }[]>([])
+async function loadGroupOptions() {
+  try {
+    const payload = await api<{ groups: { id: string; name?: string }[] }>('/api/groups')
+    groupOptions.value = (payload.groups || [])
+      .slice(0, 200)
+      .map(g => ({ label: g.name ? `${g.name}（${g.id}）` : g.id, value: g.id }))
+  } catch { /* 拉不到就回退手填 */ }
+}
+onMounted(() => { void load(); void loadGroupOptions() })
 onBeforeUnmount(() => {
   live = false
   seq++
@@ -294,7 +304,13 @@ onBeforeUnmount(() => {
             <form class="semantic-form" @submit.prevent="tab === 'search' ? search() : browse()">
               <label class="form-field"
                 ><span>群号</span
-                ><NInput v-model:value="group" placeholder="输入完整群号" /><IdentityLabel
+                ><NSelect
+                  v-model:value="group"
+                  filterable
+                  tag
+                  clearable
+                  :options="groupOptions"
+                  placeholder="搜索或手输完整群号" /><IdentityLabel
                   v-if="group.trim()"
                   kind="group"
                   :id="group.trim()" /></label

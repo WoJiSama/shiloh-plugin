@@ -59,6 +59,9 @@ try {
         enabled: cfg.enabled !== false,
         autoSummaryEnabled: cfg.autoSummaryEnabled !== false,
         totalSamples: Number(memory?.totalSamples) || 0,
+        // 活性信号：最近一次 AI 总结与最近一次观察落盘（区分「没学到」与「视图坏了」）
+        lastSummaryAt: String(memory?.aiSummary?.lastAt || memory?.aiSummary?.lastAutoAt || ''),
+        memoryUpdatedAt: String(memory?.updatedAt || ''),
         aiRules: {
           absorb: (memory?.aiRules?.absorb || []).map(r => ({ key: r.key, label: r.label, rule: r.rule, confidence: r.confidence })),
           avoid: (memory?.aiRules?.avoid || []).map(r => ({ key: r.key, label: r.label, rule: r.rule, confidence: r.confidence })),
