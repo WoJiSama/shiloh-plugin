@@ -98,6 +98,12 @@ pluginSettings:
         # "981339693": 15
     agentPresetKeywords: []      # 默认注入唤醒触发器的关键词（AI 之后可用 simSetWakeConfig 自己改）
     # 「活跃」为长期档：管理员切到活跃后一直生效，直到切回自主/仅@；AI 每次活跃唤醒都会被引导自调自己的触发器
+    # 人物核心档案（跨群共享）：称呼偏好/长期爱好/雷点——只收"任何群都合适被知道"的身份级事实，
+    # 情感倾诉/争执/群内梗/RP设定等情境内容留在各群自己的记忆里；空档时侧路小模型提取
+    personProfile:
+      enabled: true              # 设 false 关闭提取与注入（档案保留）
+      # extractCooldownMs: 21600000  # 每群提取冷却（默认 6 小时）
+      # maxFields: 6             # 爱好/雷点各自的上限条数
     # QQ空间互动（偷偷逛群友空间点赞/评论）：默认关——打开后 AI 可在主动机会里去熟群友的空间互动
     qzone:
       enabled: false             # 打开后 simQzoneInteract 工具可用

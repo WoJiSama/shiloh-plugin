@@ -89,6 +89,14 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       enabled: (section.wakeGate || {}).enabled !== false,
     },
     activeBoostMs: Math.min(12 * 3600_000, Math.max(10 * 60_000, Math.floor(section.activeBoostMs ?? 3 * 3600_000))),
+    personProfile: (() => {
+      const raw = section.personProfile || {}
+      return {
+        enabled: raw.enabled !== false,
+        extractCooldownMs: Math.min(24 * 3600_000, Math.max(60 * 60_000, Math.floor(raw.extractCooldownMs ?? 6 * 3600_000))),
+        maxFields: Math.min(12, Math.max(3, Math.floor(raw.maxFields ?? 6)))
+      }
+    })(),
     qzone: (() => {
       const raw = section.qzone || {}
       return {

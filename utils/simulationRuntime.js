@@ -333,6 +333,17 @@ export const simulationRuntime = createSimulationRuntime({
       return { ok: false, error: error?.message || String(error) }
     }
   },
+  // 人物核心档案提取：侧路小模型 + 保守口径提示词（跨群身份级事实：称呼/长期爱好/雷点）
+  personProfileExtract: async (messages) => {
+    const cfg = readPluginSettings().memoryAiConfig || {}
+    if (!cfg.memoryAiUrl || !cfg.memoryAiApikey || !cfg.memoryAiModel) throw new Error('memoryAiConfig 未配置')
+    const { buildPersonProfileExtractPrompt } = await import('../dist/backend/modules/simulation/domain/personProfile.js')
+    const { system, user } = buildPersonProfileExtractPrompt(messages)
+    const result = await sideLLMCall({ url: cfg.memoryAiUrl, apikey: cfg.memoryAiApikey, model: cfg.memoryAiModel, temperature: 0.1, maxTokens: 600, timeoutMs: 20000, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] })
+    if (!result.ok) throw new Error(result.error)
+    return result.content
+  },
+
   // QQ空间互动：QQApi 走 NapCat get_credentials 拿 qzone 域凭据（与发说说同链路）。
   // visit 返回紧凑说说列表（tid/时间/文本/赞数），like/comment 直通。
   qzoneInteract: async ({ action, userId, tid, text }) => {

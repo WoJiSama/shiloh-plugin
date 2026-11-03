@@ -25,6 +25,8 @@ const OVERRIDES_KEY = 'shiloh:sim:overrides'
 /** 收到过消息的群登记（sweep 遍历用；allGroups 模式下运行时无法枚举白名单群，靠 ingest 自报） */
 const KNOWN_KEY = 'shiloh:sim:known'
 const BUSY_KEY = (groupId: string) => `shiloh:sim:busy:${groupId}`
+/** 人物核心档案（跨群共享，按人一个 key）：称呼偏好 + 长期爱好 + 雷点，只放"到处都合适被知道"的身份级事实 */
+const PERSON_KEY = (userId: string) => `shiloh:sim:person:${userId}`
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 export const SIM_TURN_BUSY_LEASE_MS = 15 * 60_000
 
@@ -52,6 +54,9 @@ export interface SimSessionStore {
   /** 按人口头禅表：{ userId: string[], updatedAt } */
   loadUserStyle(groupId: string): Promise<{ users: Record<string, string[]>; updatedAt: number }>
   saveUserStyle(groupId: string, users: Record<string, string[]>): Promise<void>
+  /** 人物核心档案（跨群）：读取 + 合并去重（name 最新优先，interests/taboos 并集截断） */
+  loadPersonProfile(userId: string): Promise<{ name?: string; interests: string[]; taboos: string[]; updatedAt?: number }>
+  mergePersonProfile(userId: string, patch: { name?: string; interests?: string[]; taboos?: string[] }, maxFields: number): Promise<{ name?: string; interests: string[]; taboos: string[] }>
 }
 
 function parseStringList(value: unknown): string[] {
@@ -196,6 +201,44 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
     },
     async saveUserStyle(groupId, users) {
       await redis.set(USER_STYLE_KEY(groupId), JSON.stringify({ users, updatedAt: now() }))
+    },
+    async loadPersonProfile(userId) {
+      const id = String(userId || '').replace(/[^0-9]/g, '')
+      if (!id) return { interests: [], taboos: [] }
+      const raw = await redis.get(PERSON_KEY(id))
+      try {
+        const parsed = raw ? record(JSON.parse(raw)) : {}
+        return {
+          ...(typeof parsed.name === 'string' && parsed.name.trim() ? { name: parsed.name.trim().slice(0, 20) } : {}),
+          interests: parseStringList(parsed.interests).slice(0, 12),
+          taboos: parseStringList(parsed.taboos).slice(0, 12),
+          ...(typeof parsed.updatedAt === 'number' ? { updatedAt: parsed.updatedAt } : {})
+        }
+      } catch { return { interests: [], taboos: [] } }
+    },
+    async mergePersonProfile(userId, patch, maxFields) {
+      const id = String(userId || '').replace(/[^0-9]/g, '')
+      if (!id) return { interests: [], taboos: [] }
+      const current = await this.loadPersonProfile(id)
+      const name = typeof patch.name === 'string' && patch.name.trim() ? patch.name.trim().slice(0, 20) : current.name
+      const uniq = (list: string[]) => {
+        const seen = new Set<string>()
+        const out: string[] = []
+        for (const item of list) {
+          const value = String(item || '').trim().slice(0, 30)
+          if (!value || seen.has(value)) continue
+          seen.add(value); out.push(value)
+        }
+        return out
+      }
+      const merged = {
+        ...(name ? { name } : {}),
+        interests: uniq([...(patch.interests || []), ...current.interests]).slice(0, maxFields),
+        taboos: uniq([...(patch.taboos || []), ...current.taboos]).slice(0, maxFields),
+        updatedAt: now()
+      }
+      await redis.set(PERSON_KEY(id), JSON.stringify(merged))
+      return merged
     },
   }
 }

@@ -12,6 +12,7 @@ import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../doma
 import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { isSilentDeclaration, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
+import { parsePersonProfilePatches, formatPersonProfile } from '../domain/personProfile.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
@@ -66,6 +67,8 @@ export interface SimulationRuntimePorts {
   wakeGateJudge?(input: { reason: string; messages: { name: string; text: string; atSelf: boolean }[] }): Promise<{ engage: boolean; reason?: string } | null>
   /** QQ空间互动：看指定成员的最近说说 / 点赞 / 评论（凭据由装配层处理；内容已在上层脱敏） */
   qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
+  /** 人物核心档案提取（侧路小模型）：近期消息 → 跨群身份级事实补丁 */
+  personProfileExtract?(messages: { name: string; text: string }[]): Promise<string>
   /** 群成员列表（B3）：[{userId, nick}] */
   getGroupMembers?(groupId: string): Promise<{ userId: string; nick: string }[]>
   /** 合并转发内容（B4）：逐条正文 + 图片 URL 列表（按 [图片#N] 编号）+ 内嵌转发 id 列表（可递归展开） */
@@ -537,11 +540,20 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const initialPrompt = reason.kind === 'bootstrap' ? await store.getInitPrompt(groupId) : ''
       const styleDigest = await (async () => { try { return String((await ports.getStyleDigest?.(groupId)) || '') } catch { return '' } })()
       const userStyle = (await store.loadUserStyle(groupId).catch(() => ({ users: {} as Record<string, string[]>, updatedAt: 0 }))).users || {}
+      // 在场群友的人物核心档案（跨群身份级事实，≤5 人）
+      const speakerIds = [...new Set([...session.unread, ...session.recent].map(m => m.userId))].slice(0, 5)
+      const personProfiles: Record<string, string> = {}
+      for (const speakerId of speakerIds) {
+        const profile = await store.loadPersonProfile(speakerId).catch(() => undefined)
+        const line = formatPersonProfile(profile, nameOf(speakerId))
+        if (line) personProfiles[speakerId] = line
+      }
       const wakePrompt = buildWakePrompt({
         state, reason, snapshotText: snapshot.text, unreadTotal: snapshot.unreadTotal, now: now(), selfName: self.name,
         ...(initialPrompt ? { initialPrompt } : {}),
         memories, affinity, speakers, nameOf,
         userCatchphrases: (userId: string) => userStyle[userId],
+        ...(Object.keys(personProfiles).length ? { personProfiles } : {}),
         groupDigest: safeText(() => ports.getGroupDigest?.(groupId)),
         episodesText: safeText(() => ports.getRecentEpisodesText?.(groupId)),
         styleDigest,
@@ -950,6 +962,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       }
       // 本群专属梗自动提取（独立于唤醒：不产生回合，只沉淀记忆）
       if (!saved && !running.has(groupId)) await maybeExtractMemes(groupId, state, cfg)
+      if (!saved && !running.has(groupId)) await maybeExtractPersonProfiles(groupId, state, cfg)
       // 按人挖口头禅（风格个性化）：冷却默认 6h，读归档 → 纯函数挖掘 → Redis
       if (!saved && !running.has(groupId)) await maybeMineUserStyle(groupId, cfg)
     }
@@ -983,6 +996,35 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   }
 
   /** 按人口头禅挖掘：每群冷却（默认 6h），从归档挖"他说得多、别人基本不说"的专属词 */
+  /** 人物核心档案提取（跨群身份级事实）：保守口径 + 冷却，空档时在 sweep 里跑 */
+  async function maybeExtractPersonProfiles(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig): Promise<void> {
+    if (!cfg.personProfile.enabled || typeof ports.personProfileExtract !== 'function') return
+    const at = now()
+    const cursor = state.personProfileCursor
+    if (cursor && at - cursor.at < cfg.personProfile.extractCooldownMs) return
+    const fresh = state.recent.filter(m => m.seq > (cursor?.seq ?? Math.max(0, state.seq - 40)))
+    if (fresh.length < 20) return
+    state.personProfileCursor = { seq: state.seq, at }
+    await store.save(groupId, state)
+    try {
+      const startedAt = now()
+      const raw = await ports.personProfileExtract(fresh.slice(-40).map(m => ({ name: m.name, text: m.text })))
+      try { ports.recordTokens?.({ scope: groupId, stage: 'person-profile', ms: now() - startedAt }) } catch { /* 账本不可用 */ }
+      const patches = parsePersonProfilePatches(raw)
+      let mergedCount = 0
+      for (const patch of patches) {
+        const before = await store.loadPersonProfile(patch.userId)
+        const after = await store.mergePersonProfile(patch.userId, patch, cfg.personProfile.maxFields)
+        const beforeSig = JSON.stringify([before.name || '', before.interests, before.taboos])
+        const afterSig = JSON.stringify([after.name || '', after.interests, after.taboos])
+        if (beforeSig !== afterSig) mergedCount += 1
+      }
+      if (mergedCount > 0) logger.info(`[仿真] 群 ${groupId} 人物档案更新 ${mergedCount} 人（提取自 ${fresh.length} 条消息）`)
+    } catch (error) {
+      logger.warn(`[仿真] 群 ${groupId} 人物档案提取失败：${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   async function maybeMineUserStyle(groupId: string, cfg: SimRuntimeConfig): Promise<void> {
     if (!cfg.userStyle.enabled || typeof ports.readArchiveMessages !== 'function') return
     try {

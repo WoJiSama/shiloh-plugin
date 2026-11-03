@@ -102,6 +102,8 @@ export interface WakePromptInput {
   nameOf?: (userId: string) => string
   /** 按人口头禅（高好感对象的风格匹配） */
   userCatchphrases?: (userId: string) => string[] | undefined
+  /** 在场群友的人物核心档案（跨群身份级事实：称呼/长期爱好/雷点），键=userId */
+  personProfiles?: Record<string, string>
   /** 本群近期主线摘要 / 近两天情节（来自中期记忆与情节记忆） */
   groupDigest?: string
   episodesText?: string
@@ -125,6 +127,10 @@ export function buildWakePrompt(input: WakePromptInput): string {
   if (memeSection) lines.push(memeSection)
   const affinitySection = input.affinity ? formatAffinitySection(input.affinity, input.speakers || [], nameOf, 8, input.userCatchphrases) : ''
   if (affinitySection) lines.push(affinitySection)
+  const profileLines = Object.values(input.personProfiles || {}).slice(0, 5).filter(Boolean)
+  if (profileLines.length) {
+    lines.push(['【群友核心档案】（这些是跨群都成立的身份级事实，在任何群都可用；自然运用别生硬罗列）', ...profileLines.map(line => `- ${line}`)].join('\n'))
+  }
   const digestParts: string[] = []
   if (input.groupDigest) digestParts.push(String(input.groupDigest).slice(0, 400))
   if (input.episodesText) digestParts.push(String(input.episodesText).slice(0, 600))
