@@ -27,6 +27,8 @@ const KNOWN_KEY = 'shiloh:sim:known'
 const BUSY_KEY = (groupId: string) => `shiloh:sim:busy:${groupId}`
 /** 人物核心档案（跨群共享，按人一个 key）：称呼偏好 + 长期爱好 + 雷点，只放"到处都合适被知道"的身份级事实 */
 const PERSON_KEY = (userId: string) => `shiloh:sim:person:${userId}`
+/** 全局好感底分（跨群）：群内每次好感变动按 30% 权重镜像，作为关系的"本钱" */
+const GLOBAL_AFFINITY_KEY = (userId: string) => `shiloh:sim:person:${userId}:affinity`
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 export const SIM_TURN_BUSY_LEASE_MS = 15 * 60_000
 
@@ -57,6 +59,9 @@ export interface SimSessionStore {
   /** 人物核心档案（跨群）：读取 + 合并去重（name 最新优先，interests/taboos 并集截断） */
   loadPersonProfile(userId: string): Promise<{ name?: string; interests: string[]; taboos: string[]; updatedAt?: number }>
   mergePersonProfile(userId: string, patch: { name?: string; interests?: string[]; taboos?: string[] }, maxFields: number): Promise<{ name?: string; interests: string[]; taboos: string[] }>
+  /** 全局好感底分：批量读 + 变动镜像（delta×权重，EMA 不需要——简单累积即长期均值） */
+  loadGlobalAffinity(userIds: string[]): Promise<Record<string, number>>
+  bumpGlobalAffinity(userId: string, delta: number): Promise<number>
 }
 
 function parseStringList(value: unknown): string[] {
@@ -239,6 +244,27 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       }
       await redis.set(PERSON_KEY(id), JSON.stringify(merged))
       return merged
+    },
+    async loadGlobalAffinity(userIds) {
+      const out: Record<string, number> = {}
+      for (const raw of userIds) {
+        const id = String(raw || '').replace(/[^0-9]/g, '')
+        if (!id) continue
+        try {
+          const parsed = record(JSON.parse(String(await redis.get(GLOBAL_AFFINITY_KEY(id)) || 'null')))
+          const score = Number(parsed.score)
+          if (Number.isFinite(score) && score >= 0 && score <= 100) out[id] = Math.round(score)
+        } catch { /* 单人失败不影响整批 */ }
+      }
+      return out
+    },
+    async bumpGlobalAffinity(userId, delta) {
+      const id = String(userId || '').replace(/[^0-9]/g, '')
+      if (!id) return 50
+      const current = (await this.loadGlobalAffinity([id]))[id] ?? 50
+      const next = Math.max(0, Math.min(100, Math.round(current + (Number(delta) || 0) * 0.3)))
+      await redis.set(GLOBAL_AFFINITY_KEY(id), JSON.stringify({ score: next, updatedAt: Date.now() }))
+      return next
     },
   }
 }

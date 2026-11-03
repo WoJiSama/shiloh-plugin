@@ -49,3 +49,26 @@ test('档案存储往返：合并去重与上限（经集成 harness 的 redis �
     assert.ok(true)
   } finally { runtime.stop() }
 })
+
+test('好感分层：有效分=群60%+全局40%；跨群熟秘标注阈值', async () => {
+  const sim = await import('../dist/backend/modules/simulation/domain/simMemory.js')
+  // 群 50 全局 80 → 有效 62（别群熟人在这群也有底子）
+  assert.equal(sim.effectiveAffinityScore(50, 80), 62)
+  // 群 80 全局 50 → 有效 68（本群热络占主导但不到满额）
+  assert.equal(sim.effectiveAffinityScore(80, 50), 68)
+  // 无全局数据 → 群分原样
+  assert.equal(sim.effectiveAffinityScore(75, undefined), 75)
+  // 跨群标注：全局高出 ≥10 分才提示
+  assert.match(sim.crossGroupHint(50, 80), /别的群/)
+  assert.equal(sim.crossGroupHint(50, 58), '')
+  assert.equal(sim.crossGroupHint(80, 50), '')
+  // 注入段：排序按有效分，显示有效分与标注
+  const affinity = {
+    '1001': { score: 50, updatedAt: 0, today: '', todayDelta: 0, reasons: [] },
+    '1002': { score: 55, updatedAt: 0, today: '', todayDelta: 0, reasons: [] }
+  }
+  const section = sim.formatAffinitySection(affinity, [], (id) => `友${id}`, 8, undefined, { '1001': 80 })
+  assert.ok(section.includes('好感 62'), '1001 有效分 62')
+  assert.ok(section.includes('在别的群和你更熟'), '跨群标注')
+  assert.ok(section.indexOf('友1001') < section.indexOf('友1002'), '排序按有效分（1001=62 > 1002=55）')
+})

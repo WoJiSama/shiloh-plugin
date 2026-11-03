@@ -548,12 +548,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const line = formatPersonProfile(profile, nameOf(speakerId))
         if (line) personProfiles[speakerId] = line
       }
+      const globalAffinity = await store.loadGlobalAffinity(speakerIds).catch(() => ({} as Record<string, number>))
       const wakePrompt = buildWakePrompt({
         state, reason, snapshotText: snapshot.text, unreadTotal: snapshot.unreadTotal, now: now(), selfName: self.name,
         ...(initialPrompt ? { initialPrompt } : {}),
         memories, affinity, speakers, nameOf,
         userCatchphrases: (userId: string) => userStyle[userId],
         ...(Object.keys(personProfiles).length ? { personProfiles } : {}),
+        ...(Object.keys(globalAffinity).length ? { globalAffinity } : {}),
         groupDigest: safeText(() => ports.getGroupDigest?.(groupId)),
         episodesText: safeText(() => ports.getRecentEpisodesText?.(groupId)),
         styleDigest,
@@ -817,6 +819,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       getAffinity: () => affinityBox.map,
       saveAffinity: map => { affinityBox.map = map; void store.saveAffinity(groupId, map) },
       qzoneConfig: () => cfg.qzone,
+      ...(typeof store.bumpGlobalAffinity === 'function' ? { bumpGlobalAffinity: (userId: string, delta: number) => store.bumpGlobalAffinity(userId, delta) } : {}),
       ...(typeof ports.qzoneInteract === 'function' ? { qzoneInteract: (input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }) => ports.qzoneInteract!(input) } : {}),
       pokeMember: async (userId: string) => {
         if (typeof ports.pokeMember !== 'function') return { ok: false, error: '戳一戳不可用' }

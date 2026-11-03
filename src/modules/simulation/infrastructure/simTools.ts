@@ -38,6 +38,8 @@ export interface SimToolContext {
   getMessageImages(seq: number): Promise<{ seq: number; images: { mime: string; base64: string }[]; error?: string }>
   /** 戳群成员（带频率护栏：每群每小时 ≤6 次） */
   pokeMember(userId: string): Promise<{ ok: boolean; error?: string }>
+  /** 全局好感底分镜像（群内变动时同步 30% 权重到跨群底分） */
+  bumpGlobalAffinity?(userId: string, delta: number): Promise<number>
   /** QQ空间互动：visit 看说说 / like 点赞 / comment 评论（内容已脱敏） */
   qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
   /** 空间互动的运行时配置（开关/冷却/日限额/好感门槛） */
@@ -435,6 +437,8 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       }
       affinity[userId] = result.entry
       ctx.saveAffinity(affinity)
+      // 跨群底分镜像：同样的关系变化在任何群都算数（权重 30%，见 bumpGlobalAffinity）
+      try { if (typeof ctx.bumpGlobalAffinity === 'function') await ctx.bumpGlobalAffinity(userId, result.applied) } catch { /* 镜像失败不影响本群 */ }
       return JSON.stringify({ applied: result.applied, score: result.entry.score, capped: result.capped })
     }
   }

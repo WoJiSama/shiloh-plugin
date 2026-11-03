@@ -104,6 +104,8 @@ export interface WakePromptInput {
   userCatchphrases?: (userId: string) => string[] | undefined
   /** 在场群友的人物核心档案（跨群身份级事实：称呼/长期爱好/雷点），键=userId */
   personProfiles?: Record<string, string>
+  /** 全局好感底分（跨群关系的"本钱"），键=userId——有效分 = 群内 60% + 全局 40% */
+  globalAffinity?: Record<string, number>
   /** 本群近期主线摘要 / 近两天情节（来自中期记忆与情节记忆） */
   groupDigest?: string
   episodesText?: string
@@ -125,7 +127,7 @@ export function buildWakePrompt(input: WakePromptInput): string {
   if (memorySection) lines.push(memorySection)
   const memeSection = input.memories?.length ? formatMemeSection(input.memories) : ''
   if (memeSection) lines.push(memeSection)
-  const affinitySection = input.affinity ? formatAffinitySection(input.affinity, input.speakers || [], nameOf, 8, input.userCatchphrases) : ''
+  const affinitySection = input.affinity ? formatAffinitySection(input.affinity, input.speakers || [], nameOf, 8, input.userCatchphrases, input.globalAffinity) : ''
   if (affinitySection) lines.push(affinitySection)
   const profileLines = Object.values(input.personProfiles || {}).slice(0, 5).filter(Boolean)
   if (profileLines.length) {
