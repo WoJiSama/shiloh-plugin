@@ -156,6 +156,28 @@ export const simulationRuntime = createSimulationRuntime({
         if (!first) return { ok: false, error: `B站没搜到「${input.query}」相关的视频(或被风控拦截)` }
         bvid = String(first.bvid)
       }
+      // 番剧 URL（/bangumi/play/ss 或 ep）：走 pgc season API，卡片跳番剧页（先于 bvid 检查——番剧没有 BV 号）
+      const bangumiMatch = String(input?.url || '').match(/bangumi\/play\/(?:ss(\d+)|ep(\d+))/)
+      if (bangumiMatch) {
+        const ssId = bangumiMatch[1] || ''
+        const seasonUrl2 = ssId
+          ? `https://api.bilibili.com/pgc/view/web/season?season_id=${ssId}`
+          : `https://api.bilibili.com/pgc/view/web/season?ep_id=${bangumiMatch[2] || ''}`
+        const seasonData = await fetch(seasonUrl2, { headers: baseHeaders, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => null)
+        const sResult = seasonData?.result
+        if (sResult?.title) {
+          const bTitle = String(sResult.title || 'B站番剧').replace(/[\n\r[\]]/g, ' ').slice(0, 40)
+          const bDesc = String(sResult.newest_ep?.desc || `${(sResult.episodes || []).length}集`).slice(0, 40)
+          const bCard = {
+            app: 'com.tencent.structmsg', view: 'news', ver: '0.0.0.1',
+            prompt: `[分享] ${bTitle}`,
+            meta: { news: { appid: '100951776', style: 2, cta: '去看番', title: bTitle, desc: bDesc, preview: String(sResult.cover || ''), jump_url: `https://www.bilibili.com/bangumi/play/ss${ssId || sResult.season_id}`, tag: '哔哩哔哩', app_type: 1 } },
+            config: { type: 'normal', forward: true, autosize: true },
+          }
+          return { ok: true, title: bTitle, cardJson: JSON.stringify(bCard) }
+        }
+        return { ok: false, error: '番剧信息获取失败' }
+      }
       if (!bvid) return { ok: false, error: '无法从输入解析出B站视频' }
       const viewUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${encodeURIComponent(bvid)}`
       let view = await fetch(viewUrl, { headers: baseHeaders, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => null)
