@@ -715,3 +715,34 @@ test('A4 sanitizeUntrustedText：全角【】替换为⟨⟩', async () => {
   assert.equal(sanitizeUntrustedText('正常消息'), '正常消息')
   assert.equal(sanitizeUntrustedText(''), '')
 })
+
+// ── A2 错误外发收紧 ──
+
+test('A2 safeToolErrorText：上游错误不透传原文，按类型给固定文案', async () => {
+  const { safeToolErrorText, shouldSendErrorNotice, resetErrorNoticeForTest } = await import('../../src/modules/simulation/domain/safety.js')
+  resetErrorNoticeForTest()
+  // 超时
+  const timeout = safeToolErrorText('simGetMessageImages', new Error('Request timed out after 30000ms'))
+  assert.ok(timeout.includes('超时'), '超时归类')
+  assert.ok(!timeout.includes('30000'), '不透传毫秒数')
+  // 网络
+  const network = safeToolErrorText('searchVideoTool', new Error('fetch failed ECONNRESET'))
+  assert.ok(network.includes('网络'), '网络归类')
+  assert.ok(!network.includes('ECONNRESET'), '不透传 errno')
+  // 鉴权
+  const auth = safeToolErrorText('simSendMessage', new Error('401 Unauthorized: invalid api key sk-abc123'))
+  assert.ok(auth.includes('鉴权'), '鉴权归类')
+  assert.ok(!auth.includes('sk-abc'), '不透传 API key')
+  // 已脱敏的错误直接透传
+  const pre = safeToolErrorText('simGetForward', 'error: 503 上游服务异常')
+  assert.ok(pre.includes('503'), '已脱敏透传')
+  // 未知类型
+  const unknown = safeToolErrorText('simGetGroupMembers', new Error('{"gateway_hint":"private-account-pool-detail"}'))
+  assert.ok(!unknown.includes('gateway_hint'), '不透传 provider 内部信息')
+  assert.ok(unknown.includes('执行失败'), '给固定文案')
+  // 节流
+  assert.equal(shouldSendErrorNotice('group_1'), true, '首次允许')
+  assert.equal(shouldSendErrorNotice('group_1'), false, '5 分钟内拦截')
+  assert.equal(shouldSendErrorNotice('group_2'), true, '不同群互不影响')
+  resetErrorNoticeForTest()
+})

@@ -4,7 +4,7 @@ import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMes
 import { defaultSimRuntimeConfig } from '../domain/simConfig.js'
 import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
 import { mineUserCatchphrases } from '../domain/userStyle.js'
-import { boundedTimerDelay, safeSetTimeout, isDuplicateMessageId, sanitizeUntrustedText } from '../domain/safety.js'
+import { boundedTimerDelay, safeSetTimeout, isDuplicateMessageId, sanitizeUntrustedText, safeToolErrorText, shouldSendErrorNotice } from '../domain/safety.js'
 import { evaluateWakeTrigger, formatWakeReason, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
 import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
@@ -180,7 +180,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       })
       return typeof result === 'string' ? result : JSON.stringify(result)
     } catch (error) {
-      return `error: 工具 ${tool.name || ''} 执行失败: ${error instanceof Error ? error.message : String(error)}`
+      return safeToolErrorText(String(tool.name || ''), error)
     }
   }
 

@@ -52,3 +52,40 @@ export function sanitizeUntrustedText(text: string): string {
 export function resetMessageIdCacheForTest(): void {
   messageIdCache.clear()
 }
+
+// ── A2 错误外发收紧 ──
+/**
+ * 仿真模式的工具错误给模型的文本不应透传上游 error.message——
+ * 可能含内部 URL、凭据、provider 信息（qq-bridge 实测案例：503 {"gateway_hint":"..."}）。
+ * 统一替换为固定文案，原文只进本地日志。
+ */
+export function safeToolErrorText(toolName: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  // 已脱敏的错误（buildVisibleFailureDetail 产物格式："error: 503 上游服务异常" 等）直接透传
+  // 注意：不能只看开头数字——"401 Unauthorized: invalid api key..." 也是数字开头但是原始上游错误
+  if (/^(?:error: )?\d{3}\s+(?:上游服务|请求失败|Too Many|Not Found|Forbidden)/.test(message) || /^error: (?:请求超时|网络连接失败)/.test(message)) {
+    return `error: ${message}`
+  }
+  // 原始上游错误 → 固定文案 + 类型提示（不给模型可利用的内部信息）
+  const kind = /timeout|timed?.?out|超时/i.test(message) ? '超时'
+    : /fetch|network|econn|enotfound|socket|连接/i.test(message) ? '网络'
+    : /401|403|unauthorized|鉴权/i.test(message) ? '鉴权'
+    : /429|rate.?limit|频率/i.test(message) ? '限频'
+    : ''
+  return `error: 工具 ${toolName} ${kind ? `因${kind}问题` : '执行'}失败，请换种方式或稍后再试`
+}
+
+/** 群友可见的错误回复节流（5 分钟）：同一群短时间内不反复发失败提示 */
+const errorNoticeAt = new Map<string, number>()
+export function shouldSendErrorNotice(scope: string, throttleMs = 300_000): boolean {
+  const now = Date.now()
+  const last = errorNoticeAt.get(scope) || 0
+  if (now - last < throttleMs) return false
+  errorNoticeAt.set(scope, now)
+  return true
+}
+
+/** 测试用 */
+export function resetErrorNoticeForTest(): void {
+  errorNoticeAt.clear()
+}

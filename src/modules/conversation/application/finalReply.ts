@@ -29,6 +29,7 @@ import type {ActionFactsEvent, ActionFactsQuery, TurnActionFacts} from '../../..
 import type {ChatProviderConfig, ChatRequestData} from '../../../contracts/modelGateway.js'
 import type {ExecutionOptions} from '../../../contracts/modelExecution.js'
 import {buildChatRequestData} from '../../models/domain/modelGateway.js'
+import { shouldSendErrorNotice } from '../../simulation/domain/safety.js'
 export interface Message {role:string;content:string;tool_call_id?:string;name?:string}
 export interface FinalEvent extends ReplyEvent {_personaSnapshot?:PersonaSnapshot;message_id?:string|number;time?:number;_receivedAt?:number;sender?:{card?:string;nickname?:string;role?:string};message_type?:string;message?:import('../../../contracts/chatEvent.js').MessageSegment[]}
 export interface FinalSession {personaSnapshot?:PersonaSnapshot;userContent?:string;rawArgs?:string;rawUserText?:string;interactionContext?:TurnInteractionContext;actionFactsQuery?:ActionFactsQuery;replyGrounding?:ReplyGroundingAudit;taskContext?:{messageId?:unknown};turnTrace?:{addModelCall(kind:string,elapsed:number):void};toolContent?:unknown;modrinthCardItems?:unknown[]|null;responseAttempted?:boolean;turnDrawRequested?:boolean;lastFinalReply?:string;modelIntentDecision?:{intent?:string};initialExecutionRoute?:{mode?:string};turnPlan?:{outcomes?:{toolName:string;success?:boolean}[]};toolResults?:{toolCall?:{id?:string};toolName:string;result:string}[];groupUserMessages?:Message[]}
@@ -408,6 +409,9 @@ function messageTimestamp(value:unknown):number|undefined {
 function getFriendlyFailureMessage(toolName = "", context:FailureContext = {}) {
     const committedReply = buildCommittedActionReply(context?.session)
     if (committedReply) return committedReply
+    // A2 错误外发节流：同群 5 分钟内不重复发失败提示（防刷屏；qq-bridge v0.2.1-r2）
+    const throttleKey = String((context as {e?:{group_id?:unknown}})?.e?.group_id || 'global')
+    if (!shouldSendErrorNotice(throttleKey)) return ''
     if (toolName === "mentionMembersTool") {
       return buildMentionMembersFailureReply(String(context?.error || context?.failedResult || ""))
     }
