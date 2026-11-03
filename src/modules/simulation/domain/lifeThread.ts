@@ -56,5 +56,5 @@ export function formatLifeThreads(threads: LifeThread[]): string {
     const notes = t.notes.slice(0, 4).map(n => `  · ${n}`).join('\n')
     return notes ? `${head}\n${notes}` : head
   })
-  return ['【你最近的生活线】（以下全部来自真实公开资料——更新进度和内容摘要都是实际数据。谈论时以此为据：可以聊感想，但不要编造资料里没有的具体剧情/版本细节。群里聊到你在追的番时，可以用 simShareVideoCard(url: 分享链接) 发一张番剧卡片）', ...lines].join('\n')
+  return ['【你最近的生活线】（以下是你自己在追的作品和真实更新进度——这是你的个人兴趣背景知识，不是当前话题。严格规则：只有当群里正在聊动画/番剧相关话题、或有人提到你在追的作品时才自然带出；绝不在无关话题的群里主动提起。被问「最近在追什么」时可以聊，但别像汇报一样罗列。聊到时以此为据（真实资料），可以聊感想，不要编造资料里没有的剧情细节；可以用 simShareVideoCard(url: 分享链接) 发番剧卡片）', ...lines].join('\\n')
 }
