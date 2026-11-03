@@ -341,6 +341,66 @@ export const simulationRuntime = createSimulationRuntime({
       return { ok: false, error: error?.message || String(error) }
     }
   },
+  // 生活线真实数据源：B 站番剧搜索定位 + 季详情同步（真实单集简介 + 观众热评，分块标注）
+  lifeThreadResolve: async ({ title }) => {
+    try {
+      const { ensureBilibiliBuvidCookie } = await import('../dist/backend/modules/media/infrastructure/bilibiliMessage.js')
+      const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+      let cookie = ''
+      try { cookie = String(await ensureBilibiliBuvidCookie(fetch) || '') } catch {}
+      const headers = { 'user-agent': UA, Referer: 'https://search.bilibili.com', accept: 'application/json', ...(cookie ? { cookie } : {}) }
+      const url = `https://api.bilibili.com/x/web-interface/search/type?keyword=${encodeURIComponent(String(title || '').slice(0, 40))}&search_type=media_bangumi`
+      const raw = await fetch(url, { headers, signal: AbortSignal.timeout(15000) }).then(r => r.text()).catch(() => '')
+      if (raw.trimStart().startsWith('<!DOCTYPE')) return { ok: false, error: 'B站搜索被风控拦截（稍后再试）' }
+      const json = JSON.parse(raw)
+      const results = (json.data?.result || []).filter(r => r?.season_id)
+      if (!results.length) return { ok: false, error: `B站没搜到「${title}」` }
+      // 取第一个非中配/配音版的（标题中不包含"中配""配音"）
+      const pick = results.find(r => !/中配|配音/.test(String(r.title || ''))) || results[0]
+      return { ok: true, sourceId: String(pick.season_id), title: String(pick.title || '').replace(/<[^>]+>/g, '') }
+    } catch (error) { return { ok: false, error: error?.message || String(error) } }
+  },
+
+  lifeThreadSync: async ({ sourceId, title, lastEpisode }) => {
+    try {
+      const { ensureBilibiliBuvidCookie } = await import('../dist/backend/modules/media/infrastructure/bilibiliMessage.js')
+      const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+      let cookie = ''
+      try { cookie = String(await ensureBilibiliBuvidCookie(fetch) || '') } catch {}
+      const headers = { 'user-agent': UA, Referer: 'https://www.bilibili.com', accept: 'application/json', ...(cookie ? { cookie } : {}) }
+      const seasonUrl = `https://api.bilibili.com/pgc/view/web/season?season_id=${encodeURIComponent(sourceId)}`
+      const raw = await fetch(seasonUrl, { headers, signal: AbortSignal.timeout(15000) }).then(r => r.json()).catch(() => null)
+      const result = raw?.result || {}
+      const eps = result.episodes || []
+      if (!eps.length) return { newNotes: [] }
+      const lastEp = eps[eps.length - 1]
+      const epNum = parseInt(String(lastEp?.title || '0'), 10) || 0
+      const newNotes = []
+      // 有新集 → 记官方简介 + 观众热评（分块标注）
+      if (epNum > (lastEpisode || 0)) {
+        const ts = lastEp?.pub_time || 0
+        const dt = ts > 0 ? new Date(ts * 1000 + 8 * 3600_000).toISOString().slice(0, 10) : '近期'
+        const longTitle = String(lastEp?.long_title || '').trim()
+        const official = `〔官方〕第${epNum}集「${longTitle}」（${dt} 更新）`
+        newNotes.push(official)
+        // 拉这一集的评论热评（aid）
+        const aid = lastEp?.aid
+        if (aid) {
+          try {
+            const replyRaw = await fetch(`https://api.bilibili.com/x/v2/reply?type=1&oid=${aid}&sort=1&ps=5`, { headers, signal: AbortSignal.timeout(10000) }).then(r => r.json()).catch(() => null)
+            const replies = (replyRaw?.data?.replies || []).slice(0, 3)
+            for (const rp of replies) {
+              const msg = String(rp?.content?.message || '').replace(/\n/g, ' ').slice(0, 60)
+              const likes = rp?.like || 0
+              if (msg && likes >= 10) newNotes.push(`〔观众·${likes}赞〕${msg}`)
+            }
+          } catch { /* 评论拉不到不影响 */ }
+        }
+      }
+      return { newNotes, ...(epNum > 0 ? { episode: epNum } : {}) }
+    } catch (error) { return { newNotes: [], ...(error?.message ? { error: String(error.message).slice(0, 80) } : {}) } }
+  },
+
   // 人物核心档案提取：侧路小模型 + 保守口径提示词（跨群身份级事实：称呼/长期爱好/雷点）
   personProfileExtract: async (messages) => {
     const cfg = readPluginSettings().memoryAiConfig || {}

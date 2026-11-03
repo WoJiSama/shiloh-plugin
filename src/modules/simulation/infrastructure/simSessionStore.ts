@@ -31,6 +31,10 @@ const BUSY_KEY = (groupId: string) => `shiloh:sim:busy:${groupId}`
 const PERSON_KEY = (userId: string) => `shiloh:sim:person:${userId}`
 /** 全局好感底分（跨群）：群内每次好感变动按 30% 权重镜像，作为关系的"本钱" */
 const GLOBAL_AFFINITY_KEY = (userId: string) => `shiloh:sim:person:${userId}:affinity`
+/** 全局作息（人物级，不分群）：AI 可用 simSetRhythm 自设睡眠窗口 */
+const RHYTHM_KEY = 'shiloh:sim:rhythm'
+/** 生活线（全局）：真实数据源的持续关注线（在追的番/在玩的游戏） */
+const LIFE_THREADS_KEY = 'shiloh:sim:life-threads'
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 /**
  * 回合忙租约：正常运行时 15 分钟（防并发回合），但进程重启后不应阻塞群这么久。
@@ -75,6 +79,12 @@ export interface SimSessionStore {
   deletePersonProfile(userId: string): Promise<boolean>
   /** 控制台：删单条字段（field: name|interests|taboos|traits|facts；value 省略=清空 name） */
   deletePersonProfileField(userId: string, field: string, value?: string): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[] }>
+  /** 全局作息：load 返回 null=从未设过（用配置默认）；save 由 simSetRhythm 调用 */
+  loadRhythm(): Promise<{ sleepFrom: number; sleepTo: number; setBy?: string } | null>
+  saveRhythm(rhythm: { sleepFrom: number; sleepTo: number; setBy?: string }): Promise<void>
+  /** 生活线：全局列表读写（真实数据源线程） */
+  loadLifeThreads(): Promise<unknown[]>
+  saveLifeThreads(threads: unknown[]): Promise<void>
 }
 
 function parseStringList(value: unknown): string[] {
@@ -310,6 +320,29 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       if (!id) return false
       await redis.del(PERSON_KEY(id), GLOBAL_AFFINITY_KEY(id))
       return true
+    },
+    async loadRhythm() {
+      try {
+        const raw = await redis.get(RHYTHM_KEY)
+        if (!raw) return null
+        const parsed = record(JSON.parse(raw))
+        const from = Number(parsed.sleepFrom), to = Number(parsed.sleepTo)
+        if (!Number.isFinite(from) || !Number.isFinite(to) || from < 0 || from > 23 || to < 1 || to > 24 || to <= from) return null
+        return { sleepFrom: from, sleepTo: to, ...(typeof parsed.setBy === 'string' ? { setBy: parsed.setBy } : {}) }
+      } catch { return null }
+    },
+    async saveRhythm(rhythm) {
+      await redis.set(RHYTHM_KEY, JSON.stringify({ sleepFrom: rhythm.sleepFrom, sleepTo: rhythm.sleepTo, setBy: rhythm.setBy || 'agent', updatedAt: now() }))
+    },
+    async loadLifeThreads() {
+      try {
+        const raw = await redis.get(LIFE_THREADS_KEY)
+        const parsed = raw ? JSON.parse(raw) : []
+        return Array.isArray(parsed) ? parsed : []
+      } catch { return [] }
+    },
+    async saveLifeThreads(threads) {
+      await redis.set(LIFE_THREADS_KEY, JSON.stringify(Array.isArray(threads) ? threads : []))
     },
     async deletePersonProfileField(userId, field, value) {
       const id = String(userId || '').replace(/[^0-9]/g, '')

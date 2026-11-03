@@ -106,6 +106,12 @@ export interface WakePromptInput {
   personProfiles?: Record<string, string>
   /** 全局好感底分（跨群关系的"本钱"），键=userId——有效分 = 群内 60% + 全局 40% */
   globalAffinity?: Record<string, number>
+  /** 深夜被吵醒的困意提示 */
+  sleepNote?: string
+  /** 旧消息时间感（超30分钟时提示"刚看到"） */
+  staleNote?: string
+  /** 生活线（真实资料：在追的番+真实更新进度+观众反馈） */
+  lifeThreadSection?: string
   /** 本群近期主线摘要 / 近两天情节（来自中期记忆与情节记忆） */
   groupDigest?: string
   episodesText?: string
@@ -133,6 +139,9 @@ export function buildWakePrompt(input: WakePromptInput): string {
   if (profileLines.length) {
     lines.push(['【群友核心档案】（这些是跨群都成立的身份级事实，在任何群都可用；自然运用别生硬罗列）', ...profileLines.map(line => `- ${line}`)].join('\n'))
   }
+  if (input.sleepNote) lines.push(input.sleepNote)
+  if (input.staleNote) lines.push(input.staleNote)
+  if (input.lifeThreadSection) lines.push(input.lifeThreadSection)
   const digestParts: string[] = []
   if (input.groupDigest) digestParts.push(String(input.groupDigest).slice(0, 400))
   if (input.episodesText) digestParts.push(String(input.episodesText).slice(0, 600))

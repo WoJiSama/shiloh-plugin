@@ -13,6 +13,8 @@ import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDu
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { isSilentDeclaration, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
 import { parsePersonProfilePatches, formatPersonProfile } from '../domain/personProfile.js'
+import { isSleeping, activityFactor, sleepinessNote, staleMessageNote, type RhythmWindow } from '../domain/rhythm.js'
+import { normalizeLifeThreads, mergeThreadSync, formatLifeThreads, type LifeThread } from '../domain/lifeThread.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
@@ -69,6 +71,9 @@ export interface SimulationRuntimePorts {
   qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
   /** 人物核心档案提取（侧路小模型）：近期消息 → 跨群身份级事实补丁 */
   personProfileExtract?(messages: { name: string; text: string }[]): Promise<string>
+  /** 生活线真实数据源：resolve 按 kind 用真实搜索定位（找不到返回 error，拒绝编造）；sync 拉取真实更新 */
+  lifeThreadResolve?(input: { title: string }): Promise<{ ok: true; sourceId: string; title: string; episode?: number } | { ok: false; error: string }>
+  lifeThreadSync?(input: { sourceId: string; title: string; lastEpisode?: number }): Promise<{ newNotes: string[]; episode?: number } | { error: string }>
   /** 群成员列表（B3）：[{userId, nick}] */
   getGroupMembers?(groupId: string): Promise<{ userId: string; nick: string }[]>
   /** 合并转发内容（B4）：逐条正文 + 图片 URL 列表（按 [图片#N] 编号）+ 内嵌转发 id 列表（可递归展开） */
@@ -123,6 +128,9 @@ export interface SimulationRuntime {
   listPersonProfiles(): Promise<{ userId: string; name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[]; globalAffinity?: number; updatedAt?: number }[]>
   deletePersonProfile(userId: string): Promise<boolean>
   deletePersonProfileField(userId: string, field: string, value?: string): Promise<unknown>
+  /** 控制台「作息与生活」页：总览 + 修改作息 */
+  lifeOverview(): Promise<{ rhythm: { sleepFrom: number; sleepTo: number; setBy?: string }; threads: unknown[]; now: { hour: number; sleeping: boolean } }>
+  setLifeRhythm(from: number, to: number): Promise<string>
 }
 
 export interface SimIngestEvent {
@@ -398,12 +406,19 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       reason = { kind: 'bootstrap' }
       state.bootstrapSent = true
     } else {
-      reason = evaluateWakeTrigger(message, state.wakeConfig, { selfId: self.id, selfName: self.name, random, conversation: state.conversation })
+      const hourNow = new Date(now() + 8 * 3600_000).getUTCHours()
+      reason = evaluateWakeTrigger(message, state.wakeConfig, { selfId: self.id, selfName: self.name, random, conversation: state.conversation, activityFactor: cfg.rhythm.enabled ? activityFactor(hourNow) : 1 })
     }
     // 管理员设定的「仅@才回」优先于一切触发器（含 AI 自设唤醒）：非点名类唤醒压掉。
     // 消息照常入库——AI 被点名醒来后仍可读到全部内容；定时器/管理类唤醒是被点名后的延伸，不受影响。
     const atOnlyGroup = (overridesCache?.atOnly || []).includes(groupId)
     if (reason && atOnlyGroup && !AT_ONLY_WAKE_KINDS.has(reason.kind)) reason = null
+    // 生物节律：睡眠窗口内非点名唤醒全部压掉（真人在睡觉；被@会醒，这是唯一的例外）
+    if (reason && cfg.rhythm.enabled) {
+      const rhythmWin = await loadRhythmWindow(cfg)
+      const hour = new Date(now() + 8 * 3600_000).getUTCHours()
+      if (isSleeping(hour, rhythmWin) && !AT_ONLY_WAKE_KINDS.has(reason.kind)) reason = null
+    }
     // 自主·活跃档：群里持续有动静时按节奏主动醒来跟进剧情，不等点名。
     // 节奏由 lastPlayAlongWakeAt 冷却（默认 5 分钟）控制，防刷屏/烧钱；仅@模式优先于活跃档，两者同开时主动跟进被压掉。
     if (!reason && !atOnlyGroup && playAlongActive(groupId)
@@ -553,6 +568,13 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (line) personProfiles[speakerId] = line
       }
       const globalAffinity = await store.loadGlobalAffinity(speakerIds).catch(() => ({} as Record<string, number>))
+      // 生物节律+生活线注入
+      const hourNow2 = new Date(now() + 8 * 3600_000).getUTCHours()
+      const rhythmWin2 = cfg.rhythm.enabled ? await loadRhythmWindow(cfg) : null
+      const sleepNote = rhythmWin2 ? sleepinessNote(hourNow2, rhythmWin2) : ''
+      const staleNote = staleMessageNote(state.lastIncomingAt || 0, now())
+      const lifeThreadsRaw = cfg.lifeThreads.enabled ? await store.loadLifeThreads().catch(() => []) : []
+      const lifeThreadSection = formatLifeThreads(normalizeLifeThreads(lifeThreadsRaw))
       const wakePrompt = buildWakePrompt({
         state, reason, snapshotText: snapshot.text, unreadTotal: snapshot.unreadTotal, now: now(), selfName: self.name,
         ...(initialPrompt ? { initialPrompt } : {}),
@@ -560,6 +582,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         userCatchphrases: (userId: string) => userStyle[userId],
         ...(Object.keys(personProfiles).length ? { personProfiles } : {}),
         ...(Object.keys(globalAffinity).length ? { globalAffinity } : {}),
+        ...(sleepNote ? { sleepNote } : {}),
+        ...(staleNote ? { staleNote } : {}),
+        ...(lifeThreadSection ? { lifeThreadSection } : {}),
         groupDigest: safeText(() => ports.getGroupDigest?.(groupId)),
         episodesText: safeText(() => ports.getRecentEpisodesText?.(groupId)),
         styleDigest,
@@ -828,6 +853,37 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       saveAffinity: map => { affinityBox.map = map; void store.saveAffinity(groupId, map) },
       qzoneConfig: () => cfg.qzone,
       ...(typeof store.bumpGlobalAffinity === 'function' ? { bumpGlobalAffinity: (userId: string, delta: number) => store.bumpGlobalAffinity(userId, delta) } : {}),
+      setRhythm: async (sleepFrom: number, sleepTo: number) => {
+        await store.saveRhythm({ sleepFrom, sleepTo, setBy: 'agent' })
+        rhythmCache = null
+        return `已设定你的作息：${sleepFrom}:00 睡到 ${sleepTo}:00。这个时间你会更少说话（被@还是会回），对话中可以自然提到自己的作息习惯。`
+      },
+      ...(typeof ports.lifeThreadResolve === 'function' ? {
+        lifeThreadFollow: async (title: string) => {
+          const threads = normalizeLifeThreads(await store.loadLifeThreads().catch(() => []))
+          const activeCount = threads.filter(t => t.status === 'active').length
+          const existing = threads.find(t => t.title.includes(title) || title.includes(t.title))
+          if (existing && existing.status === 'active') return { ok: false, error: `你已经在追《${existing.title}》了` }
+          if (activeCount >= 3 && !existing) return { ok: false, error: '最多同时追 3 部——先弃掉一部再追新的（drop）' }
+          const resolved = await ports.lifeThreadResolve!({ title })
+          if (!resolved.ok) return resolved
+          const next = normalizeLifeThreads([...threads, { id: `lt-${Date.now()}`, kind: 'anime' as const, title: resolved.title, sourceId: resolved.sourceId, status: 'active' as const, addedAt: now(), lastSyncAt: 0, ...(resolved.episode ? { lastEpisode: resolved.episode } : {}), notes: [] }])
+          await store.saveLifeThreads(next)
+          return { ok: true, title: resolved.title }
+        },
+        lifeThreadList: async () => {
+          const threads = normalizeLifeThreads(await store.loadLifeThreads().catch(() => []))
+          return threads.map(t => ({ title: t.title, status: t.status, ...(t.lastEpisode ? { lastEpisode: t.lastEpisode } : {}), notes: t.notes }))
+        },
+        lifeThreadDrop: async (title: string) => {
+          const threads = normalizeLifeThreads(await store.loadLifeThreads().catch(() => []))
+          const target = threads.find(t => t.title.includes(title) || title.includes(t.title))
+          if (!target) return { ok: false, error: `没找到《${title}》` }
+          target.status = 'dropped'
+          await store.saveLifeThreads(threads)
+          return { ok: true }
+        },
+      } : {}),
       ...(typeof ports.qzoneInteract === 'function' ? { qzoneInteract: (input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }) => ports.qzoneInteract!(input) } : {}),
       pokeMember: async (userId: string) => {
         if (typeof ports.pokeMember !== 'function') return { ok: false, error: '戳一戳不可用' }
@@ -956,9 +1012,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         state.nextReplyCheckAt = 0
         reasons.push({ kind: 'replyCheck' })
       }
-      // 仅@才回的群不主动冒泡：静默期检查照常排期，但不产生 proactiveCheck 唤醒
+      // 仅@才回的群不主动冒泡：静默期检查照常排期，但不产生 proactiveCheck 唤醒；睡眠窗口内同样不冒泡
       const atOnly = (overridesCache?.atOnly || []).includes(groupId)
-      if (!atOnly && state.lastIncomingAt > 0 && at - state.lastIncomingAt >= cfg.wake.proactiveIdleMs && at >= state.nextProactiveCheckAt) {
+      let sleepingNow = false
+      if (cfg.rhythm.enabled) {
+        const rhythmWin = await loadRhythmWindow(cfg)
+        sleepingNow = isSleeping(new Date(now() + 8 * 3600_000).getUTCHours(), rhythmWin)
+      }
+      if (!atOnly && !sleepingNow && state.lastIncomingAt > 0 && at - state.lastIncomingAt >= cfg.wake.proactiveIdleMs && at >= state.nextProactiveCheckAt) {
         state.nextProactiveCheckAt = at + cfg.wake.proactiveCheckMinMs + Math.floor(random() * Math.max(1, cfg.wake.proactiveCheckMaxMs - cfg.wake.proactiveCheckMinMs))
         if (random() < cfg.wake.proactiveProbability) reasons.push({ kind: 'proactiveCheck' })
       }
@@ -976,6 +1037,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       if (!saved && !running.has(groupId)) await maybeExtractPersonProfiles(groupId, state, cfg)
       // 按人挖口头禅（风格个性化）：冷却默认 6h，读归档 → 纯函数挖掘 → Redis
       if (!saved && !running.has(groupId)) await maybeMineUserStyle(groupId, cfg)
+      if (!saved && !running.has(groupId)) await maybeSyncLifeThreads(cfg)
     }
   }
 
@@ -1034,6 +1096,29 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     } catch (error) {
       logger.warn(`[仿真] 群 ${groupId} 人物档案提取失败：${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+
+  /** 生活线同步：空闲时拉取真实更新（新集→记笔记），全局共享 */
+  async function maybeSyncLifeThreads(cfg: SimRuntimeConfig): Promise<void> {
+    if (!cfg.lifeThreads.enabled || typeof ports.lifeThreadSync !== 'function') return
+    const threads = normalizeLifeThreads(await store.loadLifeThreads().catch(() => []))
+    const at = now()
+    let dirty = false
+    for (const thread of threads) {
+      if (thread.status !== 'active') continue
+      if (at - thread.lastSyncAt < cfg.lifeThreads.syncIntervalMs) continue
+      try {
+        const started = now()
+        const result = await ports.lifeThreadSync({ sourceId: thread.sourceId, title: thread.title, ...(thread.lastEpisode ? { lastEpisode: thread.lastEpisode } : {}) })
+        try { ports.recordTokens?.({ scope: 'life-thread', stage: 'sync', ms: now() - started }) } catch {}
+        if (result && !('error' in result) && result.newNotes?.length) {
+          Object.assign(thread, mergeThreadSync(thread, result, at))
+          dirty = true
+          logger.info(`[仿真] 生活线《${thread.title}》新增 ${result.newNotes.length} 条真实笔记`)
+        }
+      } catch { /* 单线失败不影响整批 */ }
+    }
+    if (dirty) await store.saveLifeThreads(threads)
   }
 
   async function maybeMineUserStyle(groupId: string, cfg: SimRuntimeConfig): Promise<void> {
@@ -1100,6 +1185,15 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
   /** 永久活跃档的到期哨兵值（2100-01-01）：活跃=长期生效，不自动回落 */
   const ACTIVE_FOREVER_MS = 4102444800000
+
+  let rhythmCache: { at: number; win: RhythmWindow } | null = null
+  async function loadRhythmWindow(cfg: SimRuntimeConfig): Promise<RhythmWindow> {
+    if (rhythmCache && now() - rhythmCache.at < 60_000) return rhythmCache.win
+    const stored = await store.loadRhythm().catch(() => null)
+    const win = stored ? { sleepFrom: stored.sleepFrom, sleepTo: stored.sleepTo } : { sleepFrom: cfg.rhythm.sleepFrom, sleepTo: cfg.rhythm.sleepTo }
+    rhythmCache = { at: now(), win }
+    return win
+  }
 
   /** 活跃助推是否生效（窗口未过期） */
   function playAlongActive(groupId: string): boolean {
@@ -1418,5 +1512,18 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget, listPersonProfiles: () => store.listPersonProfiles(), deletePersonProfile: (userId: string) => store.deletePersonProfile(userId), deletePersonProfileField: (userId: string, field: string, value?: string) => store.deletePersonProfileField(userId, field, value) }
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget, listPersonProfiles: () => store.listPersonProfiles(), deletePersonProfile: (userId: string) => store.deletePersonProfile(userId), deletePersonProfileField: (userId: string, field: string, value?: string) => store.deletePersonProfileField(userId, field, value),
+  lifeOverview: async () => {
+    const cfg = runtimeConfig()
+    const stored = await store.loadRhythm().catch(() => null)
+    const rhythm = stored ? { sleepFrom: stored.sleepFrom, sleepTo: stored.sleepTo, ...(stored.setBy ? { setBy: stored.setBy } : {}) } : { sleepFrom: cfg.rhythm.sleepFrom, sleepTo: cfg.rhythm.sleepTo }
+    const threads = normalizeLifeThreads(await store.loadLifeThreads().catch(() => []))
+    const hour = new Date(now() + 8 * 3600_000).getUTCHours()
+    return { rhythm, threads, now: { hour, sleeping: isSleeping(hour, { sleepFrom: rhythm.sleepFrom, sleepTo: rhythm.sleepTo }) } }
+  },
+  setLifeRhythm: async (from: number, to: number) => {
+    await store.saveRhythm({ sleepFrom: from, sleepTo: to, setBy: 'admin' })
+    rhythmCache = null
+    return `已设定作息 ${from}:00 - ${to}:00（页面设定）`
+  } }
 }

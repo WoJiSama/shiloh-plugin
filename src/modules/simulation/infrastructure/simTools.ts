@@ -40,6 +40,12 @@ export interface SimToolContext {
   pokeMember(userId: string): Promise<{ ok: boolean; error?: string }>
   /** 全局好感底分镜像（群内变动时同步 30% 权重到跨群底分） */
   bumpGlobalAffinity?(userId: string, delta: number): Promise<number>
+  /** 自设作息（全局）：sleepFrom/sleepTo 小时，如 1-8 */
+  setRhythm?(sleepFrom: number, sleepTo: number): Promise<string>
+  /** 生活线管理：follow（真实搜索定位）/list/drop */
+  lifeThreadFollow?(title: string): Promise<{ ok: boolean; error?: string; title?: string }>
+  lifeThreadList?(): Promise<{ title: string; status: string; lastEpisode?: number; notes: string[] }[]>
+  lifeThreadDrop?(title: string): Promise<{ ok: boolean; error?: string }>
   /** QQ空间互动：visit 看说说 / like 点赞 / comment 评论（内容已脱敏） */
   qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
   /** 空间互动的运行时配置（开关/冷却/日限额/好感门槛） */
@@ -496,6 +502,84 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     }
   }
 
+  // 自设作息：AI 给自己定睡眠窗口（全局生效，页面可改）
+  class SimSetRhythmTool extends AbstractTool {
+    constructor() {
+      super()
+      this.name = 'simSetRhythm'
+      this.description = '设置你自己的睡眠时间（几点睡到几点起）。这是你的个人作息，会在所有群生效：睡觉时你不主动说话、被@才醒且回复带困意。像真人一样有自己的生物钟，别设定得不像人（凌晨2点睡早上9点起比晚9早5更像年轻人）。设置时会立即生效。'
+      this.parameters = {
+        type: 'object',
+        properties: {
+          sleepFrom: { type: 'number', description: '几点开始睡（0-23 的整数，如 1 表示凌晨1点）' },
+          sleepTo: { type: 'number', description: '几点醒来（1-24 的整数，如 8 表示早上8点）' },
+        },
+        required: ['sleepFrom', 'sleepTo'],
+        additionalProperties: false,
+      }
+    }
+    async func(opts: Record<string, unknown>) {
+      if (typeof ctx.setRhythm !== 'function') return 'error: 当前环境不支持自设作息'
+      const from = Math.floor(Number(opts.sleepFrom))
+      const to = Math.floor(Number(opts.sleepTo))
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from > 23 || to < 1 || to > 24 || to <= from) {
+        return 'error: sleepFrom 需要 0-23、sleepTo 需要 1-24 且必须晚于 sleepFrom（如 1→8 表示凌晨1点睡到早上8点）'
+      }
+      const msg = await ctx.setRhythm(from, to)
+      return msg
+    }
+  }
+
+  // 生活线管理：追番（真实搜索定位，搜不到拒绝）
+  class SimLifeThreadTool extends AbstractTool {
+    constructor() {
+      super()
+      this.name = 'simLifeThread'
+      this.description = [
+        '管理你正在追的番剧（基于真实公开数据，不编造）。三种用法：',
+        'follow（开始追）: 传番剧名，会通过真实搜索定位作品——搜不到会拒绝，不会编造。',
+        'list（查看）: 列出你当前在追的所有番及真实更新进度。',
+        'drop（弃了）: 弃掉某部番（弃了也是真实的——可以自然提到"我弃了XX"）。',
+        '系统会定期拉取真实更新（新集上线、观众热评），你谈论时以这些真实资料为据。',
+        '最多同时追 3 部。选择你有兴趣的、群里可能聊到的作品。',
+      ].join('\n')
+      this.parameters = {
+        type: 'object',
+        properties: {
+          action: { type: 'string', description: 'follow | list | drop' },
+          title: { type: 'string', description: '番剧名（follow/drop 必填）' },
+        },
+        required: ['action'],
+        additionalProperties: false,
+      }
+    }
+    async func(opts: Record<string, unknown>) {
+      const action = String(opts.action || '')
+      const title = String(opts.title || '').trim().slice(0, 40)
+      if (action === 'list') {
+        if (typeof ctx.lifeThreadList !== 'function') return 'error: 当前环境不支持生活线'
+        const list = await ctx.lifeThreadList()
+        if (!list.length) return '你还没有在追的番——用 follow(番名) 开始追一部你感兴趣的'
+        return list.map(t => `- 《${t.title}》${t.status === 'dropped' ? '（已弃）' : `（在追${t.lastEpisode ? `，看到第 ${t.lastEpisode} 集` : ''}）`}${t.notes.length ? `\n  最近动态：${t.notes.slice(0, 2).join(' / ')}` : ''}`).join('\n')
+      }
+      if (action === 'follow') {
+        if (!title) return 'error: follow 需要 title（番剧名）'
+        if (typeof ctx.lifeThreadFollow !== 'function') return 'error: 当前环境不支持生活线'
+        const result = await ctx.lifeThreadFollow(title)
+        if (!result.ok) return `error: ${result.error || '没找到这部作品'}——确保输入的是真实存在的番剧名，别编造`
+        return `已开始追《${result.title}》。系统会定期拉取真实更新，你谈论时以真实资料为据。`
+      }
+      if (action === 'drop') {
+        if (!title) return 'error: drop 需要 title'
+        if (typeof ctx.lifeThreadDrop !== 'function') return 'error: 当前环境不支持生活线'
+        const result = await ctx.lifeThreadDrop(title)
+        if (!result.ok) return `error: ${result.error || '没找到这部'}`
+        return `已弃《${title}》。`
+      }
+      return 'error: action 必须是 follow | list | drop'
+    }
+  }
+
   // QQ空间互动（偷偷逛群友空间）：visit=看最近说说(带冷却与好感门槛), like=点赞, comment=评论(过脱敏+日限额)
   class SimQzoneInteractTool extends AbstractTool {
     constructor() {
@@ -678,7 +762,9 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     new SimGetMessageImagesTool(),
     new SimSendPokeTool(),
     new SimGetGroupMembersTool(),
-    new SimQzoneInteractTool(),
+    new SimSetRhythmTool(),
+  new SimLifeThreadTool(),
+  new SimQzoneInteractTool(),
   new SimGetForwardTool(),
     new SimCollectStickerTool(),
   ]

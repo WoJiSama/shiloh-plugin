@@ -96,6 +96,8 @@ export interface ConsoleExtraPorts {
     setGroupTurnsCap?(groupId: string, cap: number): Promise<string>
     setReplyMode?(groupId: string, mode: 'atOnly' | 'auto' | 'active'): Promise<string>
     listPersonProfiles?(): Promise<unknown>
+    lifeOverview?(): Promise<unknown>
+    setLifeRhythm?(from: number, to: number): Promise<string>
     deletePersonProfile?(userId: string): Promise<boolean>
     deletePersonProfileField?(userId: string, field: string, value?: string): Promise<unknown>
     setDefaultBudget?(cny: number): Promise<string>
@@ -2124,6 +2126,19 @@ const server = http.createServer(async (req, res) => {
       if (!["name", "interests", "taboos", "traits", "facts"].includes(field)) return sendJson(res, 400, { error: "field 必须是 name|interests|taboos|traits|facts" })
       const result = await simulation.deletePersonProfileField(userId, field, body?.value === undefined ? undefined : String(body.value))
       return sendJson(res, 200, { ok: true, profile: result })
+    }
+    if (url.pathname === "/api/life/overview" && req.method === "GET") {
+      if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
+      return sendJson(res, 200, await simulation.lifeOverview!())
+    }
+    if (url.pathname === "/api/life/rhythm" && req.method === "POST") {
+      if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
+      const body = await readJsonBody(req, 4 * 1024)
+      const from = Math.floor(Number(body?.sleepFrom)), to = Math.floor(Number(body?.sleepTo))
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from > 23 || to < 1 || to > 24 || to <= from) {
+        return sendJson(res, 400, { error: "sleepFrom 0-23 / sleepTo 1-24 且 to > from" })
+      }
+      return sendJson(res, 200, { ok: true, message: await simulation.setLifeRhythm!(from, to) })
     }
     if (url.pathname === "/api/simulation/budget-default" && req.method === "POST") {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })

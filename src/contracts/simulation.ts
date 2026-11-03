@@ -189,6 +189,10 @@ export interface SimulationSection {
   qzone?: { enabled?: boolean; visitCooldownMs?: number; maxLikesPerDay?: number; maxCommentsPerDay?: number; minAffinity?: number }
   /** 人物核心档案（跨群）：称呼/长期爱好/雷点——只在所有群都合适的身份级事实；提取冷却与字段上限 */
   personProfile?: { enabled?: boolean; extractCooldownMs?: number; maxFields?: number }
+  /** 生物节律：作息窗口（小时，AI 可用 simSetRhythm 自设）与分时活跃调制 */
+  rhythm?: { enabled?: boolean; sleepFrom?: number; sleepTo?: number }
+  /** 生活线：真实数据源的持续关注线（在追的番/在玩的游戏），同步冷却与条数上限 */
+  lifeThreads?: { enabled?: boolean; maxThreads?: number; syncIntervalMs?: number }
   /** 仿真回合模型：缺省沿用 toolsAiModel；设为 glm-5.3-flash 等可整体降档（省 token） */
   turnModel?: string
   budget?: {
@@ -248,5 +252,7 @@ export interface SimRuntimeConfig {
   activeBoostMs: number
   qzone: { enabled: boolean; visitCooldownMs: number; maxLikesPerDay: number; maxCommentsPerDay: number; minAffinity: number }
   personProfile: { enabled: boolean; extractCooldownMs: number; maxFields: number }
+  rhythm: { enabled: boolean; sleepFrom: number; sleepTo: number }
+  lifeThreads: { enabled: boolean; maxThreads: number; syncIntervalMs: number }
   userStyle: { enabled: boolean; cooldownMs: number; archiveDays: number }
 }

@@ -89,6 +89,22 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       enabled: (section.wakeGate || {}).enabled !== false,
     },
     activeBoostMs: Math.min(12 * 3600_000, Math.max(10 * 60_000, Math.floor(section.activeBoostMs ?? 3 * 3600_000))),
+    rhythm: (() => {
+      const raw = section.rhythm || {}
+      return {
+        enabled: raw.enabled !== false,
+        sleepFrom: Math.min(23, Math.max(0, Math.floor(raw.sleepFrom ?? 1))),
+        sleepTo: Math.min(24, Math.max(1, Math.floor(raw.sleepTo ?? 8)))
+      }
+    })(),
+    lifeThreads: (() => {
+      const raw = section.lifeThreads || {}
+      return {
+        enabled: raw.enabled !== false,
+        maxThreads: Math.min(6, Math.max(1, Math.floor(raw.maxThreads ?? 3))),
+        syncIntervalMs: Math.min(24 * 3600_000, Math.max(60 * 60_000, Math.floor(raw.syncIntervalMs ?? 6 * 3600_000)))
+      }
+    })(),
     personProfile: (() => {
       const raw = section.personProfile || {}
       return {

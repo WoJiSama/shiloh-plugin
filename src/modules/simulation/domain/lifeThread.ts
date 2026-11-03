@@ -1,0 +1,60 @@
+/** 生活线（真实数据源）：解析同步结果、合并真实笔记、注入格式。核心约束——不编造，一切以真实拉取的资料为据。 */
+
+export interface LifeThread {
+  id: string
+  kind: 'anime' | 'game'
+  title: string
+  /** B 站 season_id（anime）或搜索锚点（game） */
+  sourceId: string
+  status: 'active' | 'dropped'
+  addedAt: number
+  lastSyncAt: number
+  lastEpisode?: number
+  /** 真实资料笔记（最新在前，≤12 条，每条 ≤120 字） */
+  notes: string[]
+}
+
+export interface ThreadSyncResult { newNotes: string[]; episode?: number }
+
+const MAX_NOTES = 12
+
+export function normalizeLifeThreads(raw: unknown): LifeThread[] {
+  const list = Array.isArray(raw) ? raw : []
+  const out: LifeThread[] = []
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue
+    const row = item as Record<string, unknown>
+    const id = String(row.id || '').trim()
+    const title = String(row.title || '').trim().slice(0, 40)
+    const sourceId = String(row.sourceId || '').trim()
+    const kind = row.kind === 'game' ? 'game' : 'anime'
+    if (!id || !title || !sourceId) continue
+    out.push({
+      id, kind, title, sourceId,
+      status: row.status === 'dropped' ? 'dropped' : 'active',
+      addedAt: Number(row.addedAt) || 0,
+      lastSyncAt: Number(row.lastSyncAt) || 0,
+      ...(Number(row.lastEpisode) > 0 ? { lastEpisode: Number(row.lastEpisode) } : {}),
+      notes: Array.isArray(row.notes) ? row.notes.map(n => String(n || '').trim().slice(0, 120)).filter(Boolean).slice(0, MAX_NOTES) : [],
+    })
+  }
+  return out.slice(0, 6)
+}
+
+/** 合并同步结果：新笔记置顶、总量截断；集数推进 */
+export function mergeThreadSync(thread: LifeThread, sync: ThreadSyncResult, now: number): LifeThread {
+  const notes = [...sync.newNotes.map(n => String(n || '').trim().slice(0, 120)).filter(Boolean), ...thread.notes].slice(0, MAX_NOTES)
+  return { ...thread, notes, lastSyncAt: now, ...(sync.episode !== undefined && sync.episode > 0 ? { lastEpisode: sync.episode } : {}) }
+}
+
+/** 注入格式：活跃线程 + 真实笔记；附使用规则（以真实资料为据，不编造） */
+export function formatLifeThreads(threads: LifeThread[]): string {
+  const active = threads.filter(t => t.status === 'active')
+  if (!active.length) return ''
+  const lines = active.slice(0, 3).map(t => {
+    const head = `- 《${t.title}》（${t.kind === 'anime' ? `在追${t.lastEpisode ? `，看到第 ${t.lastEpisode} 集` : ''}` : '在玩'}）`
+    const notes = t.notes.slice(0, 4).map(n => `  · ${n}`).join('\n')
+    return notes ? `${head}\n${notes}` : head
+  })
+  return ['【你最近的生活线】（以下全部来自真实公开资料——更新进度和内容摘要都是实际数据。谈论时以此为据：可以聊感想，但不要编造资料里没有的具体剧情/版本细节）', ...lines].join('\n')
+}

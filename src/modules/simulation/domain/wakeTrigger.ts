@@ -51,6 +51,8 @@ export interface WakeTriggerContext {
   selfName: string
   random(): number
   isPrivate?: boolean
+  /** 分时活跃系数（生物节律）：乘在概率触发上，深夜显著降低 */
+  activityFactor?: number
   /** 会话延续状态（机器人最近参与过对话）：对话对象不点名的新消息也值得醒来看 */
   conversation?: { activeUntil: number; interlocutorIds: string[] }
 }
@@ -87,7 +89,7 @@ export function evaluateWakeTrigger(message: SimMessage, config: SimWakeConfig, 
   if (t.speakerIds.length && t.speakerIds.includes(message.userId)) {
     return { kind: 'speaker', seq: message.seq, detail: message.name }
   }
-  if (t.probability > 0 && ctx.random() < t.probability) return { kind: 'probability', seq: message.seq }
+  if (t.probability > 0 && ctx.random() < t.probability * (ctx.activityFactor ?? 1)) return { kind: 'probability', seq: message.seq }
   return null
 }
 
