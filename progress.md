@@ -1862,3 +1862,7 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 任务4【生活线×档案兴趣连接】：新增 `interestMatchesTitle`，在追作品与在场群友档案 interests 匹配时在【生活线】段追加"共同话题"提示行（CJK≥2字/字母数字≥3字互为子串，泛词不误报）。
 - 顺手修存量 bug：formatLifeThreads 的 `.join('\\n')` 字面反斜杠n → 真换行（生活线段此前一直挤成一行）。
 - 验证：backend:typecheck 通过；全量 npm test 2957 项 2955 通过/0 失败/2 环境跳过；新增领域测试 5 项（simulationDomain.test.ts）+ 工具级测试 1 项（simIngest.test.js，含时间词护栏/无档案能力降级/pendingEvent 不入档案）。
+- 复审(渲染真实唤醒 prompt 实证)发现两处缺陷并修复:
+  1) 记忆溢出丢失——卡内人记忆 >2 条时,第 3 条起在卡与【你记着的事】双双不可见(旧版【你记着的事】top-5 不丢)。改为按条目 id 精确豁免(omitMemoryIds=已进卡∪被档案覆盖),溢出未展示条目回流【你记着的事】。
+  2) 档案内部近重复——simRemember 全句入 facts + 提取器短语并存,展示两遍。formatPersonProfile 的 facts 改为短词优先去重(互为子串/≥3字公共段视为同事实),且被 traits/interests 覆盖的 fact 不渲染。
+- 复验:m3 溢出回流 ✓、长句被短词压制 ✓;定向 83/83;全量 npm test 2959 项 2957 通过/0 失败/2 环境跳过;+2 回归测试。

@@ -770,7 +770,7 @@ test('buildPersonCards：同一人的关系+档案+本群记忆合成一张卡�
     { id: 'm2', kind: 'note', content: '小鱼在学日语', done: false, createdAt: now, updatedAt: now, source: 'agent', aboutUser: '1001' },
     { id: 'm3', kind: 'note', content: '自己的口头禅：绷不住了', done: false, createdAt: now, updatedAt: now, source: 'agent' },
   ]
-  const { section, cardedUserIds } = buildPersonCards({
+  const { section, omitMemoryIds } = buildPersonCards({
     affinity: { '1001': { ...defaultAffinityEntry(now), score: 70 }, '1002': { ...defaultAffinityEntry(now), score: 30 } },
     speakers: ['1001', '1002'],
     nameOf: id => (id === '1001' ? '小鱼' : '路人'),
@@ -786,11 +786,46 @@ test('buildPersonCards：同一人的关系+档案+本群记忆合成一张卡�
   assert.ok(!section.includes('m2'), '档案已覆盖"在学日语"不重复注入')
   assert.ok(!section.includes('m3'), '不带 aboutUser 的自身记忆不进卡')
   assert.ok(section.indexOf('小鱼') < section.indexOf('路人'), '在场者优先')
-  assert.ok(cardedUserIds.has('1001') && cardedUserIds.has('1002'))
-  // 卡内已并入的关于某人的记忆 → 【你记着的事】不再重复
-  const memoryText = formatMemorySections(memories, now, id => (id === '1001' ? '小鱼' : '路人'), cardedUserIds)
+  assert.deepEqual([...omitMemoryIds].sort(), ['m1', 'm2'], '豁免=已进卡的 m1 + 被档案覆盖的 m2')
+  // 卡内已并入/被覆盖的关于某人的记忆 → 【你记着的事】不再重复；溢出未展示的回流不丢
+  const memoryText = formatMemorySections(memories, now, id => (id === '1001' ? '小鱼' : '路人'), omitMemoryIds)
   assert.ok(memoryText.includes('m3'), '自身记忆保留在【你记着的事】')
   assert.ok(!memoryText.includes('m1') && !memoryText.includes('m2'), '关于卡内人的记忆不再重复出现')
+})
+
+test('buildPersonCards：同一人记忆溢出卡上限（2条）时，未展示条目回流【你记着的事】不丢失', async () => {
+  const { buildPersonCards } = await import('../../src/modules/simulation/domain/simMemory.js')
+  const now = 1_700_000_000_000
+  const memories: SimMemoryEntry[] = [
+    { id: 'm1', kind: 'note', content: '上次一起打了星露谷联机到凌晨', done: false, createdAt: now, updatedAt: now, source: 'agent', aboutUser: '1001' },
+    { id: 'm2', kind: 'note', content: '养了一只橘猫叫馒头', done: false, createdAt: now, updatedAt: now - 1, source: 'agent', aboutUser: '1001' },
+    { id: 'm3', kind: 'note', content: '不会打麻将，被拉去凑数输惨了', done: false, createdAt: now, updatedAt: now - 2, source: 'agent', aboutUser: '1001' },
+  ]
+  const { section, omitMemoryIds } = buildPersonCards({
+    affinity: { '1001': { ...defaultAffinityEntry(now), score: 70 } },
+    speakers: ['1001'], nameOf: () => '弧月酱', profiles: {}, memories,
+  })
+  assert.ok(section.includes('m1') && section.includes('m2'), '最新的两条进卡')
+  assert.ok(!section.includes('m3'), '第三条不进卡')
+  assert.ok(!omitMemoryIds.has('m3'), '溢出条目不豁免')
+  const rest = formatMemorySections(memories, now, () => '弧月酱', omitMemoryIds)
+  assert.ok(rest.includes('m3'), '溢出条目回流【你记着的事】——不丢信息')
+  assert.ok(!rest.includes('m1') && !rest.includes('m2'), '卡内条目不重复')
+})
+
+test('formatPersonProfile：facts 展示去重——短词优先，同事实长句不重复渲染', async () => {
+  const { formatPersonProfile } = await import('../../src/modules/simulation/domain/personProfile.js')
+  const line = formatPersonProfile(
+    { name: '弧月酱', interests: ['日语'], taboos: [], facts: ['弧月酱说芙莉莲超好看安利我', '财税专业', '喜欢芙莉莲'] },
+    '弧月酱',
+  )
+  assert.ok(line.includes('财税专业'), '独立事实保留')
+  assert.ok(line.includes('喜欢芙莉莲'), '短词保留')
+  assert.ok(!line.includes('安利我'), '被短词覆盖的同事实长句不渲染')
+  // 与 interests 重复的 fact 也不渲染
+  const line2 = formatPersonProfile({ interests: ['芙莉莲'], taboos: [], facts: ['喜欢芙莉莲', '财税专业'] }, '某人')
+  assert.ok(!line2.includes('喜欢芙莉莲'), 'fact 与 interest 同事实只留 interest')
+  assert.ok(line2.includes('财税专业'))
 })
 
 test('buildPersonCards：有好感表外档案的在场新人也入卡（默认无关系行）', async () => {

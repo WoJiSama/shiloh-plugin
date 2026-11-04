@@ -46,14 +46,25 @@ export function buildPersonProfileExtractPrompt(messages: { userId?: string; nam
   }
 }
 
-/** 注入格式：一行紧凑事实，空档案返回空串 */
+/** 注入格式：一行紧凑事实，空档案返回空串。facts 展示侧去重：短词优先，指向同一事实的长句不重复渲染。 */
 export function formatPersonProfile(profile: PersonProfile | undefined, display: string): string {
   if (!profile) return ''
   const parts: string[] = []
   if (profile.name) parts.push(`称呼「${profile.name}」`)
-  if (profile.traits?.length) parts.push(profile.traits.slice(0, 3).join('、'))
-  if (profile.interests?.length) parts.push(`喜欢：${profile.interests.slice(0, 4).join('、')}`)
-  if (profile.facts?.length) parts.push(profile.facts.slice(0, 3).join('；'))
+  const traits = (profile.traits || []).slice(0, 3)
+  if (traits.length) parts.push(traits.join('、'))
+  const interests = (profile.interests || []).slice(0, 4)
+  if (interests.length) parts.push(`喜欢：${interests.join('、')}`)
+  // simRemember 同步的是整句、提取器是短语——同事实两条时保留短的（信息密度高、省 token）
+  const factBase = [...traits, ...interests]
+  const keptFacts: string[] = []
+  for (const fact of [...(profile.facts || [])].sort((a, b) => a.length - b.length)) {
+    if (keptFacts.length >= 3) break
+    if (factBase.some(base => textCoversFact(fact, base))) continue
+    if (keptFacts.some(prev => textCoversFact(fact, prev))) continue
+    keptFacts.push(fact)
+  }
+  if (keptFacts.length) parts.push(keptFacts.join('；'))
   if (profile.taboos?.length) parts.push(`雷点：${profile.taboos.slice(0, 3).join('、')}`)
   if (!parts.length) return ''
   return `${display}：${parts.join('；')}`
@@ -81,6 +92,15 @@ function longestCommonRun(a: string, b: string): number {
   return best
 }
 
+/** 两条文本是否指向同一事实：归一化后互为子串（≥3字）或有 ≥3 字连续公共段 */
+function textCoversFact(a: string, b: string): boolean {
+  const x = normalizeForMatch(a)
+  const y = normalizeForMatch(b)
+  if (x.length < 2 || y.length < 2) return false
+  if ((x.length >= 3 && y.includes(x)) || (y.length >= 3 && x.includes(y))) return true
+  return longestCommonRun(x, y) >= 3
+}
+
 /**
  * 注入去重：判断一条本群记忆内容是否已被该人的档案覆盖。
  * 判据——归一化后与任一档案字段存在 ≥3 字符的连续公共段（如"学日语"）；
@@ -88,15 +108,10 @@ function longestCommonRun(a: string, b: string): number {
  */
 export function profileCoversContent(content: string, profile: PersonProfile | undefined): boolean {
   if (!profile) return false
-  const target = normalizeForMatch(content)
-  if (target.length < 3) return false
+  const target = String(content || '')
+  if (normalizeForMatch(target).length < 3) return false
   const fields = [...(profile.name ? [profile.name] : []), ...(profile.traits || []), ...(profile.interests || []), ...(profile.facts || []), ...(profile.taboos || [])]
-  for (const field of fields) {
-    const value = normalizeForMatch(field)
-    if (value.length >= 3 && (target.includes(value) || value.includes(target))) return true
-    if (value.length >= 2 && longestCommonRun(target, value) >= 3) return true
-  }
-  return false
+  return fields.some(field => textCoversFact(target, field))
 }
 
 /** 生活线×档案兴趣连接：兴趣词条与作品标题是否指向同一作品（归一化后互为子串，CJK ≥2 字/字母数字 ≥3 字） */

@@ -130,15 +130,15 @@ export function buildWakePrompt(input: WakePromptInput): string {
   if (input.initialPrompt) {
     lines.push(`【本群初始说明（只此一次）】${input.initialPrompt}`)
   }
-  // 人物卡（好感+档案+口头禅+本群记忆 每人一条）要先建，卡内已并入的记忆条目不再进【你记着的事】
+  // 人物卡（好感+档案+口头禅+本群记忆 每人一条）要先建，已进卡/被档案覆盖的条目不再进【你记着的事】
   const cards = input.affinity || input.personProfiles
     ? buildPersonCards({
       affinity: input.affinity || {}, speakers: input.speakers || [], nameOf, limit: 8,
       userCatchphrases: input.userCatchphrases, globalAffinity: input.globalAffinity,
       profiles: input.personProfiles, memories: input.memories,
     })
-    : { section: '', cardedUserIds: new Set<string>() }
-  const memorySection = input.memories?.length ? formatMemorySections(input.memories, now, nameOf, cards.cardedUserIds) : ''
+    : { section: '', omitMemoryIds: new Set<string>() }
+  const memorySection = input.memories?.length ? formatMemorySections(input.memories, now, nameOf, cards.omitMemoryIds) : ''
   if (memorySection) lines.push(memorySection)
   const memeSection = input.memories?.length ? formatMemeSection(input.memories) : ''
   if (memeSection) lines.push(memeSection)
