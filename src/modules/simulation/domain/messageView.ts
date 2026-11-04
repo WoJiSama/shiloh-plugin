@@ -24,7 +24,7 @@ export function compactSimMessage(message: SimMessage, now: number): string {
     ? '[引用你的话]'
     : message.quoteAuthor ? `[引用 ${message.quoteAuthor}${message.quoteText ? `：${message.quoteText}` : ''}${message.quoteImageUrls?.length ? `（附${message.quoteImageUrls.length}张图，可用 simGetMessageImages 看）` : ''}]` : ''
   const self = message.atSelf ? '[@你]' : ''
-  return `${atClock(message.at)}(${agoText(message.at, now)}) ${message.name}${self}: ${quoted}${message.text}${media}${forward}`
+  return `#${message.seq} ${atClock(message.at)}(${agoText(message.at, now)}) ${message.name}${self}: ${quoted}${message.text}${media}${forward}`
 }
 
 export interface SimSnapshot {
