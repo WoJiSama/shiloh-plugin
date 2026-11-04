@@ -97,6 +97,7 @@ export interface ConsoleExtraPorts {
     setReplyMode?(groupId: string, mode: 'atOnly' | 'auto' | 'active'): Promise<string>
     listPersonProfiles?(): Promise<unknown>
     lifeOverview?(): Promise<unknown>
+    getHealthAlerts?(): Promise<unknown>
     setLifeRhythm?(from: number, to: number): Promise<string>
     deletePersonProfile?(userId: string): Promise<boolean>
     deletePersonProfileField?(userId: string, field: string, value?: string): Promise<unknown>
@@ -2126,6 +2127,10 @@ const server = http.createServer(async (req, res) => {
       if (!["name", "interests", "taboos", "traits", "facts"].includes(field)) return sendJson(res, 400, { error: "field 必须是 name|interests|taboos|traits|facts" })
       const result = await simulation.deletePersonProfileField(userId, field, body?.value === undefined ? undefined : String(body.value))
       return sendJson(res, 200, { ok: true, profile: result })
+    }
+    if (url.pathname === "/api/health/alerts" && req.method === "GET") {
+      if (!simulation || typeof simulation.getHealthAlerts !== "function") return sendJson(res, 200, { alerts: [], checkedAt: 0 })
+      return sendJson(res, 200, await simulation.getHealthAlerts!())
     }
     if (url.pathname === "/api/life/overview" && req.method === "GET") {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })

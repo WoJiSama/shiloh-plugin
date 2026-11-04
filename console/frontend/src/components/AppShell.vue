@@ -33,6 +33,7 @@ const route = useRoute(),
   router = useRouter(),
   message = useMessage()
 installUnsavedDialog()
+const healthAlerts = ref<any>(null)
 const menuOpen = ref(false),
   searchOpen = ref(false),
   query = ref(''),
@@ -215,6 +216,13 @@ onBeforeUnmount(() => {
           ></NButton>
         </div>
       </header>
+      <div v-if="healthAlerts?.alerts?.length" class="health-banner" style="padding: 0 16px 8px">
+        <NAlert type="warning" :show-icon="true">
+          <div v-for="(a, i) in healthAlerts.alerts.slice(0, 3)" :key="i" style="font-size: 13px">
+            {{ a.severity === 'error' ? '\ud83d\udd34' : '\ud83d\udfe1' }} <strong>{{ a.component }}</strong>：{{ a.message }}
+          </div>
+        </NAlert>
+      </div>
       <main class="workspace-content" id="main-content">
         <RouterView v-slot="{ Component, route: current }"
           ><component :is="Component" :key="current.path"

@@ -37,7 +37,8 @@ try {
     listPersonProfiles: () => simulationRuntime.listPersonProfiles(),
     deletePersonProfile: (userId) => simulationRuntime.deletePersonProfile(userId),
     deletePersonProfileField: (userId, field, value) => simulationRuntime.deletePersonProfileField(userId, field, value),
-    lifeOverview: () => simulationRuntime.lifeOverview?.() ?? { rhythm: { sleepFrom: 1, sleepTo: 8 }, threads: [], now: { hour: 0, sleeping: false } },
+    lifeOverview: () => simulationRuntime.lifeOverview,
+    getHealthAlerts: () => simulationRuntime.getHealthAlerts()?.() ?? { rhythm: { sleepFrom: 1, sleepTo: 8 }, threads: [], now: { hour: 0, sleeping: false } },
     setLifeRhythm: (from, to) => simulationRuntime.setLifeRhythm?.(from, to) ?? '未接入',
   }
 } catch (error) {

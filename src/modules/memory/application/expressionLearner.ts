@@ -349,7 +349,11 @@ class ExpressionLearner {
         .join("\n")
       if (!messageSample) return
 
-      const response = await ports.fetch(memoryAiUrl, {
+      // URL 补全：与 sideLLMCall / globalStyleLearner 同款——渠道基址需补 /chat/completions
+      const exprAiUrl = /\/chat\/completions$/.test(String(memoryAiUrl))
+        ? String(memoryAiUrl)
+        : String(memoryAiUrl).replace(/\/+$/, "") + "/chat/completions"
+      const response = await ports.fetch(exprAiUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${memoryAiApikey}`, "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -15,6 +15,7 @@ import { isSilentDeclaration, mentionsSilenceVocabulary } from '../domain/silent
 import { parsePersonProfilePatches, formatPersonProfile } from '../domain/personProfile.js'
 import { isSleeping, activityFactor, sleepinessNote, staleMessageNote, type RhythmWindow } from '../domain/rhythm.js'
 import { normalizeLifeThreads, mergeThreadSync, formatLifeThreads, type LifeThread } from '../domain/lifeThread.js'
+import { checkHealth, formatAlerts, type HealthAlert } from '../domain/healthSentinel.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
@@ -131,6 +132,8 @@ export interface SimulationRuntime {
   /** 控制台「作息与生活」页：总览 + 修改作息 */
   lifeOverview(): Promise<{ rhythm: { sleepFrom: number; sleepTo: number; setBy?: string }; threads: unknown[]; now: { hour: number; sleeping: boolean } }>
   setLifeRhythm(from: number, to: number): Promise<string>
+  /** 控制台：健康哨兵告警列表 */
+  getHealthAlerts(): Promise<{ alerts: unknown[]; checkedAt: number }>
 }
 
 export interface SimIngestEvent {
@@ -219,6 +222,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   // B站卡片分享冷却:同群 20 分钟一张,保持「偶尔甩一张」的克制感
   const videoCardAt = new Map<string, number>()
   let overridesLoadedAt = 0
+  let healthSentinelLastRun = 0
   let knownGroupsCache: string[] = []
 
   function runtimeConfig(): SimRuntimeConfig {
@@ -1038,6 +1042,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       // 按人挖口头禅（风格个性化）：冷却默认 6h，读归档 → 纯函数挖掘 → Redis
       if (!saved && !running.has(groupId)) await maybeMineUserStyle(groupId, cfg)
       if (!saved && !running.has(groupId)) await maybeSyncLifeThreads(cfg)
+      // 健康哨兵：全局每小时跑一次（挂在第一个群的 sweep 里）
+      if (now() - healthSentinelLastRun > 3600_000) {
+        healthSentinelLastRun = now()
+        void runHealthSentinel()
+      }
     }
   }
 
@@ -1096,6 +1105,27 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     } catch (error) {
       logger.warn(`[仿真] 群 ${groupId} 人物档案提取失败：${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+
+  /** 健康哨兵：定期检查后台组件连环失败/过期，写 Redis 供控制台展示 */
+  async function runHealthSentinel(): Promise<void> {
+    try {
+      const alerts: HealthAlert[] = []
+      // 直接读 style_memory.json（避免 import 循环依赖）
+      try {
+        const fs = await import('node:fs')
+        const pathMod = await import('node:path')
+        const memoryPath = pathMod.join(process.cwd(), 'plugins', 'shiloh-plugin', 'data', 'global_style_learning', 'style_memory.json')
+        if (fs.existsSync(memoryPath)) {
+          const memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'))
+          alerts.push(...checkHealth({ now: now(), styleMemory: memory }))
+        }
+      } catch { /* 读不到就跳过 */ }
+      // 写 Redis 供控制台展示
+      const payload = JSON.stringify({ alerts, checkedAt: now() })
+      try { await (globalThis as unknown as { redis?: { set(k: string, v: string): Promise<unknown> } }).redis?.set?.('shiloh:health:alerts', payload) } catch { /* redis 不可用 */ }
+      if (alerts.length) logger.warn(`[健康哨兵] ${formatAlerts(alerts)}`)
+    } catch { /* 哨兵自身失败不影响主流程 */ }
   }
 
   /** 生活线同步：空闲时拉取真实更新（新集→记笔记），全局共享 */
@@ -1521,7 +1551,13 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const hour = new Date(now() + 8 * 3600_000).getUTCHours()
     return { rhythm, threads, now: { hour, sleeping: isSleeping(hour, { sleepFrom: rhythm.sleepFrom, sleepTo: rhythm.sleepTo }) } }
   },
-  setLifeRhythm: async (from: number, to: number) => {
+  getHealthAlerts: async () => {
+      try {
+        const raw = await (globalThis as unknown as { redis?: { get(k: string): Promise<string | null> } }).redis?.get?.('shiloh:health:alerts')
+        return raw ? JSON.parse(raw) : { alerts: [], checkedAt: 0 }
+      } catch { return { alerts: [], checkedAt: 0 } }
+    },
+    setLifeRhythm: async (from: number, to: number) => {
     await store.saveRhythm({ sleepFrom: from, sleepTo: to, setBy: 'admin' })
     rhythmCache = null
     return `已设定作息 ${from}:00 - ${to}:00（页面设定）`
