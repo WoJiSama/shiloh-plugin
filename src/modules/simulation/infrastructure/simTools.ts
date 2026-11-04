@@ -40,6 +40,8 @@ export interface SimToolContext {
   pokeMember(userId: string): Promise<{ ok: boolean; error?: string }>
   /** 全局好感底分镜像（群内变动时同步 30% 权重到跨群底分） */
   bumpGlobalAffinity?(userId: string, delta: number): Promise<number>
+  /** 双轨写入协同：agent 记的"关于某人的事实"同步进该人的跨群人物档案 */
+  savePersonFact?(userId: string, fact: string): Promise<void>
   /** 自设作息（全局）：sleepFrom/sleepTo 小时，如 1-8 */
   setRhythm?(sleepFrom: number, sleepTo: number): Promise<string>
   /** 生活线管理：follow（真实搜索定位）/list/drop */
@@ -352,6 +354,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.description = [
         '你的长期记忆（跨回合、跨天保存）。群友提到未来安排/约定/考试/生日时记 pendingEvent（必须给 dueInMinutes，到点系统会提醒你跟进）；',
         '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note（不带 aboutUser，这是你的性格沉淀）。',
+        '带 aboutUser 的稳定事实（TA的爱好/身份/雷点这类到哪个群都成立的）会同时进入TA的跨群人物档案；带时间性的内容（明天/下周要干嘛）不要走这条路，记 pendingEvent。',
         'action=list 查看记忆；跟进完成后 action=done 收掉待办；action=remove 删除记错的。',
       ].join('\n')
       this.parameters = {
@@ -408,7 +411,15 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       }
       const memories = [...ctx.getMemories(), entry]
       ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
-      return JSON.stringify({ saved: true, id: entry.id, note: entry.kind === 'pendingEvent' ? '到点后系统会在唤醒时提醒你跟进。' : undefined })
+      // 双轨写入协同：关于某人的稳定事实同步进跨群人物档案（时间性内容留在本群记忆）
+      let profileSynced = false
+      if (entry.aboutUser && (entry.kind === 'note' || entry.kind === 'impression') && typeof ctx.savePersonFact === 'function' && !/明天|后天|大后天|下周|下月|今晚|待会|等下|马上|这周末/.test(entry.content)) {
+        try {
+          await ctx.savePersonFact(entry.aboutUser, entry.content)
+          profileSynced = true
+        } catch { /* 档案同步失败不影响本群记忆已保存 */ }
+      }
+      return JSON.stringify({ saved: true, id: entry.id, note: entry.kind === 'pendingEvent' ? '到点后系统会在唤醒时提醒你跟进。' : profileSynced ? '（这条关于TA的稳定事实也已进入TA的跨群档案）' : undefined })
     }
   }
 

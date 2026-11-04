@@ -413,3 +413,51 @@ test('人物档案存储：合并去重、上限截断、跨 runtime 实例共�
     assert.ok(shared instanceof Map)
   } finally { r.stop() }
 })
+
+test('simRemember 双轨协同：关于某人的稳定事实自动同步跨群档案，时间性内容不同步', async () => {
+  const { createSimTools } = await import('../dist/backend/modules/simulation/infrastructure/simTools.js')
+  const savedFacts = []
+  let memories = []
+  const state = { affinity: {} }
+  const ctx = {
+    groupId: GROUP, now: () => BASE_AT, getState: () => state,
+    mutate: async fn => fn(state),
+    sendMessage: async () => ({ ok: true, sent: [] }),
+    waitForMessages: async () => ({ outcome: 'quiet' }),
+    applyWakeConfig: () => {}, sendsThisTurn: () => 0, maxSendItems: () => 5, messageTextMaxChars: () => 200,
+    getMemories: () => memories, saveMemories: list => { memories = list },
+    getAffinity: () => state.affinity, saveAffinity: () => {},
+    getMessageImages: async () => ({ seq: 0, images: [] }),
+    savePersonFact: async (userId, fact) => { savedFacts.push({ userId, fact }) },
+    pokeMember: async () => ({ ok: true }),
+    getGroupMembers: async () => [],
+  }
+  const tools = createSimTools(ctx)
+  const remember = tools.find(t => t.name === 'simRemember')
+  assert.ok(remember, '工具应注册')
+
+  // 稳定事实（关于TA、无时间词）→ 同步档案
+  let out = await remember.func({ kind: 'note', content: '小鱼养了两只猫', aboutUser: '1001' })
+  assert.equal(savedFacts.length, 1)
+  assert.equal(savedFacts[0].userId, '1001')
+  assert.equal(savedFacts[0].fact, '小鱼养了两只猫')
+  assert.match(out, /跨群档案/)
+  assert.equal(memories.length, 1, '本群记忆同样保存')
+
+  // 时间性内容（明天）→ 只进本群记忆，不进档案
+  out = await remember.func({ kind: 'note', content: '小鱼明天要考四级', aboutUser: '1001' })
+  assert.equal(savedFacts.length, 1, '时间性内容不同步')
+  assert.equal(memories.length, 2)
+  assert.doesNotMatch(out, /跨群档案/)
+
+  // pendingEvent 即便带 aboutUser 也不进档案
+  await remember.func({ kind: 'pendingEvent', content: '小鱼下周生日，记得说一句', aboutUser: '1001', dueInMinutes: 60 })
+  assert.equal(savedFacts.length, 1)
+  assert.equal(memories.length, 3)
+
+  // 无 savePersonFact 能力（人物档案功能关闭）→ 不崩，记忆照常
+  delete ctx.savePersonFact
+  out = await remember.func({ kind: 'impression', content: '小鱼人很好，上次帮我讲解题', aboutUser: '1001' })
+  assert.equal(memories.length, 4)
+  assert.doesNotMatch(out, /跨群档案/)
+})

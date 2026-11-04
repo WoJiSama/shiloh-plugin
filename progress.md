@@ -1852,3 +1852,13 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - 最终完整门禁退出0：后端2775通过/0失败/2模板截图环境跳过，前端65通过；类型、构建、边界与迁移登记全部通过。最终Chrome6项页面检查通过，错误/外部请求均0。配置首写原断言在全量测试中通过，未放宽产品测试。
 - 已新增实施交付说明及26份源码/测试SHA256验证清单，复制整仓日志、构建清单和最终截图到reports/turtle-soup-2026-10-19。1028份非目标既有文件和共享HEAD/index复核保持；没有修改其他会话的小红书实现，没有写共享dist，未执行提交、推送、部署或生产修题。
 - 独立复核26份源码与25份证据哈希全部一致；所需忽略目录证据已保存在共享目录。托管验证工作树已归档并由list_artifacts确认，可按需恢复，当前分支业务文件保留。
+
+
+# 2026-11-04 仿真注入链整合（人物卡/去重/双轨协同/兴趣连接）
+
+- 续接会话 fea03359：该会话完成注入链全景分析并给出四项改进方案，用户确认「1234都做」后会话中断，本轮全部实施。
+- 任务1+2【人物卡合并+注入去重】：新增 `buildPersonCards`（simMemory.ts）——好感+跨群档案+口头禅+本群关于TA的记忆合成每人一张【群友人物卡】，替代原【群友好感】+【群友核心档案】两段；新增 `profileCoversContent`（personProfile.ts，归一化后 ≥3 字公共段判定）把档案已覆盖的本群记忆条目剔除，卡内人的 note/impression 不再重复进【你记着的事】（formatMemorySections 加 omitAboutUserIds）。runtime 改传原始档案字段。
+- 任务3【双轨写入协同】：simRemember 的 aboutUser note/impression（无时间词）自动经 `savePersonFact` 合入该人跨群档案（mergePersonProfile，受 personProfile.enabled 门控），工具说明同步告知模型"稳定事实入档案、时间性内容记 pendingEvent"；同步失败不影响本群记忆。
+- 任务4【生活线×档案兴趣连接】：新增 `interestMatchesTitle`，在追作品与在场群友档案 interests 匹配时在【生活线】段追加"共同话题"提示行（CJK≥2字/字母数字≥3字互为子串，泛词不误报）。
+- 顺手修存量 bug：formatLifeThreads 的 `.join('\\n')` 字面反斜杠n → 真换行（生活线段此前一直挤成一行）。
+- 验证：backend:typecheck 通过；全量 npm test 2957 项 2955 通过/0 失败/2 环境跳过；新增领域测试 5 项（simulationDomain.test.ts）+ 工具级测试 1 项（simIngest.test.js，含时间词护栏/无档案能力降级/pendingEvent 不入档案）。

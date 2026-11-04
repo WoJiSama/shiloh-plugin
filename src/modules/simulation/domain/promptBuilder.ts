@@ -3,7 +3,8 @@ import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName, t
 import { PLATFORM_CAPABILITY_NOTES } from '../../conversation/domain/systemPromptTemplate.js'
 import { agoText, atClock } from './messageView.js'
 import { formatWakeReason } from './wakeTrigger.js'
-import { formatAffinitySection, formatMemeSection, formatMemorySections } from './simMemory.js'
+import { buildPersonCards, formatMemeSection, formatMemorySections } from './simMemory.js'
+import type { PersonProfile } from './personProfile.js'
 
 /**
  * 仿真协议 system prompt：人设层（复用主链路的 personaSource 投影）+ 仿真行为协议。
@@ -102,8 +103,8 @@ export interface WakePromptInput {
   nameOf?: (userId: string) => string
   /** 按人口头禅（高好感对象的风格匹配） */
   userCatchphrases?: (userId: string) => string[] | undefined
-  /** 在场群友的人物核心档案（跨群身份级事实：称呼/长期爱好/雷点），键=userId */
-  personProfiles?: Record<string, string>
+  /** 在场群友的人物核心档案（原始字段），键=userId——与好感合并成人物卡注入 */
+  personProfiles?: Record<string, PersonProfile | undefined>
   /** 全局好感底分（跨群关系的"本钱"），键=userId——有效分 = 群内 60% + 全局 40% */
   globalAffinity?: Record<string, number>
   /** 深夜被吵醒的困意提示 */
@@ -129,16 +130,19 @@ export function buildWakePrompt(input: WakePromptInput): string {
   if (input.initialPrompt) {
     lines.push(`【本群初始说明（只此一次）】${input.initialPrompt}`)
   }
-  const memorySection = input.memories?.length ? formatMemorySections(input.memories, now, nameOf) : ''
+  // 人物卡（好感+档案+口头禅+本群记忆 每人一条）要先建，卡内已并入的记忆条目不再进【你记着的事】
+  const cards = input.affinity || input.personProfiles
+    ? buildPersonCards({
+      affinity: input.affinity || {}, speakers: input.speakers || [], nameOf, limit: 8,
+      userCatchphrases: input.userCatchphrases, globalAffinity: input.globalAffinity,
+      profiles: input.personProfiles, memories: input.memories,
+    })
+    : { section: '', cardedUserIds: new Set<string>() }
+  const memorySection = input.memories?.length ? formatMemorySections(input.memories, now, nameOf, cards.cardedUserIds) : ''
   if (memorySection) lines.push(memorySection)
   const memeSection = input.memories?.length ? formatMemeSection(input.memories) : ''
   if (memeSection) lines.push(memeSection)
-  const affinitySection = input.affinity ? formatAffinitySection(input.affinity, input.speakers || [], nameOf, 8, input.userCatchphrases, input.globalAffinity) : ''
-  if (affinitySection) lines.push(affinitySection)
-  const profileLines = Object.values(input.personProfiles || {}).slice(0, 5).filter(Boolean)
-  if (profileLines.length) {
-    lines.push(['【群友核心档案】（这些是跨群都成立的身份级事实，在任何群都可用；自然运用别生硬罗列）', ...profileLines.map(line => `- ${line}`)].join('\n'))
-  }
+  if (cards.section) lines.push(cards.section)
   if (input.sleepNote) lines.push(input.sleepNote)
   if (input.staleNote) lines.push(input.staleNote)
   if (input.lifeThreadSection) lines.push(input.lifeThreadSection)

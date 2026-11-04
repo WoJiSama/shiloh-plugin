@@ -47,8 +47,8 @@ export function mergeThreadSync(thread: LifeThread, sync: ThreadSyncResult, now:
   return { ...thread, notes, lastSyncAt: now, ...(sync.episode !== undefined && sync.episode > 0 ? { lastEpisode: sync.episode } : {}) }
 }
 
-/** 注入格式：活跃线程 + 真实笔记；附使用规则（以真实资料为据，不编造） */
-export function formatLifeThreads(threads: LifeThread[]): string {
+/** 注入格式：活跃线程 + 真实笔记；附使用规则（以真实资料为据，不编造）。commonTopicLines=与群友档案的兴趣重叠提示 */
+export function formatLifeThreads(threads: LifeThread[], commonTopicLines: string[] = []): string {
   const active = threads.filter(t => t.status === 'active')
   if (!active.length) return ''
   const lines = active.slice(0, 3).map(t => {
@@ -56,5 +56,6 @@ export function formatLifeThreads(threads: LifeThread[]): string {
     const notes = t.notes.slice(0, 4).map(n => `  · ${n}`).join('\n')
     return notes ? `${head}\n${notes}` : head
   })
-  return ['【你最近的生活线】（以下是你自己在追的作品和真实更新进度——这是你的个人兴趣背景知识，不是当前话题。严格规则：只有当群里正在聊动画/番剧相关话题、或有人提到你在追的作品时才自然带出；绝不在无关话题的群里主动提起。被问「最近在追什么」时可以聊，但别像汇报一样罗列。聊到时以此为据（真实资料），可以聊感想，不要编造资料里没有的剧情细节；可以用 simShareVideoCard(url: 分享链接) 发番剧卡片）', ...lines].join('\\n')
+  const common = commonTopicLines.slice(0, 3).map(text => `- 共同话题：群里${text}`)
+  return ['【你最近的生活线】（以下是你自己在追的作品和真实更新进度——这是你的个人兴趣背景知识，不是当前话题。严格规则：只有当群里正在聊动画/番剧相关话题、或有人提到你在追的作品时才自然带出；绝不在无关话题的群里主动提起。被问「最近在追什么」时可以聊，但别像汇报一样罗列。聊到时以此为据（真实资料），可以聊感想，不要编造资料里没有的剧情细节；可以用 simShareVideoCard(url: 分享链接) 发番剧卡片）', ...lines, ...common].join('\n')
 }

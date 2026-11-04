@@ -58,3 +58,54 @@ export function formatPersonProfile(profile: PersonProfile | undefined, display:
   if (!parts.length) return ''
   return `${display}：${parts.join('；')}`
 }
+
+function normalizeForMatch(text: string): string {
+  return String(text || '').toLowerCase().replace(/[\s!！？?。，,．;；:：、~～…·「」『』""''()[\]（）<>{}"'-]/g, '')
+}
+
+/** 最长公共子串长度（归一化后逐位比对；条目都 ≤30 字，O(n·m) 足够） */
+function longestCommonRun(a: string, b: string): number {
+  if (!a || !b) return 0
+  let best = 0
+  let prev = new Array<number>(b.length + 1).fill(0)
+  for (let i = 1; i <= a.length; i += 1) {
+    const cur = new Array<number>(b.length + 1).fill(0)
+    for (let j = 1; j <= b.length; j += 1) {
+      if (a[i - 1] === b[j - 1]) {
+        cur[j] = prev[j - 1]! + 1
+        if (cur[j]! > best) best = cur[j]!
+      }
+    }
+    prev = cur
+  }
+  return best
+}
+
+/**
+ * 注入去重：判断一条本群记忆内容是否已被该人的档案覆盖。
+ * 判据——归一化后与任一档案字段存在 ≥3 字符的连续公共段（如"学日语"）；
+ * 2 字符的偶然撞词（"游戏""动漫"这类泛词）不算覆盖，宁可少量重复也不误杀独特信息。
+ */
+export function profileCoversContent(content: string, profile: PersonProfile | undefined): boolean {
+  if (!profile) return false
+  const target = normalizeForMatch(content)
+  if (target.length < 3) return false
+  const fields = [...(profile.name ? [profile.name] : []), ...(profile.traits || []), ...(profile.interests || []), ...(profile.facts || []), ...(profile.taboos || [])]
+  for (const field of fields) {
+    const value = normalizeForMatch(field)
+    if (value.length >= 3 && (target.includes(value) || value.includes(target))) return true
+    if (value.length >= 2 && longestCommonRun(target, value) >= 3) return true
+  }
+  return false
+}
+
+/** 生活线×档案兴趣连接：兴趣词条与作品标题是否指向同一作品（归一化后互为子串，CJK ≥2 字/字母数字 ≥3 字） */
+export function interestMatchesTitle(interest: string, title: string): boolean {
+  const a = normalizeForMatch(interest)
+  const b = normalizeForMatch(title)
+  if (a.length < 2 || b.length < 2) return false
+  const alnum = /^[a-z0-9]+$/.test(a)
+  const min = alnum ? 3 : 2
+  if (a.length < min) return false
+  return b.includes(a) || a.includes(b)
+}

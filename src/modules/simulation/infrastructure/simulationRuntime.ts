@@ -12,7 +12,7 @@ import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../doma
 import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { isSilentDeclaration, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
-import { parsePersonProfilePatches, formatPersonProfile } from '../domain/personProfile.js'
+import { parsePersonProfilePatches, interestMatchesTitle, type PersonProfile } from '../domain/personProfile.js'
 import { isSleeping, activityFactor, sleepinessNote, staleMessageNote, type RhythmWindow } from '../domain/rhythm.js'
 import { normalizeLifeThreads, mergeThreadSync, formatLifeThreads, type LifeThread } from '../domain/lifeThread.js'
 import { checkHealth, formatAlerts, type HealthAlert } from '../domain/healthSentinel.js'
@@ -563,13 +563,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const initialPrompt = reason.kind === 'bootstrap' ? await store.getInitPrompt(groupId) : ''
       const styleDigest = await (async () => { try { return String((await ports.getStyleDigest?.(groupId)) || '') } catch { return '' } })()
       const userStyle = (await store.loadUserStyle(groupId).catch(() => ({ users: {} as Record<string, string[]>, updatedAt: 0 }))).users || {}
-      // 在场群友的人物核心档案（跨群身份级事实，≤5 人）
+      // 在场群友的人物核心档案（跨群身份级事实，≤5 人；原始字段交给人物卡合并注入）
       const speakerIds = [...new Set([...session.unread, ...session.recent].map(m => m.userId))].slice(0, 5)
-      const personProfiles: Record<string, string> = {}
+      const personProfiles: Record<string, PersonProfile | undefined> = {}
       for (const speakerId of speakerIds) {
         const profile = await store.loadPersonProfile(speakerId).catch(() => undefined)
-        const line = formatPersonProfile(profile, nameOf(speakerId))
-        if (line) personProfiles[speakerId] = line
+        if (profile && (profile.name || profile.interests.length || profile.taboos.length || profile.traits?.length || profile.facts?.length)) personProfiles[speakerId] = profile
       }
       const globalAffinity = await store.loadGlobalAffinity(speakerIds).catch(() => ({} as Record<string, number>))
       // 生物节律+生活线注入
@@ -578,7 +577,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const sleepNote = rhythmWin2 ? sleepinessNote(hourNow2, rhythmWin2) : ''
       const staleNote = staleMessageNote(state.lastIncomingAt || 0, now())
       const lifeThreadsRaw = cfg.lifeThreads.enabled ? await store.loadLifeThreads().catch(() => []) : []
-      const lifeThreadSection = formatLifeThreads(normalizeLifeThreads(lifeThreadsRaw))
+      const lifeThreads = normalizeLifeThreads(lifeThreadsRaw)
+      // 生活线×档案兴趣连接：在追的作品恰好也是某位在场群友的爱好 → 提示共同话题（社交连接点）
+      const commonTopicLines: string[] = []
+      for (const thread of lifeThreads.filter(t => t.status === 'active').slice(0, 3)) {
+        const sharers = speakerIds.filter(id => (personProfiles[id]?.interests || []).some(interest => interestMatchesTitle(interest, thread.title)))
+        if (sharers.length) commonTopicLines.push(`《${thread.title}》：${sharers.map(nameOf).join('、')}也喜欢——你们有天然共同话题，聊到时可以自然提起`)
+      }
+      const lifeThreadSection = formatLifeThreads(lifeThreads, commonTopicLines)
       const wakePrompt = buildWakePrompt({
         state, reason, snapshotText: snapshot.text, unreadTotal: snapshot.unreadTotal, now: now(), selfName: self.name,
         ...(initialPrompt ? { initialPrompt } : {}),
@@ -857,6 +863,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       saveAffinity: map => { affinityBox.map = map; void store.saveAffinity(groupId, map) },
       qzoneConfig: () => cfg.qzone,
       ...(typeof store.bumpGlobalAffinity === 'function' ? { bumpGlobalAffinity: (userId: string, delta: number) => store.bumpGlobalAffinity(userId, delta) } : {}),
+      ...(cfg.personProfile.enabled && typeof store.mergePersonProfile === 'function' ? {
+        savePersonFact: async (userId: string, fact: string) => {
+          await store.mergePersonProfile(userId, { facts: [fact] }, cfg.personProfile.maxFields)
+        },
+      } : {}),
       setRhythm: async (sleepFrom: number, sleepTo: number) => {
         await store.saveRhythm({ sleepFrom, sleepTo, setBy: 'agent' })
         rhythmCache = null

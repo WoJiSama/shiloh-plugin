@@ -746,3 +746,82 @@ test('A2 safeToolErrorText：上游错误不透传原文，按类型给固定文
   assert.equal(shouldSendErrorNotice('group_2'), true, '不同群互不影响')
   resetErrorNoticeForTest()
 })
+
+// ── 人物卡：好感+档案+口头禅+本群记忆 每人一条（任务1+2 合并注入）──
+
+test('profileCoversContent：档案已覆盖的事实判定（≥3字公共段才算，2字泛词不误杀）', async () => {
+  const { profileCoversContent } = await import('../../src/modules/simulation/domain/personProfile.js')
+  const profile = { name: '小鱼', interests: ['日语', '明日方舟'], taboos: [], facts: ['正在学日语', '在准备考研'] }
+  // "弧月酱在学日语" 与档案事实"正在学日语"有 4 字公共段"学日语" → 已覆盖
+  assert.ok(profileCoversContent('弧月酱在学日语', profile))
+  // 档案整条是记忆的子串 → 覆盖
+  assert.ok(profileCoversContent('小鱼在准备考研还有三个月', profile))
+  // "考完N2想打游戏" 与"游戏"只撞 2 字泛词 → 不算覆盖（独特信息保留）
+  assert.ok(!profileCoversContent('考完N2想打游戏', profile))
+  assert.ok(!profileCoversContent('上次一起打肉鸽', profile))
+  assert.ok(!profileCoversContent('随便说说', undefined))
+})
+
+test('buildPersonCards：同一人的关系+档案+本群记忆合成一张卡，档案已覆盖的记忆不重复', async () => {
+  const { buildPersonCards } = await import('../../src/modules/simulation/domain/simMemory.js')
+  const now = 1_700_000_000_000
+  const memories: SimMemoryEntry[] = [
+    { id: 'm1', kind: 'note', content: '上次一起打了肉鸽', done: false, createdAt: now, updatedAt: now, source: 'agent', aboutUser: '1001' },
+    { id: 'm2', kind: 'note', content: '小鱼在学日语', done: false, createdAt: now, updatedAt: now, source: 'agent', aboutUser: '1001' },
+    { id: 'm3', kind: 'note', content: '自己的口头禅：绷不住了', done: false, createdAt: now, updatedAt: now, source: 'agent' },
+  ]
+  const { section, cardedUserIds } = buildPersonCards({
+    affinity: { '1001': { ...defaultAffinityEntry(now), score: 70 }, '1002': { ...defaultAffinityEntry(now), score: 30 } },
+    speakers: ['1001', '1002'],
+    nameOf: id => (id === '1001' ? '小鱼' : '路人'),
+    userCatchphrases: id => (id === '1001' ? ['绷不住了'] : undefined),
+    profiles: { '1001': { name: '小鱼', interests: ['日语'], taboos: [], facts: ['正在学日语'] } },
+    memories,
+  })
+  assert.ok(section.includes('【群友人物卡】'), '统一卡段')
+  assert.ok(section.includes('小鱼（好感 70，熟络'), '卡内含关系')
+  assert.ok(section.includes('TA的口头禅：绷不住了'), '卡内含口头禅')
+  assert.ok(section.includes('档案（跨群通用）：称呼「小鱼」'), '卡内含档案（名字不重复）')
+  assert.ok(section.includes('本群记忆：[m1] 上次一起打了肉鸽'), '本群记忆并入卡')
+  assert.ok(!section.includes('m2'), '档案已覆盖"在学日语"不重复注入')
+  assert.ok(!section.includes('m3'), '不带 aboutUser 的自身记忆不进卡')
+  assert.ok(section.indexOf('小鱼') < section.indexOf('路人'), '在场者优先')
+  assert.ok(cardedUserIds.has('1001') && cardedUserIds.has('1002'))
+  // 卡内已并入的关于某人的记忆 → 【你记着的事】不再重复
+  const memoryText = formatMemorySections(memories, now, id => (id === '1001' ? '小鱼' : '路人'), cardedUserIds)
+  assert.ok(memoryText.includes('m3'), '自身记忆保留在【你记着的事】')
+  assert.ok(!memoryText.includes('m1') && !memoryText.includes('m2'), '关于卡内人的记忆不再重复出现')
+})
+
+test('buildPersonCards：有好感表外档案的在场新人也入卡（默认无关系行）', async () => {
+  const { buildPersonCards } = await import('../../src/modules/simulation/domain/simMemory.js')
+  const { section } = buildPersonCards({
+    affinity: {},
+    speakers: ['2001'],
+    nameOf: () => '新人',
+    profiles: { '2001': { name: '阿新', interests: ['打铁'], taboos: [] } },
+    memories: [],
+  })
+  assert.ok(section.includes('阿新'), '新人档案仍注入')
+  assert.ok(!section.includes('好感'), '无好感数据不造关系行')
+})
+
+test('interestMatchesTitle：兴趣与作品标题互认（芙莉莲⊂葬送的芙莉莲；2字泛词/3字以下英文不算）', async () => {
+  const { interestMatchesTitle } = await import('../../src/modules/simulation/domain/personProfile.js')
+  assert.ok(interestMatchesTitle('芙莉莲', '葬送的芙莉莲'))
+  assert.ok(interestMatchesTitle('明日方舟', '明日方舟'))
+  assert.ok(interestMatchesTitle('frieren', 'Frieren 葬送的芙莉莲'))
+  assert.ok(!interestMatchesTitle('猫', '葬送的芙莉莲'))
+  assert.ok(!interestMatchesTitle('ab', 'ababab'), '3字以下字母数字词太泛')
+  assert.ok(!interestMatchesTitle('番剧', '葬送的芙莉莲'))
+})
+
+test('formatLifeThreads：共同话题行追加，且行间用真换行（不再是字面 \\n）', async () => {
+  const { formatLifeThreads } = await import('../../src/modules/simulation/domain/lifeThread.js')
+  const threads = [{ id: 'lt1', kind: 'anime' as const, title: '葬送的芙莉莲', sourceId: '123', status: 'active' as const, addedAt: 0, lastSyncAt: 0, notes: ['第8话节奏封神'] }]
+  const text = formatLifeThreads(threads, ['《葬送的芙莉莲》：小鱼、阿明也喜欢——你们有天然共同话题'])
+  assert.ok(text.includes('共同话题'), '共同话题提示')
+  assert.ok(text.includes('小鱼、阿明也喜欢'))
+  assert.ok(text.includes('\n'), '真实换行分隔')
+  assert.ok(!text.includes('\\n'), '不再出现字面反斜杠n')
+})
