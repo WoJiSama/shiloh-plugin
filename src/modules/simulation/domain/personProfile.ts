@@ -33,7 +33,7 @@ export function parsePersonProfilePatches(raw: string): PersonProfilePatch[] {
 }
 
 /** 提取提示词：只收"任何群都合适被知道"的身份级事实；情境性内容明确排除 */
-export function buildPersonProfileExtractPrompt(messages: { name: string; text: string }[]): { system: string; user: string } {
+export function buildPersonProfileExtractPrompt(messages: { userId?: string; name: string; text: string }[]): { system: string; user: string } {
   return {
     system: [
       '你是群聊机器人的人物档案提取器。从近期消息里提取"身份级、跨群稳定、此人到处都愿意被知道"的事实，建立人物核心档案。',
@@ -42,7 +42,7 @@ export function buildPersonProfileExtractPrompt(messages: { name: string; text: 
       '宁缺毋滥：只在消息里有明确、稳定的信号时才输出；拿不准就不收这个人。',
       '只输出严格 JSON 数组（可为空 []）：[{"userId":"QQ号","name":"称呼","interests":["…"],"taboos":["…"],"traits":["…"],"facts":["…"]}]，字段都可省略。',
     ].join('\n'),
-    user: JSON.stringify(messages.slice(-40).map(m => ({ name: m.name.slice(0, 20), text: m.text.slice(0, 120) })))
+    user: JSON.stringify(messages.slice(-40).map(m => ({ userId: m.userId || "", name: m.name.slice(0, 20), text: m.text.slice(0, 120) })))
   }
 }
 

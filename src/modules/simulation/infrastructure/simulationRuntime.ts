@@ -71,7 +71,7 @@ export interface SimulationRuntimePorts {
   /** QQ空间互动：看指定成员的最近说说 / 点赞 / 评论（凭据由装配层处理；内容已在上层脱敏） */
   qzoneInteract?(input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }): Promise<{ ok: boolean; error?: string; feeds?: { tid: string; time: string; text: string; likes: number }[] }>
   /** 人物核心档案提取（侧路小模型）：近期消息 → 跨群身份级事实补丁 */
-  personProfileExtract?(messages: { name: string; text: string }[]): Promise<string>
+  personProfileExtract?(messages: { userId: string; name: string; text: string }[]): Promise<string>
   /** 生活线真实数据源：resolve 按 kind 用真实搜索定位（找不到返回 error，拒绝编造）；sync 拉取真实更新 */
   lifeThreadResolve?(input: { title: string }): Promise<{ ok: true; sourceId: string; title: string; episode?: number } | { ok: false; error: string }>
   lifeThreadSync?(input: { sourceId: string; title: string; lastEpisode?: number }): Promise<{ newNotes: string[]; episode?: number } | { error: string }>
@@ -1090,7 +1090,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     await store.save(groupId, state)
     try {
       const startedAt = now()
-      const raw = await ports.personProfileExtract(fresh.slice(-40).map(m => ({ name: m.name, text: m.text })))
+      const raw = await ports.personProfileExtract(fresh.slice(-40).map(m => ({ userId: m.userId, name: m.name, text: m.text })))
       try { ports.recordTokens?.({ scope: groupId, stage: 'person-profile', ms: now() - startedAt }) } catch { /* 账本不可用 */ }
       const patches = parsePersonProfilePatches(raw)
       let mergedCount = 0

@@ -429,7 +429,7 @@ export const simulationRuntime = createSimulationRuntime({
     if (!cfg.memoryAiUrl || !cfg.memoryAiApikey || !cfg.memoryAiModel) throw new Error('memoryAiConfig 未配置')
     const { buildPersonProfileExtractPrompt } = await import('../dist/backend/modules/simulation/domain/personProfile.js')
     const { system, user } = buildPersonProfileExtractPrompt(messages)
-    const result = await sideLLMCall({ url: cfg.memoryAiUrl, apikey: cfg.memoryAiApikey, model: cfg.memoryAiModel, temperature: 0.1, maxTokens: 2000, timeoutMs: 30000, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] })
+    const result = await sideLLMCall({ url: cfg.memoryAiUrl, apikey: cfg.memoryAiApikey, model: cfg.memoryAiModel, temperature: 0.1, maxTokens: 2000, timeoutMs: 60000, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] })
     if (!result.ok) throw new Error(result.error)
     return result.content
   },
