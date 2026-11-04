@@ -4,7 +4,7 @@ import { stripAIFlavorPhrases } from '../../conversation/domain/replySanitizer.j
 import { compactSimMessage } from '../domain/messageView.js'
 import { acknowledgeMessages, readThroughSeq, noteModelSeen, unreadSince } from '../domain/watermark.js'
 import { normalizeSimWakeConfig, ensureWakeable } from '../domain/simConfig.js'
-import { activeMemories, applyAffinityDelta, capMemories, defaultAffinityEntry, dueMemories, normalizeSimMemoryEntry, SIM_MEMORY_LIMIT } from '../domain/simMemory.js'
+import { activeMemories, applyAffinityDelta, capMemories, defaultAffinityEntry, dueMemories, normalizeSimMemoryEntry, SIM_MEMORY_LIMIT, SIM_SELF_MEMORY_LIMIT } from '../domain/simMemory.js'
 import type { SimWaitPlan } from '../domain/waitGate.js'
 import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
@@ -38,10 +38,15 @@ export interface SimToolContext {
   getMessageImages(seq: number): Promise<{ seq: number; images: { mime: string; base64: string }[]; error?: string }>
   /** 戳群成员（带频率护栏：每群每小时 ≤6 次） */
   pokeMember(userId: string): Promise<{ ok: boolean; error?: string }>
-  /** 全局好感底分镜像（群内变动时同步 30% 权重到跨群底分） */
-  bumpGlobalAffinity?(userId: string, delta: number): Promise<number>
+  /** 全局好感底分镜像（群内变动时同步 30% 权重到跨群底分；reason 进全局关系近况） */
+  bumpGlobalAffinity?(userId: string, delta: number, reason?: string): Promise<number>
   /** 双轨写入协同：agent 记的"关于某人的事实"同步进该人的跨群人物档案 */
   savePersonFact?(userId: string, fact: string): Promise<void>
+  /** 事实新陈代谢：某件长期事已结束（"考完了/不玩了"）→ 移除档案里的对应旧事实 */
+  closePersonFacts?(userId: string, statement: string): Promise<void>
+  /** AI 自我记忆（跨群性格沉淀，scope=self 的条目走这里） */
+  getSelfMemories?(): SimMemoryEntry[]
+  saveSelfMemories?(memories: SimMemoryEntry[]): void
   /** 自设作息（全局）：sleepFrom/sleepTo 小时，如 1-8 */
   setRhythm?(sleepFrom: number, sleepTo: number): Promise<string>
   /** 生活线管理：follow（真实搜索定位）/list/drop */
@@ -353,8 +358,9 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.name = 'simRemember'
       this.description = [
         '你的长期记忆（跨回合、跨天保存）。群友提到未来安排/约定/考试/生日时记 pendingEvent（必须给 dueInMinutes，到点系统会提醒你跟进）；',
-        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note（不带 aboutUser，这是你的性格沉淀）。',
+        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note 且 scope=self——那是你跨群一致的性格，下次唤醒在【你自己的沉淀】里。',
         '带 aboutUser 的稳定事实（TA的爱好/身份/雷点这类到哪个群都成立的）会同时进入TA的跨群人物档案；带时间性的内容（明天/下周要干嘛）不要走这条路，记 pendingEvent。',
+        'TA之前的事结束了（"考完了""不学了"）也记 note + aboutUser，系统会自动从TA档案里移除对应的旧事实。',
         'action=list 查看记忆；跟进完成后 action=done 收掉待办；action=remove 删除记错的。',
       ].join('\n')
       this.parameters = {
@@ -362,6 +368,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         properties: {
           action: { type: 'string', enum: ['add', 'list', 'done', 'remove'], description: '默认 add。' },
           kind: { type: 'string', enum: ['pendingEvent', 'note', 'impression', 'meme', 'activeTopic'], description: 'add 时的类型，默认 note。meme=本群专属梗（系统也会自动提取）；activeTopic=正在聊的话题（6小时后自动过期，聊完用 done 删掉）。' },
+          scope: { type: 'string', enum: ['group', 'self'], description: '默认 group（只这个群）。self=你自己的性格沉淀（口头禅/偏好），所有群一致；要求不带 aboutUser。' },
           content: { type: 'string', description: '要记的内容，一句话（≤200 字）。例："阿说明天上午要考四级，说考完想打游戏"。' },
           aboutUser: { type: 'string', description: '可选：相关的群友 QQ 号。' },
           dueInMinutes: { type: 'number', description: 'kind=pendingEvent 必填：多少分钟后该跟进（10 分钟 ~ 30 天）。' },
@@ -376,50 +383,78 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       const action = opts.action === 'list' || opts.action === 'done' || opts.action === 'remove' ? opts.action : 'add'
       const now = ctx.now()
       if (action === 'list') {
-        const memories = activeMemories(ctx.getMemories(), now, 12)
-        if (!memories.length) return '记忆为空。'
+        const group = activeMemories(ctx.getMemories(), now, 12)
+        const self = activeMemories(typeof ctx.getSelfMemories === 'function' ? ctx.getSelfMemories() : [], now, 6)
+        if (!group.length && !self.length) return '记忆为空。'
         const due = new Set(dueMemories(ctx.getMemories(), now).map(m => m.id))
-        return JSON.stringify(memories.map(m => ({
-          id: m.id, kind: m.kind, content: m.content, aboutUser: m.aboutUser,
+        const shape = (m: SimMemoryEntry, scope: 'group' | 'self') => ({
+          id: m.id, scope, kind: m.kind, content: m.content, aboutUser: m.aboutUser,
           ...(m.kind === 'meme' && m.count ? { heat: m.count } : {}),
           due: m.dueAt ? (due.has(m.id) ? `已到期（该跟进了）` : `${Math.max(0, Math.round((m.dueAt - now) / 60000))} 分钟后到期`) : undefined,
-        })))
+        })
+        return JSON.stringify([...group.map(m => shape(m, 'group')), ...self.map(m => shape(m, 'self'))])
       }
       if (action === 'done' || action === 'remove') {
         const id = String(opts.id || '')
         const memories = ctx.getMemories()
-        const index = memories.findIndex(m => m.id === id)
+        let index = memories.findIndex(m => m.id === id)
+        if (index >= 0) {
+          if (action === 'remove') {
+            const removed = memories.splice(index, 1)
+            ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
+            return `已删除：${removed[0]?.content || ''}`
+          }
+          memories[index] = { ...memories[index]!, done: true, updatedAt: now }
+          ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
+          return `已收掉待办：${memories[index]!.content}`
+        }
+        // 自我记忆（scope=self）也在 done/remove 的可操作范围内
+        const selfMemories = typeof ctx.getSelfMemories === 'function' ? [...ctx.getSelfMemories()] : []
+        index = selfMemories.findIndex(m => m.id === id)
         if (index < 0) return `error: 找不到记忆 ${id}，可先用 action=list 查看`
         if (action === 'remove') {
-          const removed = memories.splice(index, 1)
-          ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
+          const removed = selfMemories.splice(index, 1)
+          ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
           return `已删除：${removed[0]?.content || ''}`
         }
-        memories[index] = { ...memories[index]!, done: true, updatedAt: now }
-        ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
-        return `已收掉待办：${memories[index]!.content}`
+        selfMemories[index] = { ...selfMemories[index]!, done: true, updatedAt: now }
+        ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
+        return `已收掉：${selfMemories[index]!.content}`
       }
+      const selfScope = opts.scope === 'self'
       const entry = normalizeSimMemoryEntry({
         kind: opts.kind,
         content: opts.content,
-        aboutUser: opts.aboutUser,
+        aboutUser: selfScope ? undefined : opts.aboutUser,
         dueAt: opts.kind === 'pendingEvent' && Number(opts.dueInMinutes) > 0 ? now + Math.min(43200, Math.max(10, Math.floor(Number(opts.dueInMinutes)))) * 60_000 : undefined,
       }, now)
       if (!entry) return 'error: content 不能为空'
       if (opts.kind === 'pendingEvent' && !(Number(opts.dueInMinutes) > 0)) {
         return 'error: pendingEvent 必须给 dueInMinutes（10 分钟 ~ 30 天）'
       }
+      if (selfScope) {
+        if (typeof ctx.saveSelfMemories !== 'function') return 'error: 自我记忆不可用'
+        if (opts.aboutUser) return 'error: scope=self 不带 aboutUser（那是你自己的沉淀，不是关于某个群友的）'
+        ctx.saveSelfMemories(capMemories([...(ctx.getSelfMemories?.() || []), entry], SIM_SELF_MEMORY_LIMIT))
+        return JSON.stringify({ saved: true, id: entry.id, note: '这是你跨群一致的性格沉淀，任何群唤醒都会带上。' })
+      }
       const memories = [...ctx.getMemories(), entry]
       ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
-      // 双轨写入协同：关于某人的稳定事实同步进跨群人物档案（时间性内容留在本群记忆）
-      let profileSynced = false
-      if (entry.aboutUser && (entry.kind === 'note' || entry.kind === 'impression') && typeof ctx.savePersonFact === 'function' && !/明天|后天|大后天|下周|下月|今晚|待会|等下|马上|这周末/.test(entry.content)) {
+      // 双轨写入协同：关于某人的稳定事实同步进跨群人物档案；结束信号走新陈代谢（移除旧事实）
+      let profileNote: string | undefined
+      const stableFact = entry.aboutUser && (entry.kind === 'note' || entry.kind === 'impression') && !/明天|后天|大后天|下周|下月|今晚|待会|等下|马上|这周末/.test(entry.content)
+      if (stableFact && typeof ctx.savePersonFact === 'function' && typeof ctx.closePersonFacts === 'function' && /考完了|考完|不学了|不玩了|弃了|弃坑|通关了|结束了|毕业了|辞职了|分手了/.test(entry.content)) {
         try {
-          await ctx.savePersonFact(entry.aboutUser, entry.content)
-          profileSynced = true
+          await ctx.closePersonFacts(entry.aboutUser!, entry.content)
+          profileNote = '（TA档案里对应的旧事实已移除）'
+        } catch { /* 新陈代谢失败不影响本群记忆 */ }
+      } else if (stableFact && typeof ctx.savePersonFact === 'function') {
+        try {
+          await ctx.savePersonFact(entry.aboutUser!, entry.content)
+          profileNote = '（这条关于TA的稳定事实也已进入TA的跨群档案）'
         } catch { /* 档案同步失败不影响本群记忆已保存 */ }
       }
-      return JSON.stringify({ saved: true, id: entry.id, note: entry.kind === 'pendingEvent' ? '到点后系统会在唤醒时提醒你跟进。' : profileSynced ? '（这条关于TA的稳定事实也已进入TA的跨群档案）' : undefined })
+      return JSON.stringify({ saved: true, id: entry.id, note: entry.kind === 'pendingEvent' ? '到点后系统会在唤醒时提醒你跟进。' : profileNote })
     }
   }
 
@@ -454,8 +489,8 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       }
       affinity[userId] = result.entry
       ctx.saveAffinity(affinity)
-      // 跨群底分镜像：同样的关系变化在任何群都算数（权重 30%，见 bumpGlobalAffinity）
-      try { if (typeof ctx.bumpGlobalAffinity === 'function') await ctx.bumpGlobalAffinity(userId, result.applied) } catch { /* 镜像失败不影响本群 */ }
+      // 跨群底分镜像：同样的关系变化在任何群都算数（权重 30%，理由进全局关系近况）
+      try { if (typeof ctx.bumpGlobalAffinity === 'function') await ctx.bumpGlobalAffinity(userId, result.applied, reason) } catch { /* 镜像失败不影响本群 */ }
       return JSON.stringify({ applied: result.applied, score: result.entry.score, capped: result.capped })
     }
   }

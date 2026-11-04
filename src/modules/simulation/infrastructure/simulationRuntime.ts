@@ -2,7 +2,7 @@ import type { ChatRequestData, ChatResponse } from '../../../contracts/modelGate
 import type { PersonaText } from '../../conversation/domain/personaSource.js'
 import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMessage, SimMemoryEntry, SimMessage, SimRuntimeConfig, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
 import { defaultSimRuntimeConfig } from '../domain/simConfig.js'
-import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
+import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, formatSelfMemorySection, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
 import { mineUserCatchphrases } from '../domain/userStyle.js'
 import { boundedTimerDelay, safeSetTimeout, isDuplicateMessageId, sanitizeUntrustedText, safeToolErrorText, shouldSendErrorNotice } from '../domain/safety.js'
 import { evaluateWakeTrigger, formatWakeReason, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
@@ -58,6 +58,8 @@ export interface SimulationRuntimePorts {
   getGroupDigest?(groupId: string): string
   /** 近两天情节记忆文本（"这两天聊过/做过什么"）；无则空串 */
   getRecentEpisodesText?(groupId: string): string
+  /** 长程语义召回（更早的相关聊天片段，来自语义记忆混合检索）；无/超时/失败=空串，绝不阻塞唤醒 */
+  getSemanticRecall?(groupId: string, query: string): Promise<string>
   /** 说话风格参考（群级表达学习 + 全局表达学习的注入文本）；无则空串 */
   getStyleDigest?(groupId: string): Promise<string> | string
   /** 读归档消息（按人挖口头禅的数据源）：近 N 天该群消息（userId+text） */
@@ -571,6 +573,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (profile && (profile.name || profile.interests.length || profile.taboos.length || profile.traits?.length || profile.facts?.length)) personProfiles[speakerId] = profile
       }
       const globalAffinity = await store.loadGlobalAffinity(speakerIds).catch(() => ({} as Record<string, number>))
+      const globalAffinityNotes = await store.loadGlobalAffinityNotes(speakerIds).catch(() => ({} as Record<string, string[]>))
       // 生物节律+生活线注入
       const hourNow2 = new Date(now() + 8 * 3600_000).getUTCHours()
       const rhythmWin2 = cfg.rhythm.enabled ? await loadRhythmWindow(cfg) : null
@@ -585,6 +588,16 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (sharers.length) commonTopicLines.push(`《${thread.title}》：${sharers.map(nameOf).join('、')}也喜欢——你们有天然共同话题，聊到时可以自然提起`)
       }
       const lifeThreadSection = formatLifeThreads(lifeThreads, commonTopicLines)
+      // AI 自我记忆（跨群性格沉淀）
+      const selfNotesText = formatSelfMemorySection(normalizeMemoryList(await store.loadSelfMemories().catch(() => []), now()))
+      // 长程语义召回：未读末尾消息做查询，检索"两天情节窗之外"的相关片段（1s 预算，失败/超时静默跳过）
+      const recallQuery = [...state.unread].sort((a, b) => a.seq - b.seq).slice(-6).map(m => String(m.text || '').trim()).filter(Boolean).join(' ').slice(0, 160)
+      const semanticRecall = recallQuery && typeof ports.getSemanticRecall === 'function'
+        ? await Promise.race([
+          Promise.resolve(ports.getSemanticRecall(groupId, recallQuery)).catch(() => ''),
+          new Promise<string>(resolve => { const timer = setTimeout(() => resolve(''), 1000); timer.unref?.() }),
+        ])
+        : ''
       const wakePrompt = buildWakePrompt({
         state, reason, snapshotText: snapshot.text, unreadTotal: snapshot.unreadTotal, now: now(), selfName: self.name,
         ...(initialPrompt ? { initialPrompt } : {}),
@@ -592,6 +605,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         userCatchphrases: (userId: string) => userStyle[userId],
         ...(Object.keys(personProfiles).length ? { personProfiles } : {}),
         ...(Object.keys(globalAffinity).length ? { globalAffinity } : {}),
+        ...(Object.keys(globalAffinityNotes).length ? { globalAffinityNotes } : {}),
+        ...(selfNotesText ? { selfNotesText } : {}),
+        ...(semanticRecall ? { semanticRecall } : {}),
         ...(sleepNote ? { sleepNote } : {}),
         ...(staleNote ? { staleNote } : {}),
         ...(lifeThreadSection ? { lifeThreadSection } : {}),
@@ -607,7 +623,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const systemPrompt = buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames: cfg.extraTools, hasEmojiTool: cfg.extraTools.includes('sendLocalEmojiTool') })
 
       const memoryBox = { list: memories, sentTexts: [] as string[] }
-      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity })
+      const selfMemoryBox = { list: normalizeMemoryList(await store.loadSelfMemories().catch(() => []), now()) }
+      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox)
       const tools = [...createSimTools(ctx), ...extraTools]
       const toolFunctions = simToolsAsFunctions(tools)
       const executionConfig = ports.getExecutionConfig()
@@ -658,7 +675,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
               logger.info(`[仿真] 群 ${groupId} 提醒后仍未发送，兜底直发 ${text.length} 字`)
               history.push({ role: 'user', content: '【系统】已替你把上面那段话发出去了。以后想说的话必须自己调 simSendMessage。' })
               try {
-                const sendCtx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity })
+                const sendCtx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox)
                 await sendCtx.sendMessage([text.slice(0, cfg.turn.messageTextMaxChars)], {})
               } catch (error) {
                 logger.warn(`[仿真] 群 ${groupId} 兜底直发失败: ${error instanceof Error ? error.message : String(error)}`)
@@ -762,7 +779,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
   }
 
-  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[] }, affinityBox: { map: SimAffinityMap }): SimToolContext {
+  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[] }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }): SimToolContext {
     let sendsThisTurn = 0
     return {
       groupId,
@@ -867,6 +884,13 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         savePersonFact: async (userId: string, fact: string) => {
           await store.mergePersonProfile(userId, { facts: [fact] }, cfg.personProfile.maxFields)
         },
+        closePersonFacts: async (userId: string, statement: string) => {
+          await store.mergePersonProfile(userId, { closedFacts: [statement] }, cfg.personProfile.maxFields)
+        },
+      } : {}),
+      ...(typeof store.loadSelfMemories === 'function' && typeof store.saveSelfMemories === 'function' ? {
+        getSelfMemories: () => selfMemoryBox.list,
+        saveSelfMemories: (list: SimMemoryEntry[]) => { selfMemoryBox.list = list; void store.saveSelfMemories(list) },
       } : {}),
       setRhythm: async (sleepFrom: number, sleepTo: number) => {
         await store.saveRhythm({ sleepFrom, sleepTo, setBy: 'agent' })

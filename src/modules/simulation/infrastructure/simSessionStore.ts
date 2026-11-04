@@ -1,5 +1,6 @@
 import type { SimSessionState } from '../../../contracts/simulation.js'
 import { createDefaultSimSession } from '../domain/simConfig.js'
+import { stripSupersededItems } from '../domain/personProfile.js'
 
 /** Redis 形状约束：TRSS 包装层支持 get/set/del/eval，Set 用 JSON 数组模拟（避免依赖 sadd 族）。 */
 export interface SimRedisLike {
@@ -35,6 +36,8 @@ const GLOBAL_AFFINITY_KEY = (userId: string) => `shiloh:sim:person:${userId}:aff
 const RHYTHM_KEY = 'shiloh:sim:rhythm'
 /** 生活线（全局）：真实数据源的持续关注线（在追的番/在玩的游戏） */
 const LIFE_THREADS_KEY = 'shiloh:sim:life-threads'
+/** AI 自我记忆（跨群性格沉淀）：与群级 memories 同结构，但全局一份 */
+const SELF_MEMORIES_KEY = 'shiloh:sim:self-memories'
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 /**
  * 回合忙租约：正常运行时 15 分钟（防并发回合），但进程重启后不应阻塞群这么久。
@@ -67,12 +70,14 @@ export interface SimSessionStore {
   /** 按人口头禅表：{ userId: string[], updatedAt } */
   loadUserStyle(groupId: string): Promise<{ users: Record<string, string[]>; updatedAt: number }>
   saveUserStyle(groupId: string, users: Record<string, string[]>): Promise<void>
-  /** 人物核心档案（跨群）：读取 + 合并去重（name 最新优先，interests/taboos 并集截断） */
+  /** 人物核心档案（跨群）：读取 + 合并去重（name 最新优先，interests/taboos 并集截断；closedFacts 新陈代谢先剔除再并入） */
   loadPersonProfile(userId: string): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[]; updatedAt?: number }>
-  mergePersonProfile(userId: string, patch: { name?: string; interests?: string[]; taboos?: string[]; traits?: string[]; facts?: string[] }, maxFields: number): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[] }>
-  /** 全局好感底分：批量读 + 变动镜像（delta×权重，EMA 不需要——简单累积即长期均值） */
+  mergePersonProfile(userId: string, patch: { name?: string; interests?: string[]; taboos?: string[]; traits?: string[]; facts?: string[]; closedFacts?: string[] }, maxFields: number): Promise<{ name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[] }>
+  /** 全局好感底分：批量读 + 变动镜像（delta×权重，EMA 不需要——简单累积即长期均值；reason 进全局关系近况） */
   loadGlobalAffinity(userIds: string[]): Promise<Record<string, number>>
-  bumpGlobalAffinity(userId: string, delta: number): Promise<number>
+  bumpGlobalAffinity(userId: string, delta: number, reason?: string): Promise<number>
+  /** 全局关系近况：跨群好感变动的理由（最近在前，≤6 条），供人物卡"关系近况"行 */
+  loadGlobalAffinityNotes(userIds: string[]): Promise<Record<string, string[]>>
   /** 控制台：列出全部人物档案（跨群数据透明化） */
   listPersonProfiles(): Promise<{ userId: string; name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[]; globalAffinity?: number; updatedAt?: number }[]>
   /** 控制台：整人删除（档案 + 全局好感） */
@@ -85,6 +90,9 @@ export interface SimSessionStore {
   /** 生活线：全局列表读写（真实数据源线程） */
   loadLifeThreads(): Promise<unknown[]>
   saveLifeThreads(threads: unknown[]): Promise<void>
+  /** AI 自我记忆（跨群性格沉淀：口头禅/偏好，scope=self 的 simRemember 条目） */
+  loadSelfMemories(): Promise<unknown[]>
+  saveSelfMemories(memories: unknown[]): Promise<void>
 }
 
 function parseStringList(value: unknown): string[] {
@@ -261,12 +269,14 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
         }
         return out
       }
+      // 新陈代谢：closedFacts 先剔除存量（facts/interests/traits 都可能被结束），新事实再并入
+      const closed = patch.closedFacts
       const merged = {
         ...(name ? { name } : {}),
-        interests: uniq([...(patch.interests || []), ...current.interests]).slice(0, maxFields),
+        interests: uniq([...(patch.interests || []), ...stripSupersededItems(current.interests, closed)]).slice(0, maxFields),
         taboos: uniq([...(patch.taboos || []), ...current.taboos]).slice(0, maxFields),
-        ...(uniq([...(patch.traits || []), ...(current.traits || [])]).length ? { traits: uniq([...(patch.traits || []), ...(current.traits || [])]).slice(0, 4) } : {}),
-        ...(uniq([...(patch.facts || []), ...(current.facts || [])]).length ? { facts: uniq([...(patch.facts || []), ...(current.facts || [])]).slice(0, maxFields) } : {}),
+        ...(uniq([...(patch.traits || []), ...stripSupersededItems(current.traits, closed)]).length ? { traits: uniq([...(patch.traits || []), ...stripSupersededItems(current.traits, closed)]).slice(0, 4) } : {}),
+        ...(uniq([...(patch.facts || []), ...stripSupersededItems(current.facts, closed)]).length ? { facts: uniq([...(patch.facts || []), ...stripSupersededItems(current.facts, closed)]).slice(0, maxFields) } : {}),
         updatedAt: now()
       }
       await redis.set(PERSON_KEY(id), JSON.stringify(merged))
@@ -285,13 +295,33 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       }
       return out
     },
-    async bumpGlobalAffinity(userId, delta) {
+    async bumpGlobalAffinity(userId, delta, reason) {
       const id = String(userId || '').replace(/[^0-9]/g, '')
       if (!id) return 50
-      const current = (await this.loadGlobalAffinity([id]))[id] ?? 50
-      const next = Math.max(0, Math.min(100, Math.round(current + (Number(delta) || 0) * 0.3)))
-      await redis.set(GLOBAL_AFFINITY_KEY(id), JSON.stringify({ score: next, updatedAt: Date.now() }))
+      let existing: { score?: number; reasons?: unknown[] } = {}
+      try {
+        existing = record(JSON.parse(String(await redis.get(GLOBAL_AFFINITY_KEY(id)) || 'null')))
+      } catch { existing = {} }
+      const current = Number(existing.score)
+      const base = Number.isFinite(current) && current >= 0 && current <= 100 ? current : 50
+      const next = Math.max(0, Math.min(100, Math.round(base + (Number(delta) || 0) * 0.3)))
+      const reasonText = String(reason || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+      const reasons = [...(reasonText ? [reasonText] : []), ...(Array.isArray(existing.reasons) ? existing.reasons.map(String) : [])].slice(0, 6)
+      await redis.set(GLOBAL_AFFINITY_KEY(id), JSON.stringify({ score: next, updatedAt: Date.now(), reasons }))
       return next
+    },
+    async loadGlobalAffinityNotes(userIds) {
+      const out: Record<string, string[]> = {}
+      for (const raw of userIds) {
+        const id = String(raw || '').replace(/[^0-9]/g, '')
+        if (!id) continue
+        try {
+          const parsed = record(JSON.parse(String(await redis.get(GLOBAL_AFFINITY_KEY(id)) || 'null')))
+          const reasons = Array.isArray(parsed.reasons) ? parsed.reasons.map(String).filter(Boolean).slice(0, 6) : []
+          if (reasons.length) out[id] = reasons
+        } catch { /* 单人失败不影响整批 */ }
+      }
+      return out
     },
     async listPersonProfiles() {
       if (typeof redis.keys !== 'function') return []
@@ -343,6 +373,16 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
     },
     async saveLifeThreads(threads) {
       await redis.set(LIFE_THREADS_KEY, JSON.stringify(Array.isArray(threads) ? threads : []))
+    },
+    async loadSelfMemories() {
+      try {
+        const raw = await redis.get(SELF_MEMORIES_KEY)
+        const parsed = raw ? JSON.parse(raw) : []
+        return Array.isArray(parsed) ? parsed : []
+      } catch { return [] }
+    },
+    async saveSelfMemories(memories) {
+      await redis.set(SELF_MEMORIES_KEY, JSON.stringify(Array.isArray(memories) ? memories : []))
     },
     async deletePersonProfileField(userId, field, value) {
       const id = String(userId || '').replace(/[^0-9]/g, '')

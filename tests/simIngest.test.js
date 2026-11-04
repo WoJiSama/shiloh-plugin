@@ -461,3 +461,121 @@ test('simRemember 双轨协同：关于某人的稳定事实自动同步跨群�
   assert.equal(memories.length, 4)
   assert.doesNotMatch(out, /跨群档案/)
 })
+
+test('simRemember scope=self：性格沉淀进全局自我记忆，list 合并双域，done/remove 可操作', async () => {
+  const { createSimTools } = await import('../dist/backend/modules/simulation/infrastructure/simTools.js')
+  let group = []
+  let self = []
+  const state = { affinity: {} }
+  const ctx = {
+    groupId: GROUP, now: () => BASE_AT, getState: () => state,
+    mutate: async fn => fn(state),
+    sendMessage: async () => ({ ok: true, sent: [] }),
+    waitForMessages: async () => ({ outcome: 'quiet' }),
+    applyWakeConfig: () => {}, sendsThisTurn: () => 0, maxSendItems: () => 5, messageTextMaxChars: () => 200,
+    getMemories: () => group, saveMemories: list => { group = list },
+    getSelfMemories: () => self, saveSelfMemories: list => { self = list },
+    getAffinity: () => state.affinity, saveAffinity: () => {},
+    getMessageImages: async () => ({ seq: 0, images: [] }),
+    pokeMember: async () => ({ ok: true }),
+    getGroupMembers: async () => [],
+  }
+  const remember = createSimTools(ctx).find(t => t.name === 'simRemember')
+
+  let out = await remember.func({ kind: 'note', content: '我的口头禅：绷不住了', scope: 'self' })
+  assert.match(out, /跨群一致/)
+  assert.equal(self.length, 1)
+  assert.equal(group.length, 0, 'self 不进群级记忆')
+
+  // scope=self 带 aboutUser 拒绝（那是关于群友的，不是自己的沉淀）
+  out = await remember.func({ kind: 'note', content: '小鱼很可爱', scope: 'self', aboutUser: '1001' })
+  assert.match(out, /error/)
+
+  // list 合并双域且带 scope 标记
+  await remember.func({ kind: 'note', content: '群里在玩星露谷' })
+  out = await remember.func({ action: 'list' })
+  const rows = JSON.parse(out)
+  assert.equal(rows.filter(r => r.scope === 'self').length, 1)
+  assert.equal(rows.filter(r => r.scope === 'group').length, 1)
+
+  // done 可操作 self 条目
+  const selfId = self[0].id
+  out = await remember.func({ action: 'done', id: selfId })
+  assert.match(out, /已收掉/)
+  assert.equal(self[0].done, true)
+})
+
+test('simUpdateAffinity 理由进全局镜像；结束信号走 closePersonFacts 新陈代谢', async () => {
+  const { createSimTools } = await import('../dist/backend/modules/simulation/infrastructure/simTools.js')
+  const bumps = []
+  const closed = []
+  const saved = []
+  let memories = []
+  const state = { affinity: {} }
+  const ctx = {
+    groupId: GROUP, now: () => BASE_AT, getState: () => state,
+    mutate: async fn => fn(state),
+    sendMessage: async () => ({ ok: true, sent: [] }),
+    waitForMessages: async () => ({ outcome: 'quiet' }),
+    applyWakeConfig: () => {}, sendsThisTurn: () => 0, maxSendItems: () => 5, messageTextMaxChars: () => 200,
+    getMemories: () => memories, saveMemories: list => { memories = list },
+    getAffinity: () => state.affinity, saveAffinity: map => { state.affinity = map },
+    getMessageImages: async () => ({ seq: 0, images: [] }),
+    bumpGlobalAffinity: async (userId, delta, reason) => { bumps.push({ userId, delta, reason }); return 60 },
+    savePersonFact: async (userId, fact) => { saved.push({ userId, fact }) },
+    closePersonFacts: async (userId, statement) => { closed.push({ userId, statement }) },
+    pokeMember: async () => ({ ok: true }),
+    getGroupMembers: async () => [],
+  }
+  const tools = createSimTools(ctx)
+  const affinityTool = tools.find(t => t.name === 'simUpdateAffinity')
+  const remember = tools.find(t => t.name === 'simRemember')
+
+  await affinityTool.func({ userId: '1001', delta: 2, reason: '连续三天一起打肉鸽' })
+  assert.equal(bumps.length, 1)
+  assert.equal(bumps[0].reason, '连续三天一起打肉鸽', '理由随全局镜像走')
+
+  // 普通稳定事实仍走 savePersonFact
+  await remember.func({ kind: 'note', content: '小鱼养了两只猫', aboutUser: '1001' })
+  assert.equal(saved.length, 1)
+  assert.equal(closed.length, 0)
+
+  // 结束信号 → closePersonFacts（移除旧事实）而不是新增
+  const out = await remember.func({ kind: 'note', content: '小鱼考完了N2，解放了', aboutUser: '1001' })
+  assert.equal(closed.length, 1)
+  assert.equal(closed[0].userId, '1001')
+  assert.equal(saved.length, 1, '结束信号不再当新事实入库')
+  assert.match(out, /旧事实已移除/)
+})
+
+test('存储层：自我记忆全局键往返；closedFacts 新陈代谢；全局好感理由', async () => {
+  const { createSimSessionStore } = await import('../dist/backend/modules/simulation/infrastructure/simSessionStore.js')
+  const kv = new Map()
+  const store = createSimSessionStore({
+    redis: { async get(k){ return kv.has(k) ? kv.get(k) : null }, async set(k,v){ kv.set(k,v); return 'OK' }, async del(){ return 0 } },
+    now: () => BASE_AT,
+  })
+  // 自我记忆全局键往返
+  await store.saveSelfMemories([{ id: 's1', kind: 'note', content: '口头禅：绷不住了', done: false, createdAt: 1, updatedAt: 1, source: 'agent' }])
+  const selfBack = await store.loadSelfMemories()
+  assert.equal(selfBack.length, 1)
+  assert.equal(selfBack[0].content, '口头禅：绷不住了')
+  assert.ok([...kv.keys()].some(k => String(k).includes('self-memories')), '全局自我键形态')
+
+  // closedFacts：考完了 → 移除"在准备考研"，保留无关事实与兴趣
+  await store.mergePersonProfile('1001', { facts: ['在准备考研', '养了两只猫'], interests: ['日语'] }, 12)
+  const after = await store.mergePersonProfile('1001', { facts: ['考研结束了，准备复试'], closedFacts: ['考研结束了'] }, 12)
+  assert.ok(!after.facts.some(f => f.includes('考研') && f === '在准备考研'), '旧事实被移除: ' + JSON.stringify(after.facts))
+  assert.ok(after.facts.some(f => f.includes('复试')), '新事实并入')
+  assert.ok(after.facts.includes('养了两只猫'), '无关事实保留')
+  assert.ok(after.interests.includes('日语'), '无关兴趣保留')
+
+  // 全局好感：理由汇聚 + notes 批量读
+  await store.bumpGlobalAffinity('1001', 2, '一起打肉鸽')
+  await store.bumpGlobalAffinity('1001', 1, '帮我装系统')
+  const notes = await store.loadGlobalAffinityNotes(['1001'])
+  assert.equal(notes['1001'].length, 2)
+  assert.equal(notes['1001'][0], '帮我装系统', '最近在前')
+  const score = (await store.loadGlobalAffinity(['1001']))['1001']
+  assert.ok(score > 50, '分数照常镜像: ' + score)
+})

@@ -1,5 +1,5 @@
 /** 人物核心档案（跨群）：保守提取判定 + 合并 + 注入格式化。 */
-export interface PersonProfilePatch { userId: string; name?: string; interests?: string[]; taboos?: string[]; traits?: string[]; facts?: string[] }
+export interface PersonProfilePatch { userId: string; name?: string; interests?: string[]; taboos?: string[]; traits?: string[]; facts?: string[]; closedFacts?: string[] }
 export interface PersonProfile { name?: string; interests: string[]; taboos: string[]; traits?: string[]; facts?: string[] }
 
 const USERID_RE = /^\d{4,12}$/
@@ -22,11 +22,11 @@ export function parsePersonProfilePatches(raw: string): PersonProfilePatch[] {
       const patch: PersonProfilePatch = { userId }
       const name = String(row.name || '').trim()
       if (name) patch.name = name.slice(0, 20)
-      for (const field of ['interests', 'taboos', 'traits', 'facts'] as const) {
+      for (const field of ['interests', 'taboos', 'traits', 'facts', 'closedFacts'] as const) {
         const list = strings(row[field])
-        if (list?.length) patch[field] = list
+        if (list?.length) patch[field] = list as never
       }
-      if (patch.name || patch.interests?.length || patch.taboos?.length || patch.traits?.length || patch.facts?.length) out.push(patch)
+      if (patch.name || patch.interests?.length || patch.taboos?.length || patch.traits?.length || patch.facts?.length || patch.closedFacts?.length) out.push(patch)
     }
     return out.slice(0, 10)
   } catch { return [] }
@@ -38,9 +38,10 @@ export function buildPersonProfileExtractPrompt(messages: { userId?: string; nam
     system: [
       '你是群聊机器人的人物档案提取器。从近期消息里提取"身份级、跨群稳定、此人到处都愿意被知道"的事实，建立人物核心档案。',
       '只收五类：name（此人喜欢被怎么称呼）、interests（长期爱好，如喜欢的番/游戏/音乐/运动）、taboos（雷点忌讳，如不想被提的话题）、traits（稳定性格印象，如"爱玩梗""技术宅"，≤4字/条）、facts（稳定小事实，如"养了两只猫""在准备考研"）。',
+      '另有 closedFacts（事实新陈代谢）：消息里出现某件长期事已明确结束/放弃的信号（"考完了""不学了""弃坑了""通关了"）时，把结束的事写进 closedFacts（如"考研结束了"），系统会移除档案里对应旧事实。',
       '明确不收：情感倾诉、健康隐私、争执冲突、群内梗、角色扮演设定、一次性话题、只在当前群成立的内容——这些留在各群自己的记忆里。',
       '宁缺毋滥：只在消息里有明确、稳定的信号时才输出；拿不准就不收这个人。',
-      '只输出严格 JSON 数组（可为空 []）：[{"userId":"QQ号","name":"称呼","interests":["…"],"taboos":["…"],"traits":["…"],"facts":["…"]}]，字段都可省略。',
+      '只输出严格 JSON 数组（可为空 []）：[{"userId":"QQ号","name":"称呼","interests":["…"],"taboos":["…"],"traits":["…"],"facts":["…"],"closedFacts":["…"]}]，字段都可省略。',
     ].join('\n'),
     user: JSON.stringify(messages.slice(-40).map(m => ({ userId: m.userId || "", name: m.name.slice(0, 20), text: m.text.slice(0, 120) })))
   }
@@ -123,4 +124,24 @@ export function interestMatchesTitle(interest: string, title: string): boolean {
   const min = alnum ? 3 : 2
   if (a.length < min) return false
   return b.includes(a) || a.includes(b)
+}
+
+/**
+ * 事实新陈代谢：closedFacts（"考研结束了"）与存量条目（"在准备考研"）是否指向同一件事。
+ * 比去重判据松（≥2 字公共段即可）：这是模型明确给出的"结束"信号，宁可多删让档案保鲜，
+ * 删错了管理员端还有按字段删除/回填兜底。
+ */
+export function supersedeMatches(closed: string, item: string): boolean {
+  const x = normalizeForMatch(closed)
+  const y = normalizeForMatch(item)
+  if (x.length < 2 || y.length < 2) return false
+  if (x.includes(y) || y.includes(x)) return true
+  return longestCommonRun(x, y) >= 2
+}
+
+/** 从列表里剔除被 closedFacts 覆盖的条目（facts/interests/traits 通用）。 */
+export function stripSupersededItems(items: string[] | undefined, closedFacts: string[] | undefined): string[] {
+  const list = items || []
+  if (!list.length || !closedFacts?.length) return list
+  return list.filter(item => !closedFacts.some(closed => supersedeMatches(closed, item)))
 }

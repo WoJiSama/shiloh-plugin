@@ -22,3 +22,21 @@ test('profile keeps current speaker messages without duplicating own persona',as
  assert.match(result,/my recent message/)
  assert.doesNotMatch(result,/default|other private context/)
 })
+
+test('profile injects cross-group learned profile and degrades without it',async()=>{
+ const seen=[]
+ const withProfile=createPersonProfileClass({getConfig:()=>({personProfileInjection:{enabled:true}}),getPersonaFor:()=>null,getMessages:async()=>[],getCrossGroupProfile:async id=>{seen.push(id);return {name:'小鱼',interests:['明日方舟'],taboos:['别叫全名']}}})
+ const text=await new withProfile().build('group',7,{sender:{nickname:'speaker'}})
+ assert.equal(String(seen[0]),'7','按 QQ 读档案')
+ assert.match(text,/跨群档案: 称呼「小鱼」/)
+ assert.match(text,/明日方舟/)
+ assert.doesNotMatch(text,/speaker：/, '展示名前缀不重复')
+
+ const noPort=createPersonProfileClass({getConfig:()=>({personProfileInjection:{enabled:true}}),getPersonaFor:()=>null,getMessages:async()=>[{sender:{user_id:7},raw_message:'hi'}]})
+ const plain=await new noPort().build('group',7,{sender:{nickname:'speaker'}})
+ assert.doesNotMatch(plain,/跨群档案/,'无端口/无档案时不注入')
+
+ const broken=createPersonProfileClass({getConfig:()=>({personProfileInjection:{enabled:true}}),getPersonaFor:()=>null,getMessages:async()=>[],getCrossGroupProfile:async()=>{throw new Error('redis down')}})
+ const degraded=await new broken().build('group',7,{sender:{nickname:'speaker'}})
+ assert.doesNotMatch(degraded,/跨群档案/,'读取失败静默降级')
+})

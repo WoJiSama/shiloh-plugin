@@ -313,6 +313,23 @@ export const simulationRuntime = createSimulationRuntime({
       return ''
     }
   },
+  // 长程语义召回：混合检索"两天情节窗之外"的更早相关片段（runtime 侧 1s 预算兜底，这里再给检索器 850ms）
+  getSemanticRecall: async (groupId, query) => {
+    try {
+      const { getSemanticMemoryRuntime } = await import('../dist/backend/modules/memory/infrastructure/semanticRuntime.js')
+      const runtime = getSemanticMemoryRuntime()
+      if (!runtime?.retriever) return ''
+      const result = await runtime.retriever.search(String(groupId), String(query || ''), { topK: 2, timeoutMs: 850 })
+      const items = Array.isArray(result?.items) ? result.items : []
+      const lines = items.map(item => {
+        const text = String(item?.chunk?.text || '').replace(/\s+/g, ' ').trim().slice(0, 200)
+        return text ? `- ${text}` : ''
+      }).filter(Boolean)
+      return lines.slice(0, 2).join('\n')
+    } catch {
+      return ''
+    }
+  },
   // 仿真回合补记情节（仿真群不走主链路，主链路的 recordEpisode 不会触发）
   recordEpisode: (input) => {
     try {

@@ -1866,3 +1866,15 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
   1) 记忆溢出丢失——卡内人记忆 >2 条时,第 3 条起在卡与【你记着的事】双双不可见(旧版【你记着的事】top-5 不丢)。改为按条目 id 精确豁免(omitMemoryIds=已进卡∪被档案覆盖),溢出未展示条目回流【你记着的事】。
   2) 档案内部近重复——simRemember 全句入 facts + 提取器短语并存,展示两遍。formatPersonProfile 的 facts 改为短词优先去重(互为子串/≥3字公共段视为同事实),且被 traits/interests 覆盖的 fact 不渲染。
 - 复验:m3 溢出回流 ✓、长句被短词压制 ✓;定向 83/83;全量 npm test 2959 项 2957 通过/0 失败/2 环境跳过;+2 回归测试。
+
+
+# 2026-11-04 全局统一二期（P1-P6）
+
+- 深度分析后用户确认全部实施。核心判断:上轮统一的是仿真注入侧的"读";剩余碎片在跨链路、自我、时间纵深、关系演化四类(全部有代码证据)。
+- P1【档案跨链路共享】:主链路 personProfileInjector 加 getCrossGroupProfile 端口读 shiloh:sim:person:*(domains 装配层直读 Redis,主链路只读不写),【当前对话者画像】注入与仿真人物卡同一份 formatPersonProfile 输出——仿真学到的跨群事实第一次惠及非仿真群,两套画像系统合一。读取失败静默降级。
+- P2【AI 自我档案】:simRemember 加 scope=group|self;self 条目(口头禅/偏好)存全局键 shiloh:sim:self-memories(容量 50),list 合并双域带 scope 标记,done/remove 可跨域操作;唤醒注入【你自己的沉淀】段;协议 #30 改指 scope=self——AI 在所有群是同一个人,性格不再按群分裂。
+- P3【长程语义召回】:wake 装配用未读末 6 条拼查询(≤160字),经 getSemanticRecall 端口调语义检索 topK=2(检索器 850ms+runtime 1s 双层预算,失败/超时静默跳过),注入【更早的相关记忆】段——仿真第一次用上混合检索基建,突破情节记忆 2 天窗。
+- P4【关系有历史】:bumpGlobalAffinity 携理由,全局好感键存最近 6 条理由;人物卡加"跨群近况"行(最近 2 条)。
+- P5【档案新陈代谢】:提取 prompt 增加 closedFacts(考完了/不玩了/弃坑了);mergePersonProfile 先按 supersedeMatches(结束信号放行 ≥2 字公共段)剔除存量 facts/interests/traits 再并入;simRemember 记到结束信号时自动走 closePersonFacts 移除旧事实而非新增。
+- P6【注入审计】:新增 scripts/sim-injection-eval.mjs——3 场景(冷启动/熟人群/潜水)确定性渲染真实唤醒 prompt,校验 I1 不重复/I2 不丢失/I3 结构/I4 预算+溢出回流 共 20 项,0 失败;报告落盘 docs/evals/sim-injection-2026-11-04.json。模型侧 28 组盲评需线上网关,未在本轮运行(已在报告注明)。
+- 验证:backend:typecheck、test:boundaries 通过;全量 npm test 2967 项 2965 通过/0 失败/2 环境跳过;新增测试 8 项(工具 3/存储 1/边界 1/领域 3)。修一处实现缺陷:scope=self 的 aboutUser 拒绝守卫原查归一化后条目(恒不触发),改查原始参数。

@@ -1,9 +1,10 @@
 import { safeTruncateUnicode } from '../../models/domain/unicodeText.js'
+import { formatPersonProfile, type PersonProfile } from '../../simulation/domain/personProfile.js'
 type Fields = Record<string, unknown>
 interface Sender { card?: string; nickname?: string; user_id?: unknown }
 interface ProfileEvent { sender?: Sender; group?: { getMemberMap?(): Promise<Map<number, Sender>> } }
 interface RecentMessage { raw_message?: string; content?: string; sender?: Sender }
-export interface ProfilePorts { getConfig(): Fields; getPersonaFor(event: ProfileEvent): Fields | null; getMessages(type: string, groupId: unknown): Promise<RecentMessage[]> }
+export interface ProfilePorts { getConfig(): Fields; getPersonaFor(event: ProfileEvent): Fields | null; getMessages(type: string, groupId: unknown): Promise<RecentMessage[]>; /** 仿真系统学出的跨群人物档案（Redis shiloh:sim:person:*）；无则不注入 */ getCrossGroupProfile?(userId: unknown): Promise<PersonProfile | null> }
 function object(value: unknown): Fields { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Fields : {} }
 export function createPersonProfileClass(ports: ProfilePorts) {
 function asList(value: unknown) {
@@ -88,6 +89,17 @@ class PersonProfileInjector {
     if (groupPrompt) lines.push(groupPrompt)
 
     const userLines = [`【当前对话者画像】`, `- 昵称: ${senderName} (QQ: ${userId})`]
+
+    // 跨群人物档案（仿真系统学习、全链路共享）：与仿真的人物卡同一份格式化，主链路/仿真看到同一个TA
+    try {
+      const profile = await ports.getCrossGroupProfile?.(userId)
+      const profileLine = profile ? formatPersonProfile(profile, senderName) : ""
+      // formatPersonProfile 返回 "名字：内容"——名字已在上一行，裁掉前缀
+      if (profileLine && profileLine.length > senderName.length + 1) {
+        userLines.push(`- 跨群档案: ${profileLine.slice(senderName.length + 1)}`)
+        hasData = true
+      }
+    } catch { /* 档案读取失败降级为无档案 */ }
 
     try {
       const recent = await ports.getMessages("group", groupId)
