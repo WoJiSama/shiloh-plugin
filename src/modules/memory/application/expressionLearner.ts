@@ -138,6 +138,11 @@ class ExpressionLearner {
       "好", "行", "对", "是的", "不", "没", "别", "请", "谢谢",
       "qq", "member", "admin", "owner", "id",
       "消息", "群身份", "在群里", "群里说", "回复了", "艾特了",
+      // 跑团/DND/TRPG 术语（不是说话习惯，是命令碎片）
+      "hp", "dc", "san", "ac", "ab", "db", "pc", "npc", "kp", "gm",
+      "dex", "str", "con", "int", "wis", "cha", "pow", "siz", "app", "edu",
+      "init", "coc", "dnd", "bp", "pp", "rp", "ra", "rc", "rh", "st", "sc",
+      "ww", "dx", "ek", "ri", "ti", "li", "nn", "sn", "ob", "log",
       "发送了", "一张图片", "张图片", "表情", "发送了表情"
     ])
     this.sensitiveWords = new Set(this.config.blockedWords)
@@ -169,13 +174,26 @@ class ExpressionLearner {
 
   extractWords(content: string) {
     if (!content || typeof content !== "string") return []
-    let text = content.replace(/https?:\/\/[^\s]+/g, "").replace(/@[^\s]+/g, "").replace(/\[CQ:[^\]]+\]/g, "")
+    // 剥掉命令（.xxx）、URL、@、CQ 码——这些不是说话
+    let text = content.replace(/^\s*[#.。]\S+/gm, "")
+      .replace(/https?:\/\/[^\s]+/g, "")
+      .replace(/@[^\s]+/g, "")
+      .replace(/\[CQ:[^\]]+\]/g, "")
+      .replace(/\d*d\d+/gi, " ")  // 骰子表达式 1d100/2d6
+      .replace(/[\d]+/g, " ")       // 纯数字全剥
     const words = [
       ...(text.match(/[\u4e00-\u9fa5]{2,6}/g) || []),
-      ...(text.match(/[a-zA-Z]{2,10}/gi) || []).map(word => word.toLowerCase()),
-      ...(text.match(/[a-zA-Z0-9]{2,6}/gi) || []).map(word => word.toLowerCase())
+      ...(text.match(/[a-zA-Z]{3,10}/gi) || []).map(word => word.toLowerCase()),
     ]
-    return words.filter(word => !this.commonWords.has(word) && !this.sensitiveWords.has(word) && !/^\d+$/.test(word) && word.length >= 2)
+    return words.filter(word =>
+      !this.commonWords.has(word) &&
+      !this.sensitiveWords.has(word) &&
+      word.length >= 2 &&
+      // 英文至少 3 字符（2 字符几乎全是命令/游戏缩写碎片）
+      (word.charCodeAt(0) > 0x7f || word.length >= 3) &&
+      // 剥掉含数字的混合碎片
+      !/\d/.test(word)
+    )
   }
 
   extractEmojis(content: string) {
