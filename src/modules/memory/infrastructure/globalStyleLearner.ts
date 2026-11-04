@@ -1765,7 +1765,11 @@ return class GlobalStyleLearnerManager {
     for (let index = 0; index < attempts.length; index += 1) {
       const attempt = attempts[index]!
       try {
-        const res = await fetchImpl(aiConfig.memoryAiUrl, {
+        // URL 补全：调用方给的多是渠道基址(.../v4)，统一补 /chat/completions（同 sideLLMCall；404 事故实锤 1143 次）
+        const summaryUrl = /\/chat\/completions$/.test(String(aiConfig.memoryAiUrl))
+          ? String(aiConfig.memoryAiUrl)
+          : String(aiConfig.memoryAiUrl).replace(/\/+$/, "") + "/chat/completions"
+        const res = await fetchImpl(summaryUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${aiConfig.memoryAiApikey}`,
