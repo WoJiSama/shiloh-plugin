@@ -1095,6 +1095,13 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const patches = parsePersonProfilePatches(raw)
       let mergedCount = 0
       for (const patch of patches) {
+        // 模型没提取到称呼时，用该群最常见的名片做默认名（否则没人说"叫我XX"就永远空着）
+        if (!patch.name) {
+          const nick = fresh.filter(m => m.userId === patch.userId).map(m => m.name).sort((a, b) =>
+            fresh.filter(m => m.name === a).length - fresh.filter(m => m.name === b).length
+          ).pop()
+          if (nick && nick.length <= 12) patch.name = nick
+        }
         const before = await store.loadPersonProfile(patch.userId)
         const after = await store.mergePersonProfile(patch.userId, patch, cfg.personProfile.maxFields)
         const beforeSig = JSON.stringify([before.name || '', before.interests, before.taboos])
