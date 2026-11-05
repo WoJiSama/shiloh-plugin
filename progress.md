@@ -1879,3 +1879,12 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - P6【注入审计】:新增 scripts/sim-injection-eval.mjs——3 场景(冷启动/熟人群/潜水)确定性渲染真实唤醒 prompt,校验 I1 不重复/I2 不丢失/I3 结构/I4 预算+溢出回流 共 20 项,0 失败;报告落盘 docs/evals/sim-injection-2026-11-04.json。模型侧 28 组盲评需线上网关,未在本轮运行(已在报告注明)。
 - 验证:backend:typecheck、test:boundaries 通过;全量 npm test 2967 项 2965 通过/0 失败/2 环境跳过;新增测试 8 项(工具 3/存储 1/边界 1/领域 3)。修一处实现缺陷:scope=self 的 aboutUser 拒绝守卫原查归一化后条目(恒不触发),改查原始参数。
 - 部署:deploy.sh 全门禁通过后发版 d5b2cb0 至生产(124.223.95.142),健康检查全绿(service=active/load_errors=0/pipeline=1/命令页200/控制台active+200);快照 20261105-103005 可回滚。
+
+
+# 2026-11-05 实拍事故:引用回复别人的消息被当成对自己说
+
+- 现象(群953676639):归尘(925640859)引用回复念念无肝awa说"你好",星野(机器人)随机唤醒(proactiveCheck)后回"早呀沃基,怎么突然问好"——把对别人说的话当成了对自己说。(名字"沃基"本身不是bug:归尘在跑团群名片就叫沃基,情节记忆里有历史。)
+- 根因:实拍原文是 [CQ:reply,id=X][CQ:at,qq=3108239960] 你好,ingest 收到的事件缺 e.source/e.message(断线补投类形态),而 extractQuote/extractAtOther 只读结构化字段——引用上下文(atOther/quoteAuthor)整条丢失,存成裸"你好",模型无从判断这句话对谁说。主链路的 collectMentionTargetIds 早有裸 CQ 串回退,仿真侧没有。
+- 修复:extractQuote 增加裸 CQ 串兜底([CQ:reply][CQ:at,qq=Y] 固定模式还原"回复给谁",名字从会话近窗按 QQ 解析,解析不到退 群友XXXX);extractAtOther 改用主链路同一解析(collectMentionTargetIds);SimMessage 新增 replyToUserId 持久化;quoteToSelf 同步走兜底(引用机器人不再因缺 source 漏醒);可见文本剥 reply/at CQ 码,纯 @ 消息以 @你/@了某人 占位不再整条丢弃。
+- 效果:同样的消息快照将渲染为"归尘: [引用 念念无肝awa] 你好",配合协议#6(引用别人的话别抢话)模型可正确旁听。
+- 验证:+4 回归测试(兜底还原/自引用/结构化路径不变/纯@占位);全量 2971 项 0 失败;boundaries 通过。

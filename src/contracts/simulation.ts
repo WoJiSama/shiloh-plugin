@@ -59,6 +59,8 @@ export interface SimMessage {
   /** 引用的是别人的话：被引用人昵称 + 原文截断（判断"这句话对谁说"的关键信号） */
   quoteAuthor?: string
   quoteText?: string
+  /** 引用回复的目标 QQ（e.source 缺失时从 CQ 串解析的兜底，QQ 引用回复自动 @被回复人；名字可能已并入 quoteAuthor） */
+  replyToUserId?: string
   /** 合并转发 id（有则可用 simGetForward 查看内容） */
   forwardId?: string
   /** 媒体摘要标记：图片/表情数量等 */

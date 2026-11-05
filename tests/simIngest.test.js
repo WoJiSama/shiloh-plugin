@@ -579,3 +579,89 @@ test('存储层：自我记忆全局键往返；closedFacts 新陈代谢；全�
   const score = (await store.loadGlobalAffinity(['1001']))['1001']
   assert.ok(score > 50, '分数照常镜像: ' + score)
 })
+
+test('引用回复兜底：e.source 缺失时从 CQ 串还原"回复给谁"（实拍事故：对别人的引用问候被当成对自己说）', async () => {
+  const { runtime, kv } = buildRuntime()
+  try {
+    // 被回复者先说话（近窗有名字可解析）
+    await runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '3108239960', msg: '大家早上好呀', message: [], sender: { nickname: '念念无肝awa' } })
+    // 归尘引用回复念念无肝awa：只有原始 CQ 串（断线补投/适配器无 source 形态）
+    await runtime.ingest({
+      group_id: GROUP, message_type: 'group', user_id: '925640859',
+      msg: '[CQ:reply,id=1384632266][CQ:at,qq=3108239960] 你好',
+      message: [], sender: { nickname: '归尘' },
+    })
+    const list = recent(kv)
+    const m = list[list.length - 1]
+    assert.equal(m.userId, '925640859')
+    assert.equal(m.text, '你好')
+    assert.equal(m.replyToUserId, '3108239960', '回复目标 QQ 还原')
+    assert.equal(m.quoteAuthor, '念念无肝awa', '从近窗解析被回复者名字')
+    assert.equal(m.atOther, true, '@ 了别人被识别')
+    assert.equal(m.quoteToSelf, false)
+    assert.equal(m.atSelf, false)
+    // 快照渲染带引用标记——模型能看到这句话是对谁说的
+    const { compactSimMessage } = await import('../dist/backend/modules/simulation/domain/messageView.js')
+    const line = compactSimMessage({ ...m, seq: 1 }, BASE_AT)
+    assert.ok(line.includes('[引用 念念无肝awa]'), '快照含引用标记: ' + line)
+
+    // 近窗没有该用户时兜底到 群友XXXX（不因拿不到名字而丢引用）
+    await runtime.ingest({
+      group_id: GROUP, message_type: 'group', user_id: '10000',
+      msg: '[CQ:reply,id=2][CQ:at,qq=999888777] 在吗',
+      message: [], sender: { nickname: '路人' },
+    })
+    const list2 = recent(kv)
+    const m2 = list2[list2.length - 1]
+    assert.equal(m2.replyToUserId, '999888777')
+    assert.equal(m2.quoteAuthor, '群友8777', '兜底名: ' + m2.quoteAuthor)
+  } finally { runtime.stop() }
+})
+
+test('引用回复兜底：回复目标是机器人时 quoteToSelf 成立（含命令前缀例外与 atMention 唤醒语义）', async () => {
+  const { runtime, kv } = buildRuntime()
+  try {
+    await runtime.ingest({
+      group_id: GROUP, message_type: 'group', user_id: '10000',
+      msg: `[CQ:reply,id=9][CQ:at,qq=${SELF_ID}] #帮我看看这个`,
+      message: [], sender: { nickname: '群友' },
+    })
+    const list = recent(kv)
+    const m = list[list.length - 1]
+    assert.equal(m.quoteToSelf, true, '引用机器人被识别')
+    assert.ok(!m.atOther, '@ 的是机器人不算 atOther')
+    // 命令前缀 + 引用机器人 = 点名，不能被吞
+    assert.ok(m.text.includes('帮我看看这个'))
+  } finally { runtime.stop() }
+})
+
+test('结构化 source 路径不受兜底影响：quoteAuthor/quoteText 照常', async () => {
+  const { runtime, kv } = buildRuntime()
+  try {
+    await runtime.ingest({
+      group_id: GROUP, message_type: 'group', user_id: '10000',
+      msg: '波波你说得对', message: [],
+      sender: { nickname: '阿明' },
+      source: { user_id: '2000', card: '波波', text: '这游戏就是垃圾' },
+    })
+    const list = recent(kv)
+    const m = list[list.length - 1]
+    assert.equal(m.quoteAuthor, '波波')
+    assert.equal(m.quoteText, '这游戏就是垃圾')
+    assert.equal(m.replyToUserId, '2000')
+    assert.equal(m.quoteToSelf, false)
+  } finally { runtime.stop() }
+})
+
+test('纯 @ 消息剥码后不丢：占位文本保留点名语义', async () => {
+  const { runtime, kv } = buildRuntime()
+  try {
+    await runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: `[CQ:at,qq=${SELF_ID}]`, message: [], sender: { nickname: '群友' } })
+    await runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10001', msg: '[CQ:at,qq=3108239960]', message: [], sender: { nickname: '路人' } })
+    const list = recent(kv)
+    assert.equal(list[list.length - 2].text, '@你')
+    assert.equal(list[list.length - 2].atSelf, true)
+    assert.equal(list[list.length - 1].text, '@了某人')
+    assert.equal(list[list.length - 1].atOther, true)
+  } finally { runtime.stop() }
+})

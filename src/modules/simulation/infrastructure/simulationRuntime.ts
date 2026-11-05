@@ -20,7 +20,7 @@ import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
-import { messageMentionsUser } from '../../conversation/domain/mentionTargets.js'
+import { collectMentionTargetIds, messageMentionsUser } from '../../conversation/domain/mentionTargets.js'
 import { createSimTools, simToolsAsFunctions, type SimSendResult, type SimWaitResult, type SimToolContext } from './simTools.js'
 
 export const SIM_RECENT_LIMIT = 60
@@ -305,12 +305,23 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   }
 
   /** 引用解析：被引用人 + 原文截断 + 被引消息里的图片 URL（qq-bridge 的"判断对谁说"关键信号；引用自己仍由 quoteToSelf 表达） */
-  function extractQuote(e: SimIngestEvent, selfId: string): { author: string; text: string; isSelf: boolean; imageUrls: string[] } | null {
+  function extractQuote(e: SimIngestEvent, selfId: string): { author: string; text: string; isSelf: boolean; imageUrls: string[]; targetUserId: string } | null {
     const source = e.source
-    if (!source?.user_id) return null
-    const isSelf = String(source.user_id) === selfId
-    if (isSelf) return { author: '', text: '', isSelf: true, imageUrls: [] }
-    const author = String(source.card || source.nickname || `群友${String(source.user_id).slice(-4)}`)
+    if (!source?.user_id) {
+      // 兜底：断线补投/部分适配器不给 e.source——QQ 引用回复的原始串固定是
+      // [CQ:reply,id=X][CQ:at,qq=Y]（客户端自动 @被回复人），从这里至少拿回"回复给谁"。
+      const raw = String(e.msg || e.raw_message || '')
+      const match = raw.match(/\[CQ:reply,[^\]]*\]\s*\[CQ:at,[^\]]*(?:qq|user_id|id|uin)=(\d+)[^\]]*\]/)
+      if (match?.[1]) {
+        const targetUserId = match[1]
+        return { author: '', text: '', isSelf: targetUserId === selfId, imageUrls: [], targetUserId }
+      }
+      return null
+    }
+    const targetUserId = String(source.user_id)
+    const isSelf = targetUserId === selfId
+    if (isSelf) return { author: '', text: '', isSelf: true, imageUrls: [], targetUserId }
+    const author = String(source.card || source.nickname || `群友${targetUserId.slice(-4)}`)
     let text = ''
     const imageUrls: string[] = []
     if (typeof source.text === 'string') text = source.text
@@ -321,7 +332,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       }
     }
     text = text.replace(/\s+/g, ' ').trim().slice(0, 60)
-    return { author, text, isSelf: false, imageUrls: imageUrls.slice(0, 3) }
+    return { author, text, isSelf: false, imageUrls: imageUrls.slice(0, 3), targetUserId }
   }
 
   /** 合并转发 id（Yunzai 转发段） */
@@ -335,15 +346,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return ''
   }
 
-  /** @ 了别的具体成员（非机器人）：延续触发的排除条件 */
+  /** @ 了别的具体成员（非机器人）：延续触发的排除条件。与主链路同一解析（结构化段 + 裸 CQ 串都认） */
   function extractAtOther(e: SimIngestEvent, selfId: string): boolean {
-    const segments = (e as { message?: { type?: string; data?: { qq?: unknown } }[] }).message || []
-    for (const seg of segments) {
-      if (seg?.type !== 'at') continue
-      const qq = String((seg as { data?: { qq?: unknown } }).data?.qq || '')
-      if (qq && qq !== 'all' && qq !== selfId) return true
-    }
-    return false
+    return collectMentionTargetIds(e, selfId).length > 0
   }
 
   /** 会话延续：登记对话对象（≤5，最近优先）并刷新活跃窗口 */
@@ -366,14 +371,24 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const self = ports.getSelf(e.self_id ?? e.bot?.uin)
     const userId = String(e.user_id || '')
     if (userId && userId === self.id) return true
-    const text = String(e.msg || e.raw_message || '').trim()
     const images = (e.message || []).filter(seg => seg?.type === 'image' || seg?.type === 'mface').length
-    if (!text && images === 0) return true
     // 命令前缀不入会话流;例外:@ 了机器人或引用机器人消息的(「#抱抱希洛@这里是希洛!」是点名不是命令)。
     // atSelf 必须用段级检测:TRSS-Yunzai @机器人设的是 e.atBot,e.at===true 永远不成立,
     // 只看 e.at 会把「@机器人 .r10」这类点名静默吞掉、atMention 唤醒也永不触发。
-    const quoteToSelf = !!e.source?.user_id && String(e.source.user_id) === self.id
+    // quoteToSelf/quote 均带 CQ 串兜底:断线补投等场景 e.source 缺失时,引用上下文不能整个丢掉
+    // (实拍事故:引用回复别人的"你好"被存成裸文本,模型以为是对自己说的)。
     const atSelf = messageMentionsUser(e, self.id)
+    const atOther = extractAtOther(e, self.id)
+    const quote = extractQuote(e, self.id)
+    const quoteToSelf = quote?.isSelf === true
+    // 可见文本剥掉 reply/at 的 CQ 码（引用/点名语义由 replyToUserId/quote*/at* 字段结构化承载）；
+    // 纯 @ 消息（一个字不带）保留为占位——点名本身就是内容，不能因剥码整条丢掉
+    const text = String(e.msg || e.raw_message || '')
+      .replace(/\[CQ:reply,[^\]]*\]/g, '')
+      .replace(/\[CQ:at,[^\]]*\]/g, '')
+      .replace(/\s+/g, ' ').trim()
+      || (atSelf ? '@你' : atOther ? '@了某人' : '')
+    if (!text && images === 0) return true
     if (text && /^[#./\\]/.test(text) && !atSelf && !quoteToSelf) return true
 
     const cfg = runtimeConfig()
@@ -381,9 +396,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const state = live ?? await store.load(groupId)
     state.seq += 1
     const imageUrls = extractImageUrls(e)
-    const atOther = extractAtOther(e, self.id)
-    const quote = extractQuote(e, self.id)
     const forwardId = extractForwardId(e)
+    // 兜底路径解析不出名片：从会话近窗按 QQ 找最近一个名字（被回复的人必然刚说过话）
+    const fallbackQuoteAuthor = quote?.targetUserId
+      ? (state.recent.find(m => m.userId === quote.targetUserId)?.name || `群友${quote.targetUserId.slice(-4)}`)
+      : ''
     const message: SimMessage = {
       seq: state.seq,
       messageId: e.message_id ?? null,
@@ -394,7 +411,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       atSelf,
       ...(atOther ? { atOther: true } : {}),
       quoteToSelf,
-      ...(quote && !quote.isSelf ? { quoteAuthor: quote.author, quoteText: quote.text, ...(quote.imageUrls.length ? { quoteImageUrls: quote.imageUrls } : {}) } : {}),
+      ...(quote && !quote.isSelf ? {
+        ...(quote.targetUserId ? { replyToUserId: quote.targetUserId } : {}),
+        ...(quote.author || fallbackQuoteAuthor ? { quoteAuthor: quote.author || fallbackQuoteAuthor } : {}),
+        ...(quote.text ? { quoteText: quote.text } : {}),
+        ...(quote.imageUrls.length ? { quoteImageUrls: quote.imageUrls } : {}),
+      } : {}),
       ...(forwardId ? { forwardId } : {}),
       imageCount: images,
       ...(imageUrls.length ? { imageUrls } : {}),
