@@ -242,6 +242,26 @@ test('发送配额：回合上限与每分钟频率', () => {
   assert.equal(checkSendAllowance(state, cfg, now + 61_000, 0).allowed, true)
 })
 
+test('发送配额：小时级节流——13分钟13条式高频输出被拦（实拍识破事故）', () => {
+  const cfg = defaultSimRuntimeConfig({ enabled: true })
+  const state = session()
+  const now = 1_700_000_000_000
+  // 每条间隔 70s（避开每分钟闸），一小时窗口内灌满 sendsPerHour
+  for (let i = 0; i < cfg.turn.sendsPerHour; i += 1) recordSend(state, now - i * 70_000, 1)
+  const verdict = checkSendAllowance(state, cfg, now, 0)
+  assert.equal(verdict.allowed, false)
+  assert.ok(verdict.reason.includes('一小时'), '小时闸文案: ' + verdict.reason)
+  // 窗口滑出后恢复
+  assert.equal(checkSendAllowance(state, cfg, now + 3600_000, 0).allowed, true)
+})
+
+test('协议第1条：被问是不是机器人时坦然接住，不回避不解释', () => {
+  const text = buildSimulationProtocol('希洛')
+  assert.ok(text.includes('是不是机器人'))
+  assert.ok(text.includes('大方承认'))
+  assert.ok(text.includes('回避身份问题'))
+})
+
 test('resetPreSleepWait 清空观察', () => {
   const state = session()
   state.preSleepWait.satisfiedAt = 1

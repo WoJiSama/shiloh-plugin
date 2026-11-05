@@ -213,6 +213,8 @@ export interface SimulationSection {
     maxSendsPerTurn?: number
     minSendGapMs?: number
     sendPerMinute?: number
+    /** 滑动 60 分钟窗口的发送条数上限——防"每条必回"式高频输出（实拍事故：13 分钟 13 条被群友识破） */
+    sendsPerHour?: number
     maxTurnsPerDay?: number
     historyMaxMessages?: number
     historyMaxChars?: number
@@ -243,7 +245,7 @@ export interface SimRuntimeConfig {
   /** 所有过了群白名单的群默认进仿真（.仿真 关 可按群退出） */
   allGroups: boolean
   wake: Required<Pick<NonNullable<SimulationSection['wake']>, 'probability' | 'batchWindowMs' | 'maxWakePerMinute' | 'maxWakePerHour' | 'proactiveIdleMs' | 'proactiveCheckMinMs' | 'proactiveCheckMaxMs' | 'proactiveProbability' | 'replyCheckMs' | 'continuationWindowMs' | 'playAlongGapMs'>>
-  turn: Required<Pick<NonNullable<SimulationSection['turn']>, 'maxToolRounds' | 'maxSendsPerTurn' | 'minSendGapMs' | 'sendPerMinute' | 'maxTurnsPerDay' | 'historyMaxMessages' | 'historyMaxChars' | 'unreadLimit' | 'wakeMessageLimit' | 'wakeMaxChars' | 'messageTextMaxChars' | 'waitQuietMaxMs' | 'waitTimeoutMaxMs'>> & { groups: Record<string, number> }
+  turn: Required<Pick<NonNullable<SimulationSection['turn']>, 'maxToolRounds' | 'maxSendsPerTurn' | 'minSendGapMs' | 'sendPerMinute' | 'sendsPerHour' | 'maxTurnsPerDay' | 'historyMaxMessages' | 'historyMaxChars' | 'unreadLimit' | 'wakeMessageLimit' | 'wakeMaxChars' | 'messageTextMaxChars' | 'waitQuietMaxMs' | 'waitTimeoutMaxMs'>> & { groups: Record<string, number> }
   agentPresetKeywords: string[]
   extraTools: string[]
   meme: { enabled: boolean; extractCooldownMs: number; extractMinMessages: number; injectMax: number }

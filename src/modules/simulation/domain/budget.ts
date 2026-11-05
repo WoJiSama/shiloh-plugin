@@ -65,6 +65,11 @@ export function checkSendAllowance(state: SimSessionState, config: SimRuntimeCon
   if (minuteWindow.length >= config.turn.sendPerMinute) {
     return { allowed: false, reason: `发送频率已达 ${config.turn.sendPerMinute} 条/分钟，请等一会儿再发` }
   }
+  // 小时级节流：真人再能聊也不会一小时每分钟一条——高频连续输出是最容易被识破的机器人特征
+  const hourWindow = pruneWindow(state.sendTimes, now, 3600_000, 200)
+  if (hourWindow.length >= config.turn.sendsPerHour) {
+    return { allowed: false, reason: `这一小时你已经发了 ${hourWindow.length} 条，说得够多了——像真人一样歇一会儿，本轮只 markRead 结束，等别人@你或话题真正轮到你再开口` }
+  }
   return { allowed: true, reason: 'ok' }
 }
 

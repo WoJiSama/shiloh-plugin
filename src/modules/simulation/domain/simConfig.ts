@@ -63,6 +63,7 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       maxSendsPerTurn: Math.max(1, Math.floor(turn.maxSendsPerTurn ?? 5)),
       minSendGapMs: Math.max(0, Math.floor(turn.minSendGapMs ?? 800)),
       sendPerMinute: Math.max(1, Math.floor(turn.sendPerMinute ?? 8)),
+      sendsPerHour: Math.max(1, Math.floor(turn.sendsPerHour ?? 10)),
       maxTurnsPerDay: Math.max(1, Math.floor(turn.maxTurnsPerDay ?? 40)),
       historyMaxMessages: Math.max(4, Math.floor(turn.historyMaxMessages ?? 40)),
       historyMaxChars: Math.max(2000, Math.floor(turn.historyMaxChars ?? 24_000)),
