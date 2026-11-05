@@ -1878,3 +1878,4 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - P5【档案新陈代谢】:提取 prompt 增加 closedFacts(考完了/不玩了/弃坑了);mergePersonProfile 先按 supersedeMatches(结束信号放行 ≥2 字公共段)剔除存量 facts/interests/traits 再并入;simRemember 记到结束信号时自动走 closePersonFacts 移除旧事实而非新增。
 - P6【注入审计】:新增 scripts/sim-injection-eval.mjs——3 场景(冷启动/熟人群/潜水)确定性渲染真实唤醒 prompt,校验 I1 不重复/I2 不丢失/I3 结构/I4 预算+溢出回流 共 20 项,0 失败;报告落盘 docs/evals/sim-injection-2026-11-04.json。模型侧 28 组盲评需线上网关,未在本轮运行(已在报告注明)。
 - 验证:backend:typecheck、test:boundaries 通过;全量 npm test 2967 项 2965 通过/0 失败/2 环境跳过;新增测试 8 项(工具 3/存储 1/边界 1/领域 3)。修一处实现缺陷:scope=self 的 aboutUser 拒绝守卫原查归一化后条目(恒不触发),改查原始参数。
+- 部署:deploy.sh 全门禁通过后发版 d5b2cb0 至生产(124.223.95.142),健康检查全绿(service=active/load_errors=0/pipeline=1/命令页200/控制台active+200);快照 20261105-103005 可回滚。
