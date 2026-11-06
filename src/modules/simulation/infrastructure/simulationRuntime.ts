@@ -1,6 +1,6 @@
 import type { ChatRequestData, ChatResponse } from '../../../contracts/modelGateway.js'
 import type { PersonaText } from '../../conversation/domain/personaSource.js'
-import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMessage, SimMemoryEntry, SimMessage, SimRuntimeConfig, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
+import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMessage, SimMemoryEntry, SimMessage, SimMoodState, SimRuntimeConfig, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
 import { defaultSimRuntimeConfig } from '../domain/simConfig.js'
 import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, formatSelfMemorySection, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
 import { mineUserCatchphrases } from '../domain/userStyle.js'
@@ -15,6 +15,7 @@ import { isSilentDeclaration, mentionsSilenceVocabulary } from '../domain/silent
 import { parsePersonProfilePatches, interestMatchesTitle, type PersonProfile } from '../domain/personProfile.js'
 import { isSleeping, activityFactor, sleepinessNote, staleMessageNote, type RhythmWindow } from '../domain/rhythm.js'
 import { normalizeLifeThreads, mergeThreadSync, formatLifeThreads, type LifeThread } from '../domain/lifeThread.js'
+import { applyMoodUpdate, formatMoodSection, moodSummaryLine, normalizeSimMood, projectMood, type MoodAxis } from '../domain/mood.js'
 import { checkHealth, formatAlerts, type HealthAlert } from '../domain/healthSentinel.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
@@ -435,7 +436,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       state.bootstrapSent = true
     } else {
       const hourNow = new Date(now() + 8 * 3600_000).getUTCHours()
-      reason = evaluateWakeTrigger(message, state.wakeConfig, { selfId: self.id, selfName: self.name, random, conversation: state.conversation, activityFactor: cfg.rhythm.enabled ? activityFactor(hourNow) : 1 })
+      // 插话熔断：我上次发言后有第三人插过话（recent 只含群友消息，当前消息已入列但按 userId 自然排除）——
+      // 对话对象这条更可能是接那人的话而不是对我说的，不算延续唤醒。宁可漏接不要抢话。
+      const interveningSinceBotTurn = state.lastAiSendAt > 0
+        && state.recent.some(m => m.at > state.lastAiSendAt && m.userId !== message.userId)
+      reason = evaluateWakeTrigger(message, state.wakeConfig, { selfId: self.id, selfName: self.name, random, conversation: state.conversation, interveningSinceBotTurn, activityFactor: cfg.rhythm.enabled ? activityFactor(hourNow) : 1 })
     }
     // 管理员设定的「仅@才回」优先于一切触发器（含 AI 自设唤醒）：非点名类唤醒压掉。
     // 消息照常入库——AI 被点名醒来后仍可读到全部内容；定时器/管理类唤醒是被点名后的延伸，不受影响。
@@ -612,14 +617,28 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const lifeThreadSection = formatLifeThreads(lifeThreads, commonTopicLines)
       // AI 自我记忆（跨群性格沉淀）
       const selfNotesText = formatSelfMemorySection(normalizeMemoryList(await store.loadSelfMemories().catch(() => []), now()))
-      // 长程语义召回：未读末尾消息做查询，检索"两天情节窗之外"的相关片段（1s 预算，失败/超时静默跳过）
+      // 情绪四轴（跨群全局）：回合开始投影一次——注入底色段 + 本回合更新的包络锚点共用；
+      // 中性带/从未写过时段落为空串，不注入（缺席=情绪平常）
+      const moodCurrent = cfg.mood.enabled ? normalizeSimMood(await store.loadMood().catch(() => null), now()) : null
+      const moodAnchor = projectMood(moodCurrent, now(), cfg.mood.halfLifeMs)
+      const moodBox = { current: moodCurrent }
+      const moodSection = formatMoodSection(moodCurrent, now(), cfg.mood.halfLifeMs)
+      // 长程语义召回：未读末尾消息做查询，检索"两天情节窗之外"的相关片段（1s 预算）。
+      // 失败/超时不注入内容，但必须与"检索无结果"区分开——注入未完成提示，防止模型把"没召回到"当"没发生过"。
       const recallQuery = [...state.unread].sort((a, b) => a.seq - b.seq).slice(-6).map(m => String(m.text || '').trim()).filter(Boolean).join(' ').slice(0, 160)
-      const semanticRecall = recallQuery && typeof ports.getSemanticRecall === 'function'
-        ? await Promise.race([
-          Promise.resolve(ports.getSemanticRecall(groupId, recallQuery)).catch(() => ''),
-          new Promise<string>(resolve => { const timer = setTimeout(() => resolve(''), 1000); timer.unref?.() }),
+      let semanticRecall = ''
+      let semanticRecallIncomplete = false
+      if (recallQuery && typeof ports.getSemanticRecall === 'function') {
+        type RecallOutcome = { ok: boolean; value: string }
+        const outcome = await Promise.race<RecallOutcome>([
+          Promise.resolve(ports.getSemanticRecall(groupId, recallQuery))
+            .then((value: string) => ({ ok: true, value: String(value || '') }))
+            .catch(() => ({ ok: false, value: '' })),
+          new Promise<RecallOutcome>(resolve => { const timer = setTimeout(() => resolve({ ok: false, value: '' }), 1000); timer.unref?.() }),
         ])
-        : ''
+        semanticRecall = outcome.ok ? outcome.value : ''
+        semanticRecallIncomplete = !outcome.ok
+      }
       const wakePrompt = buildWakePrompt({
         state, reason, snapshotText: snapshot.text, unreadTotal: snapshot.unreadTotal, now: now(), selfName: self.name,
         ...(initialPrompt ? { initialPrompt } : {}),
@@ -629,7 +648,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         ...(Object.keys(globalAffinity).length ? { globalAffinity } : {}),
         ...(Object.keys(globalAffinityNotes).length ? { globalAffinityNotes } : {}),
         ...(selfNotesText ? { selfNotesText } : {}),
+        ...(moodSection ? { moodSection } : {}),
         ...(semanticRecall ? { semanticRecall } : {}),
+        ...(semanticRecallIncomplete ? { semanticRecallIncomplete: true } : {}),
         ...(sleepNote ? { sleepNote } : {}),
         ...(staleNote ? { staleNote } : {}),
         ...(lifeThreadSection ? { lifeThreadSection } : {}),
@@ -642,11 +663,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
       const persona = ports.getPersona(groupId, self.id)
       const extraTools = resolveExtraTools(cfg.extraTools)
-      const systemPrompt = buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames: cfg.extraTools, hasEmojiTool: cfg.extraTools.includes('sendLocalEmojiTool') })
+      const systemPrompt = buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames: cfg.extraTools, hasEmojiTool: cfg.extraTools.includes('sendLocalEmojiTool'), hasMoodTool: cfg.mood.enabled })
 
       const memoryBox = { list: memories, sentTexts: [] as string[] }
       const selfMemoryBox = { list: normalizeMemoryList(await store.loadSelfMemories().catch(() => []), now()) }
-      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox)
+      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor)
       const tools = [...createSimTools(ctx), ...extraTools]
       const toolFunctions = simToolsAsFunctions(tools)
       const executionConfig = ports.getExecutionConfig()
@@ -801,7 +822,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
   }
 
-  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[] }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }): SimToolContext {
+  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[] }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }, moodBox: { current: SimMoodState | null } = { current: null }, moodAnchor: Record<MoodAxis, number> | null = null): SimToolContext {
     let sendsThisTurn = 0
     return {
       groupId,
@@ -913,6 +934,17 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       ...(typeof store.loadSelfMemories === 'function' && typeof store.saveSelfMemories === 'function' ? {
         getSelfMemories: () => selfMemoryBox.list,
         saveSelfMemories: (list: SimMemoryEntry[]) => { selfMemoryBox.list = list; void store.saveSelfMemories(list) },
+      } : {}),
+      ...(cfg.mood.enabled && typeof store.saveMood === 'function' ? {
+        getMood: () => (moodBox.current ? { summary: moodSummaryLine(moodBox.current, now(), cfg.mood.halfLifeMs) } : null),
+        updateMood: (deltas: Parameters<NonNullable<SimToolContext['updateMood']>>[0], reason: string) => {
+          const result = applyMoodUpdate({ mood: moodBox.current, deltas, reason, now: now(), halfLifeMs: cfg.mood.halfLifeMs, maxStep: cfg.mood.maxStep, ...(moodAnchor ? { turnAnchor: moodAnchor } : {}) })
+          // 全部被包络夹成零变化 → 不落盘（更新 updatedAt 会白刷新衰减起点，等于无事件续命情绪）
+          if (!Object.values(result.applied).some(v => v !== 0)) return { error: '没有产生实际变化（可能已到本轮变化上限）' }
+          moodBox.current = result.mood
+          void store.saveMood(result.mood)
+          return { mood: result.mood, applied: result.applied, capped: result.capped }
+        },
       } : {}),
       setRhythm: async (sleepFrom: number, sleepTo: number) => {
         await store.saveRhythm({ sleepFrom, sleepTo, setBy: 'agent' })
@@ -1365,6 +1397,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const active = groupActive(cfg, groupId)
     const live = liveStates.get(groupId)
     const state = live ?? await store.load(groupId)
+    const moodSummary = cfg.mood.enabled
+      ? moodSummaryLine(normalizeSimMood(await store.loadMood().catch(() => null), now()), now(), cfg.mood.halfLifeMs)
+      : ''
     return [
       `模式：${active ? '仿真（AI 自主收发）' : '普通'}${running.has(groupId) ? '（回合进行中）' : ''}`,
       `回复模式：${(overridesCache?.atOnly || []).includes(groupId) ? '仅被@才回（管理员设定，优先于 AI 自设触发器）' : playAlongActive(groupId) ? (Number(overridesCache?.playAlongUntil?.[groupId]) >= 4102444800000 ? '自主·活跃（长期）' : `自主·活跃（剩 ${Math.max(1, Math.ceil((Number(overridesCache?.playAlongUntil?.[groupId]) - now()) / 60_000))} 分钟）`) : '自主'}`,
@@ -1375,6 +1410,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       `今日：${state.budget.turns}/${cfg.turn.maxTurnsPerDay} 回合，${state.budget.tokens} tokens`,
       `最近唤醒：${state.lastWakeReason?.kind || '无'}（${state.lastWakeAt ? Math.round((now() - state.lastWakeAt) / 1000) + ' 秒前' : '从未'}）`,
       `最近发言：${state.lastAiSendAt ? Math.round((now() - state.lastAiSendAt) / 1000) + ' 秒前' : '未发言'}`,
+      ...(moodSummary ? [`情绪底色（跨群全局）：${moodSummary}`] : []),
       `回合历史：${state.agentHistory.length} 条`,
     ].join('\n')
   }

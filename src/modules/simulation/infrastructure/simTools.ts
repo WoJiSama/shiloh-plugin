@@ -1,10 +1,11 @@
-import type { SimMemoryEntry, SimSessionState, SimWakeConfig } from '../../../contracts/simulation.js'
+import type { SimMemoryEntry, SimMoodState, SimSessionState, SimWakeConfig } from '../../../contracts/simulation.js'
 import { coerceStringArray, looksLikeToolArguments } from '../domain/paramTolerance.js'
 import { stripAIFlavorPhrases } from '../../conversation/domain/replySanitizer.js'
 import { compactSimMessage } from '../domain/messageView.js'
 import { acknowledgeMessages, readThroughSeq, noteModelSeen, unreadSince } from '../domain/watermark.js'
 import { normalizeSimWakeConfig, ensureWakeable } from '../domain/simConfig.js'
 import { activeMemories, applyAffinityDelta, capMemories, defaultAffinityEntry, dueMemories, normalizeSimMemoryEntry, SIM_MEMORY_LIMIT, SIM_SELF_MEMORY_LIMIT } from '../domain/simMemory.js'
+import { MOOD_AXES, type MoodAxis } from '../domain/mood.js'
 import type { SimWaitPlan } from '../domain/waitGate.js'
 import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
@@ -47,6 +48,10 @@ export interface SimToolContext {
   /** AI 自我记忆（跨群性格沉淀，scope=self 的条目走这里） */
   getSelfMemories?(): SimMemoryEntry[]
   saveSelfMemories?(memories: SimMemoryEntry[]): void
+  /** 情绪四轴（跨群全局）：summary 为预翻译的单行摘要（simGetState 展示用） */
+  getMood?(): { summary: string } | null
+  /** 情绪四轴有界更新：运行时负责半衰期投影/单步上限/回合包络并落盘 */
+  updateMood?(deltas: Partial<Record<MoodAxis, number>>, reason: string): { mood: SimMoodState; applied: Partial<Record<MoodAxis, number>>; capped: boolean } | { error: string }
   /** 自设作息（全局）：sleepFrom/sleepTo 小时，如 1-8 */
   setRhythm?(sleepFrom: number, sleepTo: number): Promise<string>
   /** 生活线管理：follow（真实搜索定位）/list/drop */
@@ -339,6 +344,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
 
     async func() {
       const state = ctx.getState()
+      const mood = typeof ctx.getMood === 'function' ? ctx.getMood() : null
       return JSON.stringify({
         mode: state.wakeConfig.mode,
         triggers: state.wakeConfig.triggers,
@@ -348,6 +354,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         lastWakeReason: state.lastWakeReason?.kind || '无',
         todayTurns: state.budget.turns,
         sendsThisTurn: ctx.sendsThisTurn(),
+        ...(mood?.summary ? { mood: mood.summary } : {}),
       })
     }
   }
@@ -492,6 +499,51 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       // 跨群底分镜像：同样的关系变化在任何群都算数（权重 30%，理由进全局关系近况）
       try { if (typeof ctx.bumpGlobalAffinity === 'function') await ctx.bumpGlobalAffinity(userId, result.applied, reason) } catch { /* 镜像失败不影响本群 */ }
       return JSON.stringify({ applied: result.applied, score: result.entry.score, capped: result.capped })
+    }
+  }
+
+  // 情绪四轴（跨群全局）：小幅更新 + 理由；半衰期/包络由运行时把关
+  class SimSetMoodTool extends AbstractTool {
+    constructor() {
+      super()
+      this.name = 'simSetMood'
+      this.description = '更新你自己的情绪（所有群共用的你，别把它当人设表演）。四个轴：joy 开心 / anger 生气 / sorrow 难过 / fear 担心，各传这轮的变化量（-3~+3 整数，只传真正被触动的轴，没变的轴不传）。被夸、聊得开心、看到好玩的事 → joy +；被冒犯、被怼 → anger +；输了游戏、看到难过的事 → sorrow +；担心某人某事 → fear +。情绪会随时间自己消退，不用每轮都调，没有波动就别调。理由必填。'
+      this.parameters = {
+        type: 'object',
+        properties: {
+          joy: { type: 'number', description: '开心轴变化量 -3~+3，没变不传。' },
+          anger: { type: 'number', description: '生气轴变化量 -3~+3，没变不传。' },
+          sorrow: { type: 'number', description: '难过轴变化量 -3~+3，没变不传。' },
+          fear: { type: 'number', description: '担心轴变化量 -3~+3，没变不传。' },
+          reason: { type: 'string', description: '一句话理由（≤40 字），如"跟群友斗图斗赢了"。' },
+        },
+        required: ['reason'],
+        additionalProperties: false,
+      }
+    }
+
+    async func(opts: Record<string, unknown>) {
+      if (typeof ctx.updateMood !== 'function') return 'error: 当前环境不支持情绪'
+      const reason = String(opts.reason || '').trim().slice(0, 60)
+      if (!reason) return 'error: 必须给理由'
+      const deltas: Partial<Record<MoodAxis, number>> = {}
+      let any = false
+      for (const axis of MOOD_AXES) {
+        const delta = Math.round(Number(opts[axis]))
+        if (Number.isFinite(delta) && delta !== 0) {
+          deltas[axis] = delta
+          any = true
+        }
+      }
+      if (!any) return 'error: 至少给一个轴的变化量（-3~+3），没有波动就不用调'
+      const result = ctx.updateMood(deltas, reason)
+      if ('error' in result) return `error: ${result.error}`
+      return JSON.stringify({
+        mood: result.mood.axes,
+        applied: result.applied,
+        ...(result.capped ? { note: '变化量有单次/单回合上限（情绪有惯性），已按上限截取' } : {}),
+        hint: '情绪只影响你的语气和节奏，别把数值说出口',
+      })
     }
   }
 
@@ -805,6 +857,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     new SimGetStateTool(),
     new SimRememberTool(),
     new SimUpdateAffinityTool(),
+    new SimSetMoodTool(),
     new SimGetMessageImagesTool(),
     new SimSendPokeTool(),
     new SimGetGroupMembersTool(),

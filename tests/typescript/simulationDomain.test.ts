@@ -539,6 +539,19 @@ test('continuation：窗口内对话对象不点名也醒，@别人/过期/陌�
   assert.ok(WAKE_PRIORITY.question > WAKE_PRIORITY.continuation && WAKE_PRIORITY.continuation > WAKE_PRIORITY.nameMention)
 })
 
+test('continuation 插话熔断：我上次发言后第三人插过话 → 不当延续唤醒；点名类不受影响', () => {
+  const cfg = { ...DEFAULT_SIM_WAKE_CONFIG, triggers: { ...DEFAULT_SIM_WAKE_CONFIG.triggers, probability: 0 } }
+  const conversation = { activeUntil: 10_000, interlocutorIds: ['10000'] }
+  const ctx = { ...SELF, conversation, interveningSinceBotTurn: true }
+  // 场景：我回完话后别人（9999）插了话，对话对象 10000 这条更可能是接那人的话 → 不醒
+  assert.equal(evaluateWakeTrigger(msg({ seq: 1, text: '哈哈确实', at: 9_000 }), cfg, ctx), null)
+  // 同一场景下被@ 仍然最高优先（点名就是对我说的，插不插话都该醒）
+  assert.equal(evaluateWakeTrigger(msg({ seq: 2, text: '@希洛 你觉得呢', at: 9_000, atSelf: true }), cfg, ctx)?.kind, 'atMention')
+  // 熔断关闭（无第三人插话）→ 恢复延续唤醒
+  const openCtx = { ...SELF, conversation }
+  assert.equal(evaluateWakeTrigger(msg({ seq: 3, text: '哈哈确实', at: 9_000 }), cfg, openCtx)?.kind, 'continuation')
+})
+
 // ── 人设扩展字段与 activeTopic ──
 
 test('buildSimSystemPrompt：人设反应模式/示例/黑名单进入人格层', async () => {
@@ -941,4 +954,128 @@ test('buildWakePrompt：自我沉淀段与长程召回段注入，协议 #30 指
   assert.ok(prompt.includes('【更早的相关记忆】'), '长程召回段')
   assert.ok(prompt.includes('语义检索命中'), '召回段说明')
   assert.ok(buildSimulationProtocol('希洛').includes('scope=self'), '协议 #30 更新')
+})
+
+test('buildWakePrompt：预算截断诚实提示——超长段落记名+未查全≠没有；召回未完成≠无结果', () => {
+  const state = session()
+  state.lastIncomingAt = 1_000
+  const base = { state, reason: { kind: 'atMention', seq: 1 }, snapshotText: '阿卡: 在吗', unreadTotal: 1, now: 10_000, selfName: '希洛' } as const
+  // 全部段落都在预算内 → 不出现提示
+  const clean = buildWakePrompt({ ...base, semanticRecall: '短召回', groupDigest: '短动态', styleDigest: '短风格' })
+  assert.ok(!clean.includes('【资料预算提示】'), '未截断不提示')
+  assert.ok(!clean.includes('【更早记忆检索未完成】'), '召回正常不提示')
+  // 风格段超 900 字 → 记名提示"没看到≠没有"
+  const longStyle = '字'.repeat(901)
+  const clipped = buildWakePrompt({ ...base, styleDigest: longStyle })
+  assert.ok(clipped.includes('【资料预算提示】'), '截断要提示')
+  assert.ok(clipped.includes('说话风格参考'), '提示要记名')
+  assert.ok(clipped.includes('没看到全文不等于没有'), '未查全≠没有')
+  // 召回超时/失败（与"检索无结果"区分）→ 单独提示，别断言没发生过
+  const incomplete = buildWakePrompt({ ...base, semanticRecallIncomplete: true })
+  assert.ok(incomplete.includes('【更早记忆检索未完成】'), '未完成提示')
+  assert.ok(incomplete.includes('未返回不代表没有'), '未完成≠无结果')
+  // 两个 digest 合并截断 → 只记一次"近期动态"
+  const bothDigest = buildWakePrompt({ ...base, groupDigest: '动'.repeat(401), episodesText: '节'.repeat(601) })
+  const notice = bothDigest.match(/【资料预算提示】(.+)因长度预算/)?.[1] || ''
+  assert.ok(notice.includes('近期动态'), '截断记名')
+  assert.equal((notice.match(/近期动态/g) || []).length, 1, '同名段落去重')
+})
+
+// ── 情绪四轴（跨群全局）：半衰期投影 + 有界更新 + 底色注入 ──
+
+test('mood：半衰期投影——joy 向基线 5 回归、负性轴向 1 回归，负值时间不外溢', async () => {
+  const { decayedAxis, isNeutralMood, normalizeSimMood, projectMood } = await import('../../src/modules/simulation/domain/mood.js')
+  const halfLife = 360 * 60_000
+  // 恰好一个半衰期：joy 9 → 5 + (9-5)*0.5 = 7；sorrow 9 → 1 + 8*0.5 = 5
+  assert.equal(decayedAxis(9, 5, halfLife, halfLife), 7)
+  assert.equal(decayedAxis(9, 1, halfLife, halfLife), 5)
+  // 两个半衰期再减半
+  assert.equal(decayedAxis(9, 5, 2 * halfLife, halfLife), 6)
+  // 时间倒流/为零 → 原值
+  assert.equal(decayedAxis(9, 5, 0, halfLife), 9)
+  assert.equal(decayedAxis(9, 5, -1000, halfLife), 9)
+  const mood = { axes: { joy: 9, anger: 1, sorrow: 9, fear: 1 }, updatedAt: 1_000 }
+  const p = projectMood(mood, 1_000 + halfLife, halfLife)
+  assert.equal(Math.round(p.joy), 7)
+  assert.equal(Math.round(p.sorrow), 5)
+  // null（从未写过）→ 静息即中性
+  const rest = projectMood(null, 5_000, halfLife)
+  assert.ok(isNeutralMood(rest))
+  // 归一化：垃圾输入 → null；数值夹取
+  assert.equal(normalizeSimMood(null, 5_000), null)
+  assert.equal(normalizeSimMood('junk', 5_000), null)
+  const normalized = normalizeSimMood({ axes: { joy: 99, anger: -5, sorrow: 3, fear: 1 }, updatedAt: 1_000 }, 5_000)
+  assert.deepEqual(normalized?.axes, { joy: 10, anger: 1, sorrow: 3, fear: 1 })
+})
+
+test('mood：有界更新——单轴夹 ±maxStep，回合锚点包络防连环推高，理由入档', async () => {
+  const { applyMoodUpdate } = await import('../../src/modules/simulation/domain/mood.js')
+  const halfLife = 360 * 60_000
+  const maxStep = 3
+  const now = 10_000
+  // delta 超上限被夹：+9 → +3（joy 5 → 8）
+  const r1 = applyMoodUpdate({ mood: null, deltas: { joy: 9 }, reason: '聊嗨了', now, halfLifeMs: halfLife, maxStep })
+  assert.equal(r1.mood.axes.joy, 8)
+  assert.ok(r1.capped, '超步长要标记')
+  assert.deepEqual(r1.applied, { joy: 3 })
+  // 回合锚点：锚 joy=5（回合开始投影），第二次 +3 被包络夹回 8（5+3）
+  const r2 = applyMoodUpdate({ mood: r1.mood, deltas: { joy: 3 }, reason: '又聊嗨了', now: now + 1000, halfLifeMs: halfLife, maxStep, turnAnchor: { joy: 5, anger: 1, sorrow: 1, fear: 1 } })
+  assert.equal(r2.mood.axes.joy, 8, '回合包络：连调也推不过锚点+maxStep')
+  assert.ok(r2.capped)
+  assert.deepEqual(r2.applied, { joy: 0 }, '被夹成零变化可检测（runtime 据此拒绝空更新防衰减续命）')
+  // 无锚点时（跨回合）：从新投影出发可继续走 +3
+  const r3 = applyMoodUpdate({ mood: r2.mood, deltas: { joy: 3 }, reason: '第二天又开心', now: now + 12 * 3600_000, halfLifeMs: halfLife, maxStep })
+  // 12h=两个半衰期：joy 8 → 5+(8-5)*0.25=5.75，再 +3 → round(8.75)=9
+  assert.equal(r3.mood.axes.joy, 9)
+  assert.deepEqual(r3.mood.reasons, ['第二天又开心', '又聊嗨了', '聊嗨了'])
+  // 未请求的轴保持投影值
+  assert.equal(r3.mood.axes.anger, 1)
+})
+
+test('mood：底色注入——中性/未写过不注入；新鲜情绪无消退注；陈旧情绪带余韵措辞', async () => {
+  const { formatMoodSection, moodSummaryLine } = await import('../../src/modules/simulation/domain/mood.js')
+  const halfLife = 360 * 60_000
+  // 未写过 → 空
+  assert.equal(formatMoodSection(null, 10_000, halfLife), '')
+  // 中性（刚好静息）→ 空（缺席=平常）
+  assert.equal(formatMoodSection({ axes: { joy: 5, anger: 1, sorrow: 1, fear: 1 }, updatedAt: 10_000 }, 20_000, halfLife), '')
+  // 非中性、刚更新 → 有底色段，无"消退"注
+  const fresh = formatMoodSection({ axes: { joy: 8, anger: 1, sorrow: 1, fear: 3 }, updatedAt: 10_000 }, 12_000, halfLife)
+  assert.ok(fresh.includes('【你的情绪底色】'))
+  assert.ok(fresh.includes('挺开心'))
+  assert.ok(fresh.includes('有点担心'))
+  assert.ok(fresh.includes('别把数值说出口'), '状态是底色不是汇报')
+  assert.ok(!fresh.includes('消退'), '新鲜情绪无余韵注')
+  // 非中性、已过 30 分钟 → 余韵措辞（按消退中的余韵拿捏）
+  const aged = formatMoodSection({ axes: { joy: 8, anger: 1, sorrow: 1, fear: 3 }, updatedAt: 10_000 }, 10_000 + 31 * 60_000, halfLife)
+  assert.ok(aged.includes('慢慢消退'), '陈旧情绪带余韵注')
+  // 摘要行：中性 → 平常
+  assert.equal(moodSummaryLine(null, 10_000, halfLife), '平常')
+  assert.ok(moodSummaryLine({ axes: { joy: 8, anger: 1, sorrow: 1, fear: 1 }, updatedAt: 10_000 }, 12_000, halfLife).includes('挺开心'))
+})
+
+test('buildWakePrompt：情绪底色段在自我沉淀之后注入；协议 #31 随 hasMoodTool 门控', () => {
+  const state = session()
+  state.lastIncomingAt = 1_000
+  const prompt = buildWakePrompt({
+    state, reason: { kind: 'atMention', seq: 1 }, snapshotText: '阿卡: 在吗', unreadTotal: 1, now: 10_000, selfName: '希洛',
+    selfNotesText: '【你自己的沉淀】\n- 我的口头禅：绷不住了',
+    moodSection: '【你的情绪底色】（你自己此刻的状态）\n- 挺开心（joy 8/10）',
+  })
+  const selfIdx = prompt.indexOf('【你自己的沉淀】')
+  const moodIdx = prompt.indexOf('【你的情绪底色】')
+  assert.ok(selfIdx >= 0 && moodIdx > selfIdx, '情绪段在自我沉淀之后')
+  // 协议条门控
+  assert.ok(buildSimulationProtocol('希洛', { hasMoodTool: true }).includes('31. 你有自己的情绪'), '开情绪时协议有 #31')
+  assert.ok(!buildSimulationProtocol('希洛').includes('simSetMood'), '默认不出现 simSetMood')
+})
+
+test('defaultSimRuntimeConfig：mood 默认开、半衰期/步长夹取', () => {
+  const cfg = defaultSimRuntimeConfig({ mood: { halfLifeMinutes: 5, maxStep: 99 } })
+  assert.equal(cfg.mood.enabled, true)
+  assert.equal(cfg.mood.halfLifeMs, 30 * 60_000, '半衰期下限 30 分钟')
+  assert.equal(cfg.mood.maxStep, 5, '步长上限 5')
+  const off = defaultSimRuntimeConfig({ mood: { enabled: false } })
+  assert.equal(off.mood.enabled, false)
+  assert.equal(defaultSimRuntimeConfig().mood.halfLifeMs, 360 * 60_000, '默认半衰期 6 小时')
 })

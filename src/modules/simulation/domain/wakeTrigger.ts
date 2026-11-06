@@ -55,6 +55,8 @@ export interface WakeTriggerContext {
   activityFactor?: number
   /** 会话延续状态（机器人最近参与过对话）：对话对象不点名的新消息也值得醒来看 */
   conversation?: { activeUntil: number; interlocutorIds: string[] }
+  /** 插话熔断：我上次发言后有第三人插过话——当前这条更可能是接那人的话，不算延续唤醒（宁可漏接不要抢话） */
+  interveningSinceBotTurn?: boolean
 }
 
 /**
@@ -79,10 +81,12 @@ export function evaluateWakeTrigger(message: SimMessage, config: SimWakeConfig, 
   if (t.question && isQuestionDirectedAtAi(message.text, ctx.selfName)) return { kind: 'question', seq: message.seq }
   // 会话延续：窗口内、说话的是刚才的对话对象、且没在 @ 别人（@ 别人 = 明显不是对机器人说）。
   // 醒来后由模型读上下文自行决定接不接（不想接可以安静 markRead），所以这里放宽是安全的。
+  // 插话熔断：我上次发言后若有第三人插过话，对话对象这条更可能是接那人的话——不当延续唤醒。
   const conversation = ctx.conversation
   if (conversation && conversation.activeUntil > 0
     && conversation.activeUntil >= message.at
     && !message.atOther
+    && !ctx.interveningSinceBotTurn
     && conversation.interlocutorIds.includes(message.userId)) {
     return { kind: 'continuation', seq: message.seq, detail: message.name }
   }

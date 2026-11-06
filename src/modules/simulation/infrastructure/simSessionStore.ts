@@ -1,4 +1,4 @@
-import type { SimSessionState } from '../../../contracts/simulation.js'
+import type { SimMoodState, SimSessionState } from '../../../contracts/simulation.js'
 import { createDefaultSimSession } from '../domain/simConfig.js'
 import { stripSupersededItems } from '../domain/personProfile.js'
 
@@ -38,6 +38,8 @@ const RHYTHM_KEY = 'shiloh:sim:rhythm'
 const LIFE_THREADS_KEY = 'shiloh:sim:life-threads'
 /** AI 自我记忆（跨群性格沉淀）：与群级 memories 同结构，但全局一份 */
 const SELF_MEMORIES_KEY = 'shiloh:sim:self-memories'
+/** 情绪四轴（跨群全局）：你自己此刻的状态，换群不重置 */
+const MOOD_KEY = 'shiloh:sim:mood'
 /** 回合忙租约：进程崩溃后最多这么久，别的唤醒可以接管。 */
 /**
  * 回合忙租约：正常运行时 15 分钟（防并发回合），但进程重启后不应阻塞群这么久。
@@ -93,6 +95,9 @@ export interface SimSessionStore {
   /** AI 自我记忆（跨群性格沉淀：口头禅/偏好，scope=self 的 simRemember 条目） */
   loadSelfMemories(): Promise<unknown[]>
   saveSelfMemories(memories: unknown[]): Promise<void>
+  /** 情绪四轴（跨群全局）：存最近一次写入的瞬时值，null=从未写过；衰减投影由读取侧做 */
+  loadMood(): Promise<unknown>
+  saveMood(mood: SimMoodState): Promise<void>
 }
 
 function parseStringList(value: unknown): string[] {
@@ -383,6 +388,15 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
     },
     async saveSelfMemories(memories) {
       await redis.set(SELF_MEMORIES_KEY, JSON.stringify(Array.isArray(memories) ? memories : []))
+    },
+    async loadMood() {
+      try {
+        const raw = await redis.get(MOOD_KEY)
+        return raw ? JSON.parse(raw) : null
+      } catch { return null }
+    },
+    async saveMood(mood) {
+      await redis.set(MOOD_KEY, JSON.stringify(mood))
     },
     async deletePersonProfileField(userId, field, value) {
       const id = String(userId || '').replace(/[^0-9]/g, '')

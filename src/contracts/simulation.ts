@@ -163,6 +163,15 @@ export interface SimSessionState {
   memeCursor?: { seq: number; at: number }
 }
 
+/** 情绪四轴状态（跨群全局，shiloh:sim:mood）：axes 为上次写入的瞬时值（1-10），读取侧按半衰期投影。 */
+export interface SimMoodState {
+  axes: { joy: number; anger: number; sorrow: number; fear: number }
+  /** 上次更新时间（epoch ms）——投影起点 */
+  updatedAt: number
+  /** 最近变动理由（新在前，≤8 条）——审计/状态展示用 */
+  reasons?: string[]
+}
+
 /** message.yaml pluginSettings.simulation 配置段（未解码的宽松形状） */
 export interface SimulationSection {
   enabled?: boolean
@@ -195,6 +204,8 @@ export interface SimulationSection {
   rhythm?: { enabled?: boolean; sleepFrom?: number; sleepTo?: number }
   /** 生活线：真实数据源的持续关注线（在追的番/在玩的游戏），同步冷却与条数上限 */
   lifeThreads?: { enabled?: boolean; maxThreads?: number; syncIntervalMs?: number }
+  /** 情绪四轴（跨群全局）：AI 用 simSetMood 小幅更新，半衰期自动回归静息 */
+  mood?: { enabled?: boolean; halfLifeMinutes?: number; maxStep?: number }
   /** 仿真回合模型：缺省沿用 toolsAiModel；设为 glm-5.3-flash 等可整体降档（省 token） */
   turnModel?: string
   budget?: {
@@ -259,4 +270,6 @@ export interface SimRuntimeConfig {
   rhythm: { enabled: boolean; sleepFrom: number; sleepTo: number }
   lifeThreads: { enabled: boolean; maxThreads: number; syncIntervalMs: number }
   userStyle: { enabled: boolean; cooldownMs: number; archiveDays: number }
+  /** 情绪四轴（跨群全局）：半衰期投影在读取侧做 */
+  mood: { enabled: boolean; halfLifeMs: number; maxStep: number }
 }

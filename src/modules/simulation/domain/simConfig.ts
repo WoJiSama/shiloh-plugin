@@ -86,6 +86,14 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
       cooldownMs: Math.max(600_000, Math.floor((section.userStyle || {}).cooldownMs ?? 6 * 3600_000)),
       archiveDays: Math.min(14, Math.max(1, Math.floor((section.userStyle || {}).archiveDays ?? 3))),
     },
+    mood: (() => {
+      const raw = section.mood || {}
+      return {
+        enabled: raw.enabled !== false,
+        halfLifeMs: Math.min(48 * 3600_000, Math.max(30 * 60_000, Math.floor(raw.halfLifeMinutes ?? 360) * 60_000)),
+        maxStep: Math.min(5, Math.max(1, Math.floor(raw.maxStep ?? 3))),
+      }
+    })(),
     wakeGate: {
       enabled: (section.wakeGate || {}).enabled !== false,
     },
