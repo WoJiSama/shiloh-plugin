@@ -255,10 +255,11 @@ test('发送配额：小时级节流——13分钟13条式高频输出被拦（�
   assert.equal(checkSendAllowance(state, cfg, now + 3600_000, 0).allowed, true)
 })
 
-test('协议第1条：被问是不是机器人时坦然接住，不回避不解释', () => {
+test('协议第1条：被问是不是机器人时顺着话头开玩笑，不尬聊不解释', () => {
   const text = buildSimulationProtocol('希洛')
   assert.ok(text.includes('是不是机器人'))
-  assert.ok(text.includes('大方承认'))
+  assert.ok(text.includes('顺着「机器人」这个话头'), '玩笑要接住话头')
+  assert.ok(text.includes('不是开玩笑是尬聊'), '点名答非所问式打岔（实拍:突然报租金价）')
   assert.ok(text.includes('回避身份问题'))
 })
 
