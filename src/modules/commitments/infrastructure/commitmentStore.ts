@@ -98,8 +98,11 @@ export function createCommitmentStore(ports:{redis:CommitmentRedisLike;logger:{w
     await redis.del(`${REDIS_KEY_PREFIX}detail:${id}`)
   }
 
-  /** 取出到期承诺(先移出列表防下一秒重复触发);到期的过期承诺就地标记不再返回 */
+  /** 取出到期承诺(先移出列表防下一秒重复触发);到期的过期承诺就地标记不再返回。
+   *  先无锁 peek(对齐 ReminderTool):99% 的时间池子为空或全是未到期项,不进锁。 */
   async function takeDueCommitments(now:number):Promise<CommitmentData[]>{
+    const peek=await getPendingList()
+    if(!peek.length||!peek.some(item=>item.next_run_at<=now))return []
     return await withLock(async()=>{
       const list=await getPendingList()
       const due=list.filter(item=>item.next_run_at<=now)
