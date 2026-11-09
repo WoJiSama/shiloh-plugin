@@ -95,7 +95,11 @@ function resolveDeterministicToolIntent(text = "", availableToolNames: string[] 
   const candidates = selectToolIntentCandidates(text, availableToolNames, context)
   if (candidates.length !== 1) return null
   const toolName = candidates[0]!
-  const resolver = getAllRegisteredIntentManifests()[toolName]?.deterministicResolver
+  const manifest = getAllRegisteredIntentManifests()[toolName]
+  // 路由手术闸:只有 syntax 级(磁链/URL/单元格号等结构锚,匹配即意图)可免模型直调;
+  // semantic 级 resolver 靠关键词猜语义,一律交规划器/主模型判定,防止正则抢答吞掉半个意图。
+  if (!manifest || manifest.resolverGrade !== "syntax") return null
+  const resolver = manifest.deterministicResolver
   if (!resolver) return null
   const params = resolver(normalizeText(text), context)
   if (!params || typeof params !== "object") return null

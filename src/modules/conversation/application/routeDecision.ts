@@ -3,7 +3,6 @@ import type {ToolDefinition,ToolCall,SemanticDecision,SemanticMember,ToolSemanti
 interface Reaction {replies:string[];tags:string[];useCases:string[]}
 interface RoutePorts {
  resolveDeterministicToolIntent(text:string,tools:string[],context:ToolIntentContext):SemanticDecision|null;
- resolveNaturalDeltaForceToolCall(text:string,options:{botName:string}):{params:Record<string,unknown>}|null;
 }
 interface RoutedCall {tools:ToolDefinition[];toolName:string;toolCall:ToolCall;intent?:string|undefined}
 interface RouteDecision {toolNames?:string[];toolChoiceName?:string;forcedToolCallParams?:Record<string,unknown>;toolCall?:ToolCall;tools?:ToolDefinition[];toolDecision?:SemanticDecision|undefined;noTools?:boolean;lock?:boolean;appendAvatarLink?:string|number;log?:string;logParams?:unknown;abort?:string;warn?:string;intent?:string|undefined;silent?:boolean}
@@ -38,7 +37,7 @@ import {isExplicitNoToolAction} from '../domain/toolActionPolicy.js'
 
 
 export function createRouteDecision(ports:RoutePorts) {
-const {resolveDeterministicToolIntent,resolveNaturalDeltaForceToolCall}=ports
+const {resolveDeterministicToolIntent}=ports
 // 从 apps/test.js 原样迁出:识图请求是否需要在视觉之后接搜索
 function getImageAnalysisToolNames(text = "") {
   const content = normalizeIntentText(text)
@@ -349,15 +348,12 @@ const ROUTE_RULES: {name:string;guard:"auto"|"both"|"unlocked";evaluate(context:
     name: "naturalDeltaForce",
     guard: "both",
     evaluate(ctx) {
-      const call = resolveNaturalDeltaForceToolCall(ctx.intentText, { botName: ctx.botName })
-      if (!call) return null
-      const tools = ctx.applyTools(["deltaForceTool"])
-      if (!tools?.length) return { silent: true }
-      return {
-        toolChoiceName: "deltaForceTool",
-        forcedToolCallParams: call.params,
-        log: `[工具选择] group=${ctx.groupId} 规则兜底使用 deltaForceTool 处理三角洲自然语言请求 params=${JSON.stringify(call.params)}`
-      }
+      // 路由手术(2026-11 露营地事故):本规则曾用 /三角洲/ 等正则在规划器未出决策时
+      // 强制路由,把"每天12点发三角洲密码"的定时半个意图吞掉。语义判定权归规划器/主模型,
+      // 本规则退役——三角洲请求由 semanticPlanner 决策;规划器不可用时消息带候选工具与
+      // disclosure 落给主模型自主调用,韧性仍在。resolveNaturalDeltaForceToolCall 仍作为
+      // conversationEntryPolicy 的入口信号(hint)与 deltaForceTool 的披露说明存在。
+      return null
     }
   },
   {

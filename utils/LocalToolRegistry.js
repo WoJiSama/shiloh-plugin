@@ -34,6 +34,8 @@ import { ForgetGroupKnowledgeTool } from "../functions/functions_tools/ForgetGro
 import { TorrentDownloadTool } from "../functions/functions_tools/TorrentDownloadTool.js"
 import { PixivSearchTool } from "../functions/functions_tools/PixivSearchTool.js"
 import { PixivDownloadTool } from "../functions/functions_tools/PixivDownloadTool.js"
+import { CommitmentTool } from "../functions/functions_tools/CommitmentTool.js"
+import { DelegateMemoryTool } from "../functions/functions_tools/DelegateMemoryTool.js"
 import "./toolManifestRegistry.js"
 import {LocalToolRegistry as TypedLocalToolRegistry} from "../dist/backend/modules/tools/infrastructure/LocalToolRegistry.js"
 const BUILT_IN_TOOL_FACTORIES = [
@@ -73,6 +75,8 @@ const BUILT_IN_TOOL_FACTORIES = [
   () => new TorrentDownloadTool(),
   () => new PixivSearchTool(),
   () => new PixivDownloadTool(),
+  () => new CommitmentTool(),
+  () => new DelegateMemoryTool(),
 ]
 
 export class LocalToolRegistry extends TypedLocalToolRegistry {constructor(options={}){super(options,{factories:BUILT_IN_TOOL_FACTORIES,logger:{info:message=>globalThis.logger?.info?.(message),warn:message=>globalThis.logger?.warn?.(message),error:(message,error)=>globalThis.logger?.error?.(message,error)}})}}

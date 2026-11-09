@@ -70,12 +70,14 @@ pluginSettings:
     allGroups: true              # true（默认）= 过了群白名单的群默认全部进仿真；false = 仅 groups 清单
     groups: []                   # 显式启用群种子（仅 allGroups: false 时用；.仿真 开/关 的按群覆盖存 Redis）
     # 仿真回合额外放通的既有工具（白名单，从工具注册表按名取）。
-    # 默认开四件套：
+    # 默认开六件套：
     #   sendLocalEmojiTool=发表情（自带限流与冷却）
     #   searchVideoTool=搜B站视频并直接发群里（缺教程/要参考时主动搜）
     #   bananaTool=画图（群友说"画一张X"直接画，不需要 #tool）
     #   searchInformationTool=联网搜索
-    extraTools: ["sendLocalEmojiTool", "searchVideoTool", "bananaTool", "searchInformationTool"]
+    #   commitmentTool=承诺账本（群友托付的定时/循环事务，到期唤醒 agent 兑现）
+    #   delegateMemoryTool=委托记忆（替群友记事，原文锚定）
+    extraTools: ["sendLocalEmojiTool", "searchVideoTool", "bananaTool", "searchInformationTool", "commitmentTool", "delegateMemoryTool"]
     # 按人挖口头禅（风格个性化）：每 6 小时从归档挖"他说得多、别人基本不说"的专属词，
     # 注入高好感（熟络以上）对象的说话指引——用TA的梗接话更投契。
     userStyle:
@@ -1154,5 +1156,16 @@ pluginSettings:
     - torrentDownloadTool(dedupe)
     - sendLocalEmojiTool
     - sendGiftTool
+    - commitmentTool
+    - delegateMemoryTool
+  # 承诺账本（P0 统一 agent 内核）：群友托付的定时/循环事务。数据全部本机 redis，不出机。
+  commitments:
+    maxActivePerGroup: 10       # 每群并发承诺上限
+    maxPerCreator: 5            # 每人并发承诺上限
+    defaultExpiryDays: 30       # 默认有效期（到期收档，P1 加续约问询）
+  # 委托记忆（P0 统一 agent 内核）：替群友记事，原文锚定，可查可删（被托付人的数据归被托付人）。
+  delegatedMemory:
+    maxPerGroup: 50             # 每群托付条数上限
+    maxPerOwner: 20             # 每人托付条数上限
   githubToken: ""
   qqMusicToken: ""

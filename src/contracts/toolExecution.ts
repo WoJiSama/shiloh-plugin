@@ -7,8 +7,12 @@ export interface ToolExecutorPort {execute(name:string,params:Record<string,unkn
 export function toolRecord(value:unknown):Record<string,unknown>{return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{}}
 
 export interface ToolIntentContext { hasExcelContext?: boolean; hasPixivSearchSession?: boolean; [key:string]:unknown }
-export interface ToolManifest {name?:string; terminal?:boolean; background?:boolean; triggers?:RegExp[]; disclosure?:string; deterministicResolver?:((text:string,context:ToolIntentContext)=>Record<string,unknown>|null)|null; [key:string]:unknown}
-export interface RegisteredToolIntentManifest {triggers:RegExp[];disclosure:string;deterministicResolver:((text:string,context:ToolIntentContext)=>Record<string,unknown>|null)|null}
+// resolverGrade——路由手术的分级闸(2026-11 露营地"每天12点发三角洲密码"半意图蒸发事故后确立):
+// syntax  = 解析锚是结构信号(磁链/URL/单元格号/列表编号),匹配即意图,可免模型确定性直调;
+// semantic= 解析靠关键词猜语义,禁止强制路由——语义判定权归规划器/主模型,正则只当 hint(候选/门控/披露)。
+// 缺省视为 semantic:新工具一律不进确定性快路,除非解析锚是纯语法。
+export interface ToolManifest {name?:string; terminal?:boolean; background?:boolean; triggers?:RegExp[]; disclosure?:string; resolverGrade?:"syntax"|"semantic"; deterministicResolver?:((text:string,context:ToolIntentContext)=>Record<string,unknown>|null)|null; [key:string]:unknown}
+export interface RegisteredToolIntentManifest {triggers:RegExp[];disclosure:string;resolverGrade:"syntax"|"semantic"|null;deterministicResolver:((text:string,context:ToolIntentContext)=>Record<string,unknown>|null)|null}
 export interface BuiltinManifestPorts {
  getEmojiToolIntentPatterns():RegExp[];
  buildExcelToolParams(text:string,context:{hasExcelContext:boolean}):Record<string,unknown>|null;

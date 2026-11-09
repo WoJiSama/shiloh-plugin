@@ -21,7 +21,6 @@ import {parseModrinthRequestOptions} from '../modules/media/infrastructure/modri
 import {extractGroupKnowledgeForgetTarget} from '../modules/knowledge/domain/groupKnowledgeForgetPolicy.js'
 import {extractValidBtihMagnetUri} from '../modules/media/infrastructure/torrentDownload.js'
 import {PIXIV_DOWNLOAD_TOOL_MANIFEST,PIXIV_SEARCH_TOOL_MANIFEST} from '../modules/media/domain/pixivIntent.js'
-import {resolveNaturalDeltaForceToolCall} from '../modules/games/domain/deltaForceIntent.js'
 import type {ToolDefinition,ToolCall,ToolSemanticContext,SemanticToolHost,SemanticDecision,SemanticMember,SemanticToolPorts,ToolSkillSource} from '../contracts/toolExecution.js'
 import type {RouteContext} from '../modules/conversation/application/routeDecision.js'
 import type {TurnPlanInput} from '../contracts/turnPlan.js'
@@ -121,7 +120,7 @@ export async function replayToolExposureScenario(scenario:ExposureScenario,fixtu
   const session:RouteContext['session']={tools:[...definitions],atQq,memberMap,groupUserMessages:history,groupContextAssets:{...(ctx.replyTargetUserId?{replyTargetUserId:ctx.replyTargetUserId}:{})}}
   const promptContext=():ToolSemanticContext=>({e:{msg:text,raw_message:text},currentIntentText:text,args:text,msg:text,userContent:ctx.quote?`当前消息: ${text}\n引用消息（来源材料）: ${ctx.quote}`:text,images,videos,atQq,memberMap,currentUserId:ctx.currentUserId||'10001',replyTargetUserId:ctx.replyTargetUserId,groupUserMessages:history,modelIntent:primary?.intent,sessionTools:definitions})
   let plannerVisited=false
-  const routeApi=createRouteDecision({resolveDeterministicToolIntent:intents.resolveDeterministicToolIntent,resolveNaturalDeltaForceToolCall:(text,options)=>{const result=resolveNaturalDeltaForceToolCall(text,options);return result?{params:{...result.params}}:null}})
+  const routeApi=createRouteDecision({resolveDeterministicToolIntent:intents.resolveDeterministicToolIntent})
   const route=await routeApi.resolveToolRoute({intentText:text,rawMsg:text,args:text,...(primary?{modelIntent:primary.intent}:{}),images,videos,groupId:'eval-group',userId:ctx.currentUserId||'10001',botName:'评测机器人',emojiCooldownMs:0,memberMap,hasExcelContext:ctx.hasExcelContext===true,hasPixivSearchSession:false,session,promptContext,imageGenerationReferenceImages:()=>images,applyTools:requested=>{session.tools=definitions.filter(tool=>requested.includes(tool.function?.name||''));return session.tools},log(){},helpers:{resolveSingularOwnerMention:()=>null,resolveForcedReplyTextRate:async()=>1,buildForcedToolCall:forcedCall,buildImageEditPrompt:host.buildImageEditPrompt,buildImageGenerationPrompt:host.buildImageGenerationPrompt,resolveContextualDrawGeneration:()=>null,buildToolCallFromDecision:(decision,context)=>api.buildToolCallFromDecision(host,decision,context) as ReturnType<RouteContext['helpers']['buildToolCallFromDecision']>,classifySemanticToolIntent:async context=>{plannerVisited=true;return api.classifySemanticToolIntent(host,context)},semanticSessionTools:()=>definitions}})
   let choice=route.toolChoice
   const beforeFilter=names(session.tools)

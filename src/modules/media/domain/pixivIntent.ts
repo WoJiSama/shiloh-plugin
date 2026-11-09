@@ -171,6 +171,7 @@ export const PIXIV_SEARCH_TOOL_MANIFEST = {
 export const PIXIV_DOWNLOAD_TOOL_MANIFEST = {
   name: "pixivDownloadTool",
   terminal: true,
+  resolverGrade: "syntax" as const,
   description: "下载并搬运一张 Pixiv 插画到群里。用户在搜索列表后回复「下载 3」「下载 126649495」「下个载 id=xxx」之类时调用。",
   skill: {
     name: "pixivDownloadTool",

@@ -22,13 +22,14 @@ import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } f
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
 import { collectMentionTargetIds, messageMentionsUser } from '../../conversation/domain/mentionTargets.js'
+import { normalizeDelegatedEntries, formatDelegatedSection } from '../../memory/domain/delegatedMemory.js'
 import { createSimTools, simToolsAsFunctions, type SimSendResult, type SimWaitResult, type SimToolContext } from './simTools.js'
 
 export const SIM_RECENT_LIMIT = 60
 export const SIM_SWEEP_INTERVAL_MS = 30_000
 
-/** 仅@才回模式下仍放行的唤醒：点名（@/引用）、一次性开场、被点名后的定时延伸（等待超时/回合补发）、管理指令。主动冒泡(proactiveCheck)不放行。 */
-const AT_ONLY_WAKE_KINDS = new Set<SimWakeReason['kind']>(['atMention', 'bootstrap', 'timeout', 'replyCheck', 'admin'])
+/** 仅@才回模式下仍放行的唤醒：点名（@/引用）、一次性开场、被点名后的定时延伸（等待超时/回合补发）、管理指令、承诺到期（答应了的事必须兑现）。主动冒泡(proactiveCheck)不放行。 */
+const AT_ONLY_WAKE_KINDS = new Set<SimWakeReason['kind']>(['atMention', 'bootstrap', 'timeout', 'replyCheck', 'admin', 'commitment'])
 
 /**
  * 唤醒预判闸旁路：这些唤醒不经便宜模型预判、直达完整回合——
@@ -59,6 +60,8 @@ export interface SimulationRuntimePorts {
   getGroupDigest?(groupId: string): string
   /** 近两天情节记忆文本（"这两天聊过/做过什么"）；无则空串 */
   getRecentEpisodesText?(groupId: string): string
+  /** 委托记忆（群友托付记的事，原文锚定）；无/失败=空数组，绝不阻塞唤醒 */
+  loadDelegatedMemories?(groupId: string): Promise<unknown[]> | unknown[]
   /** 长程语义召回（更早的相关聊天片段，来自语义记忆混合检索）；无/超时/失败=空串，绝不阻塞唤醒 */
   getSemanticRecall?(groupId: string, query: string): Promise<string>
   /** 说话风格参考（群级表达学习 + 全局表达学习的注入文本）；无则空串 */
@@ -117,6 +120,10 @@ export interface SimulationRuntime {
   ingestPoke(e: { group_id?: string | number; user_id?: string | number; self_id?: string | number; target_id?: string | number }): Promise<boolean>
   /** A3 撤回处理：从 unread/recent 里移除已撤回的消息 */
   handleRecall(e: { group_id?: string | number; message_id?: string | number }): Promise<boolean>
+  /** 承诺账本查询口：该群当前是否仿真生效（commitmentTool 创建 agent 类承诺前的闸） */
+  isGroupActive(groupId: string): boolean
+  /** 承诺账本兑现口：agent 类承诺到期唤醒仿真回合（timer 类 1s 直醒；群未生效则忽略） */
+  wakeForCommitment(groupId: string, detail: string): Promise<void>
   /** 控制台总览：全部生效群的状态列表 */
   overview(): Promise<Record<string, unknown>>
   describeGroup(groupId: string): Promise<Record<string, unknown>>
@@ -190,11 +197,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   }
 
   /** 工具执行统一包装：事件含 reply 绑定（文本段/段数组归一 + message_id 回执） */
-  async function runSimTool(tool: { name?: string; execute(args: Record<string, unknown>, event: unknown): Promise<unknown> }, args: Record<string, unknown>, groupId: string, selfId: string): Promise<string> {
+  async function runSimTool(tool: { name?: string; execute(args: Record<string, unknown>, event: unknown): Promise<unknown> }, args: Record<string, unknown>, groupId: string, selfId: string, triggerUser?: { id: string; name: string } | null): Promise<string> {
     try {
       const result = await tool.execute(args, {
         group_id: Number(groupId),
         self_id: selfId,
+        ...(triggerUser?.id ? { user_id: /^\d+$/.test(triggerUser.id) ? Number(triggerUser.id) : triggerUser.id, sender: { user_id: /^\d+$/.test(triggerUser.id) ? Number(triggerUser.id) : triggerUser.id, nickname: triggerUser.name || '' } } : {}),
         simulation: true,
         reply: (payload: unknown) => ports.sendGroupMessage(groupId, normalizeReplyPayload(payload)).then(receipt => {
           if (!receipt.ok) throw new Error(receipt.error || '发送失败')
@@ -267,6 +275,21 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     if (overridesCache.disabled.includes(groupId)) return false
     if (cfg.allGroups) return true
     return overridesCache.explicitEnabled.includes(groupId)
+  }
+
+  /** 承诺账本查询口：该群当前是否仿真生效（commitmentTool 创建 agent 类承诺前的闸） */
+  function isSimulationGroup(groupId: string): boolean {
+    return groupActive(runtimeConfig(), String(groupId || ''))
+  }
+
+  /** 承诺账本兑现口：agent 类承诺到期由 commitmentTick 调这里唤醒仿真回合（timer 类 1s 直醒） */
+  async function wakeForCommitment(groupId: string, detail: string): Promise<void> {
+    const gid = String(groupId || '')
+    if (!gid) return
+    const cfg = runtimeConfig()
+    if (!groupActive(cfg, gid)) return
+    await refreshGroupState(false).catch(() => {})
+    await scheduleWake(gid, { kind: 'commitment', detail: String(detail || '').slice(0, 240) }, cfg)
   }
 
   function notifyWaiters(groupId: string) {
@@ -588,6 +611,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         || memories.find(m => m.aboutUser === userId)?.content.split('说')[0]?.slice(0, 12)
         || `群友${userId.slice(-4)}`
       const speakers = [...new Set([...session.unread, ...session.recent].map(m => m.userId))]
+      // 委托记忆（群友托付记的事）：原文注入【群友托付的事】段（在场优先、到期高亮）
+      const delegatedEntries = normalizeDelegatedEntries(await (async () => {
+        try { const raw = typeof ports.loadDelegatedMemories === 'function' ? await ports.loadDelegatedMemories(groupId) : []; return Array.isArray(raw) ? raw : [] } catch { return [] }
+      })(), now())
+      const delegatedSection = delegatedEntries.length ? formatDelegatedSection(delegatedEntries, now(), speakers) : ''
       // 初始提示词只在 bootstrap 唤醒注入一次（bootstrapSent 在 ingest 时已置位，不能作为这里的判据）
       const initialPrompt = reason.kind === 'bootstrap' ? await store.getInitPrompt(groupId) : ''
       const styleDigest = await (async () => { try { return String((await ports.getStyleDigest?.(groupId)) || '') } catch { return '' } })()
@@ -654,6 +682,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         ...(sleepNote ? { sleepNote } : {}),
         ...(staleNote ? { staleNote } : {}),
         ...(lifeThreadSection ? { lifeThreadSection } : {}),
+        ...(delegatedSection ? { delegatedSection } : {}),
         groupDigest: safeText(() => ports.getGroupDigest?.(groupId)),
         episodesText: safeText(() => ports.getRecentEpisodesText?.(groupId)),
         styleDigest,
@@ -667,6 +696,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
       const memoryBox = { list: memories, sentTexts: [] as string[] }
       const selfMemoryBox = { list: normalizeMemoryList(await store.loadSelfMemories().catch(() => []), now()) }
+      // 额外工具的触发者身份（commitmentTool/delegateMemoryTool 等 owner 维度工具需要 user_id）：
+      // 优先本回合未读首条，回退最近一条，再回退会话触发者——与情节补记的 trigger 判定同源。
+      const triggerMessage = [...state.unread][0] ?? [...state.recent].slice(-1)[0] ?? null
+      const triggerUser = triggerMessage?.userId
+        ? { id: String(triggerMessage.userId), name: String(triggerMessage.name || '') }
+        : (state.conversation.lastTriggerUserId ? { id: String(state.conversation.lastTriggerUserId), name: nameOf(String(state.conversation.lastTriggerUserId)) } : null)
       const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor)
       const tools = [...createSimTools(ctx), ...extraTools]
       const toolFunctions = simToolsAsFunctions(tools)
@@ -750,11 +785,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
                 const waitSec = Math.ceil((cooldownMs - (now() - lastAt)) / 1000)
                 resultText = `error: 表情包冷却中（还要 ${waitSec} 秒）。请直接用文字回应，本回合不要再发表情。`
               } else {
-                resultText = await runSimTool(tool, args, groupId, self.id)
+                resultText = await runSimTool(tool, args, groupId, self.id, triggerUser)
                 if (!(typeof resultText === 'string' && resultText.startsWith('error:'))) emojiLastSentAt.set(groupId, now())
               }
             } else {
-              resultText = await runSimTool(tool, args, groupId, self.id)
+              resultText = await runSimTool(tool, args, groupId, self.id, triggerUser)
             }
           }
           // simGetMessageImages 的结果带回图片：主模型多为纯文本(实测 glm-5.3 收 image_url 直接 400，
@@ -1642,7 +1677,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return `【群友好感 · 前8】\n${top}${mineLine}`
   }
 
-  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget, listPersonProfiles: () => store.listPersonProfiles(), deletePersonProfile: (userId: string) => store.deletePersonProfile(userId), deletePersonProfileField: (userId: string, field: string, value?: string) => store.deletePersonProfileField(userId, field, value),
+  return { isCapture, ingest, start, stop, sweepOnce, enableGroup, disableGroup, setGroupReplyMode, groupStatus, resetGroup, listMemories, listAffinity, ingestPoke, handleRecall, overview, describeGroup, getInitialPrompt, setInitialPrompt, setGroupBudget, setGroupTurnsCap, setDefaultBudget, isGroupActive: isSimulationGroup, wakeForCommitment, listPersonProfiles: () => store.listPersonProfiles(), deletePersonProfile: (userId: string) => store.deletePersonProfile(userId), deletePersonProfileField: (userId: string, field: string, value?: string) => store.deletePersonProfileField(userId, field, value),
   lifeOverview: async () => {
     const cfg = runtimeConfig()
     const stored = await store.loadRhythm().catch(() => null)

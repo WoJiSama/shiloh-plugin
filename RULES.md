@@ -31,6 +31,7 @@
 
 ## 红线
 
-1. 模型输出在出站前必经 `sanitizeFinalReplyText`（主链路）或 `simSendMessage`（仿真）——脱敏 + 凭据/工具参数拦截在此，**任何新出站路径必须接入**。
+1. 模型输出在出站前必经 `sanitizeFinalReplyText`（主链路）或 `simSendMessage`（仿真）——脱敏 + 凭据/工具参数拦截在此，**任何新出站路径必须接入**（承诺账本 static 直发已接入）。
 2. 仿真回合工具面装配期裁剪：不在 `sim* + simulation.extraTools` 清单里的工具对模型不可见。
 3. 出机数据必须能在配置里关掉，并登记在 SECURITY_BASELINE 的数据出机清单。
+4. **路由手术铁律（2026-11 露营地事故后）**：语义判定权归规划器/主模型，正则只当 hint——manifest `resolverGrade: "syntax"`（磁链/URL/单元格号等结构锚）才可确定性强制直调，semantic 级一律交模型；**触发正则数量只减不增**，新工具入口靠 skill/disclosure 不靠强制正则。

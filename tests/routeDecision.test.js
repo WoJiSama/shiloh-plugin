@@ -240,3 +240,16 @@ test('规划器不可用保留既有改图兜底，区别于明确 chat', async 
   assert.equal(route.toolDecision, null)
   assert.ok(route.applied.includes('imageEdit'))
 })
+
+// 路由手术(2026-11 露营地事故)回归:语义正则不再抢答。
+// "每天中午12点在群里发三角洲今日密码"曾被 naturalDeltaForce 正则兜底强制到 deltaForceTool,
+// "每天"半个意图蒸发;手术后该规则退役(墓碑),规划器未出决策时消息连同候选工具落给主模型。
+test("语义关键词消息在规划器无决策时不再被正则强制路由(事故回归)", async () => {
+  const ctx = buildCtx({ ctx: { intentText: "每天中午12点在群里发三角洲今日密码" } })
+  ctx.availableTools = ["deltaForceTool", "commitmentTool"]
+  const route = await resolveToolRoute(ctx)
+  assert.equal(route.forcedToolCall, null, "naturalDeltaForce 退役后不允许正则强制 deltaForceTool")
+  assert.equal(route.toolChoice, "auto", "无强制决策时保持 auto,候选工具交给主模型")
+  assert.equal(ctx.classifierCalls.length, 1, "规划器仍应被评估(三角洲候选构成信号)")
+  assert.ok(!route.applied.includes("naturalDeltaForce"))
+})

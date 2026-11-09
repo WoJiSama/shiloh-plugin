@@ -19,7 +19,16 @@ export function buildSimSystemPrompt(input: { persona: PersonaText; systemConten
   blocks.push(PLATFORM_CAPABILITY_NOTES)
   const extraNames = (input.extraToolNames || []).filter(Boolean)
   if (extraNames.length) {
-    blocks.push(`【本群额外能力】除 sim* 工具外，你还有这些工具（这是本群实际放通的清单，别的群可能不同）：${extraNames.join('、')}。其中 searchVideoTool=搜B站视频并直接发到群里；sendLocalEmojiTool=发表情包（有冷却；要配文字，别单独当回复）；searchInformation/webParser=联网查资料。用法先看各工具自己的说明。`)
+    const EXTRA_TOOL_NOTES: Record<string, string> = {
+      searchVideoTool: '搜B站视频并直接发到群里',
+      sendLocalEmojiTool: '发表情包（有冷却；要配文字，别单独当回复）',
+      searchInformationTool: '联网查资料',
+      webParserTool: '联网查资料',
+      commitmentTool: '接群友的定时/循环托付（每天X点做Y、定时提醒都找它）——群友求你定时办事时直接用它应下来，别教他们去敲命令',
+      delegateMemoryTool: '替群友记事（"帮我记住X"）——记的是原话，他们问起要答得出原文',
+    }
+    const notes = extraNames.map(name => EXTRA_TOOL_NOTES[name] ? `${name}=${EXTRA_TOOL_NOTES[name]}` : '').filter(Boolean).join('；')
+    blocks.push(`【本群额外能力】除 sim* 工具外，你还有这些工具（这是本群实际放通的清单，别的群可能不同）：${extraNames.join('、')}。${notes ? `其中 ${notes}。` : ''}用法先看各工具自己的说明。`)
   }
   blocks.push(buildSimulationProtocol(input.selfName, { hasExtraTools: input.hasExtraTools === true, hasEmojiTool: input.hasEmojiTool === true, hasMoodTool: input.hasMoodTool === true }))
   return blocks.join('\n\n')
@@ -129,6 +138,8 @@ export interface WakePromptInput {
   /** 本群近期主线摘要 / 近两天情节（来自中期记忆与情节记忆） */
   groupDigest?: string
   episodesText?: string
+  /** 委托记忆（群友托付记的事，原文锚定；在场优先、到期高亮） */
+  delegatedSection?: string
   /** 说话风格参考（群级表达学习 + 全局表达学习） */
   styleDigest?: string
 }
@@ -162,6 +173,7 @@ export function buildWakePrompt(input: WakePromptInput): string {
   if (input.sleepNote) lines.push(input.sleepNote)
   if (input.staleNote) lines.push(input.staleNote)
   if (input.lifeThreadSection) lines.push(input.lifeThreadSection)
+  if (input.delegatedSection) lines.push(input.delegatedSection)
   // 预算截断要诚实：被裁的段落记名，末尾统一提示"没看到≠没有"——模型不知道自己看到的是节选时，
   // 容易把「资料里没写」当成「没这回事」，聊旧事时会过度断言。
   const clippedSections: string[] = []
@@ -225,6 +237,8 @@ function reasonTail(reason: SimWakeReason | null, hasDue: boolean): string {
       return `【接下来 · 活跃期结束】你之前设置的活跃观察期到了。快速看一眼群里有没有你关心的动静：有就接，没有就调好唤醒配置后结束回合。`
     case 'bootstrap':
       return `【接下来 · 初次见面】这是你在本群的第一次回合。可以先安静地把未读看完（simMarkRead），设好你关心的触发器（simSetWakeConfig），也可以在合适的时候自然地冒个泡。不要一上来发长篇自我介绍。`
+    case 'commitment':
+      return `【接下来 · 承诺到期】你答应过的定时任务到点了（见唤醒原因里托付的事）。用你可用的工具把它完成，结果自然地发到群里——像你自己想起来"哦对了该发密码了"，不要汇报"任务执行完毕"、不要@托付的人请功。需要查数据就真去查（工具失败就直说失败原因，别编结果）；一次办不成可以说明情况后结束，别硬凑。`
     default:
       return base
   }

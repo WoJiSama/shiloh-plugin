@@ -9,6 +9,7 @@ export const WAKE_PRIORITY: Record<SimWakeReasonKind, number> = {
   speaker: 75,
   session: 72,
   nameMention: 70,
+  commitment: 68,
   keyword: 60,
   anyMessage: 50,
   probability: 45,
@@ -19,7 +20,7 @@ export const WAKE_PRIORITY: Record<SimWakeReasonKind, number> = {
 }
 
 /** 定时器类唤醒：与未读无关，回合结束补发时必须无条件补。 */
-export const TIMER_WAKE_REASONS: readonly SimWakeReasonKind[] = ['timeout', 'replyCheck', 'proactiveCheck', 'bootstrap', 'admin']
+export const TIMER_WAKE_REASONS: readonly SimWakeReasonKind[] = ['timeout', 'replyCheck', 'proactiveCheck', 'bootstrap', 'admin', 'commitment']
 
 /** 指向 AI 的疑问/催促判定（规则版，零 LLM）。 */
 const QUESTION_HINT_RE = /[?？吗呢嘛么啊呀]\s*$|[?？]/
@@ -111,6 +112,7 @@ export function formatWakeReason(reason: SimWakeReason | null): string {
     case 'speaker': return `关注的群友 ${reason.detail || reason.seq || ''}`
     case 'atMention': return '被@或引用'
     case 'continuation': return `刚才在聊天的${reason.detail || '群友'}又说话了`
+    case 'commitment': return `承诺到期（${reason.detail || '群友托付的定时事务'}）`
     default: return reason.kind
   }
 }

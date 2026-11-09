@@ -138,67 +138,30 @@ test("uses deterministic fast paths only when one safe tool has complete paramet
       "查一下 Modrinth 1.21.1 Fabric 下载量前五的优化模组",
       ["modrinthTool", "searchInformationTool"]
     ),
-    {
-      intent: "tool",
-      toolName: "modrinthTool",
-      params: { sort: "downloads", limit: 5, gameVersion: "1.21.1", loader: "fabric", category: "optimization", query: "" },
-      reason: "deterministic_manifest"
-    }
+    null
   )
+  // 路由手术(2026-11):modrinth/forgetGroupKnowledge/memberInfo 属 semantic 级——关键词猜语义,
+    // 不再确定性直调,统一交语义规划器;triggers 仍作为候选 hint(见 selectToolIntentCandidates 用例)。
   assert.deepEqual(
     resolveDeterministicToolIntent(
       "希洛告诉我mc排行榜前10的冒险模组",
       ["modrinthTool", "searchInformationTool"]
     ),
-    {
-      intent: "tool",
-      toolName: "modrinthTool",
-      params: { sort: "downloads", limit: 10, gameVersion: "", loader: "", category: "adventure", query: "" },
-      reason: "deterministic_manifest"
-    }
+    null
   )
   assert.deepEqual(
     resolveDeterministicToolIntent(
-      "希洛告诉我名字里面带有 nrg 的mc模组",
-      ["modrinthTool", "searchInformationTool"]
+      "忘掉我的星怒",
+      ["forgetGroupKnowledgeTool"]
     ),
-    {
-      intent: "tool",
-      toolName: "modrinthTool",
-      params: { sort: "relevance", limit: 5, gameVersion: "", loader: "", category: "", query: "nrg" },
-      reason: "deterministic_manifest"
-    }
+    null
   )
   assert.deepEqual(
     resolveDeterministicToolIntent(
-      "，Modrinth 下载量前十",
-      ["modrinthTool", "sendLocalEmojiTool"]
+      "那个叫小明的群名片是什么",
+      ["memberInfoTool"]
     ),
-    {
-      intent: "tool",
-      toolName: "modrinthTool",
-      params: { sort: "downloads", limit: 10, gameVersion: "", loader: "", category: "", query: "" },
-      reason: "deterministic_manifest"
-    }
-  )
-  assert.deepEqual(
-    resolveDeterministicToolIntent(
-      "希洛，Modrinth 最近更新的魔法模组前五",
-      ["modrinthTool", "sendLocalEmojiTool"]
-    ),
-    {
-      intent: "tool",
-      toolName: "modrinthTool",
-      params: { sort: "updated", limit: 5, gameVersion: "", loader: "", category: "magic", query: "" },
-      reason: "deterministic_manifest"
-    }
-  )
-  assert.deepEqual(
-    resolveDeterministicToolIntent(
-      "希洛，告诉我Modrinth 最近更新的魔法模组前五",
-      ["modrinthTool", "sendLocalEmojiTool"]
-    )?.params,
-    { sort: "updated", limit: 5, gameVersion: "", loader: "", category: "magic", query: "" }
+    null
   )
   assert.deepEqual(
     resolveDeterministicToolIntent("读取预算表这个 tab 的 C12", ["excelWorkbookTool"], { hasExcelContext: true }),
@@ -223,7 +186,8 @@ test("uses deterministic fast paths only when one safe tool has complete paramet
 })
 
 test("shortens only deterministic tool merge windows", () => {
-  assert.equal(resolveToolRequestMergeMs("查一下 Modrinth 热门模组前五", ["modrinthTool"], { defaultMs: 3000, fastMs: 600 }), 600)
+  assert.equal(resolveToolRequestMergeMs("帮我下载 magnet:?xt=urn:btih:AF4B684892182408E4AE9DF0C8FFE9E49CCBF171", ["torrentDownloadTool"], { defaultMs: 3000, fastMs: 600 }), 600)
+  assert.equal(resolveToolRequestMergeMs("查一下 Modrinth 热门模组前五", ["modrinthTool"], { defaultMs: 3000, fastMs: 600 }), 3000)
   assert.equal(resolveToolRequestMergeMs("帮我画一只猫", ["bananaTool"], { defaultMs: 3000, fastMs: 600 }), 3000)
   assert.equal(resolveToolRequestMergeMs("禁言小明一分钟", ["jinyanTool"], { defaultMs: 3000, fastMs: 600 }), 3000)
 })

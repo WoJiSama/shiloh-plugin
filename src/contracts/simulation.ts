@@ -16,6 +16,7 @@ export type SimWakeReasonKind =
   | 'replyCheck'
   | 'proactiveCheck'
   | 'admin'
+  | 'commitment'
 
 export interface SimWakeReason { kind: SimWakeReasonKind; seq?: number; detail?: string }
 

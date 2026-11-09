@@ -20,6 +20,7 @@ export function registerToolManifest(manifest:ToolManifest = {}) {
     intentManifests.set(name, {
       triggers: hasTriggers ? manifest.triggers ?? [] : [],
       disclosure: String(manifest.disclosure || ""),
+      resolverGrade: manifest.resolverGrade === "syntax" ? "syntax" : manifest.resolverGrade === "semantic" ? "semantic" : null,
       deterministicResolver: typeof manifest.deterministicResolver === "function" ? manifest.deterministicResolver : null
     })
   }

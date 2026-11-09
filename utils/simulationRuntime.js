@@ -313,6 +313,15 @@ export const simulationRuntime = createSimulationRuntime({
       return ''
     }
   },
+  // 委托记忆（群友托付记的事，原文锚定）：独立控制台进程没有 redis 时降级为空
+  loadDelegatedMemories: async (groupId) => {
+    try {
+      const { delegatedMemoryStore } = await import('../functions/functions_tools/DelegateMemoryTool.js')
+      return await delegatedMemoryStore.load(String(groupId))
+    } catch {
+      return []
+    }
+  },
   // 长程语义召回：混合检索"两天情节窗之外"的更早相关片段（runtime 侧 1s 预算兜底，这里再给检索器 850ms）
   getSemanticRecall: async (groupId, query) => {
     try {

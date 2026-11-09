@@ -221,6 +221,7 @@ const MENTION_ADMINS_TOOL_MANIFEST: ToolManifest = {
 
 const FORGET_GROUP_KNOWLEDGE_TOOL_MANIFEST: ToolManifest = {
   name: "forgetGroupKnowledgeTool",
+  resolverGrade: "semantic",
   deterministicResolver: resolveForgetKnowledgeIntent,
 
     triggers: [
@@ -281,6 +282,7 @@ const SEARCH_INFORMATION_TOOL_MANIFEST: ToolManifest = {
 
 const WEB_PARSER_TOOL_MANIFEST: ToolManifest = {
   name: "webParserTool",
+  resolverGrade: "syntax",
   deterministicResolver: resolveWebParserIntent,
 
     triggers: [
@@ -302,6 +304,7 @@ const WEB_PARSER_TOOL_MANIFEST: ToolManifest = {
 
 const GITHUB_REPO_TOOL_MANIFEST: ToolManifest = {
   name: "githubRepoTool",
+  resolverGrade: "syntax",
   deterministicResolver: resolveGithubRepoIntent,
 
     triggers: [
@@ -342,6 +345,7 @@ const AI_MIND_MAP_TOOL_MANIFEST: ToolManifest = {
 
 const EXCEL_WORKBOOK_TOOL_MANIFEST: ToolManifest = {
   name: "excelWorkbookTool",
+  resolverGrade: "syntax",
   deterministicResolver: resolveExcelIntent,
 
     triggers: [
@@ -384,6 +388,7 @@ const EXCEL_WORKBOOK_TOOL_MANIFEST: ToolManifest = {
 
 const MODRINTH_TOOL_MANIFEST: ToolManifest = {
   name: "modrinthTool",
+  resolverGrade: "semantic",
   deterministicResolver: parseModrinthRequestOptions,
 
     triggers: [
@@ -414,6 +419,7 @@ const TORRENT_DOWNLOAD_TOOL_MANIFEST: ToolManifest = {
   name: "torrentDownloadTool",
   terminal: true,
   background: true,
+  resolverGrade: "syntax",
   deterministicResolver: resolveTorrentDownloadIntent,
 
     triggers: [
@@ -568,6 +574,7 @@ const GOOGLE_IMAGE_EDIT_TOOL_MANIFEST: ToolManifest = {
 
 const MEMBER_INFO_TOOL_MANIFEST: ToolManifest = {
   name: 'memberInfoTool',
+  resolverGrade: "semantic",
   triggers: MEMBER_INFO_PATTERNS,
   deterministicResolver: resolveMemberInfoIntent,
   disclosure: [
@@ -577,6 +584,57 @@ const MEMBER_INFO_TOOL_MANIFEST: ToolManifest = {
     '现有上下文已提供所问事实时可直接据实回答。普通闲聊、否定查询、引用他人请求不构成本轮查询。'
   ].join('\n')
 }
+
+// 承诺账本/委托记忆(P0 统一 agent 内核):hint triggers 只用于候选与规划器门控,
+// 无 deterministicResolver——语义判定权归规划器/主模型(路由手术铁律,与 deltaForce 同型)。
+const COMMITMENT_TOOL_MANIFEST: ToolManifest = {
+  name: "commitmentTool",
+
+    triggers: [
+      /每天|每周|定时|定点|到时候|到点|每隔|固定.{0,6}(发|提醒|做)|(?:提醒|叫|催)我(?!.{0,12}(?:一下|现在|马上))/,
+      /\d{1,2}点.{0,12}(?:发|做|提醒|叫|查)|(?:早|中|晚|下)午?\d{1,2}点/
+    ],
+    disclosure: [
+      "【commitmentTool 承诺账本 详细用法】",
+      "用途：把群友托付的定时/循环事务记进承诺账本，到期由机器人兑现（查数据、发消息、提醒都算）。",
+      "调用边界：",
+      "- 用户表达「到某个时间/每天某时要做某事」且这事由我执行时调用；一次性提醒也走这里（schedule_kind=once）。",
+      "- 纯粹的即时请求（现在就查/就发）不要调用。",
+      "- 带工具的活（如每天发三角洲密码）deliver=agent；只发一句固定文字时 deliver=static 并填 static_message。",
+      "参数规则：",
+      "- intent 保留用户原话（含时间语境），禁止改写。",
+      "- schedule_kind=daily 时 schedule_time 填 HH:mm（24小时制北京时间）；once 填 ISO 8601 带 +08:00（按当前北京时间换算）。",
+      "- 时间信息不足（没说几点/哪天）时不调用，先向用户追问。",
+      "等价例子：",
+      "- “每天中午12点在群里发三角洲今日密码” -> {\"action\":\"create\",\"intent\":\"每天中午12点在群里发三角洲今日密码\",\"schedule_kind\":\"daily\",\"schedule_time\":\"12:00\"}",
+      "- “半小时后提醒我收菜” -> {\"action\":\"create\",\"intent\":\"半小时后提醒我收菜\",\"schedule_kind\":\"once\",\"schedule_time\":\"<当前北京时间+30分钟的ISO 8601>\",\"deliver\":\"static\",\"static_message\":\"该收菜啦\"}",
+      "- “我定的那个每日密码取消掉” -> 先 {\"action\":\"list\"} 再 {\"action\":\"cancel\",\"commitment_id\":\"<list里的短id>\"}"
+    ].join("\n")
+}
+
+const DELEGATE_MEMORY_TOOL_MANIFEST: ToolManifest = {
+  name: "delegateMemoryTool",
+
+    triggers: [
+      /帮我记|替我记|记住[：:]?\s*\S|别忘了|记一下|我跟你说过|我上次(说|讲|提)/,
+      /我让你记|你帮我记的|我托你记/
+    ],
+    disclosure: [
+      "【delegateMemoryTool 委托记忆 详细用法】",
+      "用途：替群友记住托付的事，之后能原文背出来。",
+      "调用边界：",
+      "- 用户明确让你「记住/别忘了」某事时 remember；问「我上次让你记的/我跟你说过的X」时 recall；list 列出；forget 忘掉。",
+      "- 闲聊中随口说的信息不要自作主张记。",
+      "参数规则：",
+      "- content 必须是用户原话或含时间语境的忠实转述，禁止润色改写（原文锚定，防记岔）。",
+      "- due_time 仅当用户给了明确时间点才填 ISO 8601 带 +08:00。",
+      "- recall 的 query 放要找的那件事的关键词；返回原文，回答时原样引用。",
+      "等价例子：",
+      "- “帮我记住周五要交报告” -> {\"action\":\"remember\",\"content\":\"周五要交报告\",\"due_time\":\"<周五的ISO 8601>\"}",
+      "- “我上次让你记的那个报告是啥来着” -> {\"action\":\"recall\",\"query\":\"报告\"}"
+    ].join("\n")
+}
+
 
 const CHAT_HISTORY_TOOL_MANIFEST: ToolManifest = {
   name: 'chatHistoryTool',
@@ -617,8 +675,10 @@ const BUILTIN_TOOL_MANIFESTS = [
     MEMBER_INFO_TOOL_MANIFEST,
   CHAT_HISTORY_TOOL_MANIFEST,
   PIXIV_SEARCH_TOOL_MANIFEST,
-  PIXIV_DOWNLOAD_TOOL_MANIFEST
+  PIXIV_DOWNLOAD_TOOL_MANIFEST,
+  COMMITMENT_TOOL_MANIFEST,
+  DELEGATE_MEMORY_TOOL_MANIFEST
 ]
 
-return {DELTA_FORCE_TOOL_MANIFEST,REMINDER_TOOL_MANIFEST,SEARCH_MUSIC_TOOL_MANIFEST,VOICE_TOOL_MANIFEST,SEND_LOCAL_EMOJI_TOOL_MANIFEST,MENTION_MEMBERS_TOOL_MANIFEST,MENTION_ADMINS_TOOL_MANIFEST,FORGET_GROUP_KNOWLEDGE_TOOL_MANIFEST,EMOJI_SEARCH_TOOL_MANIFEST,SEARCH_INFORMATION_TOOL_MANIFEST,WEB_PARSER_TOOL_MANIFEST,GITHUB_REPO_TOOL_MANIFEST,AI_MIND_MAP_TOOL_MANIFEST,EXCEL_WORKBOOK_TOOL_MANIFEST,MODRINTH_TOOL_MANIFEST,TORRENT_DOWNLOAD_TOOL_MANIFEST,TEXT_IMAGE_TOOL_MANIFEST,POKE_TOOL_MANIFEST,LIKE_TOOL_MANIFEST,CHANGE_CARD_TOOL_MANIFEST,JINYAN_TOOL_MANIFEST,BANANA_TOOL_MANIFEST,GOOGLE_IMAGE_EDIT_TOOL_MANIFEST,MEMBER_INFO_TOOL_MANIFEST,CHAT_HISTORY_TOOL_MANIFEST,BUILTIN_TOOL_MANIFESTS}
+return {DELTA_FORCE_TOOL_MANIFEST,REMINDER_TOOL_MANIFEST,SEARCH_MUSIC_TOOL_MANIFEST,VOICE_TOOL_MANIFEST,SEND_LOCAL_EMOJI_TOOL_MANIFEST,MENTION_MEMBERS_TOOL_MANIFEST,MENTION_ADMINS_TOOL_MANIFEST,FORGET_GROUP_KNOWLEDGE_TOOL_MANIFEST,EMOJI_SEARCH_TOOL_MANIFEST,SEARCH_INFORMATION_TOOL_MANIFEST,WEB_PARSER_TOOL_MANIFEST,GITHUB_REPO_TOOL_MANIFEST,AI_MIND_MAP_TOOL_MANIFEST,EXCEL_WORKBOOK_TOOL_MANIFEST,MODRINTH_TOOL_MANIFEST,TORRENT_DOWNLOAD_TOOL_MANIFEST,TEXT_IMAGE_TOOL_MANIFEST,POKE_TOOL_MANIFEST,LIKE_TOOL_MANIFEST,CHANGE_CARD_TOOL_MANIFEST,JINYAN_TOOL_MANIFEST,BANANA_TOOL_MANIFEST,GOOGLE_IMAGE_EDIT_TOOL_MANIFEST,MEMBER_INFO_TOOL_MANIFEST,CHAT_HISTORY_TOOL_MANIFEST,COMMITMENT_TOOL_MANIFEST,DELEGATE_MEMORY_TOOL_MANIFEST,BUILTIN_TOOL_MANIFESTS}
 }

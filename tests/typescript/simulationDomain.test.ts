@@ -1079,3 +1079,44 @@ test('defaultSimRuntimeConfig：mood 默认开、半衰期/步长夹取', () => 
   assert.equal(off.mood.enabled, false)
   assert.equal(defaultSimRuntimeConfig().mood.halfLifeMs, 360 * 60_000, '默认半衰期 6 小时')
 })
+
+// ── 承诺账本接入(P0 统一 agent 内核) ──────────────────────────────────────────
+import { TIMER_WAKE_REASONS, formatWakeReason } from '../../src/modules/simulation/domain/wakeTrigger.js'
+import { formatDelegatedSection } from '../../src/modules/memory/domain/delegatedMemory.js'
+import type { DelegatedMemoryEntry } from '../../src/contracts/delegatedMemory.js'
+
+test('commitment 唤醒:timer 类无条件补发、直点类免限频、格式化带托付事由', () => {
+  assert.equal(WAKE_PRIORITY.commitment, 68)
+  assert.ok(TIMER_WAKE_REASONS.includes('commitment'), '承诺是定时器类:回合补发无条件')
+  assert.equal(messageReasonStillPending({ kind: 'commitment' }, []), true)
+  assert.match(formatWakeReason({ kind: 'commitment', detail: '星野 托付的事：每天中午12点发密码' }), /承诺到期/)
+  // 预算直点类:承诺唤醒不吃限频窗(检查直点集合含 commitment——通过 allowed 验证)
+  const cfg = defaultSimRuntimeConfig({ wake: { maxWakePerMinute: 0, maxWakePerHour: 0 } })
+  const st = createDefaultSimSession(1)
+  const verdict = checkWakeBudget(st, cfg, 2, 0, { kind: 'commitment' }, 'g1')
+  assert.equal(verdict.allowed, true, 'maxWake=0 时承诺唤醒仍放行(直点类)')
+})
+
+test('buildWakePrompt 注入委托记忆段:在场优先、到期高亮、无条目不注入', () => {
+  const base = { ...session(), unread: [], pendingWakeReasons: [] } as SimSessionState
+  const mk = (owner: string, content: string, dueAt = 0): DelegatedMemoryEntry => ({
+    id: `dlg_${owner}`, owner, ownerName: owner === '10001' ? '星野' : owner, content, dueAt, status: 'active', createdAt: 5, updatedAt: 5,
+  })
+  const now = 1000
+  const section = formatDelegatedSection([mk('10001', '周五要交报告', 500), mk('20002', '记得带伞')], now, ['10001'])
+  assert.match(section, /【群友托付的事】/)
+  assert.ok(section.indexOf('到点了') < section.indexOf('记得带伞'), '到期条目排前面')
+  assert.match(section, /周五要交报告/)
+  const withPrompt = buildWakePrompt({ state: base, now, selfName: '希洛', reason: { kind: 'keyword', detail: 'x' }, snapshotText: '', unreadTotal: 0, delegatedSection: section })
+  assert.match(withPrompt, /群友托付的事/)
+  const without = buildWakePrompt({ state: base, now, selfName: '希洛', reason: { kind: 'keyword', detail: 'x' }, snapshotText: '', unreadTotal: 0 })
+  assert.ok(!without.includes('群友托付的事'), '无条目不注入')
+})
+
+test('buildWakePrompt 承诺唤醒的行动指引:自然兑现、不汇报、失败直说', () => {
+  const base = { ...session(), unread: [], pendingWakeReasons: [] } as SimSessionState
+  const text = buildWakePrompt({ state: base, now: 1000, selfName: '希洛', reason: { kind: 'commitment', detail: '星野 托付的事：每天中午12点发三角洲今日密码' }, snapshotText: '', unreadTotal: 0 })
+  assert.match(text, /承诺到期/)
+  assert.match(text, /不要汇报/)
+  assert.match(text, /别编/)
+})
