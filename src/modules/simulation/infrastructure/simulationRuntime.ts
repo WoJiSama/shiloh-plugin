@@ -12,7 +12,7 @@ import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
 import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
-import { isSilentDeclaration, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
+import { isSilentDeclaration, isWrappedAnnotation, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
 import { parsePersonProfilePatches, interestMatchesTitle, type PersonProfile } from '../domain/personProfile.js'
 import { isSleeping, activityFactor, sleepinessNote, staleMessageNote, type RhythmWindow } from '../domain/rhythm.js'
 import { normalizeLifeThreads, mergeThreadSync, formatLifeThreads, type LifeThread } from '../domain/lifeThread.js'
@@ -756,15 +756,17 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             if (!nudgedForUnsent) {
               nudgedForUnsent = true
               logger.info(`[仿真] 群 ${groupId} 检测到未外发文本（${text.length} 字，本回合 0 发送），已提醒模型用 simSendMessage 发出`)
-              history.push({ role: 'user', content: '【系统提醒】你刚才写的这段话群友看不到——本模式下只有 simSendMessage 发出的内容才会出现在群里，群里刚才只能看到你发的表情/动作。如果那段话就是你想说的，现在用 simSendMessage 原样（或更口语化、可拆几条）发出去；如果改变主意不想说了，从此不要再输出任何文字——「无需发送」「结束回合」「已静默结束」「不是对我说的」这类说明也不要写，直接停下即可。' })
+              history.push({ role: 'user', content: '【系统提醒】你刚才写的这段话群友看不到——本模式下只有 simSendMessage 发出的内容才会出现在群里，群里刚才只能看到你发的表情/动作。如果那段话就是你想说的，现在用 simSendMessage 原样（或更口语化、可拆几条）发出去；如果改变主意不想说了，从此不要再输出任何文字——「无需发送」「结束回合」「已静默结束」「不是对我说的」「(已经决定不说话)」这类说明不要写，括号里的状态标注也一样不行，直接停下即可。' })
               continue
             }
             // 提醒过一次还是把话写在文本里(实测高发:连续多轮 6 字文本 0 发送,群里看着就是已读不回)——
             // 直接替它发出去。内容照原样,不走模型再加工,避免又一轮哑火。
-            // 最后防线：提醒后还输出含元话术的文本（「已静默结束」「不是对我说的」等自创变体），按沉默处理不直发——
-            // 漏发可以下轮补，误发进群里收不回。
-            if (mentionsSilenceVocabulary(text)) {
-              logger.info(`[仿真] 群 ${groupId} 提醒后文本仍含元话术（${text.slice(0, 24)}），按沉默处理不直发`)
+            // 最后防线：提醒后还输出含元话术的文本，按沉默处理不直发——漏发可以下轮补，误发进群里收不回。
+            // ①词表拦截（子串级）；②形状拦截（2026-11-09 实拍「(已经决定不说话，直接停。)」漏网后新增）：
+            //   整条被括号/引号包裹的"状态标注"一律不直发——词表追不上模型造句，形状是稳定的；
+            //   真想发言写裸文本，括号动作（（笑））远短于 6 字门槛。
+            if (mentionsSilenceVocabulary(text) || isWrappedAnnotation(text)) {
+              logger.info(`[仿真] 群 ${groupId} 提醒后文本仍含元话术或为括号标注（${text.slice(0, 24)}），按沉默处理不直发`)
             } else {
               logger.info(`[仿真] 群 ${groupId} 提醒后仍未发送，兜底直发 ${text.length} 字`)
               history.push({ role: 'user', content: '【系统】已替你把上面那段话发出去了。以后想说的话必须自己调 simSendMessage。' })
