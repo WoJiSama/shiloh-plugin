@@ -2601,12 +2601,12 @@ P0（abad55c/c525220）已上线：承诺账本+委托记忆+路由手术，生�
 4. P1-4 控制台托付数据页：/trusteeship——承诺账本（活跃清单+失败日志，可取消/清失败记录）+委托记忆（按群可删）；主人令牌保护；数据全在本机 redis，不出机。
 
 ## 阶段
-- [ ] 阶段 1：domain/contracts（renewal、admission、toolPolicy、sentinel 输入扩展）
-- [ ] 阶段 2：承诺 runtime（tick 明说、renew、续约扫描、faillog）+ budget 豁免
-- [ ] 阶段 3：simConfig.toolPolicy 解析+装配面改造+shell 端口
-- [ ] 阶段 4：哨兵接线+控制台 API/前端页/导航
-- [ ] 阶段 5：回归测试+RULES/SECURITY_BASELINE/config_default 同步+全量验证
-- [ ] 阶段 6：deploy.sh 部署+健康检查+progress 记录+push
+- [x] 阶段 1：domain/contracts（renewal、admission、toolPolicy、sentinel 输入扩展）
+- [x] 阶段 2：承诺 runtime（tick 明说、renew、续约扫描、faillog）+ budget 豁免
+- [x] 阶段 3：simConfig.toolPolicy 解析+装配面改造+shell 端口
+- [x] 阶段 4：哨兵接线+控制台 API/前端页/导航
+- [x] 阶段 5：回归测试+RULES/SECURITY_BASELINE/config_default 同步+全量验证（3020 项 3018 通过/0 失败/2 环境跳过）
+- [x] 阶段 6：deploy.sh 部署+健康检查+progress 记录+push（22e5129，健康全绿，快照 20261109-135324；真群自然触发待被动验证）
 
 ## 约束
 - 一切 static 直发（失约明说/续约问询）必经 sanitizeFinalReplyText；发送失败只记日志不再抛。
