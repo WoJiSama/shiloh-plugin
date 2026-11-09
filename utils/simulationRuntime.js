@@ -250,6 +250,11 @@ export const simulationRuntime = createSimulationRuntime({
       .map(name => snapshot.toolInstances[name])
       .filter(tool => !!tool)
   },
+  // toolPolicy open 模式的默认能力面：内置注册表名（builtInToolNames 由 JS 子类构造时的工厂填充）
+  listRegistryToolNames: () => ({
+    builtIn: [...localToolRegistry.builtInToolNames],
+    all: Object.keys(localToolRegistry.getSnapshot().toolInstances),
+  }),
   // 按人挖口头禅的数据源：读归档近 N 天消息（data/message_archive/group/{gid}/日期.ndjson）
   readArchiveMessages: async (groupId, days) => {
     try {

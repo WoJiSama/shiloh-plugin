@@ -4,6 +4,8 @@ import type {CommitmentData,CommitmentRedisLike} from '../../../contracts/commit
 
 const REDIS_KEY_PREFIX='bl-chat:commitment:'
 const PENDING_LIST_KEY=`${REDIS_KEY_PREFIX}pending:list`
+const FAILLOG_KEY=`${REDIS_KEY_PREFIX}faillog`
+const FAILLOG_LIMIT=20
 const LOCK_KEY=`${REDIS_KEY_PREFIX}lock`
 const LOCK_TIMEOUT=15000
 const LOCK_ACQUIRE_TIMEOUT=1500
@@ -26,7 +28,8 @@ export function decodeCommitment(data:string):CommitmentData {
     id:r.id,group_id:r.group_id,creator_id:r.creator_id,creator_name:String(r.creator_name||''),
     intent:r.intent,schedule:normalizedSchedule,deliver,
     static_message:typeof r.static_message==='string'?r.static_message:null,
-    expiry_at:Number(r.expiry_at)||0,next_run_at:Number(r.next_run_at)||0,status,
+    expiry_at:Number(r.expiry_at)||0,renewal_asked_at:Number(r.renewal_asked_at)||0,
+    next_run_at:Number(r.next_run_at)||0,status,
     last_run_at:Number(r.last_run_at)||0,last_result:String(r.last_result||''),retry_count:Number(r.retry_count)||0,
     created_at:Number(r.created_at)||0,bot_id:String(r.bot_id||'')
   }
@@ -132,15 +135,38 @@ export function createCommitmentStore(ports:{redis:CommitmentRedisLike;logger:{w
     }
   }
 
-  /** 失败重试:+10s 回列,超限置 failed */
-  async function requeueForRetry(c:CommitmentData,at:number){
+  /** 失败重试:+10s 回列,超限置 failed。返回终态(failed)供调用方失约明说。 */
+  async function requeueForRetry(c:CommitmentData,at:number):Promise<'retrying'|'failed'>{
     const retry=c.retry_count+1
     if(retry>=3){
       await commitRunOutcome({...c,retry_count:retry,status:'failed',last_result:c.last_result||'重试超限'})
-      return
+      return 'failed'
     }
     const next={...c,retry_count:retry,next_run_at:at+10000}
     await commitRunOutcome(next)
+    return 'retrying'
+  }
+
+  /** 终态失败日志(截断 20 条):健康哨兵读它告警;控制台托付页展示/清理。只存 id/intent/群/原因/时间。 */
+  async function appendFailLog(entry:{id:string;intent:string;group_id:string;reason:string;at:number}){
+    const current=await readFailLog()
+    await redis.set(FAILLOG_KEY,JSON.stringify([entry,...current].slice(0,FAILLOG_LIMIT)))
+  }
+
+  async function readFailLog():Promise<{id?:string;intent?:string;group_id?:string;reason?:string;at?:number}[]>{
+    const raw=await redis.get(FAILLOG_KEY)
+    if(!raw)return []
+    try{
+      const parsed:unknown=JSON.parse(raw)
+      return Array.isArray(parsed)?parsed.filter(v=>v!==null&&typeof v==='object'):[]
+    }catch{
+      logger.warn('[承诺] 失败日志损坏，按空处理')
+      return []
+    }
+  }
+
+  async function clearFailLog():Promise<void>{
+    await redis.del(FAILLOG_KEY)
   }
 
   /** 活跃承诺全量(上限小,逐条取详情可接受) */
@@ -154,5 +180,5 @@ export function createCommitmentStore(ports:{redis:CommitmentRedisLike;logger:{w
     return out
   }
 
-  return {createCommitment,getCommitment,cancelCommitment,takeDueCommitments,commitRunOutcome,requeueForRetry,listActiveCommitments}
+  return {createCommitment,getCommitment,cancelCommitment,takeDueCommitments,commitRunOutcome,requeueForRetry,listActiveCommitments,appendFailLog,readFailLog,clearFailLog}
 }

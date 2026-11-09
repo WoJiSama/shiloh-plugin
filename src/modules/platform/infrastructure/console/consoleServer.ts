@@ -103,8 +103,20 @@ export interface ConsoleExtraPorts {
     deletePersonProfileField?(userId: string, field: string, value?: string): Promise<unknown>
     setDefaultBudget?(cny: number): Promise<string>
   }
+  /** 托付数据（承诺账本+委托记忆）控制台页：透明化与被遗忘权，只读+删除，数据不出机 */
+  trusteeship?: {
+    overview(): Promise<{
+      commitments: { id: string; groupId: string; creatorId: string; creatorName: string; intent: string; schedule: string; deliver: string; nextRunAt: number; expiryAt: number; status: string; lastResult: string; retryCount: number }[]
+      failures: { id?: string; intent?: string; group_id?: string; reason?: string; at?: number }[]
+      delegated: { groupId: string; entries: { id: string; owner: string; ownerName: string; content: string; dueAt: number; status: string; createdAt: number }[] }[]
+      config: { maxActivePerGroup: number; maxPerCreator: number; defaultExpiryDays: number; maxPerGroupDelegated: number; maxPerOwnerDelegated: number }
+    }>
+    cancelCommitment(id: string): Promise<boolean>
+    deleteDelegated(groupId: string, id: string): Promise<boolean>
+    clearFailLog(): Promise<boolean>
+  }
 }
-export function createConsoleServer({pluginRoot,buildTurnTraceReport,tokens,simulation,style}:{pluginRoot:string;buildTurnTraceReport:(records:Data[])=>unknown;tokens?:ConsoleExtraPorts["tokens"];simulation?:ConsoleExtraPorts["simulation"];style?:ConsoleExtraPorts["style"]}) {
+export function createConsoleServer({pluginRoot,buildTurnTraceReport,tokens,simulation,style,trusteeship}:{pluginRoot:string;buildTurnTraceReport:(records:Data[])=>unknown;tokens?:ConsoleExtraPorts["tokens"];simulation?:ConsoleExtraPorts["simulation"];style?:ConsoleExtraPorts["style"];trusteeship?:ConsoleExtraPorts["trusteeship"]}) {
 const {classifyConfigKind,probeProvider,probeProviders}=createProviderProbe((url,init)=>fetch(url,init))
 const PLUGIN_ROOT = path.resolve(process.env.CONSOLE_PLUGIN_ROOT || pluginRoot)
 const FRONTEND_DIST = path.join(PLUGIN_ROOT, "console", "frontend", "dist")
@@ -2127,6 +2139,33 @@ const server = http.createServer(async (req, res) => {
       if (!["name", "interests", "taboos", "traits", "facts"].includes(field)) return sendJson(res, 400, { error: "field 必须是 name|interests|taboos|traits|facts" })
       const result = await simulation.deletePersonProfileField(userId, field, body?.value === undefined ? undefined : String(body.value))
       return sendJson(res, 200, { ok: true, profile: result })
+    }
+    if (url.pathname === "/api/trusteeship/overview" && req.method === "GET") {
+      if (!trusteeship) return sendJson(res, 503, { error: "托付数据运行时未接入控制台" })
+      return sendJson(res, 200, await trusteeship.overview())
+    }
+    if (url.pathname === "/api/trusteeship/commitment-cancel" && req.method === "POST") {
+      if (!trusteeship) return sendJson(res, 503, { error: "托付数据运行时未接入控制台" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const id = String(body?.id || "")
+      if (!/^cmt_\d{10,15}_\d{4,12}_[0-9a-f]{6}$/.test(id)) return sendJson(res, 400, { error: "id 必须是完整的承诺 id（cmt_开头）" })
+      const ok = await trusteeship.cancelCommitment(id)
+      return sendJson(res, ok ? 200 : 404, ok ? { ok: true, message: `已取消承诺 ${id}` } : { error: "承诺不存在或已不在活跃清单" })
+    }
+    if (url.pathname === "/api/trusteeship/delegated-delete" && req.method === "POST") {
+      if (!trusteeship) return sendJson(res, 503, { error: "托付数据运行时未接入控制台" })
+      const body = await readJsonBody(req, 8 * 1024)
+      const groupId = String(body?.groupId || "")
+      const id = String(body?.id || "")
+      if (!/^\d{5,12}$/.test(groupId)) return sendJson(res, 400, { error: "groupId 必须是群号" })
+      if (!/^dlg_\d{10,15}_\d{4,12}_[0-9a-f]{6}$/.test(id)) return sendJson(res, 400, { error: "id 必须是完整的托付记忆 id（dlg_开头）" })
+      const ok = await trusteeship.deleteDelegated(groupId, id)
+      return sendJson(res, ok ? 200 : 404, ok ? { ok: true, message: "已删除该条托付记忆" } : { error: "托付记忆不存在" })
+    }
+    if (url.pathname === "/api/trusteeship/faillog-clear" && req.method === "POST") {
+      if (!trusteeship) return sendJson(res, 503, { error: "托付数据运行时未接入控制台" })
+      await trusteeship.clearFailLog()
+      return sendJson(res, 200, { ok: true, message: "已清空失败记录（哨兵告警将自动消除）" })
     }
     if (url.pathname === "/api/health/alerts" && req.method === "GET") {
       if (!simulation || typeof simulation.getHealthAlerts !== "function") return sendJson(res, 200, { alerts: [], checkedAt: 0 })

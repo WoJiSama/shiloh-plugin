@@ -1912,3 +1912,14 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
   4) 注入预算截断诚实化:被裁的段落(近期动态/风格/召回)记名,末尾【资料预算提示】——没看到全文≠没有这回事,可用工具续读,别把"资料里没写"当"没发生过"。
 - 验证:backend:typecheck 通过;全量 npm test 2980 项 0 失败;boundaries 通过。
 - 部署:dd40e90 发版生产(含情绪四轴/插话熔断/召回与截断诚实提示,及此前积累的识破治理 9852a5b、身份玩笑措辞 056d8e0),健康检查全绿(service=active/load_errors=0/pipeline=1/命令页200/控制台active+200);快照 20261106-162448。
+
+
+# 2026-11-09 P1 统一 agent 内核后续(失约明说/哨兵/能力翻转/托付页)
+
+- 续接会话 ff73946d(P0 上线后的遗留清单),用户确认「全部完成」。先补掉遗留:c525220 已推送 GitHub(443 恢复);生产 redis 检查无承诺/托付真实数据(部署至今无人自然触发,端到端待被动验证,服务 active)。
+- P1-1 失约明说+续约问询:requeueForRetry 返回终态,tick 在重试 3 次转 failed 与「群未开仿真」两条路径都失约明说(@创建人+真实原因+「已停手不再重试」,经 sanitizeFinalReplyText 出站红线,发送失败只记日志);commitmentTool 加 renew 动作(本人/群主,顺延默认 30 天+重置问询标记);到期前 3 天续约问询(agent 类唤醒仿真自然问、static 类直发问,renewal_asked_at 持久化只问一次,问询失败 10 分钟后重试);承诺唤醒绕过每日回合/金额预算闸(budget.ts PROMISE_WAKE_KINDS——隐性失约比超软预算伤信任,量小有界);修复 domain 缺陷:已过期承诺不再触发问询。
+- P1-2 哨兵接入:终态失败写 faillog(JSON 数组键 bl-chat:commitment:faillog,截断 20 条,只存 id/intent/群/原因/时间);healthSentinel 单条即 error 告警(样例≤3 条),runHealthSentinel 直读该键(与 style_memory.json 同款直读先例,避免 import 环);控制台健康页自动可见。
+- P1-3 能力策略翻转:simulation.toolPolicy(mode 默认 open)——open=内置注册表工具默认全量放通−RESTRICTED 默认禁(禁言/撤回/送礼/抢红包/QQ空间/改名片/@全体管理/reminder 与承诺账本重叠)−全局/按群 denyTools+allowTools 解禁;extraTools 恒为追加面(自定义工具仍显式放行);legacy 一键回退;端口缺省/解析异常安全回落 legacy(能力面只小不大);RULES 红线 2 与 SECURITY_BASELINE R5 同步改写。
+- P1-4 控制台托付数据页:/trusteeship(导航「托付数据」)——承诺账本活跃清单+失败日志(可取消/清失败记录)+委托记忆按群(可删);4 个 API(overview/commitment-cancel/delegated-delete/faillog-clear,id 全格式校验);console/server.js 直连本机 redis 与 bot 进程共享同一份键,数据不出机。
+- 验证:backend:typecheck、test:boundaries、console check/test/build 通过;全量 3020 项 3018 通过/0 失败/2 环境跳过;新增/扩展测试 12 项(domain 续约/明说/到期标注、compiled renew/失约明说/双路径续约问询、toolPolicy 6 项、healthSentinel 4 项、budget 承诺豁免)。
+- 过程修正:healthSentinel 样例全角括号、toolPolicy 测试群号位数(5-12 位校验)、续约文案断言对齐实现。

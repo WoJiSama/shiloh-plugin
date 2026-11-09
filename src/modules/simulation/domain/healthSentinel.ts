@@ -18,6 +18,8 @@ export interface HealthCheckInput {
   styleMemory?: { aiSummary?: { autoFailureCount?: number; lastAutoAt?: string; lastAutoFailureAt?: string } } | null
   /** 表达学习近期错误（从日志或状态提取） */
   expressionErrors?: number | null
+  /** 承诺账本终态失败日志（读 bl-chat:commitment:faillog，失约明说消息可能也没送达） */
+  commitmentFailures?: { id?: string; intent?: string; group_id?: string; reason?: string; at?: number }[] | null
 }
 
 const FAILURE_STREAK_THRESHOLD = 10
@@ -63,6 +65,19 @@ export function checkHealth(input: HealthCheckInput): HealthAlert[] {
       severity: 'error',
       message: `连续失败 ${input.expressionErrors} 次——大概率是模型接口配置问题`,
       metric: input.expressionErrors,
+      detectedAt: now,
+    })
+  }
+
+  // 4. 承诺账本：终态失败（对群友失约,明说消息可能也没送达）——单条即告警
+  const failures = (input.commitmentFailures || []).filter(f => f && (f.intent || f.id))
+  if (failures.length > 0) {
+    const samples = failures.slice(0, 3).map(f => `「${String(f.intent || f.id).slice(0, 30)}」（群${f.group_id || '?'}）`).join('、')
+    alerts.push({
+      component: '承诺账本·失约',
+      severity: 'error',
+      message: `${failures.length} 个托付终态失败：${samples}——重试 3 次未成,失约明说消息也可能没送达,需人工核实原因`,
+      metric: failures.length,
       detectedAt: now,
     })
   }

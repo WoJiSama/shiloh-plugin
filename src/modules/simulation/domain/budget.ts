@@ -18,6 +18,10 @@ export interface WakeBudgetVerdict { allowed: boolean; reason: string }
  *  社交上"被点名不回""答应了不放"最伤——限频只管旁观型唤醒(关键词/随机/延续等),这几类直接放行;金额与每日回合预算仍生效。 */
 const DIRECT_ADDRESS_WAKE_KINDS: readonly string[] = ['admin', 'atMention', 'nameMention', 'question', 'commitment']
 
+/** 承诺到期唤醒：对群友的定时托付，量小有界（每群 ≤10、每日至多各一次）——
+ *  连每日回合/金额预算也绕过。被预算静默丢弃等于隐性失约，比超一点软预算伤信任得多。 */
+const PROMISE_WAKE_KINDS: readonly string[] = ['commitment']
+
 /** 唤醒限频（1 分钟/1 小时两窗）+ 每群每日回合预算 + 当日金额预算（读令牌账本）。超限只能延后不能丢弃（由调用方重试）。 */
 export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig, now: number, todayCostCny = 0, reason: SimWakeReason | null = null, groupId = ''): WakeBudgetVerdict {
   rollBudgetDay(state, now)
@@ -30,6 +34,10 @@ export function checkWakeBudget(state: SimSessionState, config: SimRuntimeConfig
     if (hourWindow.length >= config.wake.maxWakePerHour) {
       return { allowed: false, reason: `wakePerHour:${hourWindow.length}/${config.wake.maxWakePerHour}` }
     }
+  }
+  // 承诺到期绕过每日回合/金额预算（隐性失约比超软预算伤信任；量小有界）
+  if (PROMISE_WAKE_KINDS.includes(String(reason?.kind || ''))) {
+    return { allowed: true, reason: 'commitment' }
   }
   // 按群覆盖(-1=不限)优先于全局默认:回合与金额同规则
   const turnsCap = config.turn.groups?.[groupId] ?? config.turn.maxTurnsPerDay

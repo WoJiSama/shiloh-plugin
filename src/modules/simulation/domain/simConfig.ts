@@ -1,4 +1,5 @@
 import type { SimulationSection, SimRuntimeConfig, SimSessionState, SimWakeConfig, SimWakeTriggers } from '../../../contracts/simulation.js'
+import { normalizeSimToolPolicy } from './toolPolicy.js'
 
 export const SIM_UNREAD_LIMIT_DEFAULT = 30
 export const SIM_PENDING_REASONS_LIMIT = 20
@@ -77,6 +78,8 @@ export function defaultSimRuntimeConfig(section: SimulationSection = {}): SimRun
     },
     agentPresetKeywords: (section.agentPresetKeywords || []).map(k => String(k || '').trim()).filter(Boolean).slice(0, SIM_KEYWORDS_LIMIT),
     extraTools: Array.isArray(section.extraTools) ? [...new Set(section.extraTools.map(n => String(n || '').trim()).filter(Boolean))] : [],
+    // 默认 open（能力制翻转）：内置安全工具默认全量放通；要回 P0 白名单行为写 mode: legacy
+    toolPolicy: normalizeSimToolPolicy(section.toolPolicy),
     budget: {
       dailyCostCny: Math.max(0, Number((section.budget || {}).dailyCostCny ?? 5)),
       groups: normalizeGroupCapOverrides((section.budget || {}).groups),

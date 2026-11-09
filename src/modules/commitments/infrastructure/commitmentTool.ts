@@ -5,8 +5,8 @@ import {AbstractTool} from '../../toolSupport/infrastructure/AbstractTool.js'
 import {sanitizeFinalReplyText} from '../../conversation/domain/replySanitizer.js'
 import {createCommitmentStore} from './commitmentStore.js'
 import {
-  advanceCommitmentAfterRun,checkCommitmentCaps,formatCommitmentLine,formatScheduleText,
-  isCommitmentExpired,normalizeSchedule,renderCommitmentCard,resolvedCommitmentConfig
+  advanceCommitmentAfterRun,buildMissAdmissionText,buildRenewalAskText,checkCommitmentCaps,formatCommitmentLine,formatScheduleText,
+  isCommitmentExpired,normalizeSchedule,renderCommitmentCard,renderRenewalCard,resolvedCommitmentConfig,shouldAskRenewal
 } from '../domain/commitments.js'
 import type {CommitmentData,CommitmentEvent,CommitmentPorts} from '../../../contracts/commitments.js'
 
@@ -31,24 +31,25 @@ export function createCommitmentRuntime(ports:CommitmentPorts) {
         name:'commitmentTool',
         purpose:'把群友托付的定时/循环事务记进承诺账本，到期兑现。',
         whenToUse:'用户表达"到某个时间点/每天某时要做某事"且执行者是我（发消息、查东西、提醒、每日定点任务）时。',
-        boundaries:'只接时间明确的托付，时间缺失先追问。deliver=static 仅限固定文字；要查数据/调工具的活必须 deliver=agent（需该群开仿真）。非定时请求、纯提醒类一次性闹钟也走本工具（once）。群成员都可创建，创建人和群管理可取消。',
+        boundaries:'只接时间明确的托付，时间缺失先追问。deliver=static 仅限固定文字；要查数据/调工具的活必须 deliver=agent（需该群开仿真）。非定时请求、纯提醒类一次性闹钟也走本工具（once）。群成员都可创建，创建人和群管理可取消/续期。',
         instructions:[
           'schedule_kind: 循环=daily（schedule_time 填 HH:mm 24小时制）；一次性=once（schedule_time 填 ISO 8601 带 +08:00，按当前北京时间换算）。',
           'intent 保留用户原话，如"每天中午12点在群里发三角洲今日密码"。',
           'deliver: 默认 agent（到点我自己完成）；只有用户要发的就是一句固定文字时才 static 并把原文放 static_message。',
-          '创建成功后向用户轻确认一句（什么时候会做什么），不要念参数。'
+          '创建成功后向用户轻确认一句（什么时候会做什么），不要念参数。',
+          '续期：承诺到期前几天系统会提醒你问创建人还续不续；对方说"续/继续/还要"就调 renew（commitment_id 用 list 查），回一句"好，继续给你记着"即可。'
         ].join('\n')
       }
       this.parameters={
         type:'object',
         properties:{
-          action:{type:'string',enum:['create','list','cancel'],description:'create 创建承诺；list 查看当前群承诺；cancel 取消（commitment_id 填 list 里的短 id）'},
+          action:{type:'string',enum:['create','list','cancel','renew'],description:'create 创建承诺；list 查看当前群承诺；cancel 取消（commitment_id 填 list 里的短 id）；renew 续期（创建人说"续"时用）'},
           intent:{type:'string',description:'用户托付的原话（含时间语境），如"每天中午12点在群里发三角洲今日密码"。create 必填'},
           schedule_kind:{type:'string',enum:['once','daily'],description:'once=一次性；daily=每天循环'},
           schedule_time:{type:'string',description:'once 填 ISO 8601 带 +08:00（如 2026-11-10T12:00:00+08:00）；daily 填 HH:mm（如 12:00）'},
           deliver:{type:'string',enum:['agent','static'],description:'agent=到点我自己动手完成（默认）；static=到点直接发固定文字'},
           static_message:{type:'string',description:'deliver=static 时必填：到点要发的原文'},
-          commitment_id:{type:'string',description:'cancel 时填 list 结果里的短 id'}
+          commitment_id:{type:'string',description:'cancel/renew 时填 list 结果里的短 id'}
         },
         required:['action'],
         additionalProperties:false
@@ -61,7 +62,8 @@ export function createCommitmentRuntime(ports:CommitmentPorts) {
       if(action==='create')return await create(opts,ev)
       if(action==='list')return await list(ev)
       if(action==='cancel')return await cancel(opts,ev)
-      return `未知操作：${action||'(空)'}（可用 create/list/cancel）`
+      if(action==='renew')return await renew(opts,ev)
+      return `未知操作：${action||'(空)'}（可用 create/list/cancel/renew）`
     }
   }
 
@@ -135,11 +137,80 @@ export function createCommitmentRuntime(ports:CommitmentPorts) {
     return `已取消：「${target.intent.slice(0,60)}」（${formatScheduleText(target.schedule)}）`
   }
 
+  /** 续期:到期前问询后创建人说"续"→ 顺延一个默认周期,重置问询标记 */
+  async function renew(opts:Record<string,unknown>,ev:CommitmentEvent){
+    const groupId=String(ev.group_id||'')
+    const shortId=String(opts.commitment_id||'').trim()
+    if(!shortId)return '要续哪个？先 list 看短 id'
+    const active=(await store.listActiveCommitments()).filter(c=>c.group_id===groupId)
+    const matches=active.filter(c=>c.id.includes(shortId))
+    if(!matches.length)return `没找到 id 含「${shortId}」的托付（可能已结束或已到期），先 list 确认`
+    if(matches.length>1)return `「${shortId}」匹配到 ${matches.length} 条，把 id 抄全一点`
+    const target=matches[0]!
+    const userId=String(ev.user_id||'')
+    if(target.creator_id!==userId&&ev.isMaster!==true)return '只能续自己创建的托付（群主/管理可续任何人的）'
+    const cfg=resolvedCommitmentConfig(ports.loadConfig())
+    const at=now()
+    const updated={...target,expiry_at:at+cfg.defaultExpiryDays*86400_000,renewal_asked_at:0}
+    await store.commitRunOutcome(updated)
+    ports.logger.info(`[承诺] 群 ${groupId} 续期 ${target.id}「${target.intent.slice(0,40)}」至 ${cfg.defaultExpiryDays} 天后`)
+    return `已续期：「${target.intent.slice(0,60)}」再跑 ${cfg.defaultExpiryDays} 天（到期前会再问一次）。轻确认一句就行，别念参数。`
+  }
+
+  /** 群内通知(失约明说/续约问询):static 直发出站红线——先 sanitize 再发;失败只记日志 */
+  async function sendGroupNotice(c:CommitmentData,text:string){
+    try{
+      const Bot=ports.getBot(c.bot_id||undefined)||ports.getBot()
+      if(!Bot?.sendApi)throw new Error('机器人未连接')
+      const safe=sanitizeFinalReplyText(text)
+      await Bot.sendApi('send_group_msg',{
+        group_id:Number(c.group_id),
+        message:[
+          {type:'at',data:{qq:c.creator_id}},
+          {type:'text',data:{text:` ${safe}`}}
+        ]
+      })
+    }catch(error){
+      ports.logger.warn(`[承诺] 群 ${c.group_id} 通知发送失败(明说/续约未送达,哨兵会看到失败日志): ${error instanceof Error?error.message:String(error)}`)
+    }
+  }
+
+  /** 终态失败收口:记 faillog(哨兵告警)+ 失约明说(失败可见比失约本身伤信任得多) */
+  async function finalizeFailure(c:CommitmentData,reason:string,at:number){
+    await store.appendFailLog({id:c.id,intent:c.intent,group_id:c.group_id,reason:reason.slice(0,80),at}).catch(()=>{})
+    await sendGroupNotice(c,buildMissAdmissionText(c,reason))
+  }
+
+  /** 续约问询扫描(10 分钟一拍,闭内冷却):到期前 3 天问一次,只问一次 */
+  let nextRenewalScanAt=0
+  async function maybeAskRenewals(){
+    const at=now()
+    if(at<nextRenewalScanAt)return
+    nextRenewalScanAt=at+10*60_000
+    const active=await store.listActiveCommitments()
+    for(const c of active){
+      if(!shouldAskRenewal(c,at))continue
+      try{
+        if(c.deliver==='agent'&&await ports.isSimulationGroup(c.group_id)){
+          await ports.wakeSim(c.group_id,renderRenewalCard(c,at))
+        }else{
+          await sendGroupNotice(c,buildRenewalAskText(c,at))
+        }
+        await store.commitRunOutcome({...c,renewal_asked_at:at})
+        ports.logger.info(`[承诺] ${c.id}「${c.intent.slice(0,40)}」续约问询已发出`)
+      }catch(error){
+        ports.logger.warn(`[承诺] ${c.id} 续约问询失败(下轮扫描重试): ${error instanceof Error?error.message:String(error)}`)
+      }
+    }
+  }
+
   /**
    * 到期兑现:static 直发(经 sanitize);agent 唤醒仿真群回合。daily 立即顺延防双发;
-   * 失败 +10s 重试至 3 次置 failed。agent 兑现成败由仿真回合自证,P0 记 dispatched(P1 失约明说)。
+   * 失败 +10s 重试至 3 次,终态 failed 时失约明说+记 faillog(哨兵告警)。
+   * 续约问询扫描同拍运行(10 分钟冷却),到期前 3 天问创建人一次。
    */
   async function commitmentTick(){
+    await maybeAskRenewals().catch(()=>{})
     const at=now()
     const due=await store.takeDueCommitments(at)
     if(!due.length)return
@@ -155,6 +226,7 @@ export function createCommitmentRuntime(ports:CommitmentPorts) {
           const simGroup=await ports.isSimulationGroup(c.group_id)
           if(!simGroup){
             await store.commitRunOutcome({...c,status:'failed',last_run_at:at,last_result:'群未开仿真,无法兑现'})
+            await finalizeFailure(c,'群没开仿真模式，到点干不了活',at)
             continue
           }
           await ports.wakeSim(c.group_id,renderCommitmentCard(c))
@@ -178,8 +250,10 @@ export function createCommitmentRuntime(ports:CommitmentPorts) {
         await store.commitRunOutcome({...c,last_run_at:at,retry_count:0,last_result:'sent',next_run_at:advanced.nextRunAt??0,status:advanced.status})
         ports.logger.info(`[承诺] ${c.id} 静态兑现到群 ${c.group_id}「${c.intent.slice(0,40)}」`)
       }catch(error){
+        const reason=String(error instanceof Error?error.message:error).slice(0,80)
         ports.logger.error(`[承诺] 兑现 ${c.id} 失败:`,error)
-        await store.requeueForRetry({...c,last_result:String(error instanceof Error?error.message:error).slice(0,80)},at).catch(()=>{})
+        const outcome=await store.requeueForRetry({...c,last_result:reason},at).catch(()=>'retrying' as const)
+        if(outcome==='failed')await finalizeFailure(c,reason,at)
       }
     }
   }

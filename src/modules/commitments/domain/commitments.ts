@@ -70,6 +70,38 @@ export function isCommitmentExpired(c:CommitmentData,now:number):boolean {
   return c.expiry_at>0&&now>=c.expiry_at
 }
 
+/** 到期前 3 天进入续约问询窗;只问一次(renewal_asked_at 持久化),对方不回应就自然过期 */
+export const RENEWAL_LEAD_MS=3*86400_000
+const RENEWAL_LINE_SUFFIX_MS=7*86400_000
+
+export function daysUntilExpiry(c:CommitmentData,now:number):number {
+  return c.expiry_at>0?Math.max(0,Math.ceil((c.expiry_at-now)/86400_000)):0
+}
+
+export function shouldAskRenewal(c:CommitmentData,now:number):boolean {
+  if(c.status!=='active'||c.expiry_at<=0)return false
+  if(now<c.expiry_at-RENEWAL_LEAD_MS)return false
+  if(now>=c.expiry_at)return false
+  return !c.renewal_asked_at
+}
+
+/** 续约问询的仿真唤醒卡:agent 据此自然地问创建人,用户答应就 renew */
+export function renderRenewalCard(c:CommitmentData,now:number):string {
+  const days=daysUntilExpiry(c,now)
+  return `${c.creator_name||c.creator_id} 托付的「${c.intent}」还有 ${days} 天到期（到期就不再执行）。自然地问 TA 还要不要继续：要续就调 commitmentTool（action=renew，commitment_id 用 list 查）；TA 没接话或没回应就当默认到期，不再追问。`
+}
+
+/** static/非仿真群的续约问询直发文案(出站前仍经 sanitize) */
+export function buildRenewalAskText(c:CommitmentData,now:number):string {
+  return `你托付的「${c.intent.slice(0,80)}」还有 ${daysUntilExpiry(c,now)} 天到期，到期就不再执行了——要继续的话跟我说一声「续」就行`
+}
+
+/** 失约明说:重试超限转 failed 时向群坦白(失败可见 > 失约本身伤信任) */
+export function buildMissAdmissionText(c:CommitmentData,reason:string):string {
+  const clean=String(reason||'原因不明').slice(0,80)
+  return `你托付的「${c.intent.slice(0,80)}」这次没办成：${clean}。已停手不再重试了，还需要的话跟我说一声重新安排`
+}
+
 /** 执行后顺延:daily=下次同时刻;once=完结。拿不到下次时刻按失败收尾(P1 明说)。 */
 export function advanceCommitmentAfterRun(c:CommitmentData,now:number):{nextRunAt:number|null;status:CommitmentData['status']} {
   if(c.schedule.kind==='daily'){
@@ -94,8 +126,10 @@ export function renderCommitmentCard(c:CommitmentData):string {
 }
 
 export function formatCommitmentLine(c:CommitmentData,now:number):string {
+  const nearExpiry=c.status==='active'&&c.expiry_at>0&&c.expiry_at-now<=RENEWAL_LINE_SUFFIX_MS&&c.expiry_at>now
+    ?`（${daysUntilExpiry(c,now)} 天后到期）`:''
   const tail=c.status!=='active'
     ?`【${c.status}${c.last_result?`：${c.last_result.slice(0,40)}`:''}】`
     :c.next_run_at>now?`下次 ${formatBeijingClock(c.next_run_at)}`:'马上执行'
-  return `- [${c.id.slice(4,14)}] ${formatScheduleText(c.schedule)}「${c.intent.slice(0,60)}」 创建人:${c.creator_name||c.creator_id} ${tail}`
+  return `- [${c.id.slice(4,14)}] ${formatScheduleText(c.schedule)}「${c.intent.slice(0,60)}」${nearExpiry} 创建人:${c.creator_name||c.creator_id} ${tail}`
 }

@@ -16,7 +16,8 @@ import {
   Database,
   ImagePlus,
   Waves,
-  Coins
+  Coins,
+  ScrollText
 } from 'lucide-vue-next'
 export const navigation = [
   {
@@ -42,6 +43,7 @@ export const navigation = [
       { path: '/semantic', label: '语义记忆', icon: Database, hint: '长期记忆与召回' },
       { path: '/simulation', label: '自主仿真', icon: Waves, hint: 'AI 自主收发与唤醒管理' },
       { path: '/person-profiles', label: '人物记忆', icon: IdCard, hint: '跨群档案与全局好感' },
+      { path: '/trusteeship', label: '托付数据', icon: ScrollText, hint: '定时承诺与委托记忆' },
       { path: '/life', label: '作息与生活', icon: AlarmClock, hint: '生物钟与追番动态' },
       { path: '/games', label: '游戏', icon: Gamepad2, hint: '海龟汤题库审核与游戏参数' }
     ]

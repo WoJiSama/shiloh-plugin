@@ -6,6 +6,7 @@ import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinit
 import { mineUserCatchphrases } from '../domain/userStyle.js'
 import { boundedTimerDelay, safeSetTimeout, isDuplicateMessageId, sanitizeUntrustedText, safeToolErrorText, shouldSendErrorNotice } from '../domain/safety.js'
 import { evaluateWakeTrigger, formatWakeReason, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
+import { resolveSimToolSurface } from '../domain/toolPolicy.js'
 import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
@@ -54,8 +55,10 @@ export interface SimulationRuntimePorts {
   /** 出站发送：segments 为 OneBot 消息段数组（经全局出站闸门）；成功时尽量带回 message_id 供回执校验 */
   sendGroupMessage(groupId: string, segments: unknown[]): Promise<{ ok: boolean; error?: string; messageId?: string | number }>
   getPersona(groupId: string, selfId: string): { persona: PersonaText; systemContent: string }
-  /** 仿真回合额外放通的既有工具（simulation.extraTools 白名单；从 localToolRegistry 取实例） */
+  /** 仿真回合额外放通的既有工具（toolPolicy 解析出的实际放通名清单；从 localToolRegistry 取实例） */
   getExtraTools?(names: string[]): import('../../toolSupport/infrastructure/AbstractTool.js').AbstractTool[]
+  /** 注册表工具名清单（toolPolicy open 模式的默认能力面）；缺省时安全回落 legacy 白名单行为 */
+  listRegistryToolNames?(): { builtIn: string[]; all: string[] }
   /** 本群近期主线摘要（中期记忆）；无则空串 */
   getGroupDigest?(groupId: string): string
   /** 近两天情节记忆文本（"这两天聊过/做过什么"）；无则空串 */
@@ -312,6 +315,18 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       return ports.getExtraTools(names)
     } catch {
       return []
+    }
+  }
+
+  /** 实际放通的既有工具名清单:open=内置安全面−减法+追加(自定义/敏感走 extraTools/allowTools);legacy=extraTools 白名单。
+   *  端口缺省或解析异常都安全回落 legacy 行为——能力面只会更小不会更大。 */
+  function resolveExtraToolNames(cfg: SimRuntimeConfig, groupId: string): string[] {
+    if (cfg.toolPolicy.mode === 'legacy' || typeof ports.listRegistryToolNames !== 'function') return cfg.extraTools
+    try {
+      const registry = ports.listRegistryToolNames()
+      return resolveSimToolSurface({ policy: cfg.toolPolicy, builtInNames: registry.builtIn, extraTools: cfg.extraTools, groupId })
+    } catch {
+      return cfg.extraTools
     }
   }
 
@@ -691,8 +706,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       await store.save(groupId, state)
 
       const persona = ports.getPersona(groupId, self.id)
-      const extraTools = resolveExtraTools(cfg.extraTools)
-      const systemPrompt = buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames: cfg.extraTools, hasEmojiTool: cfg.extraTools.includes('sendLocalEmojiTool'), hasMoodTool: cfg.mood.enabled })
+      const extraToolNames = resolveExtraToolNames(cfg, groupId)
+      const extraTools = resolveExtraTools(extraToolNames)
+      const systemPrompt = buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames, hasEmojiTool: extraToolNames.includes('sendLocalEmojiTool'), hasMoodTool: cfg.mood.enabled })
 
       const memoryBox = { list: memories, sentTexts: [] as string[] }
       const selfMemoryBox = { list: normalizeMemoryList(await store.loadSelfMemories().catch(() => []), now()) }
@@ -1242,7 +1258,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   async function runHealthSentinel(): Promise<void> {
     try {
       const alerts: HealthAlert[] = []
-      // 直接读 style_memory.json（避免 import 循环依赖）
+      let commitmentFailures: { id?: string; intent?: string; group_id?: string; reason?: string; at?: number }[] | null = null
+      // 直接读 style_memory.json / redis faillog（与承诺模块约定键名，避免 import 循环依赖——同 style_memory 先例）
       try {
         const fs = await import('node:fs')
         const pathMod = await import('node:path')
@@ -1252,6 +1269,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           alerts.push(...checkHealth({ now: now(), styleMemory: memory }))
         }
       } catch { /* 读不到就跳过 */ }
+      try {
+        const raw = await (globalThis as unknown as { redis?: { get(k: string): Promise<string | null> } }).redis?.get?.('bl-chat:commitment:faillog')
+        if (raw) {
+          const parsed: unknown = JSON.parse(raw)
+          if (Array.isArray(parsed)) commitmentFailures = parsed.filter(v => v !== null && typeof v === 'object')
+        }
+      } catch { /* 读不到就跳过 */ }
+      alerts.push(...checkHealth({ now: now(), commitmentFailures }))
       // 写 Redis 供控制台展示
       const payload = JSON.stringify({ alerts, checkedAt: now() })
       try { await (globalThis as unknown as { redis?: { set(k: string, v: string): Promise<unknown> } }).redis?.set?.('shiloh:health:alerts', payload) } catch { /* redis 不可用 */ }

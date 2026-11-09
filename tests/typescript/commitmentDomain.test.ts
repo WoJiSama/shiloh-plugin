@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  advanceCommitmentAfterRun, checkCommitmentCaps, computeNextDailyRun, formatScheduleText,
-  isCommitmentExpired, normalizeSchedule, parseOnceTime, renderCommitmentCard, resolvedCommitmentConfig,
+  advanceCommitmentAfterRun, buildMissAdmissionText, buildRenewalAskText, checkCommitmentCaps, computeNextDailyRun, daysUntilExpiry, formatCommitmentLine, formatScheduleText,
+  isCommitmentExpired, normalizeSchedule, parseOnceTime, renderCommitmentCard, renderRenewalCard, resolvedCommitmentConfig, shouldAskRenewal,
 } from '../../src/modules/commitments/domain/commitments.js'
 import type { CommitmentData } from '../../src/contracts/commitments.js'
 
@@ -88,4 +88,45 @@ test('isCommitmentExpired', () => {
   assert.equal(isCommitmentExpired(c, NOON), false)
   assert.equal(isCommitmentExpired(c, NOON + 1000), true)
   assert.equal(isCommitmentExpired({ expiry_at: 0 } as CommitmentData, NOON), false, '0=永不过期')
+})
+
+test('shouldAskRenewal:到期前 3 天进问询窗,只问一次', () => {
+  const expiry = NOON + 30 * 86400_000
+  const base = { expiry_at: expiry, renewal_asked_at: 0, status: 'active' } as CommitmentData
+  assert.equal(shouldAskRenewal(base, NOON), false, '离到期还远,不问')
+  const leadEdge = expiry - 3 * 86400_000
+  assert.equal(shouldAskRenewal(base, leadEdge), true, '进入 3 天窗')
+  assert.equal(shouldAskRenewal(base, expiry - 1), true, '临到期仍可问')
+  assert.equal(shouldAskRenewal({ ...base, renewal_asked_at: NOON } as CommitmentData, expiry - 1), false, '问过一次就不再问')
+  assert.equal(shouldAskRenewal({ ...base, status: 'failed' } as CommitmentData, expiry - 1), false, '非 active 不问')
+  assert.equal(shouldAskRenewal({ ...base, expiry_at: 0 } as CommitmentData, NOON), false, '永不经理不上问询')
+  assert.equal(daysUntilExpiry(base, expiry - 86400_000), 1)
+})
+
+test('renderRenewalCard/buildRenewalAskText/buildMissAdmissionText:措辞锚定', () => {
+  const c = {
+    id: 'cmt_1', group_id: '1', creator_id: '2', creator_name: '星野', intent: '每天中午12点发三角洲今日密码',
+    schedule: { kind: 'daily', time: '12:00' }, deliver: 'agent', static_message: null,
+    expiry_at: NOON + 2 * 86400_000, renewal_asked_at: 0, next_run_at: NOON, status: 'active',
+    last_run_at: 0, last_result: '', retry_count: 0, created_at: 0, bot_id: '',
+  } as CommitmentData
+  assert.match(renderRenewalCard(c, NOON), /星野 托付的.+还有 2 天到期/, '卡片点名创建人与剩余天数')
+  assert.match(renderRenewalCard(c, NOON), /action=renew/, '卡片指引 renew 动作')
+  assert.match(renderRenewalCard(c, NOON), /不再追问/)
+  assert.match(buildRenewalAskText(c, NOON), /还有 2 天到期.+跟我说一声/)
+  const admit = buildMissAdmissionText(c, '上游搜索接口 503')
+  assert.match(admit, /没办成.+503/, '明说包含真实原因')
+  assert.match(admit, /已停手不再重试/, '明说不装没事')
+})
+
+test('formatCommitmentLine:临近到期标注天数', () => {
+  const base = {
+    id: 'cmt_1770000000000_2_abc123', group_id: '1', creator_id: '2', creator_name: '星野', intent: '每天发密码',
+    schedule: { kind: 'daily', time: '12:00' }, deliver: 'agent', static_message: null,
+    renewal_asked_at: 0, next_run_at: NOON + 3600_000, status: 'active',
+    last_run_at: 0, last_result: '', retry_count: 0, created_at: 0, bot_id: '',
+  } as CommitmentData
+  assert.doesNotMatch(formatCommitmentLine({ ...base, expiry_at: NOON + 20 * 86400_000 } as CommitmentData, NOON), /天后到期/, '远期不标')
+  assert.match(formatCommitmentLine({ ...base, expiry_at: NOON + 5 * 86400_000 } as CommitmentData, NOON), /5 天后到期/, '7 天内标注')
+  assert.match(formatCommitmentLine({ ...base, status: 'failed', expiry_at: NOON + 5 * 86400_000 } as CommitmentData, NOON), /【failed/, '非活跃仍显示状态')
 })

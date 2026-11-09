@@ -69,8 +69,21 @@ pluginSettings:
     enabled: true                # 总开关；false 时所有群走原链路
     allGroups: true              # true（默认）= 过了群白名单的群默认全部进仿真；false = 仅 groups 清单
     groups: []                   # 显式启用群种子（仅 allGroups: false 时用；.仿真 开/关 的按群覆盖存 Redis）
-    # 仿真回合额外放通的既有工具（白名单，从工具注册表按名取）。
-    # 默认开六件套：
+    # 工具能力策略（P1-3 翻转：白名单制 → 能力制）。
+    # mode: open（默认）= 内置注册表的安全工具默认全部放通，按需做减法——agent 拿到全量能力，
+    #        敏感工具（禁言/撤回/送礼/抢红包/QQ空间/改名片/@全体管理/reminder 与承诺账本重叠）默认禁；
+    # mode: legacy = 仅下面 extraTools 白名单（P0 行为，出问题可一键回退）。
+    # denyTools: 全局减法（工具名数组，如 ["bananaTool"] 全群禁画图）
+    # groups: 按群减法（如 {"123456789": ["bananaTool"]}）
+    # allowTools: 显式解禁敏感工具/放行自定义工具——开启前想清楚后果并在此写明原因
+    toolPolicy:
+      mode: open
+      denyTools: []
+      groups: {}
+      allowTools: []
+    # 仿真回合追加放通的既有工具（两种模式下都生效：legacy 模式=唯一放通面；open 模式=在默认面之上追加）。
+    # 自定义工具（custom_tools/）不进 open 默认面，仍从这里显式放行。
+    # 六件套（open 模式下已被默认面覆盖，保留给 legacy 回退用）：
     #   sendLocalEmojiTool=发表情（自带限流与冷却）
     #   searchVideoTool=搜B站视频并直接发群里（缺教程/要参考时主动搜）
     #   bananaTool=画图（群友说"画一张X"直接画，不需要 #tool）

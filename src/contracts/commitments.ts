@@ -15,6 +15,7 @@ export interface CommitmentData {
   deliver:'agent'|'static'         // agent=到点唤醒仿真 agent 用工具完成;static=直发固定文案
   static_message:string|null
   expiry_at:number                 // 到期不再执行(默认30天,防遗忘永动机)
+  renewal_asked_at?:number         // 到期前问询续约的时间(0/缺省=未问过;只问一次,不追问)
   next_run_at:number
   status:CommitmentStatus
   last_run_at:number

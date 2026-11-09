@@ -43,8 +43,8 @@
 | **VLM（analysisAi）** | 表情包图片（入库打标）；主链路识图图片 | 开 | 关 emojiSystem / 识图工具 |
 | **搜索 provider**（searchInformation/webParser；`simulation.extraTools` 放通后仿真回合也可用） | 搜索关键词（可能含群聊内容里的线索） | 开 | 从 oneapi_tools / simulation.extraTools 移除 |
 | **令牌账本** | 仅计数/模型名/金额，**不出机**（本地 NDJSON） | — | — |
-| **承诺账本（commitments）** | 托付原话/时间/创建人，**不出机**（本机 redis）；到期 static 直发文本必经 `sanitizeFinalReplyText` | 开 | `simulation.extraTools` / `oneapi_tools` 移除 commitmentTool 即停新增 |
-| **委托记忆（delegatedMemory）** | 群友托付的原话（owner 维度），**不出机**（本机 redis）；可查可删（本人/群主） | 开 | 同上移除 delegateMemoryTool |
+| **承诺账本（commitments）** | 托付原话/时间/创建人，**不出机**（本机 redis）；到期 static 直发、失约明说与续约问询文本必经 `sanitizeFinalReplyText`；终态失败记 faillog（仅 id/intent/群/原因/时间，截断 20 条，本机 redis）供哨兵告警 | 开 | `simulation.extraTools` / `oneapi_tools` 移除 commitmentTool 即停新增 |
+| **委托记忆（delegatedMemory）** | 群友托付的原话（owner 维度），**不出机**（本机 redis）；可查可删（本人/群主/控制台托付页） | 开 | 同上移除 delegateMemoryTool |
 | **梗提取（memoryAi 渠道）** | 近 40 条群消息文本（发给小模型判定） | 开（simulation.meme.enabled） | `simulation.meme.enabled: false` |
 
 > 向群友披露"消息会被 AI 处理"时，应一并考虑上表前四行。
@@ -55,7 +55,7 @@
 - **R2** `config/*.yaml` 中 API key 明文存放（同机读权限者可见）。
 - **R3** `custom_tools/` 与 MCP server 是任意代码执行面，信任边界=部署者本人。
 - **R4** 上游 provider 对发过去的内容的留存与使用不受本插件控制。
-- **R5** 仿真 extraTools 放通的工具继承其自身实现的安全性（如搜索的关键词出网）。
+- **R5** 仿真放通的既有工具（toolPolicy open 默认面 / extraTools 追加）继承其自身实现的安全性（如搜索的关键词出网）；敏感工具（禁言/撤回/送礼/抢红包/QQ空间/改名片/@全体管理/reminder）RESTRICTED 默认禁，解禁须显式 `toolPolicy.allowTools`。
 
 ## 五、发布前检查清单
 

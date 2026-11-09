@@ -100,3 +100,14 @@ test('限额提示只在有人在场时发:死群的定时器唤醒被拦不冒�
     assert.equal(shouldAnnounceBudgetLimit(kind, 0, t), true, `${kind} 被点名必提示`)
   }
 })
+
+test('承诺到期唤醒绕过每日回合/金额预算：答应了不放，不隐性失约', () => {
+  const cfg = config()
+  const commitment = { kind: 'commitment', detail: '每天中午12点发三角洲今日密码' }
+  assert.equal(checkWakeBudget(state({ turns: 40 }), cfg, now, 0, commitment).allowed, true, '回合打满仍放行')
+  const costly = checkWakeBudget(state(), cfg, now, 5.0, commitment)
+  assert.equal(costly.allowed, true, '金额到顶仍放行')
+  assert.equal(costly.reason, 'commitment')
+  // 其他直接点名类不享受该豁免（对照组）
+  assert.equal(checkWakeBudget(state({ turns: 40 }), cfg, now, 0, { kind: 'atMention', seq: 1 }).allowed, false)
+})

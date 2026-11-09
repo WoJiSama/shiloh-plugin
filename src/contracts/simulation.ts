@@ -240,8 +240,10 @@ export interface SimulationSection {
     groups?: Record<string, number>
   }
   agentPresetKeywords?: string[]
-  /** 仿真回合额外放通的既有工具名（白名单：不在此列的 40 工具仍不可用） */
+  /** 仿真回合额外放通的既有工具名（legacy 白名单；open 模式下作为追加面——自定义工具仍走这里显式放行） */
   extraTools?: unknown
+  /** 工具能力策略（P1-3 翻转）：mode=open 默认放通全量内置安全工具再按需做减法；legacy=仅 extraTools 白名单 */
+  toolPolicy?: unknown
   /** 本群专属梗自动提取（从群聊自身长出来的梗，不联网） */
   meme?: {
     enabled?: boolean
@@ -249,6 +251,18 @@ export interface SimulationSection {
     extractMinMessages?: number
     injectMax?: number
   }
+}
+
+/** 工具能力策略（仿真回合既有工具的放通口径） */
+export interface SimToolPolicyConfig {
+  /** legacy=仅 extraTools 白名单（P0 行为，可一键回退）；open=默认放通内置安全工具再做减法 */
+  mode: 'legacy' | 'open'
+  /** 显式放行（可解禁 RESTRICTED 默认禁的敏感工具；自定义工具也走这里） */
+  allowTools: string[]
+  /** 全局减法（对 open 默认面与 allowTools 都生效） */
+  denyTools: string[]
+  /** 按群减法：键=群号，值=工具名数组 */
+  groups: Record<string, string[]>
 }
 
 /** 归一化后的仿真运行配置（domain 默认值 + yaml 覆盖） */
@@ -260,6 +274,8 @@ export interface SimRuntimeConfig {
   turn: Required<Pick<NonNullable<SimulationSection['turn']>, 'maxToolRounds' | 'maxSendsPerTurn' | 'minSendGapMs' | 'sendPerMinute' | 'sendsPerHour' | 'maxTurnsPerDay' | 'historyMaxMessages' | 'historyMaxChars' | 'unreadLimit' | 'wakeMessageLimit' | 'wakeMaxChars' | 'messageTextMaxChars' | 'waitQuietMaxMs' | 'waitTimeoutMaxMs'>> & { groups: Record<string, number> }
   agentPresetKeywords: string[]
   extraTools: string[]
+  /** 归一化后的工具能力策略（open=默认放通内置安全工具再减法；legacy=仅 extraTools 白名单） */
+  toolPolicy: SimToolPolicyConfig
   meme: { enabled: boolean; extractCooldownMs: number; extractMinMessages: number; injectMax: number }
   budget: { dailyCostCny: number; groups: Record<string, number> }
   /** 唤醒预判闸开关（模型与凭证在装配层解析） */

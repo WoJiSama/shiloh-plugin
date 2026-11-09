@@ -44,6 +44,77 @@ try {
 } catch (error) {
   console.warn?.(`[console] 仿真运行时不可用（相关页面将显示未启用）：${error?.message || error}`)
 }
+// 托付数据（承诺账本+委托记忆）：直连本机 redis 读同一份键（与 bot 进程共享状态），只读+删除，数据不出机
+let trusteeship = null
+try {
+  const { lazyRedis, readPluginSettings } = await import("../utils/simulationRuntime.js")
+  if (!globalThis.redis) globalThis.redis = lazyRedis()
+  const redis = lazyRedis()
+  const { createCommitmentStore } = await import("../dist/backend/modules/commitments/infrastructure/commitmentStore.js")
+  const { createDelegatedMemoryStore } = await import("../dist/backend/modules/memory/infrastructure/delegatedMemoryStore.js")
+  const { resolvedCommitmentConfig } = await import("../dist/backend/modules/commitments/domain/commitments.js")
+  const { resolvedDelegatedConfig } = await import("../dist/backend/modules/memory/domain/delegatedMemory.js")
+  const quietLogger = { warn: () => {}, info: () => {} }
+  const commitmentStore = createCommitmentStore({ redis, logger: quietLogger })
+  const delegatedStore = createDelegatedMemoryStore({ redis, logger: quietLogger, loadConfig: () => ({}), now: () => Date.now() })
+  async function delegatedGroupIds() {
+    const ids = new Set()
+    try {
+      if (typeof redis.scanIterator === "function") {
+        for await (const key of redis.scanIterator({ MATCH: "bl-chat:delegated:*", COUNT: 100 })) ids.add(key.slice("bl-chat:delegated:".length))
+      } else {
+        for (const key of await redis.keys("bl-chat:delegated:*")) ids.add(key.slice("bl-chat:delegated:".length))
+      }
+    } catch { /* redis 不可用就当空 */ }
+    return [...ids]
+  }
+  trusteeship = {
+    overview: async () => {
+      const settings = readPluginSettings()
+      const ccfg = resolvedCommitmentConfig(settings.commitments || {})
+      const dcfg = resolvedDelegatedConfig(settings.delegatedMemory || {})
+      const [commitments, failures, groupIds] = await Promise.all([
+        commitmentStore.listActiveCommitments(),
+        commitmentStore.readFailLog(),
+        delegatedGroupIds(),
+      ])
+      const delegated = []
+      for (const groupId of groupIds) {
+        try {
+          const entries = await delegatedStore.load(groupId)
+          if (entries.length) delegated.push({
+            groupId,
+            entries: entries.map(e => ({ id: e.id, owner: e.owner, ownerName: e.ownerName, content: e.content, dueAt: e.dueAt, status: e.status, createdAt: e.createdAt })),
+          })
+        } catch { /* 坏键跳过 */ }
+      }
+      return {
+        commitments: commitments.map(c => ({
+          id: c.id, groupId: c.group_id, creatorId: c.creator_id, creatorName: c.creator_name,
+          intent: c.intent, schedule: c.schedule.kind === "daily" ? `每天 ${c.schedule.time}` : new Date(c.schedule.time + 8 * 3600_000).toISOString().slice(0, 16).replace("T", " "),
+          deliver: c.deliver, nextRunAt: c.next_run_at, expiryAt: c.expiry_at, status: c.status, lastResult: c.last_result, retryCount: c.retry_count,
+        })),
+        failures,
+        delegated,
+        config: {
+          maxActivePerGroup: ccfg.maxActivePerGroup, maxPerCreator: ccfg.maxPerCreator, defaultExpiryDays: ccfg.defaultExpiryDays,
+          maxPerGroupDelegated: dcfg.maxPerGroup, maxPerOwnerDelegated: dcfg.maxPerOwner,
+        },
+      }
+    },
+    cancelCommitment: async id => commitmentStore.cancelCommitment(id).then(() => true).catch(() => false),
+    deleteDelegated: async (groupId, id) => {
+      const entries = await delegatedStore.load(String(groupId))
+      const next = entries.filter(e => e.id !== String(id))
+      if (next.length === entries.length) return false
+      await delegatedStore.save(String(groupId), next)
+      return true
+    },
+    clearFailLog: async () => commitmentStore.clearFailLog().then(() => true).catch(() => false),
+  }
+} catch (error) {
+  console.warn?.(`[console] 托付数据不可用（相关页面将显示未启用）：${error?.message || error}`)
+}
 let style = null
 try {
   const { GlobalStyleLearnerManager } = await import("../domains/memory/GlobalStyleLearnerManager.js")
@@ -92,5 +163,5 @@ try {
 } catch (error) {
   console.warn?.(`[console] 风格学习视图不可用：${error?.message || error}`)
 }
-const app = createConsoleServer({ pluginRoot, buildTurnTraceReport, tokens, simulation, style })
+const app = createConsoleServer({ pluginRoot, buildTurnTraceReport, tokens, simulation, style, trusteeship })
 app.listen()

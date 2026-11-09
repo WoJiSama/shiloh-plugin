@@ -2587,3 +2587,29 @@ Report: docs/ai-low-reasoning-2026-10-15.md. Conditional future promises and low
 文件分工：父代理维护 contracts/schema/Store/gameFiles 与集成；生成代理维护 Generator/Prompts/Quality，玩法代理维护 Manager/Rules/Host，管理代理维护 console/UI/配置。各代理不运行共享构建、不提交。
 
 完成：Node24隔离整仓verify:phase退出0，后端2775通过/2环境跳过/0失败、前端65通过；类型/构建/边界/迁移登记均通过。真实本地控制台API+stub模型的6项浏览器检查通过。26份目标源码/测试哈希一致，1028份收尾非目标既有文件及共享HEAD/index保持。报告docs/turtle-soup-fixes-2026-10-19.md、验证清单docs/turtle-soup-verification-2026-10-19.json；未调用真实模型、未修生产题库、未提交/推送/部署。
+
+
+# 2026-11-09 P1 统一 agent 内核后续（失约明说/哨兵/能力翻转/托付页）
+
+## 背景
+P0（abad55c/c525220）已上线：承诺账本+委托记忆+路由手术，生产健康全绿。遗留：c525220 推送（本轮已完成）、真群自然验证（被动等待）、P1 四项。用户确认「全部完成」。
+
+## 目标
+1. P1-1 失约明说+续约问询：重试 3 次转 failed 时向群明说失败原因（经 sanitize 出站红线）；到期前 3 天问创建人续不续（agent 类唤醒仿真问、static 类直发问，只问一次）；commitmentTool 加 renew 动作；承诺唤醒绕过每日回合/金额预算闸（「答应了不放」优先于软预算，量小有界）。
+2. P1-2 哨兵接入：承诺终态失败写 faillog（JSON 数组键，截断 20 条，只存 id/intent/群/原因/时间）；health sentinel 读 faillog 产出 error 告警；控制台健康页自动可见。
+3. P1-3 能力策略翻转：simulation.toolPolicy（mode=legacy|open，默认 open）——open=内置注册表工具默认全量放通-减法（RESTRICTED 默认禁：禁言/撤回/送礼/抢红包/QQ空间/改名片/@全体管理/reminder 与承诺账本重叠）；按群减法 groups；allowTools 显式放行；extraTools 在两种模式下都保持追加（自定义工具仍显式放行）；RULES 红线 2 同步改写，legacy 可一键回退。
+4. P1-4 控制台托付数据页：/trusteeship——承诺账本（活跃清单+失败日志，可取消/清失败记录）+委托记忆（按群可删）；主人令牌保护；数据全在本机 redis，不出机。
+
+## 阶段
+- [ ] 阶段 1：domain/contracts（renewal、admission、toolPolicy、sentinel 输入扩展）
+- [ ] 阶段 2：承诺 runtime（tick 明说、renew、续约扫描、faillog）+ budget 豁免
+- [ ] 阶段 3：simConfig.toolPolicy 解析+装配面改造+shell 端口
+- [ ] 阶段 4：哨兵接线+控制台 API/前端页/导航
+- [ ] 阶段 5：回归测试+RULES/SECURITY_BASELINE/config_default 同步+全量验证
+- [ ] 阶段 6：deploy.sh 部署+健康检查+progress 记录+push
+
+## 约束
+- 一切 static 直发（失约明说/续约问询）必经 sanitizeFinalReplyText；发送失败只记日志不再抛。
+- faillog 不存用户额外数据；控制台页只读+删除，不提供编辑。
+- open 模式默认面只含内置注册表工具，自定义工具与敏感工具一律显式放行；翻转同一提交更新 RULES.md 红线与 SECURITY_BASELINE。
+- 续约问询只问一次（renewal_asked_at 持久化），对方不回应就自然过期，不追问。
