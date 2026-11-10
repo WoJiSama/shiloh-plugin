@@ -114,6 +114,9 @@ function replaceVariables(value, state, activities = {}) {
 }
 
 export function assessEvent(event, result) {
+  // A skipped dependency produced no behavior observation. Its skipped status
+  // still blocks engineering acceptance independently of behavior totals.
+  if (result.status === 'skipped') return {}
   const state = result.character, before = result.beforeCharacter, behavior = {}
   const wants = event.expect || {}
   const goals = state?.goals || [], oldGoals = before?.goals || [], memories = state?.memories || [], oldMemories = before?.memories || []
@@ -453,6 +456,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           activeResult.status = 'failed'; activeResult.errors.push(scrub(error.message)); activeResult.structuralFailures.push('exception')
           activeResult.character = character(); controller.abort(); runtime.stop()
           try { activeResult.activities = await activitySnapshot() } catch { /* Preserve the last trustworthy snapshot if shutdown prevents observation. */ }
+          activeResult.behavior = assessEvent(activeEvent, activeResult)
           // Do not allow an unsettled timed-out runtime to contaminate later events.
           halted ||= 'previous_event_incomplete'
         }

@@ -117,6 +117,39 @@ test('saved optimistic summaries and forged behavior values are independently re
   assert.ok(result.integrityFailures.some(value => value.startsWith('behavior_evidence_mismatch:')))
 })
 
+test('skipped dependency evidence has no behavior observations and still blocks acceptance', async t => {
+  const document = fixture(), result = document.results[0]
+  result.status = 'skipped'
+  result.skipReason = 'model_created_no_due_goal'
+  result.behavior = {}
+  document.summary = summarize(document.results)
+  const inspected = inspectReplay(document)
+  assert.equal(inspected.integrity, 'passed')
+  assert.equal(inspected.summary.behaviorMisses, 0)
+  assert.equal(inspected.summary.skippedEvents, 1)
+  assert.equal(inspected.engineering, 'failed')
+  const dir = scratch(t), candidate = saved(dir, 'skipped.json', document)
+  const report = await main(['--candidate', candidate, '--output-dir', path.join(dir, 'acceptance')], { log: noLog })
+  assert.equal(report.shadowAcceptance, 'failed')
+  assert.equal(report.exitCode, 1)
+})
+
+test('historical missing failure observations and skipped-summary inconsistencies remain detectable', () => {
+  const missing = fixture()
+  missing.results[0].status = 'failed'
+  missing.results[0].errors.push('logical_call_budget_exhausted')
+  missing.results[0].structuralFailures.push('exception')
+  delete missing.results[0].behavior
+  missing.summary = summarize(missing.results)
+  assert.ok(inspectReplay(missing).integrityFailures.some(value => value.startsWith('behavior_evidence_mismatch:')))
+  const stale = fixture()
+  stale.results[0].status = 'skipped'
+  stale.results[0].skipReason = 'model_created_no_due_goal'
+  stale.results[0].behavior = { noMessageSent: false }
+  stale.summary = summarize(stale.results)
+  assert.ok(inspectReplay(stale).integrityFailures.includes('saved_summary_mismatch'))
+})
+
 test('per-sample continuity, event ordering, clock and captured send scope stay consistent', () => {
   for (const [mutate, marker] of [
     [document => { document.results.reverse() }, 'event_order_mismatch'],

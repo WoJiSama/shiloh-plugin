@@ -4,8 +4,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createConsoleServer } from '../dist/backend/modules/platform/infrastructure/console/consoleServer.js'
+import { createSimulationRuntime } from '../dist/backend/modules/simulation/infrastructure/simulationRuntime.js'
+import { createDefaultSimSession } from '../dist/backend/modules/simulation/domain/simConfig.js'
 
-async function fixture(t, withControl = true) {
+async function fixture(t, withControl = true, simulation = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'character-console-'))
   const constructorTimers = []
   let server
@@ -43,7 +45,8 @@ async function fixture(t, withControl = true) {
         ...(withControl ? {
           controlCharacter: async (...args) => { calls.push(args); return '已更新' },
           controlActivity: async (...args) => { activityCalls.push(args); return '活动已更新' }
-        } : {})
+        } : {}),
+        ...simulation,
       }
     }))
   } finally {
@@ -60,8 +63,50 @@ async function fixture(t, withControl = true) {
     })
     return { status: response.status, data: await response.json() }
   }
-  return { request, calls, activityCalls }
+  const get = async endpoint => {
+    const response = await fetch(`${base}${endpoint}`, { headers: { 'x-console-token': token } })
+    return { status: response.status, data: await response.json() }
+  }
+  return { request, get, calls, activityCalls }
 }
+
+test('真实无机器人控制台读取旧会话返回待绑定且不创建角色范围', async t => {
+  const group = '10086', at = Date.parse('2026-11-09T00:00:00Z')
+  const state = createDefaultSimSession(at)
+  state.budget.turns = 4
+  const kv = new Map([
+    [`shiloh:sim:g:${group}`, JSON.stringify(state)],
+    ['shiloh:sim:known', JSON.stringify([group])],
+    ['shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [group], disabled: [], budgetCaps: {}, turnCaps: {} })],
+  ])
+  const runtime = createSimulationRuntime({
+    redis: { async get(key) { return kv.get(key) ?? null }, async set(key, value) { kv.set(key, value) }, async del(key) { kv.delete(key) } },
+    now: () => at, logger: { info() {}, warn() {}, error() {} },
+    getSelf: () => ({ id: '', name: '' }),
+    getPersona: () => { throw new Error('未绑定群不得解析人格') },
+    getSection: () => ({ enabled: true, allGroups: false, groups: [group] }),
+    getExecutionConfig: () => ({}), getExtraTools: () => [],
+    YTapi: async () => { throw new Error('控制台读取不得调用模型') },
+    sendGroupMessage: async () => { throw new Error('控制台读取不得发送群消息') },
+  })
+  t.after(() => runtime.stop())
+  const f = await fixture(t, true, runtime)
+  const before = [...kv.entries()]
+  const detail = await f.get(`/api/simulation/group?group=${group}`)
+  assert.equal(detail.status, 200)
+  assert.equal(detail.data.character, null)
+  assert.equal(detail.data.characterBinding.status, 'pending')
+  assert.equal(detail.data.budget.turns, 4)
+  assert.deepEqual(detail.data.activities.works, [])
+  assert.equal((await f.get('/api/simulation/overview')).data.groups[0].groupId, group)
+  assert.deepEqual((await f.get('/api/life/overview')).data.threads, [])
+  for (const body of [{ operation: 'pause' }, { action: 'activity', operation: 'reflection-reset' }]) {
+    const response = await f.request(body)
+    assert.ok(response.status >= 400)
+    assert.match(response.data.error, /尚未绑定机器人/)
+  }
+  assert.deepEqual([...kv.entries()], before)
+})
 
 test('character console actions require authentication and validate their target before dispatch', async t => {
   const f = await fixture(t)

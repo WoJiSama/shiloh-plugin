@@ -222,6 +222,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   function scopeFor(groupId: string, botId = ports.getSelf().id): CharacterScope {
     return { botId, personaId: ports.getPersona(groupId, botId).personaId || 'default', groupId }
   }
+  // A console process may have no adapter identity, or an unrelated default bot.
+  // Only an actual session binding establishes ownership of character data.
+  function boundScopeFor(groupId: string, botId?: string): CharacterScope | null {
+    return botId ? scopeFor(groupId, botId) : null
+  }
   function scopedStore(scope: CharacterScope): SimSessionStore {
     return createSimSessionStore({ redis: ports.redis, logger, now, characterScope: scope })
   }
@@ -1526,7 +1531,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             const timeout = setTimeout(() => controller.abort(), 30_000)
             timeout.unref?.()
             try {
-              const response = await ports.reflectCharacter!({ messages: [{ role: 'system', content: prompt }], temperature: 0.3, max_tokens: 1200 }, ports.getExecutionConfig(), controller.signal)
+              const response = await ports.reflectCharacter!({ messages: [{ role: 'system', content: prompt }, { role: 'user', content: '请根据以上材料进行本次反思，只返回规定 JSON。' }], temperature: 0.3, max_tokens: 1200 }, ports.getExecutionConfig(), controller.signal)
               const usage = record(response.usage)
               recordWakeTokens(state, Number(usage.total_tokens) || 0)
               await store.save(groupId, state)
@@ -1951,8 +1956,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     await refreshGroupState(true)
     const cfg = runtimeConfig()
     const state = await store.load(groupId)
-    const scope = scopeFor(groupId, state.botId)
-    await revokeSharedDerived(scope)
+    const scope = boundScopeFor(groupId, state.botId)
+    if (scope) await revokeSharedDerived(scope)
     const memories = normalizeMemoryList(await store.loadMemories(groupId), now())
     const memes = memories.filter(m => m.kind === 'meme' && !m.done).sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10)
     const affinity = await store.loadAffinity(groupId)
@@ -1982,8 +1987,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       pendingEvents: memories.filter(m => m.kind === 'pendingEvent' && !m.done).slice(0, 10).map(m => ({ id: m.id, content: m.content, dueAt: m.dueAt })),
       memes: memes.map(m => ({ id: m.id, content: m.content, count: m.count || 1, origin: m.origin || '' })),
       affinity: affinityList,
-      character: (state.botId || ports.getSelf().id) ? await characters.load(scopeFor(groupId, state.botId)) : null,
-      activities: {
+      characterBinding: scope
+        ? { status: 'bound', botId: scope.botId, personaId: scope.personaId }
+        : { status: 'pending', botId: null, personaId: null, reason: '等待机器人收到本群消息后绑定角色' },
+      character: scope ? await characters.load(scope) : null,
+      activities: scope ? {
         works: await workspaceFor(scope).list(), subscriptions: await subscriptionsFor(scope).list(),
         reflection: await reflectionFor(scope).read(), shared: await sharedFor(scope).projection(), sharedPending: await sharedFor(scope).pending(),
         capabilities: [
@@ -1994,16 +2002,16 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           { name: '外部工作器', description: '可配置研究、图片或浏览器网关，受任务协议、超时、取消与真实回执约束', available: !!ports.runCharacterWorker && ports.characterWorkerAvailable?.() !== false },
           ...resolveExtraTools(resolveExtraToolNames(runtimeConfig(),groupId)).map(tool => ({ name: tool.name, description: (tool.description || '').slice(0,160), available: AUTONOMOUS_EXTRA_TOOLS.includes(tool.name) || (AUTONOMOUS_CREATIVE_TOOLS.includes(tool.name) && Array.isArray(ports.getSection().autonomousTools) && ports.getSection().autonomousTools!.includes(tool.name)) })),
         ],
-      },
+      } : { works: [], subscriptions: [], reflection: null, shared: [], sharedPending: [], capabilities: [] },
     }
   }
 
   async function controlCharacter(groupId: string, action: 'pause' | 'resume' | 'cancel-goal' | 'pause-goal' | 'resume-goal' | 'delete-memory', id?: string): Promise<string> {
     if (!/^\d{5,12}$/.test(groupId)) throw new Error('群号格式无效')
     const state = await store.load(groupId)
+    const scope = boundScopeFor(groupId, state.botId)
+    if (!scope) throw new Error('本群尚未绑定机器人，请等待机器人收到本群消息后再管理角色')
     if (action === 'pause' || action === 'delete-memory') backgroundByGroup.get(groupId)?.abort()
-    if (!state.botId && !ports.getSelf().id) throw new Error('本群尚未绑定机器人，请等待机器人收到本群消息后再管理角色')
-    const scope = scopeFor(groupId, state.botId)
     if (action === 'delete-memory') await store.invalidateActivity(groupId)
     await characters.update(scope, current => {
       if (action === 'pause' || action === 'resume') return setCharacterPaused(current, action === 'pause', now())
@@ -2029,7 +2037,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
   async function controlActivity(groupId: string, action: CharacterActivityOperation, id?: string, payload?: Record<string, unknown>): Promise<string> {
     if (!/^\d{5,12}$/.test(groupId)) throw new Error('群号格式无效')
-    const session = await store.load(groupId), scope = scopeFor(groupId, session.botId)
+    const session = await store.load(groupId), scope = boundScopeFor(groupId, session.botId)
+    if (!scope) throw new Error('本群尚未绑定机器人，请等待机器人收到本群消息后再管理角色活动')
     if (action !== 'reflection-reset' && (!id || id.trim() !== id || id.length > 200)) throw new Error('缺少有效记录标识')
     const workspace = workspaceFor(scope), subscriptions = subscriptionsFor(scope), shared = sharedFor(scope)
     if (['work-delete','shared-delete','shared-approve'].includes(action)) {
@@ -2174,8 +2183,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     await refreshGroupState(true)
     const threads = (await Promise.all(knownGroupsCache.map(async groupId => {
       const state = await store.load(groupId)
-      if (!state.botId && !ports.getSelf().id) return []
-      return normalizeLifeThreads(await scopedStore(scopeFor(groupId, state.botId)).loadLifeThreads()).map(thread => ({ ...thread, groupId }))
+      const scope = boundScopeFor(groupId, state.botId)
+      if (!scope) return []
+      return normalizeLifeThreads(await scopedStore(scope).loadLifeThreads()).map(thread => ({ ...thread, groupId }))
     }))).flat()
     const hour = new Date(now() + 8 * 3600_000).getUTCHours()
     return { rhythm, threads, now: { hour, sleeping: isSleeping(hour, { sleepFrom: rhythm.sleepFrom, sleepTo: rhythm.sleepTo }) } }
@@ -2191,8 +2201,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     await refreshGroupState(true)
     for (const groupId of knownGroupsCache) {
       const state = await store.load(groupId)
-      if (!state.botId && !ports.getSelf().id) continue
-      await scopedStore(scopeFor(groupId, state.botId)).saveRhythm({ sleepFrom: from, sleepTo: to, setBy: 'admin' })
+      const scope = boundScopeFor(groupId, state.botId)
+      if (!scope) continue
+      await scopedStore(scope).saveRhythm({ sleepFrom: from, sleepTo: to, setBy: 'admin' })
     }
     rhythmCache = null
     return `已设定作息 ${from}:00 - ${to}:00（页面设定）`

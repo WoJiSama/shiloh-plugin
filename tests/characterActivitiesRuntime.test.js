@@ -73,7 +73,7 @@ function fixture({ groups = [GROUP], script = () => quiet(), fetchCharacterFeed,
   const characters = createCharacterStore({ redis, now: () => clock.value })
   return {
     runtime, kv, clock, calls, events, sent, errors, scope, redis, characters,
-    peerRuntime: () => createSimulationRuntime({ ...runtimePorts, redis: { ...redis } }),
+    peerRuntime: (overrides = {}) => createSimulationRuntime({ ...runtimePorts, redis: { ...redis }, ...overrides }),
     async memory(id, content, groupId = GROUP, kind = 'interest') {
       return characters.update(scope(groupId), state => addCharacterMemory(state, {
         id, kind, content, epistemic: kind === 'experience' ? 'reported' : 'inferred', evidenceRefs: ['message:1'],
@@ -91,6 +91,63 @@ async function idle(h, minCalls, group = GROUP) {
 }
 function toolResult(request, name) { return [...request.messages].reverse().find(message => message.role === 'tool' && message.name === name)?.content }
 function receiptFrom(result) { return JSON.parse(result.match(/【运行时行动回执】(.*)$/u)[1]) }
+
+test('旧会话在无机器人独立控制台保留群视图，拒绝空范围管理，收到真实消息后才绑定角色', async () => {
+  const h = fixture()
+  const state = JSON.parse(h.kv.get(sessionKey(GROUP)))
+  delete state.botId
+  state.seq = 3
+  state.lastReadThroughSeq = 2
+  state.agentHistory = [{ role: 'assistant', content: '历史会话内容' }]
+  state.budget.turns = 7
+  const message = { seq: 3, messageId: 'legacy-3', userId: '40000', name: '群友', text: '旧会话未读', at: BASE, atSelf: false, quoteToSelf: false }
+  state.unread = [message]; state.recent = [message]
+  h.kv.set(sessionKey(GROUP), JSON.stringify(state))
+  h.kv.set('shiloh:sim:overrides', JSON.stringify({ explicitEnabled: [GROUP], disabled: [], budgetCaps: {}, turnCaps: {} }))
+  let personaReads = 0
+  const consoleRuntime = h.peerRuntime({
+    getSelf: () => ({ id: '', name: '' }),
+    getPersona: (_groupId, botId) => {
+      assert.equal(botId, BOT, '仅允许已绑定会话解析实际机器人的人格')
+      personaReads++
+      return { personaId: 'shiloh', persona: { name: '希洛' }, systemContent: '喜欢探索与解谜' }
+    },
+  })
+  try {
+    const before = [...h.kv.entries()]
+    for (const runtime of [consoleRuntime, h.runtime]) {
+      const detail = await runtime.describeGroup(GROUP)
+      assert.equal(detail.groupId, GROUP)
+      assert.equal(detail.unreadCount, 1); assert.equal(detail.recentCount, 1)
+      assert.equal(detail.historyLength, 1); assert.equal(detail.lastReadThroughSeq, 2)
+      assert.equal(detail.budget.turns, 7)
+      assert.equal(detail.character, null)
+      assert.deepEqual(detail.characterBinding, { status: 'pending', botId: null, personaId: null, reason: '等待机器人收到本群消息后绑定角色' })
+      assert.deepEqual(detail.activities, { works: [], subscriptions: [], reflection: null, shared: [], sharedPending: [], capabilities: [] })
+      assert.deepEqual((await runtime.overview()).groups.map(group => group.groupId), [GROUP])
+      assert.deepEqual((await runtime.lifeOverview()).threads, [])
+      for (const action of ['pause', 'resume', 'cancel-goal', 'pause-goal', 'resume-goal', 'delete-memory']) {
+        await assert.rejects(runtime.controlCharacter(GROUP, action, action === 'pause' || action === 'resume' ? undefined : 'record-1'), /尚未绑定机器人/)
+      }
+      for (const action of ['work-archive', 'work-delete', 'work-restore', 'subscription-pause', 'subscription-resume', 'subscription-remove', 'shared-approve', 'shared-delete', 'reflection-reset']) {
+        await assert.rejects(runtime.controlActivity(GROUP, action, action === 'reflection-reset' ? undefined : 'record-1', action === 'work-restore' ? { revision: 1 } : undefined), /尚未绑定机器人/)
+      }
+    }
+    assert.deepEqual([...h.kv.entries()], before, '读取与被拒绝的管理不得写角色、撤销版本或覆盖旧会话')
+    assert.equal(personaReads, 0)
+    assert.equal(h.calls.length, 0); assert.equal(h.sent.length, 0)
+    await h.runtime.setLifeRhythm(1, 8)
+    assert.deepEqual([...h.kv.entries()].filter(([key]) => key !== 'shiloh:sim:rhythm'), before, '全局作息编辑不能为未绑定群创建角色范围')
+    await h.ingest('真正收到本群消息后建立绑定', { at: false })
+    const bound = await consoleRuntime.describeGroup(GROUP)
+    assert.deepEqual(bound.characterBinding, { status: 'bound', botId: BOT, personaId: 'shiloh' })
+    assert.deepEqual(bound.character.scope, h.scope())
+    assert.equal(bound.unreadCount, 2); assert.equal(bound.budget.turns, 7)
+    assert.ok(personaReads > 0)
+    assert.equal(h.calls.length, 0); assert.equal(h.sent.length, 0)
+    assert.ok([...h.kv.keys()].filter(key => key.startsWith('shiloh:character:')).every(key => key.includes(`:${BOT}:shiloh:${GROUP}`)))
+  } finally { h.runtime.stop(); consoleRuntime.stop() }
+})
 
 test('后台收尾写入等待期间的新消息保持序号与未读，点名触发在收尾后正常唤醒', async () => {
   for (const at of [false, true]) {
@@ -194,7 +251,11 @@ test('作品与订阅经模型工具持久化，订阅更新自主唤醒且去�
 test('后台反思阻止重置和巡检重入，保留新消息，暂停后丢弃迟到结果且不发送', async () => {
   const held = deferred()
   let reflected = 0, signal
-  const h = fixture({ reflectCharacter: async (_request, _config, abortSignal) => {
+  const h = fixture({ reflectCharacter: async (request, _config, abortSignal) => {
+    assert.equal(request.messages[0].role, 'system', '反思规则与来源保留在 system 消息')
+    assert.equal(request.messages[1].role, 'user', '兼容不接受 system-only 请求的模型服务')
+    assert.match(request.messages[1].content, /反思.*JSON/u)
+    assert.equal(request.tools, undefined, '反思调用不得获得发送工具')
     reflected++; signal = abortSignal; await held.promise
     return { choices: [{ message: { content: JSON.stringify({ summary: '形成新观点', updates: [{ kind: 'opinion', content: '我更喜欢连贯线索', evidenceRefs: ['memory:source-a', 'memory:source-b'] }], goals: [] }) } }], usage: { total_tokens: 20 } }
   } })

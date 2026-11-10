@@ -6,6 +6,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { parseOptions, validateScenarios, summarize, assessEvent, assessmentVersion, scenarioManifest, main } from '../scripts/characterReplay.mjs'
+import { inspectReplay } from '../scripts/characterAcceptance.mjs'
 import { hashReplayValue } from '../scripts/conversationQualityReplay.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -148,6 +149,14 @@ test('summary keeps missing usage and unknown money distinct from reported token
   const behavior = assessEvent({ expect: { goalCompleted: true, noSend: true } }, { character: { goals: [{ status: 'waiting', evidenceRefs: [] }], memories: [] }, sent: [], calls: [] })
   assert.equal(behavior.goalCompletedWithReceipt, false)
   assert.equal(behavior.noMessageSent, true)
+})
+
+test('skipped dependencies have no observed behavior and remain visible in summary', () => {
+  const result = { status: 'skipped', skipReason: 'model_created_no_due_goal', calls: [], sent: [], character: { goals: [], memories: [] } }
+  result.behavior = assessEvent({ expect: { goalCompleted: true } }, result)
+  assert.deepEqual(result.behavior, {})
+  assert.equal(summarize([result]).behaviorMisses, 0)
+  assert.equal(summarize([result]).skippedEvents, 1)
 })
 
 test('activity assessment fails closed for stale or missing snapshots and unconfirmed worker evidence', () => {
@@ -381,10 +390,33 @@ test('logical and total time budgets stop later events and retain partial eviden
   assert.equal(limited.summary.skippedEvents, 1)
   assert.equal(limited.results[1].skipReason, 'logical_call_budget_exhausted')
   assert.ok(limited.results[0].sent.length, 'actions before the limit remain in evidence')
+  assert.equal(limited.results[0].behavior.refusalRecorded, true, 'the final snapshot retains the valid decision made before budget exhaustion')
+  assert.ok(limited.results[0].errors.includes('logical_call_budget_exhausted'))
+  assert.ok(limited.results[0].structuralFailures.includes('exception'))
+  const inspected = inspectReplay(limited)
+  assert.equal(inspected.engineering, 'failed', 'partial behavior cannot override budget exhaustion or later skips')
+  assert.equal(inspected.integrityFailures.some(value => value.startsWith('behavior_evidence_mismatch:')), false)
+  assert.equal(inspected.integrityFailures.includes('saved_summary_mismatch'), false)
   const expired = await main(['--dry-run', '--scenario', 'social-refusal', '--max-duration-ms', '1', '--output-dir', path.join(dir, 'time')], { log: noLog })
   assert.equal(expired.summary.logicalCalls, 0)
   assert.equal(expired.summary.skippedEvents, 2)
   assert.ok(expired.results.every(r => r.skipReason === 'run_duration_exhausted'))
+})
+
+test('a missing due goal remains skipped without diverging from acceptance behavior totals', async t => {
+  const report = await main(['--scenario', 'motivated-goal-restart', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async () => ({ choices: [{ message: { role: 'assistant', content: '' } }] }), log: noLog, turnTimeoutMs: 5000,
+  })
+  const skipped = report.results.find(result => result.kind === 'goal-check')
+  assert.equal(skipped.status, 'skipped')
+  assert.equal(skipped.skipReason, 'model_created_no_due_goal')
+  assert.deepEqual(skipped.behavior, {})
+  const inspected = inspectReplay(report)
+  assert.deepEqual(inspected.summary, report.summary)
+  assert.equal(inspected.summary.skippedEvents, 1)
+  assert.equal(inspected.engineering, 'failed')
+  assert.equal(inspected.liveModel, 'pending')
+  assert.equal(inspected.integrityFailures.includes('saved_summary_mismatch'), false)
 })
 
 test('HTTP retries consume the HTTP budget even inside one logical model call', async t => {
