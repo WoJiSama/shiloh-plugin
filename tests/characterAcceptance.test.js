@@ -134,6 +134,23 @@ test('declared tool reply coverage is independently recomputed while old reports
   assert.ok(inspectReplay(document).integrityFailures.some(value => value.startsWith('invalid_tool_result_coverage:')))
 })
 
+test('tool evidence rejects reused ids across events and mismatched tool ownership', () => {
+  const document = fixture({ mode: 'live_model', eventCount: 2 })
+  document.metadata.toolResults = 'unique_tool_ids_per_sample'
+  for (const event of document.results) {
+    const toolCallId = 'same-provider-id', content = '{"ok":true,"goals":[]}'
+    event.calls[0].toolCalls = [{ id: toolCallId, function: { name: 'simGoal', arguments: '{"action":"list"}' } }]
+    event.toolResults = [{ toolCallId, content, name: 'simGoal', stage: 'main', hash: h({ toolCallId, content }) }]
+    event.toolResultCapture = { complete: true, requestedToolCallIds: [toolCallId], missingToolCallIds: [] }
+  }
+  assert.ok(inspectReplay(document).integrityFailures.some(value => value.startsWith('reused_tool_call_id:')))
+  const single = fixture({ mode: 'live_model' })
+  single.metadata.toolResults = document.metadata.toolResults
+  Object.assign(single.results[0], { calls: document.results[0].calls, toolResults: document.results[0].toolResults, toolResultCapture: document.results[0].toolResultCapture })
+  single.results[0].toolResults[0].name = 'simSubscription'
+  assert.ok(inspectReplay(single).integrityFailures.some(value => value.startsWith('orphan_tool_result_evidence:')))
+})
+
 test('skipped dependency evidence has no behavior observations and still blocks acceptance', async t => {
   const document = fixture(), result = document.results[0]
   result.status = 'skipped'

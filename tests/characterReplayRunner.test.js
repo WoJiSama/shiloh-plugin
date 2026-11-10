@@ -482,6 +482,24 @@ test('the final tool result at the round limit is captured without another model
   assert.equal(inspectReplay(report).integrity, 'passed')
 })
 
+test('reusing a previous event tool id cannot turn an old reply into current evidence', async t => {
+  const rounds = new Map()
+  const report = await main(['--scenario', 'social-refusal', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (_request, { event }) => {
+      const round = (rounds.get(event) || 0) + 1
+      rounds.set(event, round)
+      return { choices: [{ message: { role: 'assistant', content: '', ...(round === 1 ? { tool_calls: [{
+        id: 'reused-provider-id', type: 'function', function: { name: 'simGoal', arguments: '{"action":"list"}' },
+      }] } : {}) } }] }
+    }, turnTimeoutMs: 5000, log: noLog,
+  })
+  assert.equal(report.results[0].status, 'passed')
+  assert.equal(report.results[1].status, 'failed')
+  assert.ok(report.results[1].structuralFailures.includes('tool_call_id_reused'))
+  assert.deepEqual(report.results[1].toolResults, [])
+  assert.equal(inspectReplay(report).engineering, 'failed')
+})
+
 test('missing live configuration is skipped without network or claims of model success', async t => {
   const dir = scratch(t), originalFetch = globalThis.fetch
   let fetches = 0

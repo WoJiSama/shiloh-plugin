@@ -75,7 +75,7 @@ export function inspectReplay(document) {
       for (const event of scenario.events) expected.set(JSON.stringify([scenario.id, sampleIndex, event.eventIndex]), event)
     }
   }
-  const seen = new Set(), observations = [], recomputedResults = [], sampleResults = new Map()
+  const seen = new Set(), observations = [], recomputedResults = [], sampleResults = new Map(), sampleToolCallIds = new Map()
   let behaviorChecks = 0
   for (const result of document.results) {
     if (!isObject(result) || typeof result.scenario !== 'string' || !Number.isSafeInteger(result.sampleIndex) || !Number.isSafeInteger(result.eventIndex) || !['passed', 'failed', 'skipped'].includes(result.status)) fail('Invalid replay result identity or status')
@@ -95,7 +95,14 @@ export function inspectReplay(document) {
         if (!isObject(evidence) || !['main', 'reflection'].includes(evidence.stage) || typeof evidence.toolCallId !== 'string' || !evidence.toolCallId || typeof evidence.content !== 'string' || !validHash(evidence.hash) || evidence.hash !== hashReplayValue({ toolCallId: evidence.toolCallId, content: evidence.content })) failures.push(`invalid_tool_result_evidence:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
       }
       if (metadata.toolResults && result.status !== 'skipped') {
-        const requestedToolCallIds = [...new Set(result.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id)))]
+        const sampleKey = JSON.stringify([result.scenario, result.sampleIndex])
+        const previousIds = sampleToolCallIds.get(sampleKey) || new Set()
+        const currentCalls = result.calls.flatMap(call => (call.toolCalls || []).map(tool => ({ id: tool.id, name: tool.function?.name, stage: call.stage })))
+        const requestedToolCallIds = [...new Set(currentCalls.map(tool => tool.id))]
+        if (currentCalls.some(tool => previousIds.has(tool.id)) || requestedToolCallIds.length !== currentCalls.length) failures.push(`reused_tool_call_id:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
+        for (const id of requestedToolCallIds) previousIds.add(id)
+        sampleToolCallIds.set(sampleKey, previousIds)
+        if ((result.toolResults || []).some(evidence => !currentCalls.some(tool => tool.id === evidence.toolCallId && tool.name === evidence.name && tool.stage === evidence.stage))) failures.push(`orphan_tool_result_evidence:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
         const missingToolCallIds = requestedToolCallIds.filter(id => !(result.toolResults || []).some(evidence => evidence.toolCallId === id))
         if (!same(result.toolResultCapture, { complete: !missingToolCallIds.length, requestedToolCallIds, missingToolCallIds })) failures.push(`invalid_tool_result_coverage:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
         if (missingToolCallIds.length && result.status === 'passed') failures.push(`incomplete_tool_result_capture:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)

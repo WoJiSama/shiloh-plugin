@@ -264,7 +264,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
     clock: 'fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded',
     search: 'synthetic_fixture', feeds: 'synthetic_fixture; no_real_HTTP', worker: 'synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission', reflection: 'separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode',
     storage: 'fresh_in_memory_per_sample', platform: 'captured_only',
-    toolResults: 'current_event_tool_replies_from_model_requests_and_final_persisted_session; no_extra_model_calls',
+    toolResults: 'current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls',
     generation: 'configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters',
     simulationOverrides: { tools: 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded' },
     personaSource: 'merged_config_persona; persona_library_bindings_not_loaded',
@@ -289,6 +289,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
   ]) : null
   for (const scenario of scenarios) for (let sampleIndex = 1; sampleIndex <= options.repetitions; sampleIndex++) {
     const kv = new Map(), scope = { botId: BOT, personaId: 'character-replay', groupId: GROUP }
+    const seenToolCallIds = new Set()
     let epoch = BASE_AT, anchor = Date.now(), activeResult, activeEvent, eventCalls = 0, controller, activeModelStage
     const now = () => epoch + Date.now() - anchor
     const sessionKey = `shiloh:sim:g:${GROUP}`
@@ -346,6 +347,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       for (const message of messages || []) {
         if (message.role !== 'tool') continue
         const toolCallId = String(message.tool_call_id || '')
+        if (seenToolCallIds.has(toolCallId)) continue
         const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? null)
         const key = hashReplayValue({ toolCallId, content })
         if (activeResult.toolResults.some(result => result.hash === key)) continue
@@ -383,6 +385,11 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         const message = response?.choices?.[0]?.message
         capture.output = message?.content || ''
         capture.toolCalls = (message?.tool_calls || []).map(call => ({ id: call.id, type: call.type, function: { name: call.function?.name, arguments: call.function?.arguments } }))
+        const currentToolCallIds = activeResult.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id))
+        if (currentToolCallIds.some(id => seenToolCallIds.has(id)) || new Set(currentToolCallIds).size !== currentToolCallIds.length) {
+          activeResult.structuralFailures.push('tool_call_id_reused')
+          throw new Error('tool_call_id_reused')
+        }
         if (response?.error || !message) throw new Error(scrub(typeof response?.error === 'string' ? response.error : 'model_returned_no_message'))
         if (reflection) Object.assign(reflection, { status: 'succeeded', output: capture.output, usage: capture.usage, model: capture.model })
         return response
@@ -504,6 +511,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         const requestedToolCallIds = [...new Set(activeResult.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id)))]
         const missingToolCallIds = requestedToolCallIds.filter(id => !activeResult.toolResults.some(result => result.toolCallId === id))
         activeResult.toolResultCapture = { complete: !missingToolCallIds.length, requestedToolCallIds, missingToolCallIds }
+        for (const id of requestedToolCallIds) seenToolCallIds.add(id)
         if (missingToolCallIds.length && activeResult.status === 'passed') {
           activeResult.structuralFailures.push('tool_result_capture_incomplete')
           activeResult.status = 'failed'
