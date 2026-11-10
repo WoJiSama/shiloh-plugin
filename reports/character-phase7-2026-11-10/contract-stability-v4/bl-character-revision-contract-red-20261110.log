@@ -1,0 +1,37 @@
+✖ 观点修订不能成功后遗漏旧来源；错误来源提示保留完整前缀格式 (2.228458ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51.452291
+
+✖ failing tests:
+
+test at tests/characterTools.test.js:78:1
+✖ 观点修订不能成功后遗漏旧来源；错误来源提示保留完整前缀格式 (2.228458ms)
+  AssertionError [ERR_ASSERTION]: The "string" argument must be of type string. Received type object ({
+    ok: true,
+    memory: {
+      id: 'memory-2',
+      kind: 'opinion',
+      content: '根据新反馈调整这个看法',
+      epistemic: 'inferred',
+      evidenceRefs: [ 'message:1' ],
+      createdAt: 1794200000000,
+      updatedAt: 1794200000000,
+      supersedes: 'memory-1'
+    }
+  })
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterTools.test.js:84:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { ok: true, memory: { id: 'memory-2', kind: 'opinion', content: '根据新反馈调整这个看法', epistemic: 'inferred', evidenceRefs: [Array], createdAt: 1794200000000, updatedAt: 1794200000000, supersedes: 'memory-1' } },
+    expected: /^error:.*memory:/,
+    operator: 'match',
+    diff: 'simple'
+  }

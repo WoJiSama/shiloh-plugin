@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "file": "reflection-results.json",
+    "sha256": "1bceea497e7ce3c4ab9d943c549ff7770e10ec825231cd3519361f6b028ab77d",
+    "mode": "live_model",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "passed",
+    "behavior": "passed",
+    "liveModel": "passed",
+    "assessmentVersion": 3,
+    "repetitions": 1,
+    "runId": "1d066406-48b7-4b08-a8f3-5ced82cc9857",
+    "startedAtISO": "2026-11-10T05:13:26.577Z",
+    "fingerprints": {
+      "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+      "scenariosHash": "e15a041b655c6f638dd2e92a7086e5fc84abcc8306ba01406afe66d964a1c581",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+      "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+      "scenarioManifestHash": "d08b7415c1077e017c924de77308dd1dd98b9a6d0863bbaaab2760006d9fd513"
+    },
+    "expectedEvents": 3,
+    "behaviorChecks": 9,
+    "successfulHttpRequests": 6,
+    "summary": {
+      "events": 3,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 6,
+      "mainCalls": 5,
+      "reflectionCalls": 1,
+      "feedFetches": 0,
+      "workerCalls": 0,
+      "httpRequests": 6,
+      "capturedMessages": 2,
+      "reportedTokens": 64063,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "noReflectionModelCall": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "opinionPersisted": true,
+          "noMessageSent": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "noReflectionModelCall": true,
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "independent-reflection:sample-1",
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "expectedEvents": 3
+      }
+    ]
+  },
+  "comparison": {
+    "status": "pending",
+    "reason": "baseline_not_provided",
+    "singleVariableAttribution": false
+  },
+  "humanReview": {
+    "status": "pending",
+    "items": [
+      {
+        "sampleId": "independent-reflection:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      }
+    ]
+  },
+  "stage7": {
+    "status": "pending",
+    "realGroupObservation": "not_provided",
+    "deployment": "not_verified",
+    "reason": "Shadow reports cannot replace actual cross-day group observation and deployment evidence."
+  },
+  "evidenceTrust": "Fingerprints check local consistency and bind review to saved bytes; they do not authenticate a provider, a human reviewer or an actual independent deployment.",
+  "shadowAcceptance": "pending",
+  "exitCode": 2
+}

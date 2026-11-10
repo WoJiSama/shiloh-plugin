@@ -54,7 +54,7 @@ function strings(input: Record<string, unknown>, key: string): string[] {
 function evidence(input: Record<string, unknown>, ctx: CharacterToolContext): string[] {
   const refs = strings(input, 'evidenceRefs')
   const visible = new Set(ctx.visibleEvidenceRefs())
-  if (refs.some(ref => !visible.has(ref))) throw new Error('引用了本轮不可见的来源')
+  if (refs.some(ref => !visible.has(ref))) throw new Error('引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。')
   return refs
 }
 
@@ -101,16 +101,16 @@ function page<T extends { id: string; createdAt: number; updatedAt: number }>(it
 
 export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] {
   const memory = new CharacterTool('simCharacterMemory',
-    '读取或保存当前角色在本群的经历、观点和兴趣。记忆必须引用本轮可见的 message:序号、receipt:回执ID 或 memory:记忆ID。别人说的记 reported，推测/观点记 inferred，计划记 desired；observed 必须有真实成功回执。不得把愿望、计划或工具调用本身记成已完成。', {
+    '读取或保存当前角色在本群的经历、观点和兴趣。list只传action和可选beforeId；remember必填kind/content/epistemic/evidenceRefs。转述群友反馈用experience+reported，自己的判断用opinion+inferred，兴趣用interest+inferred或desired；opinion绝不能搭配reported。独立来源分别保存，综合判断另记inferred。来源只用本轮可见的message:序号、receipt:回执ID或memory:记忆ID；observed必须有真实成功回执，不能把调用成功当作资料内容已核实。修正时先读取真实旧记忆，再传supersedes并引用旧memory来源及新证据；不存在旧记录就新建，不虚构修订。成功返回后才能说已记住，不得把愿望或计划记成已完成。', {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['list', 'remember'] },
         beforeId: { type: 'string', description: '仅list：下一页传上次nextBeforeId，从最近记录向更早记录分页读取。' },
-        kind: { type: 'string', enum: ['experience', 'opinion', 'interest'] },
-        content: { type: 'string' },
-        epistemic: { type: 'string', enum: ['reported', 'observed', 'inferred', 'desired'] },
-        evidenceRefs: { type: 'array', items: { type: 'string' } },
-        supersedes: { type: 'string', description: '修正旧记忆时引用原记忆ID。' },
+        kind: { type: 'string', enum: ['experience', 'opinion', 'interest'], description: 'experience保存转述或经历；opinion保存自己的判断且epistemic只能inferred；interest保存兴趣。' },
+        content: { type: 'string', description: '只写来源实际支持的内容；多条独立反馈分别保存，自己的综合判断另记。' },
+        epistemic: { type: 'string', enum: ['reported', 'observed', 'inferred', 'desired'], description: 'reported=别人说的(experience)；inferred=自己的推测/观点；desired=想做；observed=有成功回执的实际行动。opinion必须inferred。' },
+        evidenceRefs: { type: 'array', items: { type: 'string' }, description: 'remember必填，本轮可见来源；修正旧观点时包含memory:旧ID及支持修正的新证据。' },
+        supersedes: { type: 'string', description: '仅修正实际存在且可见的旧记忆时传原ID，同时把memory:原ID加入evidenceRefs；首次保存不传。' },
       },
       required: ['action'], additionalProperties: false,
     }, async input => {
@@ -127,6 +127,7 @@ export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] 
       const content = text(input, 'content')
       const supersedes = input.supersedes === undefined ? undefined : text(input, 'supersedes')
       if (supersedes && !ctx.visibleEvidenceRefs().includes(`memory:${supersedes}`)) throw new Error('被修正的记忆本轮不可见')
+      if (supersedes && !refs.includes(`memory:${supersedes}`)) throw new Error(`修正记忆必须在 evidenceRefs 中包含 memory:${supersedes}，并保留支持修正的新证据；本次未保存。`)
       const state = await ctx.update(state => addCharacterMemory(state, {
         id, kind, content, epistemic, evidenceRefs: refs,
         ...(supersedes === undefined ? {} : { supersedes }),
@@ -136,10 +137,10 @@ export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] 
     })
 
   const goal = new CharacterTool('simGoal',
-    '管理自己的少量自主目标，不能代替群友已接受的托付账本。create 要有动机、完成标准、停止条件及可见来源；focus 在行动前选择目标，执行身份切为自主且不能借用群友权限。没有新信息用 wait（最早15分钟后检查），有真实成功回执才可 complete，也可以 abandon。普通聊天不必建立目标。', {
+    '管理自己的少量自主目标，不能代替群友已接受的托付账本。普通聊天或只想关注话题不用建目标；若自己已决定稍后主动继续研究，先检查已有目标，新计划create成功后再表达，已有目标复用，不重复创建。已有目标安排变更用wait；wait/complete/abandon是收尾，之后结束本轮，不继续行动或发言；必要说明先自然表达打算，不声称尚未保存的更新。关键词唤醒不等于目标。create必填title/motivation/nextStep/completionCriteria/stopConditions/evidenceRefs，可选nextCheckInMinutes/expiresInHours/maxAttempts，不传id或outcome。focus只传action/id，在行动前选择目标，执行身份切为自主且不能借群友权限；不要给focus传outcome。wait传action/id及可选nextCheckInMinutes/nextStep/outcome/evidenceRefs，最早15分钟后检查。complete传action/id/evidenceRefs及可选outcome，来源必须有本目标的真实成功回执；abandon传action/id及可选outcome/evidenceRefs。list只传action和可选beforeId。', {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['list', 'create', 'focus', 'wait', 'complete', 'abandon'] },
+        action: { type: 'string', enum: ['list', 'create', 'focus', 'wait', 'complete', 'abandon'], description: '各action字段不能混用；focus仅action/id，结果在wait/complete/abandon的outcome中保存。' },
         beforeId: { type: 'string', description: '仅list：下一页传上次nextBeforeId，从最近记录向更早记录分页读取。' },
         id: { type: 'string', description: '操作已有目标时的ID；创建ID由系统生成。' },
         title: { type: 'string' }, motivation: { type: 'string' },
@@ -149,7 +150,7 @@ export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] 
         nextCheckInMinutes: { type: 'number', minimum: 15, maximum: 43200 },
         expiresInHours: { type: 'number', minimum: 0.25, maximum: 720 },
         maxAttempts: { type: 'number', minimum: 1, maximum: 8 },
-        outcome: { type: 'string', description: '这一步的简短结果或放弃理由，不是完整思考过程。' },
+        outcome: { type: 'string', description: '仅wait/complete/abandon：简短结果或放弃理由；create/focus/list不接受，不写完整思考过程。' },
       },
       required: ['action'], additionalProperties: false,
     }, async input => {
@@ -205,7 +206,7 @@ export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] 
     })
 
   const decision = new CharacterTool('simDecide',
-    '拒绝或暂缓请求时先调用本工具保存选择及简短理由，再视需要用 simSendMessage 自然说明；只在聊天里拒绝不会留下决策记录。engage参与、silent旁听、cannot能力不足、unauthorized未获授权、unwilling不愿意、deferred暂缓。silent/deferred 会阻止本轮未发送文本兜底外发；不向群友展示内部理由或标签。选择不会撤销已接受的正式承诺或提升权限。', {
+    '拒绝或暂缓请求时先调用本工具保存选择及简短理由，成功后再视需要用simSendMessage自然说明；只在聊天里拒绝不会留下决策记录。例如不愿一味迎合：先传kind=unwilling、reason=简短边界理由，再发自然拒绝。engage参与、silent旁听、cannot能力不足、unauthorized未获授权、unwilling不愿意、deferred暂缓。silent/deferred会阻止本轮发送，选择后直接结束。不向群友展示内部理由或标签；选择不会撤销已接受的正式承诺或提升权限。', {
       type: 'object',
       properties: {
         kind: { type: 'string', enum: ['engage', 'silent', 'cannot', 'unauthorized', 'unwilling', 'deferred'] },

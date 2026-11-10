@@ -1,0 +1,632 @@
+{
+  "kind": "final_contract_stability_live_shadow_observations",
+  "runs": [
+    {
+      "name": "social",
+      "file": "server-live/social-results.json",
+      "sha256": "0c262b4cd058d9a62b9b9540b49c586264d2e67a143f04e24106cf4b5c13602c",
+      "metadata": {
+        "schemaVersion": 1,
+        "assessmentVersion": 3,
+        "runId": "16bc08f7-21bc-4878-a93c-fff1d8bbf1c6",
+        "startedAtISO": "2026-11-10T05:13:26.558Z",
+        "scenarioManifest": [
+          {
+            "id": "social-refusal",
+            "events": [
+              {
+                "eventIndex": 0,
+                "eventHash": "3f6a699e3ebdd05a906d4cf2e7516fe5cb2bacc8fbbcbab582afdf9e42b25f4e",
+                "expect": {
+                  "refusal": true
+                }
+              },
+              {
+                "eventIndex": 1,
+                "eventHash": "c6602b77c6601368d5494d739ce4d4406dfb3a171124fabf7395116c46b99064",
+                "expect": {
+                  "refusal": true
+                }
+              }
+            ]
+          }
+        ],
+        "scenarioManifestHash": "403cb0d864d7bcbeedfe93e05a33ccfb8a58d692ec3c50651ac023a765904047",
+        "mode": "live_model",
+        "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+        "scenariosHash": "5769d8c35b6eff00579a9fa84959009112535b0644aed11ce73b69cadd66f256",
+        "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+        "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+        "model": "glm-5.3",
+        "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+        "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+        "search": "synthetic_fixture",
+        "feeds": "synthetic_fixture; no_real_HTTP",
+        "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+        "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+        "storage": "fresh_in_memory_per_sample",
+        "platform": "captured_only",
+        "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+        "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+        "simulationOverrides": {
+          "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+          "maxToolRounds": 6,
+          "maxSendsPerTurn": 3,
+          "waitMaxMs": 1000,
+          "auxiliaryModels": false,
+          "independentReflection": true,
+          "probabilityWake": false,
+          "scheduledIdleProbability": 1,
+          "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+        },
+        "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+        "seed": "empty_bound_session; no_goals_or_memories_seeded",
+        "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+        "maxCalls": 24,
+        "maxHttp": 32,
+        "maxDurationMs": 240000,
+        "repetitions": 2,
+        "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+      },
+      "integrity": "passed",
+      "engineering": "passed",
+      "behavior": "passed",
+      "liveModel": "passed",
+      "expectedEvents": 4,
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 20,
+        "mainCalls": 20,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 20,
+        "capturedMessages": 8,
+        "reportedTokens": 256732,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "toolErrors": [],
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    },
+    {
+      "name": "opinion",
+      "file": "server-live/opinion-results.json",
+      "sha256": "7016f184fcddf3899ab584a4aacc43b2517aa7c6992aa064bed5ece52aebe317",
+      "metadata": {
+        "schemaVersion": 1,
+        "assessmentVersion": 3,
+        "runId": "5a56247e-e519-4987-bd0e-cfc7dbe41f88",
+        "startedAtISO": "2026-11-10T05:11:43.801Z",
+        "scenarioManifest": [
+          {
+            "id": "opinion-revision",
+            "events": [
+              {
+                "eventIndex": 0,
+                "eventHash": "b2713209b68840182146abfde0237556545a31abf9927cd72db8c94b384431ff",
+                "expect": {
+                  "opinion": true
+                }
+              },
+              {
+                "eventIndex": 1,
+                "eventHash": "7c109e31ec1541ecc292a2dbcd526f4789dcdd1f0427917a195699007941dd49",
+                "expect": {
+                  "revisedOpinion": true
+                }
+              }
+            ]
+          }
+        ],
+        "scenarioManifestHash": "3013600ef0e0de19eafd8127a949b2b964ddea931de3852a8090e461f784eca2",
+        "mode": "live_model",
+        "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+        "scenariosHash": "5e4a25f603210e3efa00052e2fe348bae0c4db699f5bba06a77e786101e0474e",
+        "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+        "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+        "model": "glm-5.3",
+        "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+        "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+        "search": "synthetic_fixture",
+        "feeds": "synthetic_fixture; no_real_HTTP",
+        "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+        "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+        "storage": "fresh_in_memory_per_sample",
+        "platform": "captured_only",
+        "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+        "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+        "simulationOverrides": {
+          "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+          "maxToolRounds": 6,
+          "maxSendsPerTurn": 3,
+          "waitMaxMs": 1000,
+          "auxiliaryModels": false,
+          "independentReflection": true,
+          "probabilityWake": false,
+          "scheduledIdleProbability": 1,
+          "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+        },
+        "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+        "seed": "empty_bound_session; no_goals_or_memories_seeded",
+        "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+        "maxCalls": 24,
+        "maxHttp": 32,
+        "maxDurationMs": 240000,
+        "repetitions": 1,
+        "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+      },
+      "integrity": "passed",
+      "engineering": "passed",
+      "behavior": "passed",
+      "liveModel": "passed",
+      "expectedEvents": 2,
+      "summary": {
+        "events": 2,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 8,
+        "mainCalls": 8,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 8,
+        "capturedMessages": 6,
+        "reportedTokens": 106806,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "toolErrors": [],
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    },
+    {
+      "name": "reflection",
+      "file": "server-live/reflection-results.json",
+      "sha256": "1bceea497e7ce3c4ab9d943c549ff7770e10ec825231cd3519361f6b028ab77d",
+      "metadata": {
+        "schemaVersion": 1,
+        "assessmentVersion": 3,
+        "runId": "1d066406-48b7-4b08-a8f3-5ced82cc9857",
+        "startedAtISO": "2026-11-10T05:13:26.577Z",
+        "scenarioManifest": [
+          {
+            "id": "independent-reflection",
+            "events": [
+              {
+                "eventIndex": 0,
+                "eventHash": "898b4d7e355083f943de0df89fea7d4626510776ce0c1906ba9e0c8646c320d4",
+                "expect": {
+                  "noReflectionCall": true
+                }
+              },
+              {
+                "eventIndex": 1,
+                "eventHash": "251e1a288d44a1e707a04fd0407d3b51f900550eaf7a3ffe37c205f0f11df466",
+                "expect": {
+                  "reflected": true,
+                  "opinion": true,
+                  "noSend": true,
+                  "noWorkerCall": true
+                }
+              },
+              {
+                "eventIndex": 2,
+                "eventHash": "9d3c3c9ca4e521ef316533e1fc753cace30b26fd5b9479b9ddac0597d02ac5b7",
+                "expect": {
+                  "reflected": false,
+                  "noReflectionCall": true,
+                  "noCall": true,
+                  "noSend": true
+                }
+              }
+            ]
+          }
+        ],
+        "scenarioManifestHash": "d08b7415c1077e017c924de77308dd1dd98b9a6d0863bbaaab2760006d9fd513",
+        "mode": "live_model",
+        "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+        "scenariosHash": "e15a041b655c6f638dd2e92a7086e5fc84abcc8306ba01406afe66d964a1c581",
+        "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+        "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+        "model": "glm-5.3",
+        "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+        "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+        "search": "synthetic_fixture",
+        "feeds": "synthetic_fixture; no_real_HTTP",
+        "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+        "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+        "storage": "fresh_in_memory_per_sample",
+        "platform": "captured_only",
+        "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+        "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+        "simulationOverrides": {
+          "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+          "maxToolRounds": 6,
+          "maxSendsPerTurn": 3,
+          "waitMaxMs": 1000,
+          "auxiliaryModels": false,
+          "independentReflection": true,
+          "probabilityWake": false,
+          "scheduledIdleProbability": 1,
+          "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+        },
+        "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+        "seed": "empty_bound_session; no_goals_or_memories_seeded",
+        "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+        "maxCalls": 24,
+        "maxHttp": 32,
+        "maxDurationMs": 240000,
+        "repetitions": 1,
+        "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+      },
+      "integrity": "passed",
+      "engineering": "passed",
+      "behavior": "passed",
+      "liveModel": "passed",
+      "expectedEvents": 3,
+      "summary": {
+        "events": 3,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 6,
+        "mainCalls": 5,
+        "reflectionCalls": 1,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 6,
+        "capturedMessages": 2,
+        "reportedTokens": 64063,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "toolErrors": [],
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    },
+    {
+      "name": "motivated",
+      "file": "server-live/motivated-results.json",
+      "sha256": "68dcfccb8c90eff249d91386dc69fa79019e248cdaebf6f8e015a6c1cf1e88c2",
+      "metadata": {
+        "schemaVersion": 1,
+        "assessmentVersion": 3,
+        "runId": "040b06fc-d3cb-4762-b6f1-78d872dbcf30",
+        "startedAtISO": "2026-11-10T05:11:43.813Z",
+        "scenarioManifest": [
+          {
+            "id": "motivated-goal-restart",
+            "events": [
+              {
+                "eventIndex": 0,
+                "eventHash": "39d8f3b3abca0001b75d4705f7ae28eefbc429bb7de68276f4b81f300beb1406",
+                "expect": {
+                  "goalCreated": true
+                }
+              },
+              {
+                "eventIndex": 1,
+                "eventHash": "b2fbc1ef13406e5b64bf66bcc923481f22867a641e211f452e7435fcf10e8c32",
+                "expect": {
+                  "goalCompleted": true
+                }
+              },
+              {
+                "eventIndex": 2,
+                "eventHash": "d6fd7a15d1e162f3b08c97a8f80fb7a14b0f8af4ffeb12391d9b7ba8a31c9ec0",
+                "expect": {}
+              }
+            ]
+          }
+        ],
+        "scenarioManifestHash": "c9442766cc3247a52e616f5816e17025315997c7aec59e1a3e990c383a32f17d",
+        "mode": "live_model",
+        "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+        "scenariosHash": "a18d5fcd10d727c5e88b16c03cfdbb39f18db2aae65ac9c33fc2ac7ca0a912a2",
+        "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+        "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+        "model": "glm-5.3",
+        "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+        "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+        "search": "synthetic_fixture",
+        "feeds": "synthetic_fixture; no_real_HTTP",
+        "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+        "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+        "storage": "fresh_in_memory_per_sample",
+        "platform": "captured_only",
+        "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+        "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+        "simulationOverrides": {
+          "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+          "maxToolRounds": 6,
+          "maxSendsPerTurn": 3,
+          "waitMaxMs": 1000,
+          "auxiliaryModels": false,
+          "independentReflection": true,
+          "probabilityWake": false,
+          "scheduledIdleProbability": 1,
+          "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+        },
+        "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+        "seed": "empty_bound_session; no_goals_or_memories_seeded",
+        "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+        "maxCalls": 24,
+        "maxHttp": 32,
+        "maxDurationMs": 240000,
+        "repetitions": 1,
+        "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+      },
+      "integrity": "passed",
+      "engineering": "failed",
+      "behavior": "failed",
+      "liveModel": "failed",
+      "expectedEvents": 3,
+      "summary": {
+        "events": 3,
+        "failedEvents": 0,
+        "skippedEvents": 1,
+        "behaviorMisses": 1,
+        "logicalCalls": 12,
+        "mainCalls": 12,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 12,
+        "capturedMessages": 6,
+        "reportedTokens": 161899,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "toolErrors": [
+        {
+          "sample": 1,
+          "event": 2,
+          "name": "simCharacterMemory",
+          "content": "error: 工具 simCharacterMemory 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        },
+        {
+          "sample": 1,
+          "event": 2,
+          "name": "simCharacterMemory",
+          "content": "error: 工具 simCharacterMemory 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        },
+        {
+          "sample": 1,
+          "event": 2,
+          "name": "simCharacterMemory",
+          "content": "error: 工具 simCharacterMemory 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        }
+      ],
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    },
+    {
+      "name": "worker",
+      "file": "server-live/worker-results.json",
+      "sha256": "43393332a0bba7160ccb68bd7ed4f2b9fc0e5c9b6bea9aa2eeba4cee210141ce",
+      "metadata": {
+        "schemaVersion": 1,
+        "assessmentVersion": 3,
+        "runId": "51c462dc-a3fc-4c68-b286-7f274d36f353",
+        "startedAtISO": "2026-11-10T05:14:51.146Z",
+        "scenarioManifest": [
+          {
+            "id": "worker-success-artifact",
+            "events": [
+              {
+                "eventIndex": 0,
+                "eventHash": "ce405958cc46faee3056dd0861a4b312de27116fff4c7847e3fc4f263b8ae9bb",
+                "expect": {
+                  "goalCreated": true,
+                  "noWorkerCall": true
+                }
+              },
+              {
+                "eventIndex": 1,
+                "eventHash": "99023227ba5e621a2fa4ad9544f010b405452b81f24a80a7be4746ec721eb06b",
+                "expect": {
+                  "workCreated": true,
+                  "goalCompleted": true,
+                  "workerUnknown": false
+                }
+              }
+            ]
+          }
+        ],
+        "scenarioManifestHash": "819255f6684421c0721ac44fc57eabb97695425ef922c0c36c4876e561219504",
+        "mode": "live_model",
+        "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+        "scenariosHash": "05a05f4797cda3dcdabb1022f865b1aec962964a6c13ff7bf579c59c72e10e50",
+        "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+        "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+        "model": "glm-5.3",
+        "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+        "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+        "search": "synthetic_fixture",
+        "feeds": "synthetic_fixture; no_real_HTTP",
+        "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+        "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+        "storage": "fresh_in_memory_per_sample",
+        "platform": "captured_only",
+        "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+        "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+        "simulationOverrides": {
+          "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+          "maxToolRounds": 6,
+          "maxSendsPerTurn": 3,
+          "waitMaxMs": 1000,
+          "auxiliaryModels": false,
+          "independentReflection": true,
+          "probabilityWake": false,
+          "scheduledIdleProbability": 1,
+          "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+        },
+        "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+        "seed": "empty_bound_session; no_goals_or_memories_seeded",
+        "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+        "maxCalls": 24,
+        "maxHttp": 32,
+        "maxDurationMs": 240000,
+        "repetitions": 2,
+        "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+      },
+      "integrity": "passed",
+      "engineering": "passed",
+      "behavior": "failed",
+      "liveModel": "failed",
+      "expectedEvents": 4,
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 1,
+        "logicalCalls": 21,
+        "mainCalls": 21,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 2,
+        "httpRequests": 21,
+        "capturedMessages": 9,
+        "reportedTokens": 283748,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "toolErrors": [
+        {
+          "sample": 2,
+          "event": 1,
+          "name": "simWorkerTask",
+          "content": "error: 工具 simWorkerTask 执行失败: 工作器引用了本轮不可见的来源\n【运行时行动回执】{\"evidenceRef\":\"receipt:ff770516-ab66-437c-9fc0-7a14422493c1\",\"status\":\"failed\",\"goalId\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\"}"
+        },
+        {
+          "sample": 2,
+          "event": 1,
+          "name": "simGoal",
+          "content": "error: 工具 simGoal 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        },
+        {
+          "sample": 2,
+          "event": 1,
+          "name": "simGoal",
+          "content": "error: 工具 simGoal 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        }
+      ],
+      "platformMessagesSent": 0,
+      "productionStoreWrites": 0
+    }
+  ],
+  "summary": {
+    "events": 16,
+    "failedEvents": 0,
+    "skippedEvents": 1,
+    "behaviorMisses": 2,
+    "logicalCalls": 67,
+    "mainCalls": 66,
+    "reflectionCalls": 1,
+    "workerCalls": 2,
+    "httpRequests": 67,
+    "capturedMessages": 31,
+    "reportedTokens": 873248,
+    "callsWithoutUsage": 0
+  },
+  "sourceSnapshot": {
+    "kind": "precommit_verified_source_snapshot",
+    "commitRecordedInBuild": "ed9dff01b2a32ba1f8fb4320dada7dcc4fa889c2",
+    "manifestSha256": "ceb178097894a883a6669f6d0d302a5be174cc09247976e723a8b92e78aba492",
+    "sourcesSha256": "8cf79d3ed5513b3354dfea444bf6b252bd575a099ae0cc8086b2854380bed0b0",
+    "filesSha256": "5fdb2983711b3e0aea8ea8ab98a45120dd54308f6e9b7f255b4e7c51d425c17c",
+    "selectedSourceSha256": {
+      "src/modules/simulation/domain/promptBuilder.ts": "7af294ece3f7c7815c79a0e439c4796ded1f4e65c0248f7e0e4e968aef630d5f",
+      "src/modules/simulation/infrastructure/characterTools.ts": "aaaccb903185af322ac09a42a549fa2a327efbe1b83b0e43a01d92b4b7e91b53",
+      "src/modules/simulation/infrastructure/characterWorker.ts": "b89a9e42dd7b7603348e6e5206e8ea9596790e5729a2a47450a58bafe0f1c683",
+      "src/modules/simulation/infrastructure/simulationRuntime.ts": "1624d69f5aa2e01003b8ef4f0da53660c3b6be3c421c0ebc04e0a6564832e41f"
+    }
+  },
+  "oneCompiledBuild": true,
+  "buildManifestHashes": [
+    "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b"
+  ],
+  "costCny": null,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "stage7": "pending",
+  "humanReview": "pending",
+  "realCrossDay": "pending",
+  "sameRunnerComparisons": [
+    {
+      "name": "social",
+      "baselineFile": "server-live/social-before-results.json",
+      "baselineSha256": "9bf0b3a7d0570f3a5ff2e64150aca8f71155a25006191211ca6bee02949cbdb5",
+      "baselineSummary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 1,
+        "logicalCalls": 16,
+        "mainCalls": 16,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 16,
+        "capturedMessages": 9,
+        "reportedTokens": 188121,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "comparison": {
+        "status": "available",
+        "differences": [],
+        "configChanged": false,
+        "singleVariableAttribution": false,
+        "attribution": "Matching recorded conditions allow observation comparison; hashes do not establish a causal improvement.",
+        "modelChanged": false,
+        "buildChanged": true
+      },
+      "shadowAcceptance": "failed"
+    },
+    {
+      "name": "worker",
+      "baselineFile": "server-live/worker-before-results.json",
+      "baselineSha256": "154683e3a521cb552ea6b0453d36f3c1302dc8742899e7c0b974b740a296274a",
+      "baselineSummary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 2,
+        "logicalCalls": 22,
+        "mainCalls": 22,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 1,
+        "httpRequests": 22,
+        "capturedMessages": 4,
+        "reportedTokens": 265839,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "comparison": {
+        "status": "available",
+        "differences": [],
+        "configChanged": false,
+        "singleVariableAttribution": false,
+        "attribution": "Matching recorded conditions allow observation comparison; hashes do not establish a causal improvement.",
+        "modelChanged": false,
+        "buildChanged": true
+      },
+      "shadowAcceptance": "failed"
+    }
+  ]
+}

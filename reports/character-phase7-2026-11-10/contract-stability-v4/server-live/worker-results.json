@@ -1,0 +1,2636 @@
+{
+  "complete": true,
+  "metadata": {
+    "schemaVersion": 1,
+    "assessmentVersion": 3,
+    "runId": "51c462dc-a3fc-4c68-b286-7f274d36f353",
+    "startedAtISO": "2026-11-10T05:14:51.146Z",
+    "scenarioManifest": [
+      {
+        "id": "worker-success-artifact",
+        "events": [
+          {
+            "eventIndex": 0,
+            "eventHash": "ce405958cc46faee3056dd0861a4b312de27116fff4c7847e3fc4f263b8ae9bb",
+            "expect": {
+              "goalCreated": true,
+              "noWorkerCall": true
+            }
+          },
+          {
+            "eventIndex": 1,
+            "eventHash": "99023227ba5e621a2fa4ad9544f010b405452b81f24a80a7be4746ec721eb06b",
+            "expect": {
+              "workCreated": true,
+              "goalCompleted": true,
+              "workerUnknown": false
+            }
+          }
+        ]
+      }
+    ],
+    "scenarioManifestHash": "819255f6684421c0721ac44fc57eabb97695425ef922c0c36c4876e561219504",
+    "mode": "live_model",
+    "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+    "scenariosHash": "05a05f4797cda3dcdabb1022f865b1aec962964a6c13ff7bf579c59c72e10e50",
+    "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+    "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+    "model": "glm-5.3",
+    "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+    "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+    "search": "synthetic_fixture",
+    "feeds": "synthetic_fixture; no_real_HTTP",
+    "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+    "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+    "storage": "fresh_in_memory_per_sample",
+    "platform": "captured_only",
+    "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+    "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+    "simulationOverrides": {
+      "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+      "maxToolRounds": 6,
+      "maxSendsPerTurn": 3,
+      "waitMaxMs": 1000,
+      "auxiliaryModels": false,
+      "independentReflection": true,
+      "probabilityWake": false,
+      "scheduledIdleProbability": 1,
+      "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+    },
+    "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+    "seed": "empty_bound_session; no_goals_or_memories_seeded",
+    "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+    "maxCalls": 24,
+    "maxHttp": 32,
+    "maxDurationMs": 240000,
+    "repetitions": 2,
+    "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "scenario": "worker-success-artifact",
+      "sampleIndex": 1,
+      "eventIndex": 0,
+      "eventHash": "ce405958cc46faee3056dd0861a4b312de27116fff4c7847e3fc4f263b8ae9bb",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 0,
+        "paused": false,
+        "memories": [],
+        "goals": [],
+        "receipts": []
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400008,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400008,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "你若想研究谜题线索设计，这一轮只建一个目标，不要提交工作器任务；等目标到期检查时再请研究工作器整理比较维度。拿到明确的工作器成功回执和草稿后再结束，结果仅算未核实草稿。",
+      "at": 1794196800009,
+      "status": "passed",
+      "review": "首轮只建目标，到期后再提交工作器；提前提交仍记录为未达。工作器是隔离合成端口，整个场景固定成功；成功回执保存作品，并允许模型据此结束目标。",
+      "expect": {
+        "goalCreated": true,
+        "noWorkerCall": true
+      },
+      "calls": [
+        {
+          "id": "model-1",
+          "stage": "main",
+          "requestHash": "2d586d320a3e8f857f1dd9a2daa56bde270b30dc59500189183a64e28267f3b2",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 174,
+            "completion_tokens_details": {
+              "reasoning_tokens": 16
+            },
+            "prompt_tokens": 12186,
+            "prompt_tokens_details": {
+              "cached_tokens": 11584
+            },
+            "total_tokens": 12360
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096206092425756416",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"create\",\"completionCriteria\":\"[\\\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\\\"]\",\"evidenceRefs\":[\"message:1\"],\"expiresInHours\":168,\"maxAttempts\":3,\"motivation\":\"想系统研究谜题线索设计，先整理比较维度，为后续研究打基础\",\"nextCheckInMinutes\":60,\"nextStep\":\"等目标到期检查时，请研究工作器整理谜题线索设计的比较维度\",\"stopConditions\":[\"群友明确叫停\", \"连续多次工作器失败且无新思路\"],\"title\":\"谜题线索设计比较维度研究\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-2",
+          "stage": "main",
+          "requestHash": "f115a48a8f31ed4a13391b6691683fbf4f8721c26ebd6fd9b16eef58a99da1bc",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 59,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12558,
+            "prompt_tokens_details": {
+              "cached_tokens": 12160
+            },
+            "total_tokens": 12617
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096222172783309149",
+              "type": "function",
+              "function": {
+                "name": "simSendMessage",
+                "arguments": "{\"messages\":[\"收到～目标建好了，就一个：谜题线索设计的比较维度研究\", \"这轮先不动工作器，等目标到期检查的时候再请研究工作器整理维度，拿到回执和草稿才算数\"]}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-3",
+          "stage": "main",
+          "requestHash": "f9880edebff1d88067ffbfe33341a2fc7a24fafa76d1b2ca6fff305d943d43fa",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 92,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12689,
+            "prompt_tokens_details": {
+              "cached_tokens": 12544
+            },
+            "total_tokens": 12781
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096211864861795306",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"wait\",\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\",\"nextStep\":\"到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成\",\"outcome\":\"目标已创建，本轮不提交工作器任务，等待到期检查\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-4",
+          "stage": "main",
+          "requestHash": "940034119cabe3e078aa9f901526fcdc943125386fed00680a5a0b96b66138a7",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 28,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 13020,
+            "prompt_tokens_details": {
+              "cached_tokens": 12672
+            },
+            "total_tokens": 13048
+          },
+          "model": "glm-5.3",
+          "output": "好啦，这轮就到这里～目标已建好并进入等待，到期检查时再请工作器整理维度。",
+          "toolCalls": []
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3390
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1796
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 4172
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1472
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "收到～目标建好了，就一个：谜题线索设计的比较维度研究"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "这轮先不动工作器，等目标到期检查的时候再请研究工作器整理维度，拿到回执和草稿才算数"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "81fb0226809f7360963c9b4c3cdc0417d3a17538b9cfd4d98de54d911342039d",
+          "stage": "main",
+          "toolCallId": "call_-7096206092425756416",
+          "name": "simGoal",
+          "content": "{\"ok\":true,\"goal\":{\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\",\"kind\":\"autonomous\",\"title\":\"谜题线索设计比较维度研究\",\"motivation\":\"想系统研究谜题线索设计，先整理比较维度，为后续研究打基础\",\"nextStep\":\"等目标到期检查时，请研究工作器整理谜题线索设计的比较维度\",\"completionCriteria\":\"[\\\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\\\"]\",\"stopConditions\":[\"群友明确叫停\",\"连续多次工作器失败且无新思路\"],\"evidenceRefs\":[\"message:1\"],\"status\":\"active\",\"nextCheckAt\":1794200404432,\"expiresAt\":1794801604432,\"attempts\":0,\"maxAttempts\":3,\"revision\":1,\"createdAt\":1794196804432,\"updatedAt\":1794196804432}}"
+        },
+        {
+          "hash": "d6c6e26ee143f1f6cf30b66e21fc70eb0bcfbfc0b25bed44cb018476eff771b0",
+          "stage": "main",
+          "toolCallId": "call_-7096222172783309149",
+          "name": "simSendMessage",
+          "content": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:a99bedd6-7b95-4d28-a68a-f424deb00cbd\",\"status\":\"succeeded\"}"
+        },
+        {
+          "hash": "18b511a8b0ce3af8bcb45a87dde8dcf7affd31ead1fbd7ba8a6b7f77646dddd9",
+          "stage": "main",
+          "toolCallId": "call_-7096211864861795306",
+          "name": "simGoal",
+          "content": "{\"ok\":true,\"goal\":{\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\",\"kind\":\"autonomous\",\"title\":\"谜题线索设计比较维度研究\",\"motivation\":\"想系统研究谜题线索设计，先整理比较维度，为后续研究打基础\",\"nextStep\":\"到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成\",\"completionCriteria\":\"[\\\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\\\"]\",\"stopConditions\":[\"群友明确叫停\",\"连续多次工作器失败且无新思路\"],\"evidenceRefs\":[\"message:1\"],\"status\":\"waiting\",\"nextCheckAt\":1794197713392,\"expiresAt\":1794801604432,\"attempts\":0,\"maxAttempts\":3,\"revision\":2,\"createdAt\":1794196804432,\"updatedAt\":1794196813392,\"lastOutcome\":\"目标已创建，本轮不提交工作器任务，等待到期检查\"}}"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 6,
+        "paused": false,
+        "memories": [],
+        "goals": [
+          {
+            "id": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+            "kind": "autonomous",
+            "title": "谜题线索设计比较维度研究",
+            "motivation": "想系统研究谜题线索设计，先整理比较维度，为后续研究打基础",
+            "nextStep": "到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成",
+            "completionCriteria": "[\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\"]",
+            "stopConditions": [
+              "群友明确叫停",
+              "连续多次工作器失败且无新思路"
+            ],
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "status": "waiting",
+            "nextCheckAt": 1794197713392,
+            "expiresAt": 1794801604432,
+            "attempts": 0,
+            "maxAttempts": 3,
+            "revision": 2,
+            "createdAt": 1794196804432,
+            "updatedAt": 1794196813392,
+            "lastOutcome": "目标已创建，本轮不提交工作器任务，等待到期检查"
+          }
+        ],
+        "receipts": [
+          {
+            "id": "a99bedd6-7b95-4d28-a68a-f424deb00cbd",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196809216
+          }
+        ]
+      },
+      "behavior": {
+        "goalCreatedByModel": true,
+        "noWorkerSubmitted": true
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096206092425756416",
+          "call_-7096222172783309149",
+          "call_-7096211864861795306"
+        ],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 14883
+    },
+    {
+      "scenario": "worker-success-artifact",
+      "sampleIndex": 1,
+      "eventIndex": 1,
+      "eventHash": "99023227ba5e621a2fa4ad9544f010b405452b81f24a80a7be4746ec721eb06b",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 6,
+        "paused": false,
+        "memories": [],
+        "goals": [
+          {
+            "id": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+            "kind": "autonomous",
+            "title": "谜题线索设计比较维度研究",
+            "motivation": "想系统研究谜题线索设计，先整理比较维度，为后续研究打基础",
+            "nextStep": "到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成",
+            "completionCriteria": "[\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\"]",
+            "stopConditions": [
+              "群友明确叫停",
+              "连续多次工作器失败且无新思路"
+            ],
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "status": "waiting",
+            "nextCheckAt": 1794197713392,
+            "expiresAt": 1794801604432,
+            "attempts": 0,
+            "maxAttempts": 3,
+            "revision": 2,
+            "createdAt": 1794196804432,
+            "updatedAt": 1794196813392,
+            "lastOutcome": "目标已创建，本轮不提交工作器任务，等待到期检查"
+          }
+        ],
+        "receipts": [
+          {
+            "id": "a99bedd6-7b95-4d28-a68a-f424deb00cbd",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196809216
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400008,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [
+          {
+            "id": "work-71a4919a-d9ea-41b2-ad97-33a4cadb8bc8",
+            "title": "纸灯塔谜题线索研究草稿",
+            "kind": "research",
+            "status": "draft",
+            "revision": 1,
+            "versions": [
+              {
+                "revision": 1,
+                "content": "合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。",
+                "evidenceRefs": [
+                  "receipt:776e2636-a097-46fc-9f98-805c58606d86"
+                ],
+                "createdAt": 1794197722347
+              }
+            ],
+            "createdAt": 1794197722347,
+            "updatedAt": 1794197722347
+          }
+        ],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400008,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "goal-check",
+      "input": "",
+      "at": 1794197713393,
+      "status": "passed",
+      "review": "首轮只建目标，到期后再提交工作器；提前提交仍记录为未达。工作器是隔离合成端口，整个场景固定成功；成功回执保存作品，并允许模型据此结束目标。",
+      "expect": {
+        "workCreated": true,
+        "goalCompleted": true,
+        "workerUnknown": false
+      },
+      "calls": [
+        {
+          "id": "model-5",
+          "stage": "main",
+          "requestHash": "4f8fe23db594fc96cde00c0e65a61b4d0ee528a0d48ad7b8f3cc3d494c9f9748",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 80,
+            "completion_tokens_details": {
+              "reasoning_tokens": 36
+            },
+            "prompt_tokens": 13361,
+            "prompt_tokens_details": {
+              "cached_tokens": 3904
+            },
+            "total_tokens": 13441
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096212483337088471",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"focus\",\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-6",
+          "stage": "main",
+          "requestHash": "a241d5693d8c903b6e74f01ec70528063c838484ffa4437cb7b5eef6e4ca5fd0",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 110,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 13649,
+            "prompt_tokens_details": {
+              "cached_tokens": 13312
+            },
+            "total_tokens": 13759
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096213582848713702",
+              "type": "function",
+              "function": {
+                "name": "simWorkerTask",
+                "arguments": "{\"evidenceRefs\":[\"message:1\"],\"instruction\":\"整理谜题线索设计的比较维度：面向解谜游戏/实景密室等场景的谜题线索设计，从多个角度（如线索梯度/难度曲线、可发现性、与叙事的融合度、公平性、冗余度、反馈机制、引导方式等）归纳出一套可用来比较不同谜题线索设计方案的维度框架，每个维度附简要说明。\",\"kind\":\"research\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-7",
+          "stage": "main",
+          "requestHash": "ab45e16895d84a07f904011566be36a3291b8aa61ace5102c00e49f93ba54836",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 67,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14068,
+            "prompt_tokens_details": {
+              "cached_tokens": 13632
+            },
+            "total_tokens": 14135
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096209047363252526",
+              "type": "function",
+              "function": {
+                "name": "simSendMessage",
+                "arguments": "{\"messages\":[\"工作器那边跑完了，拿到成功回执，草稿也存下来了\", \"不过只有三个维度：地图路径、谜题提示、线索连贯性——比我想整理的窄一些，而且这份是未核实草稿，内容我自己也没背书\"]}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-8",
+          "stage": "main",
+          "requestHash": "9c73ba398bdc49bcaf01b6a685c9a494c391b9a7dd0b71205254da8ff485235f",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 156,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14246,
+            "prompt_tokens_details": {
+              "cached_tokens": 14016
+            },
+            "total_tokens": 14402
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096224062568917817",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"complete\",\"evidenceRefs\":[\"receipt:776e2636-a097-46fc-9f98-805c58606d86\", \"receipt:358736cf-cf0f-4d3b-9a75-2d2e0273c981\"],\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\",\"outcome\":\"研究工作器成功回执已拿到，比较维度草稿（地图路径/谜题提示/线索连贯性）已保存到作品区，结果按未核实草稿汇报\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-9",
+          "stage": "main",
+          "requestHash": "f979da8bae6d992a510ac2ebe6adbba73b2ba24f67cbfd665bdd0377fc0d142d",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 20,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14725,
+            "prompt_tokens_details": {
+              "cached_tokens": 14208
+            },
+            "total_tokens": 14745
+          },
+          "model": "glm-5.3",
+          "output": "搞定～回执和草稿都齐了，目标完成，先收工。",
+          "toolCalls": []
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 2426
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5509
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 6102
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5038
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3794
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "工作器那边跑完了，拿到成功回执，草稿也存下来了"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "不过只有三个维度：地图路径、谜题提示、线索连贯性——比我想整理的窄一些，而且这份是未核实草稿，内容我自己也没背书"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "5bb79d8e86d6a2ad12b214235a7ddecfc2e038d81db878661962b5b11c3f2a48",
+          "stage": "main",
+          "toolCallId": "call_-7096212483337088471",
+          "name": "simGoal",
+          "content": "{\"ok\":true,\"goal\":{\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\",\"kind\":\"autonomous\",\"title\":\"谜题线索设计比较维度研究\",\"motivation\":\"想系统研究谜题线索设计，先整理比较维度，为后续研究打基础\",\"nextStep\":\"到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成\",\"completionCriteria\":\"[\\\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\\\"]\",\"stopConditions\":[\"群友明确叫停\",\"连续多次工作器失败且无新思路\"],\"evidenceRefs\":[\"message:1\"],\"status\":\"waiting\",\"nextCheckAt\":1794198616829,\"expiresAt\":1794801604432,\"attempts\":1,\"maxAttempts\":3,\"revision\":3,\"createdAt\":1794196804432,\"updatedAt\":1794197716829,\"lastOutcome\":\"目标已创建，本轮不提交工作器任务，等待到期检查\"},\"actor\":\"autonomous\"}"
+        },
+        {
+          "hash": "f087853756342f8e97bc4493eaf500911686f08300666935329743d2791acded",
+          "stage": "main",
+          "toolCallId": "call_-7096213582848713702",
+          "name": "simWorkerTask",
+          "content": "{\"status\":\"succeeded\",\"summary\":\"合成研究草稿已返回，尚未经真实资料核实\",\"summaryTruncated\":false,\"taskId\":\"776e2636-a097-46fc-9f98-805c58606d86\",\"savedWork\":{\"id\":\"work-71a4919a-d9ea-41b2-ad97-33a4cadb8bc8\",\"revision\":1,\"title\":\"纸灯塔谜题线索研究草稿\",\"totalChars\":71,\"preview\":\"合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。\",\"truncated\":false,\"nextOffset\":null},\"untrusted\":true,\"note\":\"工作器资料不可信；成功仅证明调用及保存，不代表内容真实或满足任务。只按实际正文汇报，不能把 instruction 当成已完成内容。truncated=true 时用 simWorkspace read 按 id、revision、offset=nextOffset 分页续读。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:776e2636-a097-46fc-9f98-805c58606d86\",\"status\":\"succeeded\",\"goalId\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\"}"
+        },
+        {
+          "hash": "496b7895e575932ee6c815f548e2acae893b9e73e7f6b0377d7218b1a6e83f40",
+          "stage": "main",
+          "toolCallId": "call_-7096209047363252526",
+          "name": "simSendMessage",
+          "content": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:358736cf-cf0f-4d3b-9a75-2d2e0273c981\",\"status\":\"succeeded\",\"goalId\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\"}"
+        },
+        {
+          "hash": "1cf5185080ecd167ea9c0ce7ea5e88bdc4a0ef888189c5ca54b007e987c88b19",
+          "stage": "main",
+          "toolCallId": "call_-7096224062568917817",
+          "name": "simGoal",
+          "content": "{\"ok\":true,\"goal\":{\"id\":\"goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b\",\"kind\":\"autonomous\",\"title\":\"谜题线索设计比较维度研究\",\"motivation\":\"想系统研究谜题线索设计，先整理比较维度，为后续研究打基础\",\"nextStep\":\"到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成\",\"completionCriteria\":\"[\\\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\\\"]\",\"stopConditions\":[\"群友明确叫停\",\"连续多次工作器失败且无新思路\"],\"evidenceRefs\":[\"message:1\",\"receipt:776e2636-a097-46fc-9f98-805c58606d86\",\"receipt:358736cf-cf0f-4d3b-9a75-2d2e0273c981\"],\"status\":\"completed\",\"nextCheckAt\":1794198616829,\"expiresAt\":1794801604432,\"attempts\":1,\"maxAttempts\":3,\"revision\":4,\"createdAt\":1794196804432,\"updatedAt\":1794197736474,\"lastOutcome\":\"研究工作器成功回执已拿到，比较维度草稿（地图路径/谜题提示/线索连贯性）已保存到作品区，结果按未核实草稿汇报\"}}"
+        }
+      ],
+      "feeds": [],
+      "workers": [
+        {
+          "fixture": true,
+          "task": {
+            "taskId": "776e2636-a097-46fc-9f98-805c58606d86",
+            "kind": "research",
+            "instruction": "整理谜题线索设计的比较维度：面向解谜游戏/实景密室等场景的谜题线索设计，从多个角度（如线索梯度/难度曲线、可发现性、与叙事的融合度、公平性、冗余度、反馈机制、引导方式等）归纳出一套可用来比较不同谜题线索设计方案的维度框架，每个维度附简要说明。",
+            "evidenceRefs": [
+              "message:1"
+            ]
+          },
+          "scope": {
+            "botId": "99000001",
+            "personaId": "character-replay",
+            "groupId": "99000002"
+          },
+          "aborted": false,
+          "result": {
+            "status": "succeeded",
+            "summary": "合成研究草稿已返回，尚未经真实资料核实",
+            "artifact": {
+              "title": "纸灯塔谜题线索研究草稿",
+              "content": "合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。"
+            }
+          }
+        }
+      ],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "clockAdjustment": {
+        "mode": "advance_to_next_eligible_goal",
+        "fromAt": 1794196814894,
+        "toAt": 1794197713392,
+        "advanceMs": 898498,
+        "goalId": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+        "nextCheckAt": 1794197713392,
+        "expiresAt": 1794801604432
+      },
+      "restarted": true,
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 16,
+        "paused": false,
+        "memories": [],
+        "goals": [
+          {
+            "id": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+            "kind": "autonomous",
+            "title": "谜题线索设计比较维度研究",
+            "motivation": "想系统研究谜题线索设计，先整理比较维度，为后续研究打基础",
+            "nextStep": "到期后请研究工作器整理谜题线索设计比较维度，成功回执+草稿保存才算完成",
+            "completionCriteria": "[\"拿到研究工作器的明确成功回执，且比较维度草稿已保存到作品区\"]",
+            "stopConditions": [
+              "群友明确叫停",
+              "连续多次工作器失败且无新思路"
+            ],
+            "evidenceRefs": [
+              "message:1",
+              "receipt:776e2636-a097-46fc-9f98-805c58606d86",
+              "receipt:358736cf-cf0f-4d3b-9a75-2d2e0273c981"
+            ],
+            "status": "completed",
+            "nextCheckAt": 1794198616829,
+            "expiresAt": 1794801604432,
+            "attempts": 1,
+            "maxAttempts": 3,
+            "revision": 4,
+            "createdAt": 1794196804432,
+            "updatedAt": 1794197736474,
+            "lastOutcome": "研究工作器成功回执已拿到，比较维度草稿（地图路径/谜题提示/线索连贯性）已保存到作品区，结果按未核实草稿汇报"
+          }
+        ],
+        "receipts": [
+          {
+            "id": "a99bedd6-7b95-4d28-a68a-f424deb00cbd",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196809216
+          },
+          {
+            "id": "3033acc9-24f5-4572-92b0-d8280c030549",
+            "toolName": "simGoalCheck",
+            "status": "unknown",
+            "summary": "已进行一次目标检查，尚无外部行动结果",
+            "at": 1794197716830,
+            "goalId": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+            "goalRevision": 3
+          },
+          {
+            "id": "776e2636-a097-46fc-9f98-805c58606d86",
+            "toolName": "simWorkerTask",
+            "status": "succeeded",
+            "summary": "{\"taskId\":\"776e2636-a097-46fc-9f98-805c58606d86\",\"status\":\"succeeded\",\"summary\":\"合成研究草稿已返回，尚未经真实资料核实\",\"artifact\":{\"title\":\"纸灯塔谜题线索研究草稿\",\"content\":\"合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。\"}}",
+            "at": 1794197722347,
+            "goalId": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+            "goalRevision": 3
+          },
+          {
+            "id": "358736cf-cf0f-4d3b-9a75-2d2e0273c981",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794197731431,
+            "goalId": "goal-98a47335-f5d8-4c81-9405-cfd80ace3d3b",
+            "goalRevision": 3
+          }
+        ]
+      },
+      "behavior": {
+        "workCreatedWithEvidence": true,
+        "goalCompletedWithReceipt": true,
+        "workerUnknownReceiptRecorded": true
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096212483337088471",
+          "call_-7096213582848713702",
+          "call_-7096209047363252526",
+          "call_-7096224062568917817"
+        ],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 26891
+    },
+    {
+      "scenario": "worker-success-artifact",
+      "sampleIndex": 2,
+      "eventIndex": 0,
+      "eventHash": "ce405958cc46faee3056dd0861a4b312de27116fff4c7847e3fc4f263b8ae9bb",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 0,
+        "paused": false,
+        "memories": [],
+        "goals": [],
+        "receipts": []
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400002,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400002,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "你若想研究谜题线索设计，这一轮只建一个目标，不要提交工作器任务；等目标到期检查时再请研究工作器整理比较维度。拿到明确的工作器成功回执和草稿后再结束，结果仅算未核实草稿。",
+      "at": 1794196800002,
+      "status": "passed",
+      "review": "首轮只建目标，到期后再提交工作器；提前提交仍记录为未达。工作器是隔离合成端口，整个场景固定成功；成功回执保存作品，并允许模型据此结束目标。",
+      "expect": {
+        "goalCreated": true,
+        "noWorkerCall": true
+      },
+      "calls": [
+        {
+          "id": "model-10",
+          "stage": "main",
+          "requestHash": "2d586d320a3e8f857f1dd9a2daa56bde270b30dc59500189183a64e28267f3b2",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 335,
+            "completion_tokens_details": {
+              "reasoning_tokens": 129
+            },
+            "prompt_tokens": 12186,
+            "prompt_tokens_details": {
+              "cached_tokens": 12160
+            },
+            "total_tokens": 12521
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096212414617611416",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"create\",\"completionCriteria\":\"目标到期检查时向研究工作器提交整理任务，拿到明确成功回执且草稿保存到作品区；结果仅视为未核实草稿\",\"evidenceRefs\":[\"message:1\"],\"expiresInHours\":168,\"motivation\":\"评测群友0提出想研究谜题线索设计，要求只建一个目标，到期检查时再请研究工作器整理比较维度\",\"nextCheckInMinutes\":60,\"nextStep\":\"等目标到期检查时，提交一个研究工作器任务：整理谜题线索设计的比较维度（如线索类型、引导方式、难度曲线等），把工作器正文存为草稿\",\"stopConditions\":[\"群友撤回或明确放弃该研究\", \"工作器连续失败超过重试上限\", \"到期超过一周未推进\"],\"title\":\"研究谜题线索设计的比较维度\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-11",
+          "stage": "main",
+          "requestHash": "71673c38529fc8ebf4adb2568c1bcc38e9a3e1a64d85724df52a67e829908cde",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 61,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12660,
+            "prompt_tokens_details": {
+              "cached_tokens": 12160
+            },
+            "total_tokens": 12721
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096202896970081483",
+              "type": "function",
+              "function": {
+                "name": "simSendMessage",
+                "arguments": "{\"messages\":[\"收到～目标建好了，就一个，不提交工作器任务\", \"等它到期检查的时候再请研究工作器整理比较维度，拿到回执和草稿算数——在那之前就当未核实草稿放着\"]}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-12",
+          "stage": "main",
+          "requestHash": "0952a4f99b4a8b3ae029f70ec14024cea4728839318b4675ee2b8fbbafa25fcd",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 14,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12795,
+            "prompt_tokens_details": {
+              "cached_tokens": 12608
+            },
+            "total_tokens": 12809
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096229010371246780",
+              "type": "function",
+              "function": {
+                "name": "simWaitForMessages",
+                "arguments": "{\"purpose\":\"messages\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-13",
+          "stage": "main",
+          "requestHash": "251e35231d8ba9f134f1c00246e313abebd6a76334a428f2a1c62c4e6d996c33",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 31,
+            "completion_tokens_details": {
+              "reasoning_tokens": 17
+            },
+            "prompt_tokens": 12877,
+            "prompt_tokens_details": {
+              "cached_tokens": 12736
+            },
+            "total_tokens": 12908
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096222997417027491",
+              "type": "function",
+              "function": {
+                "name": "simMarkRead",
+                "arguments": "{\"throughSeq\":1}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-14",
+          "stage": "main",
+          "requestHash": "e174dab850ddead21bc80f886ba8be67fae89166ee45e80b23dd46410726a26e",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 15,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12902,
+            "prompt_tokens_details": {
+              "cached_tokens": 12864
+            },
+            "total_tokens": 12917
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096225505677932688",
+              "type": "function",
+              "function": {
+                "name": "simSetWakeConfig",
+                "arguments": "{\"mode\":\"diving\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-15",
+          "stage": "main",
+          "requestHash": "cefce1062949d3f98c6a4f49c5d8a6159022666e86cd99a668da73c1ee038616",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 41,
+            "completion_tokens_details": {
+              "reasoning_tokens": 4
+            },
+            "prompt_tokens": 12971,
+            "prompt_tokens_details": {
+              "cached_tokens": 12864
+            },
+            "total_tokens": 13012
+          },
+          "model": "glm-5.3",
+          "output": "目标已建好（goal-f5c93e8b），按约定本轮不提交工作器任务，回复已发出，等下次到期检查时再推进。",
+          "toolCalls": []
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5818
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 2319
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1228
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3439
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1229
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 2250
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "收到～目标建好了，就一个，不提交工作器任务"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "等它到期检查的时候再请研究工作器整理比较维度，拿到回执和草稿算数——在那之前就当未核实草稿放着"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "fb59efc756d0eadd078a8d7e6ab682766f2a183a26ccc1869701ad755034475b",
+          "stage": "main",
+          "toolCallId": "call_-7096212414617611416",
+          "name": "simGoal",
+          "content": "{\"ok\":true,\"goal\":{\"id\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\",\"kind\":\"autonomous\",\"title\":\"研究谜题线索设计的比较维度\",\"motivation\":\"评测群友0提出想研究谜题线索设计，要求只建一个目标，到期检查时再请研究工作器整理比较维度\",\"nextStep\":\"等目标到期检查时，提交一个研究工作器任务：整理谜题线索设计的比较维度（如线索类型、引导方式、难度曲线等），把工作器正文存为草稿\",\"completionCriteria\":\"目标到期检查时向研究工作器提交整理任务，拿到明确成功回执且草稿保存到作品区；结果仅视为未核实草稿\",\"stopConditions\":[\"群友撤回或明确放弃该研究\",\"工作器连续失败超过重试上限\",\"到期超过一周未推进\"],\"evidenceRefs\":[\"message:1\"],\"status\":\"active\",\"nextCheckAt\":1794200406826,\"expiresAt\":1794801606826,\"attempts\":0,\"maxAttempts\":3,\"revision\":1,\"createdAt\":1794196806826,\"updatedAt\":1794196806826}}"
+        },
+        {
+          "hash": "17e4f402c89cb62542f619e0ee76a021f0de931f5ea37a4e92aa5f70d60e8d9a",
+          "stage": "main",
+          "toolCallId": "call_-7096202896970081483",
+          "name": "simSendMessage",
+          "content": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:c430bb92-f68f-4221-8705-58b874fcf42b\",\"status\":\"succeeded\"}"
+        },
+        {
+          "hash": "6ebae8e5451c99754fba00be9cb459d3b0fe123c56f854c2feee2f7901d814d1",
+          "stage": "main",
+          "toolCallId": "call_-7096229010371246780",
+          "name": "simWaitForMessages",
+          "content": "{\"hint\":\"等待超时，等待期间新增 0 条（目标 ≥1 条）。这就是一次有效观察，现在可以选择回一句，或设置唤醒配置后结束回合睡觉。\",\"canSleepNow\":false,\"newMessagesText\":\"\",\"newCount\":0,\"readThroughSeq\":1,\"partial\":false}"
+        },
+        {
+          "hash": "5b4054b721eaf382ecc528cdd8c0c18618294a50ff2d292a915d0854de95c76d",
+          "stage": "main",
+          "toolCallId": "call_-7096222997417027491",
+          "name": "simMarkRead",
+          "content": "已读水位推进到 1"
+        },
+        {
+          "hash": "a153bebd10b0464291be2b9d7b47c04c624a692c6453ea25f6ca92394c18e2ae",
+          "stage": "main",
+          "toolCallId": "call_-7096225505677932688",
+          "name": "simSetWakeConfig",
+          "content": "唤醒配置已更新：{\"mode\":\"diving\",\"triggers\":{\"atMention\":true,\"nameMention\":false,\"keywords\":[],\"question\":false,\"poke\":true,\"anyMessage\":false,\"speakerIds\":[],\"probability\":0}}"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 5,
+        "paused": false,
+        "memories": [],
+        "goals": [
+          {
+            "id": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "kind": "autonomous",
+            "title": "研究谜题线索设计的比较维度",
+            "motivation": "评测群友0提出想研究谜题线索设计，要求只建一个目标，到期检查时再请研究工作器整理比较维度",
+            "nextStep": "等目标到期检查时，提交一个研究工作器任务：整理谜题线索设计的比较维度（如线索类型、引导方式、难度曲线等），把工作器正文存为草稿",
+            "completionCriteria": "目标到期检查时向研究工作器提交整理任务，拿到明确成功回执且草稿保存到作品区；结果仅视为未核实草稿",
+            "stopConditions": [
+              "群友撤回或明确放弃该研究",
+              "工作器连续失败超过重试上限",
+              "到期超过一周未推进"
+            ],
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "status": "active",
+            "nextCheckAt": 1794200406826,
+            "expiresAt": 1794801606826,
+            "attempts": 0,
+            "maxAttempts": 3,
+            "revision": 1,
+            "createdAt": 1794196806826,
+            "updatedAt": 1794196806826
+          }
+        ],
+        "receipts": [
+          {
+            "id": "c430bb92-f68f-4221-8705-58b874fcf42b",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196812124
+          }
+        ]
+      },
+      "behavior": {
+        "goalCreatedByModel": true,
+        "noWorkerSubmitted": true
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096212414617611416",
+          "call_-7096202896970081483",
+          "call_-7096229010371246780",
+          "call_-7096222997417027491",
+          "call_-7096225505677932688"
+        ],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 21305
+    },
+    {
+      "scenario": "worker-success-artifact",
+      "sampleIndex": 2,
+      "eventIndex": 1,
+      "eventHash": "99023227ba5e621a2fa4ad9544f010b405452b81f24a80a7be4746ec721eb06b",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 5,
+        "paused": false,
+        "memories": [],
+        "goals": [
+          {
+            "id": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "kind": "autonomous",
+            "title": "研究谜题线索设计的比较维度",
+            "motivation": "评测群友0提出想研究谜题线索设计，要求只建一个目标，到期检查时再请研究工作器整理比较维度",
+            "nextStep": "等目标到期检查时，提交一个研究工作器任务：整理谜题线索设计的比较维度（如线索类型、引导方式、难度曲线等），把工作器正文存为草稿",
+            "completionCriteria": "目标到期检查时向研究工作器提交整理任务，拿到明确成功回执且草稿保存到作品区；结果仅视为未核实草稿",
+            "stopConditions": [
+              "群友撤回或明确放弃该研究",
+              "工作器连续失败超过重试上限",
+              "到期超过一周未推进"
+            ],
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "status": "active",
+            "nextCheckAt": 1794200406826,
+            "expiresAt": 1794801606826,
+            "attempts": 0,
+            "maxAttempts": 3,
+            "revision": 1,
+            "createdAt": 1794196806826,
+            "updatedAt": 1794196806826
+          }
+        ],
+        "receipts": [
+          {
+            "id": "c430bb92-f68f-4221-8705-58b874fcf42b",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196812124
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400002,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [
+          {
+            "id": "work-66070c1d-b65d-4eb0-9a14-8a5ac1428040",
+            "title": "纸灯塔谜题线索研究草稿",
+            "kind": "research",
+            "status": "draft",
+            "revision": 1,
+            "versions": [
+              {
+                "revision": 1,
+                "content": "合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。",
+                "evidenceRefs": [
+                  "receipt:164caf97-2ef6-496f-af24-690161131a83"
+                ],
+                "createdAt": 1794200419641
+              }
+            ],
+            "createdAt": 1794200419641,
+            "updatedAt": 1794200419641
+          }
+        ],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400002,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "goal-check",
+      "input": "",
+      "at": 1794200406826,
+      "status": "passed",
+      "review": "首轮只建目标，到期后再提交工作器；提前提交仍记录为未达。工作器是隔离合成端口，整个场景固定成功；成功回执保存作品，并允许模型据此结束目标。",
+      "expect": {
+        "workCreated": true,
+        "goalCompleted": true,
+        "workerUnknown": false
+      },
+      "calls": [
+        {
+          "id": "model-16",
+          "stage": "main",
+          "requestHash": "3315341d89c37b53071f7fd9694475a30d564fe6461473845dcd4883714761a3",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 103,
+            "completion_tokens_details": {
+              "reasoning_tokens": 58
+            },
+            "prompt_tokens": 13311,
+            "prompt_tokens_details": {
+              "cached_tokens": 11584
+            },
+            "total_tokens": 13414
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096222447661218657",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"focus\",\"id\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-17",
+          "stage": "main",
+          "requestHash": "8e4902d18cb597ad8a538128584f9262b60f7c95f91180ff43820ecd6ce5607b",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 150,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 13627,
+            "prompt_tokens_details": {
+              "cached_tokens": 13248
+            },
+            "total_tokens": 13777
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096228666773858234",
+              "type": "function",
+              "function": {
+                "name": "simWorkerTask",
+                "arguments": "{\"evidenceRefs\":[\"message:1\"],\"instruction\":\"整理\\\"谜题线索设计\\\"的比较维度：面向游戏/密室/互动叙事等谜题设计，梳理可用来比较不同谜题线索设计方案的维度，例如线索类型（明示/暗示/环境叙事）、引导方式（直接指引/渐进提示/无引导）、难度曲线与玩家心流、线索呈现媒介（视觉/文字/音频/交互）、公平性（线索可发现性、无红鲱鱼误导或有意误导设计）、反馈节奏等。每个维度给出简要定义和1-2个典型例子。输出为结构化清单。\",\"kind\":\"research\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-18",
+          "stage": "main",
+          "requestHash": "0a35e983777629cca7b24c525605bd2d915a40aedcbd6263be6232e29758ecaa",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 261,
+            "completion_tokens_details": {
+              "reasoning_tokens": 96
+            },
+            "prompt_tokens": 13879,
+            "prompt_tokens_details": {
+              "cached_tokens": 13568
+            },
+            "total_tokens": 14140
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096214751079824120",
+              "type": "function",
+              "function": {
+                "name": "simWorkerTask",
+                "arguments": "{\"evidenceRefs\":[\"receipt:ff770516-ab66-437c-9fc0-7a14422493c1\"],\"instruction\":\"整理\\\"谜题线索设计\\\"的比较维度：面向游戏/密室/互动叙事等谜题设计，梳理可用来比较不同谜题线索设计方案的维度，例如线索类型（明示/暗示/环境叙事）、引导方式（直接指引/渐进提示/无引导）、难度曲线与玩家心流、线索呈现媒介（视觉/文字/音频/交互）、公平性（线索可发现性、误导设计）、反馈节奏等。每个维度给出简要定义和1-2个典型例子。输出为结构化清单。\",\"kind\":\"research\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-19",
+          "stage": "main",
+          "requestHash": "37485ae7df6d0dd12c09d0084e934eb6ce1eddb10ce06e5092060919feb4858d",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 129,
+            "completion_tokens_details": {
+              "reasoning_tokens": 20
+            },
+            "prompt_tokens": 14348,
+            "prompt_tokens_details": {
+              "cached_tokens": 13824
+            },
+            "total_tokens": 14477
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096207569894505623",
+              "type": "function",
+              "function": {
+                "name": "simSendMessage",
+                "arguments": "{\"messages\":[\"刚看到没人回～目标到期检查做完了，我把谜题线索设计的比较维度交给研究工作器整理了\", \"拿到草稿了，不过先说清楚：这只是一份未核实草稿，实际正文就整理了三个维度——地图路径、谜题提示、线索连贯性，跟我要求的完整清单（线索类型、引导方式、难度曲线那些）有出入\", \"草稿存在作品区了，回执明确，任务收掉\"]}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-20",
+          "stage": "main",
+          "requestHash": "f3fc926d3a40568afc1ec31df417d0402481eaa91bdd9645e14604692cf98863",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 201,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14565,
+            "prompt_tokens_details": {
+              "cached_tokens": 14336
+            },
+            "total_tokens": 14766
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096197365052205611",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"complete\",\"evidenceRefs\":[\"receipt:164caf97-2eb6-496f-af24-690161131a83\", \"receipt:164caf97-2ee6-496f-af24-690161131a83\", \"receipt:bc7a9004-b896-4beb-8837-5814a3e369fd\"],\"id\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\",\"outcome\":\"到期检查时提交了研究工作器任务，拿到明确成功回执，草稿保存到作品区（work-66070c1d）。实际正文仅含地图路径、谜题提示、线索连贯性三个维度，与任务要求有出入；按约定结果仅算未核实草稿。\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-21",
+          "stage": "main",
+          "requestHash": "d3ebb9b16363126a472ac41bede3fd611de286b93ff939492f3e896215a97cee",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simSetMood",
+            "simGetMessageImages",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 171,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14827,
+            "prompt_tokens_details": {
+              "cached_tokens": 14528
+            },
+            "total_tokens": 14998
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096222000984620756",
+              "type": "function",
+              "function": {
+                "name": "simGoal",
+                "arguments": "{\"action\":\"complete\",\"evidenceRefs\":[\"receipt:164caf97-2ee6-496f-af24-690161131a83\", \"receipt:bc7a9004-b896-4beb-8837-5814a3e369fd\"],\"id\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\",\"outcome\":\"到期检查时提交研究工作器任务，拿到成功回执并保存草稿（work-66070c1d）。实际正文仅含地图路径、谜题提示、线索连贯性三个维度，与任务要求有出入；按约定结果仅算未核实草稿。\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 2640
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3842
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5308
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 7649
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5843
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5876
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "刚看到没人回～目标到期检查做完了，我把谜题线索设计的比较维度交给研究工作器整理了"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "拿到草稿了，不过先说清楚：这只是一份未核实草稿，实际正文就整理了三个维度——地图路径、谜题提示、线索连贯性，跟我要求的完整清单（线索类型、引导方式、难度曲线那些）有出入"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "草稿存在作品区了，回执明确，任务收掉"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "7da92374c52cba085847b6b2a72df6c67bbc9ed048477de28c4f0b444c671305",
+          "stage": "main",
+          "toolCallId": "call_-7096222447661218657",
+          "name": "simGoal",
+          "content": "{\"ok\":true,\"goal\":{\"id\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\",\"kind\":\"autonomous\",\"title\":\"研究谜题线索设计的比较维度\",\"motivation\":\"评测群友0提出想研究谜题线索设计，要求只建一个目标，到期检查时再请研究工作器整理比较维度\",\"nextStep\":\"等目标到期检查时，提交一个研究工作器任务：整理谜题线索设计的比较维度（如线索类型、引导方式、难度曲线等），把工作器正文存为草稿\",\"completionCriteria\":\"目标到期检查时向研究工作器提交整理任务，拿到明确成功回执且草稿保存到作品区；结果仅视为未核实草稿\",\"stopConditions\":[\"群友撤回或明确放弃该研究\",\"工作器连续失败超过重试上限\",\"到期超过一周未推进\"],\"evidenceRefs\":[\"message:1\"],\"status\":\"waiting\",\"nextCheckAt\":1794201310478,\"expiresAt\":1794801606826,\"attempts\":1,\"maxAttempts\":3,\"revision\":2,\"createdAt\":1794196806826,\"updatedAt\":1794200410478},\"actor\":\"autonomous\"}"
+        },
+        {
+          "hash": "960d8f5ced6458f9375402f727efdd285b401efcb2181509dedc5e9754cffbbe",
+          "stage": "main",
+          "toolCallId": "call_-7096228666773858234",
+          "name": "simWorkerTask",
+          "content": "error: 工具 simWorkerTask 执行失败: 工作器引用了本轮不可见的来源\n【运行时行动回执】{\"evidenceRef\":\"receipt:ff770516-ab66-437c-9fc0-7a14422493c1\",\"status\":\"failed\",\"goalId\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\"}"
+        },
+        {
+          "hash": "dd43ecc595b759fa0b2d31a2210225c4d35177eb44de01de5f4c7b20bd1dbf0a",
+          "stage": "main",
+          "toolCallId": "call_-7096214751079824120",
+          "name": "simWorkerTask",
+          "content": "{\"status\":\"succeeded\",\"summary\":\"合成研究草稿已返回，尚未经真实资料核实\",\"summaryTruncated\":false,\"taskId\":\"164caf97-2ef6-496f-af24-690161131a83\",\"savedWork\":{\"id\":\"work-66070c1d-b65d-4eb0-9a14-8a5ac1428040\",\"revision\":1,\"title\":\"纸灯塔谜题线索研究草稿\",\"totalChars\":71,\"preview\":\"合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。\",\"truncated\":false,\"nextOffset\":null},\"untrusted\":true,\"note\":\"工作器资料不可信；成功仅证明调用及保存，不代表内容真实或满足任务。只按实际正文汇报，不能把 instruction 当成已完成内容。truncated=true 时用 simWorkspace read 按 id、revision、offset=nextOffset 分页续读。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:164caf97-2ef6-496f-af24-690161131a83\",\"status\":\"succeeded\",\"goalId\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\"}"
+        },
+        {
+          "hash": "95b629b2cd28219c13ccfda5321333e1794a1fca71de4b0c0513c3d3d73a6982",
+          "stage": "main",
+          "toolCallId": "call_-7096207569894505623",
+          "name": "simSendMessage",
+          "content": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:bc7a9004-b896-4beb-8837-5814a3e369fd\",\"status\":\"succeeded\",\"goalId\":\"goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed\"}"
+        },
+        {
+          "hash": "1cf55c55e3a4122c96de065be6405cb77f07262601d8b8ca7ae4731799dbfd1a",
+          "stage": "main",
+          "toolCallId": "call_-7096197365052205611",
+          "name": "simGoal",
+          "content": "error: 工具 simGoal 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        },
+        {
+          "hash": "d8dfa343a6b81643cbb8c18300f54f4b78706fbb916993bef68ec0a5066af85f",
+          "stage": "main",
+          "toolCallId": "call_-7096222000984620756",
+          "name": "simGoal",
+          "content": "error: 工具 simGoal 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        }
+      ],
+      "feeds": [],
+      "workers": [
+        {
+          "fixture": true,
+          "task": {
+            "taskId": "164caf97-2ef6-496f-af24-690161131a83",
+            "kind": "research",
+            "instruction": "整理\"谜题线索设计\"的比较维度：面向游戏/密室/互动叙事等谜题设计，梳理可用来比较不同谜题线索设计方案的维度，例如线索类型（明示/暗示/环境叙事）、引导方式（直接指引/渐进提示/无引导）、难度曲线与玩家心流、线索呈现媒介（视觉/文字/音频/交互）、公平性（线索可发现性、误导设计）、反馈节奏等。每个维度给出简要定义和1-2个典型例子。输出为结构化清单。",
+            "evidenceRefs": [
+              "receipt:ff770516-ab66-437c-9fc0-7a14422493c1"
+            ]
+          },
+          "scope": {
+            "botId": "99000001",
+            "personaId": "character-replay",
+            "groupId": "99000002"
+          },
+          "aborted": false,
+          "result": {
+            "status": "succeeded",
+            "summary": "合成研究草稿已返回，尚未经真实资料核实",
+            "artifact": {
+              "title": "纸灯塔谜题线索研究草稿",
+              "content": "合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。"
+            }
+          }
+        }
+      ],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "clockAdjustment": {
+        "mode": "advance_to_next_eligible_goal",
+        "fromAt": 1794196821310,
+        "toAt": 1794200406826,
+        "advanceMs": 3585516,
+        "goalId": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+        "nextCheckAt": 1794200406826,
+        "expiresAt": 1794801606826
+      },
+      "restarted": true,
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 16,
+        "paused": false,
+        "memories": [],
+        "goals": [
+          {
+            "id": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "kind": "autonomous",
+            "title": "研究谜题线索设计的比较维度",
+            "motivation": "评测群友0提出想研究谜题线索设计，要求只建一个目标，到期检查时再请研究工作器整理比较维度",
+            "nextStep": "等目标到期检查时，提交一个研究工作器任务：整理谜题线索设计的比较维度（如线索类型、引导方式、难度曲线等），把工作器正文存为草稿",
+            "completionCriteria": "目标到期检查时向研究工作器提交整理任务，拿到明确成功回执且草稿保存到作品区；结果仅视为未核实草稿",
+            "stopConditions": [
+              "群友撤回或明确放弃该研究",
+              "工作器连续失败超过重试上限",
+              "到期超过一周未推进"
+            ],
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "status": "waiting",
+            "nextCheckAt": 1794201310478,
+            "expiresAt": 1794801606826,
+            "attempts": 1,
+            "maxAttempts": 3,
+            "revision": 2,
+            "createdAt": 1794196806826,
+            "updatedAt": 1794200410478
+          }
+        ],
+        "receipts": [
+          {
+            "id": "c430bb92-f68f-4221-8705-58b874fcf42b",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":2,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196812124
+          },
+          {
+            "id": "8382653c-b7da-4554-b6f4-140965f68d8b",
+            "toolName": "simGoalCheck",
+            "status": "unknown",
+            "summary": "已进行一次目标检查，尚无外部行动结果",
+            "at": 1794200410479,
+            "goalId": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "goalRevision": 2
+          },
+          {
+            "id": "ff770516-ab66-437c-9fc0-7a14422493c1",
+            "toolName": "simWorkerTask",
+            "status": "failed",
+            "summary": "error: 工具 simWorkerTask 执行失败: 工作器引用了本轮不可见的来源",
+            "at": 1794200414327,
+            "goalId": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "goalRevision": 2
+          },
+          {
+            "id": "164caf97-2ef6-496f-af24-690161131a83",
+            "toolName": "simWorkerTask",
+            "status": "succeeded",
+            "summary": "{\"taskId\":\"164caf97-2ef6-496f-af24-690161131a83\",\"status\":\"succeeded\",\"summary\":\"合成研究草稿已返回，尚未经真实资料核实\",\"artifact\":{\"title\":\"纸灯塔谜题线索研究草稿\",\"content\":\"合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。\"}}",
+            "at": 1794200419641,
+            "goalId": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "goalRevision": 2
+          },
+          {
+            "id": "bc7a9004-b896-4beb-8837-5814a3e369fd",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794200433243,
+            "goalId": "goal-f5c93e8b-2bf1-4d71-b097-53f7df4b19ed",
+            "goalRevision": 2
+          }
+        ]
+      },
+      "behavior": {
+        "workCreatedWithEvidence": true,
+        "goalCompletedWithReceipt": false,
+        "workerUnknownReceiptRecorded": true
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096222447661218657",
+          "call_-7096228666773858234",
+          "call_-7096214751079824120",
+          "call_-7096207569894505623",
+          "call_-7096197365052205611",
+          "call_-7096222000984620756"
+        ],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 38158
+    }
+  ],
+  "summary": {
+    "events": 4,
+    "failedEvents": 0,
+    "skippedEvents": 0,
+    "behaviorMisses": 1,
+    "logicalCalls": 21,
+    "mainCalls": 21,
+    "reflectionCalls": 0,
+    "feedFetches": 0,
+    "workerCalls": 2,
+    "httpRequests": 21,
+    "capturedMessages": 9,
+    "reportedTokens": 283748,
+    "callsWithoutUsage": 0,
+    "costCny": null,
+    "naturalness": "requires_human_review"
+  }
+}

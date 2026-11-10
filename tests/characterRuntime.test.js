@@ -114,6 +114,24 @@ function seededGoal(harness, id = 'goal-seeded') {
   return state.goals[0]
 }
 
+test('当前唤醒末尾给出条件式持久化检查，普通聊天不会自动创建角色状态', async () => {
+  const h = fixture()
+  try {
+    await h.ingest('只是聊聊，不用记住或安排什么'); await idle(h, 1)
+    const current = h.calls[0].messages.filter(message => message.role === 'user').at(-1).content
+    const reminder = current.slice(current.lastIndexOf('【本轮执行检查】'))
+    assert.ok(current.lastIndexOf('【本轮执行检查】') > current.indexOf('本轮可引用的消息证据'))
+    assert.match(reminder, /simDecide/)
+    assert.match(reminder, /simGoal.*create/)
+    assert.match(reminder, /simCharacterMemory/)
+    assert.match(reminder, /正文/)
+    const character = (await h.runtime.describeGroup(GROUP)).character
+    assert.equal(character.memories.length, 0)
+    assert.equal(character.goals.length, 0)
+    assert.equal(character.decision, undefined)
+  } finally { h.runtime.stop() }
+})
+
 test('被 @ 回合工具主体来自 reason.seq，不借用第一条未读群友身份', async () => {
   const h = fixture({ script: (_request, index) => index === 0 ? tools(toolCall('ownerAdminTool', {})) : quiet() })
   try {
@@ -213,6 +231,37 @@ test('用户回合聚焦自主目标后，按当前主体保留最终文本且�
     assert.equal(h.sent.length, 0)
     assert.equal((await h.runtime.describeGroup(GROUP)).character.decision, undefined)
     assert.ok(JSON.parse(h.kv.get(sessionKey(GROUP))).agentHistory.some(message => message.content === text))
+  } finally { h.runtime.stop() }
+})
+
+test('到期自主目标自动聚焦后 wait 成功即收尾，后续发送仍被版本保护拒绝', async () => {
+  let goal
+  const nextStep = '等官方补充后继续核对玩法资料'
+  const h = fixture({ script: (_request, index) => index === 0
+    ? tools(toolCall('simGoal', { action: 'wait', id: goal.id, nextStep, nextCheckInMinutes: 30, outcome: '现有资料不足，先等待新来源' }))
+    : index === 1 ? tools(toolCall('simSendMessage', { messages: ['等待更新已保存后也不该继续发送这条消息'] })) : quiet() })
+  try {
+    await h.ingest('用于自主目标的可见来源', '30000', { at: false })
+    goal = seededGoal(h)
+    h.clock.value = goal.nextCheckAt
+    await h.runtime.sweepOnce()
+    await idle(h, 3)
+    const waited = JSON.parse(toolResult(h.calls[1], 'simGoal'))
+    assert.equal(waited.ok, true)
+    assert.equal(waited.goal.id, goal.id)
+    assert.equal(waited.goal.attempts, 1, '到期回合须已由运行时自动聚焦目标')
+    assert.equal(waited.goal.status, 'waiting')
+    assert.equal(waited.goal.nextStep, nextStep)
+    assert.equal(waited.goal.nextCheckAt, h.clock.value + 30 * 60_000)
+    assert.equal(waited.goal.revision, goal.revision + 2, '自动聚焦和 wait 更新各推进一次版本')
+    assert.match(toolResult(h.calls[2], 'simSendMessage'), /^error:/, 'wait 改变版本后不能沿用本轮旧授权发送')
+    const detail = await h.runtime.describeGroup(GROUP)
+    assert.equal(detail.lastWakeReason, 'characterGoal')
+    assert.equal(detail.character.goals.length, 1, '继续已有目标不能额外创建目标')
+    assert.equal(detail.character.goals[0].revision, waited.goal.revision)
+    assert.equal(detail.character.receipts.some(receipt => receipt.toolName === 'simSendMessage'), false, '发送须在登记外部动作前被拦截')
+    assert.equal(h.calls.length, 3)
+    assert.equal(h.sent.length, 0)
   } finally { h.runtime.stop() }
 })
 

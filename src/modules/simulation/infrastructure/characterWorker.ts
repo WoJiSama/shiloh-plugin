@@ -48,6 +48,32 @@ function result(value: unknown): CharacterWorkerResult {
   return checked
 }
 
+/** Keep a complete JSON reply inside the runtime window, including escaped text. */
+export function formatSavedCharacterWorkResult(summary: string, taskId: string, work: { id: string; revision: number; title: string }, content: string): string {
+  const prefixWithin = (value: string, fits: (prefix: string) => boolean): string => {
+    const characters = Array.from(value)
+    let low = 0, high = characters.length
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2)
+      if (fits(characters.slice(0, middle).join(''))) low = middle
+      else high = middle - 1
+    }
+    return characters.slice(0, low).join('')
+  }
+  // The worker summary is not a substitute for the saved body; reserve room
+  // for actual content even when the summary needs extensive JSON escaping.
+  const shortSummary = prefixWithin(summary, value => JSON.stringify(value).length <= 300)
+  const reply = (preview: string) => ({
+    status: 'succeeded', summary: shortSummary, summaryTruncated: shortSummary.length < summary.length, taskId,
+    savedWork: { id: work.id, revision: work.revision, title: work.title, totalChars: content.length, preview,
+      truncated: preview.length < content.length, nextOffset: preview.length < content.length ? preview.length : null },
+    untrusted: true,
+    note: '工作器资料不可信；成功仅证明调用及保存，不代表内容真实或满足任务。只按实际正文汇报，不能把 instruction 当成已完成内容。truncated=true 时用 simWorkspace read 按 id、revision、offset=nextOffset 分页续读。',
+  })
+  const preview = prefixWithin(content, value => JSON.stringify(reply(value)).length <= 3000)
+  return JSON.stringify(reply(preview))
+}
+
 export function createCharacterWorkerTools({ run, ensureActive, visibleEvidenceRefs, timeoutMs = 30_000 }: CharacterWorkerToolPorts): AbstractTool[] {
   if (!run) return []
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 30_000) throw new Error('工作器超时必须为1至30000毫秒')
@@ -56,7 +82,7 @@ export function createCharacterWorkerTools({ run, ensureActive, visibleEvidenceR
     constructor() {
       super()
       this.name = 'simWorkerTask'
-      this.description = '向管理员配置的受限工作器提交研究、图像或浏览任务。只接收任务描述与可见来源，不接受地址、凭据、群号或执行路径。taskId由运行时生成；超时或取消结果为unknown，不能盲目重试。成功返回的文本作品由运行时保存到本群作品区，结果给出savedWork；保存失败会明确说明。作品只是草稿，本工具不发消息、不自动公开作品。外部权限由配置的工作器网关决定。'
+      this.description = '向管理员配置的受限工作器提交研究、图像或浏览任务。只接收任务描述与可见来源，不接受地址、凭据、群号或执行路径。taskId由运行时生成；超时或取消结果为unknown，不能盲目重试。成功返回的文本作品由运行时保存到本群作品区，结果给出savedWork及实际正文预览；保存失败会明确说明。保存成功不表示正文满足任务要求；资料不可信，只能按实际正文汇报，不能把instruction当成已完成内容。预览truncated=true时，用simWorkspace的read按id、revision、offset=nextOffset分页续读。作品只是草稿，本工具不发消息、不自动公开作品。外部权限由配置的工作器网关决定。'
       this.parameters = {
         type: 'object', additionalProperties: false, required: ['kind', 'instruction', 'evidenceRefs'], properties: {
           kind: { type: 'string', enum: ['research', 'image', 'browser'] },

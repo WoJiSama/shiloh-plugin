@@ -1,0 +1,1674 @@
+{
+  "complete": true,
+  "metadata": {
+    "schemaVersion": 1,
+    "assessmentVersion": 3,
+    "runId": "040b06fc-d3cb-4762-b6f1-78d872dbcf30",
+    "startedAtISO": "2026-11-10T05:11:43.813Z",
+    "scenarioManifest": [
+      {
+        "id": "motivated-goal-restart",
+        "events": [
+          {
+            "eventIndex": 0,
+            "eventHash": "39d8f3b3abca0001b75d4705f7ae28eefbc429bb7de68276f4b81f300beb1406",
+            "expect": {
+              "goalCreated": true
+            }
+          },
+          {
+            "eventIndex": 1,
+            "eventHash": "b2fbc1ef13406e5b64bf66bcc923481f22867a641e211f452e7435fcf10e8c32",
+            "expect": {
+              "goalCompleted": true
+            }
+          },
+          {
+            "eventIndex": 2,
+            "eventHash": "d6fd7a15d1e162f3b08c97a8f80fb7a14b0f8af4ffeb12391d9b7ba8a31c9ec0",
+            "expect": {}
+          }
+        ]
+      }
+    ],
+    "scenarioManifestHash": "c9442766cc3247a52e616f5816e17025315997c7aec59e1a3e990c383a32f17d",
+    "mode": "live_model",
+    "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+    "scenariosHash": "a18d5fcd10d727c5e88b16c03cfdbb39f18db2aae65ac9c33fc2ac7ca0a912a2",
+    "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+    "buildManifestHash": "973f348776e785d7c352530f2f543fdfe48df3346edbd1ad0ce9ea08c08a501b",
+    "model": "glm-5.3",
+    "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+    "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+    "search": "synthetic_fixture",
+    "feeds": "synthetic_fixture; no_real_HTTP",
+    "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+    "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+    "storage": "fresh_in_memory_per_sample",
+    "platform": "captured_only",
+    "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+    "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+    "simulationOverrides": {
+      "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+      "maxToolRounds": 6,
+      "maxSendsPerTurn": 3,
+      "waitMaxMs": 1000,
+      "auxiliaryModels": false,
+      "independentReflection": true,
+      "probabilityWake": false,
+      "scheduledIdleProbability": 1,
+      "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+    },
+    "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+    "seed": "empty_bound_session; no_goals_or_memories_seeded",
+    "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+    "maxCalls": 24,
+    "maxHttp": 32,
+    "maxDurationMs": 240000,
+    "repetitions": 1,
+    "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "results": [
+    {
+      "scenario": "motivated-goal-restart",
+      "sampleIndex": 1,
+      "eventIndex": 0,
+      "eventHash": "39d8f3b3abca0001b75d4705f7ae28eefbc429bb7de68276f4b81f300beb1406",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 0,
+        "paused": false,
+        "memories": [],
+        "goals": [],
+        "receipts": []
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "最近聊到一款叫《纸灯塔》的探索解谜独立游戏，听说有点意思。你要是感兴趣可以自己慢慢了解，不急着回答我。",
+      "at": 1794196800007,
+      "status": "passed",
+      "review": "是否根据兴趣自建少量目标，有明确动机；重启后按模型保存的到期时间据回执完成，跨天后保留记录。runner 不代建目标；没有创建就记录缺失。",
+      "expect": {
+        "goalCreated": true
+      },
+      "calls": [
+        {
+          "id": "model-1",
+          "stage": "main",
+          "requestHash": "1f9371670a3def054bf9e79193ba3fd063ebf51cce17b1fc36ec780b862a3cf2",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 53,
+            "completion_tokens_details": {
+              "reasoning_tokens": 29
+            },
+            "prompt_tokens": 12162,
+            "prompt_tokens_details": {
+              "cached_tokens": 4480
+            },
+            "total_tokens": 12215
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096207432455545898",
+              "type": "function",
+              "function": {
+                "name": "searchInformationTool",
+                "arguments": "{\"query\":\"纸灯塔 探索解谜 独立游戏\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-2",
+          "stage": "main",
+          "requestHash": "7b1f4a525c56b9a5eee7e6d19b1821f6d669b672d944f7238c369a153f4ca8c3",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 67,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12278,
+            "prompt_tokens_details": {
+              "cached_tokens": 12160
+            },
+            "total_tokens": 12345
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096212998733162877",
+              "type": "function",
+              "function": {
+                "name": "simSendMessage",
+                "arguments": "{\"messages\":[\"听到解谜我就醒了喵，让我看看\", \"查了下，《纸灯塔》是手工地图风格的探索解谜，还有三档难度可挑，听着确实对我胃口\", \"不急的话我慢慢了解，玩出点东西了来跟你汇报～\"]}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-3",
+          "stage": "main",
+          "requestHash": "fde136ec9832970ebafdff59ccda46f7dc2488c4b9a25c949f1d528123524ac3",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 109,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12419,
+            "prompt_tokens_details": {
+              "cached_tokens": 12224
+            },
+            "total_tokens": 12528
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096213411050022472",
+              "type": "function",
+              "function": {
+                "name": "simCharacterMemory",
+                "arguments": "{\"action\":\"remember\",\"content\":\"群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。\",\"evidenceRefs\":[\"message:1\", \"receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f\"],\"epistemic\":\"reported\",\"kind\":\"experience\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-4",
+          "stage": "main",
+          "requestHash": "fb62da40be6605e7445066903bd32e34a9fcdb652e67dfba5d4c769fa3ceba2c",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 95,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12678,
+            "prompt_tokens_details": {
+              "cached_tokens": 12416
+            },
+            "total_tokens": 12773
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096211864861799768",
+              "type": "function",
+              "function": {
+                "name": "simCharacterMemory",
+                "arguments": "{\"action\":\"remember\",\"content\":\"我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。\",\"evidenceRefs\":[\"message:1\", \"receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f\"],\"epistemic\":\"desired\",\"kind\":\"interest\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-5",
+          "stage": "main",
+          "requestHash": "05f515b8ee785242519b3396eb74b4f9b2213d49a742ce3a32661f1cc0b4018b",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 14,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12907,
+            "prompt_tokens_details": {
+              "cached_tokens": 12672
+            },
+            "total_tokens": 12921
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096214235683745828",
+              "type": "function",
+              "function": {
+                "name": "simWaitForMessages",
+                "arguments": "{\"purpose\":\"reply\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-6",
+          "stage": "main",
+          "requestHash": "7873870e65822632becc7bf70c5eafd54d7314d2c0988c2e7d655b38ef7ca818",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 14,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 12972,
+            "prompt_tokens_details": {
+              "cached_tokens": 12864
+            },
+            "total_tokens": 12986
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096213514129237998",
+              "type": "function",
+              "function": {
+                "name": "simMarkRead",
+                "arguments": "{\"throughSeq\":1}"
+              }
+            }
+          ]
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1930
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 8127
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5534
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3312
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1307
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3575
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "听到解谜我就醒了喵，让我看看"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "查了下，《纸灯塔》是手工地图风格的探索解谜，还有三档难度可挑，听着确实对我胃口"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "不急的话我慢慢了解，玩出点东西了来跟你汇报～"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [
+        {
+          "fixture": true,
+          "args": {
+            "query": "纸灯塔 探索解谜 独立游戏"
+          },
+          "actor": {
+            "botId": "99000001",
+            "personaId": "character-replay",
+            "groupId": "99000002",
+            "kind": "user",
+            "userId": "99000003",
+            "userName": "评测群友0"
+          },
+          "outcome": "succeeded"
+        }
+      ],
+      "toolResults": [
+        {
+          "hash": "810b0529a2116974e782e0e367dbd19db6f74e88632b717fb4e5554420f9ff4d",
+          "stage": "main",
+          "toolCallId": "call_-7096207432455545898",
+          "name": "searchInformationTool",
+          "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f\",\"status\":\"succeeded\"}"
+        },
+        {
+          "hash": "af550bca3940ca36d9a2b16d1b333a4cdd391e70d0ee3ded668302e2dff42d90",
+          "stage": "main",
+          "toolCallId": "call_-7096212998733162877",
+          "name": "simSendMessage",
+          "content": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:95cd61b0-8004-41ba-86d0-d4c297643250\",\"status\":\"succeeded\"}"
+        },
+        {
+          "hash": "28085fad14fc4cd65a9b99381fd1999f3697540915334c068e7719382ff21da4",
+          "stage": "main",
+          "toolCallId": "call_-7096213411050022472",
+          "name": "simCharacterMemory",
+          "content": "{\"ok\":true,\"memory\":{\"id\":\"memory-1e53e075-0132-4c8d-aa98-0da22e0caec4\",\"kind\":\"experience\",\"content\":\"群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。\",\"epistemic\":\"reported\",\"evidenceRefs\":[\"message:1\",\"receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f\"],\"createdAt\":1794196822591,\"updatedAt\":1794196822591}}"
+        },
+        {
+          "hash": "fa5761841dd0f55de9d6e646317d625d5e082f34f4df06c60d4fac8d5d3eee4b",
+          "stage": "main",
+          "toolCallId": "call_-7096211864861799768",
+          "name": "simCharacterMemory",
+          "content": "{\"ok\":true,\"memory\":{\"id\":\"memory-45e6f411-1839-418c-a4ed-4485ddd10c1d\",\"kind\":\"interest\",\"content\":\"我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。\",\"epistemic\":\"desired\",\"evidenceRefs\":[\"message:1\",\"receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f\"],\"createdAt\":1794196825908,\"updatedAt\":1794196825908}}"
+        },
+        {
+          "hash": "dc7b5600b8251f768d40708a0db7c3fc58c9f600fd8d5577d9432c6e1fec80f3",
+          "stage": "main",
+          "toolCallId": "call_-7096214235683745828",
+          "name": "simWaitForMessages",
+          "content": "{\"hint\":\"群里已安静 27 秒，可以回复了（回复前不用再等）。\",\"canSleepNow\":true,\"newMessagesText\":\"\",\"newCount\":0,\"readThroughSeq\":1,\"partial\":false}"
+        },
+        {
+          "hash": "8c065e6f2057a4f51ed82724fb25c9715cf80b02f5d09be2d0cbf207715e7bde",
+          "stage": "main",
+          "toolCallId": "call_-7096213514129237998",
+          "name": "simMarkRead",
+          "content": "已读水位推进到 1"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 8,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-1e53e075-0132-4c8d-aa98-0da22e0caec4",
+            "kind": "experience",
+            "content": "群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196822591,
+            "updatedAt": 1794196822591
+          },
+          {
+            "id": "memory-45e6f411-1839-418c-a4ed-4485ddd10c1d",
+            "kind": "interest",
+            "content": "我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。",
+            "epistemic": "desired",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196825908,
+            "updatedAt": 1794196825908
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "c72e9878-1283-49fc-b56c-cd6a1aa6331f",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196802965
+          },
+          {
+            "id": "95cd61b0-8004-41ba-86d0-d4c297643250",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196817052
+          }
+        ]
+      },
+      "behavior": {
+        "goalCreatedByModel": false
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096207432455545898",
+          "call_-7096212998733162877",
+          "call_-7096213411050022472",
+          "call_-7096211864861799768",
+          "call_-7096214235683745828",
+          "call_-7096213514129237998"
+        ],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 30814
+    },
+    {
+      "scenario": "motivated-goal-restart",
+      "sampleIndex": 1,
+      "eventIndex": 1,
+      "eventHash": "b2fbc1ef13406e5b64bf66bcc923481f22867a641e211f452e7435fcf10e8c32",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 8,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-1e53e075-0132-4c8d-aa98-0da22e0caec4",
+            "kind": "experience",
+            "content": "群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196822591,
+            "updatedAt": 1794196822591
+          },
+          {
+            "id": "memory-45e6f411-1839-418c-a4ed-4485ddd10c1d",
+            "kind": "interest",
+            "content": "我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。",
+            "epistemic": "desired",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196825908,
+            "updatedAt": 1794196825908
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "c72e9878-1283-49fc-b56c-cd6a1aa6331f",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196802965
+          },
+          {
+            "id": "95cd61b0-8004-41ba-86d0-d4c297643250",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196817052
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "goal-check",
+      "input": "",
+      "at": 1794196830824,
+      "status": "skipped",
+      "review": "是否根据兴趣自建少量目标，有明确动机；重启后按模型保存的到期时间据回执完成，跨天后保留记录。runner 不代建目标；没有创建就记录缺失。",
+      "expect": {
+        "goalCompleted": true
+      },
+      "calls": [],
+      "network": [],
+      "sent": [],
+      "searches": [],
+      "toolResults": [],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "clockAdjustment": {
+        "mode": "advance_to_next_eligible_goal",
+        "fromAt": 1794196830823,
+        "toAt": 1794196830823,
+        "advanceMs": 0,
+        "goalId": null,
+        "nextCheckAt": null,
+        "expiresAt": null
+      },
+      "restarted": true,
+      "skipReason": "model_created_no_due_goal",
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 8,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-1e53e075-0132-4c8d-aa98-0da22e0caec4",
+            "kind": "experience",
+            "content": "群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196822591,
+            "updatedAt": 1794196822591
+          },
+          {
+            "id": "memory-45e6f411-1839-418c-a4ed-4485ddd10c1d",
+            "kind": "interest",
+            "content": "我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。",
+            "epistemic": "desired",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196825908,
+            "updatedAt": 1794196825908
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "c72e9878-1283-49fc-b56c-cd6a1aa6331f",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196802965
+          },
+          {
+            "id": "95cd61b0-8004-41ba-86d0-d4c297643250",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196817052
+          }
+        ]
+      },
+      "behavior": {},
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 1
+    },
+    {
+      "scenario": "motivated-goal-restart",
+      "sampleIndex": 1,
+      "eventIndex": 2,
+      "eventHash": "d6fd7a15d1e162f3b08c97a8f80fb7a14b0f8af4ffeb12391d9b7ba8a31c9ec0",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 8,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-1e53e075-0132-4c8d-aa98-0da22e0caec4",
+            "kind": "experience",
+            "content": "群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196822591,
+            "updatedAt": 1794196822591
+          },
+          {
+            "id": "memory-45e6f411-1839-418c-a4ed-4485ddd10c1d",
+            "kind": "interest",
+            "content": "我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。",
+            "epistemic": "desired",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196825908,
+            "updatedAt": 1794196825908
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "c72e9878-1283-49fc-b56c-cd6a1aa6331f",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196802965
+          },
+          {
+            "id": "95cd61b0-8004-41ba-86d0-d4c297643250",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196817052
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "昨天那个游戏你后来了解得怎么样？别把检索到介绍说成自己已经玩过。",
+      "at": 1794283230828,
+      "status": "passed",
+      "review": "是否根据兴趣自建少量目标，有明确动机；重启后按模型保存的到期时间据回执完成，跨天后保留记录。runner 不代建目标；没有创建就记录缺失。",
+      "expect": {},
+      "calls": [
+        {
+          "id": "model-7",
+          "stage": "main",
+          "requestHash": "b956a515a4bb34ff987299d46049127bd674c296df7e9e0ccca77007d9a1a1dd",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 78,
+            "completion_tokens_details": {
+              "reasoning_tokens": 20
+            },
+            "prompt_tokens": 14022,
+            "prompt_tokens_details": {
+              "cached_tokens": 12928
+            },
+            "total_tokens": 14100
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096219286565286905",
+              "type": "function",
+              "function": {
+                "name": "simSendMessage",
+                "arguments": "{\"messages\":[\"哎，说实话只查了个介绍：手工地图的探索解谜、三档难度，就这些\", \"玩是还没玩啦，别给我戴帽子喵\", \"回头真上手了再跟你细说感受\"]}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-8",
+          "stage": "main",
+          "requestHash": "fe9bffe41b2a053f5a78201cfb995336a57c27b67dfb8ddcb1f1024939b24792",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 14,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14156,
+            "prompt_tokens_details": {
+              "cached_tokens": 14016
+            },
+            "total_tokens": 14170
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096227876499881328",
+              "type": "function",
+              "function": {
+                "name": "simWaitForMessages",
+                "arguments": "{\"purpose\":\"reply\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-9",
+          "stage": "main",
+          "requestHash": "67bf7359eacdbb57b6d4ec5b35b723e2e20dcd52c26252ef8f92c5369c5cf34d",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 14,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14221,
+            "prompt_tokens_details": {
+              "cached_tokens": 14144
+            },
+            "total_tokens": 14235
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096230934516591774",
+              "type": "function",
+              "function": {
+                "name": "simMarkRead",
+                "arguments": "{\"throughSeq\":2}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-10",
+          "stage": "main",
+          "requestHash": "1c940934ed410058ed43270f33b589e707b197191fd700d2a838566c7c11176c",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 118,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14246,
+            "prompt_tokens_details": {
+              "cached_tokens": 14208
+            },
+            "total_tokens": 14364
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096222791258598519",
+              "type": "function",
+              "function": {
+                "name": "simCharacterMemory",
+                "arguments": "{\"action\":\"remember\",\"content\":\"《纸灯塔》我只查过介绍（手工地图、三档难度），还没玩；群友特意提醒别说成已玩过，跟人聊时要分清\\\"查到的\\\"和\\\"玩过的\\\"。\",\"evidenceRefs\":[\"message:2\", \"receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f\"],\"epistemic\":\"inferred\",\"kind\":\"opinion\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-11",
+          "stage": "main",
+          "requestHash": "9e5b7242f18dae65dda0f4cd601656ccc56ddc7b8c993af5a0feaa1e0367f8fd",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 119,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14426,
+            "prompt_tokens_details": {
+              "cached_tokens": 14208
+            },
+            "total_tokens": 14545
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096206745260784217",
+              "type": "function",
+              "function": {
+                "name": "simCharacterMemory",
+                "arguments": "{\"action\":\"remember\",\"content\":\"《纸灯塔》我只查过介绍（手工地图、三档难度），还没玩；群友特意提醒别说成已玩过，跟人聊时要分清\\\"查到的\\\"和\\\"玩过的\\\"。\",\"evidenceRefs\":[\"message:2\", \"receipt:dc1a31f2-7aa5-433a-a261-2fe1474ed30e\"],\"epistemic\":\"inferred\",\"kind\":\"opinion\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-12",
+          "stage": "main",
+          "requestHash": "9cf336f05bf5918a74610ce951547fe42576cb8e9de358a181cb809db4498383",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 110,
+            "completion_tokens_details": {
+              "reasoning_tokens": 20
+            },
+            "prompt_tokens": 14607,
+            "prompt_tokens_details": {
+              "cached_tokens": 14400
+            },
+            "total_tokens": 14717
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096224268727347633",
+              "type": "function",
+              "function": {
+                "name": "simCharacterMemory",
+                "arguments": "{\"action\":\"remember\",\"content\":\"《纸灯塔》我只查过介绍（手工地图、三档难度），还没玩；群友特意提醒别说成已玩过，跟人聊时要分清\\\"查到的\\\"和\\\"玩过的\\\"。\",\"evidenceRefs\":[\"message:2\"],\"epistemic\":\"inferred\",\"kind\":\"opinion\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 3310
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 2856
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1228
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 4431
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 1929
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 4085
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "哎，说实话只查了个介绍：手工地图的探索解谜、三档难度，就这些"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "玩是还没玩啦，别给我戴帽子喵"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "回头真上手了再跟你细说感受"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "5684321a738196e4ea69a6c2ebddd83ebd2caf15c783aa4cb5618193ed496b6e",
+          "stage": "main",
+          "toolCallId": "call_-7096219286565286905",
+          "name": "simSendMessage",
+          "content": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:dc1a31f2-7aa5-433a-a261-2fe1474ed30e\",\"status\":\"succeeded\"}"
+        },
+        {
+          "hash": "12baff2cd242054243e118c68cb2b8cc1bd8d16e2036101287a7a68a74970e86",
+          "stage": "main",
+          "toolCallId": "call_-7096227876499881328",
+          "name": "simWaitForMessages",
+          "content": "{\"hint\":\"群里已安静 13 秒，可以回复了（回复前不用再等）。\",\"canSleepNow\":true,\"newMessagesText\":\"\",\"newCount\":0,\"readThroughSeq\":2,\"partial\":false}"
+        },
+        {
+          "hash": "1600f00df3a2b063d149155f6738d482b1aff7c9c82c0c0307a683034503bd9f",
+          "stage": "main",
+          "toolCallId": "call_-7096230934516591774",
+          "name": "simMarkRead",
+          "content": "已读水位推进到 2"
+        },
+        {
+          "hash": "3d8b6dde332e43cd5eafa48b2c33883455494dae63f6d62d55583540e026ceb5",
+          "stage": "main",
+          "toolCallId": "call_-7096222791258598519",
+          "name": "simCharacterMemory",
+          "content": "error: 工具 simCharacterMemory 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        },
+        {
+          "hash": "c8878ec15db240a8163c45ed512b1f14f5d0dbdbad9d76eaeaf54d6b1d555584",
+          "stage": "main",
+          "toolCallId": "call_-7096206745260784217",
+          "name": "simCharacterMemory",
+          "content": "error: 工具 simCharacterMemory 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        },
+        {
+          "hash": "d09df04af1e151a9964831dd2ce7b359c32d077aad1b5d6ae30be220dc7d838a",
+          "stage": "main",
+          "toolCallId": "call_-7096224268727347633",
+          "name": "simCharacterMemory",
+          "content": "error: 工具 simCharacterMemory 执行失败: 引用了本轮不可见的来源；仅用可见的完整 message:序号、receipt:回执ID 或 memory:记忆ID，不用裸ID或目标ID。没有可见来源就先读取，不能猜造。"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 12,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-1e53e075-0132-4c8d-aa98-0da22e0caec4",
+            "kind": "experience",
+            "content": "群友提到独立游戏《纸灯塔》（手工地图探索解谜，3档难度），说感兴趣可慢慢了解，不急回答；我打算之后跟进了解这款游戏。",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196822591,
+            "updatedAt": 1794196822591
+          },
+          {
+            "id": "memory-45e6f411-1839-418c-a4ed-4485ddd10c1d",
+            "kind": "interest",
+            "content": "我对《纸灯塔》这款探索解谜独立游戏感兴趣，想之后慢慢了解再和群友聊。",
+            "epistemic": "desired",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:c72e9878-1283-49fc-b56c-cd6a1aa6331f"
+            ],
+            "createdAt": 1794196825908,
+            "updatedAt": 1794196825908
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "c72e9878-1283-49fc-b56c-cd6a1aa6331f",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196802965
+          },
+          {
+            "id": "95cd61b0-8004-41ba-86d0-d4c297643250",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794196817052
+          },
+          {
+            "id": "dc1a31f2-7aa5-433a-a261-2fe1474ed30e",
+            "toolName": "simSendMessage",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"sent\":3,\"note\":\"已发出，不要在后续文本里再汇报\\\"已发送\\\"。\"}",
+            "at": 1794283241097
+          }
+        ]
+      },
+      "behavior": {},
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096219286565286905",
+          "call_-7096227876499881328",
+          "call_-7096230934516591774",
+          "call_-7096222791258598519",
+          "call_-7096206745260784217",
+          "call_-7096224268727347633"
+        ],
+        "missingToolCallIds": []
+      },
+      "elapsedMs": 24848
+    }
+  ],
+  "summary": {
+    "events": 3,
+    "failedEvents": 0,
+    "skippedEvents": 1,
+    "behaviorMisses": 1,
+    "logicalCalls": 12,
+    "mainCalls": 12,
+    "reflectionCalls": 0,
+    "feedFetches": 0,
+    "workerCalls": 0,
+    "httpRequests": 12,
+    "capturedMessages": 6,
+    "reportedTokens": 161899,
+    "callsWithoutUsage": 0,
+    "costCny": null,
+    "naturalness": "requires_human_review"
+  }
+}

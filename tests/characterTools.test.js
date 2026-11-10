@@ -75,6 +75,21 @@ test('模型不能指定新记录的ID或伪造动作回执', async () => {
   assert.equal(h.state().goals.length, 0)
 })
 
+test('观点修订不能成功后遗漏旧来源；错误来源提示保留完整前缀格式', async () => {
+  const h = harness()
+  const first = await h.call('simCharacterMemory', memoryInput)
+  const oldId = first.memory.id
+  h.visible.push(`memory:${oldId}`)
+  const revision = { ...memoryInput, content: '根据新反馈调整这个看法', supersedes: oldId }
+  assert.match(await h.call('simCharacterMemory', revision), /^error:.*memory:/)
+  assert.equal(h.state().memories.length, 1, '缺失修订来源的写入不应报告成功')
+  assert.match(await h.call('simCharacterMemory', { ...revision, evidenceRefs: ['message:1', oldId] }), /^error:.*memory:/)
+  const revised = await h.call('simCharacterMemory', { ...revision, evidenceRefs: ['message:1', `memory:${oldId}`] })
+  assert.equal(revised.ok, true)
+  assert.equal(revised.memory.supersedes, oldId)
+  assert.deepEqual(revised.memory.evidenceRefs, ['message:1', `memory:${oldId}`])
+})
+
 test('完成自主目标必须引用本目标的真实成功回执', async () => {
   const h = harness()
   const created = await h.call('simGoal', goalInput)

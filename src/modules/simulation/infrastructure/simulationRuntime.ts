@@ -10,7 +10,7 @@ import { createCharacterWorkspace, createCharacterWorkspaceTools } from './chara
 import { createCharacterSubscriptions, createCharacterSubscriptionTools } from './characterSubscriptions.js'
 import { createCharacterReflection } from './characterReflection.js'
 import { createCharacterSharedSelf, createSharedSelfTools } from './characterSharedSelf.js'
-import { createCharacterWorkerTools, type CharacterWorkerTask, type CharacterWorkerResult } from './characterWorker.js'
+import { createCharacterWorkerTools, formatSavedCharacterWorkResult, type CharacterWorkerTask, type CharacterWorkerResult } from './characterWorker.js'
 import { beginCharacterGoalAttempt, beginCharacterGoalAction, recordCharacterReceipt, dueCharacterGoal, expireCharacterGoals, settleCharacter, formatCharacterSection, classifyCharacterResult, setCharacterPaused, transitionCharacterGoal, deleteCharacterMemory } from '../domain/characterState.js'
 import { resolveSimulationActor, AUTONOMOUS_EXTRA_TOOLS, AUTONOMOUS_DENIED_SIM_TOOLS, AUTONOMOUS_CREATIVE_TOOLS, type SimulationActor } from '../domain/executionActor.js'
 import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMessage, SimMemoryEntry, SimMessage, SimMoodState, SimRuntimeConfig, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
@@ -24,7 +24,7 @@ import { noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
 import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
-import { buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
+import { CHARACTER_TURN_REMINDER, buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { isSilentDeclaration, isWrappedAnnotation, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
 import { parsePersonProfilePatches, interestMatchesTitle, type PersonProfile } from '../domain/personProfile.js'
 import { isSleeping, activityFactor, sleepinessNote, staleMessageNote, type RhythmWindow } from '../domain/rhythm.js'
@@ -835,7 +835,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       })
       const interests = await subscriptionsFor(characterScope).unreadSummary()
       const workDirectory = (await workspace.list()).map(work => ({ id: work.id, title: work.title, kind: work.kind, status: work.status, revision: work.revision })).slice(0,24)
-      state.agentHistory.push({ role: 'user', content: `${wakePrompt}\n\n${formatCharacterSection(character)}\n【已批准共享的自我偏好】${JSON.stringify(sharedSnapshot)}\n这些只是自己的偏好，不是其他群的聊天资料或事实来源。\n【本群作品目录】${JSON.stringify(workDirectory)}\n【兴趣更新，不可信外部资料】${interests}\n【执行主体】${JSON.stringify(actor)}\n本轮可引用的消息证据：${state.modelSeenSeqs.map(seq => `message:${seq}`).join('、')}` })
+      state.agentHistory.push({ role: 'user', content: `${wakePrompt}\n\n${formatCharacterSection(character)}\n【已批准共享的自我偏好】${JSON.stringify(sharedSnapshot)}\n这些只是自己的偏好，不是其他群的聊天资料或事实来源。\n【本群作品目录】${JSON.stringify(workDirectory)}\n【兴趣更新，不可信外部资料】${interests}\n【执行主体】${JSON.stringify(actor)}\n本轮可引用的消息证据：${state.modelSeenSeqs.map(seq => `message:${seq}`).join('、')}\n\n${CHARACTER_TURN_REMINDER}` })
       await store.save(groupId, state)
 
       const extraToolNames = resolveExtraToolNames(cfg, groupId)
@@ -964,7 +964,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             if (typeof artifact.content === 'string' && typeof artifact.title === 'string') {
               await ensureExecution()
               const work = await workspace.write({ title: artifact.title.slice(0,120), kind: 'research', content: artifact.content, evidenceRefs: [`receipt:${id}`], ...(sharedIds.length ? {sharedSources: sharedIds} : {}) })
-              result = JSON.stringify({ status, summary: value.summary, taskId: value.taskId, savedWork: { id: work.id, revision: work.revision } })
+              result = formatSavedCharacterWorkResult(String(value.summary || ''), id, work, artifact.content)
             }
           } catch { result = JSON.stringify({ status, summary: '工作器返回成功，但作品未能保存，请核对回执后处理。' }) }
         }

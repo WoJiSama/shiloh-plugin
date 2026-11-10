@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "file": "worker-candidate-results.json",
+    "sha256": "1320dfdcae6d5f58fb3d758b0ecc088dad83418425d64ef807d74ba4f74b69d2",
+    "mode": "live_model",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "passed",
+    "behavior": "passed",
+    "liveModel": "passed",
+    "assessmentVersion": 3,
+    "repetitions": 2,
+    "runId": "f2e7ba78-e440-40a0-999c-dc5a16034112",
+    "startedAtISO": "2026-11-10T05:02:44.941Z",
+    "fingerprints": {
+      "runnerHash": "c503d13dfcd523bfa0fde553d2b468a141a48dfe82a82d66792da59634ca3134",
+      "scenariosHash": "05a05f4797cda3dcdabb1022f865b1aec962964a6c13ff7bf579c59c72e10e50",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "buildManifestHash": "69d94751dda3c6cb31ff0c53a6a4b992921473556a1cfd2d181acd4ae6392a93",
+      "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+      "scenarioManifestHash": "819255f6684421c0721ac44fc57eabb97695425ef922c0c36c4876e561219504"
+    },
+    "expectedEvents": 4,
+    "behaviorChecks": 10,
+    "successfulHttpRequests": 21,
+    "summary": {
+      "events": 4,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 21,
+      "mainCalls": 21,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 2,
+      "httpRequests": 21,
+      "capturedMessages": 7,
+      "reportedTokens": 277219,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      }
+    ]
+  },
+  "baseline": {
+    "file": "worker-before-results.json",
+    "sha256": "24c86d367116be9f8f3db3c4b4c5476eb880186ed0dc84734d49852bf021f92d",
+    "mode": "live_model",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "failed",
+    "behavior": "failed",
+    "liveModel": "failed",
+    "assessmentVersion": 3,
+    "repetitions": 2,
+    "runId": "c28e16d2-9565-42ac-bf30-82d66e55dbeb",
+    "startedAtISO": "2026-11-10T04:57:56.994Z",
+    "fingerprints": {
+      "runnerHash": "fc24407b5462ab3008fb130bfe22601766f4b1cf9deea6bdd2b77eef5b3fe6c5",
+      "scenariosHash": "05a05f4797cda3dcdabb1022f865b1aec962964a6c13ff7bf579c59c72e10e50",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "buildManifestHash": "679450d414f7eab672f1c84712227842d0d1be9125107c46f24347c25a536cba",
+      "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+      "scenarioManifestHash": "819255f6684421c0721ac44fc57eabb97695425ef922c0c36c4876e561219504"
+    },
+    "expectedEvents": 4,
+    "behaviorChecks": 7,
+    "successfulHttpRequests": 15,
+    "summary": {
+      "events": 4,
+      "failedEvents": 0,
+      "skippedEvents": 1,
+      "behaviorMisses": 2,
+      "logicalCalls": 15,
+      "mainCalls": 15,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 1,
+      "httpRequests": 15,
+      "capturedMessages": 3,
+      "reportedTokens": 179274,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": false,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "skipped",
+        "behavior": {}
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": false,
+          "workerUnknownReceiptRecorded": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      }
+    ]
+  },
+  "comparison": {
+    "status": "incompatible",
+    "differences": [
+      "runnerHash",
+      "toolResults"
+    ],
+    "configChanged": false,
+    "singleVariableAttribution": false,
+    "attribution": "Matching recorded conditions allow observation comparison; hashes do not establish a causal improvement.",
+    "modelChanged": false,
+    "buildChanged": true
+  },
+  "humanReview": {
+    "status": "pending",
+    "items": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      }
+    ]
+  },
+  "stage7": {
+    "status": "pending",
+    "realGroupObservation": "not_provided",
+    "deployment": "not_verified",
+    "reason": "Shadow reports cannot replace actual cross-day group observation and deployment evidence."
+  },
+  "evidenceTrust": "Fingerprints check local consistency and bind review to saved bytes; they do not authenticate a provider, a human reviewer or an actual independent deployment.",
+  "shadowAcceptance": "failed",
+  "exitCode": 1
+}

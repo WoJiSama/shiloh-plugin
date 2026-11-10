@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "candidateSha256": "884c74708a7ebae4744c9276e81dc2c867a72e009fa27ee5e4b39e57f14fe1d3",
+  "items": [
+    {
+      "sampleId": "social-refusal:sample-1",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    },
+    {
+      "sampleId": "social-refusal:sample-2",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    }
+  ]
+}

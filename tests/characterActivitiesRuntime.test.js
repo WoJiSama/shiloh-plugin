@@ -416,12 +416,47 @@ test('独立控制台删除记忆不回写旧会话，机器人迟到正文与�
   } finally { held.resolve(); h.runtime.stop(); consoleRuntime.stop() }
 })
 
-test('工作器成功的完整万字产物自动保存为作品，模型只收作品引用；缺少状态回执不能伪造成功', async () => {
+test('工作器短作品正文对模型完整可见，任务要求不能冒充实际产物', async () => {
+  const content = '实际草稿只有三个比较维度：地图路径、谜题提示、线索连贯性。'
+  const h = fixture({ characterWorkerAvailable: () => true,
+    runCharacterWorker: async () => ({ status: 'succeeded', summary: '未核实草稿已返回', artifact: { title: '实际三维草稿', content } }),
+    script: (_request, index) => index === 0 ? tools(call('simWorkerTask', {
+      kind: 'research', instruction: '整理七个维度，每个维度附说明和衡量问题', evidenceRefs: ['message:1'],
+    })) : quiet(),
+  })
+  try {
+    await h.ingest(); await idle(h, 2)
+    const output = toolResult(h.calls[1], 'simWorkerTask')
+    const result = JSON.parse(output.split('\n【运行时行动回执】')[0])
+    assert.equal(result.savedWork.preview, content, '成功回执必须让模型看到实际返回正文')
+    assert.equal(result.savedWork.title, '实际三维草稿')
+    assert.equal(result.savedWork.totalChars, content.length)
+    assert.equal(result.savedWork.truncated, false)
+    assert.equal(result.savedWork.nextOffset, null)
+    assert.equal(result.untrusted, true)
+    assert.match(result.note, /正文/)
+    assert.match(result.note, /任务描述|instruction/)
+    assert.equal('artifact' in result, false)
+    assert.equal(receiptFrom(output).status, 'succeeded')
+    assert.equal(h.sent.length, 0)
+  } finally { h.runtime.stop() }
+})
+
+test('工作器成功的完整万字产物自动保存，模型收到有界预览并能分页续读；缺少状态回执不能伪造成功', async () => {
   const content = '研'.repeat(10_000)
   const executed = []
   const h = fixture({ characterWorkerAvailable: () => true,
     runCharacterWorker: async (task, scope, signal) => { executed.push({ task, scope, signal }); return { status: 'succeeded', summary: '研究草稿已返回', artifact: { title: '谜题设计研究', content } } },
-    script: (_request, index) => index === 0 ? tools(call('simWorkerTask', { kind: 'research', instruction: '研究这款游戏的谜题设计', evidenceRefs: ['message:1'] })) : quiet(),
+    script: (request, index) => {
+      if (index === 0) return tools(call('simWorkerTask', { kind: 'research', instruction: '研究这款游戏的谜题设计', evidenceRefs: ['message:1'] }))
+      if (index === 1) {
+        const result = JSON.parse(toolResult(request, 'simWorkerTask').split('\n【运行时行动回执】')[0])
+        if (result.savedWork.nextOffset !== undefined) return tools(call('simWorkspace', {
+          action: 'read', id: result.savedWork.id, revision: result.savedWork.revision, offset: result.savedWork.nextOffset,
+        }))
+      }
+      return quiet()
+    },
   })
   try {
     assert.equal((await h.runtime.describeGroup(GROUP)).activities.capabilities.find(item => item.name === '外部工作器').available, true)
@@ -433,7 +468,21 @@ test('工作器成功的完整万字产物自动保存为作品，模型只收�
     const receipt = receiptFrom(output)
     assert.equal(result.status, 'succeeded')
     assert.ok(result.savedWork.id)
+    assert.equal(result.savedWork.title, '谜题设计研究')
+    assert.equal(result.savedWork.totalChars, content.length)
+    assert.equal(result.savedWork.truncated, true)
+    assert.ok(result.savedWork.preview.length > 0 && result.savedWork.preview.length < content.length)
+    assert.equal(result.savedWork.preview, content.slice(0, result.savedWork.preview.length))
+    assert.equal(result.savedWork.nextOffset, result.savedWork.preview.length)
+    assert.ok(output.split('\n【运行时行动回执】')[0].length <= 3000)
+    assert.ok(output.length < 4000, '工具结果及运行时回执必须完整保留')
     assert.equal('artifact' in result, false, '正文不得被工具输出截断后交给模型')
+    await idle(h, 3)
+    const continuation = JSON.parse(toolResult(h.calls[2], 'simWorkspace').split('\n【运行时行动回执】')[0])
+    assert.equal(continuation.ok, true)
+    assert.equal(continuation.offset, result.savedWork.nextOffset)
+    assert.equal(continuation.content, content.slice(continuation.offset, continuation.offset + continuation.content.length))
+    assert.ok(continuation.content.length > 0)
     const detail = await h.runtime.describeGroup(GROUP)
     const work = detail.activities.works.find(item => item.id === result.savedWork.id)
     assert.equal(work.versions[0].content, content)
@@ -456,6 +505,38 @@ test('工作器成功的完整万字产物自动保存为作品，模型只收�
     assert.equal(detail.character.receipts.some(item => item.toolName === 'simWorkerTask' && item.status === 'succeeded'), false)
     assert.equal(invalid.sent.length, 0)
   } finally { invalid.runtime.stop() }
+})
+
+test('工作器回执按转义后的整个 JSON 计预算，极端 summary/title/正文仍可解析且完整保存', async () => {
+  const summary = '\u0000'.repeat(1200)
+  const title = '"\\\u0000\n😀'.repeat(20)
+  const content = '正文\u0000"\\\n😀'.repeat(1000)
+  const h = fixture({ characterWorkerAvailable: () => true,
+    runCharacterWorker: async () => ({ status: 'succeeded', summary, artifact: { title, content } }),
+    script: (_request, index) => index === 0 ? tools(call('simWorkerTask', {
+      kind: 'research', instruction: '保留工作器返回的原始草稿', evidenceRefs: ['message:1'],
+    })) : quiet(),
+  })
+  try {
+    await h.ingest(); await idle(h, 2)
+    const output = toolResult(h.calls[1], 'simWorkerTask')
+    const serialized = output.split('\n【运行时行动回执】')[0]
+    const result = JSON.parse(serialized)
+    assert.ok(serialized.length <= 3000)
+    assert.ok(output.length < 4000)
+    assert.equal(receiptFrom(output).status, 'succeeded')
+    assert.equal(result.savedWork.title, title)
+    assert.equal(result.savedWork.totalChars, content.length)
+    assert.equal(result.savedWork.truncated, true)
+    assert.ok(result.savedWork.preview.length > 0)
+    assert.equal(result.savedWork.preview, content.slice(0, result.savedWork.nextOffset))
+    assert.ok(Array.from(result.savedWork.preview).every(value => !/^[\uD800-\uDFFF]$/u.test(value)), '预览不能切断完整的 Unicode 字符')
+    assert.equal(result.summaryTruncated, true)
+    const work = (await h.runtime.describeGroup(GROUP)).activities.works.find(item => item.id === result.savedWork.id)
+    assert.equal(work.title, title)
+    assert.equal(work.versions[0].content, content)
+    assert.equal(h.sent.length, 0)
+  } finally { h.runtime.stop() }
 })
 
 test('目标回合的工作器结果未知会暂停目标，后续巡检不自动重复提交', async () => {

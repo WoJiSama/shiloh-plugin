@@ -1,0 +1,59 @@
+✖ 工作器短作品正文对模型完整可见，任务要求不能冒充实际产物 (1021.693334ms)
+✖ 工作器成功的完整万字产物自动保存，模型收到有界预览并能分页续读；缺少状态回执不能伪造成功 (1026.874333ms)
+✖ 工作器回执按转义后的整个 JSON 计预算，极端 summary/title/正文仍可解析且完整保存 (1010.596792ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3159.439875
+
+✖ failing tests:
+
+test at tests/characterActivitiesRuntime.test.js:419:1
+✖ 工作器短作品正文对模型完整可见，任务要求不能冒充实际产物 (1021.693334ms)
+  AssertionError [ERR_ASSERTION]: 成功回执必须让模型看到实际返回正文
+  + actual - expected
+  
+  + undefined
+  - '实际草稿只有三个比较维度：地图路径、谜题提示、线索连贯性。'
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterActivitiesRuntime.test.js:431:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '实际草稿只有三个比较维度：地图路径、谜题提示、线索连贯性。',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterActivitiesRuntime.test.js:445:1
+✖ 工作器成功的完整万字产物自动保存，模型收到有界预览并能分页续读；缺少状态回执不能伪造成功 (1026.874333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - '谜题设计研究'
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterActivitiesRuntime.test.js:471:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: '谜题设计研究',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterActivitiesRuntime.test.js:510:1
+✖ 工作器回执按转义后的整个 JSON 计预算，极端 summary/title/正文仍可解析且完整保存 (1010.596792ms)
+  SyntaxError: Unexpected end of JSON input
+      at JSON.parse (<anonymous>)
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterActivitiesRuntime.test.js:524:25)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
