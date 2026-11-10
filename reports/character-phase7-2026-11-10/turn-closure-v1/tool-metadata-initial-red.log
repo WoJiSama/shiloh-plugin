@@ -1,0 +1,113 @@
+✔ 收尾 schema 复用角色工具字段和描述，嵌套操作不暴露 action (2.84575ms)
+✖ 两条记忆和新目标在草稿中验证后一次保存，成功才把真实状态交给收尾回调 (3.937792ms)
+✔ 后一个记忆或目标验证失败时没有部分写入、收尾或自动补来源 (1.951292ms)
+✔ CAS 冲突保留并发状态，存储失败也不调用 finish (0.748708ms)
+✔ complete 只能引用本目标真实成功回执，不能把收尾本身或别的目标当成果 (2.13025ms)
+✔ wait 和 abandon 只更新显式已有目标，不支持 focus 或重建目标 (0.754917ms)
+✔ 普通聊天与纯兴趣可以不写状态；拒绝和沉默不自动生成目标 (0.901208ms)
+✔ 顶层、嵌套字段和收尾发送参数严格验证，不忽略 action、枚举或调用者指定新 ID (2.633541ms)
+✔ 修订沿用已有来源约束，不自动补旧来源；已撤销授权不进入草稿或收尾 (0.333709ms)
+✔ finish 的发送失败结果原样返回，不重试或回滚已保存状态 (0.272083ms)
+✔ 仿真协议教模型先判定说话对象，判断不了默认旁听 (0.590625ms)
+✔ 仿真协议要求多话题线分线接话，不跨线混接 (0.085875ms)
+✔ 对话延续指引不再偏向「大概率是对我说的」，要求先判定、猜不中就安静 (0.293584ms)
+✔ 关键词/随机/关注群友唤醒给出旁观型指引：话题沾边不等于有人找你 (0.864042ms)
+✔ 被@点名必须给出回应的指引存在 (0.096625ms)
+✔ 固定协议不含角色名，人格变化和工具变化保留相同前缀 (0.444917ms)
+✔ 每轮尾部只传阶段、剩余轮数、聚焦目标和实际可见来源 (0.515209ms)
+✔ 工具详细说明以实际工具清单为准，旧布尔选项不扩大已过滤能力 (0.217667ms)
+✔ 资料和人格示例不能改写固定执行协议，注入内容保留为资料 (0.200625ms)
+✔ 结构化收尾要求保存成功才发送，完成回执失败不能提前宣告 (0.163ms)
+✔ 兴趣、旁听和自然拒绝仍是有效选择，唤醒指引不再要求先标读后收尾 (0.21725ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 20
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 76.822084
+
+✖ failing tests:
+
+test at tests/characterTurn.test.js:55:1
+✖ 两条记忆和新目标在草稿中验证后一次保存，成功才把真实状态交给收尾回调 (3.937792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+      atUserIds: [
+        '40000'
+      ],
+      choice: 'schedule',
+  +   goal: {
+  +     attempts: 0,
+  +     completionCriteria: '取得公开介绍并核对',
+  +     createdAt: 1794200000000,
+  +     evidenceRefs: [
+  +       'message:1'
+  +     ],
+  +     expiresAt: 1794804800000,
+  +     id: 'goal-3',
+  +     kind: 'autonomous',
+  +     maxAttempts: 3,
+  +     motivation: '想了解线索设计',
+  +     nextCheckAt: 1794201800000,
+  +     nextStep: '查官方介绍',
+  +     revision: 1,
+  +     sharedSources: [
+  +       'approved-preference'
+  +     ],
+  +     status: 'active',
+  +     stopConditions: [
+  +       '来源不可用时停止'
+  +     ],
+  +     title: '核对公开玩法',
+  +     updatedAt: 1794200000000
+  +   },
+  +   memories: [
+  +     {
+  +       content: '群友提到线索设计很连贯',
+  +       createdAt: 1794200000000,
+  +       epistemic: 'reported',
+  +       evidenceRefs: [
+  +         'message:1'
+  +       ],
+  +       id: 'memory-1',
+  +       kind: 'experience',
+  +       sharedSources: [
+  +         'approved-preference'
+  +       ],
+  +       updatedAt: 1794200000000
+  +     },
+  +     {
+  +       content: '我暂时更看重线索连贯性',
+  +       createdAt: 1794200000000,
+  +       epistemic: 'inferred',
+  +       evidenceRefs: [
+  +         'message:2'
+  +       ],
+  +       id: 'memory-2',
+  +       kind: 'opinion',
+  +       sharedSources: [
+  +         'approved-preference'
+  +       ],
+  +       updatedAt: 1794200000000
+  +     }
+  +   ],
+      messages: [
+        '我稍后继续看看官方资料'
+      ],
+      replyToSeq: 1,
+      state: {
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterTurn.test.js:66:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { choice: 'schedule', state: { schemaVersion: 1, scope: [Object], revision: 1, paused: false, memories: [Array], goals: [Array], receipts: [] }, memories: [ [Object], [Object] ], goal: { id: 'goal-3', kind: 'autonomous', title: '核对公开玩法', motivation: '想了解线索设计', nextStep: '查官方介绍', completionCriteria: '取得公开介绍并核对', stopConditions: [Array], evidenceRefs: [Array], status: 'active', nextCheckAt: 1794201800000, expiresAt: 1794804800000, attempts: 0, maxAttempts: 3, revision: 1, createdAt: 1794200000000, updatedAt: 1794200000000, sharedSources: [Array] }, messages: [ '我稍后继续看看官方资料' ], replyToSeq: 1, atUserIds: [ '40000' ], throughSeq: 1 },
+    expected: { choice: 'schedule', state: { schemaVersion: 1, scope: [Object], revision: 1, paused: false, memories: [Array], goals: [Array], receipts: [] }, messages: [ '我稍后继续看看官方资料' ], replyToSeq: 1, atUserIds: [ '40000' ], throughSeq: 1 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

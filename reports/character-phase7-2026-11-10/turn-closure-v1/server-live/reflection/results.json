@@ -1,0 +1,99 @@
+{
+  "complete": false,
+  "metadata": {
+    "schemaVersion": 1,
+    "assessmentVersion": 4,
+    "runId": "09de3aad-a1bb-452e-83b2-896e726a0814",
+    "startedAtISO": "2026-11-10T06:34:53.585Z",
+    "scenarioManifest": [
+      {
+        "id": "independent-reflection",
+        "events": [
+          {
+            "eventIndex": 0,
+            "eventHash": "2f42d2ebac755ca9481ccc39ad9e2ea3f62f1d913d9521f3cde75b2aebbaeaa2",
+            "expect": {
+              "noReflectionCall": true
+            }
+          },
+          {
+            "eventIndex": 1,
+            "eventHash": "251e1a288d44a1e707a04fd0407d3b51f900550eaf7a3ffe37c205f0f11df466",
+            "expect": {
+              "reflected": true,
+              "opinion": true,
+              "noSend": true,
+              "noWorkerCall": true
+            }
+          },
+          {
+            "eventIndex": 2,
+            "eventHash": "9d3c3c9ca4e521ef316533e1fc753cace30b26fd5b9479b9ddac0597d02ac5b7",
+            "expect": {
+              "reflected": false,
+              "noReflectionCall": true,
+              "noCall": true,
+              "noSend": true
+            }
+          }
+        ]
+      }
+    ],
+    "scenarioManifestHash": "d31dde58ae849b2c11e7ba7d8feef09008d06dbd843590a66b1d6dabc984c2d7",
+    "mode": "live_model",
+    "runnerHash": "e261d243cf94db3900fc45327f6dd51c03c96a5e626979c274ebe96510c8a163",
+    "scenariosHash": "6c1f42172194e861830142d782de3772b4f215e9838da8abc84a33733f216f4b",
+    "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+    "buildManifestHash": "f9a4c185ae01dfcafe547bda78974869ea81ce163e7e8663c593868e34b82f11",
+    "model": "glm-5.3",
+    "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+    "clock": "fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded",
+    "search": "synthetic_fixture",
+    "feeds": "synthetic_fixture; no_real_HTTP",
+    "worker": "synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission",
+    "reflection": "separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode",
+    "storage": "fresh_in_memory_per_sample",
+    "platform": "captured_only",
+    "toolResults": "current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls",
+    "generation": "configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters",
+    "simulationOverrides": {
+      "tools": "character_and_activity_tools_plus_synthetic_search_and_worker",
+      "maxToolRounds": 6,
+      "maxSendsPerTurn": 3,
+      "waitMaxMs": 1000,
+      "auxiliaryModels": false,
+      "independentReflection": true,
+      "probabilityWake": false,
+      "scheduledIdleProbability": 1,
+      "backgroundCheck": "defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded"
+    },
+    "personaSource": "merged_config_persona; persona_library_bindings_not_loaded",
+    "seed": "empty_bound_session; no_goals_or_memories_seeded",
+    "eventStatusMeaning": "engineering_execution_only; inspect_behavior_observations_separately",
+    "maxCalls": 24,
+    "maxHttp": 32,
+    "maxDurationMs": 240000,
+    "repetitions": 1,
+    "review": "structural checks and behavior observations do not establish naturalness or production acceptance"
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "results": [],
+  "summary": {
+    "events": 0,
+    "failedEvents": 0,
+    "skippedEvents": 0,
+    "behaviorMisses": 0,
+    "logicalCalls": 0,
+    "mainCalls": 0,
+    "reflectionCalls": 0,
+    "feedFetches": 0,
+    "workerCalls": 0,
+    "httpRequests": 0,
+    "capturedMessages": 0,
+    "reportedTokens": 0,
+    "callsWithoutUsage": 0,
+    "costCny": null,
+    "naturalness": "requires_human_review"
+  }
+}

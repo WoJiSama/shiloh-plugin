@@ -137,7 +137,7 @@ export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] 
     })
 
   const goal = new CharacterTool('simGoal',
-    '管理自己的少量自主目标，不能代替群友已接受的托付账本。普通聊天或只想关注话题不用建目标；若自己已决定稍后主动继续研究，先检查已有目标，新计划create成功后再表达，已有目标复用，不重复创建。已有目标安排变更用wait；wait/complete/abandon是收尾，之后结束本轮，不继续行动或发言；必要说明先自然表达打算，不声称尚未保存的更新。关键词唤醒不等于目标。create必填title/motivation/nextStep/completionCriteria/stopConditions/evidenceRefs，可选nextCheckInMinutes/expiresInHours/maxAttempts，不传id或outcome。focus只传action/id，在行动前选择目标，执行身份切为自主且不能借群友权限；不要给focus传outcome。wait传action/id及可选nextCheckInMinutes/nextStep/outcome/evidenceRefs，最早15分钟后检查。complete传action/id/evidenceRefs及可选outcome，来源必须有本目标的真实成功回执；abandon传action/id及可选outcome/evidenceRefs。list只传action和可选beforeId。', {
+    '管理自己的少量自主目标，不能代替群友已接受的托付账本。普通聊天或只想关注话题不用建目标；若自己已决定稍后主动继续研究，先检查已有目标，新计划create成功后再表达，已有目标复用，不重复创建。后续排期或状态变更及其说明优先合并进simFinishTurn的schedule/wait/complete/abandon，先保存成功才发送。直接调用本工具wait/complete/abandon后旧目标授权失效，之后不继续行动或发言；不能先宣告尚未保存的结果。关键词唤醒不等于目标。create必填title/motivation/nextStep/completionCriteria/stopConditions/evidenceRefs，可选nextCheckInMinutes/expiresInHours/maxAttempts，不传id或outcome。focus只传action/id，在行动前选择目标，执行身份切为自主且不能借群友权限；不要给focus传outcome。wait传action/id及可选nextCheckInMinutes/nextStep/outcome/evidenceRefs，最早15分钟后检查。complete传action/id/evidenceRefs及可选outcome，来源必须有本目标的真实成功回执；abandon传action/id及可选outcome/evidenceRefs。list只传action和可选beforeId。', {
       type: 'object',
       properties: {
         action: { type: 'string', enum: ['list', 'create', 'focus', 'wait', 'complete', 'abandon'], description: '各action字段不能混用；focus仅action/id，结果在wait/complete/abandon的outcome中保存。' },

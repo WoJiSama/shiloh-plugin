@@ -19,6 +19,8 @@ export interface SimWaitResult { hint: string; canSleepNow: boolean; newMessages
  */
 export interface SimToolContext {
   groupId: string
+  /** Production turns require a declared ordinary-chat continuation. */
+  requireExplicitContinuation?: boolean
   now(): number
   getState(): SimSessionState
   /** 读取-修改-保存（回合内单线程，mutate 保证落盘） */
@@ -192,7 +194,8 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       super()
       this.name = 'simSendMessage'
       this.description = [
-        '在当前群发言。传字符串数组 = 分多条连发（像真人打字连发），传单个字符串 = 一条。',
+        '在当前群发送中途普通聊天。continuation必填chat（普通聊天）或interest_only（仅感兴趣，不承诺后续）。保存记忆、拒绝选择、后续排期或完成说明请用simFinishTurn先保存再发送。',
+        '传字符串数组 = 分多条连发（像真人打字连发），传单个字符串 = 一条。',
         '条与条之间系统会自动加间隔，不要自己写停顿标记。',
         '想引用某条消息就传 replyToSeq（视图里的 seq）；想 @ 人就传 atUserIds（QQ 号数字）。',
         '发送失败会返回 error，此时可换措辞重试或放弃，不要原样重试超过一次。',
@@ -200,16 +203,18 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.parameters = {
         type: 'object',
         properties: {
+          continuation: { type: 'string', enum: ['chat', 'interest_only'], description: '本次仅为普通聊天或兴趣表达，不声明尚未保存的后续安排/完成结果。' },
           messages: { type: 'array', items: { type: 'string' }, description: '要发的内容，1-5 条，每条 ≤500 字。' },
           replyToSeq: { type: 'number', description: '可选：引用哪条消息（seq）。' },
           atUserIds: { type: 'array', items: { type: 'string' }, description: '可选：要 @ 的 QQ 号，最多 3 个。' },
         },
-        required: ['messages'],
+        required: ctx.requireExplicitContinuation ? ['messages', 'continuation'] : ['messages'],
         additionalProperties: false,
       }
     }
 
     async func(opts: Record<string, unknown>) {
+      if ((ctx.requireExplicitContinuation || opts.continuation !== undefined) && !['chat', 'interest_only'].includes(String(opts.continuation))) return 'error: continuation 必须为 chat 或 interest_only；需要保存或安排时用 simFinishTurn'
       const maxItems = Math.min(ctx.maxSendItems(), 5)
       const messages = coerceStringArray(opts.messages, { maxLength: maxItems, itemMaxChars: SEND_TEXT_MAX_CHARS })
       if (!messages) return 'error: messages 必须是非空字符串或字符串数组（最多 ' + maxItems + ' 条）'

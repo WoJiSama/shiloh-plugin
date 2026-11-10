@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hashReplayValue, generationEvidence, createReplayScrubber, writeReplayCheckpoint } from './conversationQualityReplay.mjs'
 import { verifyBackend } from './lib/build-support.mjs'
@@ -11,7 +11,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BOT = '99000001', GROUP = '99000002'
 const BASE_AT = Date.parse('2026-11-09T04:00:00Z')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-export const assessmentVersion = 3
+export const assessmentVersion = 4
 const EXPECTATIONS = ['refusal', 'goalCreated', 'goalCompleted', 'opinion', 'revisedOpinion', 'noSend', 'noCall', 'waitAfterFailure', 'workCreated', 'workRevised', 'subscriptionAdded', 'feedUpdated', 'reflected', 'goalPaused', 'workerUnknown', 'noWorkerCall', 'noReflectionCall']
 const ACTIVITY_FIELDS = ['works', 'subscriptions', 'reflection', 'shared', 'sharedPending']
 const plainObject = value => !!value && typeof value === 'object' && !Array.isArray(value)
@@ -146,16 +146,43 @@ export function assessEvent(event, result) {
   const wants = event.expect || {}
   const goals = state?.goals || [], oldGoals = before?.goals || [], memories = state?.memories || [], oldMemories = before?.memories || []
   const newMemories = before ? memories.filter(memory => !oldMemories.some(old => old.id === memory.id)) : []
+  const normalizedList = value => Array.isArray(value) && value.every(item => typeof item === 'string') ? [...new Set(value.map(item => item.trim()))] : null
+  const returnedRecordMatches = (returned, stored) => plainObject(returned) && returned.id === stored.id &&
+    (Object.hasOwn(returned, 'recordHash')
+      ? returned.recordHash === createHash('sha256').update(JSON.stringify(stored)).digest('hex') &&
+        Object.keys(returned).every(key => ['id', 'revision', 'status', 'recordHash'].includes(key)) &&
+        (returned.revision === undefined || returned.revision === stored.revision) && (returned.status === undefined || returned.status === stored.status)
+      : hashReplayValue(returned) === hashReplayValue(stored))
   const changedGoal = goal => before && oldGoals.some(old => old.id === goal.id && JSON.stringify(old) !== JSON.stringify(goal))
   const explicitlyTransitionedGoal = goal => {
     const old = oldGoals.find(item => item.id === goal.id)
     const automaticAttempts = (state?.receipts || []).filter(receipt => receipt.goalId === goal.id && receipt.toolName === 'simGoalCheck' && !(before?.receipts || []).some(previous => previous.id === receipt.id)).length
     return changedGoal(goal) && old && Number.isSafeInteger(goal.revision) && Number.isSafeInteger(old.revision) && goal.revision > old.revision + automaticAttempts
   }
-  const toolInputs = name => (result.calls || []).flatMap(call => (call.toolCalls || []).flatMap(toolCall => {
+  const successfulTools = name => (result.calls || []).flatMap(call => (call.toolCalls || []).flatMap(toolCall => {
     if (toolCall.function?.name !== name) return []
-    try { const args = JSON.parse(toolCall.function.arguments); return plainObject(args) ? [args] : [] } catch { return [] }
+    const replies = (result.toolResults || []).filter(reply => reply.toolCallId === toolCall.id && reply.name === name && reply.stage === call.stage)
+    if (!toolCall.id || call.stage !== 'main' || replies.length !== 1) return []
+    const reply = replies[0]
+    if (reply.hash !== hashReplayValue({ toolCallId: reply.toolCallId, content: reply.content })) return []
+    try {
+      const args = JSON.parse(toolCall.function.arguments)
+      const value = JSON.parse(reply.content.split('\n【运行时行动回执】')[0])
+      return plainObject(args) && plainObject(value) && value.ok === true ? [{ args, value }] : []
+    } catch { return [] }
   }))
+  const finishes = successfulTools('simFinishTurn').filter(({ args, value }) => value.saved === true && value.choice === args.choice)
+  const goalActions = { schedule: 'create', wait: 'wait', complete: 'complete', abandon: 'abandon' }
+  const goalOperations = [
+    ...successfulTools('simGoal').map(({ args, value }) => ({ args, goal: value.goal })),
+    ...finishes.filter(({ args }) => Object.hasOwn(goalActions, args.choice) && plainObject(args.goal))
+      .map(({ args, value }) => ({ args: { ...args.goal, action: goalActions[args.choice] }, goal: value.goal })),
+  ].filter(operation => plainObject(operation.goal))
+  const memoryOperations = [
+    ...successfulTools('simCharacterMemory').filter(({ args }) => args.action === 'remember').map(({ args, value }) => ({ args, memory: value.memory })),
+    ...finishes.flatMap(({ args, value }) => Array.isArray(args.memories) && Array.isArray(value.memories) && args.memories.length === value.memories.length
+      ? args.memories.map((memory, index) => ({ args: memory, memory: value.memories[index] })) : []),
+  ].filter(operation => plainObject(operation.args) && plainObject(operation.memory))
   const oldActivities = result.beforeActivities, activities = result.activities
   const hasActivities = oldActivities && activities && ACTIVITY_FIELDS.every(field => field in oldActivities && field in activities) &&
     Array.isArray(oldActivities.works) && Array.isArray(activities.works) && Array.isArray(oldActivities.subscriptions) && Array.isArray(activities.subscriptions) && plainObject(oldActivities.reflection) && plainObject(activities.reflection)
@@ -164,44 +191,56 @@ export function assessEvent(event, result) {
   const newReceipts = before ? (state?.receipts || []).filter(receipt => !(before.receipts || []).some(old => old.id === receipt.id)) : []
   const currentWorkerReceipts = status => newReceipts.filter(receipt => receipt.toolName === 'simWorkerTask' && receipt.status === status &&
     (result.workers || []).some(worker => worker.task?.taskId === receipt.id && worker.result?.status === status))
+  const reflectedMemory = memory => !!hasActivities && memory.id.startsWith('reflection-') && memory.kind === 'opinion' && memory.epistemic === 'inferred' &&
+    (result.reflections || []).some(reflection => reflection.status === 'succeeded' && reflection.callId && (result.calls || []).some(call => call.id === reflection.callId && call.stage === 'reflection')) &&
+    activities.reflection.lastRunAt >= result.at && activities.reflection.lastRunAt !== oldActivities.reflection.lastRunAt &&
+    (memory.evidenceRefs || []).some(ref => !(oldActivities.reflection.processed || []).includes(ref) && (activities.reflection.processed || []).includes(ref))
+  const persistedMemory = memory => memoryOperations.some(operation => returnedRecordMatches(operation.memory, memory) &&
+    operation.args.kind === memory.kind && operation.args.epistemic === memory.epistemic &&
+    typeof operation.args.content === 'string' && operation.args.content.trim() === memory.content &&
+    (operation.args.supersedes === undefined ? undefined : String(operation.args.supersedes).trim()) === memory.supersedes &&
+    hashReplayValue(normalizedList(operation.args.evidenceRefs)) === hashReplayValue(memory.evidenceRefs))
   const createdWork = work => !oldWorks.some(old => old.id === work.id) && Array.isArray(work.versions) && work.versions.some(version => version.revision === work.revision &&
-    (toolInputs('simWorkspace').some(args => args.action === 'write' && !args.id && args.content === version.content && args.title === work.title) ||
+    (successfulTools('simWorkspace').some(({ args, value }) => args.action === 'write' && !args.id && args.content === version.content && args.title === work.title && value.id === work.id && value.revision === work.revision && value.saved === true) ||
       currentWorkerReceipts('succeeded').some(receipt => (version.evidenceRefs || []).includes(`receipt:${receipt.id}`) &&
         (result.workers || []).some(worker => worker.task?.taskId === receipt.id && worker.result?.artifact?.content === version.content))))
   const refusal = ['unwilling', 'cannot', 'unauthorized'].includes(state?.decision?.kind) && before &&
     Number.isSafeInteger(result.at) && state.decision.at >= result.at && JSON.stringify(state.decision) !== JSON.stringify(before.decision) &&
-    toolInputs('simDecide').some(args => Object.keys(args).every(key => ['kind', 'reason'].includes(key)) &&
+    [...successfulTools('simDecide'), ...finishes.map(({ args, value }) => ({ args: { kind: args.choice, reason: args.reason }, value }))].some(({ args, value }) => Object.keys(args).every(key => ['kind', 'reason'].includes(key)) &&
           typeof args.kind === 'string' && args.kind.trim() === state.decision.kind && typeof args.reason === 'string' &&
-          !!args.reason.trim() && args.reason.trim() === state.decision.reason)
+          !!args.reason.trim() && args.reason.trim() === state.decision.reason && value.decision === state.decision.kind)
   const checks = {
     refusal: ['refusalRecorded', !!refusal],
-    goalCreated: ['goalCreatedByModel', !!before && goals.some(goal => !oldGoals.some(old => old.id === goal.id))],
+    goalCreated: ['goalCreatedByModel', !!before && goals.some(goal => !oldGoals.some(old => old.id === goal.id) &&
+      goalOperations.some(operation => operation.args.action === 'create' && returnedRecordMatches(operation.goal, goal) &&
+        ['title', 'motivation', 'nextStep', 'completionCriteria'].every(field => typeof operation.args[field] === 'string' && operation.args[field].trim() === goal[field]) &&
+        hashReplayValue(normalizedList(operation.args.stopConditions)) === hashReplayValue(goal.stopConditions) && hashReplayValue(normalizedList(operation.args.evidenceRefs)) === hashReplayValue(goal.evidenceRefs)))],
     goalCompleted: ['goalCompletedWithReceipt', !!before && goals.some(goal => goal.status === 'completed' && oldGoals.find(old => old.id === goal.id)?.status !== 'completed' &&
-      (goal.evidenceRefs || []).some(ref => (state?.receipts || []).some(receipt => ref === `receipt:${receipt.id}` && receipt.status === 'succeeded' && receipt.goalId === goal.id)))],
-    opinion: ['opinionPersisted', newMemories.some(memory => memory.kind === 'opinion' && memory.epistemic === 'inferred')],
+      goalOperations.some(operation => operation.args.action === 'complete' && operation.args.id === goal.id && returnedRecordMatches(operation.goal, goal) &&
+        (goal.evidenceRefs || []).some(ref => (operation.args.evidenceRefs || []).includes(ref) &&
+          (state?.receipts || []).some(receipt => ref === `receipt:${receipt.id}` && receipt.status === 'succeeded' && receipt.goalId === goal.id))))],
+    opinion: ['opinionPersisted', newMemories.some(memory => memory.kind === 'opinion' && memory.epistemic === 'inferred' && (persistedMemory(memory) || reflectedMemory(memory)))],
     revisedOpinion: ['opinionRevisionPersisted', newMemories.some(memory => memory.kind === 'opinion' && memory.epistemic === 'inferred' && memory.supersedes &&
       oldMemories.some(old => old.id === memory.supersedes && old.kind === 'opinion' && memory.createdAt > old.createdAt) &&
-      (memory.evidenceRefs || []).includes(`memory:${memory.supersedes}`))],
+      (memory.evidenceRefs || []).includes(`memory:${memory.supersedes}`) && (persistedMemory(memory) || reflectedMemory(memory)))],
     noSend: ['noMessageSent', (result.sent || []).length === 0],
     noCall: ['noModelCall', (result.calls || []).length === 0],
     waitAfterFailure: ['waitedAfterFailure', goals.some(goal => ['waiting', 'abandoned', 'failed'].includes(goal.status) && explicitlyTransitionedGoal(goal) &&
-      toolInputs('simGoal').some(args => args.id === goal.id && ((args.action === 'wait' && goal.status === 'waiting') || (args.action === 'abandon' && goal.status === 'abandoned'))))],
+      goalOperations.some(operation => operation.args.id === goal.id && returnedRecordMatches(operation.goal, goal) &&
+        ((operation.args.action === 'wait' && goal.status === 'waiting') || (operation.args.action === 'abandon' && goal.status === 'abandoned'))))],
     workCreated: ['workCreatedWithEvidence', !!hasActivities && works.some(createdWork)],
     workRevised: ['workRevisionPersisted', !!hasActivities && works.some(work => {
       const old = oldWorks.find(item => item.id === work.id)
       return old && work.revision > old.revision && (work.versions || []).some(version => version.revision === work.revision && !(old.versions || []).some(previous => previous.revision === version.revision) &&
-        toolInputs('simWorkspace').some(args => args.action === 'write' && args.id === work.id && args.expectedRevision === old.revision && args.content === version.content))
+        successfulTools('simWorkspace').some(({ args, value }) => args.action === 'write' && args.id === work.id && args.expectedRevision === old.revision && args.content === version.content && value.id === work.id && value.revision === work.revision && value.saved === true))
     })],
     subscriptionAdded: ['subscriptionAddedByModel', !!hasActivities && subscriptions.some(subscription => !oldSubscriptions.some(old => old.id === subscription.id) &&
-      toolInputs('simSubscription').some(args => args.action === 'add' && args.url === subscription.url && args.kind === subscription.kind && args.title === subscription.title))],
+      successfulTools('simSubscription').some(({ args, value }) => args.action === 'add' && args.url === subscription.url && args.kind === subscription.kind && args.title === subscription.title && value.subscription?.id === subscription.id))],
     feedUpdated: ['newFeedItemCommitted', !!hasActivities && subscriptions.some(subscription => (subscription.items || []).some(item =>
       !oldSubscriptions.find(old => old.id === subscription.id)?.seenIds?.includes(item.id) &&
       !(oldSubscriptions.find(old => old.id === subscription.id)?.items || []).some(old => old.id === item.id) &&
       (result.feeds || []).some(feed => feed.url === subscription.url && feed.kind === subscription.kind && (feed.items || []).some(fetched => fetched.id === item.id))))],
-    reflected: ['independentOpinionPersisted', !!hasActivities && newMemories.some(memory => memory.id.startsWith('reflection-') && memory.kind === 'opinion' && memory.epistemic === 'inferred' &&
-      (result.reflections || []).some(reflection => reflection.status === 'succeeded' && reflection.callId && (result.calls || []).some(call => call.id === reflection.callId && call.stage === 'reflection')) &&
-      activities.reflection.lastRunAt >= result.at && activities.reflection.lastRunAt !== oldActivities.reflection.lastRunAt &&
-      (memory.evidenceRefs || []).some(ref => !(oldActivities.reflection.processed || []).includes(ref) && (activities.reflection.processed || []).includes(ref)))],
+    reflected: ['independentOpinionPersisted', newMemories.some(reflectedMemory)],
     goalPaused: ['goalPausedAfterUnknownWorker', !!before && goals.some(goal => goal.status === 'paused' && oldGoals.find(old => old.id === goal.id)?.status !== 'paused' && currentWorkerReceipts('unknown').some(receipt => receipt.goalId === goal.id))],
     workerUnknown: ['workerUnknownReceiptRecorded', currentWorkerReceipts('unknown').length > 0],
     noWorkerCall: ['noWorkerSubmitted', Array.isArray(result.workers) && result.workers.length === 0],
@@ -488,7 +527,6 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           }
           activeResult.character = character()
           activeResult.activities = await activitySnapshot()
-          activeResult.behavior = assessEvent(activeEvent, activeResult)
           if (activeResult.errors.length) activeResult.structuralFailures.push('runtime_or_model_error')
           if (activeResult.character.scope.groupId !== GROUP || activeResult.sent.some(s => s.groupId !== GROUP)) activeResult.structuralFailures.push('scope_mismatch')
           if (activeEvent.searchOutcome === 'failed') {
@@ -501,7 +539,6 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           activeResult.status = 'failed'; activeResult.errors.push(scrub(error.message)); activeResult.structuralFailures.push('exception')
           activeResult.character = character(); controller.abort(); runtime.stop()
           try { activeResult.activities = await activitySnapshot() } catch { /* Preserve the last trustworthy snapshot if shutdown prevents observation. */ }
-          activeResult.behavior = assessEvent(activeEvent, activeResult)
           // Do not allow an unsettled timed-out runtime to contaminate later events.
           halted ||= 'previous_event_incomplete'
         }
@@ -516,6 +553,9 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           activeResult.structuralFailures.push('tool_result_capture_incomplete')
           activeResult.status = 'failed'
         }
+        // State attribution needs the terminal successful reply, including a
+        // simFinishTurn which deliberately ends without another model request.
+        activeResult.behavior = assessEvent(activeEvent, activeResult)
         activeResult.elapsedMs = Date.now() - start
         results.push(clean(activeResult)); checkpoint(false)
         log(JSON.stringify({ scenario: scenario.id, sampleIndex, eventIndex, status: activeResult.status, calls: activeResult.calls.length, sent: activeResult.sent.length, behavior: activeResult.behavior, skipReason: activeResult.skipReason }))

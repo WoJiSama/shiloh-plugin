@@ -24,6 +24,7 @@ function fixture({ mode = 'scripted_offline', repetitions = 1, eventCount = 1 } 
     network: mode === 'live_model' ? [{ stage: 'main', status: 200, generation: { parameters: { model: 'fixture-model', temperature: 0.7, max_tokens: 2048 }, hash: h({ model: 'fixture-model', temperature: 0.7, max_tokens: 2048 }) } }] : [], sent: [], searches: [], warnings: [], errors: [], structuralFailures: [],
     beforeCharacter: emptyCharacter(), character: emptyCharacter(), behavior: { noMessageSent: true },
     beforeActivities: emptyActivities(), activities: emptyActivities(), toolResults: [], feeds: [], workers: [], reflections: [],
+    toolResultCapture: { complete: true, requestedToolCallIds: [], missingToolCallIds: [] },
   }))).flat()
   return {
     complete: true, platformMessagesSent: 0, productionStoreWrites: 0,
@@ -117,7 +118,7 @@ test('saved optimistic summaries and forged behavior values are independently re
   assert.ok(result.integrityFailures.some(value => value.startsWith('behavior_evidence_mismatch:')))
 })
 
-test('declared tool reply coverage is independently recomputed while old reports remain readable', () => {
+test('current tool reply coverage is independently recomputed and remains mandatory without a metadata label', () => {
   assert.equal(inspectReplay(fixture()).integrity, 'passed')
   const document = fixture({ mode: 'live_model' }), event = document.results[0]
   document.metadata.toolResults = 'requests_and_final_persisted_session'
@@ -131,6 +132,8 @@ test('declared tool reply coverage is independently recomputed while old reports
   event.toolResults.push({ toolCallId, content, stage: 'main', name: 'simGoal', hash: h({ toolCallId, content }) })
   assert.equal(inspectReplay(document).integrity, 'passed')
   event.toolResultCapture.requestedToolCallIds = []
+  assert.ok(inspectReplay(document).integrityFailures.some(value => value.startsWith('invalid_tool_result_coverage:')))
+  delete document.metadata.toolResults
   assert.ok(inspectReplay(document).integrityFailures.some(value => value.startsWith('invalid_tool_result_coverage:')))
 })
 
@@ -149,6 +152,34 @@ test('tool evidence rejects reused ids across events and mismatched tool ownersh
   Object.assign(single.results[0], { calls: document.results[0].calls, toolResults: document.results[0].toolResults, toolResultCapture: document.results[0].toolResultCapture })
   single.results[0].toolResults[0].name = 'simSubscription'
   assert.ok(inspectReplay(single).integrityFailures.some(value => value.startsWith('orphan_tool_result_evidence:')))
+  single.results[0].toolResults[0].name = 'simGoal'
+  single.results[0].toolResults.push(structuredClone(single.results[0].toolResults[0]))
+  assert.ok(inspectReplay(single).integrityFailures.some(value => value.startsWith('duplicate_tool_result_evidence:')))
+})
+
+test('acceptance independently attributes finish completion to its successful current reply', () => {
+  const document = fixture({ mode: 'live_model' }), event = document.results[0]
+  event.expect = { goalCompleted: true }
+  document.metadata.scenarioManifest[0].events[0].expect = event.expect
+  document.metadata.scenarioManifestHash = h(document.metadata.scenarioManifest)
+  event.beforeCharacter.goals = [{ id: 'g', status: 'active', revision: 1 }]
+  const goal = { id: 'g', status: 'completed', revision: 2, evidenceRefs: ['receipt:actual'] }
+  event.character.goals = [goal]
+  event.character.receipts = [{ id: 'actual', goalId: 'g', status: 'succeeded' }]
+  event.calls[0].tools = ['simFinishTurn']
+  event.calls[0].toolCalls = [{ id: 'finish', function: { name: 'simFinishTurn', arguments: JSON.stringify({ choice: 'complete', reason: '取得本目标成功回执', goal: { id: 'g', evidenceRefs: ['receipt:actual'] } }) } }]
+  const content = JSON.stringify({ ok: true, saved: true, choice: 'complete', goal, memories: [] })
+  event.toolResults = [{ toolCallId: 'finish', name: 'simFinishTurn', stage: 'main', content, hash: h({ toolCallId: 'finish', content }) }]
+  event.toolResultCapture = { complete: true, requestedToolCallIds: ['finish'], missingToolCallIds: [] }
+  event.behavior = { goalCompletedWithReceipt: true }
+  document.summary = summarize(document.results)
+  assert.equal(inspectReplay(document).integrity, 'passed')
+  const reply = event.toolResults[0]
+  reply.content = 'error: completion was rejected'
+  reply.hash = h({ toolCallId: reply.toolCallId, content: reply.content })
+  const rejected = inspectReplay(document)
+  assert.equal(rejected.behavior, 'failed')
+  assert.ok(rejected.integrityFailures.some(value => value.startsWith('behavior_evidence_mismatch:')))
 })
 
 test('skipped dependency evidence has no behavior observations and still blocks acceptance', async t => {
@@ -283,9 +314,12 @@ test('reflection evidence must correspond one-to-one with successful or failed r
 })
 
 test('captured tool results require an exact content hash and a recorded invocation stage', () => {
-  const document = fixture(), evidence = { stage: 'main', toolCallId: 'tool-1', content: '{"ok":true}' }
+  const document = fixture(), evidence = { stage: 'main', toolCallId: 'tool-1', name: 'simGoal', content: '{"ok":true}' }
+  document.results[0].calls = [{ id: 'main-1', stage: 'main', toolCalls: [{ id: 'tool-1', function: { name: 'simGoal', arguments: '{"action":"list"}' } }] }]
+  document.results[0].toolResultCapture = { complete: true, requestedToolCallIds: ['tool-1'], missingToolCallIds: [] }
   evidence.hash = h({ toolCallId: evidence.toolCallId, content: evidence.content })
   document.results[0].toolResults.push(evidence)
+  document.summary = summarize(document.results)
   assert.equal(inspectReplay(document).integrity, 'passed')
   for (const mutate of [
     changed => { changed.results[0].toolResults[0].content = '{"ok":false}' },

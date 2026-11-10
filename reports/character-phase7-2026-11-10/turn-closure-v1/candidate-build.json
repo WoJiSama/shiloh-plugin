@@ -1,0 +1,14 @@
+{
+  "kind": "precommit_verified_source_snapshot",
+  "commitRecordedInBuild": "757713a0bded75820023357530d93e8259125074",
+  "manifestSha256": "393fe46de876933641160a69775e81a3c987a77e6dc03584abe1bd005a43fe0a",
+  "sourcesSha256": "5d71c5c1d0f1f8fccb3dd804c6cd2692ee1293136ced888a703a449bd862fbb5",
+  "filesSha256": "13597198e6aafff108da256e0b65d1ede099bb4fdd580bc97fa090130071e562",
+  "selectedSourceSha256": {
+    "src/modules/simulation/domain/promptBuilder.ts": "59bce66baac1b1362933af789fc8e7eb75d835f88091f0e1517f4fc587c96b38",
+    "src/modules/simulation/infrastructure/characterTools.ts": "0f46e4d0752f95b20f257c7e4947905094e835c2c1374fa5e7542f0ee136f7fa",
+    "src/modules/simulation/infrastructure/characterTurn.ts": "1af4ba8a668c18ab0828f96beeec6a34f6a93b3963aa49190149f422ccc4e948",
+    "src/modules/simulation/infrastructure/simTools.ts": "c0a460badfdc3ba38802f9a5496bc079f3eefafbd64320a44402f8d1cb7a18db",
+    "src/modules/simulation/infrastructure/simulationRuntime.ts": "1515b780704ee72d8e2116f9802ba7de8945c48c06b3724b590b6c9ac6a9e1b0"
+  }
+}

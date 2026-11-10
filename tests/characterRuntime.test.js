@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { createSimulationRuntime } from '../dist/backend/modules/simulation/infrastructure/simulationRuntime.js'
 import { createDefaultSimSession } from '../dist/backend/modules/simulation/domain/simConfig.js'
-import { CHARACTER_MIN_WAKE_MS, beginCharacterGoalAttempt, characterKey, createCharacterGoal, createEmptyCharacterState } from '../dist/backend/modules/simulation/domain/characterState.js'
+import { CHARACTER_MIN_WAKE_MS, addCharacterMemory, beginCharacterGoalAttempt, characterKey, createCharacterGoal, createEmptyCharacterState, deleteCharacterMemory } from '../dist/backend/modules/simulation/domain/characterState.js'
 
 const BOT = '3094088525'
 const GROUP = '10086'
@@ -11,7 +12,7 @@ const BASE_AT = 1_790_000_000_000
 const sessionKey = groupId => `shiloh:sim:g:${groupId}`
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 let callSequence = 0
-const toolCall = (name, args) => ({ id: `test-call-${++callSequence}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+const toolCall = (name, args) => ({ id: `test-call-${++callSequence}`, type: 'function', function: { name, arguments: JSON.stringify(name === 'simSendMessage' ? { continuation: 'chat', ...args } : args) } })
 const tools = (...calls) => ({ role: 'assistant', content: '', tool_calls: calls })
 const quiet = () => ({ role: 'assistant', content: '' })
 const finalText = content => ({ role: 'assistant', content })
@@ -38,8 +39,8 @@ function seedSession(kv, groupId, botId, clock) {
 function fixture({
   kv = new Map(), clock = { value: BASE_AT }, botId = BOT,
   identity = { id: 'shiloh', name: '希洛', systemContent: '喜欢独立游戏' },
-  groups = [GROUP], script = () => quiet(), execute, writeFault,
-  proactiveProbability = 0, seed = true,
+  groups = [GROUP], script = () => quiet(), execute, writeFault, onSave, send,
+  proactiveProbability = 0, seed = true, maxToolRounds = 8,
 } = {}) {
   if (seed) for (const groupId of groups) if (!kv.has(sessionKey(groupId))) seedSession(kv, groupId, botId, clock)
   const calls = []
@@ -61,6 +62,7 @@ function fixture({
       if (writeFault) await writeFault(key, value)
       writes.push({ key, value })
       kv.set(key, value)
+      if (onSave) await onSave(key, value)
       return 'OK'
     },
     async del(...keys) { let count = 0; for (const key of keys) if (kv.delete(key)) count += 1; return count },
@@ -74,7 +76,7 @@ function fixture({
       enabled: true, allGroups: false, groups,
       extraTools: toolDefinitions.map(tool => tool.name), toolPolicy: { mode: 'legacy' },
       wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability, proactiveIdleMs: 60_000 },
-      turn: { maxToolRounds: 8, minSendGapMs: 0, maxTurnsPerDay: 100 },
+      turn: { maxToolRounds, minSendGapMs: 0, maxTurnsPerDay: 100 },
       rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false },
     }),
     getExecutionConfig: () => ({ useTools: true }),
@@ -84,7 +86,11 @@ function fixture({
       const message = await script(request, calls.length - 1)
       return { choices: [{ message, finish_reason: message.tool_calls?.length ? 'tool_calls' : 'stop' }], usage: { total_tokens: 10 }, model: 'offline-test' }
     },
-    async sendGroupMessage(groupId, segments) { sent.push({ groupId, segments }); return { ok: true, messageId: `sent-${sent.length}` } },
+    async sendGroupMessage(groupId, segments) {
+      const receipt = send ? await send(groupId, segments) : { ok: true, messageId: `sent-${sent.length + 1}` }
+      if (receipt.ok) sent.push({ groupId, segments })
+      return receipt
+    },
   })
   return {
     runtime, kv, clock, identity, botId, calls, events, sent, errors, writes,
@@ -104,6 +110,16 @@ function toolResult(request, name) {
   return [...request.messages].reverse().find(message => message.role === 'tool' && message.name === name)?.content
 }
 
+function storedToolReply(harness, call) {
+  return JSON.parse(harness.kv.get(sessionKey(GROUP))).agentHistory.find(message => message.role === 'tool' && message.tool_call_id === call.id)
+}
+
+function turnContext(request) {
+  const content = request.messages.filter(message => message.role === 'user' && typeof message.content === 'string' && message.content.includes('【本轮执行检查】')).at(-1)?.content
+  assert.ok(content, '每次模型请求应包含本轮动态状态')
+  return JSON.parse(content.slice(content.lastIndexOf('【本轮执行检查】')).split('\n')[1])
+}
+
 function seededGoal(harness, id = 'goal-seeded') {
   const scope = harness.scope()
   const state = createCharacterGoal(createEmptyCharacterState(scope), {
@@ -114,21 +130,336 @@ function seededGoal(harness, id = 'goal-seeded') {
   return state.goals[0]
 }
 
-test('当前唤醒末尾给出条件式持久化检查，普通聊天不会自动创建角色状态', async () => {
+test('当前请求给出动态阶段、剩余轮数和可见来源，普通聊天不会自动创建角色状态', async () => {
   const h = fixture()
   try {
     await h.ingest('只是聊聊，不用记住或安排什么'); await idle(h, 1)
-    const current = h.calls[0].messages.filter(message => message.role === 'user').at(-1).content
-    const reminder = current.slice(current.lastIndexOf('【本轮执行检查】'))
-    assert.ok(current.lastIndexOf('【本轮执行检查】') > current.indexOf('本轮可引用的消息证据'))
-    assert.match(reminder, /simDecide/)
-    assert.match(reminder, /simGoal.*create/)
-    assert.match(reminder, /simCharacterMemory/)
-    assert.match(reminder, /正文/)
+    assert.deepEqual(turnContext(h.calls[0]), { phase: 'acting', remainingToolRounds: 8, focusedGoalId: null, visibleEvidenceRefs: ['message:1'] })
     const character = (await h.runtime.describeGroup(GROUP)).character
     assert.equal(character.memories.length, 0)
     assert.equal(character.goals.length, 0)
     assert.equal(character.decision, undefined)
+  } finally { h.runtime.stop() }
+})
+
+const finishMemory = { kind: 'interest', content: '我对连贯线索设计保持兴趣', epistemic: 'inferred', evidenceRefs: ['message:1'] }
+const finishGoal = { title: '收尾中保存的研究计划', motivation: '这符合我的线索设计兴趣', nextStep: '核对公开介绍', completionCriteria: '取得公开介绍并核对', stopConditions: ['管理员取消', '来源不可用'], evidenceRefs: ['message:1'], nextCheckInMinutes: 30 }
+
+test('finish 的目标和记忆在发送 adapter 前已落盘，发送标读后按真实 call id 保存收尾结果并停止', async () => {
+  let observed = false, h
+  const finish = toolCall('simFinishTurn', { choice: 'schedule', reason: '我决定稍后研究', goal: finishGoal, memories: [finishMemory], messages: ['我稍后继续核对介绍'], throughSeq: 1 })
+  h = fixture({ script: () => tools(finish), send: async (groupId, segments) => {
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.goals.length, 1)
+    assert.equal(character.goals[0].title, finishGoal.title)
+    assert.equal(character.memories[0].content, finishMemory.content)
+    assert.equal(character.goals[0].status, 'active')
+    assert.equal(groupId, GROUP)
+    assert.ok(JSON.stringify(segments).includes('稍后继续核对'))
+    observed = true
+    return { ok: true, messageId: 'finish-schedule-message' }
+  } })
+  try {
+    await h.ingest('请按你的兴趣决定是否继续')
+    await idle(h, 1)
+    assert.equal(observed, true)
+    assert.equal(h.calls.length, 1, '成功封口后不能再调用模型')
+    assert.equal(h.sent.length, 1)
+    const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.equal(session.lastReadThroughSeq, 1); assert.deepEqual(session.unread, [])
+    const reply = storedToolReply(h, finish)
+    assert.equal(reply.name, 'simFinishTurn'); assert.equal(reply.tool_call_id, finish.id)
+    const result = JSON.parse(reply.content)
+    assert.equal(result.ok, true); assert.equal(result.choice, 'schedule'); assert.equal(result.saved, true)
+    assert.equal(result.sendStatus, 'succeeded'); assert.equal(result.sent, 1); assert.equal(result.readStatus, 'succeeded')
+    assert.equal(session.agentHistory.at(-1).tool_call_id, finish.id)
+  } finally { h.runtime.stop() }
+})
+
+test('finish complete 先保存终态再公告一次，同一 batch 后续工具全部不执行且保留协议响应', async () => {
+  let goal, finish, after = [], h, sawCompletedBeforeSend = false
+  h = fixture({ script: (request, index) => {
+    if (index === 0) {
+      assert.equal(turnContext(request).focusedGoalId, goal.id)
+      return tools(toolCall('searchInformationTool', {}))
+    }
+    const receipt = JSON.parse(toolResult(request, 'searchInformationTool').match(/【运行时行动回执】(.*)$/u)[1])
+    assert.equal(receipt.status, 'succeeded')
+    assert.ok(turnContext(request).visibleEvidenceRefs.includes(receipt.evidenceRef))
+    finish = toolCall('simFinishTurn', { choice: 'complete', reason: '已取得本目标所需资料', goal: { id: goal.id, evidenceRefs: [receipt.evidenceRef], outcome: '已取得公开搜索结果' }, messages: ['公开资料已经找到了'], throughSeq: 1 })
+    after = [
+      toolCall('searchInformationTool', {}), toolCall('simSendMessage', { messages: ['这一条不能重复发出'] }),
+      toolCall('simCharacterMemory', { action: 'remember', kind: 'opinion', content: '封口后不能新增的观点', epistemic: 'inferred', evidenceRefs: [receipt.evidenceRef] }),
+      toolCall('simMarkRead', { throughSeq: 999 }),
+      toolCall('simFinishTurn', { choice: 'chat', reason: '不能重复提交', messages: ['重复的收尾消息'] }),
+    ]
+    return tools(finish, ...after)
+  }, send: async () => {
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.goals[0].status, 'completed', '不能先公告成功再尝试提交目标完成')
+    sawCompletedBeforeSend = true
+    return { ok: true, messageId: 'finish-complete-message' }
+  } })
+  try {
+    await h.ingest('用于目标的真实来源', '30000', { at: false })
+    goal = seededGoal(h)
+    h.clock.value = goal.nextCheckAt
+    await h.runtime.sweepOnce(); await idle(h, 2)
+    assert.equal(sawCompletedBeforeSend, true)
+    assert.equal(h.calls.length, 2); assert.equal(h.sent.length, 1)
+    assert.deepEqual(h.events.map(item => item.name), ['searchInformationTool'])
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.goals[0].status, 'completed'); assert.equal(character.memories.length, 0)
+    const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.equal(session.lastReadThroughSeq, 1); assert.deepEqual(session.unread, [])
+    const result = JSON.parse(storedToolReply(h, finish).content)
+    assert.equal(result.ok, true); assert.equal(result.choice, 'complete'); assert.equal(result.saved, true)
+    assert.equal(result.sendStatus, 'succeeded'); assert.equal(result.sent, 1)
+    for (const call of after) {
+      const response = storedToolReply(h, call)
+      assert.ok(response, `被封口的 ${call.function.name} 也需要匹配 tool_call_id 的协议响应`)
+      assert.match(response.content, /^error:/)
+    }
+  } finally { h.runtime.stop() }
+})
+
+test('非法 complete、越界 throughSeq 和存储失败都不发送或标读，也不写入部分记忆目标', async () => {
+  for (const failure of ['complete', 'throughSeq', 'storage']) {
+    let attempted, failedWrites = 0
+    const h = fixture({ script: (_request, index) => {
+      if (index > 0) return tools(toolCall('simFinishTurn', { choice: 'silent', reason: '本轮不再行动' }))
+      const input = failure === 'complete'
+        ? { choice: 'complete', reason: '没有成功回执的完成申请', goal: { id: 'missing-goal', evidenceRefs: ['message:1'] }, memories: [finishMemory] }
+        : { choice: 'schedule', reason: '先验证再执行', goal: finishGoal, memories: [finishMemory] }
+      attempted = toolCall('simFinishTurn', { ...input, messages: ['这条消息不得发出'], throughSeq: failure === 'throughSeq' ? 999 : 1 })
+      return tools(attempted)
+    }, writeFault: async (key, value) => {
+      if (failure === 'storage' && key === characterKey({ botId: BOT, personaId: 'shiloh', groupId: GROUP }) && JSON.parse(value).memories.some(memory => memory.content === finishMemory.content)) {
+        failedWrites++; throw new Error('injected closure persistence failure')
+      }
+    } })
+    try {
+      await h.ingest(); await idle(h, 2)
+      assert.equal(h.sent.length, 0, failure)
+      const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+      assert.equal(session.lastReadThroughSeq, 0, failure)
+      assert.equal(session.unread.length, 1, failure)
+      const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+      assert.equal(character.memories.length, 0, failure); assert.equal(character.goals.length, 0, failure)
+      assert.match(storedToolReply(h, attempted).content, /^error:/, failure)
+      if (failure === 'storage') assert.equal(failedWrites, 1)
+    } finally { h.runtime.stop() }
+  }
+})
+
+test('finish 参数或存储失败后锁定收尾，连续普通最终文本和同批或后续显式发送都不能绕过', async () => {
+  for (const failure of ['parameters', 'storage']) for (const fallback of ['text', 'send']) {
+    let attempted, sameBatchSend, laterSend, failedWrites = 0
+    const announcement = '后续研究已经安排并保存好了，我会继续核对公开资料'
+    const h = fixture({ script: (_request, index) => {
+      if (index === 0) {
+        attempted = toolCall('simFinishTurn', { choice: 'schedule', reason: failure === 'parameters' ? '' : '尝试保存后续计划', goal: finishGoal, memories: [finishMemory], messages: [announcement], throughSeq: 1 })
+        sameBatchSend = toolCall('simSendMessage', { messages: [announcement] })
+        return tools(attempted, sameBatchSend)
+      }
+      if (index === 1 && fallback === 'send') {
+        laterSend = toolCall('simSendMessage', { messages: [announcement] })
+        return tools(laterSend)
+      }
+      return finalText(announcement)
+    }, writeFault: async (key, value) => {
+      if (failure === 'storage' && key === characterKey({ botId: BOT, personaId: 'shiloh', groupId: GROUP }) && JSON.parse(value).memories.some(memory => memory.content === finishMemory.content)) {
+        failedWrites++; throw new Error('injected closure persistence failure')
+      }
+    } })
+    try {
+      const expectedCalls = fallback === 'send' ? 3 : 2
+      await h.ingest(); await idle(h, expectedCalls)
+      assert.equal(h.calls.length, expectedCalls, `${failure}/${fallback}：纯文本应直接结束，不能继续催发或兜底`)
+      assert.equal(h.sent.length, 0, `${failure}/${fallback}`)
+      for (const request of h.calls.slice(1)) {
+        assert.deepEqual(request.tools.map(tool => tool.function.name), ['simFinishTurn'])
+        assert.equal(request.tool_choice, 'required')
+        assert.equal(turnContext(request).phase, 'closing')
+      }
+      assert.match(storedToolReply(h, attempted).content, /^error:/)
+      assert.match(storedToolReply(h, sameBatchSend).content, /^error:/)
+      if (laterSend) assert.match(storedToolReply(h, laterSend).content, /^error:/)
+      const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+      assert.equal(session.lastReadThroughSeq, 0); assert.equal(session.unread.length, 1)
+      assert.equal(session.agentHistory.some(message => message.content?.includes('【系统提醒】你刚才写的这段话群友看不到')), false)
+      const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+      assert.equal(character.memories.length, 0); assert.equal(character.goals.length, 0); assert.equal(character.decision, undefined)
+      assert.equal(character.receipts.some(receipt => receipt.toolName === 'simSendMessage'), false)
+      if (failure === 'storage') assert.equal(failedWrites, 1)
+    } finally { h.runtime.stop() }
+  }
+})
+
+test('finish 发送失败保留已保存计划和记忆，不回滚、不重试、不再调用模型', async () => {
+  let sends = 0
+  const finish = toolCall('simFinishTurn', { choice: 'schedule', reason: '明确的后续计划', goal: finishGoal, memories: [finishMemory], messages: ['我稍后继续研究'] })
+  const h = fixture({ script: () => tools(finish), send: async () => { sends++; return { ok: false, error: '网关发送结果未确认' } } })
+  try {
+    await h.ingest(); await idle(h, 1)
+    assert.equal(sends, 1); assert.equal(h.sent.length, 0); assert.equal(h.calls.length, 1)
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.memories[0].content, finishMemory.content)
+    assert.equal(character.goals.length, 1); assert.equal(character.goals[0].status, 'active')
+    const result = JSON.parse(storedToolReply(h, finish).content)
+    assert.equal(result.ok, true); assert.equal(result.saved, true); assert.equal(result.choice, 'schedule')
+    assert.equal(result.sendStatus, 'failed'); assert.equal(result.sent, 0); assert.equal(result.readStatus, 'not_requested')
+  } finally { h.runtime.stop() }
+})
+
+test('finish 提交后目标被取消、人设切换或源记忆删除时不能公告或标读，旧状态不能复活', async () => {
+  for (const change of ['cancel', 'persona', 'source']) {
+    let injected = false, h
+    const finish = toolCall('simFinishTurn', { choice: 'schedule', reason: '本轮决定继续研究', goal: { ...finishGoal, evidenceRefs: ['memory:source-before-close'] }, messages: ['这个安排已经保存'], throughSeq: 2 })
+    h = fixture({ script: () => tools(finish), onSave: async (key, value) => {
+      if (injected || key !== characterKey(h.scope())) return
+      const current = JSON.parse(value)
+      if (!current.goals.some(goal => goal.title === finishGoal.title)) return
+      injected = true
+      if (change === 'persona') { h.identity.id = 'switched-after-commit'; return }
+      if (change === 'source') {
+        const revoked = deleteCharacterMemory(current, 'source-before-close', h.clock.value)
+        revoked.revision = current.revision + 1
+        h.kv.set(key, JSON.stringify(revoked))
+        h.kv.set(`${sessionKey(GROUP)}:activity-version`, 'source-revoked-after-commit')
+      } else {
+        current.goals[0].status = 'abandoned'; current.goals[0].revision++; current.goals[0].lastOutcome = '管理员提交后取消'
+        current.revision++
+        h.kv.set(key, JSON.stringify(current))
+      }
+    } })
+    try {
+      await h.ingest('本轮此前已有的兴趣来源', '30000', { at: false })
+      const source = addCharacterMemory(createEmptyCharacterState(h.scope()), { id: 'source-before-close', kind: 'interest', content: '我持续关注的线索设计', epistemic: 'inferred', evidenceRefs: ['message:1'] }, ['message:1'], h.clock.value)
+      const originalKey = characterKey(h.scope())
+      h.kv.set(originalKey, JSON.stringify(source))
+      await h.ingest('现在决定是否继续')
+      await idle(h, 1)
+      assert.equal(injected, true, change)
+      assert.equal(h.sent.length, 0, change)
+      const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+      assert.equal(session.lastReadThroughSeq, 0, change)
+      assert.equal(session.unread.length, 2, change)
+      const current = JSON.parse(h.kv.get(originalKey))
+      assert.equal(current.goals.length, 1, change)
+      if (change !== 'persona') assert.equal(current.goals[0].status, 'abandoned', change)
+      if (change === 'source') assert.equal(current.memories.some(memory => memory.id === 'source-before-close'), false)
+      if (change === 'persona') assert.equal(h.identity.id, 'switched-after-commit')
+    } finally { h.runtime.stop() }
+  }
+})
+
+test('聚焦目标在收尾公告登记后到期，旧 permit 不能发送最终消息或标读', async () => {
+  let goal, expired = false, h
+  const finish = toolCall('simFinishTurn', { choice: 'chat', reason: '只汇报当前想法，不改目标', messages: ['我还在核对这款游戏'], throughSeq: 1 })
+  h = fixture({ script: () => tools(finish), onSave: async (key, value) => {
+    if (expired || key !== characterKey(h.scope())) return
+    const current = JSON.parse(value)
+    if (!current.receipts.some(receipt => receipt.toolName === 'simFinishTurn' && receipt.status === 'pending')) return
+    expired = true
+    h.clock.value = goal.expiresAt
+  } })
+  try {
+    await h.ingest('用于目标的真实来源', '30000', { at: false })
+    goal = seededGoal(h)
+    h.clock.value = goal.nextCheckAt
+    await h.runtime.sweepOnce(); await idle(h, 1)
+    assert.equal(expired, true)
+    assert.equal(turnContext(h.calls[0]).focusedGoalId, goal.id)
+    assert.equal(h.calls.length, 1); assert.equal(h.sent.length, 0)
+    const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.equal(session.lastReadThroughSeq, 0); assert.equal(session.unread.length, 1)
+    const result = JSON.parse(storedToolReply(h, finish).content)
+    assert.equal(result.ok, true); assert.equal(result.saved, true)
+    assert.equal(result.sendStatus, 'failed'); assert.equal(result.sent, 0); assert.equal(result.readStatus, 'failed')
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.receipts.find(receipt => receipt.toolName === 'simFinishTurn').status, 'failed')
+  } finally { h.runtime.stop() }
+})
+
+test('超长合法记忆和目标的 finish 回执压缩为可核对哈希，仍保留完整 JSON 和发送标读状态', async () => {
+  const memories = [{ ...finishMemory, content: '源'.repeat(1200) }, { ...finishMemory, kind: 'opinion', content: '观'.repeat(1200) }]
+  const goal = { ...finishGoal, title: '题'.repeat(160), motivation: '动'.repeat(600), nextStep: '步'.repeat(600), completionCriteria: '验'.repeat(600), stopConditions: ['停'.repeat(300)] }
+  const finish = toolCall('simFinishTurn', { choice: 'schedule', reason: '完整保存合法的详细记录', memories, goal, messages: ['详细记录和后续安排已经保存'], throughSeq: 1 })
+  const h = fixture({ script: () => tools(finish) })
+  try {
+    await h.ingest(); await idle(h, 1)
+    assert.equal(h.calls.length, 1); assert.equal(h.sent.length, 1)
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.memories.length, 2); assert.equal(character.goals.length, 1)
+    assert.deepEqual(character.memories.map(memory => memory.content), memories.map(memory => memory.content))
+    assert.equal(character.goals[0].completionCriteria, goal.completionCriteria)
+    assert.ok(JSON.stringify({ memories: character.memories, goal: character.goals[0] }).length > 3500, '本用例必须触发真实的长回执压缩')
+    const reply = storedToolReply(h, finish)
+    const result = JSON.parse(reply.content)
+    assert.ok(reply.content.length <= 3500, '不能靠截断 JSON 适配历史上限')
+    assert.equal(result.ok, true); assert.equal(result.saved, true); assert.equal(result.choice, 'schedule')
+    assert.equal(result.sendStatus, 'succeeded'); assert.equal(result.sent, 1); assert.equal(result.readStatus, 'succeeded')
+    const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+    const savedGoal = character.goals[0]
+    assert.deepEqual(result.goal, { id: savedGoal.id, revision: savedGoal.revision, status: savedGoal.status, recordHash: hash(savedGoal) })
+    assert.deepEqual(result.memories, character.memories.map(memory => ({ id: memory.id, recordHash: hash(memory) })))
+    const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.equal(session.lastReadThroughSeq, 1); assert.deepEqual(session.unread, [])
+    assert.equal(session.agentHistory.at(-1).tool_call_id, finish.id)
+  } finally { h.runtime.stop() }
+})
+
+test('finish 提交合法 throughSeq 时只标读已展示消息，模型请求期间的新入站继续保持未读', async () => {
+  let arrived = false, h
+  const finish = toolCall('simFinishTurn', { choice: 'chat', reason: '回应本轮实际展示的消息', messages: ['刚才的消息我看到了'], throughSeq: 1 })
+  h = fixture({ script: async request => {
+    assert.deepEqual(turnContext(request).visibleEvidenceRefs, ['message:1'])
+    await h.ingest('这是一条后到的背景消息', '50000', { at: false })
+    arrived = true
+    return tools(finish)
+  } })
+  try {
+    await h.ingest(); await idle(h, 1)
+    assert.equal(arrived, true); assert.equal(h.calls.length, 1); assert.equal(h.sent.length, 1)
+    const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.equal(session.lastReadThroughSeq, 1)
+    assert.deepEqual(session.unread.map(message => ({ seq: message.seq, text: message.text })), [{ seq: 2, text: '这是一条后到的背景消息' }])
+    assert.deepEqual(session.modelSeenSeqs, [])
+    const result = JSON.parse(storedToolReply(h, finish).content)
+    assert.equal(result.ok, true); assert.equal(result.saved, true)
+    assert.equal(result.sendStatus, 'succeeded'); assert.equal(result.sent, 1); assert.equal(result.readStatus, 'succeeded')
+  } finally { h.runtime.stop() }
+})
+
+test('最后两轮只暴露 finish 并强制 required，provider 忽视工具限制也不能执行其他动作或兜底发送', async () => {
+  let rejected = []
+  const h = fixture({ maxToolRounds: 4, script: (_request, index) => {
+    if (index < 2) return tools(toolCall('searchInformationTool', {}))
+    if (index === 2) {
+      rejected = [toolCall('searchInformationTool', {}), toolCall('simSendMessage', { messages: ['收尾阶段不能发送的普通消息'] }), toolCall('simMarkRead', { throughSeq: 1 }), toolCall('simCharacterMemory', { action: 'remember', ...finishMemory })]
+      return tools(...rejected)
+    }
+    return finalText('我已经安排了后续研究，这段纯文本也不能被兜底发送')
+  } })
+  try {
+    await h.ingest(); await idle(h, 4)
+    assert.equal(h.calls.length, 4, 'provider 忽视 required 不能导致无限续轮')
+    assert.deepEqual(h.events.map(item => item.name), ['searchInformationTool', 'searchInformationTool'])
+    for (const [index, remaining] of [[2, 2], [3, 1]]) {
+      assert.deepEqual(h.calls[index].tools.map(tool => tool.function.name), ['simFinishTurn'])
+      assert.equal(h.calls[index].tool_choice, 'required')
+      assert.equal(turnContext(h.calls[index]).phase, 'closing')
+      assert.equal(turnContext(h.calls[index]).remainingToolRounds, remaining)
+    }
+    for (const call of rejected) assert.match(storedToolReply(h, call).content, /^error:/)
+    assert.equal(h.sent.length, 0)
+    const session = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.equal(session.lastReadThroughSeq, 0); assert.equal(session.unread.length, 1)
+    const character = JSON.parse(h.kv.get(characterKey(h.scope())))
+    assert.equal(character.memories.length, 0); assert.equal(character.goals.length, 0); assert.equal(character.decision, undefined)
+    assert.equal(character.receipts.filter(receipt => receipt.toolName === 'searchInformationTool').length, 2)
+    assert.equal(character.receipts.some(receipt => receipt.toolName === 'simSendMessage'), false)
   } finally { h.runtime.stop() }
 })
 

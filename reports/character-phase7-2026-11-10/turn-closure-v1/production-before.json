@@ -1,0 +1,35 @@
+{
+  "at": "2026-11-10T06:25:27.780Z",
+  "commit": "08bed3eee22259d9e76c5e95ccf2e7ea75407e75",
+  "runtimeFiles": 2482,
+  "mismatchedFiles": [],
+  "privateConfigSha256": "9d2847c565b7f1e117e5cfd09a08ebf5d47330b3eb609df7467bfc0e00262128",
+  "services": {
+    "trss-yunzai": "active",
+    "bl-console": "active"
+  },
+  "group": {
+    "groupId": "609235590",
+    "running": false,
+    "active": true,
+    "replyMode": "atOnly",
+    "maxTurnsPerDay": 12,
+    "dailyEstimatedCostThresholdCny": 1,
+    "binding": {
+      "status": "bound",
+      "botId": "3094088525",
+      "personaId": "default"
+    },
+    "paused": false,
+    "memoryCount": 0,
+    "goalCount": 0,
+    "revision": 37,
+    "independentRedisMatches": true
+  },
+  "overviewGroups": 12,
+  "lifeOverviewReachable": true,
+  "healthAlertsReachable": true,
+  "unauthenticatedStatus": 401,
+  "qqMessagesSentByVerifier": 0,
+  "productionWritesByVerifier": 0
+}

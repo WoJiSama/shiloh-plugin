@@ -14,7 +14,7 @@ const HOUR = 3600_000
 const sessionKey = group => `shiloh:sim:g:${group}`
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 let sequence = 0
-const call = (name, args) => ({ id: `activity-call-${++sequence}`, type: 'function', function: { name, arguments: JSON.stringify(args) } })
+const call = (name, args) => ({ id: `activity-call-${++sequence}`, type: 'function', function: { name, arguments: JSON.stringify(name === 'simSendMessage' ? { continuation: 'chat', ...args } : args) } })
 const tools = (...tool_calls) => ({ role: 'assistant', content: '', tool_calls })
 const quiet = () => ({ role: 'assistant', content: '' })
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return { promise, resolve } }

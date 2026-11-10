@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { parseOptions, validateScenarios, summarize, assessEvent, assessmentVersion, scenarioManifest, planGoalCheckAdvance, prepareBackgroundSchedule, main } from '../scripts/characterReplay.mjs'
 import { inspectReplay } from '../scripts/characterAcceptance.mjs'
@@ -17,6 +18,15 @@ const scratch = t => {
   return dir
 }
 const noLog = () => {}
+function addToolEvidence(result, name, args, value) {
+  const id = `tool-${(result.calls || []).length + 1}`
+  const call = { id: `main-${id}`, stage: 'main', toolCalls: [{ id, function: { name, arguments: JSON.stringify(args) } }] }
+  const content = typeof value === 'string' ? value : JSON.stringify(value)
+  const reply = { toolCallId: id, name, stage: 'main', content, hash: hashReplayValue({ toolCallId: id, content }) }
+  ;(result.calls ||= []).push(call)
+  ;(result.toolResults ||= []).push(reply)
+  return { call, reply }
+}
 
 test('import and help do not read private configuration, call a model, or create evidence', t => {
   const dir = scratch(t), privateRoot = path.join(dir, 'private'), output = path.join(dir, 'output')
@@ -201,6 +211,7 @@ test('completed goals require a new completion and a matching successful goal re
   const beforeCharacter = { goals: [{ id: 'g1', status: 'waiting', revision: 1 }], memories: [], receipts: [] }
   const character = { goals: [{ id: 'g1', status: 'completed', revision: 2, evidenceRefs: ['receipt:r1'] }], memories: [], receipts: [{ id: 'r1', goalId: 'other', status: 'succeeded', at: 20 }] }
   const result = { beforeCharacter, character, calls: [], sent: [], at: 20 }
+  addToolEvidence(result, 'simGoal', { action: 'complete', id: 'g1', evidenceRefs: ['receipt:r1'] }, { ok: true, goal: character.goals[0] })
   assert.equal(assessEvent({ expect: { goalCompleted: true } }, result).goalCompletedWithReceipt, false)
   character.receipts[0].goalId = 'g1'; character.receipts[0].status = 'unknown'
   assert.equal(assessEvent({ expect: { goalCompleted: true } }, result).goalCompletedWithReceipt, false)
@@ -213,12 +224,12 @@ test('completed goals require a new completion and a matching successful goal re
 test('refusal assessment requires a current valid model decision that actually persisted', () => {
   const beforeCharacter = { decision: { kind: 'unwilling', reason: '以前的拒绝', at: 1 }, memories: [], goals: [] }
   const character = { ...beforeCharacter, decision: { kind: 'unauthorized', reason: '没有权限', at: 20 } }
-  const call = args => ({ toolCalls: [{ function: { name: 'simDecide', arguments: JSON.stringify(args) } }] })
   const result = { beforeCharacter, character, at: 20, calls: [], sent: [] }
   assert.equal(assessEvent({ expect: { refusal: true } }, result).refusalRecorded, false)
-  result.calls = [call({ kind: 'unauthorized', reason: '没有权限', unsupported: true })]
+  addToolEvidence(result, 'simDecide', { kind: 'unauthorized', reason: '没有权限', unsupported: true }, { ok: true, decision: 'unauthorized' })
   assert.equal(assessEvent({ expect: { refusal: true } }, result).refusalRecorded, false)
-  result.calls = [call({ kind: 'unauthorized', reason: '没有权限' })]
+  result.calls = []; result.toolResults = []
+  addToolEvidence(result, 'simDecide', { kind: 'unauthorized', reason: '没有权限' }, { ok: true, decision: 'unauthorized' })
   assert.equal(assessEvent({ expect: { refusal: true } }, result).refusalRecorded, true)
   result.at = 21
   assert.equal(assessEvent({ expect: { refusal: true } }, result).refusalRecorded, false)
@@ -226,22 +237,85 @@ test('refusal assessment requires a current valid model decision that actually p
 
 test('new opinions and goal waiting require event changes rather than automatic attempts or old revisions', () => {
   const beforeCharacter = { goals: [{ id: 'g1', status: 'active', revision: 1 }], memories: [{ id: 'm1', kind: 'opinion', epistemic: 'inferred', createdAt: 1 }], receipts: [] }
-  const character = { goals: [{ id: 'g1', status: 'waiting', revision: 2 }], memories: [...beforeCharacter.memories, { id: 'm2', kind: 'opinion', epistemic: 'inferred', createdAt: 2, supersedes: 'm1', evidenceRefs: ['memory:m1'] }], receipts: [{ id: 'check', goalId: 'g1', toolName: 'simGoalCheck', status: 'unknown' }] }
+  const character = { goals: [{ id: 'g1', status: 'waiting', revision: 2 }], memories: [...beforeCharacter.memories, { id: 'm2', kind: 'opinion', content: '新判断', epistemic: 'inferred', createdAt: 2, supersedes: 'm1', evidenceRefs: ['memory:m1'] }], receipts: [{ id: 'check', goalId: 'g1', toolName: 'simGoalCheck', status: 'unknown' }] }
   const result = { beforeCharacter, character, at: 2, calls: [], sent: [] }
   const expect = { opinion: true, revisedOpinion: true, waitAfterFailure: true }
+  assert.deepEqual(assessEvent({ expect }, result), { opinionPersisted: false, opinionRevisionPersisted: false, waitedAfterFailure: false })
+  addToolEvidence(result, 'simCharacterMemory', { action: 'remember', kind: 'opinion', content: '新判断', epistemic: 'inferred', supersedes: 'm1', evidenceRefs: ['memory:m1'] }, { ok: true, memory: character.memories[1] })
   assert.deepEqual(assessEvent({ expect }, result), { opinionPersisted: true, opinionRevisionPersisted: true, waitedAfterFailure: false })
-  result.calls = [{ toolCalls: [{ function: { name: 'simGoal', arguments: '{"action":"wait","id":"g1"}' } }] }]
+  addToolEvidence(result, 'simGoal', { action: 'wait', id: 'g1' }, { ok: true, goal: character.goals[0] })
   assert.equal(assessEvent({ expect }, result).waitedAfterFailure, false, 'a proposed wait rejected by the tool cannot borrow the automatic attempt revision')
   character.goals[0].revision = 3
+  result.toolResults.pop(); result.calls.pop()
+  addToolEvidence(result, 'simGoal', { action: 'wait', id: 'g1' }, { ok: true, goal: character.goals[0] })
   assert.equal(assessEvent({ expect }, result).waitedAfterFailure, true)
   assert.deepEqual(Object.values(assessEvent({ expect }, { ...result, beforeCharacter: undefined })), [false, false, false])
   assert.equal(assessEvent({ expect: { noCall: false } }, result).noModelCall, true)
 })
 
+test('simFinishTurn schedule and refusal credit only successful current saved records', () => {
+  const goal = { id: 'new-goal', revision: 1, status: 'active', title: '查地图资料', motivation: '延续解谜兴趣', nextStep: '找公开介绍', completionCriteria: '取得来源', stopConditions: ['没有新资料'], evidenceRefs: ['message:1'] }
+  const { id, revision, status, ...goalInput } = goal
+  const result = { beforeCharacter: { goals: [], memories: [], receipts: [] }, character: { goals: [goal], memories: [], receipts: [] }, calls: [], toolResults: [], at: 10 }
+  const observed = () => assessEvent({ expect: { goalCreated: true } }, result).goalCreatedByModel
+  assert.equal(observed(), false, 'state delta alone does not establish a model operation')
+  const { reply } = addToolEvidence(result, 'simFinishTurn', { choice: 'schedule', reason: '想继续了解', goal: goalInput }, { ok: true, saved: true, choice: 'schedule', goal, memories: [] })
+  assert.equal(observed(), true)
+  const original = reply.content
+  for (const value of [
+    { ok: false, saved: false, choice: 'schedule', goal },
+    { ok: true, saved: false, choice: 'schedule', goal },
+    { ok: true, saved: true, choice: 'interest_only', goal },
+    { ok: true, saved: true, choice: 'schedule', goal: { ...goal, id: 'other' } },
+    { ok: true, saved: true, choice: 'schedule', goal: { ...goal, title: '不同内容' } },
+  ]) {
+    reply.content = JSON.stringify(value); reply.hash = hashReplayValue({ toolCallId: reply.toolCallId, content: reply.content })
+    assert.equal(observed(), false, JSON.stringify(value))
+  }
+  reply.content = original; reply.hash = hashReplayValue({ toolCallId: reply.toolCallId, content: reply.content })
+  reply.stage = 'reflection'; assert.equal(observed(), false)
+  reply.stage = 'main'; reply.name = 'simGoal'; assert.equal(observed(), false)
+  result.calls = []; result.toolResults = []
+  result.character.decision = { kind: 'unwilling', reason: '不想复读卖萌', at: 10 }
+  addToolEvidence(result, 'simFinishTurn', { choice: 'unwilling', reason: '不想复读卖萌' }, { ok: true, saved: true, choice: 'unwilling', memories: [], decision: 'unwilling' })
+  assert.equal(assessEvent({ expect: { refusal: true, goalCreated: false } }, result).refusalRecorded, true)
+})
+
+test('simFinishTurn maps complete, wait and abandon to matching goal transitions without inventing actions', () => {
+  for (const [choice, status, expectation] of [['complete', 'completed', 'goalCompleted'], ['wait', 'waiting', 'waitAfterFailure'], ['abandon', 'abandoned', 'waitAfterFailure']]) {
+    const goal = { id: 'g', status, revision: 2, evidenceRefs: ['receipt:actual'] }
+    const result = { beforeCharacter: { goals: [{ id: 'g', status: 'active', revision: 1 }], memories: [], receipts: [] }, character: { goals: [goal], memories: [], receipts: [{ id: 'actual', goalId: 'g', status: 'succeeded' }] }, calls: [], toolResults: [] }
+    const expectedKey = choice === 'complete' ? 'goalCompletedWithReceipt' : 'waitedAfterFailure'
+    const { reply } = addToolEvidence(result, 'simFinishTurn', { choice, reason: '依据实际回执收尾', goal: { id: 'g', evidenceRefs: ['receipt:actual'] } }, { ok: true, saved: true, choice, goal, memories: [] })
+    assert.equal(assessEvent({ expect: { [expectation]: true } }, result)[expectedKey], true, choice)
+    reply.content = JSON.stringify({ ok: true, saved: true, choice, goal: { id: goal.id, status: goal.status, revision: goal.revision, recordHash: createHash('sha256').update(JSON.stringify(goal)).digest('hex') }, memories: [] })
+    reply.hash = hashReplayValue({ toolCallId: reply.toolCallId, content: reply.content })
+    assert.equal(assessEvent({ expect: { [expectation]: true } }, result)[expectedKey], true, `${choice} compact receipt`)
+    reply.content = 'error: receipt is not visible'; reply.hash = hashReplayValue({ toolCallId: reply.toolCallId, content: reply.content })
+    assert.equal(assessEvent({ expect: { [expectation]: true } }, result)[expectedKey], false, 'a failed commit cannot borrow a state transition')
+  }
+})
+
+test('finish memories require returned records and exact persisted bytes, including compact receipt hashes', () => {
+  const memory = { id: 'new-memory', kind: 'opinion', content: '新资料让我调整判断', epistemic: 'inferred', evidenceRefs: ['memory:old', 'message:2'], supersedes: 'old', createdAt: 20 }
+  const { id, createdAt, ...memoryInput } = memory
+  const result = { beforeCharacter: { goals: [], memories: [{ id: 'old', kind: 'opinion', createdAt: 1 }], receipts: [] }, character: { goals: [], memories: [memory], receipts: [] }, calls: [], toolResults: [] }
+  const args = { choice: 'chat', reason: '根据新来源修正', memories: [memoryInput] }
+  const { reply } = addToolEvidence(result, 'simFinishTurn', args, { ok: true, saved: true, choice: 'chat', memories: [memory] })
+  const observed = () => assessEvent({ expect: { opinion: true, revisedOpinion: true } }, result)
+  assert.deepEqual(observed(), { opinionPersisted: true, opinionRevisionPersisted: true })
+  const hash = createHash('sha256').update(JSON.stringify(memory)).digest('hex')
+  reply.content = JSON.stringify({ ok: true, saved: true, choice: 'chat', memories: [{ id: memory.id, recordHash: hash }] })
+  reply.hash = hashReplayValue({ toolCallId: reply.toolCallId, content: reply.content })
+  assert.deepEqual(observed(), { opinionPersisted: true, opinionRevisionPersisted: true })
+  result.character.memories[0].content = '正文被改写但回执没变'
+  assert.deepEqual(observed(), { opinionPersisted: false, opinionRevisionPersisted: false })
+})
+
 test('scenario manifest binds ordered event hashes and declared expectations', () => {
   const scenarios = [{ id: 'one', events: [{ kind: 'message', text: '你好', expect: { refusal: false } }, { kind: 'idle-check' }] }]
   const manifest = scenarioManifest(scenarios)
-  assert.equal(assessmentVersion, 3)
+  assert.equal(assessmentVersion, 4)
   assert.deepEqual(manifest, [{ id: 'one', events: [{ eventIndex: 0, eventHash: hashReplayValue(scenarios[0].events[0]), expect: { refusal: false } }, { eventIndex: 1, eventHash: hashReplayValue(scenarios[0].events[1]), expect: {} }] }])
   scenarios[0].events[0].expect.refusal = true
   assert.equal(manifest[0].events[0].expect.refusal, false, 'manifest expectations must be a frozen snapshot')
@@ -288,17 +362,18 @@ test('workspace revisions and feed updates require matching current tool or fixt
   const empty = { works: [], subscriptions: [], reflection: {}, shared: [], sharedPending: [] }
   const result = { beforeCharacter: { goals: [], memories: [], receipts: [] }, character: { goals: [], memories: [], receipts: [] }, beforeActivities: structuredClone(empty), activities: structuredClone(empty), calls: [], feeds: [], workers: [], reflections: [] }
   result.activities.works.push({ id: 'w', title: '笔记', revision: 1, versions: [{ revision: 1, content: '第一版' }] })
-  const toolCall = (name, args) => ({ toolCalls: [{ function: { name, arguments: JSON.stringify(args) } }] })
   const expected = { workCreated: true, workRevised: true, feedUpdated: true }
   assert.deepEqual(Object.values(assessEvent({ expect: expected }, result)), [false, false, false])
-  result.calls.push(toolCall('simWorkspace', { action: 'write', title: '笔记', content: '第一版' }))
+  addToolEvidence(result, 'simWorkspace', { action: 'write', title: '笔记', content: '第一版' }, { ok: true, saved: true, id: 'w', revision: 1 })
   assert.equal(assessEvent({ expect: expected }, result).workCreatedWithEvidence, true)
   result.beforeActivities = structuredClone(result.activities)
   result.activities.works[0].revision = 2
   result.activities.works[0].versions.push({ revision: 2, content: '第二版' })
-  result.calls = [toolCall('simWorkspace', { action: 'write', id: 'w', expectedRevision: 1, content: '错误正文' })]
+  result.calls = []; result.toolResults = []
+  addToolEvidence(result, 'simWorkspace', { action: 'write', id: 'w', expectedRevision: 1, content: '错误正文' }, { ok: true, saved: true, id: 'w', revision: 2 })
   assert.equal(assessEvent({ expect: expected }, result).workRevisionPersisted, false)
-  result.calls = [toolCall('simWorkspace', { action: 'write', id: 'w', expectedRevision: 1, content: '第二版' })]
+  result.calls = []; result.toolResults = []
+  addToolEvidence(result, 'simWorkspace', { action: 'write', id: 'w', expectedRevision: 1, content: '第二版' }, { ok: true, saved: true, id: 'w', revision: 2 })
   assert.equal(assessEvent({ expect: expected }, result).workRevisionPersisted, true)
   result.activities.subscriptions.push({ id: 's', url: 'https://example.com/feed.xml', kind: 'rss', items: [{ id: 'new' }], seenIds: ['new'] })
   assert.equal(assessEvent({ expect: expected }, result).newFeedItemCommitted, false)
@@ -462,8 +537,8 @@ test('the final tool result at the round limit is captured without another model
       const invalid = rounds.size === 1 && round === 6
       return { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{
         id: `round-${rounds.size}-${round}`, type: 'function', function: {
-          name: invalid ? 'simCharacterMemory' : 'simGoal',
-          arguments: JSON.stringify(invalid ? { action: 'remember', kind: 'opinion', content: '不可见来源不能写入', epistemic: 'inferred', evidenceRefs: ['message:999'] } : { action: 'list' }),
+          name: round === 6 ? 'simFinishTurn' : 'simGoal',
+          arguments: JSON.stringify(round === 6 ? { choice: 'chat', reason: '检查最后一轮的实际收尾回执', ...(invalid ? { memories: [{ kind: 'opinion', content: '不可见来源不能写入', epistemic: 'inferred', evidenceRefs: ['message:999'] }] } : {}) } : { action: 'list' }),
         },
       }] } }] }
     }, turnTimeoutMs: 5000, log: noLog,
@@ -542,7 +617,15 @@ test('provider hidden reasoning fields are excluded while necessary tool evidenc
 
 test('logical and total time budgets stop later events and retain partial evidence', async t => {
   const dir = scratch(t)
-  const limited = await main(['--dry-run', '--scenario', 'social-refusal', '--max-calls', '1', '--output-dir', path.join(dir, 'calls')], { log: noLog })
+  // A successful finish now ends in one call. Keep the budget probe in an
+  // unfinished acting turn so its next request actually exhausts the limit.
+  const limited = await main(['--scenario', 'social-refusal', '--max-calls', '1', '--output-dir', path.join(dir, 'calls')], {
+    model: async () => ({ choices: [{ message: { role: 'assistant', content: '', tool_calls: [
+      { id: 'budget-decision', type: 'function', function: { name: 'simDecide', arguments: JSON.stringify({ kind: 'unwilling', reason: '我对独立游戏有自己的看法，不想无条件附和' }) } },
+      { id: 'budget-message', type: 'function', function: { name: 'simSendMessage', arguments: JSON.stringify({ continuation: 'chat', messages: ['这个我可不答应，我有自己的看法。'] }) } },
+    ] } }] }),
+    log: noLog,
+  })
   assert.equal(limited.summary.logicalCalls, 1)
   assert.equal(limited.summary.failedEvents, 1)
   assert.equal(limited.summary.skippedEvents, 1)
