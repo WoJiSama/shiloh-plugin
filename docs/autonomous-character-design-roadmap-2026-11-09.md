@@ -951,7 +951,11 @@ node scripts/characterAcceptance.mjs --candidate /tmp/character-offline-v3-next/
 
 发布前只读复核另复现工具 ID 重用可能把旧回复认作当前证据；当前双样本的 11 个工具 ID 及其回复均唯一，未受影响。已在本地门禁阶段终止该次发布，尚未上传或改变线上，保留[中断日志](../reports/character-phase7-2026-11-10/deploy-silence-interrupted.log)与[未完成门禁](../reports/character-phase7-2026-11-10/verify-phase-silence-interrupted.log)，终止后的子进程取消不能当成完整测试结果。修复为每个独立样本拒绝复用工具 ID，汇总器重算并核对工具名和调用阶段；不把旧历史当新回执。新增同例[红灯](../reports/character-phase7-2026-11-10/reused-tool-id-red.log)到[绿灯](../reports/character-phase7-2026-11-10/reused-tool-id-green.log)，验收器 22 项通过。
 
-**当前继续点：** 重新执行最终提交的正式发布门禁，再回读健康和测试群限额。模型漏建目标、漏记拒绝、观点持久化和内容夸大仍保留为未达，不因模拟、部署或一条正面反馈宣称阶段 7 全部完成。
+最终 ID 校验版另有[双重复离线回放](../reports/character-phase7-2026-11-10/isolated-final-idguard/results.json)，56 事件全部执行、行为未达和结果缺失均 0；其[汇总](../reports/character-phase7-2026-11-10/isolated-final-idguard-acceptance/report.md)仍将实模、人审与真实跨天保留 pending。
+
+随后正式门禁后端 3204 项中 3200 通过、2 失败、2 跳过，[失败日志](../reports/character-phase7-2026-11-10/verify-phase-silence-ingest-red.log)保留，发布脚本在本地停止并确认“未触碰服务器”。两项失败的旧 fixture 原本用未点名新会话的 bootstrap 验证自动催发，与已确定的自主主体新行为相冲突；已将保留行为回归明确为真实 @，并为该消息类唤醒设置 1 秒合并窗，避免默认 8 秒调度超过测试 6 秒等待。原兜底发送与沉默元话术拦截的断言保持不变，自主不催发另有完整专项覆盖。[修正后 ingest 专项](../reports/character-phase7-2026-11-10/ingest-preserved-reply-final.log)作为最终门禁的输入，整体通过结果随后续记。
+
+**当前继续点：** 使用同步后的保留行为 fixture 再执行正式发布门禁，随后回读健康和测试群限额。模型漏建目标、漏记拒绝、观点持久化和内容夸大仍保留为未达，不因模拟、部署或一条正面反馈宣称阶段 7 全部完成。
 
 ## 13. 相关仓库文档
 

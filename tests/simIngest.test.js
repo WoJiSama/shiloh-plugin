@@ -164,10 +164,11 @@ test('沉默声明不提醒不外发：一次模型调用安静结束回合', as
   }
 })
 
-test('真内容提醒一次仍哑火则兜底直发（不被沉默识别误伤）', async () => {
-  const r = buildRuntime({ responses: ['今天也要加油鸭！', '今天也要加油鸭！呀'] })
+test('被 @ 的真内容提醒一次仍哑火则兜底直发（不被沉默识别误伤）', async () => {
+  const r = buildRuntime({ batchWindowMs: 1000, responses: ['今天也要加油鸭！', '今天也要加油鸭！呀'] })
   try {
-    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', message: [], sender: { nickname: '群友' } })
+    // 明确点名，验证用户回合兜底；未点名的新会话 bootstrap 属于自主主体。
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', atBot: true, message: [{ type: 'at', data: { qq: SELF_ID } }], sender: { nickname: '群友' } })
     assert.ok(await waitFor(() => r.modelCalls.length >= 2), '提醒后应有第二次调用')
     assert.ok(await waitFor(() => r.sent.length >= 1), '兜底应直发第二次文本')
     assert.ok(JSON.stringify(r.sent[0]).includes('今天也要加油鸭！呀'), `直发内容应为第二次文本: ${JSON.stringify(r.sent[0])}`)
@@ -217,11 +218,11 @@ test('仅@模式与活跃档状态并存时，主动跟进唤醒被压掉', asyn
   }
 })
 
-test('提醒后输出自创沉默变体：不直发进群（295708427 实拍回归）', async () => {
+test('被 @ 提醒后输出自创沉默变体：不直发进群（295708427 实拍回归）', async () => {
   // 第一响应是真内容（触发提醒），第二响应含元词但不是完整沉默声明——由直发前子串防线拦下
-  const r = buildRuntime({ responses: ['这车怎么还没开', '这轮我就先旁听吧'] })
+  const r = buildRuntime({ batchWindowMs: 1000, responses: ['这车怎么还没开', '这轮我就先旁听吧'] })
   try {
-    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', message: [], sender: { nickname: '群友' } })
+    await r.runtime.ingest({ group_id: GROUP, message_type: 'group', user_id: '10000', msg: '大家好', atBot: true, message: [{ type: 'at', data: { qq: SELF_ID } }], sender: { nickname: '群友' } })
     assert.ok(await waitFor(() => r.modelCalls.length >= 2), '提醒后应有第二次调用')
     await sleep(300)
     assert.equal(r.modelCalls.length, 2)
