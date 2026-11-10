@@ -984,7 +984,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const history: SimHistoryMessage[] = state.agentHistory.map(m => ({ ...m }))
       type RawToolCall = NonNullable<SimHistoryMessage['tool_calls']>[number]
       let rounds = 0
-      // 未外发文本兜底（实测事故：模型按聊天习惯把要说的话写在最终文本里——本模式不外发，群里只剩它调的表情工具）
+      // 用户对话/正式托付的未外发文本兜底：自主回合的最终文本只留在内部历史。
       let nudgedForUnsent = false
       while (rounds < cfg.turn.maxToolRounds) {
         rounds += 1
@@ -1004,8 +1004,12 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const toolCallsRaw: RawToolCall[] = Array.isArray(message.tool_calls) ? message.tool_calls as RawToolCall[] : []
         if (!toolCallsRaw.length) {
           const text = String(message.content || '').trim()
-          // reserved2 语义：模型文本永不外发，只留在回合记忆里（外发只能走 simSendMessage）
+          // 先保留模型最终文本；自主回合是否发言必须由显式发送工具决定。
           if (text) history.push({ role: 'assistant', content: text })
+          if (actor.kind === 'autonomous') {
+            if (text) logger.info(`[仿真] 群 ${groupId} 自主回合最终文本仅保留内部历史（${text.length} 字），结束回合`)
+            break
+          }
           // 兜底：写了像"要说的话"的文本但本回合一条都没发过 → 提醒一次（模型惯性问题，实测高发）。
           // 沉默声明（「旁听，结束回合。」「无需发送，结束回合。」）除外：那是模型在宣布不说话，
           // 提醒/直发都会把元话术漏进群里——按其意愿安静结束。

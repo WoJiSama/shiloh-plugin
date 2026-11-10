@@ -117,6 +117,23 @@ test('saved optimistic summaries and forged behavior values are independently re
   assert.ok(result.integrityFailures.some(value => value.startsWith('behavior_evidence_mismatch:')))
 })
 
+test('declared tool reply coverage is independently recomputed while old reports remain readable', () => {
+  assert.equal(inspectReplay(fixture()).integrity, 'passed')
+  const document = fixture({ mode: 'live_model' }), event = document.results[0]
+  document.metadata.toolResults = 'requests_and_final_persisted_session'
+  const toolCallId = 'last-round-tool'
+  event.calls[0].toolCalls = [{ id: toolCallId, function: { name: 'simGoal', arguments: '{"action":"list"}' } }]
+  event.toolResultCapture = { complete: true, requestedToolCallIds: [toolCallId], missingToolCallIds: [] }
+  const missing = inspectReplay(document)
+  assert.equal(missing.integrity, 'failed')
+  assert.ok(missing.integrityFailures.some(value => value.startsWith('incomplete_tool_result_capture:')))
+  const content = '{"ok":true,"goals":[]}'
+  event.toolResults.push({ toolCallId, content, stage: 'main', name: 'simGoal', hash: h({ toolCallId, content }) })
+  assert.equal(inspectReplay(document).integrity, 'passed')
+  event.toolResultCapture.requestedToolCallIds = []
+  assert.ok(inspectReplay(document).integrityFailures.some(value => value.startsWith('invalid_tool_result_coverage:')))
+})
+
 test('skipped dependency evidence has no behavior observations and still blocks acceptance', async t => {
   const document = fixture(), result = document.results[0]
   result.status = 'skipped'
@@ -303,6 +320,18 @@ test('comparison requires independent live evidence with matching scenario, pers
   const changedTools = structuredClone(baseline)
   changedTools.results[0].calls[0].tools.push('extra-tool')
   assert.ok(compareReplays(candidate, changedTools, 'candidate', 'baseline').differences.includes('observed_tool_inventory'))
+})
+
+test('changed fixture clock, background setup and worker outcomes invalidate old comparison conditions', () => {
+  const candidate = fixture({ mode: 'live_model' }), baseline = fixture({ mode: 'live_model' })
+  baseline.metadata.clock = 'fixed 24 hour advance'
+  baseline.metadata.worker = 'event-local outcome with default success'
+  baseline.metadata.simulationOverrides = { backgroundCheck: 'defer proactive only' }
+  baseline.metadata.toolResults = 'only_from_the_next_model_request'
+  baseline.metadata.scenariosHash = h('old event and fixture contract')
+  const comparison = compareReplays(candidate, baseline, h('candidate'), h('baseline'))
+  assert.equal(comparison.status, 'incompatible')
+  for (const field of ['clock', 'worker', 'simulationOverrides', 'toolResults', 'scenariosHash']) assert.ok(comparison.differences.includes(field))
 })
 
 test('review is tied to exact candidate bytes and requires all distinct samples, named reviewers and reasons', () => {

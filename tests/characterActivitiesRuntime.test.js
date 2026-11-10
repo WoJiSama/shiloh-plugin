@@ -248,6 +248,30 @@ test('作品与订阅经模型工具持久化，订阅更新自主唤醒且去�
   } finally { lateFeed.resolve(); h.runtime.stop() }
 })
 
+test('订阅更新自主回合的自然语言收尾不触发催发或兜底发送', async () => {
+  const text = '刚看到订阅有更新，但群里一个多小时没人说话，我就不主动甩链接打扰了，安静记着，等有人聊到纸灯塔再说。继续潜水。'
+  const h = fixture({
+    fetchCharacterFeed: async () => [{ id: 'release-quiet', title: '纸灯塔更新', url: 'https://example.com/release/quiet', summary: '公开更新摘要', receivedAt: h.clock.value }],
+    script: (_request, index) => index === 0 ? tools(call('simSubscription', {
+      action: 'add', title: '纸灯塔更新', kind: 'rss', url: 'https://example.com/feed.xml', intervalHours: 1,
+    })) : index === 1 ? quiet() : { role: 'assistant', content: text },
+  })
+  try {
+    await h.ingest(); await idle(h, 2)
+    h.clock.value = (await h.runtime.describeGroup(GROUP)).activities.subscriptions[0].nextPollAt
+    await h.runtime.sweepOnce(); await idle(h, 3)
+    const detail = await h.runtime.describeGroup(GROUP)
+    assert.equal(detail.lastWakeReason, 'interestUpdate')
+    assert.equal(detail.activities.subscriptions[0].items[0].id, 'release-quiet')
+    assert.equal(h.calls.length, 3, '订阅回合不能因普通最终文本追加模型催发')
+    assert.equal(h.sent.length, 0)
+    assert.equal(detail.character.decision, undefined)
+    const history = JSON.parse(h.kv.get(sessionKey(GROUP))).agentHistory
+    assert.ok(history.some(message => message.role === 'assistant' && message.content === text))
+    assert.equal(history.some(message => message.content?.includes('【系统提醒】你刚才写的这段话群友看不到')), false)
+  } finally { h.runtime.stop() }
+})
+
 test('后台反思阻止重置和巡检重入，保留新消息，暂停后丢弃迟到结果且不发送', async () => {
   const held = deferred()
   let reflected = 0, signal

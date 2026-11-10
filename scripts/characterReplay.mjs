@@ -50,23 +50,48 @@ export function validateScenarios(scenarios) {
   if (!Array.isArray(scenarios) || !scenarios.length) throw new Error('Scenarios must be a nonempty array')
   for (const scenario of scenarios) {
     if (!plainObject(scenario) || typeof scenario.id !== 'string' || !scenario.id.trim() || ids.has(scenario.id)) throw new Error('Scenario ids must be unique')
+    if (Object.keys(scenario).some(key => !['id', 'review', 'workerOutcome', 'events'].includes(key))) throw new Error('Invalid scenario field')
+    if (scenario.workerOutcome !== undefined && !['succeeded', 'failed', 'unknown'].includes(scenario.workerOutcome)) throw new Error('Invalid scenario worker outcome')
     ids.add(scenario.id)
     if (!Array.isArray(scenario.events) || !scenario.events.length) throw new Error(`Missing events: ${scenario.id}`)
     for (const event of scenario.events) {
       if (!plainObject(event) || !['message', 'goal-check', 'idle-check', 'background-check', 'passive'].includes(event.kind)) throw new Error(`Invalid event kind: ${scenario.id}`)
-      if (Object.keys(event).some(key => !['kind', 'text', 'advanceMs', 'expect', 'restart', 'searchOutcome', 'workerOutcome', 'feedItemId', 'offline', 'offlineReflection'].includes(key))) throw new Error('Invalid event field')
+      if (Object.keys(event).some(key => !['kind', 'text', 'advanceMs', 'advanceToNextGoalCheck', 'isolateBackgroundSchedule', 'expect', 'restart', 'searchOutcome', 'feedItemId', 'offline', 'offlineReflection'].includes(key))) throw new Error('Invalid event field')
       if (['message', 'passive'].includes(event.kind) && (typeof event.text !== 'string' || !event.text.trim())) throw new Error('Missing message text')
       if (event.advanceMs !== undefined && (!Number.isSafeInteger(event.advanceMs) || event.advanceMs < 0)) throw new Error('Invalid event time')
+      if (event.advanceToNextGoalCheck !== undefined && (typeof event.advanceToNextGoalCheck !== 'boolean' || event.kind !== 'goal-check' || event.advanceMs !== undefined)) throw new Error('Invalid goal-check clock option')
+      if (event.isolateBackgroundSchedule !== undefined && (typeof event.isolateBackgroundSchedule !== 'boolean' || event.kind !== 'background-check')) throw new Error('Invalid background schedule option')
       if (event.expect !== undefined && (!plainObject(event.expect) || Object.entries(event.expect).some(([key, value]) => !EXPECTATIONS.includes(key) || typeof value !== 'boolean'))) throw new Error('Invalid event expectations')
       if (event.restart !== undefined && typeof event.restart !== 'boolean') throw new Error('Invalid restart flag')
       if (event.searchOutcome !== undefined && !['succeeded', 'failed'].includes(event.searchOutcome)) throw new Error('Invalid search outcome')
-      if (event.workerOutcome !== undefined && !['succeeded', 'failed', 'unknown'].includes(event.workerOutcome)) throw new Error('Invalid worker outcome')
       if (event.feedItemId !== undefined && (typeof event.feedItemId !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/u.test(event.feedItemId))) throw new Error('Invalid feed item id')
       if (event.offlineReflection !== undefined && (!plainObject(event.offlineReflection) || Object.keys(event.offlineReflection).some(key => !['summary', 'updates', 'goals'].includes(key)) || typeof event.offlineReflection.summary !== 'string' || event.offlineReflection.summary.length > 500 || !Array.isArray(event.offlineReflection.updates) || event.offlineReflection.updates.length > 2 || !Array.isArray(event.offlineReflection.goals) || event.offlineReflection.goals.length > 1 || event.offlineReflection.updates.some(update => !plainObject(update) || Object.keys(update).some(key => !['kind', 'content', 'evidenceRefs', 'supersedes'].includes(key)) || !['opinion', 'interest'].includes(update.kind) || typeof update.content !== 'string' || !update.content.trim() || update.content.length > 600 || !Array.isArray(update.evidenceRefs) || !update.evidenceRefs.length || update.evidenceRefs.some(ref => typeof ref !== 'string' || !ref.trim()) || (update.supersedes !== undefined && typeof update.supersedes !== 'string')) || event.offlineReflection.goals.some(goal => !plainObject(goal) || Object.keys(goal).some(key => !['id', 'action', 'reason', 'nextStep'].includes(key)) || typeof goal.id !== 'string' || !goal.id.trim() || !['wait', 'abandon'].includes(goal.action) || typeof goal.reason !== 'string' || !goal.reason.trim() || goal.reason.length > 500 || (goal.nextStep !== undefined && typeof goal.nextStep !== 'string')))) throw new Error('Invalid offline reflection')
       if (event.offline !== undefined && (!Array.isArray(event.offline) || event.offline.some(round => !Array.isArray(round) || round.some(call => !plainObject(call) || Object.keys(call).some(key => !['name', 'args'].includes(key)) || typeof call.name !== 'string' || !/^[A-Za-z][A-Za-z0-9_]*$/u.test(call.name) || !plainObject(call.args))))) throw new Error('Invalid offline script')
     }
   }
   return scenarios
+}
+
+/** Only advance the synthetic clock; never create, extend or rewrite a goal. */
+export function planGoalCheckAdvance(state, fromAt) {
+  const goal = !state.paused && state.goals.filter(item => ['active', 'waiting'].includes(item.status) &&
+    item.expiresAt > Math.max(fromAt, item.nextCheckAt) && item.attempts < item.maxAttempts &&
+    !state.receipts.some(receipt => receipt.goalId === item.id && receipt.status === 'pending'))
+    .sort((left, right) => left.nextCheckAt - right.nextCheckAt || left.createdAt - right.createdAt)[0]
+  const toAt = goal ? Math.max(fromAt, goal.nextCheckAt) : fromAt
+  return { mode: 'advance_to_next_eligible_goal', fromAt, toAt, advanceMs: toAt - fromAt,
+    goalId: goal?.id ?? null, nextCheckAt: goal?.nextCheckAt ?? null, expiresAt: goal?.expiresAt ?? null }
+}
+
+/** Explicit fixture setup confined to the in-memory session and recorded verbatim. */
+export function prepareBackgroundSchedule(state, at) {
+  const snapshot = value => ({ nextReplyCheckAt: value.nextReplyCheckAt, pendingWakeReasons: structuredClone(value.pendingWakeReasons),
+    wakeMode: value.wakeConfig.mode, sleepUntil: value.wakeConfig.sleepUntil ?? null, nextProactiveCheckAt: value.nextProactiveCheckAt })
+  const next = structuredClone(state), before = snapshot(next)
+  next.nextReplyCheckAt = 0; next.pendingWakeReasons = []
+  next.wakeConfig.mode = 'diving'; delete next.wakeConfig.sleepUntil
+  next.nextProactiveCheckAt = at + 7 * 86400000
+  return { state: next, evidence: { fixture: true, at, before, after: snapshot(next) } }
 }
 
 /** Minimal public scenario contract for independent report completeness checks. */
@@ -236,11 +261,12 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
     scenariosHash: hashReplayValue(scenarios), effectiveConfigHash: hashReplayValue(config),
     buildManifestHash: hashReplayValue(fs.readFileSync(path.join(ROOT, 'dist/backend/manifest.json'), 'utf8')),
     model: config.toolsAiConfig?.toolsAiModel || null, personaHash: hashReplayValue(config.persona || {}),
-    clock: 'fixed initial event epoch; explicit event advances; elapsed wall time within events for real wait semantics',
-    search: 'synthetic_fixture', feeds: 'synthetic_fixture; no_real_HTTP', worker: 'synthetic_fixture; no_external_worker_submission', reflection: 'separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode',
+    clock: 'fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded',
+    search: 'synthetic_fixture', feeds: 'synthetic_fixture; no_real_HTTP', worker: 'synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission', reflection: 'separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode',
     storage: 'fresh_in_memory_per_sample', platform: 'captured_only',
+    toolResults: 'current_event_tool_replies_from_model_requests_and_final_persisted_session; no_extra_model_calls',
     generation: 'configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters',
-    simulationOverrides: { tools: 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive_schedule_to_isolate_due_background_activities' },
+    simulationOverrides: { tools: 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded' },
     personaSource: 'merged_config_persona; persona_library_bindings_not_loaded',
     seed: 'empty_bound_session; no_goals_or_memories_seeded',
     eventStatusMeaning: 'engineering_execution_only; inspect_behavior_observations_separately',
@@ -316,6 +342,19 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       const activities = (await runtime.describeGroup(GROUP)).activities
       return Object.fromEntries(ACTIVITY_FIELDS.map(field => [field, structuredClone(activities[field])]))
     }
+    const captureToolResults = messages => {
+      for (const message of messages || []) {
+        if (message.role !== 'tool') continue
+        const toolCallId = String(message.tool_call_id || '')
+        const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? null)
+        const key = hashReplayValue({ toolCallId, content })
+        if (activeResult.toolResults.some(result => result.hash === key)) continue
+        const call = activeResult.calls.find(call => (call.toolCalls || []).some(tool => tool.id === toolCallId))
+        const tool = call?.toolCalls.find(tool => tool.id === toolCallId)
+        if (!tool) continue // Old history is not evidence of a tool execution in this event.
+        activeResult.toolResults.push({ hash: key, stage: call.stage, toolCallId, name: message.name || tool.function?.name || '', content })
+      }
+    }
     const invokeModel = async (stage, request, executionConfig, signal = controller.signal) => {
       if (Date.now() >= runDeadline) halted ||= 'run_duration_exhausted'
       if (logicalCalls >= options.maxCalls || halted) { halted ||= 'logical_call_budget_exhausted'; throw new Error(halted) }
@@ -324,16 +363,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       activeResult.calls.push(capture)
       const reflection = stage === 'reflection' ? { callId: capture.id, requestHash: capture.requestHash, status: 'pending', usage: null } : undefined
       if (reflection) activeResult.reflections.push(reflection)
-      for (const message of request.messages || []) {
-        if (message.role !== 'tool') continue
-        const toolCallId = String(message.tool_call_id || '')
-        const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content ?? null)
-        const key = hashReplayValue({ toolCallId, content })
-        if (activeResult.toolResults.some(result => result.hash === key)) continue
-        const tool = activeResult.calls.flatMap(call => call.toolCalls || []).find(call => call.id === toolCallId)
-        if (!tool) continue // Old history is not evidence of a tool execution in this event.
-        activeResult.toolResults.push({ hash: key, stage, toolCallId, name: message.name || tool?.function?.name || '', content })
-      }
+      captureToolResults(request.messages)
       activeModelStage = stage
       try {
         let response
@@ -384,7 +414,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       },
       characterWorkerAvailable: () => true,
       async runCharacterWorker(task, workerScope, signal) {
-        const status = activeEvent.workerOutcome || 'succeeded'
+        const status = scenario.workerOutcome || 'succeeded'
         const result = status === 'succeeded' ? { status, summary: '合成研究草稿已返回，尚未经真实资料核实', artifact: { title: '纸灯塔谜题线索研究草稿', content: '合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。' } } : { status, summary: status === 'unknown' ? '合成工作器结果未知，禁止把本次任务当成已完成' : '合成工作器执行失败，未取得产物' }
         activeResult.workers.push({ fixture: true, task: structuredClone(task), scope: structuredClone(workerScope), aborted: signal.aborted, result: structuredClone(result) })
         return result
@@ -403,8 +433,11 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         epoch = now() + (activeEvent.advanceMs || 0); anchor = Date.now()
         controller = new AbortController()
         const before = character()
+        const clockAdjustment = activeEvent.advanceToNextGoalCheck ? planGoalCheckAdvance(before, now()) : undefined
+        if (clockAdjustment) { epoch = clockAdjustment.toAt; anchor = Date.now() }
         const beforeActivities = await activitySnapshot()
         activeResult = { scenario: scenario.id, sampleIndex, eventIndex, eventHash: hashReplayValue(activeEvent), beforeCharacter: before, beforeActivities, activities: structuredClone(beforeActivities), kind: activeEvent.kind, input: activeEvent.text || '', at: now(), status: 'passed', review: scenario.review, expect: activeEvent.expect || {}, calls: [], network: [], sent: [], searches: [], toolResults: [], feeds: [], workers: [], reflections: [], warnings: [], errors: [], structuralFailures: [] }
+        if (clockAdjustment) activeResult.clockAdjustment = clockAdjustment
         if (Date.now() >= runDeadline) halted ||= 'run_duration_exhausted'
         if (halted) {
           activeResult.status = 'skipped'; activeResult.skipReason = halted
@@ -413,7 +446,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         const start = Date.now()
         try {
           if (activeEvent.restart) { runtime.stop(); runtime = create(); activeResult.restarted = true }
-          if (activeEvent.kind === 'goal-check' && !before.goals.some(g => ['active', 'waiting'].includes(g.status) && g.nextCheckAt <= now())) {
+          if (activeEvent.kind === 'goal-check' && !stateModule.dueCharacterGoal(before, now())) {
             activeResult.status = 'skipped'; activeResult.skipReason = 'model_created_no_due_goal'
           } else {
             const budgetBefore = (await runtime.describeGroup(GROUP)).budget.turns
@@ -426,7 +459,12 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
                 const state = JSON.parse(kv.get(sessionKey)); state.nextProactiveCheckAt = now() - 1; kv.set(sessionKey, JSON.stringify(state))
                 activeResult.forcedIdleSchedule = true
               } else if (activeEvent.kind === 'background-check') {
-                const state = JSON.parse(kv.get(sessionKey)); state.nextProactiveCheckAt = now() + 7 * 86400000; kv.set(sessionKey, JSON.stringify(state))
+                let state = JSON.parse(kv.get(sessionKey))
+                if (activeEvent.isolateBackgroundSchedule) {
+                  const prepared = prepareBackgroundSchedule(state, now()); state = prepared.state
+                  activeResult.backgroundScheduleIsolation = prepared.evidence
+                } else state.nextProactiveCheckAt = now() + 7 * 86400000
+                kv.set(sessionKey, JSON.stringify(state))
                 activeResult.deferredProactiveSchedule = true
               }
               await runtime.sweepOnce()
@@ -459,6 +497,16 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           activeResult.behavior = assessEvent(activeEvent, activeResult)
           // Do not allow an unsettled timed-out runtime to contaminate later events.
           halted ||= 'previous_event_incomplete'
+        }
+        // The last tool round may have no following model request. Read its
+        // persisted replies; never spend another model call just to observe it.
+        captureToolResults(JSON.parse(kv.get(sessionKey)).agentHistory)
+        const requestedToolCallIds = [...new Set(activeResult.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id)))]
+        const missingToolCallIds = requestedToolCallIds.filter(id => !activeResult.toolResults.some(result => result.toolCallId === id))
+        activeResult.toolResultCapture = { complete: !missingToolCallIds.length, requestedToolCallIds, missingToolCallIds }
+        if (missingToolCallIds.length && activeResult.status === 'passed') {
+          activeResult.structuralFailures.push('tool_result_capture_incomplete')
+          activeResult.status = 'failed'
         }
         activeResult.elapsedMs = Date.now() - start
         results.push(clean(activeResult)); checkpoint(false)

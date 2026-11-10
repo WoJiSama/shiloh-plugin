@@ -25,7 +25,7 @@
   },
   {
     "id": "motivated-goal-restart",
-    "review": "是否根据兴趣自建少量目标，有明确动机；跨天重启后据真实回执完成。runner 不代建目标；没有创建就记录缺失。",
+    "review": "是否根据兴趣自建少量目标，有明确动机；重启后按模型保存的到期时间据回执完成，跨天后保留记录。runner 不代建目标；没有创建就记录缺失。",
     "events": [
       {
         "kind": "message",
@@ -37,7 +37,7 @@
         } }]]
       },
       {
-        "kind": "goal-check", "advanceMs": 86400000, "restart": true,
+        "kind": "goal-check", "advanceToNextGoalCheck": true, "restart": true,
         "expect": { "goalCompleted": true },
         "offline": [
           [{ "name": "searchInformationTool", "args": { "query": "纸灯塔 地图设计" } }],
@@ -48,7 +48,7 @@
         ]
       },
       {
-        "kind": "message", "advanceMs": 60000,
+        "kind": "message", "advanceMs": 86400000,
         "text": "昨天那个游戏你后来了解得怎么样？别把检索到介绍说成自己已经玩过。",
         "offline": [[{ "name": "simSendMessage", "args": { "messages": ["只拿到了评测用的资料，还没玩过，也没查证真实作品。"] } }]]
       }
@@ -100,7 +100,7 @@
         } }]]
       },
       {
-        "kind": "goal-check", "advanceMs": 86400000, "restart": true, "searchOutcome": "failed",
+        "kind": "goal-check", "advanceToNextGoalCheck": true, "restart": true, "searchOutcome": "failed",
         "expect": { "waitAfterFailure": true },
         "offline": [
           [{ "name": "searchInformationTool", "args": { "query": "纸灯塔 玩法" } }],
@@ -128,7 +128,7 @@
   },
   {
     "id": "subscription-update-dedup",
-    "review": "订阅由模型创建；公开更新始终为合成资料，首次更新触发自主回合，重复条目不得再次唤醒。",
+    "review": "订阅由模型创建；后台专场显式清除合成会话中的回复检查、待唤醒与活跃超时并延后主动检查，公开更新始终为合成资料；首次更新触发自主回合，重复条目不得再次唤醒。",
     "events": [
       {
         "kind": "message", "text": "我想持续了解纸灯塔的公开更新。你若感兴趣，可以把 https://example.com/feed.xml 加为每小时检查一次的 RSS 订阅，不必每次都发群消息。",
@@ -136,19 +136,19 @@
         "offline": [[{ "name": "simSubscription", "args": { "action": "add", "title": "纸灯塔公开更新", "kind": "rss", "url": "https://example.com/feed.xml", "intervalHours": 1 } }]]
       },
       {
-        "kind": "background-check", "advanceMs": 3600000, "restart": true, "feedItemId": "release-one",
+        "kind": "background-check", "advanceMs": 3600000, "restart": true, "feedItemId": "release-one", "isolateBackgroundSchedule": true,
         "expect": { "feedUpdated": true, "noSend": true },
         "offline": [[{ "name": "simDecide", "args": { "kind": "silent", "reason": "记下这次合成更新，尚无值得打扰大家的核实进展" } }]]
       },
       {
-        "kind": "background-check", "advanceMs": 3600000, "feedItemId": "release-one",
+        "kind": "background-check", "advanceMs": 3600000, "feedItemId": "release-one", "isolateBackgroundSchedule": true,
         "expect": { "feedUpdated": false, "noCall": true, "noSend": true, "noReflectionCall": true }
       }
     ]
   },
   {
     "id": "independent-reflection",
-    "review": "先由模型记录两条有来源的经历，再经独立反思端口形成有保留的观点；反思不调用普通工具、不发送消息，不用自身反思循环触发。",
+    "review": "先由模型记录两条有来源的经历，再经独立反思端口形成有保留的观点；后台专场显式隔离回复检查、待唤醒与活跃超时。反思不调用普通工具、不发送消息，不用自身反思循环触发。",
     "events": [
       {
         "kind": "message", "text": "你可以记下我们聊过的两个设计观察，作为以后判断的材料：我喜欢能自由探索的路线，也喜欢谜题提示之间能互相照应。它们都是我的反馈，还不是对纸灯塔的事实验证。",
@@ -159,27 +159,28 @@
         ]]
       },
       {
-        "kind": "background-check", "advanceMs": 21600000, "restart": true,
+        "kind": "background-check", "advanceMs": 21600000, "restart": true, "isolateBackgroundSchedule": true,
         "expect": { "reflected": true, "opinion": true, "noSend": true, "noWorkerCall": true },
         "offlineReflection": { "summary": "形成一个仍需资料支持的设计偏好", "updates": [{ "kind": "opinion", "content": "结合这两条对话反馈，我倾向于喜欢自由探索与连贯提示并存的设计；这只是偏好，不是纸灯塔的事实结论。", "evidenceRefs": ["$firstMemoryRef", "$memoryRef"] }], "goals": [] }
       },
       {
-        "kind": "background-check", "advanceMs": 21600000,
+        "kind": "background-check", "advanceMs": 21600000, "isolateBackgroundSchedule": true,
         "expect": { "reflected": false, "noReflectionCall": true, "noCall": true, "noSend": true }
       }
     ]
   },
   {
     "id": "worker-success-artifact",
-    "review": "目标和工作器任务均由模型工具创建；工作器始终是隔离合成端口，成功回执保存作品，并允许模型据此结束目标。",
+    "workerOutcome": "succeeded",
+    "review": "首轮只建目标，到期后再提交工作器；提前提交仍记录为未达。工作器是隔离合成端口，整个场景固定成功；成功回执保存作品，并允许模型据此结束目标。",
     "events": [
       {
-        "kind": "message", "text": "你若想研究谜题线索设计，可以先建一个目标，稍后请研究工作器整理比较维度。拿到明确的工作器成功回执和草稿后再结束，结果仅算未核实草稿。",
-        "expect": { "goalCreated": true },
+        "kind": "message", "text": "你若想研究谜题线索设计，这一轮只建一个目标，不要提交工作器任务；等目标到期检查时再请研究工作器整理比较维度。拿到明确的工作器成功回执和草稿后再结束，结果仅算未核实草稿。",
+        "expect": { "goalCreated": true, "noWorkerCall": true },
         "offline": [[{ "name": "simGoal", "args": { "action": "create", "title": "整理谜题线索比较维度", "motivation": "延续对探索解谜设计的兴趣", "nextStep": "向研究工作器提交带来源的草稿任务", "completionCriteria": "取得工作器成功回执并保存研究草稿", "stopConditions": ["任务失败", "结果无法确认"], "evidenceRefs": ["message:1"] } }]]
       },
       {
-        "kind": "goal-check", "advanceMs": 86400000, "restart": true, "workerOutcome": "succeeded",
+        "kind": "goal-check", "advanceToNextGoalCheck": true, "restart": true,
         "expect": { "workCreated": true, "goalCompleted": true, "workerUnknown": false },
         "offline": [
           [{ "name": "simWorkerTask", "args": { "kind": "research", "instruction": "根据这条群聊来源，整理谜题线索设计的比较维度，明确只是未核实草稿。", "evidenceRefs": ["message:1"] } }],
@@ -190,20 +191,21 @@
   },
   {
     "id": "worker-unknown-pause",
-    "review": "结果未知的工作器回执不得当成成功；目标应暂停，后续巡检不能再次提交同一任务。",
+    "workerOutcome": "unknown",
+    "review": "首轮只建目标，提前提交仍记为未达；整个场景工作器固定结果未知，不能因提前调用变成成功。目标应暂停，后续后台专场隔离竞争唤醒，不能再次提交同一任务。",
     "events": [
       {
-        "kind": "message", "text": "你若有兴趣就建个目标，稍后让研究工作器整理谜题提示的比较维度。若工作器结果未知，请暂停等待人工核实，不要重复提交，也不要说完成了。",
-        "expect": { "goalCreated": true },
+        "kind": "message", "text": "你若有兴趣，这一轮只建个目标，不要提交工作器任务；等目标到期检查时再让研究工作器整理谜题提示的比较维度。若工作器结果未知，请暂停等待人工核实，不要重复提交，也不要说完成了。",
+        "expect": { "goalCreated": true, "noWorkerCall": true },
         "offline": [[{ "name": "simGoal", "args": { "action": "create", "title": "整理谜题提示比较维度", "motivation": "想了解连贯提示设计", "nextStep": "提交一次研究工作器任务", "completionCriteria": "取得明确成功的研究回执", "stopConditions": ["结果未知即暂停", "管理员取消"], "evidenceRefs": ["message:1"] } }]]
       },
       {
-        "kind": "goal-check", "advanceMs": 86400000, "restart": true, "workerOutcome": "unknown",
+        "kind": "goal-check", "advanceToNextGoalCheck": true, "restart": true,
         "expect": { "goalPaused": true, "workerUnknown": true, "workCreated": false, "goalCompleted": false },
         "offline": [[{ "name": "simWorkerTask", "args": { "kind": "research", "instruction": "整理谜题提示的比较维度，仅提交本次任务，结果未知时不可假定完成。", "evidenceRefs": ["message:1"] } }]]
       },
       {
-        "kind": "background-check", "advanceMs": 3600000,
+        "kind": "background-check", "advanceMs": 3600000, "isolateBackgroundSchedule": true,
         "expect": { "noWorkerCall": true, "noCall": true, "noSend": true, "goalCompleted": false }
       }
     ]

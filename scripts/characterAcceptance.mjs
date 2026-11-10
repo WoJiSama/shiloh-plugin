@@ -94,6 +94,12 @@ export function inspectReplay(document) {
       for (const evidence of result.toolResults || []) {
         if (!isObject(evidence) || !['main', 'reflection'].includes(evidence.stage) || typeof evidence.toolCallId !== 'string' || !evidence.toolCallId || typeof evidence.content !== 'string' || !validHash(evidence.hash) || evidence.hash !== hashReplayValue({ toolCallId: evidence.toolCallId, content: evidence.content })) failures.push(`invalid_tool_result_evidence:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
       }
+      if (metadata.toolResults && result.status !== 'skipped') {
+        const requestedToolCallIds = [...new Set(result.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id)))]
+        const missingToolCallIds = requestedToolCallIds.filter(id => !(result.toolResults || []).some(evidence => evidence.toolCallId === id))
+        if (!same(result.toolResultCapture, { complete: !missingToolCallIds.length, requestedToolCallIds, missingToolCallIds })) failures.push(`invalid_tool_result_coverage:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
+        if (missingToolCallIds.length && result.status === 'passed') failures.push(`incomplete_tool_result_capture:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
+      }
       const reflectionIds = new Set()
       for (const evidence of result.reflections || []) {
         const call = result.calls.find(item => item.id === evidence?.callId && item.stage === 'reflection')
@@ -162,7 +168,7 @@ export function inspectReplay(document) {
 
 export function compareReplays(candidate, baseline, candidateHash, baselineHash) {
   if (!baseline) return { status: 'pending', reason: 'baseline_not_provided', singleVariableAttribution: false }
-  const comparableFields = ['runnerHash', 'scenariosHash', 'personaHash', 'assessmentVersion', 'scenarioManifestHash', 'generation', 'simulationOverrides', 'clock', 'search', 'feeds', 'worker', 'reflection', 'storage', 'platform', 'personaSource', 'seed', 'repetitions', 'maxCalls', 'maxHttp', 'maxDurationMs']
+  const comparableFields = ['runnerHash', 'scenariosHash', 'personaHash', 'assessmentVersion', 'scenarioManifestHash', 'generation', 'simulationOverrides', 'clock', 'search', 'feeds', 'worker', 'reflection', 'storage', 'platform', 'toolResults', 'personaSource', 'seed', 'repetitions', 'maxCalls', 'maxHttp', 'maxDurationMs']
   const differences = comparableFields.filter(field => !same(candidate.metadata[field], baseline.metadata[field]))
   const observedGeneration = document => [...new Set(document.results.flatMap(result => result.network).map(request => hashReplayValue({ stage: request.stage, parameters: Object.fromEntries(Object.entries(request.generation?.parameters || {}).filter(([key]) => key !== 'model')) })))].sort()
   const observedTools = document => [...new Set(document.results.flatMap(result => result.calls).filter(call => Array.isArray(call.tools)).map(call => hashReplayValue({ stage: call.stage, tools: [...call.tools].sort() })))].sort()

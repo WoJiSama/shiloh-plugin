@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { parseOptions, validateScenarios, summarize, assessEvent, assessmentVersion, scenarioManifest, main } from '../scripts/characterReplay.mjs'
+import { parseOptions, validateScenarios, summarize, assessEvent, assessmentVersion, scenarioManifest, planGoalCheckAdvance, prepareBackgroundSchedule, main } from '../scripts/characterReplay.mjs'
 import { inspectReplay } from '../scripts/characterAcceptance.mjs'
 import { hashReplayValue } from '../scripts/conversationQualityReplay.mjs'
 
@@ -71,6 +71,115 @@ test('scenario expectations and offline calls fail closed on misspelled or malfo
     { offlineReflection: { summary: 'invalid', updates: [{ kind: 'opinion', content: '无来源', evidenceRefs: [] }], goals: [] } },
     { offlineReflection: { summary: 'invalid', updates: [], goals: [{ id: 'g', action: 'complete', reason: '越权完成' }] } },
   ]) assert.throws(() => validateScenarios([{ id: 'bad', events: [{ kind: 'message', text: '你好', ...extra }] }]), undefined, JSON.stringify(extra))
+})
+
+test('fixture scheduling options are explicit, kind-bound and cannot conflict with time advances', () => {
+  const valid = { id: 'one', workerOutcome: 'unknown', events: [{ kind: 'goal-check', advanceToNextGoalCheck: true }, { kind: 'background-check', isolateBackgroundSchedule: true }] }
+  assert.equal(validateScenarios([valid])[0], valid)
+  for (const scenario of [
+    { ...valid, workerOutcome: 'success' },
+    { ...valid, events: [{ kind: 'goal-check', advanceToNextGoalCheck: 'true' }] },
+    { ...valid, events: [{ kind: 'message', text: '你好', advanceToNextGoalCheck: true }] },
+    { ...valid, events: [{ kind: 'goal-check', advanceToNextGoalCheck: true, advanceMs: 1 }] },
+    { ...valid, events: [{ kind: 'background-check', isolateBackgroundSchedule: 1 }] },
+    { ...valid, events: [{ kind: 'idle-check', isolateBackgroundSchedule: true }] },
+    { ...valid, events: [{ kind: 'goal-check', workerOutcome: 'unknown' }] },
+  ]) assert.throws(() => validateScenarios([scenario]))
+})
+
+test('goal clock planning only selects existing eligible goals and never rewrites their deadlines', () => {
+  const goal = (id, nextCheckAt, extra = {}) => ({ id, status: 'active', nextCheckAt, expiresAt: 1000, attempts: 0, maxAttempts: 3, createdAt: 1, ...extra })
+  const state = { paused: false, goals: [goal('later', 300), goal('first', 200), goal('expired', 10, { expiresAt: 20 }), goal('exhausted', 5, { attempts: 3 }), goal('pending', 2), goal('paused', 1, { status: 'paused' }), goal('invalid-window', 1200)], receipts: [{ goalId: 'pending', status: 'pending' }] }
+  const original = structuredClone(state)
+  assert.deepEqual(planGoalCheckAdvance(state, 100), { mode: 'advance_to_next_eligible_goal', fromAt: 100, toAt: 200, advanceMs: 100, goalId: 'first', nextCheckAt: 200, expiresAt: 1000 })
+  assert.equal(planGoalCheckAdvance(state, 250).toAt, 250, 'already due goals do not move the clock backwards')
+  assert.equal(planGoalCheckAdvance({ ...state, paused: true }, 100).goalId, null)
+  assert.equal(planGoalCheckAdvance({ ...state, goals: [] }, 100).advanceMs, 0)
+  assert.equal(planGoalCheckAdvance(state, 1000).goalId, null)
+  assert.deepEqual(state, original)
+})
+
+test('background setup records competing wakes and only changes synthetic schedule fields', () => {
+  const state = { nextReplyCheckAt: 5, pendingWakeReasons: [{ kind: 'replyCheck' }, { kind: 'timeout' }], nextProactiveCheckAt: 6,
+    wakeConfig: { mode: 'active', sleepUntil: 7, triggers: { atMention: true } }, unread: [{ seq: 1 }], budget: { turns: 2 }, agentHistory: ['keep'] }
+  const original = structuredClone(state), prepared = prepareBackgroundSchedule(state, 10)
+  assert.equal(prepared.evidence.before.nextReplyCheckAt, 5)
+  assert.deepEqual(prepared.evidence.before.pendingWakeReasons, state.pendingWakeReasons)
+  assert.equal(prepared.evidence.before.sleepUntil, 7)
+  assert.deepEqual(prepared.state.unread, state.unread)
+  assert.deepEqual(prepared.state.budget, state.budget)
+  assert.deepEqual(prepared.state.agentHistory, state.agentHistory)
+  assert.deepEqual(prepared.state.wakeConfig.triggers, state.wakeConfig.triggers)
+  assert.deepEqual(prepared.evidence.after.pendingWakeReasons, [])
+  assert.equal(prepared.evidence.after.nextReplyCheckAt, 0)
+  assert.equal(prepared.evidence.after.wakeMode, 'diving')
+  assert.equal(prepared.evidence.after.sleepUntil, null)
+  assert.ok(prepared.evidence.after.nextProactiveCheckAt > 10)
+  assert.deepEqual(state, original)
+})
+
+test('an early worker submission uses the scenario outcome and remains a behavior miss', async t => {
+  let round = 0
+  const report = await main(['--scenario', 'worker-unknown-pause', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (_request, context) => {
+      const tool_calls = context.event.kind === 'message' && round++ === 0 ? [{ id: 'early-worker', type: 'function', function: { name: 'simWorkerTask', arguments: JSON.stringify({ kind: 'research', instruction: '整理谜题提示维度，仅合成回放。', evidenceRefs: ['message:1'] }) } }] : undefined
+      return { choices: [{ message: { role: 'assistant', content: '', ...(tool_calls ? { tool_calls } : {}) } }] }
+    }, log: noLog, turnTimeoutMs: 5000,
+  })
+  const initial = report.results[0]
+  assert.equal(initial.workers.length, 1)
+  assert.equal(initial.workers[0].result.status, 'unknown', 'an early call must not receive the success default')
+  assert.equal(initial.activities.works.length, 0)
+  assert.equal(initial.behavior.noWorkerSubmitted, false, 'early execution stays visible as a violated expectation')
+  assert.ok(initial.character.receipts.some(receipt => receipt.toolName === 'simWorkerTask' && receipt.status === 'unknown'))
+  assert.equal(report.results[1].status, 'skipped', 'the runner does not create a missing goal')
+  assert.equal(inspectReplay(report).engineering, 'failed')
+})
+
+test('goal checks advance to a model-created due time without expiring its 24 hour deadline', async t => {
+  let round = 0
+  const report = await main(['--scenario', 'worker-success-artifact', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (_request, context) => {
+      const tool_calls = context.event.kind === 'message' && round++ === 0 ? [{ id: 'create-goal', type: 'function', function: { name: 'simGoal', arguments: JSON.stringify({ action: 'create', title: '比较谜题提示', motivation: '兴趣延续', nextStep: '稍后请工作器比较', completionCriteria: '有来源的草稿', stopConditions: ['结果未知'], evidenceRefs: ['message:1'], expiresInHours: 24, nextCheckInMinutes: 15 }) } }] : undefined
+      return { choices: [{ message: { role: 'assistant', content: '', ...(tool_calls ? { tool_calls } : {}) } }] }
+    }, log: noLog, turnTimeoutMs: 5000,
+  })
+  const [initial, check] = report.results, goal = initial.character.goals[0]
+  assert.ok(goal)
+  assert.ok(check.at >= goal.nextCheckAt)
+  assert.ok(check.at < goal.expiresAt, 'the fixture must check the goal while it remains eligible')
+  assert.equal(check.clockAdjustment.goalId, goal.id)
+  assert.equal(check.clockAdjustment.nextCheckAt, goal.nextCheckAt)
+  assert.ok(check.clockAdjustment.advanceMs > 0)
+  assert.ok(check.character.goals.every(item => item.lastOutcome !== '目标已过期'))
+  assert.deepEqual(inspectReplay(report).summary, report.summary)
+})
+
+test('background fixtures record and clear competing reply and timeout schedules before polling', async t => {
+  let round = 0
+  const report = await main(['--scenario', 'subscription-update-dedup', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (_request, context) => {
+      const tool_calls = context.event.kind === 'message' && round++ === 0 ? [
+        { id: 'subscribe', type: 'function', function: { name: 'simSubscription', arguments: JSON.stringify({ action: 'add', title: '公开更新', kind: 'rss', url: 'https://example.com/feed.xml', intervalHours: 1 }) } },
+        { id: 'schedule', type: 'function', function: { name: 'simSetWakeConfig', arguments: JSON.stringify({ mode: 'active', sleepMinutes: 1 }) } },
+      ] : undefined
+      return { choices: [{ message: { role: 'assistant', content: '', ...(tool_calls ? { tool_calls } : {}) } }] }
+    }, log: noLog, turnTimeoutMs: 5000,
+  })
+  const first = report.results[1], duplicate = report.results[2]
+  assert.ok(first.backgroundScheduleIsolation)
+  assert.equal(first.backgroundScheduleIsolation.before.wakeMode, 'active')
+  assert.equal(first.backgroundScheduleIsolation.after.wakeMode, 'diving')
+  assert.equal(first.backgroundScheduleIsolation.after.sleepUntil, null)
+  assert.equal(first.backgroundScheduleIsolation.after.nextReplyCheckAt, 0)
+  assert.deepEqual(first.backgroundScheduleIsolation.after.pendingWakeReasons, [])
+  assert.ok(first.backgroundScheduleIsolation.after.nextProactiveCheckAt > first.at)
+  assert.equal(first.feeds.length, 1, 'the first declared background event must perform its due feed poll')
+  assert.equal(first.behavior.newFeedItemCommitted, true)
+  assert.equal(duplicate.feeds.length, 1)
+  assert.equal(duplicate.calls.length, 0)
+  assert.equal(duplicate.behavior.newFeedItemCommitted, true, 'the repeated item does not count as a new update')
+  assert.deepEqual(inspectReplay(report).summary, report.summary)
 })
 
 test('behavior assessment never credits stale decisions, goals or memories to a new event', () => {
@@ -249,7 +358,9 @@ test('all scripted scenarios exercise cross-day continuity and repeat with isola
     const created = turns[0].character.goals[0]
     assert.equal(turns[0].character.goals.length, 1)
     assert.equal(turns[1].restarted, true)
-    assert.ok(turns[1].at - turns[0].at >= 86400000)
+    assert.ok(turns[1].at >= created.nextCheckAt && turns[1].at < created.expiresAt)
+    assert.equal(turns[1].clockAdjustment.goalId, created.id)
+    assert.ok(turns[2].at - turns[1].at >= 86400000)
     assert.equal(turns[1].character.goals[0].id, created.id)
     assert.equal(turns[1].character.goals[0].status, 'completed')
     assert.equal(turns[2].character.goals[0].id, created.id)
@@ -340,6 +451,35 @@ test('injected provider errors are failed events even though runtime catches mod
   assert.ok(report.results.every(r => r.status === 'failed' && r.structuralFailures.includes('runtime_or_model_error')))
   assert.ok(report.results.every(r => r.sent.length === 0))
   assert.equal(report.summary.callsWithoutUsage, report.summary.logicalCalls)
+})
+
+test('the final tool result at the round limit is captured without another model call', async t => {
+  const rounds = new Map()
+  const report = await main(['--scenario', 'social-refusal', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (_request, { event }) => {
+      const round = (rounds.get(event) || 0) + 1
+      rounds.set(event, round)
+      const invalid = rounds.size === 1 && round === 6
+      return { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{
+        id: `round-${rounds.size}-${round}`, type: 'function', function: {
+          name: invalid ? 'simCharacterMemory' : 'simGoal',
+          arguments: JSON.stringify(invalid ? { action: 'remember', kind: 'opinion', content: '不可见来源不能写入', epistemic: 'inferred', evidenceRefs: ['message:999'] } : { action: 'list' }),
+        },
+      }] } }] }
+    }, turnTimeoutMs: 5000, log: noLog,
+  })
+  assert.equal(report.summary.logicalCalls, 12, 'capture must not request an extra model round')
+  for (const [index, event] of report.results.entries()) {
+    assert.equal(event.toolResults.length, 6, 'all six completed tool replies must be retained')
+    assert.equal(new Set(event.toolResults.map(result => result.toolCallId)).size, 6)
+    assert.equal(event.toolResultCapture.complete, true)
+    assert.deepEqual(event.toolResultCapture.missingToolCallIds, [])
+    const terminal = event.toolResults.find(result => result.toolCallId === `round-${index + 1}-6`)
+    assert.ok(terminal)
+    if (index === 0) assert.match(terminal.content, /^error:/, 'a rejected final tool must not disappear')
+    else assert.equal(JSON.parse(terminal.content).ok, true)
+  }
+  assert.equal(inspectReplay(report).integrity, 'passed')
 })
 
 test('missing live configuration is skipped without network or claims of model success', async t => {

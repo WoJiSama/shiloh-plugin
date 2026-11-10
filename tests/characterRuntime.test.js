@@ -174,6 +174,100 @@ test('simDecide silent 后普通最终文本不会触发提醒、兜底发送或
   } finally { h.runtime.stop() }
 })
 
+for (const wake of ['proactiveCheck', 'characterGoal']) {
+  test(`${wake} 自主回合的普通最终文本只留在历史，不催发、不兜底、不伪造决定`, async () => {
+    const text = wake === 'proactiveCheck'
+      ? '刚看到订阅有更新，但群里一个多小时没人说话，我就不主动甩链接打扰了，安静记着，等有人聊到纸灯塔再说。继续潜水。'
+      : '我已经整理出这款游戏值得继续研究的三个方向'
+    const h = fixture({ proactiveProbability: wake === 'proactiveCheck' ? 1 : 0, script: () => finalText(text) })
+    try {
+      await h.ingest('用于自主兴趣来源的普通消息', '30000', { at: false })
+      h.clock.value = wake === 'characterGoal' ? seededGoal(h).nextCheckAt : h.clock.value + 2 * 60 * 60_000
+      await h.runtime.sweepOnce()
+      await idle(h, 1)
+      const detail = await h.runtime.describeGroup(GROUP)
+      assert.equal(detail.lastWakeReason, wake)
+      assert.equal(h.calls.length, 1, '普通最终文本直接结束自主回合，不能追加发送提醒')
+      assert.equal(h.sent.length, 0)
+      assert.equal(detail.character.decision, undefined, '最终文本不能被运行时改写成 simDecide')
+      const history = JSON.parse(h.kv.get(sessionKey(GROUP))).agentHistory
+      assert.ok(history.some(message => message.role === 'assistant' && message.content === text))
+      assert.equal(history.some(message => message.content?.includes('【系统提醒】你刚才写的这段话群友看不到')), false)
+    } finally { h.runtime.stop() }
+  })
+}
+
+test('用户回合聚焦自主目标后，按当前主体保留最终文本且不催发', async () => {
+  let goal
+  const text = '我想先把这款游戏的研究方向整理在自己的记录里'
+  const h = fixture({ script: (_request, index) => index === 0
+    ? tools(toolCall('simGoal', { action: 'focus', id: goal.id })) : finalText(text) })
+  try {
+    await h.ingest('用于目标来源的普通消息', '30000', { at: false })
+    goal = seededGoal(h)
+    h.clock.value = goal.nextCheckAt
+    await h.ingest('看看你自己的研究目标')
+    await idle(h, 2)
+    assert.doesNotMatch(toolResult(h.calls[1], 'simGoal'), /^error:/)
+    assert.equal(h.calls.length, 2)
+    assert.equal(h.sent.length, 0)
+    assert.equal((await h.runtime.describeGroup(GROUP)).character.decision, undefined)
+    assert.ok(JSON.parse(h.kv.get(sessionKey(GROUP))).agentHistory.some(message => message.content === text))
+  } finally { h.runtime.stop() }
+})
+
+for (const wake of ['atMention', 'commitment']) {
+  test(`${wake} 普通最终文本仍提醒一次，再经原有兜底发送`, async () => {
+    const text = '这款游戏里的谜题设计确实很有意思'
+    const h = fixture({ script: () => finalText(text) })
+    try {
+      if (wake === 'atMention') await h.ingest()
+      else {
+        await h.ingest('承诺的消息来源', '30000', { at: false })
+        await h.runtime.wakeForCommitment(GROUP, '分享刚才整理的游戏看法')
+      }
+      await idle(h, 2)
+      assert.equal(h.calls.length, 2)
+      assert.equal((await h.runtime.describeGroup(GROUP)).lastWakeReason, wake)
+      assert.ok(h.calls[1].messages.some(message => message.content?.includes('【系统提醒】你刚才写的这段话群友看不到')))
+      assert.equal(h.sent.length, 1)
+      assert.ok(JSON.stringify(h.sent[0].segments).includes(text))
+    } finally { h.runtime.stop() }
+  })
+}
+
+test('自主回合仍可显式调用 simSendMessage 发送', async () => {
+  const text = '刚查到这款游戏的新资料，我想分享一下'
+  const h = fixture({ proactiveProbability: 1, script: (_request, index) => index === 0
+    ? tools(toolCall('simSendMessage', { messages: [text] })) : quiet() })
+  try {
+    await h.ingest('上一位群友的普通聊天', '30000', { at: false })
+    h.clock.value += 2 * 60 * 60_000
+    await h.runtime.sweepOnce()
+    await idle(h, 2)
+    assert.doesNotMatch(toolResult(h.calls[1], 'simSendMessage'), /^error:/)
+    assert.equal(h.sent.length, 1)
+    assert.ok(JSON.stringify(h.sent[0].segments).includes(text))
+  } finally { h.runtime.stop() }
+})
+
+test('自主回合显式 simDecide silent 仍阻止后续工具发送和最终文本发送', async () => {
+  const h = fixture({ proactiveProbability: 1, script: (_request, index) => index === 0
+    ? tools(toolCall('simDecide', { kind: 'silent', reason: '我想先听大家聊' }))
+    : index === 1 ? tools(toolCall('simSendMessage', { messages: ['这条消息不应发送'] }))
+      : finalText('今天这个话题我也有一点自己的想法') })
+  try {
+    await h.ingest('上一位群友的普通聊天', '30000', { at: false })
+    h.clock.value += 2 * 60 * 60_000
+    await h.runtime.sweepOnce()
+    await idle(h, 3)
+    assert.equal(h.calls.length, 3)
+    assert.equal(h.sent.length, 0)
+    assert.match(toolResult(h.calls[2], 'simSendMessage'), /本轮已选择沉默或暂缓/)
+    assert.equal((await h.runtime.describeGroup(GROUP)).character.decision.kind, 'silent')
+  } finally { h.runtime.stop() }
+})
+
 test('目标至少 15 分钟后经 sweep 唤醒，跨 runtime 重启后完成工具回执、观察记忆、目标闭环', async () => {
   const kv = new Map()
   const clock = { value: BASE_AT }
@@ -251,7 +345,7 @@ test('目标执行中取消后，迟到回执不复活目标且工具 reply、�
     await waitFor(() => entered, '外部工具进入等待')
     await h.runtime.controlCharacter(GROUP, 'cancel-goal', goal.id)
     release()
-    await idle(h, 4)
+    await idle(h, 3)
     const state = (await h.runtime.describeGroup(GROUP)).character
     assert.equal(state.goals[0].status, 'abandoned')
     assert.ok(state.receipts.some(receipt => receipt.toolName === 'searchInformationTool' && receipt.status === 'succeeded'))
