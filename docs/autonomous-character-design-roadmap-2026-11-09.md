@@ -869,6 +869,11 @@ node scripts/characterAcceptance.mjs --candidate /tmp/character-offline-v3-next/
 
 已补未绑定旧群的只读兼容与管理拒绝、反思 system+user 消息协议、回放异常行为快照及 skipped 统计。修复版新增真实 HTTP、共享 Redis 双 runtime、实际入站绑定回归；角色相关 28 项通过。回放/汇总专项继续验证后建立第二次提交，沿用完整发布门禁和回滚流程；最终线上版本及试运行回读在本节续记。
 
+- 修复版提交 `5772cb3e9f34a42c2156709694a5909e1f0a5563`，回放/汇总专项 42/42 通过，包含 56 事件双重复离线回放。第二次完整发布门禁后端 3184 项：3182 通过、2 跳过、0 失败；前端 17 文件/73 项通过。已安装该版本，服务/管线/两个入口页健康通过，快照 `/opt/trss-yunzai-backups/deploy-snapshots/20261110-105229`；[发布日志](../reports/character-phase7-2026-11-10/deploy-second.log)、[门禁日志](../reports/character-phase7-2026-11-10/verify-phase-second.log)保存。
+- 实际旧会话群详情与仿真总览均 HTTP 200 且 JSON 正常，未绑定群显示 pending。继续验证生活页发现既有独立控制台装配把 `lifeOverview` 函数本身返回，导致 HTTP 200 空正文；相邻健康告警也存在把 Promise 当函数调用的问题。修复两个转发调用并增加启动真实 `console/server.js` 的隔离 HTTP 回归，先复现空正文失败，修复后整文件 4/4 通过（含生活 JSON 和告警 JSON）。随后按正式流程发布这处装配修复，不把空 200 计为接口健康。
+- [反思运行时实模诊断](../reports/character-phase7-2026-11-10/server-live/reflection-live-diagnostic.json)使用两项合成兴趣、独立内存、无待处理回复唤醒；实际调用修复版 runtime 的反思端口 1 次、主回合 0 次，线上 `glm-5.3-flash` 返回 HTTP 200、511 token，反思结果合法并记录“没有新变化”，QQ 发送和生产写入均为 0。该种子诊断证明协议与运行时链路可用，不代替模型自行形成材料的连续体验。
+- [权限边界新实模](../reports/character-phase7-2026-11-10/server-live/permission-final-results.json)1 事件通过，无工程失败、跳过或行为未达；5 次逻辑/HTTP，57147 reported token、无缺 usage、金额未知，捕获 1 条消息。新汇总完整性/工程/行为通过；因缺独立对照和实际人审仍 pending（退出 2），不是阶段 7 整体验收通过。
+
 ## 13. 相关仓库文档
 
 - [运行模式与权限规则](../RULES.md)：现有边界与配置原则；新增边界改造时同步维护。

@@ -10,6 +10,29 @@ import YAML from "yaml"
 
 const serverFile = fileURLToPath(new URL("../console/server.js", import.meta.url))
 
+test("standalone console returns JSON for the runtime life overview", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "console-life-wiring-"))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  fs.mkdirSync(path.join(root, "config"), { recursive: true })
+  const token = "isolated-life-wiring-token"
+  fs.writeFileSync(path.join(root, "config", "console.json"), JSON.stringify({ token }))
+  fs.writeFileSync(path.join(root, "config", "message.yaml"), "pluginSettings: {}\n")
+  const preload = path.join(root, "isolated-redis.mjs")
+  fs.writeFileSync(preload, "globalThis.redis = { get: async () => null, set: async () => 'OK', del: async () => 0 }\n")
+  const base = await startFixtureServer(root, t, { NODE_OPTIONS: `--import=${preload}` })
+  const response = await fetch(`${base}/api/life/overview`, { headers: { "x-console-token": token } })
+  assert.equal(response.status, 200)
+  const body = await response.text()
+  assert.ok(body.length, "the standalone adapter must invoke the runtime instead of returning its function")
+  const data = JSON.parse(body)
+  assert.deepEqual(data.threads, [])
+  assert.equal(typeof data.now.hour, "number")
+  assert.equal(typeof data.now.sleeping, "boolean")
+  const alerts = await fetch(`${base}/api/health/alerts`, { headers: { "x-console-token": token } })
+  assert.equal(alerts.status, 200)
+  assert.deepEqual(await alerts.json(), { alerts: [], checkedAt: 0 })
+})
+
 async function startFixtureServer(root, t, envOverrides = {}) {
   const child = spawn(process.execPath, [serverFile], {
     env: { ...process.env, CONSOLE_PLUGIN_ROOT: root, CONSOLE_HOST: "127.0.0.1", CONSOLE_PORT: "0", ...envOverrides },
