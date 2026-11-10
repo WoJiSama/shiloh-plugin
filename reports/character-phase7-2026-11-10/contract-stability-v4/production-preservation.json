@@ -1,0 +1,22 @@
+{
+  "runtimeCommit": "08bed3eee22259d9e76c5e95ccf2e7ea75407e75",
+  "configUnchanged": true,
+  "preservedGroupFields": {
+    "groupId": true,
+    "active": true,
+    "replyMode": true,
+    "maxTurnsPerDay": true,
+    "dailyEstimatedCostThresholdCny": true,
+    "binding": true,
+    "paused": true,
+    "memoryCount": true,
+    "goalCount": true,
+    "revision": true
+  },
+  "allReleaseFilesMatch": true,
+  "releaseFiles": 2482,
+  "independentRedisMatches": true,
+  "allServicesActive": true,
+  "qqMessagesSentByVerifier": 0,
+  "productionWritesByVerifier": 0
+}
