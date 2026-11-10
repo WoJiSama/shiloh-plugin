@@ -6,7 +6,7 @@ import PageState from '../components/PageState.vue'
 import { api } from '../lib/api'
 
 interface Rhythm { sleepFrom: number; sleepTo: number; setBy?: string }
-interface Thread { title: string; status: string; lastEpisode?: number; notes: string[]; kind: string; addedAt: number; lastSyncAt: number }
+interface Thread { groupId: string; title: string; status: string; lastEpisode?: number; notes: string[]; kind: string; addedAt: number; lastSyncAt: number }
 interface Overview { rhythm: Rhythm; threads: Thread[]; now: { hour: number; sleeping: boolean } }
 
 const overview = ref<Overview | null>(null)
@@ -56,38 +56,39 @@ async function saveRhythm() {
 
 <template>
   <div class="page">
-    <PageHeader title="作息与生活" subtitle="希洛的生物钟（睡眠窗口）与正在追的番——真实数据驱动，不编造" />
+    <PageHeader title="作息与生活" subtitle="默认作息与各群角色关注的作品更新" />
     <PageState :loading="loading && !overview" :error="error" @retry="load" />
     <template v-if="overview">
       <section class="panel rhythm-panel">
         <div class="rhythm-status">
           <NTag :type="overview.now.sleeping ? 'warning' : 'success'" size="large">
-            {{ overview.now.sleeping ? '😴 睡眠中' : '✨ 空闲' }}
+            {{ overview.now.sleeping ? '默认窗口内' : '默认窗口外' }}
           </NTag>
-          <span class="muted">当前 {{ overview.now.hour }}:00 · 睡眠窗口 {{ overview.rhythm.sleepFrom }}:00 - {{ overview.rhythm.sleepTo }}:00</span>
-          <NTag v-if="overview.rhythm.setBy === 'agent'" size="small" type="info">AI 自设</NTag>
-          <NTag v-else size="small">默认</NTag>
+          <span class="muted">当前 {{ overview.now.hour }}:00 · 默认作息 {{ overview.rhythm.sleepFrom }}:00 - {{ overview.rhythm.sleepTo }}:00</span>
+          <NTag v-if="overview.rhythm.setBy === 'admin'" size="small" type="info">管理员默认</NTag>
+          <NTag v-else size="small">配置默认</NTag>
         </div>
         <div class="rhythm-editor">
-          <span>睡眠窗口：</span>
+          <span>默认作息：</span>
           <NInputNumber v-model:value="sleepFrom" :min="0" :max="23" size="small" style="width: 80px" /> 点
           <span>至</span>
           <NInputNumber v-model:value="sleepTo" :min="1" :max="24" size="small" style="width: 80px" /> 点
           <NButton size="small" type="primary" :loading="savingRhythm" @click="saveRhythm">保存</NButton>
         </div>
-        <p class="field-help">睡眠窗口内：不主动说话、不响应闲聊触发（被@还是会回，但带困意）。AI 也可通过 simSetRhythm 工具自行调整。</p>
+        <p class="field-help">保存会同步当前已知角色，并作为新角色的默认作息。各群角色可自行调整；此处的窗口状态不代表所有角色此刻都在睡眠。角色睡眠窗口内减少主动参与，被@仍可回应。</p>
       </section>
 
       <section class="panel threads-panel">
-        <h3>生活线（在追的番）</h3>
+        <h3>各群生活线（关注的作品）</h3>
         <NAlert v-if="!overview.threads.length" type="info" :show-icon="false">
-          还没有在追的番——AI 会通过 simLifeThread 工具自行开始追（基于真实 B 站搜索定位），系统定期拉取真实更新。
+          还没有关注的作品。角色可在各群自行关注，系统定期拉取真实更新。
         </NAlert>
-        <div v-for="t in overview.threads" :key="t.title" class="thread-card" :class="{ dropped: t.status === 'dropped' }">
+        <div v-for="t in overview.threads" :key="`${t.groupId}:${t.title}`" class="thread-card" :class="{ dropped: t.status === 'dropped' }">
           <div class="thread-head">
             <strong>《{{ t.title }}》</strong>
+            <NTag size="small">群 {{ t.groupId }}</NTag>
             <NTag :type="t.status === 'active' ? 'success' : 'default'" size="small">
-              {{ t.status === 'active' ? `在追${t.lastEpisode ? ` · 看到第 ${t.lastEpisode} 集` : ''}` : '已弃' }}
+              {{ t.status === 'active' ? `关注中${t.lastEpisode ? ` · 更新至 ${t.lastEpisode} 集` : ''}` : '已停止关注' }}
             </NTag>
           </div>
           <div v-for="(note, i) in t.notes.slice(0, 4)" :key="i" class="thread-note">
@@ -103,12 +104,12 @@ async function saveRhythm() {
 
 <style scoped>
 .panel { border: 1px solid var(--n-border-color); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
-.rhythm-status { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.rhythm-editor { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rhythm-status { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.rhythm-editor { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
 .threads-panel h3 { margin: 0 0 10px; font-size: 15px; }
-.thread-card { border-left: 3px solid var(--n-border-color); padding: 8px 12px; margin-bottom: 10px; }
+.thread-card { border-left: 3px solid var(--n-border-color); padding: 8px 12px; margin-bottom: 10px; min-width: 0; overflow-wrap: anywhere; }
 .thread-card.dropped { opacity: 0.5; }
-.thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
 .thread-note { font-size: 12px; margin: 2px 0; display: flex; align-items: center; gap: 4px; }
 .muted { font-size: 13px; opacity: 0.7; }
 </style>

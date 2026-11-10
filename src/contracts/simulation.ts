@@ -17,6 +17,8 @@ export type SimWakeReasonKind =
   | 'proactiveCheck'
   | 'admin'
   | 'commitment'
+  | 'characterGoal'
+  | 'interestUpdate'
 
 export interface SimWakeReason { kind: SimWakeReasonKind; seq?: number; detail?: string }
 
@@ -126,6 +128,12 @@ export interface SimAffinityEntry {
 export type SimAffinityMap = Record<string, SimAffinityEntry>
 
 export interface SimSessionState {
+  sharedSelfFingerprint?: string
+  /** Version of the shared revocation key used by this history snapshot. */
+  activityVersion?: string
+  /** First bot observed owns this group session. A second account must use a separate runtime. */
+  botId?: string
+  personaId?: string
   /** 本群单调消息序号 */
   seq: number
   /** 未读环形缓冲（≤ unreadLimit，淘汰即视为再也不可能展示） */
@@ -175,6 +183,11 @@ export interface SimMoodState {
 
 /** message.yaml pluginSettings.simulation 配置段（未解码的宽松形状） */
 export interface SimulationSection {
+  /** 后台角色反思的资源边界；行为不由管理员逐轮编排。 */
+  reflection?: { enabled?: boolean }
+  /** Explicit additional autonomous creative capabilities; still intersected with current tool policy. */
+  autonomousTools?: string[]
+  worker?: { endpoint?: string; token?: string; enabled?: boolean }
   enabled?: boolean
   /** true（默认）= 所有过了群白名单的群都进仿真；false = 仅 groups 清单（含 .仿真 开 追加的） */
   allGroups?: boolean

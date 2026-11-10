@@ -70,6 +70,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
     "request": "^2.88.2",
+    "saxes": "^5.0.1",
     "sharp": "^0.33.5",
     "textract": "^2.5.0",
     "undici": "^5.22.1",

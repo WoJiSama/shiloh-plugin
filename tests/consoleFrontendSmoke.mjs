@@ -58,6 +58,36 @@ const dice = { ...buildDiceReplyPayload(defaults.diceSystem || {}), decks: [{ na
 const timing = { count: 20, avg: 1250, p50: 1100, p95: 2400 }
 const observe = { report: { turns: 42, intents: [['chat', 30], ['tool', 12]], triggers: [['mention', 28]], routes: [['model', 42]], fastPathSkipCount: 3, totalMs: timing, modelStages: { reply: timing }, tools: { runs: 12, failures: 2, topFailures: [['mediaRelay', 2]] }, failureStages: [['send', 2]], outbound: { total: 60, avgPerTurn: 1.43 } }, hours: Array.from({ length: 24 }, (_, i) => ({ hour: `2026-10-12 ${String(i).padStart(2, '0')}`, turns: i % 7 + 1, failures: i % 5 === 0 ? 1 : 0 })), recent: [{ at: '14:20:00', group: '100001', trigger: 'mention', tools: 'mediaRelay', outbound: 2, totalMs: 2300, failures: ['send'] }] }
 const memory = id => ({ id, text: '大家约好周末一起打游戏，下午三点在群里集合。', preview: '周末游戏约定', timeRange: '2026-10-12 12:00–12:30', messages: 8, speakers: '3 位群友', recallCount: 2, effectiveStrength: .8, vectorScore: .76 })
+const fixtureAt = Date.parse('2026-11-09T04:00:00Z')
+const literalText = '<img src=x onerror="globalThis.__characterFixtureExecuted=true">'
+const simulationGroups = Object.fromEntries(['100001', '200002'].map((groupId, index) => [groupId, {
+  groupId, active: true, running: false, mode: 'active', replyMode: 'auto', unreadCount: 3,
+  budget: { turns: 2, maxTurnsPerDay: 40, tokens: 1800, dailyCostCny: 5, todayCostCny: .12 },
+  lastWakeReason: '自主目标', historyLength: 4, pendingEvents: [], memes: [], affinity: [], initialPrompt: '隔离浏览器验收群',
+  character: {
+    scope: { botId: '100001', personaId: 'friendly', groupId }, paused: false,
+    decision: { kind: 'unwilling', reason: '现在想先把自己的观察笔记整理完，稍后再参与。', at: fixtureAt },
+    memories: [{ id: `memory-${groupId}`, kind: 'interest', content: index ? '第二群自己的绘画兴趣' : `我对海边的生态观察感兴趣。${literalText}`, epistemic: 'inferred', evidenceRefs: ['receipt-source'], createdAt: fixtureAt, updatedAt: fixtureAt }],
+    goals: [{ id: `goal-${groupId}`, title: '整理海边观察笔记', motivation: '把真实观察和暂时猜想分开记录。', nextStep: '核对资料来源再完善草稿。', completionCriteria: '保存一份有依据的笔记。', status: 'active', nextCheckAt: fixtureAt + 3600000, expiresAt: fixtureAt + 86400000, attempts: 1, maxAttempts: 3, lastOutcome: '资料还不充分，暂不声称完成。' }],
+    receipts: [{ id: `receipt-${groupId}`, toolName: 'simWorkspace', status: 'unknown', summary: '保存操作的结果待核实，不能当作成功。', at: fixtureAt }]
+  },
+  activities: {
+    works: [{ id: `work-${groupId}`, title: '海边观察研究笔记', kind: 'research', status: 'draft', versions: [
+      { revision: 1, content: `第一版：仅记录实际看到的海边景象。\n${literalText}`, evidenceRefs: ['receipt-source'], createdAt: fixtureAt - 3600000 },
+      { revision: 2, content: '第二版：补充了来源，尚未公开分享。' + 'long-source-reference-'.repeat(12), evidenceRefs: ['receipt-source'], createdAt: fixtureAt }
+    ], updatedAt: fixtureAt }],
+    subscriptions: [{ id: `subscription-${groupId}`, title: '公开生态项目更新', kind: 'rss', status: 'active', url: 'https://updates.example.test/' + 'public-release-'.repeat(12), nextPollAt: fixtureAt + 3600000, failures: 1, items: [{ id: 'item-1', title: '一次真实来源更新', summary: `公开资料仍需核对。${literalText}`, receivedAt: fixtureAt }] }],
+    reflection: { lastRunAt: fixtureAt, nextRunAt: fixtureAt + 21600000, lastOutcome: '重新审视了暂时判断，没有把猜测写成事实。', runsToday: 1 },
+    shared: [{ id: `shared-${groupId}`, content: '我喜欢从来源清楚的观察中学习。', kind: 'interest', createdAt: fixtureAt }],
+    sharedPending: [{ id: `pending-${groupId}`, content: '我对海边生态的长期兴趣可以用于其他群。', kind: 'interest', sourceMemoryId: `memory-${groupId}`, createdAt: fixtureAt }],
+    capabilities: [{ name: '公开资料检索', description: '使用已经授权的公开资料接口。', available: true }, { name: '外部工作器', description: '尚未接通真实工作器。', available: false }]
+  }
+}]))
+const lifeOverview = {
+  rhythm: { sleepFrom: 1, sleepTo: 8, setBy: 'admin' }, now: { hour: 12, sleeping: false },
+  threads: ['100001', '200002'].map((groupId, index) => ({ groupId, title: index ? '第二群独立关注的作品' : '海边的观察日记', status: index ? 'dropped' : 'active', lastEpisode: 6, notes: [`〔官方〕第六集公开更新。${literalText}`, '〔观众〕这是观众意见，仍需核对实际内容。'], kind: 'animation', addedAt: fixtureAt, lastSyncAt: fixtureAt }))
+}
+const simulationRequests = [], lifeRequests = [], featureChecks = []
 const semanticRequests = [], missingApis = [], browserErrors = [], externalRequests = [], checks = [], screenshots = []
 let authMode = 'authenticated'
 const json = (res, data, status = 200) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)) }
@@ -67,6 +97,51 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/favicon.ico') { res.writeHead(204); res.end(); return }
   if (pathname === '/api/auth/state') return json(res, { hasUser: authMode !== 'setup', username: authMode === 'authenticated' ? 'fixture-admin' : null, tokenWorks: false })
   if (pathname === '/api/identities') return json(res, { bots: [{ id: '100001', name: '长昵称示例机器人与桌游助手' }, { id: '200002', name: '离线测试机器人' }], groups: [{ id: '100001', name: '周末游戏交流与桌游活动安排群（长名称示例）' }] })
+  if (pathname === '/api/simulation/overview') return json(res, { enabled: true, allGroups: true, disabled: [], budgetDefaultCny: 5, groups: Object.values(simulationGroups), groupNames: { '100001': '周末游戏交流与桌游活动安排群（长名称示例）', '200002': '第二隔离群' } })
+  if (pathname === '/api/simulation/group') {
+    if (req.method === 'GET') {
+      const group = url.searchParams.get('group')
+      simulationRequests.push({ method: 'GET', group })
+      return json(res, simulationGroups[group] || { error: 'Unknown fixture group' }, simulationGroups[group] ? 200 : 404)
+    }
+    if (req.method === 'POST') {
+      let body = ''; for await (const chunk of req) body += chunk
+      const payload = JSON.parse(body), group = simulationGroups[payload.group]
+      if (!group) return json(res, { error: 'Unknown fixture group' }, 404)
+      simulationRequests.push({ method: 'POST', ...payload })
+      const { operation, id } = payload
+      if (payload.action === 'character') {
+        if (operation === 'pause' || operation === 'resume') group.character.paused = operation === 'pause'
+        if (operation === 'delete-memory') group.character.memories = group.character.memories.filter(memory => memory.id !== id)
+        const goal = group.character.goals.find(goal => goal.id === id)
+        if (goal && ['pause-goal', 'resume-goal', 'cancel-goal'].includes(operation)) goal.status = ({ 'pause-goal': 'paused', 'resume-goal': 'active', 'cancel-goal': 'abandoned' })[operation]
+      }
+      if (payload.action === 'activity') {
+        const activities = group.activities, work = activities.works.find(work => work.id === id)
+        const subscription = activities.subscriptions.find(subscription => subscription.id === id)
+        if (work && operation === 'work-archive') work.status = 'archived'
+        if (work && operation === 'work-restore') work.status = 'draft'
+        if (operation === 'work-delete') activities.works = activities.works.filter(work => work.id !== id)
+        if (subscription && ['subscription-pause', 'subscription-resume'].includes(operation)) subscription.status = operation === 'subscription-pause' ? 'paused' : 'active'
+        if (operation === 'subscription-remove') activities.subscriptions = activities.subscriptions.filter(subscription => subscription.id !== id)
+        if (operation === 'shared-delete') activities.shared = activities.shared.filter(shared => shared.id !== id)
+        if (operation === 'shared-approve') {
+          const pending = activities.sharedPending.find(pending => pending.id === id)
+          if (pending) { activities.shared.push({ id: pending.id, content: pending.content, kind: pending.kind, createdAt: fixtureAt }); activities.sharedPending = activities.sharedPending.filter(candidate => candidate.id !== id) }
+        }
+        if (operation === 'reflection-reset') activities.reflection.nextRunAt = 0
+      }
+      return json(res, { message: '隔离 fixture 操作成功' })
+    }
+  }
+  if (pathname === '/api/life/overview') return json(res, lifeOverview)
+  if (pathname === '/api/life/rhythm' && req.method === 'POST') {
+    let body = ''; for await (const chunk of req) body += chunk
+    const payload = JSON.parse(body)
+    lifeRequests.push({ method: 'POST', ...payload })
+    lifeOverview.rhythm = { ...payload, setBy: 'admin' }
+    return json(res, { message: '隔离 fixture 默认作息已保存' })
+  }
   if (pathname === '/api/overview/accounts') return json(res, { accounts })
   if (pathname === '/api/overview/stats') return json(res, { stats: { total: traffic, week: [{ ...traffic, day: '10-12' }], todayGroups: { '100001': traffic, '200002': { recv: 8, send: 2, fail: 0 } } } })
   if (pathname === '/api/sentinel') return json(res, { status: '正常', alerts: ['[WARN] napcat(100001) fixture登录状态告警', '[WARN] napcat-200002 fixture离线告警'] })
@@ -129,7 +204,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 const port = server.address().port, origin = `http://127.0.0.1:${port}`
 let browser, page
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
-const routes = [['/', '机器人'], ['/bot/100001', '100001'], ['/groups', '群聊'], ['/group-admin', '群管理'], ['/group-admin?group=100001', '群管理'], ['/group-admin?scope=defaults', '群管理'], ['/persona', '人设'], ['/ai', 'AI 模型'], ['/conversation', '对话设置'], ['/pipeline', '消息与搬运'], ['/risk', '风控管理'], ['/draw', '生图工作台'], ['/observe', '运行观测'], ['/observe/details', '运行观测明细'], ['/commands', '命令与骰子'], ['/semantic', '语义记忆']]
+const routes = [['/', '机器人'], ['/bot/100001', '100001'], ['/groups', '群聊'], ['/group-admin', '群管理'], ['/group-admin?group=100001', '群管理'], ['/group-admin?scope=defaults', '群管理'], ['/persona', '人设'], ['/ai', 'AI 模型'], ['/conversation', '对话设置'], ['/simulation', '自主仿真'], ['/life', '作息与生活'], ['/pipeline', '消息与搬运'], ['/risk', '风控管理'], ['/draw', '生图工作台'], ['/observe', '运行观测'], ['/observe/details', '运行观测明细'], ['/commands', '命令与骰子'], ['/semantic', '语义记忆']]
 try {
   browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] })
   page = await browser.newPage()
@@ -207,12 +282,20 @@ try {
       }
       if (route.startsWith('/group-admin')) {
         if (route.includes('group=')) {
-          assert.match(await page.$eval('.group-admin-editor', element => element.textContent), /总开关关闭/)
+          assert.match(await page.$eval('.module-header-panel', element => element.textContent), /本群已启用/)
           assert.equal(await page.$eval('#field-groupGuard-timeoutSeconds', element => element.value), '90')
           assert.match(await page.$eval('[data-field="groupGuard.timeoutSeconds"]', element => element.textContent), /本群自定义/)
         }
         if (route.includes('?')) for (const text of ['广告与刷屏', '欢迎与退群', '入群验证']) {
-          await click(text, '.n-tabs-tab'); await check(`${label}-${text}`)
+          await click(text, '.n-tabs-tab')
+          // This fixture explicitly enables the group in enabledGroups even
+          // though moderation defaults to off; the per-group policy wins.
+          if (route.includes('group=') && text === '广告与刷屏') {
+            assert.equal(groupAdminSettings.groupModeration.enabled, false)
+            assert.match(await page.$eval('.module-header-panel', element => element.textContent), /本群已启用/)
+            assert.equal(await page.$eval('.module-enable-row [role="switch"]', element => element.getAttribute('aria-checked')), 'true')
+          }
+          await check(`${label}-${text}`)
           if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label.replace(/[?=]/g, '_')}-${text}`)
         }
         if (route === '/group-admin') await screenshot(`${label}-overview`)
@@ -234,6 +317,43 @@ try {
         await click('高级设置 · 判断预算与状态细节', '.n-collapse-item__header-main')
         await check(`${label}-追踪高级`)
         if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-对话追踪`)
+      }
+      if (route === '/simulation') {
+        assert.match(await page.$eval('.n-data-table', element => element.textContent), /周末游戏交流与桌游活动安排群/)
+        await click('详情'); await page.waitForSelector('[aria-label="角色与自主目标"]')
+        const character = await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent)
+        for (const value of ['机器人 100001', '人设 friendly', '不愿意', '整理海边观察笔记', '兴趣 · 暂时判断', '结果未知', literalText]) assert.ok(character.includes(value), `Missing character text ${value}`)
+        const activities = await page.$eval('[aria-label="角色活动与作品"]', element => element.textContent)
+        for (const value of ['海边观察研究笔记', '版本 2', '版本 1', '公开生态项目更新', '低频反思', '跨群共享的自我偏好', '本群待审核', '未接入']) assert.ok(activities.includes(value), `Missing activity text ${value}`)
+        for (const summary of await page.$$('[aria-label="角色活动与作品"] summary')) await summary.click()
+        assert.equal(await page.$eval('[aria-label="角色活动与作品"] pre', element => element.textContent), simulationGroups['100001'].activities.works[0].versions[1].content)
+        assert.equal(await page.evaluate(() => globalThis.__characterFixtureExecuted), undefined, 'Character text executed as markup')
+        assert.equal(await page.$$eval('.character-block img', elements => elements.length), 0)
+        // Measure after the drawer's slide-in transition has reached the
+        // viewport. A fixed 420px mobile drawer can never satisfy this bound.
+        await page.waitForFunction(() => { const rect = document.querySelector('.n-drawer')?.getBoundingClientRect(); return rect && rect.left >= -1 && rect.right <= innerWidth + 1 }, { timeout: 5000 })
+        const drawerBounds = await page.$eval('.n-drawer', element => { const rect = element.getBoundingClientRect(); return { left: rect.left, right: rect.right, viewport: innerWidth } })
+        assert.ok(drawerBounds.left >= -1 && drawerBounds.right <= drawerBounds.viewport + 1, `Character drawer is clipped: ${JSON.stringify(drawerBounds)}`)
+        await check(`${label}-角色活动详情`)
+        featureChecks.push({ label, feature: 'character-goals-memory-receipts-activities-literal-rendering', ok: true })
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) {
+          await screenshot(`${label}-character-activities`)
+          await page.$$eval('.n-drawer *', elements => { for (const element of elements) if (element.scrollTop) element.scrollTop = 0 })
+          await screenshot(`${label}-character-overview`)
+        }
+        await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
+      }
+      if (route === '/life') {
+        const threads = await page.$$eval('.thread-card', elements => elements.map(element => element.textContent))
+        assert.equal(threads.length, 2)
+        assert.ok(threads[0].includes('群 100001') && threads[0].includes('更新至 6 集') && threads[0].includes(literalText))
+        assert.ok(threads[1].includes('群 200002') && threads[1].includes('已停止关注'))
+        assert.match(await page.$eval('.rhythm-panel', element => element.textContent), /默认窗口外.*管理员默认/)
+        assert.match(await page.$eval('.field-help', element => element.textContent), /此处的窗口状态不代表所有角色此刻都在睡眠/)
+        assert.equal(await page.evaluate(() => globalThis.__characterFixtureExecuted), undefined, 'Life note text executed as markup')
+        assert.equal(await page.$$eval('.thread-card img', elements => elements.length), 0)
+        featureChecks.push({ label, feature: 'group-scoped-life-lines-and-default-rhythm', ok: true })
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-life-lines`)
       }
       if (route === '/pipeline') {
         if (width === 1440 && theme === 'dark') await screenshot('pipeline-config-desktop')
@@ -306,16 +426,79 @@ try {
   // A query change forces a full boot after changing mock auth; hash navigation keeps the current boot state.
   await page.goto(`${origin}/?auth-restored=1#/semantic`, { waitUntil: 'networkidle0' }); await ready('语义记忆')
   const typeInto = async (selector, value) => { await page.$eval(selector, element => { element.value = ''; element.dispatchEvent(new Event('input', { bubbles: true })) }); await page.type(selector, value) }
-  await typeInto('input[placeholder="输入完整群号"]', '100001'); await typeInto('input[placeholder="想找回什么记忆？"]', '周末游戏'); await click('检索'); await page.waitForNetworkIdle({ idleTime: 100 })
-  await typeInto('input[placeholder="输入完整群号"]', '200002'); await click('忘记'); await page.waitForSelector('.n-dialog')
+  async function selectSemanticGroup(group) {
+    await page.click('.semantic-form .n-base-selection')
+    await typeInto('.semantic-form .n-base-selection-input', group)
+    await delay(150); await page.keyboard.press('Enter'); await delay(150)
+    assert.ok((await page.$eval('.semantic-form .n-base-selection', element => element.textContent)).includes(group), `Group selector did not select ${group}`)
+  }
+  await selectSemanticGroup('100001'); await typeInto('input[placeholder="想找回什么记忆？"]', '周末游戏'); await click('检索'); await page.waitForNetworkIdle({ idleTime: 100 })
+  await selectSemanticGroup('200002'); await click('忘记'); await page.waitForSelector('.n-dialog')
   assert.match(await page.$eval('.n-dialog', element => element.textContent), /群 100001/)
   await click('忘记', '.n-dialog button'); await page.waitForNetworkIdle({ idleTime: 100 })
   await page.waitForSelector('.n-dialog', { hidden: true }); await delay(200)
   assert.deepEqual(semanticRequests.filter(request => request.endpoint === 'forget').at(-1), { method: 'POST', endpoint: 'forget', group: '100001', id: 'fixture-search' })
-  await click('分块管理'); await typeInto('input[placeholder="输入完整群号"]', '100001'); await click('浏览'); await page.waitForNetworkIdle({ idleTime: 100 })
-  await typeInto('input[placeholder="输入完整群号"]', '200002'); await click('2', '.n-pagination-item'); await page.waitForNetworkIdle({ idleTime: 100 })
+  await click('分块管理'); await selectSemanticGroup('100001'); await click('浏览'); await page.waitForNetworkIdle({ idleTime: 100 })
+  await selectSemanticGroup('200002'); await click('2', '.n-pagination-item'); await page.waitForNetworkIdle({ idleTime: 100 })
   assert.deepEqual(semanticRequests.filter(request => request.endpoint === 'chunks').at(-1), { method: 'GET', endpoint: 'chunks', group: '100001', offset: 20 })
   await screenshot('semantic-snapshot-context')
+  // The character and activity controls post only the group/id captured by
+  // the visible drawer. All mutations below update in-memory fixtures only.
+  await navigate('/simulation', '自主仿真')
+  await click('详情'); await page.waitForSelector('[aria-label="角色与自主目标"]')
+  async function simulationAction(label, expected, confirmTitle) {
+    const response = page.waitForResponse(res => res.url().endsWith('/api/simulation/group') && res.request().method() === 'POST')
+    await click(label)
+    if (confirmTitle) {
+      await page.waitForSelector('.n-dialog')
+      assert.match(await page.$eval('.n-dialog', element => element.textContent), new RegExp(confirmTitle))
+      await click(expected.operation === 'delete-memory' ? '删除' : '确认', '.n-dialog button')
+    }
+    assert.equal((await response).status(), 200)
+    await page.waitForNetworkIdle({ idleTime: 100 }); await delay(150)
+    assert.deepEqual(simulationRequests.filter(request => request.method === 'POST').at(-1), { method: 'POST', group: '100001', ...expected })
+    featureChecks.push({ feature: expected.operation, group: '100001', ok: true })
+  }
+  await simulationAction('暂停自主行动', { action: 'character', operation: 'pause' })
+  assert.match(await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent), /自主行动已暂停/)
+  await simulationAction('恢复自主行动', { action: 'character', operation: 'resume' })
+  await simulationAction('暂停目标', { action: 'character', operation: 'pause-goal', id: 'goal-100001' })
+  await simulationAction('恢复目标', { action: 'character', operation: 'resume-goal', id: 'goal-100001' })
+  await page.$$eval('.work-version', elements => { for (const element of elements) element.open = true })
+  await simulationAction('恢复此版本', { action: 'activity', operation: 'work-restore', id: 'work-100001', payload: { revision: 1 } })
+  await simulationAction('归档作品', { action: 'activity', operation: 'work-archive', id: 'work-100001' })
+  await simulationAction('恢复作品', { action: 'activity', operation: 'work-restore', id: 'work-100001', payload: { revision: 2 } })
+  await simulationAction('暂停订阅', { action: 'activity', operation: 'subscription-pause', id: 'subscription-100001' })
+  await simulationAction('恢复订阅', { action: 'activity', operation: 'subscription-resume', id: 'subscription-100001' })
+  await simulationAction('重置反思调度', { action: 'activity', operation: 'reflection-reset' })
+  await simulationAction('停止共享', { action: 'activity', operation: 'shared-delete', id: 'shared-100001' }, '停止共享偏好')
+  await simulationAction('批准共享', { action: 'activity', operation: 'shared-approve', id: 'pending-100001' }, '批准共享自我偏好')
+  assert.equal(await page.$$eval('[aria-label="角色活动与作品"] button', elements => elements.filter(element => element.textContent.trim() === '批准共享').length), 0)
+  await simulationAction('删除记忆', { action: 'character', operation: 'delete-memory', id: 'memory-100001' }, '删除角色记忆')
+  assert.match(await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent), /还没有带来源的角色记忆/)
+  await simulationAction('取消目标', { action: 'character', operation: 'cancel-goal', id: 'goal-100001' })
+  await simulationAction('删除作品', { action: 'activity', operation: 'work-delete', id: 'work-100001' }, '删除作品')
+  await simulationAction('移除订阅', { action: 'activity', operation: 'subscription-remove', id: 'subscription-100001' }, '移除订阅')
+  await check('character-activity-controls')
+  await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
+  const secondDetail = await page.evaluateHandle(() => [...document.querySelectorAll('.n-data-table button')].filter(element => element.textContent.trim() === '详情')[1])
+  await secondDetail.asElement().click(); await secondDetail.dispose(); await page.waitForSelector('[aria-label="角色与自主目标"]')
+  const secondCharacter = await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent)
+  assert.ok(secondCharacter.includes('第二群自己的绘画兴趣') && secondCharacter.includes('暂停目标') && secondCharacter.includes('自主行动可用'))
+  assert.match(await page.$eval('[aria-label="角色活动与作品"]', element => element.textContent), /归档作品.*暂停订阅.*批准共享/s)
+  featureChecks.push({ feature: 'other-group-preserved-after-mutations', group: '200002', ok: true })
+  await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
+  await navigate('/life', '作息与生活')
+  await typeInto('.rhythm-editor .n-input-number:first-of-type input', '2')
+  await typeInto('.rhythm-editor .n-input-number:nth-of-type(2) input', '9')
+  await page.$eval('.rhythm-editor .n-input-number:nth-of-type(2) input', element => element.blur())
+  const rhythmResponse = page.waitForResponse(res => res.url().endsWith('/api/life/rhythm') && res.request().method() === 'POST')
+  await click('保存', '.rhythm-editor button'); assert.equal((await rhythmResponse).status(), 200)
+  await page.waitForNetworkIdle({ idleTime: 100 })
+  assert.deepEqual(lifeRequests.at(-1), { method: 'POST', sleepFrom: 2, sleepTo: 9 })
+  assert.match(await page.$eval('.rhythm-status', element => element.textContent), /默认作息 2:00 - 9:00/)
+  featureChecks.push({ feature: 'default-rhythm-save-and-reload', ok: true })
+  await check('life-default-rhythm-save')
   // Save the real schema payloads through each native page. Hidden editors keep
   // drafts but must not handle the visible editor's keyboard shortcut.
   for (const policy of [
@@ -349,7 +532,7 @@ try {
     assert.match(await page.$eval('.schema-page .save-bar-status', element => element.textContent), /无未保存修改/)
     await check(`${policy.kind}-validated-save`)
   }
-  const report = { builtAt: fs.statSync(path.join(dist, 'index.html')).mtime.toISOString(), checks, failures: checks.filter(check => !check.ok), browserErrors, missingApis, externalRequests, semanticRequests, policyRequests, screenshots }
+  const report = { builtAt: fs.statSync(path.join(dist, 'index.html')).mtime.toISOString(), checks, failures: checks.filter(check => !check.ok), browserErrors, missingApis, externalRequests, semanticRequests, policyRequests, simulationRequests, lifeRequests, featureChecks, screenshots }
   fs.writeFileSync(path.join(screenshotDir, 'report.json'), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ checks: checks.length, failures: report.failures, browserErrors, missingApis, externalRequests, semanticSnapshots: 'passed', screenshots, report: path.join(screenshotDir, 'report.json') }, null, 2))
   assert.equal(missingApis.length, 0, 'Browser requested unmocked APIs')
@@ -357,7 +540,7 @@ try {
   assert.equal(browserErrors.length, 0, 'Browser emitted errors')
   assert.equal(report.failures.length, 0, 'One or more pages have horizontal document overflow')
 } catch (error) {
-  const partial = { error: String(error), builtAt: fs.statSync(path.join(dist, 'index.html')).mtime.toISOString(), checks, failures: checks.filter(check => !check.ok), browserErrors, missingApis, externalRequests, semanticRequests, screenshots }
+  const partial = { error: String(error), builtAt: fs.statSync(path.join(dist, 'index.html')).mtime.toISOString(), checks, failures: checks.filter(check => !check.ok), browserErrors, missingApis, externalRequests, semanticRequests, policyRequests, simulationRequests, lifeRequests, featureChecks, screenshots }
   fs.writeFileSync(path.join(screenshotDir, 'report-partial.json'), JSON.stringify(partial, null, 2))
   if (page) await page.screenshot({ path: path.join(screenshotDir, 'failure.png'), fullPage: true }).catch(() => {})
   throw error

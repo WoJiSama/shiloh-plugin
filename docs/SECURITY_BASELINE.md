@@ -2,13 +2,14 @@
 
 > 维护规则：**改动了任何一条边界所描述的代码，必须在同一个提交里更新本文对应条目。**
 > 发布前检查清单见文末。最后全面复核：2026-10-26。
+> 自主角色相关边界更新：2026-11-10，依据本地实现核对；实际发布与验收证据见自主角色路线文档第 12.9 节。
 
 ## 一、威胁模型
 
 | 主体 | 能力假设 | 主要防线 |
 | --- | --- | --- |
 | **QQ 群友**（含陌生群成员） | 可发任意文本/图片/表情/戳一戳；可诱导模型（prompt injection）；可刷屏 | 群白名单、工具面裁剪、发送白名单（仿真工具目标绑定会话群）、出站脱敏与审查、频率限制 |
-| **被注入的模型**（上游返回被诱导的输出） | 可尝试输出内部路径/凭据/工具参数 JSON；可尝试在仿真回合越权发送 | internalStatusLeak 出站脱敏（含凭据形状）、工具参数 JSON 硬拦截、发送配额与冷却、模型文本永不自动外发（仿真） |
+| **被注入的模型**（上游返回被诱导的输出） | 可尝试输出内部路径/凭据/工具参数 JSON；可尝试在仿真回合越权发送或借群友身份执行 | internalStatusLeak 出站脱敏（含凭据形状）、工具参数 JSON 拦截、发送配额与冷却、执行主体校验；文本兜底同样经过工具执行与发送边界 |
 | **控制台用户** | 拿到控制台访问权后可改配置、看统计、管理仿真 | scrypt 账密 + 长令牌、revision 乐观锁、建议绑定 127.0.0.1/内网、凭据脱敏读写 |
 | **同机其他进程/用户** | 可读插件目录与 Redis | Redis 由 TRSS 宿主管理；config 明文 key 的残余风险见 R2 |
 | **MCP server / custom_tools**（第三方扩展） | 任意代码执行能力（stdio 子进程/热加载 JS） | 仅 master 手工部署；不随包分发；工具结果截断 8000 字符 |
@@ -21,33 +22,54 @@
 1. **准入**：群白名单 `enableGroupWhitelist/allowedGroups`（默认开）；用户黑名单；私聊白名单（空=仅主人）；`#` 命令与仿真流互斥；违禁词命中即中断该群进行中回合（入站+出站双向）。
 2. **工具面**：
    - 主链路：`oneapi_tools` 全局白名单 + 按消息意图过滤 + 路由锁（toolScopeLocked）；私聊默认零工具（仅表情可开）。
-   - 仿真回合：装配期只挂 sim 工具 + `simulation.extraTools` 白名单——**不在清单里的工具模型物理上不可见**（注册期裁剪，qq-bridge 铁律）。
+   - 仿真回合：装配期只挂本轮仿真/角色工具和 `toolPolicy` 解析出的额外工具。默认 `open` 采用内置普通工具面、全局/按群 deny 做减法；RESTRICTED 敏感工具须显式 allow，自定义工具须显式 extra 放通。未装配的工具不可调用，已装配仍须通过执行主体检查。
+   - 执行主体：仅 `atMention/nameMention/question/continuation/session` 的 `reason.seq` 对应真实消息可形成 `user` 主体，并传该消息的用户身份；其余唤醒不回退最近群友。自主目标与 `commitment` 唤醒均不传借来的 `user_id/sender`，主体标签也不替代工具自身授权。
+   - 自主/承诺唤醒的运行期工具面仅限本轮创建的仿真/角色/活动工具实例（排除 `simQzoneInteract/simSendPoke/simUpdateAffinity`）、已放通的 `searchInformationTool/webParserTool`，以及 `simulation.autonomousTools` 显式授权且被当前普通策略装配的三个内置图像工具（`bananaTool/googleImageEditTool/googleImageAnalysisTool`）。自定义工具即使取 `sim` 前缀也不因此获权。执行前复核群开关、人设归属、角色暂停、目标状态、共享指纹和活动版本；取消可阻止后续调用，已发起的外部动作不能承诺撤销。
    - 仿真发送工具参数无群号：目标绑定会话群，不存在"发到别的群"的路径；每回合 ≤5 条 + 每分钟 ≤8 条 + 出站令牌桶三重限速。
    - MCP：`config/mcp-servers.yaml` 手工声明，工具结果截断；custom_tools 同理。
 3. **出站内容**：
    - `internalStatusLeak` 片段级脱敏（内部路径/堆栈/日志标签/协议 JSON/**凭据形状 sk-/AKIA/JWT/赋值形态**；占比>30% 或剩余<6字 heavy 整条回退）——挂在 `sanitizeFinalReplyText` 统一出口（群聊/私聊/转图路径全覆盖）+ 仿真 `simSendMessage` 发送前同源调用。
    - 工具参数形状 JSON（`looksLikeToolArguments`）主链路按行丢弃、仿真整批拒绝——同源唯一实现于 replySanitizer。
    - 违禁词出站拦截 + censor 双级词表（outboundThrottle，适配器层兜底）。
-   - 仿真模型文本**永不自动外发**（reserved2 语义），发言只能走发送工具。
-4. **控制台**：scrypt 账密 + cookie 会话/长令牌；配置写走 configRepository（revision 乐观锁 + 原子写 + 自动备份）；API key 脱敏读写。
-5. **秘密与落盘**：`config/message.yaml` 明文 key（R2）；`console-users.json` scrypt；仿真状态/记忆/好感度/初始提示词存 Redis（`shiloh:sim:*`）；令牌账本 `data/token_usage/*.ndjson`（只有计数与金额，无聊天内容）；情节记忆/归档 NDJSON 在插件 data 目录。
-6. **调度与预算**：仿真唤醒限频（2/min、12/h）+ 每群每日 40 回合 + **每日金额预算（默认 ¥5，读令牌账本）**，超限强制沉默当日不再唤醒；`TURN_BUSY_LEASE` 防并发回合。
+   - 仿真发送通常由模型调用 `simSendMessage`。本回合零发送且模型输出普通最终正文时，运行时提醒一次；随后仍输出正文可能经同一 `executeTool → simSendMessage` 兜底发送。沉默声明、含沉默元话术/整条括号状态标注及本轮显式 `simDecide` 不进入兜底；`silent/deferred` 还阻止本轮发送动作。拒绝的自然说明须显式调用发送工具，内部理由不自动外发。
+4. **控制台**：scrypt 账密 + cookie 会话/长令牌；配置写走 configRepository（revision 乐观锁 + 原子写 + 自动备份）；API key 脱敏读写。角色操作沿用认证入口并验证操作/记录标识，可暂停/恢复自主行动、暂停/恢复/取消目标、删除角色记忆。删除来源会清理依赖记忆并撤销依赖目标；此传播针对新角色结构化状态，不声称清空所有历史归档、模型上下文或第三方留存。
+   - 同一认证入口新增作品归档/恢复/删除、订阅暂停/恢复/移除、反思重置检查时间、共享偏好审核/撤销；操作名、id 和 payload 严格校验。作品恢复使用当前版本乐观锁。反思重置不清空每日次数，也不绕过新依据与预算限制。
+   - 撤销使用独立于会话快照的 Redis 活动版本，机器人与独立控制台共享；旧 session 保存或重置不能覆盖该版本。发送、行动和后台活动复核最新版本，后续回合清理绑定旧版本的模型历史。已进入外部发送或任务执行的动作仍无法保证撤回。
+   - 跨群偏好只共享同 bot/人设的角色观点/兴趣，模型只能提议，来源群控制台管理员逐条批准；投影不输出来源群或群友标识。正文来自原观点全文，不能自动保证无隐私，批准前必须审核正文；源记忆删除/修正或上游共享撤销会递归失效派生投影。各群运行/查看时清理派生记忆、目标、作品版本，发送前复核指纹阻止旧上下文外发。
+5. **秘密与落盘**：`config/message.yaml` 明文 key（R2）；`console-users.json` scrypt；原仿真会话/记忆/好感度/初始提示词存 Redis（`shiloh:sim:*`）；新角色状态存 `shiloh:character:v1:<botId>:<personaId>:<groupId>`。身份以稳定 `personaId` 而非人设文字哈希分区；新自我笔记、情绪、作息、生活线使用同分区附属键，旧全局键保留且不自动迁移。作息单独保留管理员默认：没有分区作息时，只有 `setBy=admin` 的旧全局值可继承，旧 agent 值不继承；控制台设置会同步当前已知角色并保存此默认。生活线概览汇总当前各群角色的分区记录，不迁入旧全局生活线。令牌账本 `data/token_usage/*.ndjson` 只有计数与金额；情节记忆/归档 NDJSON 在插件 data 目录。
+   - 角色状态的读取失败、坏 JSON、范围不符均抛错，不用空状态覆盖；生产 Redis 使用租约 token 校验的 Lua 原子提交/释放锁，失去锁的修改不提交。无 Lua 的内存适配器只用于同进程测试。此锁保护角色数据写入，不构成多进程执行器选主。
+   - 行动先持久化 `pending`，再调用工具并保存 `succeeded/failed/unknown`；重启恢复将遗留 `pending` 标未知。未知副作用暂停目标等待核实，避免自动重复；已取消目标不被迟到回执重新激活。成功回执只证明运行时拿到相应工具结果或投递确认，不证明搜索内容、观点或世界事实真实。
+   - 状态有界保留：保留最近 64 条一般回执和最近 16 个终态目标，保护仍被记忆/目标引用的证据来源；待确认回执也不会作为普通旧记录清掉。另有总容量限制，满载时拒绝新增；这不是永久审计归档。
+   - 本批附属存储：作品 `${characterKey}:workspace`、反思 `${characterKey}:reflection`；订阅 `shiloh:character-subscriptions:v1:<botId>:<personaId>:<groupId>`，共享偏好 `shiloh:shared-self:v1:<botId>:<personaId>`（分量均编码）。作品最多 24 件/12 版/12000 字，保护其引用的回执；删除记忆会清理对应作品版本。作品区仅存文本，不提供任意文件路径或二进制资源托管。
+6. **调度与预算**：仿真默认唤醒限频（2/min、12/h）+ 每群每日 40 回合 + **每日金额预算（默认 ¥5，读令牌账本）**，实际按群配置生效；超限按原预算规则停止或延后，`TURN_BUSY_LEASE` 与进程内运行集合防重复回合。自主目标复用群调度、参与边界和预算，不享受正式承诺的预算豁免；最多 3 个活跃目标，检查间隔至少 15 分钟，有期限和尝试上限。
+   - 当前假设单个仿真执行进程。群会话绑定一个 bot，第二个 bot 的同群入站忽略；不同群可绑定不同 bot。角色分区和写锁不能据此宣传为同群多 bot 并行或多执行进程容错。
+   - 空闲后台与正常回合互斥；仅@、睡眠、暂停或预算不足时不启动后台自主活动。反思至少 6 小时、每日最多 2 次，要求 2 项未处理依据，调用前持久化预留并计群回合，记录实际 token；失败仍冷却，重启不自动重复。独立路径不带工具和发送端口，30 秒超时/取消；只写推测性观点/兴趣及等待/放弃已有目标，不改身份、权限、关系分或宣告目标成功。
 7. **网络出机**（safe fetch 类）：`fetchImageBase64` 限 http(s)/2MB/15s；webParser/searchInformation 沿用各自实现的 SSRF 防护；梗提取**只喂群内消息给 LLM、不联网**。
+8. **角色影子回放**（`scripts/characterReplay.mjs`）：直接装配编译后的仿真引擎，不导入宿主 adapter；每个样本新建内存存储、捕获发送，搜索、订阅更新和工作器任务固定走合成端口，不访问真实 QQ、生产 Redis、RSS 或外部工作器。正常模式只调用配置中的主回合与独立反思模型渠道，反思保留独立 stage 和 usage；`--dry-run` 不读私有配置且不联网。逻辑模型调用默认最多 60 次、实际 HTTP 最多 80 次（包括兼容重试与有效降级）、整次默认 10 分钟，另有单请求和事件超时；达到限额后保留已发生结果并跳过后续事件。证据不导出请求正文、完整人设、Authorization 或 provider 附加隐藏推理字段，按既有 scrubber 精确清理配置中的秘密/长提示文本；这不保证任意上游响应片段都不含敏感内容，分享报告前仍须核对。旧报告拒绝覆盖。`characterAcceptance.mjs` 只读取已保存证据，重算本事件前后差量并核对连续性、manifest/summary/条件；人工表绑定候选文件 SHA256。哈希只证明本地证据一致性，不能认证报告来源。离线、缺对照、缺人工评审、真实群未观察或部署未验证时，不判阶段 7 完成。
+9. **公开订阅**：最多 8 个，RSS/Atom/GitHub releases，仅 HTTPS 公网且无 URL 凭据/凭据参数。解析全部 DNS 地址并绑定已核验 IP，逐跳重验重定向（最多 3 次）；请求 10 秒、正文 512KB 上限，XML 禁用外部实体。至少 1 小时、最长 7 天；预占检查时间、失败退避、seen 128/缓存 16 条，暂停/删除后迟到结果不得提交。资料标为不可信且不授予权限，不自动代表事实。
+10. **可选工作器**：管理员固定配置 HTTPS 或 loopback HTTP 网关，未启用不暴露工具；模型只能指定研究/图像/浏览任务与可见来源，不能选 endpoint、凭据、群号或文件路径。自定义桥协议 `POST /tasks` 含固定 scope、task 和 schemaVersion，`Idempotency-Key` 等于先写入的行动回执 ID；认证 token 不进入模型。30 秒超时，运行期间重复授权检查；撤销/超时以独立 2 秒 `DELETE /tasks/:taskId` 最佳努力取消，拒绝重定向、响应上限 128KB。协议不合法、异常、超时或可能已执行的 HTTP 错误记 unknown，相关目标暂停，不能盲目重试。成功文本作品完整存入本群草稿，公开仍走发送边界。外部机器实际隔离、权限与幂等由网关实现，本插件不因此提供浏览器沙箱或原生 OpenClaw API 兼容。
 
 ## 三、数据出机清单（谁收到了什么）
 
 | 目的地 | 什么数据 | 默认 | 怎么关 |
 | --- | --- | --- | --- |
-| **LLM provider**（chatAi/toolsAi/trackAi/intentAi/memoryAi/taskAi 等全部渠道） | 群/私聊消息文本、注入的记忆/人格/梗/好感度摘要、（识图/仿真看图时）图片 | 开 | 清空各渠道配置即停用对应功能 |
+| **LLM provider**（chatAi/toolsAi/trackAi/intentAi/memoryAi/taskAi 等全部渠道） | 群/私聊消息文本、注入的记忆/人格/梗/好感度摘要、角色经历/观点/目标/回执/参与选择，以及识图时图片 | 开 | 清空对应渠道配置；`simulation.enabled: false` 停用仿真回合与自主目标，不删除已存数据 |
+| **角色回放的现有模型 provider** | 合成群消息、配置人设、回放内角色记忆/目标/作品/订阅资料/工具定义，以及独立反思请求；不加载真实群历史 | 仅手工执行 runner 时 | 不运行脚本，或传 `--dry-run` 完全离线；`--config-root` 指定回放配置来源；搜索/订阅/工作器始终合成 |
 | **embedding provider** | 语义记忆文本块（群聊归档内容） | 开（语义记忆启用时） | 关 memorySystem/semanticMemory |
 | **VLM（analysisAi）** | 表情包图片（入库打标）；主链路识图图片 | 开 | 关 emojiSystem / 识图工具 |
-| **搜索 provider**（searchInformation/webParser；`simulation.extraTools` 放通后仿真回合也可用） | 搜索关键词（可能含群聊内容里的线索） | 开 | 从 oneapi_tools / simulation.extraTools 移除 |
+| **搜索 provider**（searchInformation/webParser；仿真工具策略放通后，自主目标也可调用） | 搜索关键词/访问 URL（可能含群聊线索和目标内容） | 开 | 从 oneapi_tools 移除或在仿真 `toolPolicy` deny 对应工具，并移除显式追加放通项；关闭仿真停用其自主调用 |
+| **角色状态（本机 Redis）** | 范围、经历/观点/兴趣及依据、目标、参与选择、有限行动回执；存储本身不出机，投影会进入上述现有 LLM 渠道 | 仿真启用时使用 | 关闭仿真停止回合和自主目标；认证控制台可暂停及删除角色记忆 |
+| **反思模型（现有 memory 任务渠道）** | 本群近期角色记忆、行动回执、目标和已批准共享偏好派生内容 | 有反思端口且未显式关闭时按条件启用 | `simulation.reflection.enabled: false`；亦受群参与/暂停/预算边界约束 |
+| **公开订阅服务器（RSS/Atom/GitHub）** | 订阅 URL、请求元数据和部署机出站 IP；正文不会作为抓取请求上传，但模型可选择带线索的 URL | 无订阅时无请求；添加后按计划检查 | 控制台或 simSubscription 暂停/移除，或关闭仿真/暂停角色 |
+| **管理员配置的工作器网关** | scope（bot/persona/group）、taskId、任务描述及证据引用；token 仅作网关认证；描述可能含群内线索 | 默认停用，无 endpoint 不可调用 | `simulation.worker.enabled: false`；已在途任务仅最佳努力取消，外部留存另行管理 |
+| **显式授权的图像工具 provider** | 工具参数，如提示词/图像，继承既有工具的数据流 | 自主创作默认不授权 | 清空 `simulation.autonomousTools` 或从普通 toolPolicy 装配面移除；受托调用仍按原权限 |
 | **令牌账本** | 仅计数/模型名/金额，**不出机**（本地 NDJSON） | — | — |
 | **承诺账本（commitments）** | 托付原话/时间/创建人，**不出机**（本机 redis）；到期 static 直发、失约明说与续约问询文本必经 `sanitizeFinalReplyText`；终态失败记 faillog（仅 id/intent/群/原因/时间，截断 20 条，本机 redis）供哨兵告警 | 开 | `simulation.extraTools` / `oneapi_tools` 移除 commitmentTool 即停新增 |
 | **委托记忆（delegatedMemory）** | 群友托付的原话（owner 维度），**不出机**（本机 redis）；可查可删（本人/群主/控制台托付页） | 开 | 同上移除 delegateMemoryTool |
 | **梗提取（memoryAi 渠道）** | 近 40 条群消息文本（发给小模型判定） | 开（simulation.meme.enabled） | `simulation.meme.enabled: false` |
 
 > 向群友披露"消息会被 AI 处理"时，应一并考虑上表前四行。
+> 角色模型与存储复用既有渠道；公开订阅和可选工作器增加出站目的地，分别按上表关闭。共享偏好经显式批准后进入同 bot/人设的其他群模型上下文。
 
 ## 四、已知残余风险
 
@@ -56,11 +78,12 @@
 - **R3** `custom_tools/` 与 MCP server 是任意代码执行面，信任边界=部署者本人。
 - **R4** 上游 provider 对发过去的内容的留存与使用不受本插件控制。
 - **R5** 仿真放通的既有工具（toolPolicy open 默认面 / extraTools 追加）继承其自身实现的安全性（如搜索的关键词出网）；敏感工具（禁言/撤回/送礼/抢红包/QQ空间/改名片/@全体管理/reminder）RESTRICTED 默认禁，解禁须显式 `toolPolicy.allowTools`。
+- **R6** 同一外部动作与 Redis 回执写入不能组成跨系统事务。超时、中断或回执丢失可能产生未知结果；暂停目标和未知标记降低重复执行风险，不能证明外部动作未发生，也不提供自动撤销。
 
 ## 五、发布前检查清单
 
 1. `npm run verify:phase` 全绿（typecheck + boundaries + 全量测试 + 控制台前后端检查）。
-2. 改过出站/工具边界 → `node --test tests/replySanitizer.test.js tests/simulationDomain.test.js` 单独复跑。
+2. 改过出站/工具边界 → 构建后运行 `node --test tests/replySanitizer.test.js tests/simSilentDeclaration.test.js tests/characterRuntime.test.js`；再以 `tsconfig.backend-tests.json` 编译领域测试并运行对应的 `simulationDomain` / `characterState` 用例。
 3. 新增数据出机目的地 → 同步「数据出机清单」表。
 4. 改过仿真安全相关 → 冒烟（假 Redis/假模型）确认零外发路径无回归。
 

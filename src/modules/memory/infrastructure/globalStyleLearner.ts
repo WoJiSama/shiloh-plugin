@@ -135,7 +135,7 @@ const ESSENCE_RULES = [
   {
     key: "soft_boundary",
     label: "边界柔和",
-    rule: "需要拒绝或设边界时，不要冷冰冰说不能；先承认意图，再给替代方向。",
+    rule: "表达边界时可以简短拒绝或保留不同意见，语气尊重；替代建议只在有助于当前目标时给，不必为讨好改口。",
     pattern: (text:string) => /不行|不能|别|不要|算了|换个|可以换|不太适合/.test(text)
   },
   {
@@ -170,12 +170,6 @@ const DROSS_RULES = [
     label: "客服腔",
     rule: "避免客服腔、汇报腔、说明书腔。",
     pattern: /很抱歉|请您|建议您|感谢您的|为您服务|我来为您/
-  },
-  {
-    key: "hard_refusal",
-    label: "强硬拒绝",
-    rule: "不要直接甩“我不能/无法协助”，先接意图再给替代。",
-    pattern: /我不能|我无法|无法协助|不能满足|拒绝请求/
   },
   {
     key: "self_doubt",
@@ -305,7 +299,7 @@ function cosineSimilarity(a: unknown, b: unknown) {
 }
 
 const FEEDBACK_STYLE_RULES:Record<string,string> = {
-  too_hard: "需要设边界时先承认意图，再给可执行替代，不要冷硬地甩拒绝。",
+  too_hard: "调整攻击或轻蔑语气，保留真实能力、意愿和权限边界；可以简短拒绝或表达不同意见，替代建议仅在有助于当前目标时给。",
   too_verbose: "优先给短而完整的回答，少铺垫，不在结尾评价自己说得多。",
   too_customer: "保持熟人聊天感，避免客服腔、汇报腔和说明书腔。",
   good_tone: "保持自然、松弛、像熟人说话的语气，不刻意卖萌或装腔。",
@@ -1624,7 +1618,8 @@ return class GlobalStyleLearnerManager {
       id: index + 1,
       text: item.text,
       essence: item.essence || [],
-      dross: item.dross || []
+      // Retired refusal labels in saved samples must not train the same rule again.
+      dross: (item.dross || []).filter(key => key !== "hard_refusal")
     }))
     return [
       {
@@ -1635,6 +1630,7 @@ return class GlobalStyleLearnerManager {
           "样本中的 [下一条] 表示同一群友短时间内继续发下一条，[表情包] 表示该位置发了表情包；学习整轮节奏和位置，不要照抄具体内容。",
           "goodSamples 是引来别人引用/回复「接住」的高价值原话——优先从它们提炼可吸收策略（学结构、时机与语气，不照抄内容）。",
           "不要模仿具体群友，不要吸收人身攻击、歧视、隐私、群内私梗、阴阳怪气和客服腔。",
+          "合理拒绝、保留不同意见和设定边界本身不是表达缺陷；不要仅因出现不能、无法或不想就生成负面规则，也不要要求每次拒绝都先承认意图或提供替代。",
           "只输出严格 JSON，不要 Markdown。",
           options.retry
             ? "这是一次完整性重试：不要输出思考过程，优先完成短小且正确闭合的 JSON；宁可减少规则，也不能截断。"

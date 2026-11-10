@@ -62,13 +62,20 @@ pluginSettings:
   # 启用群的消息不再走 TimingGate 触发链，而是进仿真会话缓冲；本地触发器（@/关键词/提问/关注的人/概率）
   # 决定何时唤醒 agent 回合，AI 用 sim* 工具自主读消息、发言（simSendMessage 连发带节奏）、
   # 等待下文（simWaitForMessages）、设置自己的唤醒/潜水（simSetWakeConfig）。
-  # 模型文本输出永不自动外发——发言只能走发送工具。
+  # 发言统一经过发送工具；普通最终正文提醒一次后仍可能由运行时走发送工具兜底，显式沉默/暂缓禁止兜底。
   # 注意：仿真模式只接管"何时回复"这条链；群白名单/黑名单/违禁词/禁言/骰娘互斥/出站风控/人设全部照常生效。
-  # 仿真群内暂不可用：画图/搜索/音乐等 40 工具与表情包跟随（回合只有 sim* 工具）、三层记忆注入。
+  # 既有额外工具由下方toolPolicy装配；装配可见性与自主执行权限分别检查。
   simulation:
     enabled: true                # 总开关；false 时所有群走原链路
     allGroups: true              # true（默认）= 过了群白名单的群默认全部进仿真；false = 仅 groups 清单
     groups: []                   # 显式启用群种子（仅 allGroups: false 时用；.仿真 开/关 的按群覆盖存 Redis）
+    reflection:
+      enabled: true              # 私下反思：至少6小时、每日最多2次，需2项新依据；计入群回合/金额预算，不发群消息
+    autonomousTools: []          # 自主创作需显式授权；仅支持bananaTool/googleImageEditTool/googleImageAnalysisTool，且须被toolPolicy装配
+    worker:
+      enabled: false             # 可选的自定义受限工作器网关，未配置时不暴露simWorkerTask；不是OpenClaw原生API
+      endpoint: ""               # HTTPS或本机HTTP，运行时POST /tasks并使用taskId幂等键；超时请求DELETE取消
+      token: ""                  # 仅供网关认证，不传给模型；生产凭据写在私有配置，不写入默认配置
     # 工具能力策略（P1-3 翻转：白名单制 → 能力制）。
     # mode: open（默认）= 内置注册表的安全工具默认全部放通，按需做减法——agent 拿到全量能力，
     #        敏感工具（禁言/撤回/送礼/抢红包/QQ空间/改名片/@全体管理/reminder 与承诺账本重叠）默认禁；

@@ -295,7 +295,9 @@ test('buildSimSystemPrompt：人设名与协议关键段', () => {
   // 未外发文本与表情守则（实测事故：夸人只甩一张表情）
   assert.ok(prompt.includes('你直接写出来的文本群友看不到'))
   assert.ok(prompt.includes('表情包是佐料不是答案'))
-  assert.ok(prompt.includes('阴阳怪气的"夸"等于嘲讽'))
+  assert.ok(prompt.includes('不要用阴阳怪气的"夸"冒充善意'))
+  assert.ok(prompt.includes('自然拒绝'))
+  assert.ok(prompt.includes('simDecide'))
   // 本群额外能力动态点名
   const withExtras = buildSimSystemPrompt({ persona: {}, selfName: '小鲸', extraToolNames: ['sendLocalEmojiTool', 'searchVideoTool'] })
   assert.ok(withExtras.includes('本群额外能力'))

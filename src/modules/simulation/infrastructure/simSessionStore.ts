@@ -1,4 +1,7 @@
 import type { SimMoodState, SimSessionState } from '../../../contracts/simulation.js'
+import { randomUUID } from 'node:crypto'
+import type { CharacterScope } from '../../../contracts/character.js'
+import { characterKey } from '../domain/characterState.js'
 import { createDefaultSimSession } from '../domain/simConfig.js'
 import { stripSupersededItems } from '../domain/personProfile.js'
 
@@ -12,12 +15,18 @@ export interface SimRedisLike {
 }
 
 export interface SimSessionStorePorts {
+  characterScope?: CharacterScope
   redis: SimRedisLike
   logger?: { warn?(message: string): void; error?(message: string, error?: unknown): void }
   now?(): number
 }
 
 const SESSION_KEY = (groupId: string) => `shiloh:sim:g:${groupId}`
+// Kept outside session snapshots: a second process can revoke an in-flight turn
+// without a stale writer restoring the old version or overwriting unread input.
+const ACTIVITY_VERSION_KEY = (groupId: string) => `${SESSION_KEY(groupId)}:activity-version`
+/** One execution process may still have concurrent ingress, turn and background writers. */
+const sessionWrites = new WeakMap<object, Map<string, Promise<void>>>()
 /** agent 自管记忆与好感度：独立于会话状态（.仿真 重置只清历史/水位/预算，长期记忆保留） */
 const MEMORIES_KEY = (groupId: string) => `shiloh:sim:g:${groupId}:memories`
 const INIT_KEY = (groupId: string) => `shiloh:sim:g:${groupId}:init`
@@ -55,6 +64,8 @@ export interface SimSessionStore {
   load(groupId: string): Promise<SimSessionState>
   save(groupId: string, state: SimSessionState): Promise<void>
   reset(groupId: string, presetKeywords: string[]): Promise<SimSessionState>
+  loadActivityVersion(groupId: string): Promise<string>
+  invalidateActivity(groupId: string): Promise<void>
   /** null = 从未写过覆盖（首次运行，可从 yaml groups 种子） */
   loadOverrides(): Promise<SimGroupOverrides | null>
   saveOverrides(overrides: SimGroupOverrides): Promise<void>
@@ -107,10 +118,33 @@ function parseStringList(value: unknown): string[] {
 export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionStore {
   const { redis } = ports
   const now = ports.now ?? Date.now
+  const selfKey = (legacy: string): string => ports.characterScope ? `${characterKey(ports.characterScope)}:legacy:${legacy.split(':').pop()}` : legacy
   const logWarn = (message: string) => { try { ports.logger?.warn?.(message) } catch { /* 日志不可用不阻塞 */ } }
+  const saveSession = async (groupId: string, state: SimSessionState): Promise<void> => {
+    const key = SESSION_KEY(groupId), snapshot = JSON.stringify(state)
+    let writes = sessionWrites.get(redis)
+    if (!writes) { writes = new Map(); sessionWrites.set(redis, writes) }
+    const previous = writes.get(key) ?? Promise.resolve()
+    const operation = previous.catch(() => undefined).then(async () => { await redis.set(key, snapshot) })
+    writes.set(key, operation)
+    try { await operation } finally { if (writes.get(key) === operation) writes.delete(key) }
+  }
 
   return {
+    async loadActivityVersion(groupId) {
+      return (await redis.get(ACTIVITY_VERSION_KEY(groupId))) ?? ''
+    },
+    async invalidateActivity(groupId) {
+      await redis.set(ACTIVITY_VERSION_KEY(groupId), randomUUID())
+    },
     async load(groupId) {
+      // A released live state may still have its last snapshot queued for persistence.
+      for (;;) {
+        const pending = sessionWrites.get(redis)?.get(SESSION_KEY(groupId))
+        if (!pending) break
+        await pending
+        if (sessionWrites.get(redis)?.get(SESSION_KEY(groupId)) === pending) break
+      }
       try {
         const raw = await redis.get(SESSION_KEY(groupId))
         if (!raw) return createDefaultSimSession(now())
@@ -126,12 +160,12 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       }
     },
     async save(groupId, state) {
-      await redis.set(SESSION_KEY(groupId), JSON.stringify(state))
+      await saveSession(groupId, state)
     },
     async reset(groupId, presetKeywords) {
       const state = createDefaultSimSession(now(), presetKeywords)
       state.bootstrapSent = true // 重置视为已引导过，不再补发初始提示词
-      await redis.set(SESSION_KEY(groupId), JSON.stringify(state))
+      await saveSession(groupId, state)
       return state
     },
     async loadOverrides() {
@@ -358,7 +392,7 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
     },
     async loadRhythm() {
       try {
-        const raw = await redis.get(RHYTHM_KEY)
+        const raw = await redis.get(selfKey(RHYTHM_KEY))
         if (!raw) return null
         const parsed = record(JSON.parse(raw))
         const from = Number(parsed.sleepFrom), to = Number(parsed.sleepTo)
@@ -367,36 +401,36 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       } catch { return null }
     },
     async saveRhythm(rhythm) {
-      await redis.set(RHYTHM_KEY, JSON.stringify({ sleepFrom: rhythm.sleepFrom, sleepTo: rhythm.sleepTo, setBy: rhythm.setBy || 'agent', updatedAt: now() }))
+      await redis.set(selfKey(RHYTHM_KEY), JSON.stringify({ sleepFrom: rhythm.sleepFrom, sleepTo: rhythm.sleepTo, setBy: rhythm.setBy || 'agent', updatedAt: now() }))
     },
     async loadLifeThreads() {
       try {
-        const raw = await redis.get(LIFE_THREADS_KEY)
+        const raw = await redis.get(selfKey(LIFE_THREADS_KEY))
         const parsed = raw ? JSON.parse(raw) : []
         return Array.isArray(parsed) ? parsed : []
       } catch { return [] }
     },
     async saveLifeThreads(threads) {
-      await redis.set(LIFE_THREADS_KEY, JSON.stringify(Array.isArray(threads) ? threads : []))
+      await redis.set(selfKey(LIFE_THREADS_KEY), JSON.stringify(Array.isArray(threads) ? threads : []))
     },
     async loadSelfMemories() {
       try {
-        const raw = await redis.get(SELF_MEMORIES_KEY)
+        const raw = await redis.get(selfKey(SELF_MEMORIES_KEY))
         const parsed = raw ? JSON.parse(raw) : []
         return Array.isArray(parsed) ? parsed : []
       } catch { return [] }
     },
     async saveSelfMemories(memories) {
-      await redis.set(SELF_MEMORIES_KEY, JSON.stringify(Array.isArray(memories) ? memories : []))
+      await redis.set(selfKey(SELF_MEMORIES_KEY), JSON.stringify(Array.isArray(memories) ? memories : []))
     },
     async loadMood() {
       try {
-        const raw = await redis.get(MOOD_KEY)
+        const raw = await redis.get(selfKey(MOOD_KEY))
         return raw ? JSON.parse(raw) : null
       } catch { return null }
     },
     async saveMood(mood) {
-      await redis.set(MOOD_KEY, JSON.stringify(mood))
+      await redis.set(selfKey(MOOD_KEY), JSON.stringify(mood))
     },
     async deletePersonProfileField(userId, field, value) {
       const id = String(userId || '').replace(/[^0-9]/g, '')

@@ -11,6 +11,18 @@ const CONFIG = {
   }
 }
 
+test('simulation outcome comes from the observed HTTP result, not generated search wording', async () => {
+  for (const ok of [true, false]) {
+    const outcomes = []
+    const tool = new SearchInformationTool({
+      configLoader: () => CONFIG,
+      fetchImpl: async () => ({ ok, status: ok ? 200 : 503, async json() { return ok ? { choices: [{ message: { content: '这段资料只是来源，不证明结论正确' } }] } : { error: { message: 'unavailable' } } } }),
+    })
+    await tool.func({ query: '公开资料' }, { simulationReportOutcome: status => outcomes.push(status) })
+    assert.deepEqual(outcomes, [ok ? 'succeeded' : 'failed'])
+  }
+})
+
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }

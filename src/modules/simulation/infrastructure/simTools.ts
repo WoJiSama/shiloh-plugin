@@ -47,11 +47,11 @@ export interface SimToolContext {
   closePersonFacts?(userId: string, statement: string): Promise<void>
   /** AI 自我记忆（跨群性格沉淀，scope=self 的条目走这里） */
   getSelfMemories?(): SimMemoryEntry[]
-  saveSelfMemories?(memories: SimMemoryEntry[]): void
+  saveSelfMemories?(memories: SimMemoryEntry[]): void | Promise<void>
   /** 情绪四轴（跨群全局）：summary 为预翻译的单行摘要（simGetState 展示用） */
   getMood?(): { summary: string } | null
   /** 情绪四轴有界更新：运行时负责半衰期投影/单步上限/回合包络并落盘 */
-  updateMood?(deltas: Partial<Record<MoodAxis, number>>, reason: string): { mood: SimMoodState; applied: Partial<Record<MoodAxis, number>>; capped: boolean } | { error: string }
+  updateMood?(deltas: Partial<Record<MoodAxis, number>>, reason: string): { mood: SimMoodState; applied: Partial<Record<MoodAxis, number>>; capped: boolean } | { error: string } | Promise<{ mood: SimMoodState; applied: Partial<Record<MoodAxis, number>>; capped: boolean } | { error: string }>
   /** 自设作息（全局）：sleepFrom/sleepTo 小时，如 1-8 */
   setRhythm?(sleepFrom: number, sleepTo: number): Promise<string>
   /** 生活线管理：follow（真实搜索定位）/list/drop */
@@ -236,7 +236,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         ...(atUserIds.length ? { atUserIds } : {}),
       })
       if (!result.ok) return `error: ${result.error}`
-      return JSON.stringify({ sent: result.sent, note: '已发出，不要在后续文本里再汇报"已发送"。' })
+      return JSON.stringify({ ok: true, sent: result.sent, note: '已发出，不要在后续文本里再汇报"已发送"。' })
     }
   }
 
@@ -421,11 +421,11 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         if (index < 0) return `error: 找不到记忆 ${id}，可先用 action=list 查看`
         if (action === 'remove') {
           const removed = selfMemories.splice(index, 1)
-          ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
+          await ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
           return `已删除：${removed[0]?.content || ''}`
         }
         selfMemories[index] = { ...selfMemories[index]!, done: true, updatedAt: now }
-        ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
+        await ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
         return `已收掉：${selfMemories[index]!.content}`
       }
       const selfScope = opts.scope === 'self'
@@ -442,7 +442,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       if (selfScope) {
         if (typeof ctx.saveSelfMemories !== 'function') return 'error: 自我记忆不可用'
         if (opts.aboutUser) return 'error: scope=self 不带 aboutUser（那是你自己的沉淀，不是关于某个群友的）'
-        ctx.saveSelfMemories(capMemories([...(ctx.getSelfMemories?.() || []), entry], SIM_SELF_MEMORY_LIMIT))
+        await ctx.saveSelfMemories(capMemories([...(ctx.getSelfMemories?.() || []), entry], SIM_SELF_MEMORY_LIMIT))
         return JSON.stringify({ saved: true, id: entry.id, note: '这是你跨群一致的性格沉淀，任何群唤醒都会带上。' })
       }
       const memories = [...ctx.getMemories(), entry]
@@ -536,7 +536,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         }
       }
       if (!any) return 'error: 至少给一个轴的变化量（-3~+3），没有波动就不用调'
-      const result = ctx.updateMood(deltas, reason)
+      const result = await ctx.updateMood(deltas, reason)
       if ('error' in result) return `error: ${result.error}`
       return JSON.stringify({
         mood: result.mood.axes,
@@ -812,7 +812,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     async func(opts: Record<string, unknown>) {
       const result = await ctx.collectSticker(Math.floor(Number(opts.seq)))
       if (!result.ok) return `error: ${result.error}`
-      return '已收藏（自动打标后就能用）'
+      return JSON.stringify({ ok: true, note: '已收藏（自动打标后就能用）' })
     }
   }
 
@@ -841,7 +841,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       if (!input.query && !input.url) return 'error: query 或 url 至少填一个'
       const result = await ctx.shareVideoCard(input)
       if (!result.ok) return `error: ${result.error || '分享失败'}`
-      return `已发出B站卡片：《${result.title}》`
+      return JSON.stringify({ ok: true, title: result.title, note: '已发出B站卡片' })
     }
   }
 

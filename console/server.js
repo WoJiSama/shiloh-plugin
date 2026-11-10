@@ -33,6 +33,8 @@ try {
     setGroupBudget: (groupId, cap) => simulationRuntime.setGroupBudget(groupId, cap),
     setGroupTurnsCap: (groupId, cap) => simulationRuntime.setGroupTurnsCap(groupId, cap),
     setReplyMode: (groupId, mode) => simulationRuntime.setGroupReplyMode(groupId, mode),
+    controlCharacter: (groupId, operation, id) => simulationRuntime.controlCharacter(groupId, operation, id),
+    controlActivity: (groupId, operation, id, payload) => simulationRuntime.controlActivity(groupId, operation, id, payload),
     setDefaultBudget: (cny) => simulationRuntime.setDefaultBudget(cny),
     listPersonProfiles: () => simulationRuntime.listPersonProfiles(),
     deletePersonProfile: (userId) => simulationRuntime.deletePersonProfile(userId),

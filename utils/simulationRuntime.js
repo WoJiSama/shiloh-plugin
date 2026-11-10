@@ -10,6 +10,7 @@ import { localToolRegistry } from './LocalToolRegistry.js'
 import { ExpressionLearner } from '../domains/memory/ExpressionLearner.js'
 import { globalStyleLearnerManager } from '../domains/memory/GlobalStyleLearnerManager.js'
 import { YTapi } from './apiClient.js'
+import { createCharacterWorkerGateway } from '../dist/backend/modules/simulation/infrastructure/characterWorkerGateway.js'
 import { tokenLedger } from './tokenLedger.js'
 import { sideLLMCall } from '../dist/backend/adapters/sideLLM.js'
 import path from 'node:path'
@@ -64,6 +65,13 @@ function botById(hint) {
   if (!Bot?.bots) return null
   const entry = Object.values(Bot.bots).find(b => b && String(b.uin) === String(hint))
   return entry || null
+}
+
+function scopedBot(selfId) {
+  if (!selfId) return globalThis.Bot
+  const account = botById(selfId)
+  if (account) return account
+  return String(globalThis.Bot?.uin || '') === String(selfId) ? globalThis.Bot : null
 }
 
 // bot 进程用 Yunzai 全局 redis;独立控制台进程没有 globalThis.redis——按需自建本机连接(与 bot 同实例,键互通)。
@@ -129,6 +137,18 @@ export const simulationRuntime = createSimulationRuntime({
     return { id: bot.id, name: personaName || bot.name || '' }
   },
   YTapi: (requestData, execConfig) => YTapi(requestData, execConfig),
+  reflectCharacter: (requestData, execConfig, signal) => YTapi(requestData, { ...execConfig, useTools: false }, undefined, undefined, {
+    taskBackend: 'memory', signal, generation: { maxOutputTokens: 1200 },
+  }),
+  characterWorkerAvailable: () => {
+    const worker = readPluginSettings().simulation?.worker
+    return worker?.enabled === true && !!worker.endpoint
+  },
+  runCharacterWorker: (task, scope, signal) => {
+    const worker = readPluginSettings().simulation?.worker
+    if (worker?.enabled !== true || !worker.endpoint) throw new Error('工作器未配置或已停用')
+    return createCharacterWorkerGateway({ endpoint: worker.endpoint, token: worker.token || '' })(task, scope, signal)
+  },
   // B站卡片分享:按关键词或链接解析视频并生成 QQ 卡片 JSON(搜索走 B站开放接口,图片由 QQ 客户端自行加载)
   resolveBilibiliCard: async (input) => {
     try {
@@ -214,7 +234,7 @@ export const simulationRuntime = createSimulationRuntime({
     const result = await sideLLMCall({ url: cfg.analysisApiUrl, apikey: cfg.analysisApiKey, model: cfg.analysisApiModel, messages: [{ role: 'user', content }], temperature: 0.2, maxTokens: 300, timeoutMs: 30000 })
     return result.ok ? result.content : null
   },
-  sendGroupMessage: async (groupId, segments) => {
+  sendGroupMessage: async (groupId, segments, selfId) => {
     // B2 排队动作发送前重查权限：入队时的校验约束不了排队等待期间的变化
     // （qq-bridge 5551e74：guard 在实际发送前重查静默/暂停/总开关）
     const settings = readPluginSettings()
@@ -225,7 +245,7 @@ export const simulationRuntime = createSimulationRuntime({
     }
     const Bot = globalThis.Bot
     try {
-      const group = Bot?.pickGroup?.(Number(groupId))
+      const group = scopedBot(selfId)?.pickGroup?.(Number(groupId))
       if (!group?.sendMsg) return { ok: false, error: '群对象不可用' }
       const ret = await group.sendMsg(segments)
       // 回执 message_id：表情包等额外工具靠它确认投递（TRSS sendMsg 返回 {message_id} 或 {data:{message_id}}）
@@ -239,6 +259,7 @@ export const simulationRuntime = createSimulationRuntime({
     const settings = readPluginSettings()
     const resolved = personaLibrary.resolve({ messageType: 'group', groupId: String(groupId), selfId: String(selfId) })
     return {
+      personaId: resolved?.id || 'default',
       persona: resolved?.persona || settings.persona || {},
       systemContent: String(settings.systemContent || ''),
     }
@@ -384,9 +405,9 @@ export const simulationRuntime = createSimulationRuntime({
     }
   },
   // 戳群成员（TRSS pickGroup.pokeMember）
-  pokeMember: async (groupId, userId) => {
+  pokeMember: async (groupId, userId, selfId) => {
     try {
-      const group = globalThis.Bot?.pickGroup?.(Number(groupId))
+      const group = scopedBot(selfId)?.pickGroup?.(Number(groupId))
       if (typeof group?.pokeMember !== 'function') return { ok: false, error: '当前适配器不支持戳一戳' }
       await group.pokeMember(Number(userId))
       return { ok: true }
@@ -540,8 +561,8 @@ export const simulationRuntime = createSimulationRuntime({
     }
   },
   // 群成员列表（TRSS pickGroup.getMemberMap）
-  getGroupMembers: async groupId => {
-    const group = globalThis.Bot?.pickGroup?.(Number(groupId))
+  getGroupMembers: async (groupId, selfId) => {
+    const group = scopedBot(selfId)?.pickGroup?.(Number(groupId))
     const map = await group?.getMemberMap?.()
     if (!map || typeof map[Symbol.iterator] !== 'function') return []
     const out = []
@@ -552,9 +573,9 @@ export const simulationRuntime = createSimulationRuntime({
     return out
   },
   // 合并转发内容（OneBot get_forward_msg → 纯函数渲染：媒体标记化、内嵌转发可递归）
-  getForwardContent: async forwardId => {
+  getForwardContent: async (forwardId, selfId) => {
     try {
-      const Bot = globalThis.Bot
+      const Bot = scopedBot(selfId)
       const { renderForwardTree } = await import('../dist/backend/modules/simulation/domain/forwardView.js')
       // 递归展开整棵转发（≤3 层）：内嵌 id 自动跟随，适配器拉不到的层在结果里明确标注
       const rendered = await renderForwardTree(async id => {

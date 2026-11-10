@@ -184,6 +184,7 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
     const opts=parseDrawOptions(input),rawEvent=record(event),canReply=typeof rawEvent.reply==='function',e=canReply?parseDrawEvent(event):parseDrawEvent({...rawEvent,reply:async()=>undefined}),query=text(opts.query);
 
     if (!query?.trim()) {
+      if (typeof rawEvent.simulationReportOutcome === 'function') rawEvent.simulationReportOutcome('failed');
       return '搜索失败：搜索关键词不能为空';
     }
 
@@ -248,9 +249,11 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
       }
       const content = record(record(Array.isArray(analysis.choices)?analysis.choices[0]:null).message).content
       if (typeof content!=='string'||!content.trim()) throw new Error('搜索服务没有返回可用结果')
+      if (typeof rawEvent.simulationReportOutcome === 'function') rawEvent.simulationReportOutcome('succeeded');
       return content + '\n\n提示：如果用户想基于搜索结果制作文件，可以使用 aiMindMapTool 工具继续操作。'
 
     } catch (error) {
+      if (typeof rawEvent.simulationReportOutcome === 'function') rawEvent.simulationReportOutcome('failed');
       console.error('搜索过程发生错误:', error);
       const message = record(error).name === 'AbortError' ? `搜索超过 ${Math.ceil(timeoutMs / 1000)} 秒仍未返回` : (error instanceof Error?error.message:'发生未知错误')
       return `搜索失败：${message}`;

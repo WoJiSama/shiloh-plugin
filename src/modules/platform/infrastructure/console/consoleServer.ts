@@ -11,6 +11,7 @@
 // yaml 包复用插件自身 node_modules,不新增安装项。
 // 部署:systemd 独立服务(见 console/bl-console.service),与 Yunzai 进程解耦。
 import { createImageService } from '../../../image/application/imageService.js'
+import type { CharacterActivityOperation } from '../../../../contracts/characterActivities.js'
 import { createImageResource } from '../../../image/infrastructure/imageResource.js'
 import { normalizeCustomSize, normalizeQuality } from '../../../image/domain/imageInput.js'
 import { createConfigRepository, ConfigConflictError } from '../../../config/infrastructure/configRepository.js'
@@ -95,6 +96,8 @@ export interface ConsoleExtraPorts {
     setGroupBudget?(groupId: string, cap: number): Promise<string>
     setGroupTurnsCap?(groupId: string, cap: number): Promise<string>
     setReplyMode?(groupId: string, mode: 'atOnly' | 'auto' | 'active'): Promise<string>
+    controlCharacter?(groupId: string, action: 'pause' | 'resume' | 'cancel-goal' | 'pause-goal' | 'resume-goal' | 'delete-memory', id?: string): Promise<string>
+    controlActivity?(groupId: string, operation: CharacterActivityOperation, id?: string, payload?: Record<string, unknown>): Promise<string>
     listPersonProfiles?(): Promise<unknown>
     lifeOverview?(): Promise<unknown>
     getHealthAlerts?(): Promise<unknown>
@@ -2098,7 +2101,36 @@ const server = http.createServer(async (req, res) => {
       const groupId = String(body?.group || "")
       const action = String(body?.action || "")
       if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 必须是群号" })
-      if (!["enable", "disable", "reset", "initial-prompt", "budget", "turns", "reply-mode"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget|turns|reply-mode" })
+      if (!["enable", "disable", "reset", "initial-prompt", "budget", "turns", "reply-mode", "character", "activity"].includes(action)) return sendJson(res, 400, { error: "action 必须是 enable|disable|reset|initial-prompt|budget|turns|reply-mode|character|activity" })
+      if (action === "activity") {
+        if (typeof simulation.controlActivity !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持角色活动管理" })
+        if (Object.keys(record(body)).some(key => !["group", "action", "operation", "id", "payload"].includes(key))) return sendJson(res, 400, { error: "角色活动操作含未知字段" })
+        const operation = body?.operation
+        const operations = ["work-archive", "work-restore", "work-delete", "subscription-pause", "subscription-resume", "subscription-remove", "shared-approve", "shared-delete", "reflection-reset"] as const
+        if (typeof operation !== "string" || !operations.includes(operation as typeof operations[number])) return sendJson(res, 400, { error: "operation 不是有效角色活动操作" })
+        const id = body?.id
+        if (operation === "reflection-reset" ? id !== undefined : typeof id !== "string" || !id.trim() || id !== id.trim() || id.length > 200 || /[\u0000-\u001f\u007f]/u.test(id)) return sendJson(res, 400, { error: operation === "reflection-reset" ? "reflection-reset 不接受 id" : "id 必须是非空、至多 200 字符的记录标识" })
+        const payload = body?.payload
+        if (operation === "work-restore") {
+          if (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).length !== 1 || !Number.isSafeInteger(record(payload).revision) || Number(record(payload).revision) < 1) return sendJson(res, 400, { error: "work-restore 只接受 payload.revision 正整数" })
+        } else if (payload !== undefined) return sendJson(res, 400, { error: "此操作不接受 payload" })
+        const message = await simulation.controlActivity(groupId, operation as typeof operations[number], typeof id === "string" ? id : undefined, payload === undefined ? undefined : record(payload))
+        return sendJson(res, 200, { ok: true, message })
+      }
+      if (action === "character") {
+        if (typeof simulation.controlCharacter !== "function") return sendJson(res, 503, { error: "仿真运行时版本过旧，不支持角色管理" })
+        const operation = body?.operation
+        if (typeof operation !== "string" || !["pause", "resume", "cancel-goal", "pause-goal", "resume-goal", "delete-memory"].includes(operation)) {
+          return sendJson(res, 400, { error: "operation 必须是 pause|resume|cancel-goal|pause-goal|resume-goal|delete-memory" })
+        }
+        const needsId = operation !== "pause" && operation !== "resume"
+        const id = body?.id
+        if (needsId ? (typeof id !== "string" || !id.trim() || id.length > 200 || id !== id.trim()) : id !== undefined) {
+          return sendJson(res, 400, { error: needsId ? "id 必须是非空、至多 200 字符的记录标识" : "pause/resume 不接受 id" })
+        }
+        const message = await simulation.controlCharacter(groupId, operation as "pause" | "resume" | "cancel-goal" | "pause-goal" | "resume-goal" | "delete-memory", needsId ? String(id) : undefined)
+        return sendJson(res, 200, { ok: true, message })
+      }
       if (action === "initial-prompt") {
         const text = typeof body?.text === "string" ? body.text.slice(0, 2000) : ""
         return sendJson(res, 200, { ok: true, message: await simulation.setInitialPrompt(groupId, text) })
