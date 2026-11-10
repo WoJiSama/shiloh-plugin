@@ -1,0 +1,302 @@
+{
+  "motivated": {
+    "complete": true,
+    "summary": {
+      "events": 6,
+      "failedEvents": 0,
+      "skippedEvents": 2,
+      "behaviorMisses": 2,
+      "logicalCalls": 10,
+      "mainCalls": 10,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 0,
+      "httpRequests": 10,
+      "capturedMessages": 10,
+      "reportedTokens": 137381,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "engineering": "failed",
+    "behavior": "failed",
+    "integrityFailures": [],
+    "observations": [
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": false
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "skipped",
+        "behavior": {}
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {}
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": false
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "skipped",
+        "behavior": {}
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {}
+      }
+    ]
+  },
+  "worker": {
+    "complete": true,
+    "summary": {
+      "events": 4,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 11,
+      "mainCalls": 11,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 2,
+      "httpRequests": 11,
+      "capturedMessages": 7,
+      "reportedTokens": 163504,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "engineering": "passed",
+    "behavior": "passed",
+    "integrityFailures": [],
+    "observations": [
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      }
+    ]
+  },
+  "social": {
+    "complete": true,
+    "summary": {
+      "events": 4,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 6,
+      "mainCalls": 6,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 0,
+      "httpRequests": 6,
+      "capturedMessages": 7,
+      "reportedTokens": 88172,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "engineering": "passed",
+    "behavior": "passed",
+    "integrityFailures": [],
+    "observations": [
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      }
+    ]
+  },
+  "opinion": {
+    "complete": true,
+    "summary": {
+      "events": 2,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 2,
+      "logicalCalls": 4,
+      "mainCalls": 4,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 0,
+      "httpRequests": 4,
+      "capturedMessages": 6,
+      "reportedTokens": 54677,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "engineering": "passed",
+    "behavior": "failed",
+    "integrityFailures": [],
+    "observations": [
+      {
+        "scenario": "opinion-revision",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "opinionPersisted": false
+        }
+      },
+      {
+        "scenario": "opinion-revision",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "opinionRevisionPersisted": false
+        }
+      }
+    ]
+  },
+  "reflection": {
+    "complete": true,
+    "summary": {
+      "events": 3,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 2,
+      "logicalCalls": 3,
+      "mainCalls": 2,
+      "reflectionCalls": 1,
+      "feedFetches": 0,
+      "workerCalls": 0,
+      "httpRequests": 3,
+      "capturedMessages": 2,
+      "reportedTokens": 23384,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "engineering": "passed",
+    "behavior": "failed",
+    "integrityFailures": [],
+    "observations": [
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "noReflectionModelCall": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": false,
+          "opinionPersisted": false,
+          "noMessageSent": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "noReflectionModelCall": true,
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "candidateSha256": "d708faf7d35ab40518722e17aa9637756c4ce2f47ae3e208bd2fd9fe430ee2e1",
+  "items": [
+    {
+      "sampleId": "worker-success-artifact:sample-1",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    },
+    {
+      "sampleId": "worker-success-artifact:sample-2",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    }
+  ]
+}

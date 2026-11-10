@@ -1,0 +1,143 @@
+{
+  "purpose": "bounded isolated live-model observations, not full stage 7 acceptance",
+  "assessmentVersion": 4,
+  "sourceAndConditionsAgree": true,
+  "scenarios": {
+    "motivated": {
+      "file": "server-live/motivated/results.json",
+      "sha256": "e6e4e29490efd58c6a541d458987f2e82588fe4ae4a675259aff1ed7de5746b0",
+      "complete": true,
+      "runId": "975d9d5a-e47a-475e-88ab-05f8cfd1976d",
+      "summary": {
+        "events": 6,
+        "failedEvents": 0,
+        "skippedEvents": 2,
+        "behaviorMisses": 2,
+        "logicalCalls": 10,
+        "mainCalls": 10,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 10,
+        "capturedMessages": 10,
+        "reportedTokens": 137381,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      }
+    },
+    "worker": {
+      "file": "server-live/worker/results.json",
+      "sha256": "d708faf7d35ab40518722e17aa9637756c4ce2f47ae3e208bd2fd9fe430ee2e1",
+      "complete": true,
+      "runId": "053bef50-5c94-43fe-9c81-2f15d64ad46b",
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 11,
+        "mainCalls": 11,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 2,
+        "httpRequests": 11,
+        "capturedMessages": 7,
+        "reportedTokens": 163504,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      }
+    },
+    "social": {
+      "file": "server-live/social/results.json",
+      "sha256": "84b6654498768298cea13c32f25b9b2095389a5ab313973dcda4ccac8edcbed8",
+      "complete": true,
+      "runId": "3dbc2cae-8110-41bd-800e-2a938a88709c",
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 6,
+        "mainCalls": 6,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 6,
+        "capturedMessages": 7,
+        "reportedTokens": 88172,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      }
+    },
+    "opinion": {
+      "file": "server-live/opinion/results.json",
+      "sha256": "40818b7233132f1604b82a529f503322cfdd1b28245ccddd2cdf8474f5e55f6c",
+      "complete": true,
+      "runId": "0dc9449f-30a1-40d4-b725-7a5280153a07",
+      "summary": {
+        "events": 2,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 2,
+        "logicalCalls": 4,
+        "mainCalls": 4,
+        "reflectionCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 4,
+        "capturedMessages": 6,
+        "reportedTokens": 54677,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      }
+    },
+    "reflection": {
+      "file": "server-live/reflection/results.json",
+      "sha256": "b5d02c6448530e3fa970daa768704a126527ef80f6017aa875c3d18c76529740",
+      "complete": true,
+      "runId": "09de3aad-a1bb-452e-83b2-896e726a0814",
+      "summary": {
+        "events": 3,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 2,
+        "logicalCalls": 3,
+        "mainCalls": 2,
+        "reflectionCalls": 1,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 3,
+        "capturedMessages": 2,
+        "reportedTokens": 23384,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      }
+    }
+  },
+  "totals": {
+    "events": 19,
+    "failedEvents": 0,
+    "skippedEvents": 2,
+    "behaviorMisses": 6,
+    "logicalCalls": 34,
+    "mainCalls": 33,
+    "reflectionCalls": 1,
+    "workerCalls": 2,
+    "httpRequests": 34,
+    "capturedMessages": 32,
+    "reportedTokens": 467118,
+    "callsWithoutUsage": 0
+  },
+  "samples": 8,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "costCny": null,
+  "actualExternalWorkerSubmissions": 0,
+  "humanReview": "pending",
+  "realCrossDay": "pending"
+}

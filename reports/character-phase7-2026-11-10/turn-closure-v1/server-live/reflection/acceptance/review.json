@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "candidateSha256": "b5d02c6448530e3fa970daa768704a126527ef80f6017aa875c3d18c76529740",
+  "items": [
+    {
+      "sampleId": "independent-reflection:sample-1",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    }
+  ]
+}

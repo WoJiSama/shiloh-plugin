@@ -1,0 +1,42 @@
+[1;32m[deploy][0m 类型、边界、前后端全量验证…
+ ✓ src/lib/groupAdminPage.test.ts (15 tests) 16545ms
+   ✓ group administration draft lifecycle > renders module tabs and bidirectional group links  2042ms
+   ✓ group administration draft lifecycle > sends only edited values and explicit resets, including a custom value equal to its default  2788ms
+   ✓ group administration draft lifecycle > restores legacy and custom fields while keeping each module enable flag  501ms
+   ✓ group administration draft lifecycle > switches sub-tabs inside a module and keeps hidden group drafts  1710ms
+   ✓ group administration draft lifecycle > retains edits made during a save without resubmitting already saved values  1417ms
+   ✓ group administration draft lifecycle > keeps a conflicting reset when refreshing server defaults and uses the new revision  1621ms
+   ✓ group administration draft lifecycle > discards pre-refresh drafts while retaining new edits made during a group reload  1799ms
+   ✓ group administration draft lifecycle > cancels switching groups without losing the draft and loads another group only after confirmation  894ms
+   ✓ group administration draft lifecycle > protects default-policy drafts when switching back to per-group configuration  552ms
+   ✓ group administration draft lifecycle > refreshes default policies while keeping edits made after the reload request begins  723ms
+   ✓ group administration draft lifecycle > aborts a prior group load and ignores its response after switching groups  459ms
+   ✓ group administration draft lifecycle > aborts a departed save and does not apply its response to another group  749ms
+   ✓ group administration draft lifecycle > opens group details from the management return link and exposes the matching management link  1117ms
+ ✓ src/lib/schemaState.test.ts (7 tests) 7ms
+ ✓ src/lib/api.test.ts (3 tests) 14ms
+ ✓ src/lib/clientId.test.ts (1 test) 3ms
+ ✓ src/lib/commands.test.ts (2 tests) 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/policyPages.test.ts > migrated policy settings > makes all tracking fields reachable once, including advanced fields
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/lib/policyPages.test.ts:132:13
+    130|     ['tracking', 54],
+    131|     ['memory', 35]
+    132|   ] as const)(
+       |             ^
+    133|     'makes all %s fields reachable once, including advanced fields',
+    134|     async (kind, count) => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 16 passed (17)
+      Tests  1 failed | 72 passed (73)
+   Start at  14:48:24
+   Duration  21.52s (transform 7.44s, setup 0ms, collect 46.09s, tests 73.76s, environment 14.80s, prepare 3.57s)
+
+[1;31m[deploy][0m 验收失败，未触碰服务器

@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "file": "results.json",
+    "sha256": "d708faf7d35ab40518722e17aa9637756c4ce2f47ae3e208bd2fd9fe430ee2e1",
+    "mode": "live_model",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "passed",
+    "behavior": "passed",
+    "liveModel": "passed",
+    "assessmentVersion": 4,
+    "repetitions": 2,
+    "runId": "053bef50-5c94-43fe-9c81-2f15d64ad46b",
+    "startedAtISO": "2026-11-10T06:32:22.740Z",
+    "fingerprints": {
+      "runnerHash": "e261d243cf94db3900fc45327f6dd51c03c96a5e626979c274ebe96510c8a163",
+      "scenariosHash": "14c09633847e6e84b70663de380c5b278235492eec52e3f968e3396c25d4b1dd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "buildManifestHash": "f9a4c185ae01dfcafe547bda78974869ea81ce163e7e8663c593868e34b82f11",
+      "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+      "scenarioManifestHash": "b5dd732b93d52c07e908376165b418603aaece3e0de0c491fff960fad3d17770"
+    },
+    "expectedEvents": 4,
+    "behaviorChecks": 10,
+    "successfulHttpRequests": 11,
+    "summary": {
+      "events": 4,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 11,
+      "mainCalls": 11,
+      "reflectionCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 2,
+      "httpRequests": 11,
+      "capturedMessages": 7,
+      "reportedTokens": 163504,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      }
+    ]
+  },
+  "comparison": {
+    "status": "pending",
+    "reason": "baseline_not_provided",
+    "singleVariableAttribution": false
+  },
+  "humanReview": {
+    "status": "pending",
+    "items": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      }
+    ]
+  },
+  "stage7": {
+    "status": "pending",
+    "realGroupObservation": "not_provided",
+    "deployment": "not_verified",
+    "reason": "Shadow reports cannot replace actual cross-day group observation and deployment evidence."
+  },
+  "evidenceTrust": "Fingerprints check local consistency and bind review to saved bytes; they do not authenticate a provider, a human reviewer or an actual independent deployment.",
+  "shadowAcceptance": "pending",
+  "exitCode": 2
+}

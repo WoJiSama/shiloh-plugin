@@ -1,0 +1,21 @@
+✔ store starts empty and round-trips puzzles, plays and sessions (624.069916ms)
+✔ store rejects corrupted files instead of silently resetting data (81.461916ms)
+✔ readTurtleSoupConfig reads miniGames.turtleSoup with defaults and clamping (19.270292ms)
+✔ same directory is shared safely by concurrent store instances and processes (1873.9195ms)
+✔ rating transaction retains concurrent votes, counts unique players, and pauses low-rated content (497.446208ms)
+✔ committed multi-file journal is readable and recovered after an interrupted export (190.452584ms)
+✔ an export failure after journal commit succeeds, remains readable and blocks writes until recovery (223.838083ms)
+✔ post-publish fsync and lock cleanup errors do not reject committed transactions (253.515416ms)
+✔ uncloneable transaction outcomes fail before publishing any state (5.18925ms)
+✔ candidate history, gameplay traces and strict puzzle status survive decoding (148.666208ms)
+✔ legacy running sessions expose their players immediately before round completion (151.891ms)
+✔ plugin and host roots resolve the same effective config, including legacy fields and global switch (8.540167ms)
+✔ dead lock owners and abandoned recovery locks recover without stealing a live long-running generation (319.099583ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4833.217541

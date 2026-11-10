@@ -1,0 +1,42 @@
+[1;32m[deploy][0m 类型、边界、前后端全量验证…
+✔ recognizes trusted YouTube watch, short and Shorts links (1.494375ms)
+✔ normalizes yt-dlp metadata without persisting a playback URL (1.188417ms)
+✔ passes YouTube authorization through temporary files without exposing it in metadata argv (21.583875ms)
+✔ keeps a concrete metadata failure reason when yt-dlp times out (0.425125ms)
+✔ outbox 预刷新与消息富化并发时只跑一次 yt-dlp (0.244125ms)
+✔ reports YouTube bot verification as a Cookie requirement instead of a member-only video (2004.400084ms)
+✔ YouTube relay only accepts an actual lowest single-file MP4 (11.701333ms)
+✔ YouTube 封面下载为本地文件,不把 ytimg URL 透传给适配器 (32.015416ms)
+✔ 封面下载失败时跳过封面,不影响其余节点且不透传 URL (10.113959ms)
+✔ passes YouTube authorization through temporary files without exposing it in download argv (52.177792ms)
+✔ 人机墙概率失败:第一发失败立即重试,第二发成功则解析成功 (2002.130167ms)
+✔ 两次都失败:返回不可用且不进缓存,下一条消息会重新尝试 (4009.428083ms)
+✔ 超时类失败不重试(避免拖慢回合) (1.071291ms)
+ℹ tests 3240
+ℹ suites 0
+ℹ pass 3237
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 2
+ℹ todo 0
+ℹ duration_ms 162188.122959
+
+✖ failing tests:
+
+test at tests/turtleSoupStore.test.js:252:1
+✖ dead lock owners and abandoned recovery locks recover without stealing a live long-running generation (1158.048917ms)
+  Error: 已有海龟汤生成任务进行中，请稍后重试
+      at withFileLock (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/dist/backend/modules/games/infrastructure/gameFiles.js:188:23)
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupStore.test.js:271:22)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+file:///Users/shiqi/IdeaProjects/bl-chat-plugin/scripts/lib/build-support.mjs:22
+  if (result.status !== 0) throw new Error(`${command} exited ${result.status}`)
+                                 ^
+
+Error: /Users/shiqi/.nvm/versions/node/v24.14.1/bin/node exited 1
+    at run (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/scripts/lib/build-support.mjs:22:34)
+    at file:///Users/shiqi/IdeaProjects/bl-chat-plugin/scripts/backend-test.mjs:14:1
+
+Node.js v24.14.1
+[1;31m[deploy][0m 验收失败，未触碰服务器

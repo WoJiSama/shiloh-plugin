@@ -1,0 +1,24 @@
+{
+  "beforeCommit": "08bed3eee22259d9e76c5e95ccf2e7ea75407e75",
+  "afterCommit": "536c1e80b82e033fcfa4d45eb3a0f5960c03e9da",
+  "privateConfigIdentical": true,
+  "preservedGroupFields": {
+    "groupId": "609235590",
+    "active": true,
+    "replyMode": "atOnly",
+    "maxTurnsPerDay": 12,
+    "dailyEstimatedCostThresholdCny": 1,
+    "binding": {
+      "status": "bound",
+      "botId": "3094088525",
+      "personaId": "default"
+    },
+    "paused": false,
+    "memoryCount": 0,
+    "goalCount": 0,
+    "revision": 37,
+    "independentRedisMatches": true
+  },
+  "qqMessagesSentByVerifiers": 0,
+  "productionWritesByVerifiers": 0
+}

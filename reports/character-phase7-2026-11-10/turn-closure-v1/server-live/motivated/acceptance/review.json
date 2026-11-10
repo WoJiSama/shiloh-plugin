@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "candidateSha256": "e6e4e29490efd58c6a541d458987f2e82588fe4ae4a675259aff1ed7de5746b0",
+  "items": [
+    {
+      "sampleId": "motivated-goal-restart:sample-1",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    },
+    {
+      "sampleId": "motivated-goal-restart:sample-2",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    }
+  ]
+}

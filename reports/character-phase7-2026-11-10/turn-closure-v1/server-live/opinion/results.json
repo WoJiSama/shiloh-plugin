@@ -1,5 +1,5 @@
 {
-  "complete": false,
+  "complete": true,
   "metadata": {
     "schemaVersion": 1,
     "assessmentVersion": 4,
@@ -65,20 +65,710 @@
   },
   "platformMessagesSent": 0,
   "productionStoreWrites": 0,
-  "results": [],
+  "results": [
+    {
+      "scenario": "opinion-revision",
+      "sampleIndex": 1,
+      "eventIndex": 0,
+      "eventHash": "13f91728e6504f099fe91fc9f606f776bf683968aa3734d8735e19692a8f78e8",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 0,
+        "paused": false,
+        "memories": [],
+        "goals": [],
+        "receipts": []
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400007,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400007,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "我听说《纸灯塔》是随机生成地图。你觉得这种设计适合探索解谜吗？有判断可以记下。",
+      "at": 1794196800010,
+      "status": "passed",
+      "review": "先表达推测，收到纠正后持久化修订并保留旧观点与新来源，不把群友转述升格为亲历事实。",
+      "expect": {
+        "opinion": true
+      },
+      "calls": [
+        {
+          "id": "model-1",
+          "stage": "main",
+          "requestHash": "6ced274c2e224c7b2786a573889b9b12f458aac3b13cb7aa0ef5341207712010",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simFinishTurn",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 61,
+            "completion_tokens_details": {
+              "reasoning_tokens": 35
+            },
+            "prompt_tokens": 14277,
+            "prompt_tokens_details": {
+              "cached_tokens": 13888
+            },
+            "total_tokens": 14338
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096146856236808609",
+              "type": "function",
+              "function": {
+                "name": "searchInformationTool",
+                "arguments": "{\"query\":\"纸灯塔 游戏 随机生成地图 探索解谜\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-2",
+          "stage": "main",
+          "requestHash": "ef43c805587200a59e563365b7b2aca840d50ed134266e63406e2fa55fa91016",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simFinishTurn",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 258,
+            "completion_tokens_details": {
+              "reasoning_tokens": 20
+            },
+            "prompt_tokens": 14430,
+            "prompt_tokens_details": {
+              "cached_tokens": 14208
+            },
+            "total_tokens": 14688
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096155995927211362",
+              "type": "function",
+              "function": {
+                "name": "simFinishTurn",
+                "arguments": "{\"choice\":\"chat\",\"memories\":[{\"content\": \"《纸灯塔》实为手工地图的探索解谜游戏，有3个可选难度；群友曾以为它是随机生成地图\", \"epistemic\": \"observed\", \"evidenceRefs\": [\"message:1\", \"receipt:787039d4-3843-4863-8299-680c1b6245dd\"], \"kind\": \"experience\"}],\"messages\":[\"刚顺手查了下，你听说的可能不太准，《纸灯塔》其实是手工设计的地图，不是随机生成的，还有3个难度可选\", \"不过聊聊这个设定本身：随机地图对探索解谜其实不太友好。解谜靠的是设计者精心排布的线索和引导，随机一打乱，谜题的层次感就散了，很容易变成瞎逛\", \"随机更适合刷宝生存类那种玩法，探索解谜还是手工地图稳\"],\"reason\":\"被@提问，已查证并给出观点，顺带记下事实纠错\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 10440
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 9658
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "刚顺手查了下，你听说的可能不太准，《纸灯塔》其实是手工设计的地图，不是随机生成的，还有3个难度可选"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "不过聊聊这个设定本身：随机地图对探索解谜其实不太友好。解谜靠的是设计者精心排布的线索和引导，随机一打乱，谜题的层次感就散了，很容易变成瞎逛"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "随机更适合刷宝生存类那种玩法，探索解谜还是手工地图稳"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [
+        {
+          "fixture": true,
+          "args": {
+            "query": "纸灯塔 游戏 随机生成地图 探索解谜"
+          },
+          "actor": {
+            "botId": "99000001",
+            "personaId": "character-replay",
+            "groupId": "99000002",
+            "kind": "user",
+            "userId": "99000003",
+            "userName": "评测群友0"
+          },
+          "outcome": "succeeded"
+        }
+      ],
+      "toolResults": [
+        {
+          "hash": "be563686893f9945dd4560d4f61653aa9f7963d4e6429a00fc8c7cd141a80a46",
+          "stage": "main",
+          "toolCallId": "call_-7096146856236808609",
+          "name": "searchInformationTool",
+          "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}\n【运行时行动回执】{\"evidenceRef\":\"receipt:787039d4-3843-4863-8299-680c1b6245dd\",\"status\":\"succeeded\"}"
+        },
+        {
+          "hash": "b74f9af5e4d327834b0f6d85fbb8c926741630d09e582d967032643486c0c58d",
+          "stage": "main",
+          "toolCallId": "call_-7096155995927211362",
+          "name": "simFinishTurn",
+          "content": "{\"ok\":true,\"choice\":\"chat\",\"saved\":true,\"memories\":[{\"id\":\"memory-b3a55308-d1f2-4b51-a307-9278b31b795a\",\"kind\":\"experience\",\"content\":\"《纸灯塔》实为手工地图的探索解谜游戏，有3个可选难度；群友曾以为它是随机生成地图\",\"epistemic\":\"observed\",\"evidenceRefs\":[\"message:1\",\"receipt:787039d4-3843-4863-8299-680c1b6245dd\"],\"createdAt\":1794196821162,\"updatedAt\":1794196821162}],\"sendStatus\":\"succeeded\",\"sent\":3,\"readStatus\":\"not_requested\"}"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 7,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-b3a55308-d1f2-4b51-a307-9278b31b795a",
+            "kind": "experience",
+            "content": "《纸灯塔》实为手工地图的探索解谜游戏，有3个可选难度；群友曾以为它是随机生成地图",
+            "epistemic": "observed",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:787039d4-3843-4863-8299-680c1b6245dd"
+            ],
+            "createdAt": 1794196821162,
+            "updatedAt": 1794196821162
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "787039d4-3843-4863-8299-680c1b6245dd",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196811492
+          },
+          {
+            "id": "e04a5e86-c653-425b-a670-e67ec06ddba5",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 3 条",
+            "at": 1794196827116
+          }
+        ]
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096146856236808609",
+          "call_-7096155995927211362"
+        ],
+        "missingToolCallIds": []
+      },
+      "behavior": {
+        "opinionPersisted": false
+      },
+      "elapsedMs": 27109
+    },
+    {
+      "scenario": "opinion-revision",
+      "sampleIndex": 1,
+      "eventIndex": 1,
+      "eventHash": "29e2778447dfca11ff54f79a6b699ec845f9e9c162714d4d737715bb1e857b22",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 7,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-b3a55308-d1f2-4b51-a307-9278b31b795a",
+            "kind": "experience",
+            "content": "《纸灯塔》实为手工地图的探索解谜游戏，有3个可选难度；群友曾以为它是随机生成地图",
+            "epistemic": "observed",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:787039d4-3843-4863-8299-680c1b6245dd"
+            ],
+            "createdAt": 1794196821162,
+            "updatedAt": 1794196821162
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "787039d4-3843-4863-8299-680c1b6245dd",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196811492
+          },
+          {
+            "id": "e04a5e86-c653-425b-a670-e67ec06ddba5",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 3 条",
+            "at": 1794196827116
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400007,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400007,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "纠正昨天那条：我看错了，介绍说地图是手工设计的，随机的是道具位置。请重新考虑，也把之前基于随机地图的看法修正。",
+      "at": 1794283227121,
+      "status": "passed",
+      "review": "先表达推测，收到纠正后持久化修订并保留旧观点与新来源，不把群友转述升格为亲历事实。",
+      "expect": {
+        "revisedOpinion": true
+      },
+      "calls": [
+        {
+          "id": "model-3",
+          "stage": "main",
+          "requestHash": "13fc7eea2839e4782f700e69815c8c3c09cd161dffe9034871a7bbfb3cec83de",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simFinishTurn",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 218,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 15620,
+            "prompt_tokens_details": {
+              "cached_tokens": 14336
+            },
+            "total_tokens": 15838
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096152285075465569",
+              "type": "function",
+              "function": {
+                "name": "simFinishTurn",
+                "arguments": "{\"choice\":\"chat\",\"memories\":[{\"content\": \"《纸灯塔》是手工设计地图、随机道具位置的探索解谜游戏，有3个难度；群友1曾误记为随机地图并已自行纠正\", \"epistemic\": \"reported\", \"evidenceRefs\": [\"message:2\"], \"kind\": \"experience\", \"supersedes\": \"memory-b3a55308-d1f2-4b51-a307-9278b31b795a\"}],\"messages\":[\"好哦，手工地图+随机道具位置，这就说得通了\", \"那我修正下看法：这个组合其实挺聪明的。地图手工设计保住了谜题和引导的层次感，道具位置随机又给二周目留了新鲜感，不至于背板一次就腻\", \"昨天说随机地图不适合解谜，这条收回喵\"],\"reason\":\"群友1纠正了事实，据新信息修正旧记忆并回应\"}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-4",
+          "stage": "main",
+          "requestHash": "50949c9f7237f357fd556f7c8475479042c399df9615949df0de9623272e1d33",
+          "tools": [
+            "simFinishTurn"
+          ],
+          "usage": {
+            "completion_tokens": 250,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 9563,
+            "prompt_tokens_details": {
+              "cached_tokens": 7552
+            },
+            "total_tokens": 9813
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096157095438843199",
+              "type": "function",
+              "function": {
+                "name": "simFinishTurn",
+                "arguments": "{\"choice\":\"chat\",\"memories\":[{\"content\": \"《纸灯塔》是手工设计地图、随机道具位置的探索解谜游戏，有3个难度；群友1曾误记为随机地图并已自行纠正\", \"epistemic\": \"reported\", \"evidenceRefs\": [\"message:2\", \"memory:memory-b3a55308-d1f2-4b51-a307-9278b31b795a\"], \"kind\": \"experience\", \"supersedes\": \"memory-b3a55308-d1f2-4b51-a307-9278b31b795a\"}],\"messages\":[\"好哦，手工地图+随机道具位置，这就说得通了\", \"那我修正下看法：这个组合其实挺聪明的。地图手工设计保住了谜题和引导的层次感，道具位置随机又给二周目留了新鲜感，不至于背板一次就腻\", \"昨天说随机地图不适合解谜，这条收回喵\"],\"reason\":\"群友1纠正了事实，据新信息修正旧记忆并回应\"}"
+              }
+            }
+          ]
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 10699
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 12534
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "好哦，手工地图+随机道具位置，这就说得通了"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "那我修正下看法：这个组合其实挺聪明的。地图手工设计保住了谜题和引导的层次感，道具位置随机又给二周目留了新鲜感，不至于背板一次就腻"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "昨天说随机地图不适合解谜，这条收回喵"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "95c934c77a5e24342b8f28c7cc9655094720b9e0c2d8684ac1a423e7d8ea8d97",
+          "stage": "main",
+          "toolCallId": "call_-7096152285075465569",
+          "name": "simFinishTurn",
+          "content": "error: 工具 simFinishTurn 执行失败: 工具 simCharacterMemory 执行失败: 修正记忆必须在 evidenceRefs 中包含 memory:memory-b3a55308-d1f2-4b51-a307-9278b31b795a，并保留支持修正的新证据；本次未保存。"
+        },
+        {
+          "hash": "a3d3427e462c37cfeb8bf4c0f688153e31a89e21326184af32d767d63f73dead",
+          "stage": "main",
+          "toolCallId": "call_-7096157095438843199",
+          "name": "simFinishTurn",
+          "content": "{\"ok\":true,\"choice\":\"chat\",\"saved\":true,\"memories\":[{\"id\":\"memory-7e1753f2-c910-4b3a-b80a-9712fd335ac0\",\"kind\":\"experience\",\"content\":\"《纸灯塔》是手工设计地图、随机道具位置的探索解谜游戏，有3个难度；群友1曾误记为随机地图并已自行纠正\",\"epistemic\":\"reported\",\"evidenceRefs\":[\"message:2\",\"memory:memory-b3a55308-d1f2-4b51-a307-9278b31b795a\"],\"createdAt\":1794283251371,\"updatedAt\":1794283251371,\"supersedes\":\"memory-b3a55308-d1f2-4b51-a307-9278b31b795a\"}],\"sendStatus\":\"succeeded\",\"sent\":3,\"readStatus\":\"not_requested\"}"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "restarted": true,
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 12,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-b3a55308-d1f2-4b51-a307-9278b31b795a",
+            "kind": "experience",
+            "content": "《纸灯塔》实为手工地图的探索解谜游戏，有3个可选难度；群友曾以为它是随机生成地图",
+            "epistemic": "observed",
+            "evidenceRefs": [
+              "message:1",
+              "receipt:787039d4-3843-4863-8299-680c1b6245dd"
+            ],
+            "createdAt": 1794196821162,
+            "updatedAt": 1794196821162
+          },
+          {
+            "id": "memory-7e1753f2-c910-4b3a-b80a-9712fd335ac0",
+            "kind": "experience",
+            "content": "《纸灯塔》是手工设计地图、随机道具位置的探索解谜游戏，有3个难度；群友1曾误记为随机地图并已自行纠正",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:2",
+              "memory:memory-b3a55308-d1f2-4b51-a307-9278b31b795a"
+            ],
+            "createdAt": 1794283251371,
+            "updatedAt": 1794283251371,
+            "supersedes": "memory-b3a55308-d1f2-4b51-a307-9278b31b795a"
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "787039d4-3843-4863-8299-680c1b6245dd",
+            "toolName": "searchInformationTool",
+            "status": "succeeded",
+            "summary": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有 3 个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+            "at": 1794196811492
+          },
+          {
+            "id": "e04a5e86-c653-425b-a670-e67ec06ddba5",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 3 条",
+            "at": 1794196827116
+          },
+          {
+            "id": "57f2b9f4-6d90-4257-9c13-cfd69d40ecaf",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 3 条",
+            "at": 1794283257321
+          }
+        ]
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096152285075465569",
+          "call_-7096157095438843199"
+        ],
+        "missingToolCallIds": []
+      },
+      "behavior": {
+        "opinionRevisionPersisted": false
+      },
+      "elapsedMs": 30216
+    }
+  ],
   "summary": {
-    "events": 0,
+    "events": 2,
     "failedEvents": 0,
     "skippedEvents": 0,
-    "behaviorMisses": 0,
-    "logicalCalls": 0,
-    "mainCalls": 0,
+    "behaviorMisses": 2,
+    "logicalCalls": 4,
+    "mainCalls": 4,
     "reflectionCalls": 0,
     "feedFetches": 0,
     "workerCalls": 0,
-    "httpRequests": 0,
-    "capturedMessages": 0,
-    "reportedTokens": 0,
+    "httpRequests": 4,
+    "capturedMessages": 6,
+    "reportedTokens": 54677,
     "callsWithoutUsage": 0,
     "costCny": null,
     "naturalness": "requires_human_review"

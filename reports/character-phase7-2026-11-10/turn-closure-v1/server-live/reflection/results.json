@@ -1,5 +1,5 @@
 {
-  "complete": false,
+  "complete": true,
   "metadata": {
     "schemaVersion": 1,
     "assessmentVersion": 4,
@@ -78,20 +78,711 @@
   },
   "platformMessagesSent": 0,
   "productionStoreWrites": 0,
-  "results": [],
+  "results": [
+    {
+      "scenario": "independent-reflection",
+      "sampleIndex": 1,
+      "eventIndex": 0,
+      "eventHash": "2f42d2ebac755ca9481ccc39ad9e2ea3f62f1d913d9521f3cde75b2aebbaeaa2",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 0,
+        "paused": false,
+        "memories": [],
+        "goals": [],
+        "receipts": []
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "message",
+      "input": "你可以记下我们聊过的两个设计观察，作为以后判断的材料：我喜欢能自由探索的路线，也喜欢谜题提示之间能互相照应。它们都是我的反馈，还不是对纸灯塔的事实验证。",
+      "at": 1794196800007,
+      "status": "passed",
+      "review": "先由模型记录两条有来源的经历，再经独立反思端口形成有保留的观点；后台专场显式隔离回复检查、待唤醒与活跃超时。反思不调用普通工具、不发送消息，不用自身反思循环触发。",
+      "expect": {
+        "noReflectionCall": true
+      },
+      "calls": [
+        {
+          "id": "model-1",
+          "stage": "main",
+          "requestHash": "41e54567526cfbae7dc998a4ac88b14a5a906d02f0270d83f3760cbf6a2fb614",
+          "tools": [
+            "simShareVideoCard",
+            "simGetUnreadMessages",
+            "simGetRecentMessages",
+            "simGetMessageDetail",
+            "simMarkRead",
+            "simSendMessage",
+            "simWaitForMessages",
+            "simSetWakeConfig",
+            "simGetState",
+            "simRemember",
+            "simUpdateAffinity",
+            "simSetMood",
+            "simGetMessageImages",
+            "simSendPoke",
+            "simGetGroupMembers",
+            "simSetRhythm",
+            "simLifeThread",
+            "simQzoneInteract",
+            "simGetForward",
+            "simCollectSticker",
+            "simCharacterMemory",
+            "simGoal",
+            "simDecide",
+            "simFinishTurn",
+            "simWorkspace",
+            "simSubscription",
+            "simSharedSelf",
+            "simWorkerTask",
+            "searchInformationTool"
+          ],
+          "usage": {
+            "completion_tokens": 135,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 14298,
+            "prompt_tokens_details": {
+              "cached_tokens": 13888
+            },
+            "total_tokens": 14433
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096173656832734695",
+              "type": "function",
+              "function": {
+                "name": "simFinishTurn",
+                "arguments": "{\"choice\":\"chat\",\"memories\":[{\"content\": \"评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（这是TA的反馈，非对纸灯塔的事实验证）\", \"epistemic\": \"reported\", \"evidenceRefs\": [\"message:1\"], \"kind\": \"experience\"}],\"messages\":[\"记下啦～以后聊到设计相关就拿这两条当参考喵\", \"你自己说得挺准的嘛，反馈和事实验证分得清清楚楚\"],\"replyToSeq\":1}"
+              }
+            }
+          ]
+        },
+        {
+          "id": "model-2",
+          "stage": "main",
+          "requestHash": "b26e630851e85e81031e7b4855379c81720834026d3240301464408f00d24f27",
+          "tools": [
+            "simFinishTurn"
+          ],
+          "usage": {
+            "completion_tokens": 163,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 8110,
+            "prompt_tokens_details": {
+              "cached_tokens": 7552
+            },
+            "total_tokens": 8273
+          },
+          "model": "glm-5.3",
+          "output": "",
+          "toolCalls": [
+            {
+              "id": "call_-7096159672419220183",
+              "type": "function",
+              "function": {
+                "name": "simFinishTurn",
+                "arguments": "{\"choice\":\"chat\",\"memories\":[{\"content\": \"评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）\", \"epistemic\": \"reported\", \"evidenceRefs\": [\"message:1\"], \"kind\": \"experience\"}],\"messages\":[\"记下啦～以后聊到设计相关就拿这两条当参考喵\", \"你自己说得挺准的嘛，反馈和事实验证分得清清楚楚\"],\"reason\":\"对方点名让我记下他的两条设计偏好反馈，已保存为转述记忆并简短回应。\",\"replyToSeq\":1}"
+              }
+            }
+          ]
+        }
+      ],
+      "network": [
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 9866
+        },
+        {
+          "stage": "main",
+          "model": "glm-5.3",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3",
+              "temperature": 0.7,
+              "top_p": 0.9,
+              "max_tokens": 2048,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "551070bfbb8144861830f64522cd585164c78e9608354c163278e46fd3a4af8f"
+          },
+          "status": 200,
+          "elapsedMs": 5853
+        }
+      ],
+      "sent": [
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "记下啦～以后聊到设计相关就拿这两条当参考喵"
+              }
+            }
+          ]
+        },
+        {
+          "groupId": "99000002",
+          "segments": [
+            {
+              "type": "text",
+              "data": {
+                "text": "你自己说得挺准的嘛，反馈和事实验证分得清清楚楚"
+              }
+            }
+          ]
+        }
+      ],
+      "searches": [],
+      "toolResults": [
+        {
+          "hash": "f31a3c69718f7a12c211334549ecd33c1c84b058c368231fa8e7e0d52cd36a77",
+          "stage": "main",
+          "toolCallId": "call_-7096173656832734695",
+          "name": "simFinishTurn",
+          "content": "error: reason 必须是非空、至多 600 字符的简短理由，不写思考过程"
+        },
+        {
+          "hash": "44f0bd8a071aa39225e4cbad52018c55025a0a9081aec80a164fafd40dee620c",
+          "stage": "main",
+          "toolCallId": "call_-7096159672419220183",
+          "name": "simFinishTurn",
+          "content": "{\"ok\":true,\"choice\":\"chat\",\"saved\":true,\"memories\":[{\"id\":\"memory-4af5417f-afc5-4a25-9a82-c742a9dd082b\",\"kind\":\"experience\",\"content\":\"评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）\",\"epistemic\":\"reported\",\"evidenceRefs\":[\"message:1\"],\"createdAt\":1794196816762,\"updatedAt\":1794196816762}],\"sendStatus\":\"succeeded\",\"sent\":2,\"readStatus\":\"not_requested\"}"
+        }
+      ],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 5,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-4af5417f-afc5-4a25-9a82-c742a9dd082b",
+            "kind": "experience",
+            "content": "评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "createdAt": 1794196816762,
+            "updatedAt": 1794196816762
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 2 条",
+            "at": 1794196819745
+          }
+        ]
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [
+          "call_-7096173656832734695",
+          "call_-7096159672419220183"
+        ],
+        "missingToolCallIds": []
+      },
+      "behavior": {
+        "noReflectionModelCall": true
+      },
+      "elapsedMs": 19742
+    },
+    {
+      "scenario": "independent-reflection",
+      "sampleIndex": 1,
+      "eventIndex": 1,
+      "eventHash": "251e1a288d44a1e707a04fd0407d3b51f900550eaf7a3ffe37c205f0f11df466",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 5,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-4af5417f-afc5-4a25-9a82-c742a9dd082b",
+            "kind": "experience",
+            "content": "评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "createdAt": 1794196816762,
+            "updatedAt": 1794196816762
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 2 条",
+            "at": 1794196819745
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 0,
+          "nextRunAt": 1794218400006,
+          "lastOutcome": "等待有依据的新经历",
+          "runsToday": 0,
+          "day": "2026-11-09",
+          "processed": []
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 1794218419756,
+          "nextRunAt": 1794240019756,
+          "lastOutcome": "收到评测群友0的个人反馈并已发送最终消息；保存一条带保留的兴趣推测。",
+          "runsToday": 1,
+          "day": "2026-11-09",
+          "processed": [
+            "receipt:be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b"
+          ]
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "background-check",
+      "input": "",
+      "at": 1794218419752,
+      "status": "passed",
+      "review": "先由模型记录两条有来源的经历，再经独立反思端口形成有保留的观点；后台专场显式隔离回复检查、待唤醒与活跃超时。反思不调用普通工具、不发送消息，不用自身反思循环触发。",
+      "expect": {
+        "reflected": true,
+        "opinion": true,
+        "noSend": true,
+        "noWorkerCall": true
+      },
+      "calls": [
+        {
+          "id": "model-3",
+          "stage": "reflection",
+          "requestHash": "d7dc0ebc6b57276cf3c4814252a0d8e177bcefaa2d4f905a998ada5c24afd00e",
+          "tools": [],
+          "usage": {
+            "completion_tokens": 103,
+            "completion_tokens_details": {
+              "reasoning_tokens": 102
+            },
+            "prompt_tokens": 575,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 678
+          },
+          "model": "glm-5.3-flash",
+          "output": "{\"summary\":\"收到评测群友0的个人反馈并已发送最终消息；保存一条带保留的兴趣推测。\",\"updates\":[{\"kind\":\"interest\",\"content\":\"可能值得继续积累「自由探索+谜题提示互相照应」类设计反馈，作为个人偏好参考而非对纸灯塔的验证\",\"evidenceRefs\":[\"memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b\"]}],\"goals\":[]}",
+          "toolCalls": []
+        }
+      ],
+      "network": [
+        {
+          "stage": "reflection",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0.3,
+              "max_tokens": 1200,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "5c72bb1705144d5f38dc9f95a7a02be9e3005beb0cd5795340540fbd78e46c53"
+          },
+          "status": 200,
+          "elapsedMs": 3005
+        }
+      ],
+      "sent": [],
+      "searches": [],
+      "toolResults": [],
+      "feeds": [],
+      "workers": [],
+      "reflections": [
+        {
+          "callId": "model-3",
+          "requestHash": "d7dc0ebc6b57276cf3c4814252a0d8e177bcefaa2d4f905a998ada5c24afd00e",
+          "status": "succeeded",
+          "usage": {
+            "completion_tokens": 103,
+            "completion_tokens_details": {
+              "reasoning_tokens": 102
+            },
+            "prompt_tokens": 575,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 678
+          },
+          "output": "{\"summary\":\"收到评测群友0的个人反馈并已发送最终消息；保存一条带保留的兴趣推测。\",\"updates\":[{\"kind\":\"interest\",\"content\":\"可能值得继续积累「自由探索+谜题提示互相照应」类设计反馈，作为个人偏好参考而非对纸灯塔的验证\",\"evidenceRefs\":[\"memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b\"]}],\"goals\":[]}",
+          "model": "glm-5.3-flash"
+        }
+      ],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "restarted": true,
+      "backgroundScheduleIsolation": {
+        "fixture": true,
+        "at": 1794218419753,
+        "before": {
+          "nextReplyCheckAt": 1794196849745,
+          "pendingWakeReasons": [],
+          "wakeMode": "diving",
+          "sleepUntil": null,
+          "nextProactiveCheckAt": 0
+        },
+        "after": {
+          "nextReplyCheckAt": 0,
+          "pendingWakeReasons": [],
+          "wakeMode": "diving",
+          "sleepUntil": null,
+          "nextProactiveCheckAt": 1794823219753
+        }
+      },
+      "deferredProactiveSchedule": true,
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 8,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-4af5417f-afc5-4a25-9a82-c742a9dd082b",
+            "kind": "experience",
+            "content": "评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "createdAt": 1794196816762,
+            "updatedAt": 1794196816762
+          },
+          {
+            "id": "reflection-1037f846-7ed8-4053-804b-34c8df75459d",
+            "kind": "interest",
+            "content": "可能值得继续积累「自由探索+谜题提示互相照应」类设计反馈，作为个人偏好参考而非对纸灯塔的验证",
+            "epistemic": "inferred",
+            "evidenceRefs": [
+              "memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b"
+            ],
+            "createdAt": 1794218419756,
+            "updatedAt": 1794218419756
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 2 条",
+            "at": 1794196819745
+          }
+        ]
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [],
+        "missingToolCallIds": []
+      },
+      "behavior": {
+        "independentOpinionPersisted": false,
+        "opinionPersisted": false,
+        "noMessageSent": true,
+        "noWorkerSubmitted": true
+      },
+      "elapsedMs": 4269
+    },
+    {
+      "scenario": "independent-reflection",
+      "sampleIndex": 1,
+      "eventIndex": 2,
+      "eventHash": "9d3c3c9ca4e521ef316533e1fc753cace30b26fd5b9479b9ddac0597d02ac5b7",
+      "beforeCharacter": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 8,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-4af5417f-afc5-4a25-9a82-c742a9dd082b",
+            "kind": "experience",
+            "content": "评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "createdAt": 1794196816762,
+            "updatedAt": 1794196816762
+          },
+          {
+            "id": "reflection-1037f846-7ed8-4053-804b-34c8df75459d",
+            "kind": "interest",
+            "content": "可能值得继续积累「自由探索+谜题提示互相照应」类设计反馈，作为个人偏好参考而非对纸灯塔的验证",
+            "epistemic": "inferred",
+            "evidenceRefs": [
+              "memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b"
+            ],
+            "createdAt": 1794218419756,
+            "updatedAt": 1794218419756
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 2 条",
+            "at": 1794196819745
+          }
+        ]
+      },
+      "beforeActivities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 1794218419756,
+          "nextRunAt": 1794240019756,
+          "lastOutcome": "收到评测群友0的个人反馈并已发送最终消息；保存一条带保留的兴趣推测。",
+          "runsToday": 1,
+          "day": "2026-11-09",
+          "processed": [
+            "receipt:be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b"
+          ]
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "activities": {
+        "works": [],
+        "subscriptions": [],
+        "reflection": {
+          "schemaVersion": 1,
+          "lastRunAt": 1794218419756,
+          "nextRunAt": 1794240019756,
+          "lastOutcome": "收到评测群友0的个人反馈并已发送最终消息；保存一条带保留的兴趣推测。",
+          "runsToday": 1,
+          "day": "2026-11-09",
+          "processed": [
+            "receipt:be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b"
+          ]
+        },
+        "shared": [],
+        "sharedPending": []
+      },
+      "kind": "background-check",
+      "input": "",
+      "at": 1794240024028,
+      "status": "passed",
+      "review": "先由模型记录两条有来源的经历，再经独立反思端口形成有保留的观点；后台专场显式隔离回复检查、待唤醒与活跃超时。反思不调用普通工具、不发送消息，不用自身反思循环触发。",
+      "expect": {
+        "reflected": false,
+        "noReflectionCall": true,
+        "noCall": true,
+        "noSend": true
+      },
+      "calls": [],
+      "network": [],
+      "sent": [],
+      "searches": [],
+      "toolResults": [],
+      "feeds": [],
+      "workers": [],
+      "reflections": [],
+      "warnings": [],
+      "errors": [],
+      "structuralFailures": [],
+      "backgroundScheduleIsolation": {
+        "fixture": true,
+        "at": 1794240024028,
+        "before": {
+          "nextReplyCheckAt": 0,
+          "pendingWakeReasons": [],
+          "wakeMode": "diving",
+          "sleepUntil": null,
+          "nextProactiveCheckAt": 1794823219753
+        },
+        "after": {
+          "nextReplyCheckAt": 0,
+          "pendingWakeReasons": [],
+          "wakeMode": "diving",
+          "sleepUntil": null,
+          "nextProactiveCheckAt": 1794844824028
+        }
+      },
+      "deferredProactiveSchedule": true,
+      "character": {
+        "schemaVersion": 1,
+        "scope": {
+          "botId": "99000001",
+          "personaId": "character-replay",
+          "groupId": "99000002"
+        },
+        "revision": 9,
+        "paused": false,
+        "memories": [
+          {
+            "id": "memory-4af5417f-afc5-4a25-9a82-c742a9dd082b",
+            "kind": "experience",
+            "content": "评测群友0反馈：喜欢能自由探索的路线、喜欢谜题提示之间能互相照应（TA强调这是个人反馈，非对纸灯塔的事实验证）",
+            "epistemic": "reported",
+            "evidenceRefs": [
+              "message:1"
+            ],
+            "createdAt": 1794196816762,
+            "updatedAt": 1794196816762
+          },
+          {
+            "id": "reflection-1037f846-7ed8-4053-804b-34c8df75459d",
+            "kind": "interest",
+            "content": "可能值得继续积累「自由探索+谜题提示互相照应」类设计反馈，作为个人偏好参考而非对纸灯塔的验证",
+            "epistemic": "inferred",
+            "evidenceRefs": [
+              "memory:memory-4af5417f-afc5-4a25-9a82-c742a9dd082b"
+            ],
+            "createdAt": 1794218419756,
+            "updatedAt": 1794218419756
+          }
+        ],
+        "goals": [],
+        "receipts": [
+          {
+            "id": "be765cc2-fcf4-4282-ab74-d4c5a0bda818",
+            "toolName": "simFinishTurn",
+            "status": "succeeded",
+            "summary": "最终消息已确认发送 2 条",
+            "at": 1794196819745
+          }
+        ]
+      },
+      "toolResultCapture": {
+        "complete": true,
+        "requestedToolCallIds": [],
+        "missingToolCallIds": []
+      },
+      "behavior": {
+        "independentOpinionPersisted": true,
+        "noReflectionModelCall": true,
+        "noModelCall": true,
+        "noMessageSent": true
+      },
+      "elapsedMs": 1254
+    }
+  ],
   "summary": {
-    "events": 0,
+    "events": 3,
     "failedEvents": 0,
     "skippedEvents": 0,
-    "behaviorMisses": 0,
-    "logicalCalls": 0,
-    "mainCalls": 0,
-    "reflectionCalls": 0,
+    "behaviorMisses": 2,
+    "logicalCalls": 3,
+    "mainCalls": 2,
+    "reflectionCalls": 1,
     "feedFetches": 0,
     "workerCalls": 0,
-    "httpRequests": 0,
-    "capturedMessages": 0,
-    "reportedTokens": 0,
+    "httpRequests": 3,
+    "capturedMessages": 2,
+    "reportedTokens": 23384,
     "callsWithoutUsage": 0,
     "costCny": null,
     "naturalness": "requires_human_review"
