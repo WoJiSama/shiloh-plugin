@@ -1,0 +1,120 @@
+[1;32m[deploy][0m 类型、边界、前后端全量验证…
+
+> shiloh-plugin@0.0.1 release:pack
+> node scripts/release.mjs pack
+
+
+> shiloh-plugin@0.0.1 backend:build
+> node scripts/backend-build.mjs
+
+Backend built: 1659 files, TypeScript 5.9.3
+
+> shiloh-plugin@0.0.1 console:build
+> npm --prefix console/frontend run build
+
+
+> bl-chat-console@1.0.0 build
+> vue-tsc --noEmit && vite build
+
+vite v7.3.7 building client environment for production...
+transforming...
+✓ 4338 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                           0.94 kB │ gzip:   0.56 kB
+dist/assets/ConversationPage-szbIBlnd.css                                 0.14 kB │ gzip:   0.13 kB
+dist/assets/EmbeddedPage-BHscnmE8.css                                     0.17 kB │ gzip:   0.15 kB
+dist/assets/TrusteeshipPage-ZMcA8d_a.css                                  0.25 kB │ gzip:   0.15 kB
+dist/assets/IdentityLabel-DIIdRdJT.css                                    0.36 kB │ gzip:   0.23 kB
+dist/assets/PersonProfilesPage-Bhh-W7Zl.css                               0.41 kB │ gzip:   0.20 kB
+dist/assets/StylePage-D8ryL32W.css                                        0.65 kB │ gzip:   0.32 kB
+dist/assets/LifePage-C2I6Ebr6.css                                         0.84 kB │ gzip:   0.33 kB
+dist/assets/PipelinePage-DVrYYXIo.css                                     0.85 kB │ gzip:   0.38 kB
+dist/assets/TokensPage-BBLXSd5q.css                                       1.15 kB │ gzip:   0.48 kB
+dist/assets/SemanticPage-DE0iO3Ls.css                                     1.56 kB │ gzip:   0.54 kB
+dist/assets/SimulationPage-BhSqz803.css                                   1.85 kB │ gzip:   0.58 kB
+dist/assets/BotDetailPage-Cv1rFhFd.css                                    1.94 kB │ gzip:   0.63 kB
+dist/assets/QzoneComposer-C80CfDDt.css                                    2.69 kB │ gzip:   0.84 kB
+dist/assets/DrawPage-Dh1XaVTA.css                                         3.00 kB │ gzip:   0.89 kB
+dist/assets/GroupsPage-C4fcg0qr.css                                       3.06 kB │ gzip:   0.82 kB
+dist/assets/AiPage-dX8vfBHc.css                                           3.19 kB │ gzip:   0.86 kB
+dist/assets/BotsPage-CoppvyIw.css                                         3.95 kB │ gzip:   1.11 kB
+dist/assets/ObservePage-DPok40qT.css                                      4.60 kB │ gzip:   1.18 kB
+dist/assets/SchemaPage-Bi86Cj_o.css                                       4.72 kB │ gzip:   1.29 kB
+dist/assets/GroupAdminPage-BbX3pQjc.css                                   5.51 kB │ gzip:   1.29 kB
+dist/assets/PersonaPage-CHsTpUOw.css                                      5.69 kB │ gzip:   1.41 kB
+dist/assets/GamesPage-knmIPsSj.css                                        7.42 kB │ gzip:   1.66 kB
+dist/assets/CommandsPage-BRV9P4qH.css                                     7.84 kB │ gzip:   1.85 kB
+dist/assets/index-BVVFHwHH.css                                           10.13 kB │ gzip:   2.86 kB
+dist/assets/plus-B99Otl5h.js                                              0.15 kB │ gzip:   0.15 kB
+dist/assets/arrow-left-DKBzns_N.js                                        0.17 kB │ gzip:   0.16 kB
+dist/assets/refresh-cw-8Y2jV-w9.js                                        0.32 kB │ gzip:   0.22 kB
+dist/assets/trash-2-BU7AMi5z.js                                           0.36 kB │ gzip:   0.25 kB
+dist/assets/PageHeader.vue_vue_type_script_setup_true_lang-D0v_NiIm.js    0.54 kB │ gzip:   0.32 kB
+dist/assets/IdentityLabel-BmQZ2UUf.js                                     0.59 kB │ gzip:   0.38 kB
+dist/assets/EmbeddedPage-TfWKDZ5C.js                                      1.64 kB │ gzip:   1.07 kB
+dist/assets/ConversationPage-i12T-AWh.js                                  1.88 kB │ gzip:   1.09 kB
+dist/assets/LifePage-CiEN-2de.js                                          4.11 kB │ gzip:   2.03 kB
+dist/assets/TokensPage-CSzRF3w3.js                                        4.60 kB │ gzip:   2.08 kB
+dist/assets/groupAdminState-yrGQ1Uiv.js                                   5.01 kB │ gzip:   2.45 kB
+dist/assets/PersonProfilesPage-C3NZlad9.js                                5.20 kB │ gzip:   2.51 kB
+dist/assets/PipelinePage-VOHNYiGf.js                                      5.41 kB │ gzip:   2.77 kB
+dist/assets/TrusteeshipPage-DwQIIpl3.js                                   5.89 kB │ gzip:   2.68 kB
+dist/assets/StylePage-Du_Vg7ok.js                                         6.27 kB │ gzip:   2.77 kB
+dist/assets/BotDetailPage-DLiwnT4a.js                                     7.82 kB │ gzip:   3.06 kB
+dist/assets/GroupsPage-DAlctw87.js                                        8.50 kB │ gzip:   3.44 kB
+dist/assets/QzoneComposer-CyLUXDs0.js                                     9.47 kB │ gzip:   3.84 kB
+dist/assets/ObservePage-xXQQBhjF.js                                      10.73 kB │ gzip:   3.95 kB
+dist/assets/SemanticPage-EQK53_tb.js                                     12.13 kB │ gzip:   4.86 kB
+dist/assets/BotsPage-CRE3tPHD.js                                         13.67 kB │ gzip:   4.74 kB
+dist/assets/DrawPage-BQy-ek3m.js                                         14.53 kB │ gzip:   6.04 kB
+dist/assets/AiPage-DrKwGNPJ.js                                           17.65 kB │ gzip:   6.61 kB
+dist/assets/GroupAdminPage-C-CI8hWe.js                                   17.86 kB │ gzip:   6.86 kB
+dist/assets/PersonaPage-CkyjCIrP.js                                      19.30 kB │ gzip:   6.99 kB
+dist/assets/GamesPage-CRDevc5U.js                                        22.81 kB │ gzip:   8.22 kB
+dist/assets/SimulationPage-DsyYgTWi.js                                   22.82 kB │ gzip:   7.40 kB
+dist/assets/SchemaPage-REXxU1HU.js                                       27.26 kB │ gzip:  10.68 kB
+dist/assets/index-C_77dCcX.js                                            36.05 kB │ gzip:  14.63 kB
+dist/assets/CommandsPage-CsTHIGf8.js                                     42.22 kB │ gzip:  13.29 kB
+dist/assets/vue-DI25_lXY.js                                             104.28 kB │ gzip:  40.48 kB
+dist/assets/ui-DOALhIOc.js                                              673.15 kB │ gzip: 186.10 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.28s
+/Users/shiqi/.codex/worktrees/character-consistency-release/bl-chat-plugin/.release/dd8ae9521959f2ed6966ecc6fe8ac364f60a6733
+Release verified
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'got@5.7.1',
+npm warn EBADENGINE   required: { node: '>=0.10.0 <7' },
+npm warn EBADENGINE   current: { node: 'v24.16.0', npm: '11.13.0' }
+npm warn EBADENGINE }
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated rimraf@2.7.1: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated lodash.isequal@4.5.0: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated j@0.4.3: The underlying libraries have been unified.  See < https://cdn.sheetjs.com/j/ >.
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+npm warn deprecated har-validator@5.1.5: this library is no longer supported
+npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated @koa/router@12.0.2: Please upgrade to v15 or higher. All reported bugs in this version are fixed in newer releases, dependencies have been updated, and security has been improved.
+npm warn deprecated xmldom@0.1.27: Deprecated due to CVE-2021-21366 resolved in 0.5.0
+npm warn deprecated babyparse@0.2.1: Deprecated in favour of PapaParse, which now supports Node.js
+npm warn deprecated uuid@3.4.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated harb@0.0.7: harb has been merged into xlsx
+npm warn deprecated request@2.88.2: request has been deprecated, see https://github.com/request/request/issues/3142
+npm warn deprecated fstream@1.0.12: This package is no longer supported.
+npm warn deprecated fetch-undici@3.0.2: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+npm warn deprecated xlsjs@0.7.6: xlsjs has been merged into xlsx
+npm warn deprecated xlsx@0.7.12: this version is no longer supported.  More info at https://cdn.sheetjs.com/xlsx/
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+
+added 731 packages in 10s
+[1;32m[deploy][0m 停止入口并安装已验证产物…
+Installed; service health must be verified before acceptance
+[1;32m[deploy][0m 重启 Yunzai + 控制台…
+[1;32m[deploy][0m 健康检查: service=active load_errors=0 pipeline=1 commands_page=200 console=active/200
+[1;32m[deploy][0m 部署成功 ✔  快照保留在 /opt/trss-yunzai-backups/deploy-snapshots/20261111-122051(最近 5 份)

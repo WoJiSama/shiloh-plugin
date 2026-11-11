@@ -1,0 +1,13 @@
+{
+  "backupSha256": "9d2847c565b7f1e117e5cfd09a08ebf5d47330b3eb609df7467bfc0e00262128",
+  "afterSha256": "221824f245af9a1c8ea1c21fb74abbfeaf94f3bbf4b881b76bed8d9cf3e07038",
+  "backupMatchesPredeploy": true,
+  "addedPaths": [
+    "pluginSettings.taskAiConfig.characterConsistency",
+    "pluginSettings.simulation.consistency"
+  ],
+  "removedPaths": [],
+  "changedExistingPaths": [],
+  "consistencyEnabled": false,
+  "independentBackendBlank": true
+}

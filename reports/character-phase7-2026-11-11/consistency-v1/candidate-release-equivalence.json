@@ -1,0 +1,18 @@
+{
+  "candidateBuildCommit": "ef7f7c8eccc96586c3f64865638614661a04e48a",
+  "releaseCommit": "dd8ae9521959f2ed6966ecc6fe8ac364f60a6733",
+  "sourceCount": 558,
+  "compiledFileCount": 1659,
+  "sourceDifferences": [],
+  "compiledDifferences": [],
+  "additionalDifferences": [],
+  "additionalFileHashes": {
+    "utils/simulationRuntime.js": "e0177f0ba3853d94d5bac35b61e92ef3cdbf73c3da749f99ee66684a19493447",
+    "scripts/characterReplay.mjs": "3ef0fc70d6e184de9b4c569c7b055d29f0209a0978bdec2b9efda2adc6a9dc95",
+    "scripts/characterConsistencyReplay.mjs": "23a04da5b306fc588d169e5da67e67638b3c8aca835df9e46ba9630ceaed2063",
+    "scripts/characterAcceptance.mjs": "99cae027cb9777a3883276ddd78530faf39754ff7d7eb3d990fe62b434193009",
+    "tests/fixtures/characterReplayScenarios.json": "016a01f35b6912d9df4d0e81e8a1adf7a68a6413c12e29f493bec0ccb79a3e92",
+    "config_default/message.yaml": "abdc1d90ad1caa7d2396363d150131acf03a4fd29d40b79f712f90744433618c"
+  },
+  "limitation": "same final source and compiled bytes; historical live-model runs exercised an earlier always-on experimental configuration and do not certify final production behavior"
+}

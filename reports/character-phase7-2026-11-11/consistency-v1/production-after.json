@@ -1,0 +1,52 @@
+{
+  "at": "2026-11-11T04:50:53.449Z",
+  "commit": "dd8ae9521959f2ed6966ecc6fe8ac364f60a6733",
+  "runtimeFiles": 2663,
+  "mismatchedFiles": [],
+  "privateConfigSha256": "221824f245af9a1c8ea1c21fb74abbfeaf94f3bbf4b881b76bed8d9cf3e07038",
+  "services": {
+    "trss-yunzai": "active",
+    "bl-console": "active"
+  },
+  "consistency": {
+    "enabled": false,
+    "independentBackendConfigured": false
+  },
+  "group": {
+    "groupId": "609235590",
+    "running": false,
+    "active": true,
+    "replyMode": "atOnly",
+    "budget": {
+      "day": "2026-11-10",
+      "turns": 6,
+      "tokens": 277211,
+      "maxTurnsPerDay": 12,
+      "turnsCapOverridden": true,
+      "dailyCostCny": 1,
+      "capOverridden": true,
+      "todayCostCny": 0
+    },
+    "binding": {
+      "status": "bound",
+      "botId": "3094088525",
+      "personaId": "default"
+    },
+    "scope": {
+      "botId": "3094088525",
+      "personaId": "default",
+      "groupId": "609235590"
+    },
+    "paused": false,
+    "memoryCount": 0,
+    "goalCount": 0,
+    "revision": 37,
+    "independentRedisMatches": true
+  },
+  "overviewGroups": 12,
+  "lifeOverviewReachable": true,
+  "healthAlertsReachable": true,
+  "unauthenticatedStatus": 401,
+  "qqMessagesSentByVerifier": 0,
+  "productionWritesByVerifier": 0
+}
