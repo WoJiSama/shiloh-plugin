@@ -1923,3 +1923,14 @@ Runtime 5a8a630 pushed/deployed; primary 9dab562. Full backend 2230: 2228 pass, 
 - P1-4 控制台托付数据页:/trusteeship(导航「托付数据」)——承诺账本活跃清单+失败日志(可取消/清失败记录)+委托记忆按群(可删);4 个 API(overview/commitment-cancel/delegated-delete/faillog-clear,id 全格式校验);console/server.js 直连本机 redis 与 bot 进程共享同一份键,数据不出机。
 - 验证:backend:typecheck、test:boundaries、console check/test/build 通过;全量 3020 项 3018 通过/0 失败/2 环境跳过;新增/扩展测试 12 项(domain 续约/明说/到期标注、compiled renew/失约明说/双路径续约问询、toolPolicy 6 项、healthSentinel 4 项、budget 承诺豁免)。
 - 过程修正:healthSentinel 样例全角括号、toolPolicy 测试群号位数(5-12 位校验)、续约文案断言对齐实现。
+
+
+# 2026-11-11 实拍事故:希洛被点名不回(瓦尔哈拉)——发送侧小时闸无点名豁免
+
+- 现象(群 725902146 瓦尔哈拉):18:39 猫猫虫直呼"希洛我们一起喵喵叫喵",机器人无回应;18:34-18:40 五个 nameMention/atMention 回合全部 sends=0。猫猫虫随即转私聊连环追问。
+- 链路取证:唤醒正常(nameMention 命中)、回合完整跑了(2-24s/78-141k tokens/2-4 轮),但 simSendMessage 被拒;模型自己的收尾参数原话"发送持续被限流、表情回应也不可用,静默收尾"(simFinishTurn choice=silent)。前一小时窗(17:35-18:31)恰好发满 10 条=sendsPerHour 上限;11-10 00:08 同型(23:08-00:08 恰 10 条后凌晨三个点名回合全哑);11-08 对照小时闸拒绝 0 次。被点名零发送占比:11-08 0/7 → 11-10 7/16。
+- 根因:2026-11-05 防识破加的 sendsPerHour=10 小时闸没有点名豁免,而唤醒侧 DIRECT_ADDRESS_WAKE_KINDS 有——bot 被点名会醒,却发不出声,醒着装聋。非 P1 回归(该闸早于 P1,P1 未触碰发送路径)。
+- 修复(8cfd3d1,隔离 worktree 提交+部署,快照 20261111-200039):checkSendAllowance 增加 directAddress(由本回合唤醒 kind 推导),仅跳过小时级节流;分钟频控(8/min)与回合上限(5/turn)仍生效,旁听回合行为完全不变。穿线 startTurn→buildToolContext→单发/批量/表情三发送点+两处批预检。
+- 并行会话协调:主目录检出的是 codex/character-consistency-20261111 分支且带大量未提交 WIP(simulationRuntime/messageDelivery 均混合);修复在 /tmp worktree 以其分支顶 c08f8d0 为底提交,主分支指针软推进到 8cfd3d1(其未提交 WIP 文件原样保留为未提交状态);push 顺带把该会话已验证的本地 main(71b3abd)推上 origin。
+- 过程记录:worktree 全量首跑 6 项 console fixture 超时失败(20s)+二跑测试全绿(3303/0)但进程收尾挂起——与仓库历史记录过的"开放句柄不退出"同型;硬链接 node_modules 替代符号链接后 deploy.sh 全门禁通过。定向 17/17(主树+worktree 双份)。
+- 次要发现(未处理):①生产 config oneapi_tools 含未注册的 waitTool,每小时告警~166 次(纯噪音);②仿真回合 token 量 78-141k/回合偏大(P1 能力面全量工具 schema 是因素之一),日预算消耗加速,值得后续压缩。
