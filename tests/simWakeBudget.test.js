@@ -111,3 +111,18 @@ test('承诺到期唤醒绕过每日回合/金额预算：答应了不放，不�
   // 其他直接点名类不享受该豁免（对照组）
   assert.equal(checkWakeBudget(state({ turns: 40 }), cfg, now, 0, { kind: 'atMention', seq: 1 }).allowed, false)
 })
+
+test('被点名回合发送豁免小时闸：醒了就发得出声（瓦尔哈拉实拍事故回归）', async () => {
+  const { checkSendAllowance, isDirectAddressKind } = await import('../dist/backend/modules/simulation/domain/budget.js')
+  const cfg = config()
+  const full = { wakeTimes: [], sendTimes: Array(10).fill(now - 61_000), budget: { day: dayKey(now), turns: 0, tokens: 0 } }
+  assert.equal(checkSendAllowance(full, cfg, now, 0).allowed, false, '旁听回合小时闸照拦')
+  assert.match(checkSendAllowance(full, cfg, now, 0).reason, /说得够多了/)
+  assert.equal(checkSendAllowance(full, cfg, now, 0, true).allowed, true, '点名回合跳过小时闸')
+  const minuteFull = { wakeTimes: [], sendTimes: Array(8).fill(now - 5_000), budget: { day: dayKey(now), turns: 0, tokens: 0 } }
+  assert.equal(checkSendAllowance(minuteFull, cfg, now, 0, true).allowed, false, '分钟频控不豁免')
+  assert.match(checkSendAllowance(minuteFull, cfg, now, 0, true).reason, /分钟/)
+  assert.equal(checkSendAllowance(full, cfg, now, 5, true).allowed, false, '回合上限不豁免')
+  for (const kind of ['admin', 'atMention', 'nameMention', 'question', 'commitment']) assert.equal(isDirectAddressKind(kind), true, kind)
+  for (const kind of ['keyword', 'probability', 'continuation', 'replyCheck', undefined]) assert.equal(isDirectAddressKind(kind), false, String(kind))
+})

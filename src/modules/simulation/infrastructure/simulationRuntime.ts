@@ -26,7 +26,7 @@ import { resolveSimToolSurface } from '../domain/toolPolicy.js'
 import { acknowledgeMessages, noteModelSeen, readThroughSeq } from '../domain/watermark.js'
 import { buildWakeSnapshot, compactSimMessage } from '../domain/messageView.js'
 import { computeWaitOutcome, normalizeWaitPlan, type SimWaitPlan } from '../domain/waitGate.js'
-import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
+import { checkSendAllowance, checkWakeBudget, describeBudgetLimit, isDirectAddressKind, limitNoticeDue, shouldAnnounceBudgetLimit, invalidatePreSleepWaitByParticipation, markPreSleepSatisfied, recordSend, recordWake, recordWakeTokens, resetPreSleepWait, rollBudgetDay } from '../domain/budget.js'
 import { buildCharacterTurnContext, buildSimSystemPrompt, buildWakePrompt, trimAgentHistory } from '../domain/promptBuilder.js'
 import { isSilentDeclaration, isWrappedAnnotation, mentionsSilenceVocabulary } from '../domain/silentDeclaration.js'
 import { parsePersonProfilePatches, interestMatchesTitle, type PersonProfile } from '../domain/personProfile.js'
@@ -895,7 +895,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         }
       }
       const selfMemoryBox = { list: normalizeMemoryList(await selfStore.loadSelfMemories().catch(() => []), now()) }
-      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor, characterScope, async () => { await ensureExecution(announcement); if (decision === 'silent' || decision === 'deferred') throw new Error('本轮已选择沉默或暂缓') }, () => sends, async messages => { if (!announcement) await reviewCandidate('simSendMessage', { choice: 'chat', messages }) })
+      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor, characterScope, async () => { await ensureExecution(announcement); if (decision === 'silent' || decision === 'deferred') throw new Error('本轮已选择沉默或暂缓') }, () => sends, async messages => { if (!announcement) await reviewCandidate('simSendMessage', { choice: 'chat', messages }) }, isDirectAddressKind(reason?.kind))
       const supersededMemoryIds = new Set(character.memories.flatMap(memory => memory.supersedes ? [memory.supersedes] : []))
       const visibleCharacterRefs = new Set([
         ...character.memories.filter(memory => !supersededMemoryIds.has(memory.id)).slice(-12).map(memory => `memory:${memory.id}`),
@@ -965,7 +965,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         })
         const replyTexts = transportSegments.filter(segment => record(segment).type === 'text').map(segment => String(record(record(segment).data).text || ''))
         if (!transportSegments.some(segment => !['at', 'reply'].includes(String(record(segment).type)))) return { message_id: '', sent: 0, duplicatesSkipped }
-        const allowance = checkSendAllowance(state!, cfg, now(), sends)
+        const allowance = checkSendAllowance(state!, cfg, now(), sends, isDirectAddressKind(reason?.kind))
         if (!allowance.allowed) throw new Error(allowance.reason)
         if (replyTexts.length) await reviewCandidate('toolReply', { messages: replyTexts })
         await ensureExecution()
@@ -1315,7 +1315,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
   }
 
-  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[]; deliveryUnknown?: boolean }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }, moodBox: { current: SimMoodState | null } = { current: null }, moodAnchor: Record<MoodAxis, number> | null = null, scope = scopeFor(groupId, state.botId), beforeSend?: () => Promise<void>, totalSends?: () => number, reviewSend?: (messages: string[]) => Promise<void>): SimToolContext {
+  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[]; deliveryUnknown?: boolean }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }, moodBox: { current: SimMoodState | null } = { current: null }, moodAnchor: Record<MoodAxis, number> | null = null, scope = scopeFor(groupId, state.botId), beforeSend?: () => Promise<void>, totalSends?: () => number, reviewSend?: (messages: string[]) => Promise<void>, directAddress = false): SimToolContext {
     const store = scopedStore(scope)
     let sendsThisTurn = 0
     return {
@@ -1339,18 +1339,18 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           if (redacted.heavy) return { ok: false, sent: 0, error: `第 ${i + 1} 条包含大量内部状态特征，整批未发送，请换一句自然的说法` }
           cleaned.push(redacted.text)
         }
-        const plan = planMessageDelivery({ messages: cleaned, deliveredTexts: memoryBox.sentTexts, state, config: cfg, at: now(), sendsThisTurn: totalSends?.() ?? sendsThisTurn })
+        const plan = planMessageDelivery({ messages: cleaned, deliveredTexts: memoryBox.sentTexts, state, config: cfg, at: now(), sendsThisTurn: totalSends?.() ?? sendsThisTurn, directAddress })
         if (!plan.ok) return { ok: false, sent: 0, error: plan.error, duplicatesSkipped: plan.duplicatesSkipped }
         let sent = 0, inFlight = false
         const failed = (error: string): SimSendResult => ({ ok: false, sent, duplicatesSkipped: plan.duplicatesSkipped, ...(memoryBox.deliveryUnknown ? { unknown: true } : {}), error })
         try {
           if (plan.messages.length) await reviewSend?.(plan.messages)
           // Review may take time. Check the entire remaining batch again before its first send.
-          const latest = planMessageDelivery({ messages: plan.messages, deliveredTexts: memoryBox.sentTexts, state, config: cfg, at: now(), sendsThisTurn: totalSends?.() ?? sendsThisTurn })
+          const latest = planMessageDelivery({ messages: plan.messages, deliveredTexts: memoryBox.sentTexts, state, config: cfg, at: now(), sendsThisTurn: totalSends?.() ?? sendsThisTurn, directAddress })
           if (!latest.ok) return failed(latest.error)
           for (let i = 0; i < latest.messages.length; i++) {
             await beforeSend?.()
-            const itemAllowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn)
+            const itemAllowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn, directAddress)
             if (!itemAllowance.allowed) return failed(itemAllowance.reason)
             const text = latest.messages[i]!
             const segments: unknown[] = []
@@ -1549,7 +1549,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const resolved = await ports.resolveBilibiliCard(input || {})
         if (!resolved.ok) return { ok: false, error: resolved.error || '没找到合适的视频' }
         await beforeSend?.()
-        const allowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn)
+        const allowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn, directAddress)
         if (!allowance.allowed) return { ok: false, error: allowance.reason }
         let receipt
         try { receipt = await ports.sendGroupMessage(groupId, [{ type: 'json', data: { data: resolved.cardJson || '' } }], scope.botId) }

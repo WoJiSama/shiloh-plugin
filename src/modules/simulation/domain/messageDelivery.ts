@@ -10,6 +10,8 @@ export interface MessageDeliveryInput {
   config: SimRuntimeConfig
   at: number
   sendsThisTurn: number
+  /** 直接点名回合（被@/叫名字/提问）跳过小时级节流——被点名必须能回 */
+  directAddress?: boolean
 }
 
 export type MessageDeliveryPlan =
@@ -30,7 +32,7 @@ export function planMessageDelivery(input: MessageDeliveryInput): MessageDeliver
   if (!messages.length) return { ok: true, messages, duplicatesSkipped }
   const projected = structuredClone(input.state)
   for (let index = 0; index < messages.length; index++) {
-    const allowance = checkSendAllowance(projected, input.config, input.at, input.sendsThisTurn + index)
+    const allowance = checkSendAllowance(projected, input.config, input.at, input.sendsThisTurn + index, input.directAddress === true)
     if (!allowance.allowed) return {
       ok: false, duplicatesSkipped,
       error: `本批 ${messages.length} 条消息无法全部发送，整批未发送：${allowance.reason}`,

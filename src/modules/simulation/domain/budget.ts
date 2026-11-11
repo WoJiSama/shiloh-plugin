@@ -18,6 +18,10 @@ export interface WakeBudgetVerdict { allowed: boolean; reason: string }
  *  社交上"被点名不回""答应了不放"最伤——限频只管旁观型唤醒(关键词/随机/延续等),这几类直接放行;金额与每日回合预算仍生效。 */
 const DIRECT_ADDRESS_WAKE_KINDS: readonly string[] = ['admin', 'atMention', 'nameMention', 'question', 'commitment']
 
+export function isDirectAddressKind(kind: unknown): boolean {
+  return DIRECT_ADDRESS_WAKE_KINDS.includes(String(kind || ''))
+}
+
 /** 承诺到期唤醒：对群友的定时托付，量小有界（每群 ≤10、每日至多各一次）——
  *  连每日回合/金额预算也绕过。被预算静默丢弃等于隐性失约，比超一点软预算伤信任得多。 */
 const PROMISE_WAKE_KINDS: readonly string[] = ['commitment']
@@ -64,8 +68,11 @@ export function recordWakeTokens(state: SimSessionState, tokens: number): void {
 
 export interface SendAllowance { allowed: boolean; reason: string }
 
-/** 回合内发送条数 + 每分钟发送频率。 */
-export function checkSendAllowance(state: SimSessionState, config: SimRuntimeConfig, now: number, sendsThisTurn: number): SendAllowance {
+/** 回合内发送条数 + 每分钟发送频率 + 小时级节流。
+ *  directAddress=true（本回合由被@/叫名字/提问等直接点名触发）时跳过小时级节流——
+ *  唤醒侧对点名类无限频豁免（"被点名不回"最伤），发送侧没有豁免会让 bot 醒了却发不出声，
+ *  在活跃时段聊满配额后对直呼名字装聋（2026-11-11 瓦尔哈拉实拍事故）；分钟频控与回合上限仍生效。 */
+export function checkSendAllowance(state: SimSessionState, config: SimRuntimeConfig, now: number, sendsThisTurn: number, directAddress = false): SendAllowance {
   if (sendsThisTurn >= config.turn.maxSendsPerTurn) {
     return { allowed: false, reason: `本回合发送已达上限 ${config.turn.maxSendsPerTurn} 条，请收束这一轮，把想说的话留到下次唤醒` }
   }
@@ -73,10 +80,13 @@ export function checkSendAllowance(state: SimSessionState, config: SimRuntimeCon
   if (minuteWindow.length >= config.turn.sendPerMinute) {
     return { allowed: false, reason: `发送频率已达 ${config.turn.sendPerMinute} 条/分钟，请等一会儿再发` }
   }
-  // 小时级节流：真人再能聊也不会一小时每分钟一条——高频连续输出是最容易被识破的机器人特征
-  const hourWindow = pruneWindow(state.sendTimes, now, 3600_000, 200)
-  if (hourWindow.length >= config.turn.sendsPerHour) {
-    return { allowed: false, reason: `这一小时你已经发了 ${hourWindow.length} 条，说得够多了——像真人一样歇一会儿，本轮只 markRead 结束，等别人@你或话题真正轮到你再开口` }
+  // 小时级节流：真人再能聊也不会一小时每分钟一条——高频连续输出是最容易被识破的机器人特征。
+  // 只管自发的旁听输出；被点名必须能回（对方在等这句）。
+  if (!directAddress) {
+    const hourWindow = pruneWindow(state.sendTimes, now, 3600_000, 200)
+    if (hourWindow.length >= config.turn.sendsPerHour) {
+      return { allowed: false, reason: `这一小时你已经发了 ${hourWindow.length} 条，说得够多了——像真人一样歇一会儿，本轮只 markRead 结束，等别人@你或话题真正轮到你再开口` }
+    }
   }
   return { allowed: true, reason: 'ok' }
 }
