@@ -13,6 +13,18 @@ const same = (a, b) => hashReplayValue({ value: a }) === hashReplayValue({ value
 const validHash = value => typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value)
 const fail = message => { throw new Error(message) }
 const safeLabel = value => String(value).replace(/[\r\n|`<>]/gu, ' ').slice(0, 180)
+const consistencyIssueCodes = new Set(['missing_goal', 'missing_opinion', 'unsupported_fact', 'state_claim', 'duplicate_message'])
+function validConsistencyOutput(output) {
+  try {
+    if (typeof output !== 'string' || output.length > 8192) return false
+    const value = JSON.parse(output)
+    return isObject(value) && Object.keys(value).every(key => ['verdict', 'issues'].includes(key)) &&
+      ['accept', 'revise'].includes(value.verdict) && Array.isArray(value.issues) && value.issues.length <= 5 &&
+      (value.verdict === 'accept' ? value.issues.length === 0 : value.issues.length > 0) &&
+      value.issues.every(issue => isObject(issue) && Object.keys(issue).every(key => ['code', 'reason'].includes(key)) &&
+        consistencyIssueCodes.has(issue.code) && typeof issue.reason === 'string' && !!issue.reason.trim() && issue.reason.length <= 300)
+  } catch { return false }
+}
 const ownFields = (value, fields, label) => {
   if (!isObject(value) || Object.keys(value).some(key => !fields.includes(key))) fail(`Invalid ${label} fields`)
 }
@@ -45,14 +57,17 @@ function readJson(file) {
 export function inspectReplay(document) {
   if (!isObject(document) || !isObject(document.metadata) || !Array.isArray(document.results)) fail('Invalid replay document')
   const metadata = document.metadata, failures = []
+  const version = metadata.assessmentVersion
+  const stages = version >= 5 ? ['main', 'reflection', 'consistency'] : ['main', 'reflection']
   if (metadata.schemaVersion !== 1 || !['scripted_offline', 'injected_test', 'live_model'].includes(metadata.mode)) fail('Unsupported replay schema or mode')
-  if (metadata.assessmentVersion !== assessmentVersion || !Array.isArray(metadata.scenarioManifest) || !metadata.scenarioManifest.length) fail(`Replay lacks assessment v${assessmentVersion} manifest; rerun the current characterReplay runner`)
+  if (![4, assessmentVersion].includes(version) || !Array.isArray(metadata.scenarioManifest) || !metadata.scenarioManifest.length) fail(`Replay lacks a supported assessment v4/v${assessmentVersion} manifest; rerun the current characterReplay runner`)
   for (const key of ['runnerHash', 'scenariosHash', 'effectiveConfigHash', 'buildManifestHash', 'personaHash', 'scenarioManifestHash']) if (!validHash(metadata[key])) fail(`Invalid replay fingerprint: ${key}`)
   if (!same(metadata.scenarioManifestHash, hashReplayValue(metadata.scenarioManifest))) failures.push('scenario_manifest_hash_mismatch')
   if (!Number.isSafeInteger(metadata.repetitions) || metadata.repetitions < 1 || metadata.repetitions > 5) fail('Invalid replay repetitions')
   if (assessmentVersion >= 3 && (typeof metadata.runId !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu.test(metadata.runId) || typeof metadata.startedAtISO !== 'string' || !Number.isFinite(Date.parse(metadata.startedAtISO)))) failures.push('missing_run_identity')
   if (['generation', 'clock', 'search', 'storage', 'platform', 'personaSource', 'seed'].some(key => typeof metadata[key] !== 'string' || !metadata[key])) failures.push('missing_recorded_execution_conditions')
   if (assessmentVersion >= 3 && ['feeds', 'worker', 'reflection'].some(key => typeof metadata[key] !== 'string' || !metadata[key])) failures.push('missing_activity_execution_conditions')
+  if (version >= 5 && (typeof metadata.consistency !== 'string' || !metadata.consistency)) failures.push('missing_consistency_execution_conditions')
   if (!isObject(metadata.simulationOverrides) || ['maxCalls', 'maxHttp', 'maxDurationMs'].some(key => !Number.isSafeInteger(metadata[key]) || metadata[key] < 1)) failures.push('missing_recorded_execution_limits')
   if (document.complete !== true) failures.push('incomplete_replay')
   if (document.platformMessagesSent !== 0 || document.productionStoreWrites !== 0) failures.push('shadow_isolation_not_confirmed')
@@ -87,7 +102,7 @@ export function inspectReplay(document) {
         const activities = result[field]
         if (!isObject(activities) || !['works', 'subscriptions', 'shared', 'sharedPending'].every(key => Array.isArray(activities[key])) || !isObject(activities.reflection)) failures.push(`missing_activity_state:${result.scenario}:${result.sampleIndex}:${result.eventIndex}:${field}`)
       }
-      if (result.calls.some(call => !['main', 'reflection'].includes(call?.stage))) failures.push(`missing_call_stage:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
+      if (result.calls.some(call => !stages.includes(call?.stage))) failures.push(`missing_call_stage:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
       const callIds = result.calls.map(call => call?.id)
       if (callIds.some(id => typeof id !== 'string' || !id) || new Set(callIds).size !== callIds.length) failures.push(`invalid_call_identity:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
       if (Array.isArray(result.reflections) && result.reflections.length !== result.calls.filter(call => call.stage === 'reflection').length) failures.push(`reflection_evidence_count_mismatch:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
@@ -115,6 +130,23 @@ export function inspectReplay(document) {
         if (!call || reflectionIds.has(evidence?.callId) || evidence.requestHash !== call.requestHash || evidence.status !== (call.error ? 'failed' : 'succeeded') || (evidence.status === 'succeeded' && (!same(evidence.usage, call.usage) || evidence.output !== call.output)) || (evidence.status === 'failed' && evidence.error !== call.error)) failures.push(`invalid_reflection_evidence:${result.scenario}:${result.sampleIndex}:${result.eventIndex}`)
         reflectionIds.add(evidence?.callId)
       }
+      if (version >= 5) {
+        const marker = `${result.scenario}:${result.sampleIndex}:${result.eventIndex}`
+        if (!Array.isArray(result.consistencyChecks)) failures.push(`missing_consistency_evidence:${marker}`)
+        if (result.consistencyChecks?.length !== result.calls.filter(call => call.stage === 'consistency').length) failures.push(`consistency_evidence_count_mismatch:${marker}`)
+        const ids = new Set()
+        for (const evidence of result.consistencyChecks || []) {
+          const call = result.calls.find(item => item.id === evidence?.callId && item.stage === 'consistency')
+          if (!call || ids.has(evidence?.callId) || evidence.requestHash !== call.requestHash || evidence.status !== (call.error ? 'failed' : 'succeeded') ||
+            !Number.isFinite(evidence.elapsedMs) || evidence.elapsedMs < 0 || evidence.elapsedMs !== call.elapsedMs ||
+            (evidence.status === 'succeeded' && (!same(evidence.usage, call.usage) || evidence.output !== call.output)) ||
+            (evidence.status === 'failed' && evidence.error !== call.error)) failures.push(`invalid_consistency_evidence:${marker}`)
+          if (call && !call.error && !validConsistencyOutput(call.output)) failures.push(`invalid_consistency_verdict:${marker}`)
+          ids.add(evidence?.callId)
+        }
+        if (result.calls.some(call => call.stage === 'consistency' && (call.tools?.length || call.toolCalls?.length)) ||
+          (result.toolResults || []).some(reply => reply.stage === 'consistency')) failures.push(`consistency_tool_execution:${marker}`)
+      }
     }
     if (!isObject(result.expect)) fail('Invalid result expectations')
     const key = JSON.stringify([result.scenario, result.sampleIndex, result.eventIndex]), event = expected.get(key)
@@ -131,12 +163,13 @@ export function inspectReplay(document) {
     for (const call of result.calls) {
       if (!isObject(call)) fail('Invalid captured model call')
       if (call.error) failures.push(`model_call_failed:${key}`)
+      if (call.settled === false) failures.push(`model_call_unsettled:${key}`)
       if (call.usage?.total_tokens !== undefined && (!Number.isFinite(call.usage.total_tokens) || call.usage.total_tokens < 0)) fail('Invalid reported token usage')
       if (metadata.mode === 'live_model' && (!validHash(call.requestHash) || !Array.isArray(call.tools) || call.tools.some(tool => typeof tool !== 'string'))) failures.push(`missing_call_conditions:${key}`)
     }
     if (metadata.mode === 'live_model') for (const request of result.network) {
       if (!isObject(request) || !isObject(request.generation) || !isObject(request.generation.parameters) || !validHash(request.generation.hash) || request.generation.hash !== hashReplayValue(request.generation.parameters)) failures.push(`missing_or_invalid_generation_evidence:${key}`)
-      if (assessmentVersion >= 3 && !['main', 'reflection'].includes(request?.stage)) failures.push(`missing_http_stage:${key}`)
+      if (assessmentVersion >= 3 && !stages.includes(request?.stage)) failures.push(`missing_http_stage:${key}`)
     }
     const before = result.beforeCharacter
     if (!isObject(before) || !['memories', 'goals', 'receipts'].every(field => Array.isArray(before[field]))) failures.push(`missing_before_character:${key}`)
@@ -158,6 +191,7 @@ export function inspectReplay(document) {
   }
   for (const key of expected.keys()) if (!seen.has(key)) failures.push(`missing_event:${key}`)
   const summary = summarize(recomputedResults)
+  if (version < 5) { delete summary.consistencyCalls; delete summary.consistencyElapsedMs; delete summary.unsettledCalls }
   if (!same(summary, document.summary)) failures.push('saved_summary_mismatch')
   const uniqueFailures = [...new Set(failures)]
   const integrity = uniqueFailures.length ? 'failed' : 'passed'
@@ -177,7 +211,7 @@ export function inspectReplay(document) {
 
 export function compareReplays(candidate, baseline, candidateHash, baselineHash) {
   if (!baseline) return { status: 'pending', reason: 'baseline_not_provided', singleVariableAttribution: false }
-  const comparableFields = ['runnerHash', 'scenariosHash', 'personaHash', 'assessmentVersion', 'scenarioManifestHash', 'generation', 'simulationOverrides', 'clock', 'search', 'feeds', 'worker', 'reflection', 'storage', 'platform', 'toolResults', 'personaSource', 'seed', 'repetitions', 'maxCalls', 'maxHttp', 'maxDurationMs']
+  const comparableFields = ['runnerHash', 'scenariosHash', 'personaHash', 'assessmentVersion', 'scenarioManifestHash', 'generation', 'simulationOverrides', 'clock', 'search', 'feeds', 'worker', 'reflection', 'consistency', 'storage', 'platform', 'toolResults', 'personaSource', 'seed', 'repetitions', 'maxCalls', 'maxHttp', 'maxDurationMs']
   const differences = comparableFields.filter(field => !same(candidate.metadata[field], baseline.metadata[field]))
   const observedGeneration = document => [...new Set(document.results.flatMap(result => result.network).map(request => hashReplayValue({ stage: request.stage, parameters: Object.fromEntries(Object.entries(request.generation?.parameters || {}).filter(([key]) => key !== 'model')) })))].sort()
   const observedTools = document => [...new Set(document.results.flatMap(result => result.calls).filter(call => Array.isArray(call.tools)).map(call => hashReplayValue({ stage: call.stage, tools: [...call.tools].sort() })))].sort()

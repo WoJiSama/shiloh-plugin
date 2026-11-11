@@ -27,7 +27,7 @@ test('生产聊天工具显式要求普通聊天或仅兴趣声明，其他选�
 function harness() {
   let state = createEmptyCharacterState(SCOPE), at = BASE, nextId = 0
   const visible = ['message:1', 'message:2'], updates = [], finishes = []
-  const controls = { beforeUpdate: null, saveError: null, inactive: false, finishResult: { ok: true, finished: true } }
+  const controls = { beforeUpdate: null, saveError: null, inactive: false, review: null, finishResult: { ok: true, finished: true } }
   const ctx = {
     now: () => at, read: async () => structuredClone(state),
     update: async mutate => {
@@ -43,6 +43,7 @@ function harness() {
     selectGoal: async () => { throw new Error('不能调用真实 focus 回调') },
     onDecision: () => { throw new Error('不能调用真实 decision 回调') },
     ensureActive: async () => { if (controls.inactive) throw new Error('执行授权已撤销') },
+    review: async input => { await controls.review?.(input) },
     finish: async result => { finishes.push(structuredClone(result)); return controls.finishResult },
   }
   const tool = createCharacterTurnTool(ctx)
@@ -51,6 +52,35 @@ function harness() {
     call: input => tool.execute(input, {}),
   }
 }
+
+test('提交前一致性退回不保存草稿、不发送，检查能看到已校验目标和记忆', async () => {
+  const h = harness()
+  let reviews = 0
+  h.controls.review = async input => {
+    reviews++
+    assert.equal(input.candidate.choice, 'schedule')
+    assert.equal(input.state.goals.length, 1)
+    assert.equal(input.state.memories.length, 1)
+    assert.equal(h.updates.length, 0)
+    throw new Error('一致性检查要求修正证据表述')
+  }
+  assert.match(await h.call({ choice: 'schedule', reason: '后续研究', goal, memories: [memory], messages: ['资料已经全部核实'] }), /一致性检查/)
+  assert.equal(reviews, 1); assert.equal(h.updates.length, 0); assert.equal(h.finishes.length, 0)
+  assert.equal(h.state().memories.length, 0); assert.equal(h.state().goals.length, 0)
+})
+
+test('模型检查期间状态变化或权限撤销，旧草稿不能提交', async () => {
+  for (const change of ['revision', 'permission', 'source']) {
+    const h = harness()
+    h.controls.review = async () => {
+      if (change === 'revision') h.setState({ ...h.state(), revision: 1 })
+      else if (change === 'source') h.visible.splice(0)
+      else h.controls.inactive = true
+    }
+    assert.match(await h.call({ choice: 'schedule', reason: '后续研究', goal }), /^error:/)
+    assert.equal(h.updates.length, 0); assert.equal(h.finishes.length, 0)
+  }
+})
 
 test('收尾 schema 复用角色工具字段和描述，嵌套操作不暴露 action', () => {
   const h = harness(), originals = createCharacterTools(h.ctx)

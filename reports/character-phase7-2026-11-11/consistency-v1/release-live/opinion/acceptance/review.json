@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "candidateSha256": "18a58644bfcd23d0fc1c038ea29ae26fa252dba28bf96cd8259634c8f72e78f9",
+  "items": [
+    {
+      "sampleId": "opinion-revision:sample-1",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    },
+    {
+      "sampleId": "opinion-revision:sample-2",
+      "reviewer": "",
+      "verdict": "pending",
+      "comment": ""
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+✖ 目标到期合并优先于自动回音等检查，真实消息、托付和开场仍优先 (3.879958ms)
+✖ 同一 sweep 的到期目标与回音检查并存时绑定自主目标并实际推进 (1046.8385ms)
+✔ 目标和回音已排期后真实 @ 仍升级唤醒，不借用户回合自动推进目标 (1010.048834ms)
+✔ 仅 @ 模式下到期目标不安排模型回合或目标检查 (1153.642583ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3521.56425
+
+✖ failing tests:
+
+test at tests/characterGoalWake.test.js:93:1
+✖ 目标到期合并优先于自动回音等检查，真实消息、托付和开场仍优先 (3.879958ms)
+  AssertionError [ERR_ASSERTION]: replyCheck
+  + actual - expected
+  
+    {
+  +   kind: 'replyCheck'
+  -   detail: 'goal-due',
+  -   kind: 'characterGoal'
+    }
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterGoalWake.test.js:96:12)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { kind: 'replyCheck' },
+    expected: { kind: 'characterGoal', detail: 'goal-due' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterGoalWake.test.js:106:1
+✖ 同一 sweep 的到期目标与回音检查并存时绑定自主目标并实际推进 (1046.8385ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'replyCheck'
+  - 'characterGoal'
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterGoalWake.test.js:113:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'replyCheck',
+    expected: 'characterGoal',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

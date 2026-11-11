@@ -1,0 +1,7 @@
+{"scenario":"motivated-goal-restart","sampleIndex":1,"eventIndex":0,"status":"passed","calls":2,"sent":2,"behavior":{"goalCreatedByModel":false}}
+{"scenario":"motivated-goal-restart","sampleIndex":1,"eventIndex":1,"status":"skipped","calls":0,"sent":0,"behavior":{},"skipReason":"model_created_no_due_goal"}
+{"scenario":"motivated-goal-restart","sampleIndex":1,"eventIndex":2,"status":"passed","calls":1,"sent":2,"behavior":{}}
+{"scenario":"motivated-goal-restart","sampleIndex":2,"eventIndex":0,"status":"passed","calls":2,"sent":2,"behavior":{"goalCreatedByModel":false}}
+{"scenario":"motivated-goal-restart","sampleIndex":2,"eventIndex":1,"status":"skipped","calls":0,"sent":0,"behavior":{},"skipReason":"model_created_no_due_goal"}
+{"scenario":"motivated-goal-restart","sampleIndex":2,"eventIndex":2,"status":"passed","calls":2,"sent":2,"behavior":{}}
+{"outputFile":"/opt/trss-yunzai-backups/character-eval-20261111-baseline/live/motivated/results.json","mode":"live_model","events":6,"failedEvents":0,"skippedEvents":2,"behaviorMisses":2,"logicalCalls":7,"mainCalls":7,"reflectionCalls":0,"consistencyCalls":0,"consistencyElapsedMs":0,"unsettledCalls":0,"feedFetches":0,"workerCalls":0,"httpRequests":7,"capturedMessages":8,"reportedTokens":103782,"callsWithoutUsage":0,"costCny":null,"naturalness":"requires_human_review","exitCode":2}

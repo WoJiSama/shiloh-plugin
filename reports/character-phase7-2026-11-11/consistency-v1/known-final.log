@@ -1,0 +1,29 @@
+{"case":"promise-without-goal","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_goal","reason":"正文说'回头跟你唠'，表示之后会继续体验游戏并带着后续结果回来交流，这是明确的后续行动决定；但当前 goals 为空，本次也没有 schedule 或其他目标操作，需建立对应目标或删去该后续承诺。"}],"calls":1}
+{"case":"promise-without-goal","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"accept","issues":[],"calls":1}
+{"case":"opinion-saved-as-experience","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_opinion","reason":"正文明确表达了自己的持续判断（担心随机地图破坏谜题线索连贯性，'这就是我目前的看法'），但候选记忆只有 experience+reported（记录群友提问），没有保存 opinion+inferred 的对应观点，state 中也没有已有的相同有效观点可复用。应补充一条 opinion+inferred 记忆，或将现有记忆改为 opinion 并保留推断性质。"}],"calls":1}
+{"case":"opinion-saved-as-experience","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_opinion","reason":"候选正文明确表达了自己的持续判断「担心随机地图会破坏谜题线索的连贯性，这是我目前的看法」，但候选记忆只有 experience（reported 群友提问），没有任何 opinion+inferred 记录该观点，当前已存状态也没有可复用的相同观点。应把该判断保存为 opinion 且 epistemic 为 inferred。"}],"calls":1}
+{"case":"synthetic-content-promoted-to-fact","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"unsupported_fact","reason":"搜索回执注明返回的是合成资料且未核实，正文却断言'查到了，纸灯塔其实是手工地图，还有3个难度'作为已确认事实，记忆也标为 observed。应改为'搜索返回了这段说法，但未核实/资料注明是合成内容'，并将 epistemic 调整为 reported/inferred 等非 observed。"}],"calls":1}
+{"case":"synthetic-content-promoted-to-fact","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"unsupported_fact","reason":"搜索回执明确为合成资料且未核实（\"合成资料……不是真实作品信息\"）。正文把其断言为已查明的事实（\"查到了，纸灯塔其实是……\"），记忆也以 observed 记为已核实观察，均不合法；应改为\"搜索返回了这一说法但未核实\"并使用 inferred/未核实表述。"}],"calls":1}
+{"case":"already-delivered-message","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"accept","issues":[],"calls":1}
+{"case":"already-delivered-message","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"accept","issues":[],"calls":1}
+{"case":"completion-without-success","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"state_claim","reason":"正文声称“研究任务完成了”，但状态中目标 g1 仍为 waiting，唯一的回执是 simWorkerTask 状态为 failed（未取得产物），没有任何成功完成回执支持已完成的主张。"}],"calls":1}
+{"case":"completion-without-success","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"state_claim","reason":"正文声称'研究任务完成了，已经收掉啦'，但状态中 g1 仍为 waiting，唯一回执 failed-worker 是失败回执（'未取得产物'），没有成功完成回执。失败、计划或其他目标的回执不能证明完成，完成声明与当前实际状态矛盾。"}],"calls":1}
+{"case":"ordinary-chat","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"ordinary-chat","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"interest-without-commitment","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"interest-without-commitment","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"natural-refusal","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"natural-refusal","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"already-persisted-opinion","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"already-persisted-opinion","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"observed-tool-return-not-world-fact","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"observed-tool-return-not-world-fact","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"uncertain-quotation","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"uncertain-quotation","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"completed-goal-new-promise","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_goal","reason":"正文说'回头我再细看'，这是已决定的跨回合后续行动（收尾后无法再执行），而唯一目标 worker-goal 已 completed 且只覆盖取得草稿，不覆盖后续细看；也没有本次新建等待/活跃目标的操作。可改为条件性表达（如'如果以后有需要再看'）或补充目标操作。"}],"calls":1}
+{"case":"completed-goal-new-promise","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_goal","reason":"正文以'回头我再细看'作出了后续主动复查的决定，但唯一目标 worker-goal 已 completed（本次 complete 只覆盖'取得草稿'这一已完成部分），且无新的有效目标或本次目标操作覆盖此后续安排。可删去该后续表述或补一个覆盖细看草稿的 waiting/active 目标。"}],"calls":1}
+{"case":"completed-goal-conditional-interest","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"completed-goal-conditional-interest","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"immediate-search-during-turn","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"immediate-search-during-turn","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"outputFile":"/opt/trss-yunzai-backups/character-eval-20261111-consistency-v1/known-cases-final/results.json","cases":28,"executed":28,"skipped":0,"failed":0,"falseRejections":0,"falseRejectionRate":0,"missedContradictions":3,"missRate":0.25,"expectedIssueMisses":0,"logicalCalls":28,"unsettledCalls":0,"httpRequests":28,"reportedTokens":34572,"callsWithoutUsage":0,"totalModelElapsedMs":98603,"medianModelElapsedMs":2463,"maxModelElapsedMs":12335,"costCny":null,"thresholds":{"falseRejections":0,"missedContradictions":0,"modelErrors":0,"requestTimeoutMs":15000},"meetsKnownCaseThresholds":false,"exitCode":1}

@@ -1,0 +1,23 @@
+{"case":"promise-without-goal","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"accept","issues":[],"calls":1}
+{"case":"promise-without-goal","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"accept","issues":[],"calls":1}
+{"case":"opinion-saved-as-experience","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_opinion","reason":"候选正文表达了持续判断「担心随机地图会破坏谜题线索的连贯性，这是我的看法」，但候选仅保存了 experience+reported（只是引用群友提问），没有任何 opinion+inferred 记忆，当前状态也没有对应的有效观点。应补充一条 opinion+inferred 记忆，或修改正文去掉这个持续判断。"}],"calls":1}
+{"case":"opinion-saved-as-experience","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"missing_opinion","reason":"正文明确表达了自己的持续判断（担心随机地图破坏谜题线索连贯性，并称这是自己目前的看法），但候选只保存了 experience+reported 的群友提问，没有任何 opinion+inferred 记录该观点，当前状态中也无对应有效观点可复用。"}],"calls":1}
+{"case":"synthetic-content-promoted-to-fact","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"unsupported_fact","reason":"搜索回执明确标注资料为合成、未核实的评测内容，候选将其以 observed 记忆保存并向用户断言为已查证事实（“查到了，纸灯塔其实是……”），不符合要求。可改为说明搜索返回了该说法但未核实，或将记忆标为未核实/转述。"}],"calls":1}
+{"case":"synthetic-content-promoted-to-fact","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"unsupported_fact","reason":"搜索回执明确标注资料为合成、未核实，且工具总结指出'搜索工具返回了合成资料，未核实真实作品'。将记忆的 epistemic 记为 observed 并在正文中断言'查到了，纸灯塔其实是手工地图，还有3个难度'是把未核实/合成内容当已核实事实。应改为如'搜索返回了这段说法，但未核实'的表述，并将记忆改为 inferred 或标注未核实。"}],"calls":1}
+{"case":"already-delivered-message","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"duplicate_message","reason":"候选正文「只拿到合成资料，还没核实真实作品。」与本回合 sentMessages 中已发送的内容完全相同，属于重复发送。"}],"calls":1}
+{"case":"already-delivered-message","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"duplicate_message","reason":"候选正文与本回合 sentMessages 中已发出的内容逐字相同，属于重复发送，需要修改或删除该消息。"}],"calls":1}
+{"case":"completion-without-success","sampleIndex":1,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"state_claim","reason":"正文声称研究任务已完成，但目标 g1 仍为 waiting，唯一回执是 status=failed 的失败回执（未取得产物），没有本目标的真实成功回据，也没有本次待提交的成功操作，声称完成与当前状态不符。"}],"calls":1}
+{"case":"completion-without-success","sampleIndex":2,"status":"succeeded","expected":"revise","actual":"revise","issues":[{"code":"state_claim","reason":"正文声称研究任务已完成并收好，但当前状态中目标 g1 仍是 waiting，唯一回执是 failed-worker（失败、未取得产物），没有任何成功回执或本次待提交的完成操作支撑该完成声明。"}],"calls":1}
+{"case":"ordinary-chat","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"ordinary-chat","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"interest-without-commitment","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"interest-without-commitment","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"natural-refusal","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"natural-refusal","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"already-persisted-opinion","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"already-persisted-opinion","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"observed-tool-return-not-world-fact","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"observed-tool-return-not-world-fact","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"uncertain-quotation","sampleIndex":1,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"case":"uncertain-quotation","sampleIndex":2,"status":"succeeded","expected":"accept","actual":"accept","issues":[],"calls":1}
+{"outputFile":"/opt/trss-yunzai-backups/character-eval-20261111-consistency-v1/known-cases/results.json","cases":22,"executed":22,"skipped":0,"failed":0,"falseRejections":0,"falseRejectionRate":0,"missedContradictions":2,"missRate":0.2,"expectedIssueMisses":0,"logicalCalls":22,"unsettledCalls":0,"httpRequests":22,"reportedTokens":21832,"callsWithoutUsage":0,"totalModelElapsedMs":80845,"medianModelElapsedMs":2964,"maxModelElapsedMs":8265,"costCny":null,"thresholds":{"falseRejections":0,"missedContradictions":0,"modelErrors":0,"requestTimeoutMs":15000},"meetsKnownCaseThresholds":false,"exitCode":1}

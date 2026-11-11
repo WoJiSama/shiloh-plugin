@@ -1,0 +1,129 @@
+✔ 同回合收尾去重使用完整正文，百字后不同的消息仍各发送一次 (1085.913333ms)
+✔ 收尾全部为本回合已发送正文时可零发送完成，并明确去重数量 (1050.928709ms)
+✔ 批次剩余额度不足时整批拒绝，不先发送可容纳的前半段 (1012.748291ms)
+✔ 整批预检出站清理失败时零发送，不能先发送正常的第一条 (1093.331666ms)
+✔ 真实传输第二条失败保留首条发送计数和落盘证据，不自动重发 (1434.533834ms)
+✔ 首条传输已提交但回执丢失记为 unknown，同批和后续收尾均不得重发 (1040.831625ms)
+✔ 额外工具的纯文本 e.reply 与收尾共用本回合确认正文，不能重复发送 (1017.549125ms)
+✔ 额外工具带引用和提及的混合正文只去重文本，保留实际发送段结构 (1025.767ms)
+✖ 整批消息超过配置发送上限时零发送，不在归一参数时截掉尾条 (1436.554ms)
+✖ 真实宿主 text 回执未知后所有出站均停止，不经其他工具绕过 (1120.045959ms)
+✖ 真实宿主 reply 回执未知后所有出站均停止，不经其他工具绕过 (1069.497167ms)
+✖ 真实宿主 card 回执未知后所有出站均停止，不经其他工具绕过 (1038.011292ms)
+✖ 真实宿主包装保留 sendMsg 已开始后的未知结果，不能降为确定失败 (59.829125ms)
+✔ 宿主调用前关闭或无群对象是明确失败，仍可修正后发送并保留 message_id (35.50075ms)
+✖ 消息协议保留合法完整五条，超过五条明确拒绝而非截掉尾条 (4.948667ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 9
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14052.690084
+
+✖ failing tests:
+
+test at tests/characterDeliveryRuntime.test.js:234:1
+✖ 整批消息超过配置发送上限时零发送，不在归一参数时截掉尾条 (1436.554ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterDeliveryRuntime.test.js:239:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterDeliveryRuntime.test.js:245:48
+✖ 真实宿主 text 回执未知后所有出站均停止，不经其他工具绕过 (1120.045959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  5 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterDeliveryRuntime.test.js:260:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterDeliveryRuntime.test.js:245:48
+✖ 真实宿主 reply 回执未知后所有出站均停止，不经其他工具绕过 (1069.497167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  5 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterDeliveryRuntime.test.js:260:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterDeliveryRuntime.test.js:245:48
+✖ 真实宿主 card 回执未知后所有出站均停止，不经其他工具绕过 (1038.011292ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  5 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterDeliveryRuntime.test.js:260:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/simulationHostDelivery.test.js:7:1
+✖ 真实宿主包装保留 sendMsg 已开始后的未知结果，不能降为确定失败 (59.829125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simulationHostDelivery.test.js:13:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/simulationHostDelivery.test.js:30:1
+✖ 消息协议保留合法完整五条，超过五条明确拒绝而非截掉尾条 (4.948667ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /^error:/. Input:
+  
+  '{"ok":true,"sent":5,"note":"只确认 sent 条新消息，duplicatesSkipped 是本回合已经成功发出的相同正文；不要重复发送。"}'
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simulationHostDelivery.test.js:39:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{"ok":true,"sent":5,"note":"只确认 sent 条新消息，duplicatesSkipped 是本回合已经成功发出的相同正文；不要重复发送。"}',
+    expected: /^error:/,
+    operator: 'match',
+    diff: 'simple'
+  }

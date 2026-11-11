@@ -1,0 +1,55 @@
+✖ 首条传输已提交但回执丢失记为 unknown，同批和后续收尾均不得重发 (1046.935083ms)
+✖ 额外工具的纯文本 e.reply 与收尾共用本回合确认正文，不能重复发送 (1018.692208ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2196.059708
+
+✖ failing tests:
+
+test at tests/characterDeliveryRuntime.test.js:158:1
+✖ 首条传输已提交但回执丢失记为 unknown，同批和后续收尾均不得重发 (1046.935083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      '回执丢失但可能已经送达的消息',
+  +   '回执丢失但可能已经送达的消息',
+  +   '回执丢失但可能已经送达的消息'
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterDeliveryRuntime.test.js:172:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '回执丢失但可能已经送达的消息', '回执丢失但可能已经送达的消息', '回执丢失但可能已经送达的消息' ],
+    expected: [ '回执丢失但可能已经送达的消息' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/characterDeliveryRuntime.test.js:181:1
+✖ 额外工具的纯文本 e.reply 与收尾共用本回合确认正文，不能重复发送 (1018.692208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      '额外工具已经发出的普通文本',
+  +   '额外工具已经发出的普通文本'
+    ]
+  
+      at TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterDeliveryRuntime.test.js:191:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '额外工具已经发出的普通文本', '额外工具已经发出的普通文本' ],
+    expected: [ '额外工具已经发出的普通文本' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

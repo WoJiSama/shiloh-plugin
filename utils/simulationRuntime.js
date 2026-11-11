@@ -1,6 +1,7 @@
 // 仿真模式（自主仿真会话）单例装配：dist 工厂 + Yunzai 全局注入。
 // 借鉴 qq-bridge reserved2「一切皆工具」——消息不自动转发，AI 用工具自主读/发/等/设唤醒。
 import { createSimulationRuntime } from '../dist/backend/modules/simulation/infrastructure/simulationRuntime.js'
+import { resolveCharacterConsistencyRoute } from '../dist/backend/modules/simulation/infrastructure/characterConsistencyRouting.js'
 import { createPersonaLibrary } from '../dist/backend/modules/conversation/infrastructure/personaLibrary.js'
 import { decodeHostConfig } from '../dist/backend/modules/host/infrastructure/hostConfig.js'
 import { getMidtermMemoryManager } from '../dist/backend/modules/memory/infrastructure/MidtermSummaryManager.js'
@@ -140,6 +141,12 @@ export const simulationRuntime = createSimulationRuntime({
   reflectCharacter: (requestData, execConfig, signal) => YTapi(requestData, { ...execConfig, useTools: false }, undefined, undefined, {
     taskBackend: 'memory', signal, generation: { maxOutputTokens: 1200 },
   }),
+  reviewCharacter: (requestData, execConfig, signal) => {
+    const route = resolveCharacterConsistencyRoute(execConfig)
+    return YTapi(requestData, route.config, undefined, undefined, {
+      taskBackend: route.taskBackend, signal, generation: { maxOutputTokens: 900 },
+    })
+  },
   characterWorkerAvailable: () => {
     const worker = readPluginSettings().simulation?.worker
     return worker?.enabled === true && !!worker.endpoint
@@ -243,16 +250,18 @@ export const simulationRuntime = createSimulationRuntime({
     if (Array.isArray(simCfg.groups) && simCfg.groups.length > 0 && !simCfg.groups.map(String).includes(String(groupId))) {
       // allGroups 模式不检查群清单，只有显式清单才检查
     }
-    const Bot = globalThis.Bot
+    let attempted = false
     try {
       const group = scopedBot(selfId)?.pickGroup?.(Number(groupId))
       if (!group?.sendMsg) return { ok: false, error: '群对象不可用' }
+      attempted = true
       const ret = await group.sendMsg(segments)
       // 回执 message_id：表情包等额外工具靠它确认投递（TRSS sendMsg 返回 {message_id} 或 {data:{message_id}}）
       const messageId = ret?.message_id ?? ret?.data?.message_id ?? null
       return { ok: true, ...(messageId !== null && messageId !== undefined ? { messageId: String(messageId) } : {}) }
     } catch (error) {
-      return { ok: false, error: error?.message || String(error) }
+      // Once handed to the platform, an exception cannot prove non-delivery.
+      return { ok: false, ...(attempted ? { unknown: true } : {}), error: error?.message || String(error) }
     }
   },
   getPersona: (groupId, selfId) => {

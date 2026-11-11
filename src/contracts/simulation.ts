@@ -183,6 +183,8 @@ export interface SimMoodState {
 
 /** message.yaml pluginSettings.simulation 配置段（未解码的宽松形状） */
 export interface SimulationSection {
+  /** Experimental semantic review is opt-in and requires its own configured task backend. */
+  consistency?: { enabled?: boolean }
   /** 后台角色反思的资源边界；行为不由管理员逐轮编排。 */
   reflection?: { enabled?: boolean }
   /** Explicit additional autonomous creative capabilities; still intersected with current tool policy. */

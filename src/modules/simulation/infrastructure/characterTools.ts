@@ -12,6 +12,7 @@ export interface CharacterToolContext {
   onDecision(kind: CharacterDecision['kind']): void
   makeId(prefix: string): string
   sharedSourceIds?(): string[]
+  reviewMemory?(candidate: Record<string, unknown>, draft: CharacterState): Promise<void>
 }
 
 class CharacterTool extends AbstractTool {
@@ -128,11 +129,17 @@ export function createCharacterTools(ctx: CharacterToolContext): AbstractTool[] 
       const supersedes = input.supersedes === undefined ? undefined : text(input, 'supersedes')
       if (supersedes && !ctx.visibleEvidenceRefs().includes(`memory:${supersedes}`)) throw new Error('被修正的记忆本轮不可见')
       if (supersedes && !refs.includes(`memory:${supersedes}`)) throw new Error(`修正记忆必须在 evidenceRefs 中包含 memory:${supersedes}，并保留支持修正的新证据；本次未保存。`)
-      const state = await ctx.update(state => addCharacterMemory(state, {
+      const apply = (state: CharacterState) => addCharacterMemory(state, {
         id, kind, content, epistemic, evidenceRefs: refs,
         ...(supersedes === undefined ? {} : { supersedes }),
         ...(ctx.sharedSourceIds?.().length ? { sharedSources: ctx.sharedSourceIds() } : {}),
-      }, ctx.visibleEvidenceRefs(), ctx.now()))
+      }, ctx.visibleEvidenceRefs(), ctx.now())
+      const before = ctx.reviewMemory ? await ctx.read() : undefined
+      if (before) await ctx.reviewMemory!(input, apply(structuredClone(before)))
+      const state = await ctx.update(state => {
+        if (before && state.revision !== before.revision) throw new Error('角色状态在一致性检查期间已改变，本次记忆未保存')
+        return apply(state)
+      })
       return { ok: true, memory: state.memories.find(item => item.id === id) }
     })
 

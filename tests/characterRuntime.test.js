@@ -4,6 +4,7 @@ import test from 'node:test'
 import { createSimulationRuntime } from '../dist/backend/modules/simulation/infrastructure/simulationRuntime.js'
 import { createDefaultSimSession } from '../dist/backend/modules/simulation/domain/simConfig.js'
 import { CHARACTER_MIN_WAKE_MS, addCharacterMemory, beginCharacterGoalAttempt, characterKey, createCharacterGoal, createEmptyCharacterState, deleteCharacterMemory } from '../dist/backend/modules/simulation/domain/characterState.js'
+import { resolveCharacterConsistencyRoute } from '../dist/backend/modules/simulation/infrastructure/characterConsistencyRouting.js'
 
 const BOT = '3094088525'
 const GROUP = '10086'
@@ -39,8 +40,8 @@ function seedSession(kv, groupId, botId, clock) {
 function fixture({
   kv = new Map(), clock = { value: BASE_AT }, botId = BOT,
   identity = { id: 'shiloh', name: '希洛', systemContent: '喜欢独立游戏' },
-  groups = [GROUP], script = () => quiet(), execute, writeFault, onSave, send,
-  proactiveProbability = 0, seed = true, maxToolRounds = 8,
+  groups = [GROUP], script = () => quiet(), execute, writeFault, onSave, send, review, recordTokens,
+  proactiveProbability = 0, seed = true, maxToolRounds = 8, consistencyEnabled,
 } = {}) {
   if (seed) for (const groupId of groups) if (!kv.has(sessionKey(groupId))) seedSession(kv, groupId, botId, clock)
   const calls = []
@@ -74,12 +75,15 @@ function fixture({
     getPersona: () => ({ personaId: identity.id, persona: { name: identity.name }, systemContent: identity.systemContent }),
     getSection: () => ({
       enabled: true, allGroups: false, groups,
+      ...(consistencyEnabled === undefined ? {} : { consistency: { enabled: typeof consistencyEnabled === 'function' ? consistencyEnabled() : consistencyEnabled } }),
       extraTools: toolDefinitions.map(tool => tool.name), toolPolicy: { mode: 'legacy' },
       wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability, proactiveIdleMs: 60_000 },
       turn: { maxToolRounds, minSendGapMs: 0, maxTurnsPerDay: 100 },
       rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false },
     }),
     getExecutionConfig: () => ({ useTools: true }),
+    ...(review ? { reviewCharacter: review } : {}),
+    ...(recordTokens ? { recordTokens } : {}),
     getExtraTools: names => toolDefinitions.filter(tool => names.includes(tool.name)),
     async YTapi(request) {
       calls.push(structuredClone(request))
@@ -992,4 +996,129 @@ test('工具 reply 文本数组拒绝参数 JSON 和内部路径，普通数组�
       }
     } finally { h.runtime.stop() }
   }
+})
+
+const reviewed = (verdict, issues = []) => ({ choices: [{ message: { content: JSON.stringify({ verdict, issues }) } }], usage: { total_tokens: 7 }, model: 'isolated-reviewer' })
+
+test('一致性退回后只允许修正收尾，成功保存目标才发送且审核费用计入', async () => {
+  const ledger = [], reviews = []
+  const invalid = toolCall('simFinishTurn', { choice: 'chat', reason: '聊天', messages: ['我晚点继续核对资料'], throughSeq: 1 })
+  const valid = toolCall('simFinishTurn', { choice: 'schedule', reason: '决定继续', goal: finishGoal, messages: ['我晚点继续核对资料'], throughSeq: 1 })
+  const h = fixture({ consistencyEnabled: true, script: (_r, i) => i === 0 ? tools(invalid) : tools(valid), recordTokens: row => ledger.push(row), review: async request => {
+    const data = JSON.parse(request.messages[1].content); reviews.push(data)
+    return reviews.length === 1 ? reviewed('revise', [{ code: 'missing_goal', reason: '后续安排没有目标' }]) : reviewed('accept')
+  } })
+  try {
+    await h.ingest(); await idle(h, 2)
+    assert.equal(h.sent.length, 1); assert.equal(reviews.length, 2)
+    assert.match(storedToolReply(h, invalid).content, /本次未保存或发送/)
+    assert.equal(turnContext(h.calls[1]).phase, 'closing')
+    assert.equal((await h.runtime.describeGroup(GROUP)).character.goals.length, 1)
+    assert.equal(reviews[0].state.goals.length, 0); assert.equal(reviews[1].state.goals.length, 1)
+    assert.equal(ledger.filter(row => row.stage === 'character-consistency').length, 2)
+    assert.equal(JSON.parse(h.kv.get(sessionKey(GROUP))).budget.tokens, 34)
+  } finally { h.runtime.stop() }
+})
+
+test('中途聊天和直接记忆写入也受检查，退回不会发送或偷偷补状态', async () => {
+  for (const candidate of [
+    toolCall('simSendMessage', { continuation: 'chat', messages: ['我晚点独自继续研究'] }),
+    toolCall('simCharacterMemory', { action: 'remember', kind: 'experience', epistemic: 'reported', content: '我已确认资料全都是真的', evidenceRefs: ['message:1'] }),
+  ]) {
+    let checks = 0
+    const h = fixture({ consistencyEnabled: true, script: (_r, i) => i === 0 ? tools(candidate) : tools(toolCall('simFinishTurn', { choice: 'silent', reason: '放弃不一致表达' })), review: async () => { checks++; return reviewed('revise', [{ code: 'unsupported_fact', reason: '依据不支持此断言' }]) } })
+    try {
+      await h.ingest(); await idle(h, 2)
+      assert.equal(checks, 1); assert.equal(h.sent.length, 0)
+      assert.match(storedToolReply(h, candidate).content, /一致性检查/)
+      const character = (await h.runtime.describeGroup(GROUP)).character
+      assert.equal(character.memories.length, 0); assert.equal(character.goals.length, 0)
+    } finally { h.runtime.stop() }
+  }
+})
+
+test('不可用审核每回合最多三次，失败后不能用普通消息绕过', async () => {
+  let checks = 0
+  const h = fixture({ consistencyEnabled: true, maxToolRounds: 6, script: () => tools(
+    toolCall('simFinishTurn', { choice: 'chat', reason: '普通交流', messages: ['这是一句待审核消息'] }),
+    toolCall('simSendMessage', { continuation: 'chat', messages: ['试图绕过检查'] }),
+  ), review: async () => { checks++; throw new Error('injected private provider failure') } })
+  try {
+    await h.ingest(); await idle(h, 6)
+    assert.equal(checks, 3); assert.equal(h.sent.length, 0)
+    assert.ok(h.calls.slice(1).every(request => request.tools.length === 1 && request.tools[0].function.name === 'simFinishTurn'))
+    assert.equal((await h.runtime.describeGroup(GROUP)).character.memories.length, 0)
+    assert.doesNotMatch(JSON.stringify(JSON.parse(h.kv.get(sessionKey(GROUP))).agentHistory), /private provider failure/)
+  } finally { h.runtime.stop() }
+})
+
+test('审核默认关闭或显式关闭时普通消息与状态提交均不调用审核', async () => {
+  for (const consistencyEnabled of [undefined, false]) {
+    let checks = 0
+    const h = fixture({ consistencyEnabled, review: async () => { checks++; throw new Error('disabled reviewer must not run') },
+      script: (_request, index) => index === 0 ? tools(toolCall('simSendMessage', { messages: ['先聊一句'] })) : tools(toolCall('simFinishTurn', {
+        choice: 'chat', reason: '结束普通交流', memories: [{ kind: 'experience', epistemic: 'reported', content: '群友介绍了一款游戏', evidenceRefs: ['message:1'] }], messages: ['谢谢介绍'], throughSeq: 1,
+      })),
+    })
+    try {
+      await h.ingest(); await idle(h, 2)
+      assert.equal(checks, 0)
+      assert.equal(h.sent.length, 2)
+      assert.equal((await h.runtime.describeGroup(GROUP)).character.memories.length, 1)
+    } finally { h.runtime.stop() }
+  }
+})
+
+test('明确启用但未配置审核端口或独立后端时拒绝公告，仍能静默收尾', async () => {
+  for (const missing of ['port', 'backend']) {
+    let checks = 0
+    const h = fixture({ consistencyEnabled: true,
+      ...(missing === 'port' ? {} : { review: async () => { checks++; resolveCharacterConsistencyRoute({ useTools: true }); return reviewed('accept') } }),
+      script: (_request, index) => index === 0 ? tools(toolCall('simFinishTurn', { choice: 'chat', reason: '普通交流', messages: ['未审核消息'] })) : tools(toolCall('simFinishTurn', { choice: 'silent', reason: '审核不可用，安静结束', throughSeq: 1 })),
+    })
+    try {
+      await h.ingest(); await idle(h, 2)
+      assert.equal(checks, missing === 'port' ? 0 : 1)
+      assert.equal(h.sent.length, 0)
+      assert.equal((await h.runtime.describeGroup(GROUP)).character.decision.kind, 'silent')
+      assert.match(toolResult(h.calls[1], 'simFinishTurn'), /一致性检查未通过/)
+    } finally { h.runtime.stop() }
+  }
+})
+
+test('前两次普通提交通过后阻止非收尾第三次检查，保留最终收尾配额', async () => {
+  let checks = 0
+  const blocked = toolCall('simCharacterMemory', { action: 'remember', kind: 'interest', epistemic: 'inferred', content: '不能提前耗尽最后检查', evidenceRefs: ['message:1'] })
+  const h = fixture({ consistencyEnabled: true, review: async () => { checks++; return reviewed('accept') },
+    script: (_request, index) => [
+      tools(toolCall('simSendMessage', { messages: ['先聊一句'] })),
+      tools(toolCall('simCharacterMemory', { action: 'remember', kind: 'experience', epistemic: 'reported', content: '群友介绍了一款游戏', evidenceRefs: ['message:1'] })),
+      tools(blocked),
+      tools(toolCall('simFinishTurn', { choice: 'chat', reason: '合并到最终提交', memories: [{ kind: 'interest', epistemic: 'inferred', content: '有一点兴趣', evidenceRefs: ['message:1'] }], messages: ['最后说声谢谢'], throughSeq: 1 })),
+    ][index] || quiet(),
+  })
+  try {
+    await h.ingest(); await idle(h, 4)
+    assert.equal(checks, 3)
+    assert.match(storedToolReply(h, blocked).content, /保留.*收尾/)
+    assert.equal(turnContext(h.calls[3]).phase, 'closing')
+    assert.equal(h.sent.length, 2)
+    const memories = (await h.runtime.describeGroup(GROUP)).character.memories
+    assert.equal(memories.length, 2)
+    assert.equal(memories.some(memory => memory.content === '不能提前耗尽最后检查'), false)
+    assert.equal(memories.some(memory => memory.content === '有一点兴趣'), true)
+  } finally { h.runtime.stop() }
+})
+
+test('管理员在回合中关闭审核后不再开始新审核请求', async () => {
+  let enabled = true, checks = 0
+  const h = fixture({ consistencyEnabled: () => enabled,
+    review: async () => { checks++; enabled = false; return reviewed('accept') },
+    script: (_request, index) => index === 0 ? tools(toolCall('simSendMessage', { messages: ['先聊一句'] })) : tools(toolCall('simFinishTurn', { choice: 'chat', reason: '普通收尾', messages: ['关闭审核后照常结束'], throughSeq: 1 })),
+  })
+  try {
+    await h.ingest(); await idle(h, 2)
+    assert.equal(checks, 1)
+    assert.equal(h.sent.length, 2)
+  } finally { h.runtime.stop() }
 })

@@ -1,0 +1,5 @@
+{"scenario":"social-refusal","sampleIndex":1,"eventIndex":0,"status":"passed","calls":2,"sent":2,"behavior":{"refusalRecorded":true}}
+{"scenario":"social-refusal","sampleIndex":1,"eventIndex":1,"status":"passed","calls":2,"sent":2,"behavior":{"refusalRecorded":true}}
+{"scenario":"social-refusal","sampleIndex":2,"eventIndex":0,"status":"passed","calls":2,"sent":2,"behavior":{"refusalRecorded":true}}
+{"scenario":"social-refusal","sampleIndex":2,"eventIndex":1,"status":"passed","calls":2,"sent":2,"behavior":{"refusalRecorded":true}}
+{"outputFile":"/opt/trss-yunzai-backups/character-eval-20261111-consistency-v1/live/social/results.json","mode":"live_model","events":4,"failedEvents":0,"skippedEvents":0,"behaviorMisses":0,"logicalCalls":8,"mainCalls":4,"reflectionCalls":0,"consistencyCalls":4,"consistencyElapsedMs":9642,"unsettledCalls":0,"feedFetches":0,"workerCalls":0,"httpRequests":8,"capturedMessages":8,"reportedTokens":63121,"callsWithoutUsage":0,"costCny":null,"naturalness":"requires_human_review","exitCode":0}

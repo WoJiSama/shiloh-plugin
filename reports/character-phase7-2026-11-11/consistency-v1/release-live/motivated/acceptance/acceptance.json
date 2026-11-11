@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "file": "results.json",
+    "sha256": "b5bc095f3a1cebf90e173b9e9992f7b750a7e7618cce476e7677d36212da5e7d",
+    "mode": "live_model",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "passed",
+    "behavior": "failed",
+    "liveModel": "failed",
+    "assessmentVersion": 5,
+    "repetitions": 2,
+    "runId": "1d6ddeca-d551-4bc4-a9b4-db24d4abb48e",
+    "startedAtISO": "2026-11-11T04:04:35.900Z",
+    "fingerprints": {
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "scenariosHash": "2581f8e745d247bbe9da605f0cec99a093a87df72a90fe17b99ae4b7a65ef257",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+      "scenarioManifestHash": "ddbd0cb2a04481d6937e2e66c6dd4d5d460b71cebe25373c63d7158d16e07158"
+    },
+    "expectedEvents": 6,
+    "behaviorChecks": 4,
+    "successfulHttpRequests": 22,
+    "summary": {
+      "events": 6,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 2,
+      "logicalCalls": 22,
+      "mainCalls": 13,
+      "reflectionCalls": 0,
+      "consistencyCalls": 9,
+      "consistencyElapsedMs": 67790,
+      "unsettledCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 0,
+      "httpRequests": 22,
+      "capturedMessages": 14,
+      "reportedTokens": 210501,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "goalCompletedWithReceipt": false
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {}
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "goalCompletedWithReceipt": false
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {}
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "motivated-goal-restart:sample-1",
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "motivated-goal-restart:sample-2",
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "expectedEvents": 3
+      }
+    ]
+  },
+  "comparison": {
+    "status": "pending",
+    "reason": "baseline_not_provided",
+    "singleVariableAttribution": false
+  },
+  "humanReview": {
+    "status": "pending",
+    "items": [
+      {
+        "sampleId": "motivated-goal-restart:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "motivated-goal-restart:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      }
+    ]
+  },
+  "stage7": {
+    "status": "pending",
+    "realGroupObservation": "not_provided",
+    "deployment": "not_verified",
+    "reason": "Shadow reports cannot replace actual cross-day group observation and deployment evidence."
+  },
+  "evidenceTrust": "Fingerprints check local consistency and bind review to saved bytes; they do not authenticate a provider, a human reviewer or an actual independent deployment.",
+  "shadowAcceptance": "failed",
+  "exitCode": 1
+}

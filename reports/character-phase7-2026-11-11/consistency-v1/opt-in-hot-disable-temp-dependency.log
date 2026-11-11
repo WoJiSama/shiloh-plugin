@@ -1,0 +1,39 @@
+node:internal/modules/cjs/loader:1456
+  const err = new Error(message);
+              ^
+
+Error: Cannot find module 'saxes'
+Require stack:
+- /private/tmp/bl-character-opt-in-check/modules/simulation/infrastructure/characterSubscriptions.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at file:///private/tmp/bl-character-opt-in-check/modules/simulation/infrastructure/characterSubscriptions.js:18:55
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/private/tmp/bl-character-opt-in-check/modules/simulation/infrastructure/characterSubscriptions.js'
+  ]
+}
+
+Node.js v24.14.1
+✖ /tmp/bl-character-opt-in-runtime.test.mjs (206.204209ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 213.224375
+
+✖ failing tests:
+
+test at ../../../../tmp/bl-character-opt-in-runtime.test.mjs:1:1
+✖ /tmp/bl-character-opt-in-runtime.test.mjs (206.204209ms)
+  'test failed'

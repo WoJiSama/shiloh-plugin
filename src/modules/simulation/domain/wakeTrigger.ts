@@ -14,10 +14,11 @@ export const WAKE_PRIORITY: Record<SimWakeReasonKind, number> = {
   anyMessage: 50,
   probability: 45,
   bootstrap: 40,
+  // 到期目标需绑定自主执行主体；不能被自动回音/空闲检查合并掉。真实消息与正式托付仍优先。
+  characterGoal: 31,
   replyCheck: 30,
   timeout: 25,
   proactiveCheck: 20,
-  characterGoal: 22,
   interestUpdate: 23,
 }
 

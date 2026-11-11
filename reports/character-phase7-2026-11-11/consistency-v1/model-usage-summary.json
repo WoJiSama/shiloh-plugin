@@ -1,0 +1,185 @@
+{
+  "purpose": "all saved live-model runs in this task, including failed and intermediate runs; deduplicated by runId",
+  "runCount": 19,
+  "runs": [
+    {
+      "file": "baseline/motivated/results.json",
+      "runId": "dbfae4f7-42cd-487a-9826-de6b15a9699c",
+      "complete": true,
+      "logicalCalls": 7,
+      "httpRequests": 7,
+      "reportedTokens": 103782,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "baseline/opinion/results.json",
+      "runId": "aef313f2-f6bd-4819-93b0-8c57a166d76c",
+      "complete": true,
+      "logicalCalls": 10,
+      "httpRequests": 10,
+      "reportedTokens": 139878,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "final/motivated/results.json",
+      "runId": "68e772b3-2b3b-4907-9e83-ab3e3c199c8f",
+      "complete": true,
+      "logicalCalls": 27,
+      "httpRequests": 27,
+      "reportedTokens": 231744,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "final/opinion/results.json",
+      "runId": "a24871a3-ccee-411c-8a6f-3bd88995e8cd",
+      "complete": true,
+      "logicalCalls": 12,
+      "httpRequests": 12,
+      "reportedTokens": 102143,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "final/reflection/results.json",
+      "runId": "c1747732-eb1f-4966-90c4-6369f5f437f4",
+      "complete": true,
+      "logicalCalls": 9,
+      "httpRequests": 9,
+      "reportedTokens": 43834,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "final/worker/results.json",
+      "runId": "a42515e5-d310-436a-bfb2-a71e2563c245",
+      "complete": true,
+      "logicalCalls": 13,
+      "httpRequests": 13,
+      "reportedTokens": 118137,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "known-cases-final/results.json",
+      "runId": "823db633-87fe-408b-8dae-7ff9e1013a95",
+      "complete": true,
+      "logicalCalls": 28,
+      "httpRequests": 28,
+      "reportedTokens": 34572,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "known-cases-main/results.json",
+      "runId": "e587ca58-511d-4457-89cf-7e26ba3f4b0c",
+      "complete": true,
+      "logicalCalls": 28,
+      "httpRequests": 28,
+      "reportedTokens": 48123,
+      "callsWithoutUsage": 2
+    },
+    {
+      "file": "known-cases-v1/results.json",
+      "runId": "ce4c2ee4-0069-4358-ac75-d268d297a5c5",
+      "complete": true,
+      "logicalCalls": 22,
+      "httpRequests": 22,
+      "reportedTokens": 21832,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "known-cases-v2/results.json",
+      "runId": "e844de60-a6d3-44cd-96d1-ea890c8826ac",
+      "complete": true,
+      "logicalCalls": 22,
+      "httpRequests": 22,
+      "reportedTokens": 22959,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "live-before-scheduler/motivated/results.json",
+      "runId": "fa126e01-8488-4728-be62-2b4d04c4f3db",
+      "complete": true,
+      "logicalCalls": 28,
+      "httpRequests": 28,
+      "reportedTokens": 264967,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "live-before-scheduler/opinion/results.json",
+      "runId": "23d13cff-0f54-4602-a4f7-bb5f0a1954f0",
+      "complete": true,
+      "logicalCalls": 12,
+      "httpRequests": 12,
+      "reportedTokens": 100771,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "live-before-scheduler/social/results.json",
+      "runId": "febd6944-5208-4203-ac19-20b3c425e348",
+      "complete": true,
+      "logicalCalls": 8,
+      "httpRequests": 8,
+      "reportedTokens": 63121,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "live-before-scheduler/worker/results.json",
+      "runId": "2466cbec-c500-471e-9d2e-fe9aaf75e4a3",
+      "complete": true,
+      "logicalCalls": 13,
+      "httpRequests": 13,
+      "reportedTokens": 138788,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "release-live/motivated/results.json",
+      "runId": "1d6ddeca-d551-4bc4-a9b4-db24d4abb48e",
+      "complete": true,
+      "logicalCalls": 22,
+      "httpRequests": 22,
+      "reportedTokens": 210501,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "release-live/opinion/results.json",
+      "runId": "8666720b-014d-4b53-853e-242dfd3fd82e",
+      "complete": true,
+      "logicalCalls": 21,
+      "httpRequests": 21,
+      "reportedTokens": 181871,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "release-live/reflection/results.json",
+      "runId": "51d868b4-d74f-4e3c-97e9-a43b3bd6f204",
+      "complete": true,
+      "logicalCalls": 9,
+      "httpRequests": 9,
+      "reportedTokens": 45327,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "release-live/social/results.json",
+      "runId": "f84615c1-8334-4ca3-95b5-f63e8de3d03e",
+      "complete": true,
+      "logicalCalls": 9,
+      "httpRequests": 9,
+      "reportedTokens": 78978,
+      "callsWithoutUsage": 0
+    },
+    {
+      "file": "release-live/worker/results.json",
+      "runId": "999869c6-4b40-46c7-907a-8d955fe578c5",
+      "complete": true,
+      "logicalCalls": 12,
+      "httpRequests": 12,
+      "reportedTokens": 125544,
+      "callsWithoutUsage": 0
+    }
+  ],
+  "totals": {
+    "logicalCalls": 312,
+    "httpRequests": 312,
+    "reportedTokens": 2076872,
+    "callsWithoutUsage": 2
+  },
+  "costCny": null,
+  "limitation": "reported usage only; missing usage is not zero and provider billing was not read"
+}

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { CharacterScope, CharacterState } from '../../../contracts/character.js'
-import { addCharacterMemory, characterKey, transitionCharacterGoal } from '../domain/characterState.js'
+import { addCharacterMemory, characterKey, compactCharacterState, transitionCharacterGoal } from '../domain/characterState.js'
 import { createCharacterStore, type CharacterRedis } from './characterStore.js'
 import { createScopedStateStore } from './scopedStateStore.js'
 
@@ -23,8 +23,9 @@ export function createCharacterReflection({ redis, scope, now = Date.now, retain
     const memories = character.memories.filter(m => !m.id.startsWith('reflection-') && !state.processed.includes(`memory:${m.id}`) && !character.memories.some(next => next.supersedes === m.id)).slice(-6)
     return { receipts, memories, refs: [...receipts.map(r => `receipt:${r.id}`), ...memories.map(m => `memory:${m.id}`)] }
   }
-  async function run({ guard, infer, reserve, sharedSources = [] }: {
+  async function run({ guard, infer, reserve, review, sharedSources = [] }: {
     guard(): Promise<void>; infer(prompt: string): Promise<string>; reserve(): Promise<void>; sharedSources?: string[]
+    review?(candidate: Record<string, unknown>, before: CharacterState, evidence: unknown): Promise<void>
   }): Promise<boolean> {
     const at = now(), day = new Date(at).toISOString().slice(0,10)
     const state = await initialize(), before = await characters.load(scope), evidence = inputs(before, state)
@@ -47,18 +48,24 @@ export function createCharacterReflection({ redis, scope, now = Date.now, retain
       const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/u,'').replace(/\s*```$/u,'')) as Record<string, unknown>
       if (!parsed || Object.keys(parsed).some(k => !['summary','updates','goals'].includes(k)) || typeof parsed.summary !== 'string' || parsed.summary.length > 500 || !Array.isArray(parsed.updates) || parsed.updates.length > 2 || !Array.isArray(parsed.goals) || parsed.goals.length > 1) throw new Error('反思响应结构不合法')
       const visibleRefs = [...evidence.refs, ...before.memories.slice(-12).map(m => `memory:${m.id}`)]
+      // Validate the whole candidate privately before any review or character write.
+      // Preserve the store's retention policy while moving validation outside its lock.
+      const retained = retainEvidenceRefs ? await retainEvidenceRefs(scope) : []
+      let draft = compactCharacterState(structuredClone(before), at, retained)
+      for (const value of parsed.updates as Record<string, unknown>[]) {
+        if (!value || Object.keys(value).some(k => !['kind','content','evidenceRefs','supersedes'].includes(k)) || !['opinion','interest'].includes(String(value.kind)) || typeof value.content !== 'string' || value.content.length > 600 || !Array.isArray(value.evidenceRefs) || !value.evidenceRefs.length || value.evidenceRefs.some(ref => typeof ref !== 'string' || !visibleRefs.includes(ref)) || !value.evidenceRefs.some(ref => typeof ref === 'string' && evidence.refs.includes(ref)) || (value.supersedes !== undefined && (typeof value.supersedes !== 'string' || !visibleRefs.includes(`memory:${value.supersedes}`)))) throw new Error('反思变更缺少当前依据或试图修改越界字段')
+        draft = addCharacterMemory(draft, { id: `reflection-${randomUUID()}`, kind: value.kind as 'opinion'|'interest', content: value.content, epistemic: 'inferred', evidenceRefs: value.evidenceRefs as string[], ...(typeof value.supersedes === 'string' ? { supersedes: value.supersedes } : {}), ...(sharedSources.length ? { sharedSources } : {}) }, visibleRefs, at)
+      }
+      for (const value of parsed.goals as Record<string, unknown>[]) {
+        if (!value || Object.keys(value).some(k => !['id','action','reason','nextStep'].includes(k)) || typeof value.id !== 'string' || !['wait','abandon'].includes(String(value.action)) || typeof value.reason !== 'string' || !value.reason.trim() || value.reason.length > 500 || (value.nextStep !== undefined && typeof value.nextStep !== 'string') || !before.goals.some(g => g.id === value.id && ['active','waiting'].includes(g.status))) throw new Error('反思目标更新无效')
+        draft = transitionCharacterGoal(draft, value.id, value.action === 'wait' ? 'waiting' : 'abandoned', { now: at, nextCheckAt: at + INTERVAL, lastOutcome: value.reason, ...(typeof value.nextStep === 'string' ? { nextStep: value.nextStep } : {}) })
+      }
+      await guard()
+      await review?.(structuredClone(parsed), structuredClone(before), structuredClone(evidence))
+      await guard()
       await characters.update(scope, current => {
         if (current.revision !== before.revision || current.paused) throw new Error('反思期间状态已改变，拒绝过期更新')
-        let next = current
-        for (const value of parsed.updates as Record<string, unknown>[]) {
-          if (!value || Object.keys(value).some(k => !['kind','content','evidenceRefs','supersedes'].includes(k)) || !['opinion','interest'].includes(String(value.kind)) || typeof value.content !== 'string' || value.content.length > 600 || !Array.isArray(value.evidenceRefs) || !value.evidenceRefs.length || value.evidenceRefs.some(ref => typeof ref !== 'string' || !visibleRefs.includes(ref)) || !value.evidenceRefs.some(ref => typeof ref === 'string' && evidence.refs.includes(ref)) || (value.supersedes !== undefined && (typeof value.supersedes !== 'string' || !visibleRefs.includes(`memory:${value.supersedes}`)))) throw new Error('反思变更缺少当前依据或试图修改越界字段')
-          next = addCharacterMemory(next, { id: `reflection-${randomUUID()}`, kind: value.kind as 'opinion'|'interest', content: value.content, epistemic: 'inferred', evidenceRefs: value.evidenceRefs as string[], ...(typeof value.supersedes === 'string' ? { supersedes: value.supersedes } : {}), ...(sharedSources.length ? { sharedSources } : {}) }, visibleRefs, at)
-        }
-        for (const value of parsed.goals as Record<string, unknown>[]) {
-          if (!value || Object.keys(value).some(k => !['id','action','reason','nextStep'].includes(k)) || typeof value.id !== 'string' || !['wait','abandon'].includes(String(value.action)) || typeof value.reason !== 'string' || !value.reason.trim() || value.reason.length > 500 || (value.nextStep !== undefined && typeof value.nextStep !== 'string') || !before.goals.some(g => g.id === value.id && ['active','waiting'].includes(g.status))) throw new Error('反思目标更新无效')
-          next = transitionCharacterGoal(next, value.id, value.action === 'wait' ? 'waiting' : 'abandoned', { now: at, nextCheckAt: at + INTERVAL, lastOutcome: value.reason, ...(typeof value.nextStep === 'string' ? { nextStep: value.nextStep } : {}) })
-        }
-        return next
+        return structuredClone(draft)
       })
       const outcome = String(parsed.summary || '没有值得更新的内容')
       await store.update(current => ({ ...current, lastOutcome: outcome, processed: [...new Set([...current.processed, ...evidence.refs])].slice(-512) }))

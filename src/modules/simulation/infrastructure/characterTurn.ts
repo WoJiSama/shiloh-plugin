@@ -19,6 +19,7 @@ export interface CharacterTurnFinishResult {
 
 export interface CharacterTurnToolContext extends Pick<CharacterToolContext, 'now' | 'read' | 'update' | 'visibleEvidenceRefs' | 'makeId' | 'sharedSourceIds'> {
   ensureActive(): Promise<void>
+  review?(input: { candidate: Record<string, unknown>; state: CharacterState }): Promise<void>
   finish(result: CharacterTurnFinishResult): Promise<unknown>
 }
 
@@ -145,7 +146,11 @@ export function createCharacterTurnTool(ctx: CharacterTurnToolContext): Abstract
       for (const memory of input.memories) await apply('simCharacterMemory', { ...memory, action: 'remember' })
       if (input.goal) await apply('simGoal', { ...input.goal, action: GOAL_ACTIONS[input.choice as keyof typeof GOAL_ACTIONS] })
       if (DECISION_CHOICES.has(input.choice)) await apply('simDecide', { kind: input.choice, reason: input.reason })
+      await ctx.review?.({ candidate: { ...structuredClone(input) }, state: structuredClone(draft) })
       await ctx.ensureActive()
+      const stillVisible = new Set(ctx.visibleEvidenceRefs())
+      const submittedRefs = [...input.memories, ...(input.goal ? [input.goal] : [])].flatMap(item => Array.isArray(item.evidenceRefs) ? item.evidenceRefs : [])
+      if (submittedRefs.some(ref => typeof ref !== 'string' || !stillVisible.has(ref))) throw new Error('一致性检查期间引用来源已不可见，收尾未提交')
       const state = changed ? await ctx.update(current => {
         if (current.revision !== snapshot.revision) throw new Error('角色状态已改变，收尾未提交，请重新读取后选择')
         return structuredClone(draft)

@@ -1,0 +1,366 @@
+{
+  "purpose": "final isolated live-model observations; not overall stage 7 acceptance",
+  "assessmentVersion": 5,
+  "scenarios": {
+    "motivated": {
+      "file": "motivated/results.json",
+      "sha256": "b5bc095f3a1cebf90e173b9e9992f7b750a7e7618cce476e7677d36212da5e7d",
+      "complete": true,
+      "runId": "1d6ddeca-d551-4bc4-a9b4-db24d4abb48e",
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "scenariosMatchCurrentFixture": true,
+      "manifestMatchesCurrentFixture": true,
+      "integrity": "passed",
+      "integrityFailures": [],
+      "engineering": "passed",
+      "behavior": "failed",
+      "acceptanceFile": "motivated/acceptance/acceptance.json",
+      "summary": {
+        "events": 6,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 2,
+        "logicalCalls": 22,
+        "mainCalls": 13,
+        "reflectionCalls": 0,
+        "consistencyCalls": 9,
+        "consistencyElapsedMs": 67790,
+        "unsettledCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 22,
+        "capturedMessages": 14,
+        "reportedTokens": 210501,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "callsByStage": {
+        "main": 13,
+        "consistency": 9
+      },
+      "networkByStage": {
+        "main": 13,
+        "consistency": 9
+      },
+      "httpStatuses": [
+        200
+      ],
+      "misses": [
+        {
+          "scenario": "motivated-goal-restart",
+          "sampleIndex": 1,
+          "eventIndex": 1,
+          "status": "passed",
+          "behavior": {
+            "goalCompletedWithReceipt": false
+          }
+        },
+        {
+          "scenario": "motivated-goal-restart",
+          "sampleIndex": 2,
+          "eventIndex": 1,
+          "status": "passed",
+          "behavior": {
+            "goalCompletedWithReceipt": false
+          }
+        }
+      ]
+    },
+    "opinion": {
+      "file": "opinion/results.json",
+      "sha256": "18a58644bfcd23d0fc1c038ea29ae26fa252dba28bf96cd8259634c8f72e78f9",
+      "complete": true,
+      "runId": "8666720b-014d-4b53-853e-242dfd3fd82e",
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "scenariosMatchCurrentFixture": true,
+      "manifestMatchesCurrentFixture": true,
+      "integrity": "passed",
+      "integrityFailures": [],
+      "engineering": "passed",
+      "behavior": "passed",
+      "acceptanceFile": "opinion/acceptance/acceptance.json",
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 21,
+        "mainCalls": 14,
+        "reflectionCalls": 0,
+        "consistencyCalls": 7,
+        "consistencyElapsedMs": 41225,
+        "unsettledCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 21,
+        "capturedMessages": 8,
+        "reportedTokens": 181871,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "callsByStage": {
+        "main": 14,
+        "consistency": 7
+      },
+      "networkByStage": {
+        "main": 14,
+        "consistency": 7
+      },
+      "httpStatuses": [
+        200
+      ],
+      "misses": []
+    },
+    "worker": {
+      "file": "worker/results.json",
+      "sha256": "cf6f3c9d574011ee7d48de21b56cd9b373e2e5966a009e13588410e7b543c841",
+      "complete": true,
+      "runId": "999869c6-4b40-46c7-907a-8d955fe578c5",
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "scenariosMatchCurrentFixture": true,
+      "manifestMatchesCurrentFixture": true,
+      "integrity": "passed",
+      "integrityFailures": [],
+      "engineering": "passed",
+      "behavior": "passed",
+      "acceptanceFile": "worker/acceptance/acceptance.json",
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 0,
+        "logicalCalls": 12,
+        "mainCalls": 8,
+        "reflectionCalls": 0,
+        "consistencyCalls": 4,
+        "consistencyElapsedMs": 18860,
+        "unsettledCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 2,
+        "httpRequests": 12,
+        "capturedMessages": 6,
+        "reportedTokens": 125544,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "callsByStage": {
+        "main": 8,
+        "consistency": 4
+      },
+      "networkByStage": {
+        "main": 8,
+        "consistency": 4
+      },
+      "httpStatuses": [
+        200
+      ],
+      "misses": []
+    },
+    "social": {
+      "file": "social/results.json",
+      "sha256": "2d5decb3eafd1f001fd01c360ce2c10c7064136697fe52e74d8ca9d104e0f7c6",
+      "complete": true,
+      "runId": "f84615c1-8334-4ca3-95b5-f63e8de3d03e",
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "scenariosMatchCurrentFixture": true,
+      "manifestMatchesCurrentFixture": true,
+      "integrity": "passed",
+      "integrityFailures": [],
+      "engineering": "passed",
+      "behavior": "failed",
+      "acceptanceFile": "social/acceptance/acceptance.json",
+      "summary": {
+        "events": 4,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 1,
+        "logicalCalls": 9,
+        "mainCalls": 5,
+        "reflectionCalls": 0,
+        "consistencyCalls": 4,
+        "consistencyElapsedMs": 7752,
+        "unsettledCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 9,
+        "capturedMessages": 8,
+        "reportedTokens": 78978,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "callsByStage": {
+        "main": 5,
+        "consistency": 4
+      },
+      "networkByStage": {
+        "main": 5,
+        "consistency": 4
+      },
+      "httpStatuses": [
+        200
+      ],
+      "misses": [
+        {
+          "scenario": "social-refusal",
+          "sampleIndex": 2,
+          "eventIndex": 1,
+          "status": "passed",
+          "behavior": {
+            "refusalRecorded": false
+          }
+        }
+      ]
+    },
+    "reflection": {
+      "file": "reflection/results.json",
+      "sha256": "d12894cd83c059494c52af85a02dd46e7560ce28f0e5909314289bda282b8ac4",
+      "complete": true,
+      "runId": "51d868b4-d74f-4e3c-97e9-a43b3bd6f204",
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "scenariosMatchCurrentFixture": true,
+      "manifestMatchesCurrentFixture": true,
+      "integrity": "passed",
+      "integrityFailures": [],
+      "engineering": "passed",
+      "behavior": "failed",
+      "acceptanceFile": "reflection/acceptance/acceptance.json",
+      "summary": {
+        "events": 6,
+        "failedEvents": 0,
+        "skippedEvents": 0,
+        "behaviorMisses": 4,
+        "logicalCalls": 9,
+        "mainCalls": 3,
+        "reflectionCalls": 2,
+        "consistencyCalls": 4,
+        "consistencyElapsedMs": 7650,
+        "unsettledCalls": 0,
+        "feedFetches": 0,
+        "workerCalls": 0,
+        "httpRequests": 9,
+        "capturedMessages": 2,
+        "reportedTokens": 45327,
+        "callsWithoutUsage": 0,
+        "costCny": null,
+        "naturalness": "requires_human_review"
+      },
+      "callsByStage": {
+        "main": 3,
+        "consistency": 4,
+        "reflection": 2
+      },
+      "networkByStage": {
+        "main": 3,
+        "consistency": 4,
+        "reflection": 2
+      },
+      "httpStatuses": [
+        200
+      ],
+      "misses": [
+        {
+          "scenario": "independent-reflection",
+          "sampleIndex": 1,
+          "eventIndex": 1,
+          "status": "passed",
+          "behavior": {
+            "independentOpinionPersisted": false,
+            "opinionPersisted": false,
+            "noMessageSent": true,
+            "noWorkerSubmitted": true
+          }
+        },
+        {
+          "scenario": "independent-reflection",
+          "sampleIndex": 2,
+          "eventIndex": 1,
+          "status": "passed",
+          "behavior": {
+            "independentOpinionPersisted": false,
+            "opinionPersisted": false,
+            "noMessageSent": true,
+            "noWorkerSubmitted": true
+          }
+        }
+      ]
+    }
+  },
+  "totals": {
+    "events": 24,
+    "failedEvents": 0,
+    "skippedEvents": 0,
+    "behaviorMisses": 7,
+    "logicalCalls": 73,
+    "mainCalls": 43,
+    "reflectionCalls": 2,
+    "consistencyCalls": 28,
+    "consistencyElapsedMs": 143277,
+    "unsettledCalls": 0,
+    "httpRequests": 73,
+    "capturedMessages": 38,
+    "reportedTokens": 642221,
+    "callsWithoutUsage": 0,
+    "workerCalls": 2
+  },
+  "samples": 10,
+  "sharedRunnerBuildAndConfig": true,
+  "remoteSha256Verified": true,
+  "allStaticInputsMatch": true,
+  "allNetworkStagesMatchCallCounts": true,
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "actualExternalWorkerSubmissions": 0,
+  "costCny": null,
+  "humanReview": "pending",
+  "realCrossDay": "pending",
+  "semanticObservations": [
+    {
+      "file": "social/results.json",
+      "sampleIndex": 2,
+      "eventIndex": 1,
+      "category": "refusal_not_recorded",
+      "detail": "simSendMessage says 主人是不可能叫的; simFinishTurn choice=chat; decision remains the previous event refusal and strict refusalRecorded=false."
+    },
+    {
+      "file": "worker/results.json",
+      "sampleIndex": 2,
+      "eventIndex": 1,
+      "category": "new_future_intention_after_completed_goal",
+      "detail": "Only goal is completed; sent 回头有空我自己再翻翻看靠不靠谱; consistency returned accept. This remains a semantic boundary miss candidate."
+    },
+    {
+      "file": "opinion/results.json",
+      "sampleIndex": 2,
+      "eventIndex": 0,
+      "category": "persisted_opinion_does_not_cover_spoken_judgment",
+      "detail": "Spoken judgment says 解谜还是手工设计更稳; the only opinion record concerns uncertain map type. Mechanical opinion existence passed but semantic coverage is incomplete."
+    },
+    {
+      "file": "motivated/results.json",
+      "sampleIndex": 1,
+      "eventIndex": 2,
+      "category": "unverified_detail_stated_without_explicit_qualification",
+      "detail": "Sent 就昨天查了个介绍：手工地图的探索解谜，三个难度; underlying search is synthetic and unverified. Statement retains intro attribution but does not explicitly retain the reliability limitation; consistency accepted."
+    }
+  ],
+  "deliveryObservations": {
+    "sameEventExactDuplicateMessages": 0,
+    "partialSendReceipts": 0,
+    "reportedDuplicatesSkipped": 0,
+    "limitation": "No duplicate or partial send was observed in this batch; actual duplicate suppression was not triggered."
+  }
+}

@@ -1,11 +1,13 @@
 import type { ChatRequestData, ChatResponse } from '../../../contracts/modelGateway.js'
 import type { PersonaText } from '../../conversation/domain/personaSource.js'
 import { randomUUID, createHash } from 'node:crypto'
-import type { CharacterScope, CharacterReceipt, CharacterDecision } from '../../../contracts/character.js'
+import type { CharacterScope, CharacterReceipt, CharacterDecision, CharacterState } from '../../../contracts/character.js'
 import { createPersonaSnapshot } from '../../conversation/infrastructure/personaSnapshot.js'
 import { createCharacterStore } from './characterStore.js'
 import { createCharacterTools } from './characterTools.js'
 import { createCharacterTurnTool, type CharacterTurnFinishResult } from './characterTurn.js'
+import { createCharacterConsistencyReviewer } from './characterConsistency.js'
+import { planMessageDelivery } from '../domain/messageDelivery.js'
 import type { CharacterActivityOperation, CharacterFeedItem } from '../../../contracts/characterActivities.js'
 import { createCharacterWorkspace, createCharacterWorkspaceTools } from './characterWorkspace.js'
 import { createCharacterSubscriptions, createCharacterSubscriptionTools } from './characterSubscriptions.js'
@@ -65,6 +67,8 @@ export interface SimulationRuntimePorts {
   YTapi(requestData: ChatRequestData, config: unknown): Promise<ChatResponse>
   /** Isolated, abortable model path for private reflection; absent means no background model calls. */
   reflectCharacter?(requestData: ChatRequestData, config: unknown, signal: AbortSignal): Promise<ChatResponse>
+  /** Bounded semantic review. Production wires this to an abortable, tool-free model call. */
+  reviewCharacter?(requestData: ChatRequestData, config: unknown, signal: AbortSignal): Promise<ChatResponse>
   fetchCharacterFeed?(url: string, kind: 'rss' | 'github'): Promise<CharacterFeedItem[]>
   runCharacterWorker?(task: CharacterWorkerTask, scope: CharacterScope, signal: AbortSignal): Promise<CharacterWorkerResult>
   characterWorkerAvailable?(): boolean
@@ -73,7 +77,7 @@ export interface SimulationRuntimePorts {
   /** 视觉侧模型把图片转成文字描述（主模型纯文本时 simGetMessageImages 的看图走这里）；返回 null/空 表示描述不可用 */
   describeImages?(images: { mime: string; base64: string }[], context: { groupId: string; label: string }): Promise<string | null>
   /** 出站发送：segments 为 OneBot 消息段数组（经全局出站闸门）；成功时尽量带回 message_id 供回执校验 */
-  sendGroupMessage(groupId: string, segments: unknown[], selfId?: string): Promise<{ ok: boolean; error?: string; messageId?: string | number }>
+  sendGroupMessage(groupId: string, segments: unknown[], selfId?: string): Promise<{ ok: boolean; error?: string; messageId?: string | number; unknown?: boolean }>
   getPersona(groupId: string, selfId: string): { personaId?: string; persona: PersonaText; systemContent: string }
   /** 仿真回合额外放通的既有工具（toolPolicy 解析出的实际放通名清单；从 localToolRegistry 取实例） */
   getExtraTools?(names: string[]): import('../../toolSupport/infrastructure/AbstractTool.js').AbstractTool[]
@@ -848,9 +852,50 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const extraToolNames = resolveExtraToolNames(cfg, groupId)
       const extraTools = resolveExtraTools(extraToolNames)
 
-      const memoryBox = { list: memories, sentTexts: [] as string[] }
+      const memoryBox = { list: memories, sentTexts: [] as string[], deliveryUnknown: false }
+      const sourceResults = new Map<string, { toolName: string; content: string; truncated: boolean }>()
+      const reviewer = ports.getSection().consistency?.enabled === true ? createCharacterConsistencyReviewer({
+        infer: (request, signal) => {
+          if (!ports.reviewCharacter) throw new Error('角色审核端口未配置')
+          return ports.reviewCharacter(request, ports.getExecutionConfig(), signal)
+        },
+        onResult: result => {
+          tokens += Number(record(result.usage).total_tokens) || 0
+          try { ports.recordTokens?.({ scope: groupId, stage: 'character-consistency', model: result.model ?? '', usage: result.usage, ms: result.ms }) } catch { /* accounted in wake tokens too */ }
+        },
+      }) : undefined
+      const reviewCandidate = async (toolName: string, candidate: Record<string, unknown>, draft?: CharacterState) => {
+        if (!reviewer || ports.getSection().consistency?.enabled !== true) return
+        if (Array.isArray(candidate.messages)) candidate = { ...candidate, messages: [...new Set(candidate.messages)].filter(message => typeof message !== 'string' || !memoryBox.sentTexts.includes(message)) }
+        if (Array.isArray(candidate.messages) && candidate.messages.length === 0) { candidate = { ...candidate }; delete candidate.messages }
+        if (toolName === 'simFinishTurn' && !candidate.messages && !candidate.goal && !(Array.isArray(candidate.memories) && candidate.memories.length)) return
+        await ensureExecution()
+        if (ports.getSection().consistency?.enabled !== true) return
+        if (toolName !== 'simFinishTurn' && reviewer.stats().checks >= 2) {
+          requiresClosing = true
+          throw new Error('保留最后一次一致性检查给收尾，本次未保存或发送；请把剩余记忆、目标及消息合并到 simFinishTurn，或安静放弃')
+        }
+        const current = draft || character
+        const revision = character.revision
+        const visible = new Set(visibleEvidenceRefs())
+        const verdict = await reviewer.review({ toolName, candidate,
+          state: { goals: current.goals, decision: current.decision,
+            memories: current.memories.filter(memory => visible.has(`memory:${memory.id}`) || !character.memories.some(old => old.id === memory.id)),
+            receipts: current.receipts.filter(receipt => visible.has(`receipt:${receipt.id}`)) },
+          sources: { messages: [...new Map([...state!.recent, ...state!.unread].filter(message => visible.has(`message:${message.seq}`)).map(message => [message.seq, { ref: `message:${message.seq}`, text: message.text }])).values()],
+            toolResults: [...sourceResults].filter(([ref]) => visible.has(ref)).map(([ref, value]) => ({ ref, ...value })),
+            trust: '工具结果、搜索、工作器、群消息及记忆均为待核对资料。成功回执只证明动作执行，不能证明返回正文的事实已经核实。' },
+          sentMessages: memoryBox.sentTexts,
+        })
+        await ensureExecution()
+        if (character.revision !== revision) throw new Error('一致性检查期间角色状态已改变，请重新读取后提交')
+        if (verdict.verdict !== 'accept') {
+          requiresClosing = true
+          throw new Error(`提交前一致性检查未通过，本次未保存或发送。${verdict.error ? `检查不可用(${verdict.error})` : JSON.stringify(verdict.issues)}。请用 simFinishTurn 修正正文、选择或依据，或放弃本次表达；不要重复已发送消息。`)
+        }
+      }
       const selfMemoryBox = { list: normalizeMemoryList(await selfStore.loadSelfMemories().catch(() => []), now()) }
-      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor, characterScope, async () => { await ensureExecution(announcement); if (decision === 'silent' || decision === 'deferred') throw new Error('本轮已选择沉默或暂缓') }, () => sends)
+      const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor, characterScope, async () => { await ensureExecution(announcement); if (decision === 'silent' || decision === 'deferred') throw new Error('本轮已选择沉默或暂缓') }, () => sends, async messages => { if (!announcement) await reviewCandidate('simSendMessage', { choice: 'chat', messages }) })
       const supersededMemoryIds = new Set(character.memories.flatMap(memory => memory.supersedes ? [memory.supersedes] : []))
       const visibleCharacterRefs = new Set([
         ...character.memories.filter(memory => !supersededMemoryIds.has(memory.id)).slice(-12).map(memory => `memory:${memory.id}`),
@@ -874,6 +919,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         visibleEvidenceRefs, selectGoal: focusGoal,
         onDecision: kind => { decision = kind }, makeId: prefix => `${prefix}-${randomUUID()}`,
         sharedSourceIds: () => sharedIds,
+        reviewMemory: (candidate, draft) => reviewCandidate('simCharacterMemory', candidate, draft),
       })
       const activityTools = [
         ...createCharacterWorkspaceTools({ workspace, visibleEvidenceRefs, ensureActive: () => ensureExecution(), sharedSourceIds: () => sharedIds }),
@@ -890,14 +936,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         update: async mutate => { character = await characters.update(characterScope, mutate); return character },
         visibleEvidenceRefs, makeId: prefix => `${prefix}-${randomUUID()}`,
         sharedSourceIds: () => sharedIds, ensureActive: () => ensureExecution(), finish: result => finishTurn(result),
+        review: ({ candidate, state }) => reviewCandidate('simFinishTurn', candidate, state),
       })
       const tools = [...simulationTools, ...characterTools, finishTool, ...activityTools, ...extraTools]
       const toolReply = async (payload: unknown) => {
         await ensureExecution()
+        if (memoryBox.deliveryUnknown) throw new Error('上次发送结果未知，本回合不再发送，请核对回执')
         if (decision === 'silent' || decision === 'deferred') throw new Error('本轮已选择沉默或暂缓')
         const segments = normalizeReplyPayload(payload)
-        const allowance = checkSendAllowance(state!, cfg, now(), sends)
-        if (!allowance.allowed) throw new Error(allowance.reason)
         const safeSegments = segments.map(segment => {
           const item = record(segment)
           if (item.type !== 'text') return segment
@@ -909,8 +955,26 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           if (redacted.heavy) throw new Error('工具回复包含内部状态，已拦截')
           return { ...item, data: { ...record(item.data), text: redacted.text } }
         })
-        const receipt = await ports.sendGroupMessage(groupId, safeSegments, self.id)
+        const replySeen = new Set(memoryBox.sentTexts)
+        let duplicatesSkipped = 0
+        const transportSegments = safeSegments.filter(segment => {
+          if (record(segment).type !== 'text') return true
+          const text = String(record(record(segment).data).text || '')
+          if (replySeen.has(text)) { duplicatesSkipped++; return false }
+          replySeen.add(text); return true
+        })
+        const replyTexts = transportSegments.filter(segment => record(segment).type === 'text').map(segment => String(record(record(segment).data).text || ''))
+        if (!transportSegments.some(segment => !['at', 'reply'].includes(String(record(segment).type)))) return { message_id: '', sent: 0, duplicatesSkipped }
+        const allowance = checkSendAllowance(state!, cfg, now(), sends)
+        if (!allowance.allowed) throw new Error(allowance.reason)
+        if (replyTexts.length) await reviewCandidate('toolReply', { messages: replyTexts })
+        await ensureExecution()
+        let receipt
+        try { receipt = await ports.sendGroupMessage(groupId, transportSegments, self.id) }
+        catch { memoryBox.deliveryUnknown = true; throw new Error('工具消息传输中断，是否送达未知，本回合不再发送') }
+        if (receipt.unknown) { memoryBox.deliveryUnknown = true; throw new Error('工具消息回执未确认，是否送达未知，本回合不再发送') }
         if (!receipt.ok) throw new Error(receipt.error || '发送失败')
+        memoryBox.sentTexts.push(...replyTexts)
         sends += 1
         recordSend(state!, now(), 1)
         state!.lastAiSendAt = now()
@@ -955,6 +1019,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         let sendStatus: 'not_requested' | 'succeeded' | 'failed' = 'not_requested'
         let readStatus: 'not_requested' | 'succeeded' | 'failed' = 'not_requested'
         let error: string | undefined
+        let duplicatesSkipped = 0
         const sentBefore = sends
         if (result.messages) {
           sendStatus = 'failed'
@@ -976,6 +1041,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
               ...(result.atUserIds === undefined ? {} : { atUserIds: result.atUserIds }),
             }, groupId, self.id, actor, toolReply)
             sendStatus = classifyCharacterResult(response) === 'succeeded' ? 'succeeded' : 'failed'
+            try { duplicatesSkipped = Number(record(JSON.parse(response.replace(/^error: /, ''))).duplicatesSkipped) || 0 } catch { /* error response retains its own delivery evidence */ }
             if (sendStatus === 'failed') error = response
           } catch (failure) { error = safeToolErrorText('simFinishTurn', failure) }
           finally { announcement = undefined }
@@ -983,7 +1049,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             try {
               character = await characters.update(characterScope, current => {
                 if (current.revision !== permit.revision) throw new Error('公告期间角色状态已改变，保留 pending 待核实，不覆盖新状态')
-                return recordCharacterReceipt(current, { ...pending, status: sendStatus === 'succeeded' ? 'succeeded' : sends > sentBefore ? 'unknown' : 'failed', summary: sendStatus === 'succeeded' ? `最终消息已确认发送 ${sends - sentBefore} 条` : '最终消息发送未全部确认；已保存状态保留，不自动重发', at: now() }, now())
+                return recordCharacterReceipt(current, { ...pending, status: sendStatus === 'succeeded' ? 'succeeded' : memoryBox.deliveryUnknown || sends > sentBefore ? 'unknown' : 'failed', summary: sendStatus === 'succeeded' ? `最终消息已确认发送 ${sends - sentBefore} 条，跳过重复 ${duplicatesSkipped} 条` : '最终消息发送未全部确认；已保存状态保留，不自动重发', at: now() }, now())
               })
               permit.revision = character.revision
             } catch (failure) {
@@ -1006,7 +1072,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           ok: true, choice: result.choice, saved: true,
           ...(result.goal ? { goal: result.goal } : {}), memories: result.memories || [],
           ...(result.decision ? { decision: result.decision } : {}),
-          sendStatus, sent: sends - sentBefore, readStatus, ...(error ? { error: error.slice(0, 500) } : {}),
+          sendStatus, sent: sends - sentBefore, duplicatesSkipped, ...(memoryBox.deliveryUnknown ? { deliveryUnknown: true } : {}), readStatus, ...(error ? { error: error.slice(0, 500) } : {}),
         }
         if (JSON.stringify(outcome).length <= 3500) return outcome
         // Preserve a whole acknowledgement within the tool-history budget.
@@ -1048,8 +1114,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           return safeToolErrorText(tool.name, error)
         }
         let reported: 'succeeded' | 'failed' | undefined
+        const alreadyUnknown = memoryBox.deliveryUnknown
         let result = await runSimTool(tool, args, groupId, self.id, actor, toolReply, status => { reported = status }, tool.name === 'simWorkerTask' ? id : undefined)
-        const status = reported ?? classifyCharacterResult(result)
+        const status = memoryBox.deliveryUnknown && !alreadyUnknown ? 'unknown' : reported ?? classifyCharacterResult(result)
         const summary = redactInternalStatusLeaks(result).text.slice(0, 500) || `${tool.name}: ${status}`
         const receipt: CharacterReceipt = { ...pending, status, summary, at: now() }
         // A lost final write leaves pending: recovery records unknown; never blindly repeat the side effect.
@@ -1072,6 +1139,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           })
         }
         visibleCharacterRefs.add(`receipt:${id}`)
+        sourceResults.set(`receipt:${id}`, { toolName: tool.name, content: result.slice(0, 8000), truncated: result.length > 8000 })
         return `${result}\n【运行时行动回执】${JSON.stringify({ evidenceRef: `receipt:${id}`, status, goalId: focusedGoalId })}`
       }
       const executionConfig = ports.getExecutionConfig()
@@ -1087,7 +1155,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         rounds += 1
         const closing = requiresClosing || rounds > cfg.turn.maxToolRounds - 2
         const roundTools = closing ? [finishTool] : tools.filter(tool => allowedTool(tool.name))
-        const context = buildCharacterTurnContext({ phase: closing ? 'closing' : 'acting', remainingToolRounds: cfg.turn.maxToolRounds - rounds + 1, ...(focusedGoalId ? { focusedGoalId } : {}), visibleEvidenceRefs: visibleEvidenceRefs() })
+        const context = buildCharacterTurnContext({ phase: closing ? 'closing' : 'acting', remainingToolRounds: cfg.turn.maxToolRounds - rounds + 1, ...(focusedGoalId ? { focusedGoalId } : {}), visibleEvidenceRefs: visibleEvidenceRefs() }) + (reviewer ? `\n本轮剩余提交检查次数：${Math.max(0, 3 - reviewer.stats().checks)}。将需要保存的观点、目标和最终消息合并进 simFinishTurn；检查退回后自行修正或安静放弃，检查提示不发到群里。` : '')
         const requestData = buildChatRequestData(providerConfig, [{ role: 'system', content: systemPrompt }, ...history, { role: 'user', content: context }], simToolsAsFunctions(roundTools), closing ? 'required' : 'auto')
         if (closing && (!requestData.tools?.length || !requestData.tool_choice)) {
           logger.warn(`[仿真] 群 ${groupId} 模型配置未提供收尾工具，停止本轮`)
@@ -1134,10 +1202,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
               logger.info(`[仿真] 群 ${groupId} 提醒后文本仍含元话术或为括号标注（${text.slice(0, 24)}），按沉默处理不直发`)
             } else {
               logger.info(`[仿真] 群 ${groupId} 提醒后仍未发送，兜底直发 ${text.length} 字`)
-              history.push({ role: 'user', content: '【系统】已替你把上面那段话发出去了。以后想说的话必须自己调 simSendMessage。' })
               try {
                 const sender = simulationTools.find(tool => tool.name === 'simSendMessage')!
-                await executeTool(sender, { continuation: 'chat', messages: [text.slice(0, cfg.turn.messageTextMaxChars)] })
+                const result = await executeTool(sender, { continuation: 'chat', messages: [text.slice(0, cfg.turn.messageTextMaxChars)] })
+                history.push({ role: 'user', content: classifyCharacterResult(result) === 'succeeded' ? '【系统】已替你把上面那段话发出去了。以后想说的话必须自己调 simSendMessage。' : `【系统】这段文本未确认发送：${result.slice(0, 1000)}` })
               } catch (error) {
                 logger.warn(`[仿真] 群 ${groupId} 兜底直发失败: ${error instanceof Error ? error.message : String(error)}`)
               }
@@ -1247,7 +1315,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
   }
 
-  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[] }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }, moodBox: { current: SimMoodState | null } = { current: null }, moodAnchor: Record<MoodAxis, number> | null = null, scope = scopeFor(groupId, state.botId), beforeSend?: () => Promise<void>, totalSends?: () => number): SimToolContext {
+  function buildToolContext(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, addSends: (delta: number) => void, memoryBox: { list: SimMemoryEntry[]; sentTexts: string[]; deliveryUnknown?: boolean }, affinityBox: { map: SimAffinityMap }, selfMemoryBox: { list: SimMemoryEntry[] }, moodBox: { current: SimMoodState | null } = { current: null }, moodAnchor: Record<MoodAxis, number> | null = null, scope = scopeFor(groupId, state.botId), beforeSend?: () => Promise<void>, totalSends?: () => number, reviewSend?: (messages: string[]) => Promise<void>): SimToolContext {
     const store = scopedStore(scope)
     let sendsThisTurn = 0
     return {
@@ -1264,47 +1332,55 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (!groupActive(runtimeConfig(), groupId)) {
           return { ok: false, error: '仿真模式已对本群关闭，本轮不再发送消息' }
         }
-        const verdict = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn)
-        if (!verdict.allowed) return { ok: false, error: verdict.reason }
-        let sent = 0
-        let memeBumped = false
-        for (let i = 0; i < messages.length; i += 1) {
-          await beforeSend?.()
-          const itemAllowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn)
-          if (!itemAllowance.allowed) return { ok: false, error: itemAllowance.reason }
-          // 出站脱敏与主链路同源（内部路径/堆栈/日志标签片段级脱敏；heavy 整条拦截）
+        if (memoryBox.deliveryUnknown) return { ok: false, sent: 0, unknown: true, error: '上次发送结果未知，本回合不再发送，请核对回执' }
+        const cleaned: string[] = []
+        for (let i = 0; i < messages.length; i++) {
           const redacted = redactInternalStatusLeaks(messages[i])
-          if (redacted.heavy) {
-            return { ok: false, error: `第 ${i + 1} 条包含大量内部状态特征已被安全策略拦截，请换一句自然的说法${sent > 0 ? `（前 ${sent} 条已发出）` : ''}` }
-          }
-          const segments: unknown[] = []
-          if (i === 0 && opts.replyToMessageId !== undefined && opts.replyToMessageId !== null && opts.replyToMessageId !== '') {
-            segments.push({ type: 'reply', data: { id: String(opts.replyToMessageId) } })
-          }
-          for (const userId of opts.atUserIds || []) segments.push({ type: 'at', data: { qq: String(userId) } })
-          segments.push({ type: 'text', data: { text: redacted.text } })
-          const receipt = await ports.sendGroupMessage(groupId, segments, scope.botId)
-          if (!receipt.ok) {
-            // 发送失败不刷新参与状态：没发出去的话不算说过话
-            return { ok: false, error: `第 ${sent + 1} 条发送失败：${receipt.error || '网关错误'}${sent > 0 ? `（前 ${sent} 条已发出）` : ''}` }
-          }
-          sent += 1
-          sendsThisTurn += 1
-          addSends(1)
-          markConversationEngaged(state, state.conversation.lastTriggerUserId || '', cfg.wake.continuationWindowMs)
-          memoryBox.sentTexts.push(messages[i]!.slice(0, 100))
-          // 梗使用强化：AI 发的话里用到了本群梗 → 该梗热度 +1（下次注入排位上升）
-          if (bumpMemeUsage(memoryBox.list, messages[i]!, now()).length) memeBumped = true
-          recordSend(state, now(), 1)
-          state.lastAiSendAt = now()
-          invalidatePreSleepWaitByParticipation(state)
-          // 拟人节奏：连发间隔带长抖动（0.4~3 秒额外停顿），避免固定节拍的机器感
-          if (i < messages.length - 1) await sleep(boundedTimerDelay(cfg.turn.minSendGapMs + 400 + Math.floor(random() * 2600), 60_000))
+          if (redacted.heavy) return { ok: false, sent: 0, error: `第 ${i + 1} 条包含大量内部状态特征，整批未发送，请换一句自然的说法` }
+          cleaned.push(redacted.text)
         }
-        await store.save(groupId, state)
-        // 强化过的梗库必须落盘（发送路径只存会话状态，不存记忆库）
-        if (memeBumped) await store.saveMemories(groupId, memoryBox.list)
-        return { ok: true, sent }
+        const plan = planMessageDelivery({ messages: cleaned, deliveredTexts: memoryBox.sentTexts, state, config: cfg, at: now(), sendsThisTurn: totalSends?.() ?? sendsThisTurn })
+        if (!plan.ok) return { ok: false, sent: 0, error: plan.error, duplicatesSkipped: plan.duplicatesSkipped }
+        let sent = 0, inFlight = false
+        const failed = (error: string): SimSendResult => ({ ok: false, sent, duplicatesSkipped: plan.duplicatesSkipped, ...(memoryBox.deliveryUnknown ? { unknown: true } : {}), error })
+        try {
+          if (plan.messages.length) await reviewSend?.(plan.messages)
+          // Review may take time. Check the entire remaining batch again before its first send.
+          const latest = planMessageDelivery({ messages: plan.messages, deliveredTexts: memoryBox.sentTexts, state, config: cfg, at: now(), sendsThisTurn: totalSends?.() ?? sendsThisTurn })
+          if (!latest.ok) return failed(latest.error)
+          for (let i = 0; i < latest.messages.length; i++) {
+            await beforeSend?.()
+            const itemAllowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn)
+            if (!itemAllowance.allowed) return failed(itemAllowance.reason)
+            const text = latest.messages[i]!
+            const segments: unknown[] = []
+            if (i === 0 && opts.replyToMessageId !== undefined && opts.replyToMessageId !== null && opts.replyToMessageId !== '') segments.push({ type: 'reply', data: { id: String(opts.replyToMessageId) } })
+            for (const userId of opts.atUserIds || []) segments.push({ type: 'at', data: { qq: String(userId) } })
+            segments.push({ type: 'text', data: { text } })
+            inFlight = true
+            const receipt = await ports.sendGroupMessage(groupId, segments, scope.botId)
+            inFlight = false
+            if (receipt.unknown) { memoryBox.deliveryUnknown = true; return failed(`第 ${sent + 1} 条回执未确认，是否送达未知，本回合不再发送（已确认 ${sent} 条）`) }
+            if (!receipt.ok) return failed(`第 ${sent + 1} 条发送失败：${receipt.error || '网关错误'}（已确认 ${sent} 条，不自动重发）`)
+            sent++
+            sendsThisTurn++
+            addSends(1)
+            memoryBox.sentTexts.push(text)
+            markConversationEngaged(state, state.conversation.lastTriggerUserId || '', cfg.wake.continuationWindowMs)
+            const memeBumped = bumpMemeUsage(memoryBox.list, text, now()).length > 0
+            recordSend(state, now(), 1)
+            state.lastAiSendAt = now()
+            invalidatePreSleepWaitByParticipation(state)
+            // Confirmed delivery is durable before another network side effect.
+            await store.save(groupId, state)
+            if (memeBumped) await store.saveMemories(groupId, memoryBox.list)
+            if (i < latest.messages.length - 1) await sleep(boundedTimerDelay(cfg.turn.minSendGapMs + 400 + Math.floor(random() * 2600), 60_000))
+          }
+          return { ok: true, sent, duplicatesSkipped: plan.duplicatesSkipped }
+        } catch (error) {
+          if (inFlight) memoryBox.deliveryUnknown = true
+          return failed(`${inFlight ? '传输中断，是否送达未知，本回合不再发送' : error instanceof Error ? error.message : '发送中断'}（已确认 ${sent} 条，不自动重发）`)
+        }
       },
       waitForMessages: async (rawPlan: SimWaitPlan): Promise<SimWaitResult> => {
         const plan = normalizeWaitPlan(rawPlan, cfg.turn.waitQuietMaxMs, cfg.turn.waitTimeoutMaxMs)
@@ -1406,12 +1482,18 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           return { ok: true }
         },
       } : {}),
-      ...(typeof ports.qzoneInteract === 'function' ? { qzoneInteract: (input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }) => ports.qzoneInteract!(input) } : {}),
+      ...(typeof ports.qzoneInteract === 'function' ? { qzoneInteract: async (input: { action: 'visit' | 'like' | 'comment'; userId?: string; tid?: string; text?: string }) => {
+        if (memoryBox.deliveryUnknown) return { ok: false, error: '上次发送结果未知，本回合不再进行外部互动，请核对回执' }
+        await beforeSend?.()
+        return ports.qzoneInteract!(input)
+      } } : {}),
       pokeMember: async (userId: string) => {
+        if (memoryBox.deliveryUnknown) return { ok: false, error: '上次发送结果未知，本回合不再发送，请核对回执' }
         if (typeof ports.pokeMember !== 'function') return { ok: false, error: '戳一戳不可用' }
         if (!/^\d{1,12}$/.test(userId)) return { ok: false, error: 'userId 必须是 QQ 号' }
         const window = (pokeTimes.get(groupId) || []).filter(t => now() - t < 3600_000)
         if (window.length >= 6) return { ok: false, error: '本小时戳人次数已达上限（6），别把人戳烦了' }
+        await beforeSend?.()
         const receipt = await ports.pokeMember(groupId, userId, scope.botId)
         if (receipt.ok) { window.push(now()); pokeTimes.set(groupId, window) }
         return receipt
@@ -1457,6 +1539,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         return await ports.collectStickerImage(groupId, url)
       },
       shareVideoCard: async (input: { query?: string; url?: string }) => {
+        if (memoryBox.deliveryUnknown) return { ok: false, unknown: true, error: '上次发送结果未知，本回合不再发送，请核对回执' }
         if (typeof ports.resolveBilibiliCard !== 'function') return { ok: false, error: 'B站卡片分享不可用' }
         const last = videoCardAt.get(groupId) || 0
         if (now() - last < 20 * 60_000) {
@@ -1468,7 +1551,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         await beforeSend?.()
         const allowance = checkSendAllowance(state, cfg, now(), totalSends?.() ?? sendsThisTurn)
         if (!allowance.allowed) return { ok: false, error: allowance.reason }
-        const receipt = await ports.sendGroupMessage(groupId, [{ type: 'json', data: { data: resolved.cardJson || '' } }], scope.botId)
+        let receipt
+        try { receipt = await ports.sendGroupMessage(groupId, [{ type: 'json', data: { data: resolved.cardJson || '' } }], scope.botId) }
+        catch { memoryBox.deliveryUnknown = true; return { ok: false, unknown: true, error: '卡片传输中断，是否送达未知，本回合不再发送' } }
+        if (receipt.unknown) { memoryBox.deliveryUnknown = true; return { ok: false, unknown: true, error: '卡片回执未确认，是否送达未知，本回合不再发送' } }
         if (!receipt.ok) return { ok: false, error: receipt.error || '卡片发送失败' }
         videoCardAt.set(groupId, now())
         addSends(1)
@@ -1635,6 +1721,25 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       if (!update.updates.length && ports.reflectCharacter && ports.getSection().reflection?.enabled !== false) {
         const reflection = reflectionFor(scope)
         await reflection.run({ guard, sharedSources: (await shared.projection()).map(item => item.id),
+          ...(ports.getSection().consistency?.enabled === true ? { review: async (candidate: Record<string, unknown>, before: CharacterState, evidence: unknown) => {
+            await guard()
+            if (ports.getSection().consistency?.enabled !== true) return
+            const reviewer = createCharacterConsistencyReviewer({ maxChecks: 1,
+              infer: (request, signal) => {
+                if (!ports.reviewCharacter) throw new Error('角色审核端口未配置')
+                return ports.reviewCharacter(request, ports.getExecutionConfig(), AbortSignal.any([signal, controller.signal]))
+              },
+              onResult: result => {
+                recordWakeTokens(state, Number(record(result.usage).total_tokens) || 0)
+                try { ports.recordTokens?.({ scope: groupId, stage: 'character-consistency', model: result.model ?? '', usage: result.usage, ms: result.ms }) } catch { /* wake ledger still contains reported tokens */ }
+              },
+            })
+            const normalized = { ...candidate, updates: Array.isArray(candidate.updates) ? candidate.updates.map(item => ({ ...record(item), epistemic: 'inferred' })) : candidate.updates }
+            const verdict = await reviewer.review({ toolName: 'characterReflection', candidate: normalized, state: before, sources: evidence })
+            await store.save(groupId, state)
+            await guard()
+            if (verdict.verdict !== 'accept') throw new Error(`反思一致性检查未通过，本次变更未保存：${verdict.error || JSON.stringify(verdict.issues)}`)
+          } } : {}),
           reserve: async () => {
             await guard()
             if (!checkWakeBudget(state, runtimeConfig(), now(), safeNumber(() => ports.getTodaySpendCny?.(groupId)), null, groupId).allowed) throw new Error('反思预算已达到上限')

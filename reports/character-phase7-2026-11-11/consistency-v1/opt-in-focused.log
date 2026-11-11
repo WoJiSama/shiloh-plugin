@@ -1,0 +1,17 @@
+✔ independent review route requires a complete explicit backend and never borrows memory, main or chat (2.065583ms)
+✔ explicit review backend executes text-only using its own credentials without mutating caller config (56.281208ms)
+✔ review backend failure stays on the chosen backend instead of switching to a permissive reviewer (4.801709ms)
+✔ 一致性退回后只允许修正收尾，成功保存目标才发送且审核费用计入 (1046.488541ms)
+✔ 不可用审核每回合最多三次，失败后不能用普通消息绕过 (1020.7075ms)
+✔ 审核默认关闭或显式关闭时普通消息与状态提交均不调用审核 (2040.979584ms)
+✔ 明确启用但未配置审核端口或独立后端时拒绝公告，仍能静默收尾 (2059.983958ms)
+✔ 前两次普通提交通过后阻止非收尾第三次检查，保留最终收尾配额 (1034.275875ms)
+✔ host decoder validates explicit consistency enablement without filling or mutating private settings (6.301083ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8223.569875

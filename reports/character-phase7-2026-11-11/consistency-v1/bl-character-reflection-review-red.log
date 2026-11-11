@@ -1,0 +1,89 @@
+✔ reflection waits six hours, consumes inputs once, and cannot sustain itself on its own output (9.314583ms)
+✔ two per day cap survives reset and resets only on a later UTC day (1.856709ms)
+✔ empty material and paused characters never reserve or call a model (0.4625ms)
+✔ model or reservation failure is accounted and cannot immediately retry (0.562667ms)
+✔ reflection rejects authority fields and never applies partial updates (5.02675ms)
+✔ concurrent source deletion or any revision change invalidates model output (6.562458ms)
+✔ corrupt reflection state fails without replacing the persisted value (0.720584ms)
+✖ consistency rejection runs after draft validation and writes no reflected state (1.2875ms)
+✖ legal interest-only and empty reflection candidates can pass review without creating opinions (0.597875ms)
+✖ revision changes or source deletion during consistency review reject the stale draft (3.71625ms)
+✖ revocation after consistency review prevents commit and invalid drafts never spend review calls (1.280958ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 7
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 111.183667
+
+✖ failing tests:
+
+test at ../../../../private/tmp/bl-character-reflection-before.test.mjs:134:1
+✖ consistency rejection runs after draft validation and writes no reflected state (1.2875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///private/tmp/bl-character-reflection-before.test.mjs:146:10)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../private/tmp/bl-character-reflection-before.test.mjs:153:1
+✖ legal interest-only and empty reflection candidates can pass review without creating opinions (0.597875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///private/tmp/bl-character-reflection-before.test.mjs:159:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../private/tmp/bl-character-reflection-before.test.mjs:167:1
+✖ revision changes or source deletion during consistency review reject the stale draft (3.71625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///private/tmp/bl-character-reflection-before.test.mjs:175:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../private/tmp/bl-character-reflection-before.test.mjs:181:1
+✖ revocation after consistency review prevents commit and invalid drafts never spend review calls (1.280958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///private/tmp/bl-character-reflection-before.test.mjs:191:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

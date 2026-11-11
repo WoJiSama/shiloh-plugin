@@ -6,7 +6,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { parseOptions, validateScenarios, summarize, assessEvent, assessmentVersion, scenarioManifest, planGoalCheckAdvance, prepareBackgroundSchedule, main } from '../scripts/characterReplay.mjs'
+import { parseOptions, validateScenarios, summarize, assessEvent, assessmentVersion, scenarioManifest, planGoalCheckAdvance, prepareBackgroundSchedule, main as runReplay } from '../scripts/characterReplay.mjs'
 import { inspectReplay } from '../scripts/characterAcceptance.mjs'
 import { hashReplayValue } from '../scripts/conversationQualityReplay.mjs'
 
@@ -18,6 +18,14 @@ const scratch = t => {
   return dir
 }
 const noLog = () => {}
+// Existing injected scenarios script main/reflection behavior. Their separate
+// reviewer is an explicit fixture; semantic review has dedicated cases below.
+const main = (argv, options = {}) => runReplay(argv, {
+  ...options,
+  ...(options.model ? { model: (request, context) => context.stage === 'consistency'
+    ? { choices: [{ message: { role: 'assistant', content: '{"verdict":"accept","issues":[]}' } }], usage: { total_tokens: 0 }, model: 'injected-consistency-fixture' }
+    : options.model(request, context) } : {}),
+})
 function addToolEvidence(result, name, args, value) {
   const id = `tool-${(result.calls || []).length + 1}`
   const call = { id: `main-${id}`, stage: 'main', toolCalls: [{ id, function: { name, arguments: JSON.stringify(args) } }] }
@@ -315,7 +323,7 @@ test('finish memories require returned records and exact persisted bytes, includ
 test('scenario manifest binds ordered event hashes and declared expectations', () => {
   const scenarios = [{ id: 'one', events: [{ kind: 'message', text: '你好', expect: { refusal: false } }, { kind: 'idle-check' }] }]
   const manifest = scenarioManifest(scenarios)
-  assert.equal(assessmentVersion, 4)
+  assert.equal(assessmentVersion, 5)
   assert.deepEqual(manifest, [{ id: 'one', events: [{ eventIndex: 0, eventHash: hashReplayValue(scenarios[0].events[0]), expect: { refusal: false } }, { eventIndex: 1, eventHash: hashReplayValue(scenarios[0].events[1]), expect: {} }] }])
   scenarios[0].events[0].expect.refusal = true
   assert.equal(manifest[0].events[0].expect.refusal, false, 'manifest expectations must be a frozen snapshot')
@@ -332,6 +340,24 @@ test('summary keeps missing usage and unknown money distinct from reported token
   const behavior = assessEvent({ expect: { goalCompleted: true, noSend: true } }, { character: { goals: [{ status: 'waiting', evidenceRefs: [] }], memories: [] }, sent: [], calls: [] })
   assert.equal(behavior.goalCompletedWithReceipt, false)
   assert.equal(behavior.noMessageSent, true)
+})
+
+test('consistency calls consume totals but stay separate from main rounds and reflection', () => {
+  const report = summarize([{ status: 'passed', calls: [
+    { usage: { total_tokens: 2 } },
+    { stage: 'main', usage: { total_tokens: 3 } },
+    { stage: 'reflection', usage: { total_tokens: 5 } },
+    { stage: 'consistency', usage: { total_tokens: 7 }, elapsedMs: 23 },
+    { stage: 'consistency', usage: null, elapsedMs: 11, error: 'review unavailable' },
+  ], network: [{ stage: 'main' }, { stage: 'consistency' }, { stage: 'consistency' }], sent: [], behavior: {} }])
+  assert.equal(report.logicalCalls, 5)
+  assert.equal(report.mainCalls, 2)
+  assert.equal(report.reflectionCalls, 1)
+  assert.equal(report.consistencyCalls, 2)
+  assert.equal(report.consistencyElapsedMs, 34)
+  assert.equal(report.reportedTokens, 17)
+  assert.equal(report.callsWithoutUsage, 1)
+  assert.equal(report.httpRequests, 3)
 })
 
 test('skipped dependencies have no observed behavior and remain visible in summary', () => {
@@ -416,8 +442,8 @@ test('all scripted scenarios exercise cross-day continuity and repeat with isola
     assert.ok(result.beforeCharacter)
     assert.deepEqual(Object.keys(result.beforeActivities), ['works', 'subscriptions', 'reflection', 'shared', 'sharedPending'])
     assert.deepEqual(Object.keys(result.activities), ['works', 'subscriptions', 'reflection', 'shared', 'sharedPending'])
-    for (const field of ['toolResults', 'feeds', 'workers', 'reflections']) assert.ok(Array.isArray(result[field]))
-    assert.ok(result.calls.every(call => ['main', 'reflection'].includes(call.stage)))
+    for (const field of ['toolResults', 'feeds', 'workers', 'reflections', 'consistencyChecks']) assert.ok(Array.isArray(result[field]))
+    assert.ok(result.calls.every(call => ['main', 'reflection', 'consistency'].includes(call.stage)))
     assert.deepEqual(result.behavior, assessEvent({ expect: result.expect }, result))
   }
   assert.equal(report.summary.failedEvents, 0)
@@ -517,6 +543,102 @@ test('independent reflection uses a separate port, records usage and persists a 
   assert.equal(JSON.stringify(report).includes(marker), false)
 })
 
+test('consistency review is captured separately and rejection returns to the model before sending', async t => {
+  const turns = new Map(), reviews = new Map(), marker = 'CONSISTENCY_PRIVATE_REASONING_SENTINEL'
+  const report = await runReplay(['--scenario', 'social-refusal', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (request, { stage, event }) => {
+      if (stage === 'consistency') {
+        assert.equal(request.tools, undefined)
+        assert.deepEqual(request.messages.map(message => message.role), ['system', 'user'])
+        const count = (reviews.get(event) || 0) + 1; reviews.set(event, count)
+        return { choices: [{ message: { role: 'assistant', content: JSON.stringify(count === 1
+          ? { verdict: 'revise', issues: [{ code: 'missing_goal', reason: '正文有后续承诺但没有目标，请自行修正或撤回承诺。' }] }
+          : { verdict: 'accept', issues: [] }), reasoning_content: marker } }], usage: { total_tokens: 5 }, model: 'injected-reviewer' }
+      }
+      const count = (turns.get(event) || 0) + 1; turns.set(event, count)
+      const args = count === 1 ? { choice: 'chat', reason: '普通聊天', messages: ['回头我会主动查资料，再来汇报。'] }
+        : { choice: 'unwilling', reason: '不想无条件附和，也不作后续承诺', messages: ['这个我可不答应，我有自己的看法。'] }
+      return { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ id: `finish-${turns.size}-${count}`, type: 'function', function: { name: 'simFinishTurn', arguments: JSON.stringify(args) } }] } }], usage: { total_tokens: 2 }, model: 'injected-main' }
+    }, turnTimeoutMs: 5000, log: noLog,
+  })
+  assert.equal(report.summary.failedEvents, 0)
+  assert.equal(report.summary.mainCalls, 4)
+  assert.equal(report.summary.consistencyCalls, 4)
+  assert.equal(report.summary.logicalCalls, 8)
+  assert.equal(report.summary.reportedTokens, 28)
+  for (const event of report.results) {
+    assert.equal(event.consistencyChecks.length, 2)
+    assert.ok(event.consistencyChecks.every(check => check.status === 'succeeded' && check.elapsedMs >= 0))
+    assert.equal(event.character.goals.length, 0)
+    assert.equal(event.character.decision.kind, 'unwilling')
+    assert.equal(event.sent.length, 1)
+    assert.equal(JSON.stringify(event.sent).includes('回头我会主动'), false)
+    assert.ok(event.toolResults.some(reply => /^error:/.test(reply.content)))
+    assert.ok(event.toolResults.every(reply => reply.stage === 'main'))
+  }
+  assert.equal(JSON.stringify(report).includes(marker), false)
+  assert.equal(inspectReplay(report).integrity, 'passed')
+})
+
+test('review provider errors remain failed evidence even when the runtime catches them', async t => {
+  let count = 0
+  const report = await runReplay(['--scenario', 'social-refusal', '--output-dir', path.join(scratch(t), 'evidence')], {
+    model: async (_request, { stage }) => {
+      if (stage === 'consistency') throw new Error('review-provider-unavailable')
+      return { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ id: `error-review-${++count}`, type: 'function', function: { name: 'simFinishTurn', arguments: JSON.stringify({ choice: 'chat', reason: '尝试收尾', messages: ['回头我主动研究再汇报。'] }) } }] } }] }
+    }, turnTimeoutMs: 5000, log: noLog,
+  })
+  assert.ok(report.summary.consistencyCalls > 0)
+  assert.equal(report.summary.capturedMessages, 0)
+  assert.equal(report.summary.failedEvents, 2)
+  for (const event of report.results) assert.ok(event.consistencyChecks.some(check => check.status === 'failed' && check.error.includes('review-provider-unavailable')))
+  assert.equal(inspectReplay(report).engineering, 'failed')
+})
+
+test('cancelled late review responses stay with their original event and cannot rewrite frozen evidence', async t => {
+  for (const delayMs of [20, 250]) {
+    const outputDir = path.join(scratch(t), `late-${delayMs}`), completions = []
+    const report = await runReplay(['--scenario', 'social-refusal', '--output-dir', outputDir], {
+      model: async (_request, { stage, signal }) => {
+        if (stage === 'consistency') {
+          const completion = new Promise(resolve => {
+            const respond = () => setTimeout(() => resolve({ choices: [{ message: { role: 'assistant', content: '{"verdict":"accept","issues":[]}' } }], usage: { total_tokens: 77 }, model: 'late-review' }), delayMs)
+            if (signal.aborted) respond(); else signal.addEventListener('abort', respond, { once: true })
+          })
+          completions.push(completion)
+          return completion
+        }
+        return { choices: [{ message: { role: 'assistant', content: '', tool_calls: [{ id: 'late-finish', type: 'function', function: { name: 'simFinishTurn', arguments: JSON.stringify({ choice: 'chat', reason: '普通聊天', messages: ['晚点我会主动研究再汇报。'] }) } }] } }], usage: { total_tokens: 1 } }
+      }, turnTimeoutMs: 1400, log: noLog,
+    })
+    assert.ok(completions.length > 0)
+    const review = report.results[0].calls.find(call => call.stage === 'consistency')
+    assert.ok(review)
+    assert.equal(review.aborted, true)
+    assert.equal(report.results[0].status, 'failed')
+    assert.equal(report.results[1].status, 'skipped')
+    assert.equal(report.results[1].calls.length, 0)
+    assert.equal(report.summary.capturedMessages, 0)
+    if (delayMs < 100) {
+      assert.equal(review.settled, true)
+      assert.equal(review.usage.total_tokens, 77)
+      assert.equal(review.error, 'model_request_aborted')
+      assert.equal(report.summary.unsettledCalls, 0)
+    } else {
+      assert.equal(review.settled, false)
+      assert.equal(review.usage, null)
+      assert.equal(report.summary.unsettledCalls, 1)
+      assert.ok(report.results[0].structuralFailures.includes('unsettled_model_calls'))
+    }
+    const bytes = fs.readFileSync(path.join(outputDir, 'results.json'), 'utf8'), snapshot = JSON.stringify(report)
+    await Promise.all(completions)
+    await new Promise(resolve => setTimeout(resolve, 5))
+    assert.equal(fs.readFileSync(path.join(outputDir, 'results.json'), 'utf8'), bytes)
+    assert.equal(JSON.stringify(report), snapshot)
+    assert.equal(inspectReplay(report).engineering, 'failed')
+  }
+})
+
 test('injected provider errors are failed events even though runtime catches model failures', async t => {
   const report = await main(['--scenario', 'social-refusal', '--output-dir', path.join(scratch(t), 'evidence')], {
     model: async () => ({ error: 'synthetic-provider-failure' }), turnTimeoutMs: 5000, log: noLog,
@@ -543,7 +665,7 @@ test('the final tool result at the round limit is captured without another model
       }] } }] }
     }, turnTimeoutMs: 5000, log: noLog,
   })
-  assert.equal(report.summary.logicalCalls, 12, 'capture must not request an extra model round')
+  assert.equal(report.summary.mainCalls, 12, 'capture must not request an extra main model round')
   for (const [index, event] of report.results.entries()) {
     assert.equal(event.toolResults.length, 6, 'all six completed tool replies must be retained')
     assert.equal(new Set(event.toolResults.map(result => result.toolCallId)).size, 6)
@@ -630,7 +752,7 @@ test('logical and total time budgets stop later events and retain partial eviden
   assert.equal(limited.summary.failedEvents, 1)
   assert.equal(limited.summary.skippedEvents, 1)
   assert.equal(limited.results[1].skipReason, 'logical_call_budget_exhausted')
-  assert.ok(limited.results[0].sent.length, 'actions before the limit remain in evidence')
+  assert.equal(limited.results[0].sent.length, 0, 'the exhausted review budget blocks an unchecked message')
   assert.equal(limited.results[0].behavior.refusalRecorded, true, 'the final snapshot retains the valid decision made before budget exhaustion')
   assert.ok(limited.results[0].errors.includes('logical_call_budget_exhausted'))
   assert.ok(limited.results[0].structuralFailures.includes('exception'))

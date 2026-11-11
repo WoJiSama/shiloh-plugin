@@ -69,6 +69,8 @@ pluginSettings:
     enabled: true                # 总开关；false 时所有群走原链路
     allGroups: true              # true（默认）= 过了群白名单的群默认全部进仿真；false = 仅 groups 清单
     groups: []                   # 显式启用群种子（仅 allGroups: false 时用；.仿真 开/关 的按群覆盖存 Redis）
+    consistency:
+      enabled: false             # 实验性提交语义审核，默认关闭；显式开启须完整配置 taskAiConfig.characterConsistency
     reflection:
       enabled: true              # 私下反思：至少6小时、每日最多2次，需2项新依据；计入群回合/金额预算，不发群消息
     autonomousTools: []          # 自主创作需显式授权；仅支持bananaTool/googleImageEditTool/googleImageAnalysisTool，且须被toolPolicy装配
@@ -840,6 +842,13 @@ pluginSettings:
 
   # 紧凑任务可单独配置快速后端；留空时按任务复用现有快模型或 chatAiConfig，不绑定任何模型厂商。
   taskAiConfig:
+    # 仅供显式开启的实验性角色审核；必须完整配置，留空不借用 memory/chat/tools。
+    characterConsistency:
+      apiUrl: ""
+      model: ""
+      apiKey: ""
+      maxTokensField: max_tokens
+      reasoningEffort: ""
     # 短、无工具、非复杂的闲聊；留空时回退主对话模型。
     casual:
       apiUrl: ""

@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { createHash, randomUUID } from 'node:crypto'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hashReplayValue, generationEvidence, createReplayScrubber, writeReplayCheckpoint } from './conversationQualityReplay.mjs'
 import { verifyBackend } from './lib/build-support.mjs'
@@ -11,7 +12,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BOT = '99000001', GROUP = '99000002'
 const BASE_AT = Date.parse('2026-11-09T04:00:00Z')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
-export const assessmentVersion = 4
+export const assessmentVersion = 5
 const EXPECTATIONS = ['refusal', 'goalCreated', 'goalCompleted', 'opinion', 'revisedOpinion', 'noSend', 'noCall', 'waitAfterFailure', 'workCreated', 'workRevised', 'subscriptionAdded', 'feedUpdated', 'reflected', 'goalPaused', 'workerUnknown', 'noWorkerCall', 'noReflectionCall']
 const ACTIVITY_FIELDS = ['works', 'subscriptions', 'reflection', 'shared', 'sharedPending']
 const plainObject = value => !!value && typeof value === 'object' && !Array.isArray(value)
@@ -107,7 +108,10 @@ export function summarize(results) {
     events: results.length, failedEvents: results.filter(r => r.status === 'failed').length,
     skippedEvents: results.filter(r => r.status === 'skipped').length,
     behaviorMisses: results.reduce((sum, r) => sum + Object.values(r.behavior || {}).filter(v => v === false).length, 0),
-    logicalCalls: calls.length, mainCalls: calls.filter(call => call.stage !== 'reflection').length, reflectionCalls: calls.filter(call => call.stage === 'reflection').length,
+    logicalCalls: calls.length, mainCalls: calls.filter(call => call.stage === undefined || call.stage === 'main').length, reflectionCalls: calls.filter(call => call.stage === 'reflection').length,
+    consistencyCalls: calls.filter(call => call.stage === 'consistency').length,
+    consistencyElapsedMs: calls.filter(call => call.stage === 'consistency').reduce((sum, call) => sum + (Number(call.elapsedMs) || 0), 0),
+    unsettledCalls: calls.filter(call => call.settled === false).length,
     feedFetches: results.reduce((sum, r) => sum + (r.feeds?.length || 0), 0), workerCalls: results.reduce((sum, r) => sum + (r.workers?.length || 0), 0),
     httpRequests: results.reduce((sum, r) => sum + (r.network?.length || 0), 0),
     capturedMessages: results.reduce((sum, r) => sum + (r.sent?.length || 0), 0),
@@ -260,6 +264,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
   if (options.help) { log(usage); return { exitCode: 0 } }
   const startedAtISO = new Date().toISOString(), runId = randomUUID()
   const runDeadline = Date.now() + options.maxDurationMs
+  const requestContext = new AsyncLocalStorage()
   await verifyBackend(undefined, { source: true })
   const load = file => import(pathToFileURL(path.join(ROOT, 'dist/backend', file)).href)
   const [runtimeModule, configModule, stateModule, hostModule, mergeModule] = await Promise.all([
@@ -302,10 +307,11 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
     model: config.toolsAiConfig?.toolsAiModel || null, personaHash: hashReplayValue(config.persona || {}),
     clock: 'fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded',
     search: 'synthetic_fixture', feeds: 'synthetic_fixture; no_real_HTTP', worker: 'synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission', reflection: 'separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode',
+    consistency: 'experiment_explicitly_enabled_in_isolated_replay; separate_reviewCharacter_port; scripted_accept_in_dry_mode_is_not_semantic_evidence; configured_memory_backend_in_live_mode; no_tools; 900_output_token_cap; not_production_default',
     storage: 'fresh_in_memory_per_sample', platform: 'captured_only',
     toolResults: 'current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls',
     generation: 'configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters',
-    simulationOverrides: { tools: 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded' },
+    simulationOverrides: { tools: 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, consistencyReview: true, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded' },
     personaSource: 'merged_config_persona; persona_library_bindings_not_loaded',
     seed: 'empty_bound_session; no_goals_or_memories_seeded',
     eventStatusMeaning: 'engineering_execution_only; inspect_behavior_observations_separately',
@@ -329,7 +335,8 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
   for (const scenario of scenarios) for (let sampleIndex = 1; sampleIndex <= options.repetitions; sampleIndex++) {
     const kv = new Map(), scope = { botId: BOT, personaId: 'character-replay', groupId: GROUP }
     const seenToolCallIds = new Set()
-    let epoch = BASE_AT, anchor = Date.now(), activeResult, activeEvent, eventCalls = 0, controller, activeModelStage
+    const pendingCalls = new Set()
+    let epoch = BASE_AT, anchor = Date.now(), activeResult, activeEvent, eventCalls = 0, controller
     const now = () => epoch + Date.now() - anchor
     const sessionKey = `shiloh:sim:g:${GROUP}`
     const seeded = createDefaultSimSession(now())
@@ -339,25 +346,28 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
     kv.set(sessionKey, JSON.stringify(seeded))
     const character = () => JSON.parse(kv.get(characterKey(scope)) || JSON.stringify(stateModule.createEmptyCharacterState(scope)))
     const logger = {
-      info() {}, warn(...args) { if (activeResult) activeResult.warnings.push(scrub(args.map(String).join(' '))) },
+      info() {}, warn(...args) { const result = requestContext.getStore()?.result || activeResult; if (result) result.warnings.push(scrub(args.map(String).join(' '))) },
       error(first, error) {
         // modelExecution logs the entire successful response at error level; keep it out.
         if (String(first).startsWith('OpenAI 响应:')) return
-        if (activeResult) activeResult.errors.push(scrub([first, error instanceof Error ? error.message : typeof error === 'string' ? error : ''].filter(Boolean).join(' ')))
+        const result = requestContext.getStore()?.result || activeResult
+        if (result) result.errors.push(scrub([first, error instanceof Error ? error.message : typeof error === 'string' ? error : ''].filter(Boolean).join(' ')))
       },
     }
     const executor = executorParts ? executorParts[0].createModelExecutor({
       ...executorParts[2], ...executorParts[3], ...executorParts[1], logger,
       fetch: async (url, init) => {
+        const context = requestContext.getStore()
+        if (!context) throw new Error('missing_model_request_context')
         if (Date.now() >= runDeadline) halted ||= 'run_duration_exhausted'
         if (halted) throw new Error(halted)
         if (httpCalls >= options.maxHttp) { halted = 'http_budget_exhausted'; throw new Error(halted) }
         httpCalls++
         const payload = JSON.parse(init.body), start = Date.now()
-        const evidence = { stage: activeModelStage, model: payload.model, host: new URL(url).host, generation: generationEvidence(payload), status: null, elapsedMs: 0 }
-        activeResult.network.push(evidence)
+        const evidence = { stage: context.stage, model: payload.model, host: new URL(url).host, generation: generationEvidence(payload), status: null, elapsedMs: 0 }
+        context.result.network.push(evidence)
         try {
-          const response = await fetch(url, { ...init, signal: AbortSignal.any([controller.signal, ...(init.signal ? [init.signal] : []), AbortSignal.timeout(30_000)]) })
+          const response = await fetch(url, { ...init, signal: AbortSignal.any([context.signal, ...(init.signal ? [init.signal] : []), AbortSignal.timeout(30_000)]) })
           evidence.status = response.status
           return response
         } catch (error) {
@@ -400,46 +410,71 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       if (Date.now() >= runDeadline) halted ||= 'run_duration_exhausted'
       if (logicalCalls >= options.maxCalls || halted) { halted ||= 'logical_call_budget_exhausted'; throw new Error(halted) }
       logicalCalls++
-      const capture = { id: `model-${logicalCalls}`, stage, requestHash: hashReplayValue(request), tools: request.tools?.map(t => t.function.name) || [], usage: null }
-      activeResult.calls.push(capture)
+      const started = Date.now(), result = activeResult, event = activeEvent
+      const combinedSignal = AbortSignal.any([controller.signal, signal])
+      const capture = { id: `model-${logicalCalls}`, stage, requestHash: hashReplayValue(request), tools: request.tools?.map(t => t.function.name) || [], usage: null, elapsedMs: 0, settled: false }
+      result.calls.push(capture)
+      let settle
+      const pending = { result, capture, started, promise: new Promise(resolve => { settle = resolve }) }
+      pendingCalls.add(pending)
+      const abort = () => { capture.aborted = true }
+      combinedSignal.addEventListener('abort', abort, { once: true })
+      if (combinedSignal.aborted) abort()
       const reflection = stage === 'reflection' ? { callId: capture.id, requestHash: capture.requestHash, status: 'pending', usage: null } : undefined
-      if (reflection) activeResult.reflections.push(reflection)
+      const consistency = stage === 'consistency' ? { callId: capture.id, requestHash: capture.requestHash, status: 'pending', usage: null, elapsedMs: 0 } : undefined
+      if (reflection) result.reflections.push(reflection)
+      if (consistency) result.consistencyChecks.push(consistency)
       captureToolResults(request.messages)
-      activeModelStage = stage
       try {
+        if (consistency && (request.tools?.length || request.tool_choice)) throw new Error('consistency_request_must_not_expose_tools')
         let response
         if (options.dryRun) {
           const message = { role: 'assistant', content: '' }
-          if (stage === 'reflection') message.content = JSON.stringify(replaceVariables(activeEvent.offlineReflection || { summary: '没有需要持久化的新观点', updates: [], goals: [] }, character(), await activitySnapshot()))
+          if (stage === 'consistency') message.content = JSON.stringify({ verdict: 'accept', issues: [] })
+          else if (stage === 'reflection') message.content = JSON.stringify(replaceVariables(activeEvent.offlineReflection || { summary: '没有需要持久化的新观点', updates: [], goals: [] }, character(), await activitySnapshot()))
           else {
             const scripted = activeEvent.offline?.[eventCalls++] || []
             if (scripted.length) message.tool_calls = replaceVariables(scripted, character(), await activitySnapshot()).map(call => ({ id: `offline-${++callId}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } }))
           }
-          response = { choices: [{ message }], model: stage === 'reflection' ? 'offline-reflection-script' : 'offline-script' }
-        } else response = model ? await model(request, { stage, scenario, event: activeEvent, sampleIndex, signal }) : await executor.YTapi(request, executionConfig, undefined, undefined, {
-          signal: AbortSignal.any([controller.signal, signal]), generation: { maxOutputTokens: stage === 'reflection' ? 1200 : 2048 }, ...(stage === 'reflection' ? { taskBackend: 'memory' } : {}),
-        })
+          response = { choices: [{ message }], model: stage === 'main' ? 'offline-script' : `offline-${stage}-script` }
+        } else response = await requestContext.run({ result, stage, signal: combinedSignal }, () => model ? model(request, { stage, scenario, event, sampleIndex, signal: combinedSignal }) : executor.YTapi(request, executionConfig, undefined, undefined, {
+          signal: combinedSignal, generation: { maxOutputTokens: stage === 'consistency' ? 900 : stage === 'reflection' ? 1200 : 2048 }, ...(stage !== 'main' ? { taskBackend: 'memory' } : {}),
+        }))
         capture.usage = response?.usage ?? null
         capture.model = response?.model ?? null
         const message = response?.choices?.[0]?.message
         capture.output = message?.content || ''
         capture.toolCalls = (message?.tool_calls || []).map(call => ({ id: call.id, type: call.type, function: { name: call.function?.name, arguments: call.function?.arguments } }))
-        const currentToolCallIds = activeResult.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id))
+        if (combinedSignal.aborted) throw new Error('model_request_aborted')
+        if (consistency && capture.toolCalls.length) throw new Error('consistency_response_must_not_call_tools')
+        const currentToolCallIds = result.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id))
         if (currentToolCallIds.some(id => seenToolCallIds.has(id)) || new Set(currentToolCallIds).size !== currentToolCallIds.length) {
-          activeResult.structuralFailures.push('tool_call_id_reused')
+          result.structuralFailures.push('tool_call_id_reused')
           throw new Error('tool_call_id_reused')
         }
         if (response?.error || !message) throw new Error(scrub(typeof response?.error === 'string' ? response.error : 'model_returned_no_message'))
         if (reflection) Object.assign(reflection, { status: 'succeeded', output: capture.output, usage: capture.usage, model: capture.model })
+        if (consistency) Object.assign(consistency, { status: 'succeeded', output: capture.output, usage: capture.usage, model: capture.model })
         return response
       } catch (error) {
         capture.error = scrub(error.message)
         if (reflection) {
           Object.assign(reflection, { status: 'failed', error: capture.error })
-          activeResult.errors.push(`reflection_model_error: ${capture.error}`)
+          result.errors.push(`reflection_model_error: ${capture.error}`)
+        }
+        if (consistency) {
+          Object.assign(consistency, { status: 'failed', error: capture.error })
+          result.errors.push(`consistency_model_error: ${capture.error}`)
         }
         throw error
-      } finally { activeModelStage = undefined }
+      } finally {
+        capture.elapsedMs = Date.now() - started
+        capture.settled = true
+        if (consistency) consistency.elapsedMs = capture.elapsedMs
+        combinedSignal.removeEventListener('abort', abort)
+        pendingCalls.delete(pending)
+        settle()
+      }
     }
     const create = () => createSimulationRuntime({
       redis, now, random: () => 0.99, logger,
@@ -447,6 +482,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       getPersona: () => ({ personaId: scope.personaId, persona: config.persona || {}, systemContent: config.systemContent || '' }),
       getSection: () => ({
         enabled: true, allGroups: false, groups: [GROUP], extraTools: [search.name], toolPolicy: { mode: 'legacy' },
+        consistency: { enabled: true },
         wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability: 1, proactiveIdleMs: 60_000 },
         turn: { maxToolRounds: 6, minSendGapMs: 0, maxSendsPerTurn: 3, maxTurnsPerDay: 40, waitQuietMaxMs: 1000, waitTimeoutMaxMs: 1000 },
         rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false }, lifeThreads: { enabled: false },
@@ -466,6 +502,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         return result
       },
       reflectCharacter: (request, executionConfig, signal) => invokeModel('reflection', request, executionConfig, signal),
+      reviewCharacter: (request, executionConfig, signal) => invokeModel('consistency', request, executionConfig, signal),
       YTapi: (request, executionConfig) => invokeModel('main', request, executionConfig),
       async sendGroupMessage(groupId, segments) {
         activeResult.sent.push({ groupId, segments })
@@ -482,7 +519,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         const clockAdjustment = activeEvent.advanceToNextGoalCheck ? planGoalCheckAdvance(before, now()) : undefined
         if (clockAdjustment) { epoch = clockAdjustment.toAt; anchor = Date.now() }
         const beforeActivities = await activitySnapshot()
-        activeResult = { scenario: scenario.id, sampleIndex, eventIndex, eventHash: hashReplayValue(activeEvent), beforeCharacter: before, beforeActivities, activities: structuredClone(beforeActivities), kind: activeEvent.kind, input: activeEvent.text || '', at: now(), status: 'passed', review: scenario.review, expect: activeEvent.expect || {}, calls: [], network: [], sent: [], searches: [], toolResults: [], feeds: [], workers: [], reflections: [], warnings: [], errors: [], structuralFailures: [] }
+        activeResult = { scenario: scenario.id, sampleIndex, eventIndex, eventHash: hashReplayValue(activeEvent), beforeCharacter: before, beforeActivities, activities: structuredClone(beforeActivities), kind: activeEvent.kind, input: activeEvent.text || '', at: now(), status: 'passed', review: scenario.review, expect: activeEvent.expect || {}, calls: [], network: [], sent: [], searches: [], toolResults: [], feeds: [], workers: [], reflections: [], consistencyChecks: [], warnings: [], errors: [], structuralFailures: [] }
         if (clockAdjustment) activeResult.clockAdjustment = clockAdjustment
         if (Date.now() >= runDeadline) halted ||= 'run_duration_exhausted'
         if (halted) {
@@ -542,6 +579,25 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           // Do not allow an unsettled timed-out runtime to contaminate later events.
           halted ||= 'previous_event_incomplete'
         }
+        // A timed-out reviewer may have abandoned an inference promise. Give
+        // cancellation a bounded settlement window and freeze truthful partial
+        // evidence if the provider ignores it; later replies cannot migrate to
+        // another event or mutate the saved checkpoint.
+        const pending = [...pendingCalls].filter(call => call.result === activeResult)
+        if (pending.length) await Promise.race([Promise.all(pending.map(call => call.promise)), sleep(100)])
+        const unsettled = pending.filter(call => !call.capture.settled)
+        if (unsettled.length) {
+          for (const { capture, started } of unsettled) {
+            capture.elapsedMs = Date.now() - started
+            const evidence = activeResult.consistencyChecks.find(check => check.callId === capture.id)
+            if (evidence) evidence.elapsedMs = capture.elapsedMs
+          }
+          activeResult.errors.push('model_calls_unsettled_after_cancellation')
+          activeResult.structuralFailures.push('unsettled_model_calls')
+          activeResult.status = 'failed'
+          halted ||= 'previous_event_incomplete'
+        }
+        if (activeResult.errors.length || activeResult.calls.some(call => call.error)) activeResult.status = 'failed'
         // The last tool round may have no following model request. Read its
         // persisted replies; never spend another model call just to observe it.
         captureToolResults(JSON.parse(kv.get(sessionKey)).agentHistory)

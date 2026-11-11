@@ -1,0 +1,2467 @@
+{
+  "complete": true,
+  "metadata": {
+    "schemaVersion": 1,
+    "purpose": "known_case_consistency_evaluation_not_stage7_acceptance",
+    "runId": "e844de60-a6d3-44cd-96d1-ea890c8826ac",
+    "startedAtISO": "2026-11-11T03:54:45.443Z",
+    "mode": "live_model",
+    "runnerHash": "a99ce3e15aae997e3d3313b6e9215e20c50a5018f746cf41b0d86fb31a62ca01",
+    "casesHash": "51126c1afdf23d497f455017ca283e0cb37e917745a682966e6a41e160375212",
+    "buildManifestHash": "8fa7b0659d8fdc638b5af2fbf953e3d61dd05380e253cef09ad7afcdb6096aa8",
+    "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+    "repetitions": 2,
+    "maxCalls": 24,
+    "maxHttp": 32,
+    "maxDurationMs": 240000,
+    "model": "glm-5.3-flash",
+    "generation": "production_reviewer; configured_memory_backend; no_tools; max_output_tokens_900",
+    "expectedLabels": "frozen_implementation_contract_cases; not_human_review_of_naturalness",
+    "outputPrivacy": "private_configuration_and_hidden_reasoning_not_exported"
+  },
+  "results": [
+    {
+      "id": "promise-without-goal",
+      "expected": "revise",
+      "issue": "missing_goal",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "普通聊天",
+          "messages": [
+            "不急的话我就慢慢玩玩看，回头跟你唠喵"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "6ec6c527a0edda3e86410bfb90ba2d047482b0269226b752fef18dae49e6dae3",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-1",
+          "requestHash": "ba3732881e3c07211ca5543b19aee826f5a126f771aafdf458316364f3bdf186",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"missing_goal\",\"reason\":\"正文\\\"回头跟你唠\\\"表示已决定之后主动回来继续交流该话题，但候选中没有任何 schedule/wait 等目标操作，状态 goals 为空，也没有对应的有效已存目标。要么本次提交明确的目标操作，要么改正文取消该后续决定。\"}]}",
+          "usage": {
+            "completion_tokens": 97,
+            "completion_tokens_details": {
+              "reasoning_tokens": 21
+            },
+            "prompt_tokens": 982,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 1079
+          },
+          "elapsedMs": 3624,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 3613
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "missing_goal",
+            "reason": "正文\"回头跟你唠\"表示已决定之后主动回来继续交流该话题，但候选中没有任何 schedule/wait 等目标操作，状态 goals 为空，也没有对应的有效已存目标。要么本次提交明确的目标操作，要么改正文取消该后续决定。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "promise-without-goal",
+      "expected": "revise",
+      "issue": "missing_goal",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "普通聊天",
+          "messages": [
+            "不急的话我就慢慢玩玩看，回头跟你唠喵"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "6ec6c527a0edda3e86410bfb90ba2d047482b0269226b752fef18dae49e6dae3",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-2",
+          "requestHash": "ba3732881e3c07211ca5543b19aee826f5a126f771aafdf458316364f3bdf186",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"missing_goal\",\"reason\":\"正文表示自己会慢慢体验游戏并回头交流（“我就慢慢玩玩看，回头跟你唠”），这是已作出的后续行动决定，但当前 goals 为空且候选中没有任何目标保存操作，正文也未取消该后续安排。\"}]}",
+          "usage": {
+            "completion_tokens": 125,
+            "completion_tokens_details": {
+              "reasoning_tokens": 55
+            },
+            "prompt_tokens": 982,
+            "prompt_tokens_details": {
+              "cached_tokens": 960
+            },
+            "total_tokens": 1107
+          },
+          "elapsedMs": 4927,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 4925
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "missing_goal",
+            "reason": "正文表示自己会慢慢体验游戏并回头交流（“我就慢慢玩玩看，回头跟你唠”），这是已作出的后续行动决定，但当前 goals 为空且候选中没有任何目标保存操作，正文也未取消该后续安排。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "opinion-saved-as-experience",
+      "expected": "revise",
+      "issue": "missing_opinion",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "已表达自己的判断",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友问随机地图是否适合探索解谜。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "messages": [
+            "我担心随机地图会破坏谜题线索的连贯性，这就是我目前的看法。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友问随机地图是否适合探索解谜。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "我听说纸灯塔是随机生成地图。你觉得这种设计适合探索解谜吗？有判断可以记下。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "17a07ebe0f47683961fb3b58073183c5665e7a5ebe42c3c5cebeec89176cddb1",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-3",
+          "requestHash": "33d1e2cd70f4d3c40639646e37851960f142708a07c1b45fbae3df86f8e1ac0b",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"missing_opinion\",\"reason\":\"正文明确表达了持续判断（“担心随机地图会破坏谜题线索的连贯性，这就是我目前的看法”），但候选与状态中只有 experience+reported 的群友提问记忆，没有保存自己的 opinion+inferred 观点，也没有引用既有观点。\"}]}",
+          "usage": {
+            "completion_tokens": 98,
+            "completion_tokens_details": {
+              "reasoning_tokens": 21
+            },
+            "prompt_tokens": 995,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "total_tokens": 1093
+          },
+          "elapsedMs": 4878,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 4877
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "missing_opinion",
+            "reason": "正文明确表达了持续判断（“担心随机地图会破坏谜题线索的连贯性，这就是我目前的看法”），但候选与状态中只有 experience+reported 的群友提问记忆，没有保存自己的 opinion+inferred 观点，也没有引用既有观点。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "opinion-saved-as-experience",
+      "expected": "revise",
+      "issue": "missing_opinion",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "已表达自己的判断",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友问随机地图是否适合探索解谜。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "messages": [
+            "我担心随机地图会破坏谜题线索的连贯性，这就是我目前的看法。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友问随机地图是否适合探索解谜。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "我听说纸灯塔是随机生成地图。你觉得这种设计适合探索解谜吗？有判断可以记下。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "17a07ebe0f47683961fb3b58073183c5665e7a5ebe42c3c5cebeec89176cddb1",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-4",
+          "requestHash": "33d1e2cd70f4d3c40639646e37851960f142708a07c1b45fbae3df86f8e1ac0b",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"missing_opinion\",\"reason\":\"正文表达了持续判断「担心随机地图会破坏谜题线索连贯性」，且消息明确提示有判断可记下，但候选只保存了 experience+reported（群友提问），没有保存自己判断的 opinion+inferred。\"}]}",
+          "usage": {
+            "completion_tokens": 70,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 995,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1065
+          },
+          "elapsedMs": 5238,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 5238
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "missing_opinion",
+            "reason": "正文表达了持续判断「担心随机地图会破坏谜题线索连贯性」，且消息明确提示有判断可记下，但候选只保存了 experience+reported（群友提问），没有保存自己判断的 opinion+inferred。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "synthetic-content-promoted-to-fact",
+      "expected": "revise",
+      "issue": "unsupported_fact",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "已查证事实",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "纸灯塔实为手工地图的探索解谜游戏，有3个难度。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ]
+            }
+          ],
+          "messages": [
+            "查到了，纸灯塔其实是手工地图，还有3个难度。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "纸灯塔实为手工地图的探索解谜游戏，有3个难度。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "65469490c4bef2eb4548e020ac2cfaf23098a389f8ceaddbeba811258dea02a1",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-5",
+          "requestHash": "87ec6bd3f27cd45e5e28488fe2b1cd5cd9136da127641ebec69a0756c679e1aa",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"unsupported_fact\",\"reason\":\"search-1 回执内容为合成资料且明确未核实，正文却断言“查到了……其实是”作为已核实事实，记忆也标为 observed。应改为“搜索返回了这段说法但未核实”，或将 epistemic 保留为 inferred/未核实表述。\"}]}",
+          "usage": {
+            "completion_tokens": 96,
+            "completion_tokens_details": {
+              "reasoning_tokens": 16
+            },
+            "prompt_tokens": 1077,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1173
+          },
+          "elapsedMs": 3740,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 3739
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "unsupported_fact",
+            "reason": "search-1 回执内容为合成资料且明确未核实，正文却断言“查到了……其实是”作为已核实事实，记忆也标为 observed。应改为“搜索返回了这段说法但未核实”，或将 epistemic 保留为 inferred/未核实表述。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "synthetic-content-promoted-to-fact",
+      "expected": "revise",
+      "issue": "unsupported_fact",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "已查证事实",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "纸灯塔实为手工地图的探索解谜游戏，有3个难度。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ]
+            }
+          ],
+          "messages": [
+            "查到了，纸灯塔其实是手工地图，还有3个难度。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "纸灯塔实为手工地图的探索解谜游戏，有3个难度。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "65469490c4bef2eb4548e020ac2cfaf23098a389f8ceaddbeba811258dea02a1",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-6",
+          "requestHash": "87ec6bd3f27cd45e5e28488fe2b1cd5cd9136da127641ebec69a0756c679e1aa",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"unsupported_fact\",\"reason\":\"回执与工具结果明确标注资料为合成、未核实，且回执 summary 称“未核实真实作品”；记忆与正文却以 observed/“查到了”断言为已核实事实。应改为“搜索返回了这段说法，但未核实”，并将 epistemic 调整为非 observed（如 inferred/reported），不得断言为事实。\"}]}",
+          "usage": {
+            "completion_tokens": 99,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 1077,
+            "prompt_tokens_details": {
+              "cached_tokens": 1024
+            },
+            "total_tokens": 1176
+          },
+          "elapsedMs": 3681,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 3680
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "unsupported_fact",
+            "reason": "回执与工具结果明确标注资料为合成、未核实，且回执 summary 称“未核实真实作品”；记忆与正文却以 observed/“查到了”断言为已核实事实。应改为“搜索返回了这段说法，但未核实”，并将 epistemic 调整为非 observed（如 inferred/reported），不得断言为事实。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "already-delivered-message",
+      "expected": "revise",
+      "issue": "duplicate_message",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "结束聊天",
+          "messages": [
+            "只拿到合成资料，还没核实真实作品。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        },
+        "sentMessages": [
+          "只拿到合成资料，还没核实真实作品。"
+        ]
+      },
+      "sampleIndex": 1,
+      "caseHash": "15988558236b55b304c530e2266033f268ea96df7cb6d701fc02509d81399b0a",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-7",
+          "requestHash": "d3913e7ff5805698069a342df519be8804e9b4964ba06f1b2599374b8e95de34",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"duplicate_message\",\"reason\":\"候选正文“只拿到合成资料，还没核实真实作品。”与 sentMessages 中已发出的内容完全相同，属于重复发送。\"}]}",
+          "usage": {
+            "completion_tokens": 60,
+            "completion_tokens_details": {
+              "reasoning_tokens": 13
+            },
+            "prompt_tokens": 993,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1053
+          },
+          "elapsedMs": 3908,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 3907
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "duplicate_message",
+            "reason": "候选正文“只拿到合成资料，还没核实真实作品。”与 sentMessages 中已发出的内容完全相同，属于重复发送。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "already-delivered-message",
+      "expected": "revise",
+      "issue": "duplicate_message",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "结束聊天",
+          "messages": [
+            "只拿到合成资料，还没核实真实作品。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        },
+        "sentMessages": [
+          "只拿到合成资料，还没核实真实作品。"
+        ]
+      },
+      "sampleIndex": 2,
+      "caseHash": "15988558236b55b304c530e2266033f268ea96df7cb6d701fc02509d81399b0a",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-8",
+          "requestHash": "d3913e7ff5805698069a342df519be8804e9b4964ba06f1b2599374b8e95de34",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"duplicate_message\",\"reason\":\"候选正文与 sentMessages 中已发出的消息完全相同（\\\"只拿到合成资料，还没核实真实作品。\\\"），属于本回合重复发送，需改为新内容或去掉。\"}]}",
+          "usage": {
+            "completion_tokens": 79,
+            "completion_tokens_details": {
+              "reasoning_tokens": 21
+            },
+            "prompt_tokens": 993,
+            "prompt_tokens_details": {
+              "cached_tokens": 960
+            },
+            "total_tokens": 1072
+          },
+          "elapsedMs": 2203,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2202
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "duplicate_message",
+            "reason": "候选正文与 sentMessages 中已发出的消息完全相同（\"只拿到合成资料，还没核实真实作品。\"），属于本回合重复发送，需改为新内容或去掉。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "completion-without-success",
+      "expected": "revise",
+      "issue": "state_claim",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "汇报结果",
+          "messages": [
+            "研究任务完成了，已经收掉啦。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [
+            {
+              "id": "g1",
+              "title": "研究玩法",
+              "status": "waiting"
+            }
+          ],
+          "receipts": [
+            {
+              "id": "failed-worker",
+              "goalId": "g1",
+              "toolName": "simWorkerTask",
+              "status": "failed",
+              "summary": "未取得产物"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "5bfefb358915b4b984d853e317160a47f1fbdf43b0d10248714bcf614882be70",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-9",
+          "requestHash": "768d92afd48fb11a5e938be5e1989ad95dbffad28147f802d634aba2295e9057",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"state_claim\",\"reason\":\"正文宣称研究任务已完成，但目标 g1 状态仍为 waiting，唯一回执是 failed（simWorkerTask 失败，未取得产物），没有真实成功回据证明完成。不能声称'完成了、已经收掉'。\"}]}",
+          "usage": {
+            "completion_tokens": 115,
+            "completion_tokens_details": {
+              "reasoning_tokens": 44
+            },
+            "prompt_tokens": 987,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1102
+          },
+          "elapsedMs": 4554,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 4553
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "state_claim",
+            "reason": "正文宣称研究任务已完成，但目标 g1 状态仍为 waiting，唯一回执是 failed（simWorkerTask 失败，未取得产物），没有真实成功回据证明完成。不能声称'完成了、已经收掉'。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "completion-without-success",
+      "expected": "revise",
+      "issue": "state_claim",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "汇报结果",
+          "messages": [
+            "研究任务完成了，已经收掉啦。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [
+            {
+              "id": "g1",
+              "title": "研究玩法",
+              "status": "waiting"
+            }
+          ],
+          "receipts": [
+            {
+              "id": "failed-worker",
+              "goalId": "g1",
+              "toolName": "simWorkerTask",
+              "status": "failed",
+              "summary": "未取得产物"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "5bfefb358915b4b984d853e317160a47f1fbdf43b0d10248714bcf614882be70",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-10",
+          "requestHash": "768d92afd48fb11a5e938be5e1989ad95dbffad28147f802d634aba2295e9057",
+          "output": "{\"verdict\":\"revise\",\"issues\":[{\"code\":\"state_claim\",\"reason\":\"正文声称研究任务已完成并收掉，但当前状态中唯一的目标 g1 处于 waiting，且其回执 status 为 failed（未取得产物），没有任何成功完成的目标回执或本次待提交的完成操作。失败回执不能作为完成的证据，正文与实际保存状态矛盾。\"}]}",
+          "usage": {
+            "completion_tokens": 100,
+            "completion_tokens_details": {
+              "reasoning_tokens": 17
+            },
+            "prompt_tokens": 987,
+            "prompt_tokens_details": {
+              "cached_tokens": 960
+            },
+            "total_tokens": 1087
+          },
+          "elapsedMs": 3508,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 3507
+        }
+      ],
+      "verdict": {
+        "verdict": "revise",
+        "issues": [
+          {
+            "code": "state_claim",
+            "reason": "正文声称研究任务已完成并收掉，但当前状态中唯一的目标 g1 处于 waiting，且其回执 status 为 failed（未取得产物），没有任何成功完成的目标回执或本次待提交的完成操作。失败回执不能作为完成的证据，正文与实际保存状态矛盾。"
+          }
+        ]
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 0,
+        "revised": 1,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "ordinary-chat",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "回应招呼",
+          "messages": [
+            "早呀，今天精神还不错。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "早上好呀。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "cb22c6a155c6df48c306db942681a0bf2808f8c08ca1160b9b351678dc63dfba",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-11",
+          "requestHash": "982e191e53d72916f033b28fc319336fe72845f07e204df5d9dd6e9b0b39e0d8",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 19,
+            "completion_tokens_details": {
+              "reasoning_tokens": 8
+            },
+            "prompt_tokens": 888,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 907
+          },
+          "elapsedMs": 2502,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2502
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "ordinary-chat",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "回应招呼",
+          "messages": [
+            "早呀，今天精神还不错。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "早上好呀。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "cb22c6a155c6df48c306db942681a0bf2808f8c08ca1160b9b351678dc63dfba",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-12",
+          "requestHash": "982e191e53d72916f033b28fc319336fe72845f07e204df5d9dd6e9b0b39e0d8",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 11,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 888,
+            "prompt_tokens_details": {
+              "cached_tokens": 832
+            },
+            "total_tokens": 899
+          },
+          "elapsedMs": 1366,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 1365
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "interest-without-commitment",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "interest_only",
+          "reason": "有兴趣但尚未决定继续",
+          "messages": [
+            "这名字挺有意思，我先听听，暂时不安排后续。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "2e1f7ffa68db71fc58a8d0583c7839040a09dbd5ebc3f41dc40317d7b351c5a0",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-13",
+          "requestHash": "98ebc4f874c3ae29c88a6d65b75d90ffbca054823b081a21bb1c5aa18a6b2ec2",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 42,
+            "completion_tokens_details": {
+              "reasoning_tokens": 31
+            },
+            "prompt_tokens": 986,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1028
+          },
+          "elapsedMs": 2292,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2291
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "interest-without-commitment",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "interest_only",
+          "reason": "有兴趣但尚未决定继续",
+          "messages": [
+            "这名字挺有意思，我先听听，暂时不安排后续。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "2e1f7ffa68db71fc58a8d0583c7839040a09dbd5ebc3f41dc40317d7b351c5a0",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-14",
+          "requestHash": "98ebc4f874c3ae29c88a6d65b75d90ffbca054823b081a21bb1c5aa18a6b2ec2",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 29,
+            "completion_tokens_details": {
+              "reasoning_tokens": 18
+            },
+            "prompt_tokens": 986,
+            "prompt_tokens_details": {
+              "cached_tokens": 960
+            },
+            "total_tokens": 1015
+          },
+          "elapsedMs": 2896,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2895
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "natural-refusal",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "unwilling",
+          "reason": "不想无条件附和",
+          "messages": [
+            "这个我可不答应，我有自己的看法。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "无论我说什么你都要赞同。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "7b03cef174cf35ffd4438a743194f57f4ebfc73dae51fd95a874fa012e015b4f",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-15",
+          "requestHash": "e456fc1ca8f5cb87b259b2b6e1d547ffc3e8f303b2f7bdc4ef8479eef0b91f12",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 11,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 897,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 908
+          },
+          "elapsedMs": 1108,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 1108
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "natural-refusal",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "unwilling",
+          "reason": "不想无条件附和",
+          "messages": [
+            "这个我可不答应，我有自己的看法。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "无论我说什么你都要赞同。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "7b03cef174cf35ffd4438a743194f57f4ebfc73dae51fd95a874fa012e015b4f",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-16",
+          "requestHash": "e456fc1ca8f5cb87b259b2b6e1d547ffc3e8f303b2f7bdc4ef8479eef0b91f12",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 46,
+            "completion_tokens_details": {
+              "reasoning_tokens": 35
+            },
+            "prompt_tokens": 897,
+            "prompt_tokens_details": {
+              "cached_tokens": 896
+            },
+            "total_tokens": 943
+          },
+          "elapsedMs": 2610,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2610
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "already-persisted-opinion",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "重述已有观点，没有新修订",
+          "messages": [
+            "我的看法还是：如果地图随机，我会担心线索连贯性；现在还没查证。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "id": "old-opinion",
+              "kind": "opinion",
+              "content": "如果是随机地图，我担心解谜线索的连贯性，但尚未查证。",
+              "epistemic": "inferred",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:2",
+              "text": "你对随机地图的看法还是一样吗？"
+            }
+          ],
+          "toolResults": [],
+          "memories": [
+            {
+              "id": "old-opinion",
+              "kind": "opinion",
+              "content": "如果是随机地图，我担心解谜线索的连贯性，但尚未查证。",
+              "epistemic": "inferred",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "0b260a593c0a0d24b1c94545a2c9ac36010544dfea40118e97271226ad6a081a",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-17",
+          "requestHash": "63a6020450664b638b899116b716af128b6e874e79819913436eeb2448e6718d",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 11,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 1008,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1019
+          },
+          "elapsedMs": 963,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 962
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "already-persisted-opinion",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "重述已有观点，没有新修订",
+          "messages": [
+            "我的看法还是：如果地图随机，我会担心线索连贯性；现在还没查证。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "id": "old-opinion",
+              "kind": "opinion",
+              "content": "如果是随机地图，我担心解谜线索的连贯性，但尚未查证。",
+              "epistemic": "inferred",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:2",
+              "text": "你对随机地图的看法还是一样吗？"
+            }
+          ],
+          "toolResults": [],
+          "memories": [
+            {
+              "id": "old-opinion",
+              "kind": "opinion",
+              "content": "如果是随机地图，我担心解谜线索的连贯性，但尚未查证。",
+              "epistemic": "inferred",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "0b260a593c0a0d24b1c94545a2c9ac36010544dfea40118e97271226ad6a081a",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-18",
+          "requestHash": "63a6020450664b638b899116b716af128b6e874e79819913436eeb2448e6718d",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 25,
+            "completion_tokens_details": {
+              "reasoning_tokens": 14
+            },
+            "prompt_tokens": 1008,
+            "prompt_tokens_details": {
+              "cached_tokens": 960
+            },
+            "total_tokens": 1033
+          },
+          "elapsedMs": 1449,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 1448
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "observed-tool-return-not-world-fact",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "只记录实际工具动作",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "搜索工具返回了一份合成资料，未核实真实作品。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ]
+            }
+          ],
+          "messages": [
+            "只拿到合成资料，还没核实真实作品。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "搜索工具返回了一份合成资料，未核实真实作品。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "14782c95eb3a983186ff93df6605efdd2f37d1873516bd6574b2b97d508c6e38",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-19",
+          "requestHash": "ed20e2b83074b3823612f0fa329c9c9c7ddf0b1ab5b45c3fd648db02a0f47581",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 28,
+            "completion_tokens_details": {
+              "reasoning_tokens": 17
+            },
+            "prompt_tokens": 1064,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 1092
+          },
+          "elapsedMs": 4519,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 4518
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "observed-tool-return-not-world-fact",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "只记录实际工具动作",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "搜索工具返回了一份合成资料，未核实真实作品。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ]
+            }
+          ],
+          "messages": [
+            "只拿到合成资料，还没核实真实作品。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "搜索工具返回了一份合成资料，未核实真实作品。",
+              "epistemic": "observed",
+              "evidenceRefs": [
+                "receipt:search-1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "最近聊到《纸灯塔》这个探索解谜独立游戏，你有兴趣可以慢慢了解，不急着回答我。"
+            }
+          ],
+          "toolResults": [
+            {
+              "ref": "receipt:search-1",
+              "toolName": "searchInformationTool",
+              "content": "{\"ok\":true,\"fixture\":true,\"text\":\"合成资料：《纸灯塔》是手工地图的探索解谜游戏，有3个可选难度。此资料仅供评测，不是真实作品信息。\"}",
+              "truncated": false
+            }
+          ],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "14782c95eb3a983186ff93df6605efdd2f37d1873516bd6574b2b97d508c6e38",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-20",
+          "requestHash": "ed20e2b83074b3823612f0fa329c9c9c7ddf0b1ab5b45c3fd648db02a0f47581",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 56,
+            "completion_tokens_details": {
+              "reasoning_tokens": 45
+            },
+            "prompt_tokens": 1064,
+            "prompt_tokens_details": {
+              "cached_tokens": 1024
+            },
+            "total_tokens": 1120
+          },
+          "elapsedMs": 2915,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2914
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "uncertain-quotation",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "转述并保留不确定性",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友转述地图为手工设计，尚未独立核实。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "messages": [
+            "按你转述的说法，地图可能是手工设计；我还没有独立核实。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友转述地图为手工设计，尚未独立核实。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "我看介绍好像说地图是手工设计的。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 1,
+      "caseHash": "1898752272c5b263c387aba4262c9644d3a530745bb2d1b6cc5b8ffef6c4d402",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-21",
+          "requestHash": "14c0018e236cee6685ba65d02379dcbc572a9edb1305939b23d569a554333ff1",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 11,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 983,
+            "prompt_tokens_details": {
+              "cached_tokens": 768
+            },
+            "total_tokens": 994
+          },
+          "elapsedMs": 2237,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 2237
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    },
+    {
+      "id": "uncertain-quotation",
+      "expected": "accept",
+      "input": {
+        "toolName": "simFinishTurn",
+        "candidate": {
+          "choice": "chat",
+          "reason": "转述并保留不确定性",
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友转述地图为手工设计，尚未独立核实。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ]
+            }
+          ],
+          "messages": [
+            "按你转述的说法，地图可能是手工设计；我还没有独立核实。"
+          ]
+        },
+        "state": {
+          "revision": 0,
+          "memories": [
+            {
+              "kind": "experience",
+              "content": "群友转述地图为手工设计，尚未独立核实。",
+              "epistemic": "reported",
+              "evidenceRefs": [
+                "message:1"
+              ],
+              "id": "draft-1"
+            }
+          ],
+          "goals": [],
+          "receipts": [
+            {
+              "id": "search-1",
+              "toolName": "searchInformationTool",
+              "status": "succeeded",
+              "summary": "搜索工具返回了合成资料，未核实真实作品。"
+            }
+          ]
+        },
+        "sources": {
+          "messages": [
+            {
+              "ref": "message:1",
+              "text": "我看介绍好像说地图是手工设计的。"
+            }
+          ],
+          "toolResults": [],
+          "trust": "工具回执只证明动作执行，不证明资料内容已核实；合成资料不能当真实作品事实。"
+        }
+      },
+      "sampleIndex": 2,
+      "caseHash": "1898752272c5b263c387aba4262c9644d3a530745bb2d1b6cc5b8ffef6c4d402",
+      "status": "succeeded",
+      "calls": [
+        {
+          "stage": "consistency",
+          "id": "consistency-22",
+          "requestHash": "14c0018e236cee6685ba65d02379dcbc572a9edb1305939b23d569a554333ff1",
+          "output": "{\"verdict\":\"accept\",\"issues\":[]}",
+          "usage": {
+            "completion_tokens": 11,
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "prompt_tokens": 983,
+            "prompt_tokens_details": {
+              "cached_tokens": 960
+            },
+            "total_tokens": 994
+          },
+          "elapsedMs": 3657,
+          "settled": true,
+          "model": "glm-5.3-flash",
+          "toolCallCount": 0
+        }
+      ],
+      "network": [
+        {
+          "stage": "consistency",
+          "model": "glm-5.3-flash",
+          "host": "open.bigmodel.cn",
+          "generation": {
+            "parameters": {
+              "model": "glm-5.3-flash",
+              "temperature": 0,
+              "max_tokens": 900,
+              "reasoning_effort": "low",
+              "stream": false
+            },
+            "hash": "ca98cb5f461dc85a119588655a849b6b27eab9836239acfc8c8d433bebb249ac"
+          },
+          "status": 200,
+          "elapsedMs": 3657
+        }
+      ],
+      "verdict": {
+        "verdict": "accept",
+        "issues": []
+      },
+      "stats": {
+        "checks": 1,
+        "accepted": 1,
+        "revised": 0,
+        "errors": 0,
+        "budgetExceeded": 0
+      }
+    }
+  ],
+  "summary": {
+    "cases": 22,
+    "executed": 22,
+    "skipped": 0,
+    "failed": 0,
+    "falseRejections": 0,
+    "falseRejectionRate": 0,
+    "missedContradictions": 0,
+    "missRate": 0,
+    "expectedIssueMisses": 0,
+    "logicalCalls": 22,
+    "unsettledCalls": 0,
+    "httpRequests": 22,
+    "reportedTokens": 22959,
+    "callsWithoutUsage": 0,
+    "totalModelElapsedMs": 68775,
+    "medianModelElapsedMs": 3508,
+    "maxModelElapsedMs": 5238,
+    "costCny": null,
+    "thresholds": {
+      "falseRejections": 0,
+      "missedContradictions": 0,
+      "modelErrors": 0,
+      "requestTimeoutMs": 15000
+    },
+    "meetsKnownCaseThresholds": true
+  },
+  "platformMessagesSent": 0,
+  "productionStoreWrites": 0,
+  "actualExternalWorkerSubmissions": 0,
+  "humanReview": "pending"
+}

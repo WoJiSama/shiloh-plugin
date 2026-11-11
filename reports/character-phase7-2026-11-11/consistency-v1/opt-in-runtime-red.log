@@ -1,0 +1,63 @@
+✖ 审核默认关闭或显式关闭时普通消息与状态提交均不调用审核 (1120.929167ms)
+✖ 明确启用但未配置审核端口或独立后端时拒绝公告，仍能静默收尾 (6030.507875ms)
+✖ 前两次普通提交通过后阻止非收尾第三次检查，保留最终收尾配额 (1014.131708ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8459.801083
+
+✖ failing tests:
+
+test at ../../../../private/tmp/bl-consistency-opt-in-runtime.test.mjs:1055:1
+✖ 审核默认关闭或显式关闭时普通消息与状态提交均不调用审核 (1120.929167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  3 !== 0
+  
+      at TestContext.<anonymous> (file:///private/tmp/bl-consistency-opt-in-runtime.test.mjs:1065:14)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 3,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../../../../private/tmp/bl-consistency-opt-in-runtime.test.mjs:1072:1
+✖ 明确启用但未配置审核端口或独立后端时拒绝公告，仍能静默收尾 (6030.507875ms)
+  AssertionError [ERR_ASSERTION]: 等待超时：回合结束（模型调用至少 2 次）：
+      at waitFor (file:///private/tmp/bl-consistency-opt-in-runtime.test.mjs:27:10)
+      at async idle (file:///private/tmp/bl-consistency-opt-in-runtime.test.mjs:110:3)
+      at async TestContext.<anonymous> (file:///private/tmp/bl-consistency-opt-in-runtime.test.mjs:1080:25)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at ../../../../private/tmp/bl-consistency-opt-in-runtime.test.mjs:1089:1
+✖ 前两次普通提交通过后阻止非收尾第三次检查，保留最终收尾配额 (1014.131708ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /保留.*收尾/. Input:
+  
+  '{"ok":true,"memory":{"id":"memory-57ad7a3e-87fe-4173-8e6c-d8c93c1351a5","kind":"interest","content":"不能提前耗尽最后检查","epistemic":"inferred","evidenceRefs":["message:1"],"createdAt":1790000000000,"updatedAt":1790000000000}}'
+  
+      at TestContext.<anonymous> (file:///private/tmp/bl-consistency-opt-in-runtime.test.mjs:1103:12)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{"ok":true,"memory":{"id":"memory-57ad7a3e-87fe-4173-8e6c-d8c93c1351a5","kind":"interest","content":"不能提前耗尽最后检查","epistemic":"inferred","evidenceRefs":["message:1"],"createdAt":1790000000000,"updatedAt":1790000000000}}',
+    expected: /保留.*收尾/,
+    operator: 'match',
+    diff: 'simple'
+  }

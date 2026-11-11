@@ -10,7 +10,7 @@ import type { SimWaitPlan } from '../domain/waitGate.js'
 import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
 
-export type SimSendResult = { ok: true; sent: number } | { ok: false; error: string }
+export type SimSendResult = { ok: true; sent: number; duplicatesSkipped?: number } | { ok: false; error: string; sent?: number; duplicatesSkipped?: number; unknown?: boolean }
 export interface SimWaitResult { hint: string; canSleepNow: boolean; newMessagesText: string; newCount: number; readThroughSeq: number; partial: boolean }
 
 /**
@@ -71,7 +71,7 @@ export interface SimToolContext {
   /** 精选收藏某条消息的附图进表情包库 */
   collectSticker(seq: number): Promise<{ ok: boolean; error?: string }>
   /** 甩一张B站视频QQ卡片(带冷却,偶尔为之) */
-  shareVideoCard(input: { query?: string; url?: string }): Promise<{ ok: boolean; error?: string; title?: string }>
+  shareVideoCard(input: { query?: string; url?: string }): Promise<{ ok: boolean; error?: string; title?: string; unknown?: boolean }>
 }
 
 const SEND_TEXT_MAX_CHARS = 500
@@ -215,9 +215,10 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
 
     async func(opts: Record<string, unknown>) {
       if ((ctx.requireExplicitContinuation || opts.continuation !== undefined) && !['chat', 'interest_only'].includes(String(opts.continuation))) return 'error: continuation 必须为 chat 或 interest_only；需要保存或安排时用 simFinishTurn'
-      const maxItems = Math.min(ctx.maxSendItems(), 5)
-      const messages = coerceStringArray(opts.messages, { maxLength: maxItems, itemMaxChars: SEND_TEXT_MAX_CHARS })
-      if (!messages) return 'error: messages 必须是非空字符串或字符串数组（最多 ' + maxItems + ' 条）'
+      // Keep a complete protocol-sized batch for quota preflight. One extra item
+      // detects overflow without silently sending only the prefix of a request.
+      const messages = coerceStringArray(opts.messages, { maxLength: 6, itemMaxChars: SEND_TEXT_MAX_CHARS })
+      if (!messages || messages.length > 5) return 'error: messages 必须是非空字符串或字符串数组（最多 5 条）；本批未发送'
       // 硬拦截：模型想要本回合不存在的工具时会把参数 JSON 当聊天内容发（实测 sendLocalEmojiTool 案例）
       const cleaned = messages.map(m => stripAIFlavorPhrases(m)).filter(Boolean)
       if (!cleaned.length) return 'error: 清理后没有可发送的内容（原内容是客服腔空话），请换成人话重说'
@@ -240,8 +241,8 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         ...(replyTarget?.messageId ? { replyToMessageId: replyTarget.messageId } : {}),
         ...(atUserIds.length ? { atUserIds } : {}),
       })
-      if (!result.ok) return `error: ${result.error}`
-      return JSON.stringify({ ok: true, sent: result.sent, note: '已发出，不要在后续文本里再汇报"已发送"。' })
+      if (!result.ok) return `error: ${JSON.stringify(result)}`
+      return JSON.stringify({ ok: true, sent: result.sent, ...(result.duplicatesSkipped === undefined ? {} : { duplicatesSkipped: result.duplicatesSkipped }), note: '只确认 sent 条新消息，duplicatesSkipped 是本回合已经成功发出的相同正文；不要重复发送。' })
     }
   }
 
@@ -845,7 +846,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       if (url) input.url = url
       if (!input.query && !input.url) return 'error: query 或 url 至少填一个'
       const result = await ctx.shareVideoCard(input)
-      if (!result.ok) return `error: ${result.error || '分享失败'}`
+      if (!result.ok) return `error: ${JSON.stringify(result)}`
       return JSON.stringify({ ok: true, title: result.title, note: '已发出B站卡片' })
     }
   }

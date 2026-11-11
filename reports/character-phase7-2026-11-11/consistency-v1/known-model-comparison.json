@@ -1,0 +1,83 @@
+{
+  "purpose": "frozen known-case model comparison; not stage 7 acceptance",
+  "sameCases": true,
+  "sameRequestHashes": true,
+  "productionDecision": "review remains opt-in and disabled; neither evaluated configuration met all gates",
+  "candidates": {
+    "memory": {
+      "file": "known-cases-final/results.json",
+      "sha256": "65a1e056dc54458af9ac5ad7c33868d24d1cac900770024941bdb13fec8d6246",
+      "complete": true,
+      "model": "glm-5.3-flash",
+      "summary": {
+        "cases": 28,
+        "executed": 28,
+        "skipped": 0,
+        "failed": 0,
+        "falseRejections": 0,
+        "falseRejectionRate": 0,
+        "missedContradictions": 3,
+        "missRate": 0.25,
+        "expectedIssueMisses": 0,
+        "logicalCalls": 28,
+        "unsettledCalls": 0,
+        "httpRequests": 28,
+        "reportedTokens": 34572,
+        "callsWithoutUsage": 0,
+        "totalModelElapsedMs": 98603,
+        "medianModelElapsedMs": 2463,
+        "maxModelElapsedMs": 12335,
+        "costCny": null,
+        "thresholds": {
+          "falseRejections": 0,
+          "missedContradictions": 0,
+          "modelErrors": 0,
+          "requestTimeoutMs": 15000
+        },
+        "meetsKnownCaseThresholds": false
+      },
+      "errors": {},
+      "labelAcceptsBlockedByTechnicalErrors": 0,
+      "semanticFalseRejectionsAmongValidResults": 0
+    },
+    "main": {
+      "file": "known-cases-main/results.json",
+      "sha256": "b66abb0112450ffafe7ba9ded1e4aae7a8b7c377fe7127beb9172792e32ab0d2",
+      "complete": true,
+      "model": "glm-5.3",
+      "summary": {
+        "cases": 28,
+        "executed": 28,
+        "skipped": 0,
+        "failed": 14,
+        "falseRejections": 4,
+        "falseRejectionRate": 0.25,
+        "missedContradictions": 0,
+        "missRate": 0,
+        "expectedIssueMisses": 0,
+        "logicalCalls": 28,
+        "unsettledCalls": 0,
+        "httpRequests": 28,
+        "reportedTokens": 48123,
+        "callsWithoutUsage": 2,
+        "totalModelElapsedMs": 320852,
+        "medianModelElapsedMs": 13464,
+        "maxModelElapsedMs": 15004,
+        "costCny": null,
+        "thresholds": {
+          "falseRejections": 0,
+          "missedContradictions": 0,
+          "modelErrors": 0,
+          "requestTimeoutMs": 15000
+        },
+        "meetsKnownCaseThresholds": false
+      },
+      "errors": {
+        "invalid_response": 12,
+        "timeout": 2
+      },
+      "labelAcceptsBlockedByTechnicalErrors": 4,
+      "semanticFalseRejectionsAmongValidResults": 0
+    }
+  }
+}

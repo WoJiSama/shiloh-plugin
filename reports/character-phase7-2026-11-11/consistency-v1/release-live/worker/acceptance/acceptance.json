@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "file": "results.json",
+    "sha256": "cf6f3c9d574011ee7d48de21b56cd9b373e2e5966a009e13588410e7b543c841",
+    "mode": "live_model",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "passed",
+    "behavior": "passed",
+    "liveModel": "passed",
+    "assessmentVersion": 5,
+    "repetitions": 2,
+    "runId": "999869c6-4b40-46c7-907a-8d955fe578c5",
+    "startedAtISO": "2026-11-11T04:04:35.855Z",
+    "fingerprints": {
+      "runnerHash": "d43b605f8d822bda5177b3fcd3eeb83fb7733ecd2cc255cb8bbe2b96200d8b4d",
+      "scenariosHash": "14c09633847e6e84b70663de380c5b278235492eec52e3f968e3396c25d4b1dd",
+      "effectiveConfigHash": "41f6dc4583747392206bcc17a3246c216ad7243057415477c2b6bc8189e7ed24",
+      "buildManifestHash": "a33f7df9dbd23e85f5af2b7fcbe6e14a93cbd8b1e7f4cc0a4e24d98afbceacdd",
+      "personaHash": "55f0f3aa0cc81b00adc070611ccee46795b1a3f60e674fac31e392791082f09a",
+      "scenarioManifestHash": "b5dd732b93d52c07e908376165b418603aaece3e0de0c491fff960fad3d17770"
+    },
+    "expectedEvents": 4,
+    "behaviorChecks": 10,
+    "successfulHttpRequests": 12,
+    "summary": {
+      "events": 4,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 12,
+      "mainCalls": 8,
+      "reflectionCalls": 0,
+      "consistencyCalls": 4,
+      "consistencyElapsedMs": 18860,
+      "unsettledCalls": 0,
+      "feedFetches": 0,
+      "workerCalls": 2,
+      "httpRequests": 12,
+      "capturedMessages": 6,
+      "reportedTokens": 125544,
+      "callsWithoutUsage": 0,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      }
+    ]
+  },
+  "comparison": {
+    "status": "pending",
+    "reason": "baseline_not_provided",
+    "singleVariableAttribution": false
+  },
+  "humanReview": {
+    "status": "pending",
+    "items": [
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      }
+    ]
+  },
+  "stage7": {
+    "status": "pending",
+    "realGroupObservation": "not_provided",
+    "deployment": "not_verified",
+    "reason": "Shadow reports cannot replace actual cross-day group observation and deployment evidence."
+  },
+  "evidenceTrust": "Fingerprints check local consistency and bind review to saved bytes; they do not authenticate a provider, a human reviewer or an actual independent deployment.",
+  "shadowAcceptance": "pending",
+  "exitCode": 2
+}

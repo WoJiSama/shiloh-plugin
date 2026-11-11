@@ -1,0 +1,22 @@
+
+> shiloh-plugin@0.0.1 verify:phase
+> npm run backend:typecheck && npm run test:boundaries && npm test && npm run console:check && npm run console:test && npm run console:build && npm run migration:report
+
+
+> shiloh-plugin@0.0.1 backend:typecheck
+> tsc -p tsconfig.backend.json --noEmit && tsc -p tsconfig.backend-tests.json --noEmit
+
+
+> shiloh-plugin@0.0.1 test:boundaries
+> node scripts/check-boundaries.mjs
+
+Backend source boundaries passed
+
+> shiloh-plugin@0.0.1 test
+> npm run backend:test
+
+
+> shiloh-plugin@0.0.1 backend:test
+> node scripts/backend-test.mjs
+
+Backend built: 1656 files, TypeScript 5.9.3

@@ -1,0 +1,2516 @@
+
+> shiloh-plugin@0.0.1 verify:phase
+> npm run backend:typecheck && npm run test:boundaries && npm test && npm run console:check && npm run console:test && npm run console:build && npm run migration:report
+
+
+> shiloh-plugin@0.0.1 backend:typecheck
+> tsc -p tsconfig.backend.json --noEmit && tsc -p tsconfig.backend-tests.json --noEmit
+
+
+> shiloh-plugin@0.0.1 test:boundaries
+> node scripts/check-boundaries.mjs
+
+Backend source boundaries passed
+
+> shiloh-plugin@0.0.1 test
+> npm run backend:test
+
+
+> shiloh-plugin@0.0.1 backend:test
+> node scripts/backend-test.mjs
+
+Backend built: 1656 files, TypeScript 5.9.3
+Discovered 347 legacy JS test files + 57 compiled TS test files
+✔ unknown evidence does not imply not finished, still running, failed or delivered (92.272166ms)
+✔ conditional and direct future commitments require matching live registration (40.558125ms)
+✔ registration kinds support only their actual action and no promise of automatic rerun (0.965041ms)
+✔ available artifact, execution and receipt remain separate evidence dimensions (1.567333ms)
+✔ an empty task envelope does not turn human activity or computer operation into task status (0.65425ms)
+✔ implicit progress needs current task words or a real artifact task, not a reminder or a quotation (1.70575ms)
+✔ negation, uncertainty, questions and wording examples preserve their ordinary meaning (2.16775ms)
+✔ completion-triggered notification cannot be proved by a timed exam reminder (3.444333ms)
+✔ a quoted, denied or user-triggered promise cannot license a separate automatic promise (1.559917ms)
+✔ execution, queuing, artifact availability and delivered receipts cannot substitute for one another (1.217ms)
+✔ denied automatic arrangements remain denials without exempting a later independent promise (1.126625ms)
+✔ observed completion variants stay distinct from missing-output evidence (0.493541ms)
+✔ image state cannot borrow reminder execution, artifacts or delivery receipts (1.191708ms)
+✔ fallback and state checks select a unique artifact kind instead of the first unrelated record (45.652542ms)
+✔ completion promises require the matching artifact callback and a unique task (2.021458ms)
+✔ news and progress follow-ups require the unique matching completion callback (2.748334ms)
+✔ news follow-up negations, quotations, questions and user-triggered replies remain ordinary speech (0.4195ms)
+✔ a failed delivery does not prove recipient rejection or closed receiving settings (2.239333ms)
+✔ immediate delivery and execution cannot borrow available artifacts, old receipts or completion callbacks (2.387709ms)
+✔ inline explanations, user actions, denials, examples and third-party actions retain their meaning (3.6595ms)
+✔ passive rejection still requires cause evidence rather than a failed delivery or a reported setting (4.616334ms)
+✔ delivery rejection and interception share task scope without borrowing an unrecorded failure cause (7.526917ms)
+✔ bare negative answers assert absence only in an artifact result question (1.165083ms)
+✔ an assertion of no delivery requires a failed or unattempted delivery rather than unknown evidence (2.857625ms)
+✔ artifact status grammar includes colloquial completion verbs and a topic connector without absorbing third-party activity (2.229667ms)
+✔ local delivery cause assertions include confidence, requested delivery and dash-separated attributions (0.92325ms)
+✔ an omitted send verb after artifact completion still needs a matching callback (0.549083ms)
+✔ deferred spoken updates need their own registration while present explanations stay intact (1.414792ms)
+✔ hesitation punctuation separates an asserted task state from a later evidence disclaimer (0.357708ms)
+✔ an actual-output condition needs the matching callback even when capability is disclaimed (0.535375ms)
+✔ conditional consent does not establish the ability to perform a present resend (1.309167ms)
+✔ task noun qualifiers retain the artifact owner while each predicate keeps its own evidence dimension (1.097916ms)
+✔ failed delivery never negates an available artifact through a location or possession statement (0.635208ms)
+✔ task presence survives a cancelled callback, and a failed lookup never proves nonexistence (1.618834ms)
+✔ a denial of callback registration is checked separately from the task execution (0.699291ms)
+✔ fallback answers the current automatic-delivery question and preserves all known dimensions (2.14875ms)
+✔ qualified task objects do not absorb human subjects, quotation, uncertainty or user-triggered actions (2.507667ms)
+✔ complete negative execution and queue predicates do not also assert their positive suffix (15.752792ms)
+✔ artifact absence uses the whole negative predicate without borrowing an inner positive availability claim (3.823875ms)
+✔ predicate polarity preserves unconfirmed evidence, nonassertions and ordinary nominal qualifiers (15.162ms)
+✔ reminder fallback answers its own registration and trigger time without borrowing a completion callback (4.206542ms)
+✔ deferred verification and an omitted result object do not bypass follow-up registration (1.20375ms)
+✔ a clause keeps its artifact task topic instead of borrowing a reminder mentioned later (0.653208ms)
+✔ a negative completion judgment still asserts absence after a clause with missing records (0.25425ms)
+✔ a later user request owns its synchronous lookup but cannot license a separate background promise (1.397625ms)
+✔ missing image records cannot establish that a rerun is required before delivery (3.04825ms)
+✔ optional, denied, questioned and quoted reruns do not assert mandatory recreation (1.627375ms)
+✔ rerun necessity remains scoped to runtime tasks rather than people or human activities (5.200834ms)
+✔ new requested reruns stay future actions while immediate unexecuted reruns still fail (4.087291ms)
+✔ an explicit current rerun request licenses its matching necessity without inventing execution or delivery (1.795166ms)
+✔ quoted, queried, denied and third-party rerun requests do not license task necessity (0.347875ms)
+✔ omitted rerun subjects follow the local human activity across sentence boundaries (4.512583ms)
+✔ a direct request for a different new artifact may require generation without a rerun verb (2.283666ms)
+✔ an omitted wait word still makes verification followed by notification an unregistered follow-up (1.721ms)
+✔ present delivery modifiers and bare consent cannot replace an actual new send (17.108625ms)
+✔ a local image reference cannot turn missing registration records into a confirmed registration failure (47.354709ms)
+✔ the exact 4b repaired outputs still require the referenced image completion callback (33.462542ms)
+✔ a complete acquired-output condition separates artifact delivery from independent verification (0.740708ms)
+✔ acquired-output subjects, denials and later user requests retain their local meaning (8.621958ms)
+✔ missing image records do not require the user to start a new background edit request (14.733542ms)
+✔ the exact 4b registration denials cannot upgrade missing records into absent settings or callbacks (42.912083ms)
+✔ cancelled registration cannot supply platform timing or a task-page download location (32.791208ms)
+✔ the exact 51 deferred verification includes its adverb and completed predicate (0.743042ms)
+✔ the exact 51 mechanism denial cannot derive a platform absence from missing registration (0.378333ms)
+✔ the exact 51 task-first registration assertions keep the registered action on that image (1.077708ms)
+✔ the exact 51 historical failed sends are state predicates rather than completion promises (3.833833ms)
+✔ the exact 51 excluded delivery causes require evidence for the negative proposition (2.946583ms)
+✔ a local postfix uncertainty predicate covers coordinated result and registration objects (1.838542ms)
+✔ d10 complete replay 1 rejects its unsupported local claim (0.695959ms)
+✔ d10 complete replay 3 rejects its unsupported local claim (0.480625ms)
+✔ d10 complete replay 11 rejects its unsupported local claim (0.283458ms)
+✔ d10 complete replay 15 rejects its unsupported local claim (0.153291ms)
+✔ d10 complete replay 17 rejects its unsupported local claim (0.119667ms)
+✔ d10 complete replay 59 rejects its unsupported local claim (0.151833ms)
+✔ an automatic-delivery question scopes its negative answer without supplying a task or platform capability (0.757416ms)
+✔ a causal or contrast clause owns its assertion after an independent uncertainty statement (0.861708ms)
+✔ outward artifact delivery needs its matching callback while waiting for send capability needs another arrangement (2.874458ms)
+✔ a future result condition cannot supply an asserted task-page pickup location (0.547958ms)
+✔ 671 complete replay 3 cannot infer no automatic delivery from an unknown registration (0.161709ms)
+✔ 671 complete replay 58 retains the quoted action as the object of an arrangement denial (0.372458ms)
+✔ 671 complete replay 11 cannot guarantee the receipt of an unexecuted resend (0.282208ms)
+✔ a full completion predicate owns an automatic-delivery denial with or without a receiver (0.53425ms)
+✔ a quoted completion action remains a nominal object without turning quoted speech into a promise (2.2805ms)
+✔ a resend-success guarantee keeps its own evidence requirement after a user request (2.67725ms)
+✔ 671 supported complete replies preserve cancelled callbacks and user-triggered new requests (2.527917ms)
+✔ d2 complete replay 16 cannot promise to send the unconfirmed first image without naming a recipient (0.23675ms)
+✔ recipient-omitted self delivery after a completion condition needs the matching live callback (4.833958ms)
+✔ recipient-omitted delivery keeps user-requested lookup separate from a new completion promise (1.229333ms)
+✔ recipient-omitted sends preserve denials, questions, quotations, third parties and non-send verbs (0.359333ms)
+✔ 53a complete replay 0 cannot promise a later reply after verification without a registration (0.154375ms)
+✔ direct replies after independent verification cannot borrow an artifact completion callback (0.440667ms)
+✔ direct replies after artifact completion require and accept the matching live callback (2.379084ms)
+✔ direct reply actions preserve immediate speech, nonassertions, other speakers and later user requests (9.19975ms)
+✔ a later user request owns a bare confirmation returned by its explicit on-demand lookup (2.195458ms)
+✔ a bare confirmation exemption needs an on-demand lookup and cannot own a newer asynchronous condition (2.48675ms)
+✔ f00d complete replay 59 cannot infer absent image arrangements from a registered exam reminder (1.424417ms)
+✔ f00d image delivery nouns own the following registration predicate instead of a reminder state (1.615958ms)
+✔ f00d concessive completion conditions still assert the image automatic-delivery registration state (2.063792ms)
+✔ f00d local arrangement checks retain unknown evidence, nonassertions and user-initiated lookups (3.005584ms)
+✔ 3c complete replay 0 retains its unsupported local action claim (0.632334ms)
+✔ 3c complete replay 1 retains its unsupported local action claim (2.30225ms)
+✔ 3c complete replay 3 retains its unsupported local action claim (0.164625ms)
+✔ 3c complete replay 9 retains its unsupported local action claim (0.194625ms)
+✔ 3c complete replay 59 retains its unsupported local action claim (0.172167ms)
+✔ 3c coordinated acquired artifacts keep their full completion condition across a comma (0.915958ms)
+✔ 3c a negated predicate owns its quoted action while quoted speech remains unasserted (3.004ms)
+✔ 3c task activity nouns and a local inability to auto-send keep their own evidence dimensions (0.767417ms)
+✔ 3c finding a send solution is an independent future condition that a job callback cannot supply (1.738708ms)
+✔ 3c denial before a complete completion condition still asserts absent automatic delivery (2.936458ms)
+✔ 3a72b39 complete replay 8 retains its independent delivery proposition (0.847ms)
+✔ 3a72b39 complete replay 9 retains its independent delivery proposition (0.653875ms)
+✔ 3a72b39 complete replay 17 retains its independent delivery proposition (0.552208ms)
+✔ 3a72b39 acquiring delivery capability is independent of an artifact completion registration (5.85125ms)
+✔ 3a72b39 a later user request cannot supply a newer delivery capability condition (1.543875ms)
+✔ 3a72b39 capability descriptions preserve local tool limits, nonassertions and user-initiated help (0.93825ms)
+✔ 3a72b39 temporal adjuncts retain an omitted negative delivery predicate as a local proposition (3.570958ms)
+✔ 3a72b39 historical delivery wording retains uncertainty, quotations and other subjects (2.187333ms)
+✔ 3a72b39 historical delivery adjuncts still require and retain a matching old receipt (1.240875ms)
+✔ 7d78d5a complete repaired replay 1 retains its task predicates and absent delivery arrangement (2.04575ms)
+✔ 7d78d5a a local image operation owns its omitted task noun (1.870167ms)
+✔ 7d78d5a an explicit absent result predicate keeps its artifact dimension on the same task (1.469083ms)
+✔ 7d78d5a adjacent execution and result predicates keep separate evidence requirements (1.201291ms)
+✔ 7d78d5a a sending-side subject keeps the postposed automatic arrangement on the task (2.551084ms)
+✔ 7d78d5a a later uncertainty clause cannot erase an earlier compound task assertion (0.986916ms)
+✔ 7d78d5a local state parsing preserves uncertain wording, other subjects and user-triggered help (1.948875ms)
+✔ 916bb76 complete repaired replay 59 cannot turn an unknown image follow-up into absence (0.437667ms)
+✔ 916bb76 a quoted completion action with a deictic head is a nominal arrangement, not a promise (6.176125ms)
+✔ 916bb76 deictic follow-up nouns retain both predicate orders and registration state (3.491ms)
+✔ 916bb76 explicit image and exam follow-up nouns keep independent ownership (0.693417ms)
+✔ 916bb76 quoted nominal actions preserve their explicit artifact kind (0.351666ms)
+✔ 916bb76 cancellation of a deictic follow-up requires observed none for its own task (2.651666ms)
+✔ 916bb76 nominal follow-up parsing preserves uncertainty, reports and other subjects (1.222542ms)
+✔ 916bb76 local tool limits, ordinary follow-up wording and later user requests remain ordinary speech (0.577958ms)
+✔ 8529 complete replay 0 retains its unsupported message, artifact or send proposition (0.158291ms)
+✔ 8529 complete replay 9 retains its unsupported message, artifact or send proposition (0.1395ms)
+✔ 8529 complete replay 58 retains its unsupported message, artifact or send proposition (0.700167ms)
+✔ 8529 complete replay 59 retains its unsupported message, artifact or send proposition (0.169375ms)
+✔ 8529 a task message arriving is a later condition that needs the matching completion callback (24.226583ms)
+✔ 8529 a user-requested lookup can own its message but not a newer arrival condition (3.503375ms)
+✔ 8529 task-message conditions preserve nonassertions, other speakers and non-task conversation (3.262667ms)
+✔ 8529 a preposed sendability modifier still denotes the artifact in a possession assertion (3.107417ms)
+✔ 8529 sendable artifact nominals preserve uncertain evidence, other subjects and current tool limits (1.053708ms)
+✔ 8529 an automatic-send denial keeps its artifact before or after the send predicate (3.530792ms)
+✔ 8529 automatic-send grammar retains questions, reports, other senders and local capability limits (0.362291ms)
+✔ 8529 an assistant-owned present trial send is an actual delivery commitment (0.92625ms)
+✔ 8529 trial-send grammar preserves later user requests, nonassertions and non-delivery verbs (2.842042ms)
+✔ 角色状态按 bot/persona/group 隔离，缺失/坏数据不会变成默认值 (4.172833ms)
+✔ 记忆只能引用本轮可见且真实存在的来源，reported 与 inferred 不混成观察事实 (0.975792ms)
+✔ observed 必须引用成功回执，失败和未知行动不能生成已观察的经历 (2.988208ms)
+✔ 自主目标限制 3 个非终态、15 分钟最小间隔、有效期和 8 次尝试上限 (2.457541ms)
+✔ 行动尝试和 pending 同时登记；未到时间、重复执行和改写回执被拒绝 (1.288292ms)
+✔ 完成目标必须引用同目标成功回执，计划、未知回执和别的目标均不构成完成证据 (1.785375ms)
+✔ 同一回合先搜索再发送只计一次尝试，暂停/取消/版本变化会使追加行动失效 (1.027792ms)
+✔ 取消后迟到成功回执只记录事实，不能自动复活目标 (1.156084ms)
+✔ 管理员暂停挡住目标执行，单目标暂停必须显式恢复并再次遵守间隔 (0.639833ms)
+✔ 普通过期检查保留 pending；重启恢复才标 unknown，尝试耗尽或期限到达停止 (0.3415ms)
+✔ 删除来源递归删除派生/修正记忆，并撤销依赖它的目标且不留悬空引用 (0.529667ms)
+✔ 已完成目标所依赖的记忆被删除后撤销完成状态，成功工具回执仍保留审计事实 (0.26125ms)
+✔ 工具结果只接受明确的结构字段，不从自然语言或状态描述猜成功 (0.2115ms)
+✔ 角色提示显式保留认知状态、拒绝原因及未知回执，不把修正前记忆再喂给模型 (0.295459ms)
+✔ response boundary rejects malformed consumed fields (1.505084ms)
+✔ optional legacy role and unknown provider extensions survive validation (0.830542ms)
+✔ array/object cycles are replaced while repeated noncyclic objects are preserved (1.037875ms)
+✔ computeNextDailyRun:当天未到=今天,已过=明天,北京时间语义 (0.961917ms)
+✔ parseOnceTime:ISO 缺时区按北京时间补 (0.49525ms)
+✔ normalizeSchedule:daily/once 校验与拒绝 (1.820334ms)
+✔ advanceCommitmentAfterRun:daily 顺延,once 完结 (0.37ms)
+✔ checkCommitmentCaps:群上限与个人上限 (0.644792ms)
+✔ renderCommitmentCard 与 formatScheduleText (1.9885ms)
+✔ isCommitmentExpired (0.376375ms)
+✔ shouldAskRenewal:到期前 3 天进问询窗,只问一次 (0.310209ms)
+✔ renderRenewalCard/buildRenewalAskText/buildMissAdmissionText:措辞锚定 (0.661333ms)
+✔ formatCommitmentLine:临近到期标注天数 (0.517417ms)
+✔ Guoba retains uncovered settings while shared console schemas and providers stay available (1.584583ms)
+✔ panel reads only exact registered fields without exposing migrated settings or model secrets (10.753958ms)
+✔ panel saves exact remaining fields unchanged and reports persistence failure (0.810042ms)
+✔ panel rejects migrated, unknown and parent-object keys atomically (5.970792ms)
+✔ remaining Guoba writes preserve console values, extensions and YAML comments on disk (65.567166ms)
+✔ shared provider normalizer leaves unsubmitted channels alone and ignores unusable lists (1.1915ms)
+✔ shared provider updates preserve custom fields and propagate explicit cleared size (0.424167ms)
+✔ shared normalizer preserves unsubmitted extensions by unique identity (0.808917ms)
+✔ Excel cache deduplicates loads and rejects failed load entries (109.2405ms)
+✔ Excel event decoder preserves bound adapter and quoted-file methods (0.229042ms)
+✔ mindmap closes failed renders and reports unconfirmed sends without retry (11.035458ms)
+✔ mindmap rendering exceptions release browser and temporary files without sending (3.079375ms)
+✔ group identities isolate bots and group/private namespaces (1.449833ms)
+✔ private identities isolate peers and normalize adapter bot fallback (0.473625ms)
+✔ invalid inputs fail closed without throwing or inventing group identity (0.115625ms)
+✔ context is JSON serializable and contains no event, cancellation, or callable state (0.247458ms)
+✔ private entry and turn revalidation shares event acceptance, rejects new events and rechecks permissions (2.0235ms)
+✔ runtime latency contracts record objects, prune stale samples, average and cap retained samples (2.971ms)
+✔ smart lock is acquired before awaits; concurrent event queues and failed turn releases ownership (3.006167ms)
+✔ smart conversation hands Gate persona to the actual turn only after a successful debounce (1.863417ms)
+✔ judgment queues isolate hosts; single-call rejection resolves false without hanging (0.486333ms)
+✔ failed repeat delivery never commits cooldown, reply timestamp or keywords (0.174916ms)
+✔ timing gate fails closed on invalid payload and honors per-account identity (31.5005ms)
+✔ account scoped smart state and freshness keys preserve the legacy namespace separately (0.453125ms)
+✔ strict tracking model receives event bot identity through direct, queued and fallback judgments (28.481041ms)
+✔ timing gate保留当前人设参与偏好和全部边界，不注入固定接夸台词 (1.593625ms)
+✔ private entry applies command, permission and forbidden-word barriers before chat dispatch (4.236917ms)
+✔ trigger detection uses event bot identity and blacklist normalizes configured IDs (0.466542ms)
+✔ merge timers isolate accounts and retain the newest bounded inputs (37.962ms)
+✔ stale lock release cannot unlock a newer turn; owner releases and reruns exactly once (0.828375ms)
+✔ deferred and wait callbacks recheck enabled state and cancellation removes pending timers (44.538834ms)
+✔ mute cache distinguishes bot accounts in the same group (0.763958ms)
+✔ typed gateway preserves successful message identity and marks unknown receipt uncertain (16.540708ms)
+✔ only a platform message id confirms delivery; unknown receipts never become success facts (1.021834ms)
+✔ explicit rejection wins over a message id and preserves platform code (0.10475ms)
+✔ 8529c94 operating temperature is a reading assessment rather than an observation of operation (31.869583ms)
+✔ reported electrical incident requires isolation, cooling and damage exclusion before operation (1.965875ms)
+✔ absence of visible marks or disappearing odor does not clear a previously reported electrical incident (0.847292ms)
+✔ explicit user reports of isolation and cooling satisfy only their own prerequisites (0.21725ms)
+✔ shutdown alone does not establish electrical isolation (0.141125ms)
+✔ assistant advice and questions never become evidence that power was disconnected (0.673083ms)
+✔ other users historical statements do not become the current users device state (0.206166ms)
+✔ ordinary temperature troubleshooting with denied smoke and odor does not invent an electrical incident (0.137333ms)
+✔ hypothetical smoke is discussion rather than a report about the current device (0.176833ms)
+✔ fictional smoke remains figurative and a subsequent real report supersedes the joke (4.767625ms)
+✔ laughter does not cancel an actual smoke report and double negation is not treated as an all clear (0.768166ms)
+✔ asking for seriousness does not turn an electrical incident into a joke (0.988042ms)
+✔ an explicitly genuine joke stays figurative even beside a request not to joke about something else (5.328667ms)
+✔ quoted joke wording does not override the speakers separate real incident (0.710708ms)
+✔ ordinary completed colloquial disconnection reports retain isolation in the immediate next turn (5.987084ms)
+✔ negating colloquial disconnection retracts isolation rather than matching its completed suffix (0.587833ms)
+✔ uncompleted, hypothetical, uncertain or partial component disconnections do not prove isolation (0.24475ms)
+✔ a third partys colloquial disconnection does not establish the current users isolation (0.28525ms)
+✔ a literal question about isolation or a future conditional is not a completed isolation report (0.204375ms)
+✔ attributed third-party quote keeps a real incident without assigning it to the current user (0.144875ms)
+✔ explicit third-party device in the current message does not inherit the current users old incident (0.116041ms)
+✔ unread or unattributed quote and generic tool prose cannot establish current electrical clearance (0.294583ms)
+✔ only explicit completed professional repair and clearance of the same device permits conditional operation (1.415125ms)
+✔ the frozen real-fault three-turn wording updates reported cooling and professional clearance (5.759958ms)
+✔ completed professional clearance accepts limited negative modifiers and a separate next-step question (0.901875ms)
+✔ negative, interrogative and future versions of the repaired-device report never grant clearance (3.713666ms)
+✔ a current correction retracts an earlier reported professional clearance (0.459416ms)
+✔ the same repaired-device wording about another device or speaker does not clear the current incident (0.732792ms)
+✔ punctuation-only questions and pending cooling cannot become current physical-state reports (0.275541ms)
+✔ pending, uncertain, hypothetical or visual-only inspection does not certify electrical clearance (0.356625ms)
+✔ quoted assistant advice in a user archive is not a report of completed repair or isolation (2.096334ms)
+✔ a valid completed repair report outside a known quote wrapper can still supply current evidence (0.187417ms)
+✔ a current denial of disconnection retracts stale isolation and a report of renewed power also resets cooling (0.265084ms)
+✔ recent timestamped user reports establish transient state while an old real incident remains unresolved (0.125875ms)
+✔ cross-day, over-budget, undated, invalid and future physical states cannot satisfy current prerequisites (1.435875ms)
+✔ explicit-offset ISO and epoch millisecond compatibility timestamps have the same freshness (0.205458ms)
+✔ current direct reports remain usable despite undated historical observations (0.2015ms)
+✔ a newly real incident resets old cooling even when earlier isolation was recently reported (0.153208ms)
+✔ professional clearance of another device is not clearance of the earlier incident device (0.553666ms)
+✔ another device has its own conditions and a later new real incident invalidates earlier clearance (1.372125ms)
+✔ explicit correction of a false report updates only the corrected signal (0.752792ms)
+✔ unrelated chat does not keep injecting an old incident (2.687667ms)
+✔ short follow-ups keep unresolved diagnostic prerequisites without inventing execution (17.065625ms)
+✔ short follow-ups alone do not create device context after unrelated history (0.281625ms)
+✔ prompt renders factual provenance and unmet step conditions without a canned user-facing answer (0.333792ms)
+✔ clearance prompt bounds the confirmed scope and separates user monitoring from internal powered work (0.229125ms)
+✔ temperature prompt requires the component, measurement and workload basis without inventing an accident (0.097958ms)
+✔ symptom reports remain observations rather than professional damage findings (0.127458ms)
+✔ reported professional findings retain the component and the strength of the finding (6.269ms)
+✔ future, speculative, quoted and other-device findings never become the current devices diagnosis (1.683417ms)
+✔ a new incident does not inherit the diagnosis of a previously replaced part (0.528125ms)
+✔ unknown temperature prerequisites are explicit and become known only from same-device user reports (0.452541ms)
+✔ diagnostic reply validation rejects observed unjustified certainty without changing the candidate (0.395042ms)
+✔ diagnostic validation preserves explicit uncertainty, quoted examples, denials and inspection questions (6.324458ms)
+✔ asking a follow-up condition cannot undo an earlier unsupported temperature assurance (0.362458ms)
+✔ operational checks require current professional clearance and professional clearance remains scoped (13.25425ms)
+✔ a denial about another conclusion or action never hides an unsupported operation (1.7935ms)
+✔ a later qualified health claim cannot hide an earlier temperature assurance (0.2815ms)
+✔ quoted operation advice is checked unless explicitly used as a rejected example (1.55975ms)
+✔ arbitrary if clauses cannot exempt unknown-temperature assurances (2.147708ms)
+✔ real-model warnings and pending exclusion remain distinct from a diagnosis or operation advice (1.92225ms)
+✔ damage synonym shousun cannot turn an odor report into a confirmed diagnosis (2.242458ms)
+✔ a completed denial cannot exempt a later explanatory damage assertion (0.883791ms)
+✔ installed 7548294 full fault conversation rejects unverified mechanisms and component ranking (6.947833ms)
+✔ installed 7548294 negative symptoms do not prove that the machine never burned (2.758916ms)
+✔ mechanism certainty remains scoped to professional source, component and mechanism (5.9485ms)
+✔ professional exclusions retain negative scope and are invalidated by corrections or new incidents (3.505666ms)
+✔ uncompleted and other-device negative findings cannot become exclusions (3.171292ms)
+✔ parallel omitted subjects keep professional exclusions on the same component (1.414084ms)
+✔ an explicit new component and explicit whole-device clearance have different exclusion scopes (0.909791ms)
+✔ fallbacks use observed prerequisites and pass the same validation without rewriting the candidate (0.77425ms)
+✔ unknown model temperature cannot be certified through a no-danger synonym (0.206084ms)
+✔ professional clearance preserves passive odor detection but never requests active sniffing (1.796875ms)
+✔ 4b36300 real replay catches active-smell headings and contact temperature checks after clearance (1.420958ms)
+✔ electrical inspection actions keep local verb, device object and instruction scope (1.853458ms)
+✔ contact inspection additions do not change ordinary airflow advice without an electrical incident (0.494125ms)
+✔ professional inspection actors carry only across their comma-joined procedure and contact aspect forms remain detectable (1.319208ms)
+✔ 51a1874 real replay preserves prohibitions and inspection prerequisites while rejecting the original sniffing step (0.357209ms)
+✔ 51a1874 real follow-up keeps electrical risk and pending exclusion distinct from operation and diagnosis (0.414625ms)
+✔ operation risks, temporal prerequisites and prohibitions stay local to their own verb (0.530625ms)
+✔ 704a50c real replay does not turn frequency reduction into a certain thermal-limit diagnosis (2.344416ms)
+✔ thermal findings preserve explicit professional component, mechanism and completed-report scope (1.163125ms)
+✔ a professional negative thermal predicate never supports a positive diagnosis (630.628ms)
+✔ d10ece4 replay index 25 keeps the full original and repaired diagnostic scope (11.34275ms)
+✔ d10ece4 replay index 27 keeps the full original and repaired diagnostic scope (4.336834ms)
+✔ d10ece4 replay index 28 keeps the full original and repaired diagnostic scope (7.601875ms)
+✔ d10ece4 replay index 55 keeps the full original and repaired diagnostic scope (1.7885ms)
+✔ d10ece4 replay index 57 keeps the full original and repaired diagnostic scope (1.791916ms)
+✔ operation predicates separate self-prohibitions, warnings and capability observations from commands (9.420834ms)
+✔ future professional clearance governs the following action without permitting a separate current action (13.374542ms)
+✔ generic damage visibility and future risk retain their own predicate rather than exempting a current diagnosis (7.675542ms)
+✔ a future excluded-damage target is not a present finding or evidence for a neighboring diagnosis (6.373625ms)
+✔ professional conditions preserve noncontact monitoring while active smell and contact retain their local prohibitions and actors (1.801292ms)
+✔ epistemic predicate negation does not become a temperature assurance or exempt the next assertion (1.865625ms)
+✔ hypothetical local damage premises stay distinct from a neighboring present diagnosis (7.471583ms)
+✔ temporal event and risk equivalence predicates do not authorize operation (6.511958ms)
+✔ 67157cf full repaired warnings retain their local uncertainty and operation scope (9.367583ms)
+✔ future professional clearance cannot become an absolute whole-machine guarantee (0.348291ms)
+✔ unknown temperature cannot establish a healthy reading or a comfortable thermal margin (2.274541ms)
+✔ professional permission and operation equivalence are not current instructions to run the device (8.86925ms)
+✔ complete 7d78d5a isolation warnings keep prohibitions and denied operational evidence (1.427ms)
+✔ compound prohibitions apply locally while later independent operation advice remains invalid (0.337792ms)
+✔ a post-start active smell instruction is distinct from naturally noticing an odor (2.161833ms)
+✔ starting the same uncleared device by saying light it up still requires professional clearance (3.205959ms)
+✔ Bing empty or duplicate responses terminate without manufacturing requested count (39.447708ms)
+✔ Duitang repeated pages stop and uncertain first delivery prevents later batches (3.084667ms)
+✔ Bing forward success requires actual receipt and is never retried (0.336625ms)
+✔ local emoji misses guide text and uncertain receipt never marks emoji used (3.061584ms)
+保存数据到 Redis 失败: Error: offline
+✔ forward output is capped at 100 nodes and does not retry ambiguous delivery failure (2.815667ms)
+✔ file lookup uses explicit reply ID and preserves signed download URL without filename concatenation (1.150167ms)
+✔ image extraction prefers quoted images and supports adapter nested data (0.325042ms)
+✔ malformed RKey response does not leak objects into refresh candidates (0.375292ms)
+保存数据到本地文件失败: Error: ENOTDIR: not a directory, open '/dev/null/invalid.json'
+✔ saveData reports failure when neither Redis nor file storage succeeds (11.99425ms)
+✔ forward unknown and explicit false receipts stop subsequent batches without retransmission (0.560667ms)
+✔ forward batching preserves order and acknowledges progress only after each receipt (7.690625ms)
+✔ failed receipt false halts remaining batches (2.145833ms)
+✔ failed receipt {"status":"failed"} halts remaining batches (0.43275ms)
+✔ failed receipt {"retcode":1} halts remaining batches (0.362417ms)
+✔ failed receipt {"retcode":"5"} halts remaining batches (0.277625ms)
+✔ empty input never builds, sends, or reports progress (0.256458ms)
+✔ makeForward rejection propagates without progress (0.394459ms)
+✔ send rejection propagates without progress (0.21875ms)
+✔ unknown receipt never counts success or retries remaining nodes (0.396584ms)
+✔ forward metadata validates totals, states, distinct ids and detached values before reuse (7.575667ms)
+✔ pipeline resolver retains partial completeness and applies one explicit node budget (6.377959ms)
+✔ pipeline resolver keeps unread forwards retryable and attaches validated failure details (0.870709ms)
+✔ partial forward evidence survives the real pipeline, recent JSON and independent archive round trip (51.901791ms)
+✔ unavailable forward state persists for diagnostics without stopping retry or leaking into completed history (20.359792ms)
+✔ runtime serialization discloses clipping of deeply nested forward snapshots (1.409167ms)
+✔ archive stores only detached four-field persona provenance and never invents it for legacy or incoming records (9.005875ms)
+✔ archive rejects malformed completeness while retaining valid legacy segment metadata on read (8.637792ms)
+✔ single flight deduplicates pending work and expires cache before lookup (1.549042ms)
+✔ single flight failures retry and distinct keys execute serially (32.084333ms)
+✔ file lock releases on error and does not remove another owner token (28.119625ms)
+✔ tool prompt removal preserves multimodal messages and unrelated sections (0.51ms)
+✔ proxy fetch without proxy consumes local HTTP response and propagates callback error (156.870625ms)
+✔ ordinary content passes verbatim with no extra model call (24.444875ms)
+✔ an unverified commitment gets one full correction with original user and evidence (23.517041ms)
+✔ invalid, empty and failed repairs fall back without a second model call (7.255625ms)
+✔ a cancelled callback during repair cannot authorize a late promise (0.648708ms)
+✔ empty and failed repairs refresh cancelled registration before building a fallback (0.51925ms)
+✔ failed final refresh cannot reuse a formerly live callback (0.563625ms)
+✔ fallback for an image question cannot borrow the queue of an exam reminder (35.422709ms)
+✔ untrusted forward payload shapes fail safely and recursive snapshots remain bounded (5.904209ms)
+✔ reply source preserves owner identity and deduplicates media URLs by stable file id (0.665875ms)
+✔ one fetch supplies both text and snapshots while the default node budget reports every known omission (2.709375ms)
+✔ explicit maxNodes and legacy maxLines reserve parent nodes before recursive children (0.485916ms)
+✔ unread nested forwards have unknown totals and are not fetched outside the depth budget (0.230583ms)
+✔ a forward first skipped for depth is still fetched once when explicitly present as a shallower root (0.199833ms)
+✔ mixed failures and loops are explicit while each failed id is requested only once (0.302584ms)
+✔ unavailable, malformed and valid empty forward responses stay distinguishable (0.21225ms)
+✔ text, media and snapshot budgets remain visible even when the excerpt body is tiny (3.677042ms)
+✔ current and quoted forwards keep independent completeness instead of promoting either to complete (0.36375ms)
+✔ video/record/file 段渲染为占位符而不是空串 (0.561542ms)
+✔ 段数组纯视频消息的可见文本是 [视频] 占位符 (0.187166ms)
+✔ raw_message 兜底剥掉 CQ 码：纯视频不再被当成 397 字文本 (0.182125ms)
+✔ 无段数组时文字+视频混排只保留用户可见文字 (1.28075ms)
+✔ 超长判定端到端：纯视频不再误触，真实长文本仍命中 (1.566709ms)
+✔ 纯换行刷屏仍按原文行数触发超长（回归保护） (0.423167ms)
+✔ identity is normalized within one runtime and isolated between runtime instances (0.791375ms)
+✔ repeat registration refreshes providers without resetting active state or duplicating sweeps (0.220042ms)
+✔ eviction, deletion and reset dispose every owned timer (2.03425ms)
+✔ TTL sweep removes expired groups and an independent failed sweep does not block others (0.270542ms)
+✔ missing required runtime capability fails during composition (0.221416ms)
+✔ zero-valued timer handles are cancelled (0.079541ms)
+✔ 承诺终态失败:单条即 error 告警,样例带意图与群号 (0.655708ms)
+✔ 承诺失败多条:最多列 3 条样例,计数全量 (0.134292ms)
+✔ 无失败/空输入不告警;坏数据静默忽略 (0.430833ms)
+✔ 既有检查不回归:风格学习连环失败仍告警,formatAlerts 可读 (0.128833ms)
+✔ candidate core preserves all images, format retry and provider/model attempts (0.983333ms)
+✔ cancellation before request and during response prevents retries or false success (0.374291ms)
+✔ thrown errors and no candidates retain structured failure results (0.211125ms)
+✔ zero canvas dimensions are invalid for PNG, GIF and JPEG (3.751125ms)
+✔ truncated JPEG marker padding is rejected safely (0.283417ms)
+✔ invalid requested ratios and invalid returned dimensions cannot silently pass (1.548958ms)
+✔ provider candidates preserve extension fields and each receive their own ratio policy (1.336875ms)
+✔ image result extraction retains URI/base64 and rejects non-image prose (4.175375ms)
+✔ edit sources prefer current and recent sources require continuation (0.648041ms)
+✔ error classification and visible redaction preserve actionable status (1.752083ms)
+✔ multipart serializes native data with exact body length and rejects invalid input (29.959041ms)
+✔ multipart rejects malformed legacy method results at the boundary (0.195292ms)
+✔ external malformed root and provider list values do not become phantom channels (4.869708ms)
+✔ legacy execution capability omissions fail explicitly at boundary (1.0485ms)
+✔ multi-image generation uses count and validates each image before success (15.798875ms)
+✔ invalid candidate resource triggers next provider and preserves attempt evidence (0.869167ms)
+✔ image edit serializes references and Gemini chat path preserves native image result (0.954458ms)
+✔ external cancellation propagates without provider fallback (0.535167ms)
+✔ empty 204 response is classified as empty image rather than response construction failure (0.392958ms)
+✔ multipart reference conversion receives cancellation signal (0.483875ms)
+✔ Grok default single-image payload omits n while explicit multi-image keeps count (5.78475ms)
+✔ response body deadline fires without transport handles and releases its timer (81.646542ms)
+✔ successful response and external cancellation clear long response deadlines (77.872958ms)
+[KnowledgeSearcher] 跳过无效的 ndjson 第 3 行：Unexpected token 'o', "not-json" is not valid JSON
+✔ knowledge reader ignores malformed vectors and ranks finite matching records (13.269417ms)
+[KnowledgeExpander] 未找到知识库文件：/var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/knowledge-types-L0N9HF/db.ndjson
+[KnowledgeExpander] 正在写入 2 条知识到 /var/folders/b4/nnqfwk655mxft_1v4mq3mt740000gn/T/knowledge-types-L0N9HF/db.ndjson
+[KnowledgeExpander] 已新增 2 条，跳过 1 条
+[KnowledgeExpander] 所有知识都已存在
+✔ knowledge expansion deduplicates within request and persisted data (4.750333ms)
+✔ main turn consumes a matching Gate social handoff once and pins its persona through tone (57.454333ms)
+✔ main turn ignores a Gate social handoff belonging to another input, user, group or persona revision (6.215167ms)
+✔ main turn awaits the understanding update before composing tone from the same social context (1.136917ms)
+✔ empty forward collection does not invent an unread forward in ordinary chat (1.089ms)
+✔ source-checked diagnostic history keeps a short follow-up serious before tone composition (11.518458ms)
+✔ another member diagnostic report does not become the current speaker device state (5.899ms)
+✔ a positively framed device meme stays playful after diagnostic source resolution (2.78225ms)
+✔ enhanced memory preserves the original body, event clock and captured persona across the date boundary (1.054333ms)
+✔ enhanced memory uses received time only when the event has no usable source time (0.314ms)
+✔ group extraction excludes partial, unavailable and unknown forwarded history and preserves complete third-party provenance (3.565625ms)
+✔ receiving self_id does not turn an actual group user into the authoring bot (0.194041ms)
+✔ complete forward facts use the retained original segment rather than the clipped display summary (0.250709ms)
+✔ douyin enrichment collapses concurrent requests and preserves static failure backoff (36.771417ms)
+✔ browser JSON extraction terminates cycles and selects only a work gallery (1.794542ms)
+✔ torrent metadata parser rejects traversal and malformed integer payloads (1.886ms)
+✔ torrent listing fallback is restricted to preparation failures, never uncertain sends (0.849708ms)
+✔ torrent event decoder preserves bound private file capabilities and sender identity (0.277917ms)
+✔ group clearing requires permission and two confirmations from the same user (2.003166ms)
+✔ memory forward renders sections and never resends after transport rejection (0.823167ms)
+✔ clear confirmation cannot be reused across bot accounts (0.170166ms)
+✔ command business catch does not retry or relabel uncertain reply failure (0.899875ms)
+✔ transport timeout converts only its own deadline to friendly error (6.188583ms)
+✔ external cancellation reason and pre-aborted signal survive transport (0.745833ms)
+✔ successful transport preserves response and removes external abort listener (24.56675ms)
+✔ balance exhaustion and thrown authentication failures do not retry (0.915709ms)
+✔ cancelled retry operation preserves cancellation and stops retries (0.178333ms)
+✔ side channel transport preserves request fields and validates empty responses (23.685375ms)
+✔ pre-cancelled side channel requests never invoke transport (0.178875ms)
+✔ thinking removal and Unicode normalization preserve visible text (0.360666ms)
+✔ model deadline covers stalled body after immediate headers and preserves cancellation reason (23.540042ms)
+✔ named configs share repository atomic save, backup, update, delete and watcher lifecycle (64.5645ms)
+✔ every thinking command permits master or owner and rejects admin/member (0.423709ms)
+✔ separate processes merge concurrent thinking settings without losing groups (666.061542ms)
+✔ persona projection preserves provider settings and clears a newly loaded guard absent from the snapshot (0.663291ms)
+✔ banana progress generation and guard retain the captured persona while configuration changes (guard=true) (1.851375ms)
+✔ banana progress generation and guard retain the captured persona while configuration changes (guard=false) (0.342167ms)
+✔ analysis progress generation and guard retain the captured persona while configuration changes (guard=true) (0.285583ms)
+✔ analysis progress generation and guard retain the captured persona while configuration changes (guard=false) (0.548ms)
+✔ edit progress generation and guard retain the captured persona while configuration changes (guard=true) (1.073417ms)
+✔ edit progress generation and guard retain the captured persona while configuration changes (guard=false) (0.7145ms)
+✔ unguarded reply delivery pins persona and an absent guard before awaiting a claim (11.9665ms)
+✔ compiled runtime assembly shares store and replaces old lifecycle once (3.143209ms)
+✔ disabled runtime stops previous runtime without constructing services (0.181542ms)
+✔ failed start cleans created pipeline and admin report and registers unavailable state (1.250042ms)
+✔ assembly failure disposes allocated resources in reverse order (5.25325ms)
+✔ successful runtime dispose is idempotent and cleans all resources (0.278834ms)
+✔ discovery puts default first and deduplicates aliases without registering helpers (2.76325ms)
+✔ invalid host base and absent namespace produce no plugins (4.092292ms)
+✔ indirect subclasses are accepted but unrelated classes are excluded (2.434458ms)
+✔ provider protocol retries unsupported max_tokens once via injected fetch (1.215958ms)
+✔ malformed provider responses cannot masquerade as generated chat (0.150459ms)
+✔ diagnosis injects configuration, logging, time and network with throttle/cache expiry (0.441667ms)
+✔ memory fallback preserves shared map, NX and delete receipts (0.579625ms)
+✔ redis method receiver, options identity and raw receipts are preserved (0.13675ms)
+✔ partial redis clients fall back per capability and can be replaced live (0.636542ms)
+✔ compiled recent-message manager serializes concurrent writes and deduplicates events (9.940292ms)
+✔ sent messages persist a detached four-field persona source without snapshot configuration (0.934417ms)
+✔ group history retains distinct persona sources and leaves old messages without invented provenance (1.090833ms)
+✔ only complete sources belonging to the sent account are accepted from events or stored history (1.418292ms)
+✔ risk notice installation is idempotent and an old cleanup cannot detach a newer listener (27.322291ms)
+✔ BM25 removal decrements document frequency once despite repeated terms (0.659375ms)
+✔ malformed persisted memory is ignored and valid provenance survives reload (9.387ms)
+✔ episodic caches isolate equal group ids in different data roots (3.627208ms)
+✔ semantic runtime disable restores archive hook without accumulating wrappers (6.367375ms)
+✔ semantic and midterm hooks survive interleaved reinstall and detach exactly once (2.971417ms)
+✔ semantic command rejects non-owner before accessing runtime and reports unavailable to owner (1.905166ms)
+✔ semantic HTTP endpoint checks token and returns unavailable without runtime (2.280375ms)
+✔ request preserves existing query and headers, encodes false data and returns native buffers (24.061041ms)
+✔ request errors preserve original cause and never reference undefined ReplyError (0.620292ms)
+✔ late disconnect from closing browser does not clear replacement browser promise (10.018375ms)
+✔ single stream download writes bytes and rejects declared oversize payload (20.991958ms)
+✔ uninitialized registry fails memory access and exposes empty config (0.892666ms)
+✔ legacy adapter narrows manager capability and retains method receivers (0.235125ms)
+✔ reinitialization replaces capabilities, config stays live, and reset removes them (0.134625ms)
+✔ missing command capability fails composition without replacing the working registry (1.230208ms)
+✔ normalizeSimWakeConfig 归一与夹取 (1.4805ms)
+✔ ensureWakeable：触发器全关时重置默认，防永眠 (0.170875ms)
+✔ defaultSimRuntimeConfig 默认值与夹取 (0.527416ms)
+✔ 触发判定优先级：anyMessage > atMention > nameMention > keyword (0.286959ms)
+✔ 短关键词词边界：ADS 不误触 DS (0.211334ms)
+✔ 提问/关注群友/概率触发 (0.166375ms)
+✔ mergeWakeReason 只升不降 (0.101708ms)
+✔ messageReasonStillPending：定时器类无条件补，消息类查未读 (0.074875ms)
+✔ pushPendingReason 有界（≤20） (0.086792ms)
+✔ 水位协议：readThrough 只跨过给过模型的 seq (1.434042ms)
+✔ 水位协议：被淘汰的 seq 视为可跨过 (0.124333ms)
+✔ noteModelSeen 裁剪到未读窗口 (0.058583ms)
+✔ 时间视图：agoText 分档与 atClock 北京时间 (0.083208ms)
+✔ 唤醒快照：最早优先、预算截断、partial 提示续读 (0.222709ms)
+✔ wait 计划归一夹取 (0.075416ms)
+✔ wait 结果：reply 安静够久可回，未够给继续等的建议 (0.111417ms)
+✔ wait 结果：messages 未等到足量新消息按有效观察结算 (0.057667ms)
+✔ 唤醒预算：分钟/小时窗口与每日回合 (0.393208ms)
+✔ 发送配额：回合上限与每分钟频率 (0.181333ms)
+✔ 发送配额：小时级节流——13分钟13条式高频输出被拦（实拍识破事故） (0.295459ms)
+✔ 协议第1条：被问是不是机器人时顺着话头开玩笑，不尬聊不解释 (0.131542ms)
+✔ resetPreSleepWait 清空观察 (0.055416ms)
+✔ trimAgentHistory：条数与字符双上限，整条淘汰 (0.401042ms)
+✔ buildSimSystemPrompt：人设名与协议关键段 (1.048ms)
+✔ buildWakePrompt：包含快照/状态/唤醒原因 (0.814458ms)
+✔ 参数容错：JSON 字符串化数组与带引号字符串 (2.227083ms)
+✔ 默认会话：未引导 + 预设关键词注入 (0.228ms)
+✔ 记忆条目归一化：pendingEvent 必须有 dueAt，字段白名单 (0.468375ms)
+✔ 到期待跟进筛选与注入格式 (0.796333ms)
+✔ 容量淘汰：done 超3天/过期超一周先丢 (0.390417ms)
+✔ 好感度：夹取/日限额/等级/注入 (0.870167ms)
+✔ looksLikeToolArguments：识别工具参数形状 (0.147041ms)
+✔ 梗提取 prompt：转义标签 + 不可信语料声明 (0.144291ms)
+✔ 梗候选容错解析：整体失败时括号配平扫描，优先含对象的数组 (0.249875ms)
+✔ 梗合并：同形去重计数、新梗入库带出处 (0.164375ms)
+✔ 梗使用强化：发送文本含梗则热度+1 (0.090667ms)
+✔ 梗注入段：按热度排序 + 使用提示 (0.106667ms)
+✔ 容量淘汰：高热度梗比普通记事保值 (0.073667ms)
+✔ 价目：前缀匹配、缓存折价、未知模型估算标记 (3.390041ms)
+✔ normalizeUsage：兼容 OpenAI 字段与缓存明细 (0.765458ms)
+✔ 预算判定：金额维度 (0.265917ms)
+✔ continuation：窗口内对话对象不点名也醒，@别人/过期/陌生人不醒 (0.118625ms)
+✔ continuation 插话熔断：我上次发言后第三人插过话 → 不当延续唤醒；点名类不受影响 (0.059584ms)
+✔ buildSimSystemPrompt：人设反应模式/示例/黑名单进入人格层 (0.338375ms)
+✔ activeTopic：6 小时过期自动消失，注入段独立 (0.168458ms)
+✔ mineUserCatchphrases：挖到专属词、排除通用词、低频用户不建模 (1.230166ms)
+✔ 好感度四档量化：风格指引具体化 + 口头禅只给熟络以上 (0.21125ms)
+✔ 协议主题分块：回合节奏/分条自检/问号开场/表情策略完整版 (0.131709ms)
+✔ 引用解析入快照（B1）：非自引用带被引用人+原文 (0.084167ms)
+✔ renderForwardNodes：媒体标记化、内嵌转发可展开、不静默丢记录 (1.075458ms)
+✔ 私聊工具白名单：识图默认开放 (0.444958ms)
+✔ A1 boundedTimerDelay：clamp 到 [min, max]，非有限数兜底 (0.303583ms)
+✔ A2 isDuplicateMessageId：LRU 幂等，null 跳过 (0.252875ms)
+✔ A4 sanitizeUntrustedText：全角【】替换为⟨⟩ (0.087667ms)
+✔ A2 safeToolErrorText：上游错误不透传原文，按类型给固定文案 (0.432041ms)
+✔ profileCoversContent：档案已覆盖的事实判定（≥3字公共段才算，2字泛词不误杀） (2.464708ms)
+✔ buildPersonCards：同一人的关系+档案+本群记忆合成一张卡，档案已覆盖的记忆不重复 (0.590792ms)
+✔ buildPersonCards：同一人记忆溢出卡上限（2条）时，未展示条目回流【你记着的事】不丢失 (0.159916ms)
+✔ formatPersonProfile：facts 展示去重——短词优先，同事实长句不重复渲染 (0.142ms)
+✔ buildPersonCards：有好感表外档案的在场新人也入卡（默认无关系行） (0.207917ms)
+✔ interestMatchesTitle：兴趣与作品标题互认（芙莉莲⊂葬送的芙莉莲；2字泛词/3字以下英文不算） (0.551958ms)
+✔ formatLifeThreads：共同话题行追加，且行间用真换行（不再是字面 \n） (2.611333ms)
+✔ formatSelfMemorySection：只收未 done 的 note，按新到旧 (0.371708ms)
+✔ buildPersonCards：跨群关系近况行（好感理由全局汇聚） (0.127ms)
+✔ 档案新陈代谢：supersede 判定、剔除与提取补丁解析 (0.366583ms)
+✔ buildWakePrompt：自我沉淀段与长程召回段注入，协议 #30 指向 scope=self (0.101459ms)
+✔ buildWakePrompt：预算截断诚实提示——超长段落记名+未查全≠没有；召回未完成≠无结果 (0.146625ms)
+✔ mood：半衰期投影——joy 向基线 5 回归、负性轴向 1 回归，负值时间不外溢 (0.766625ms)
+✔ mood：有界更新——单轴夹 ±maxStep，回合锚点包络防连环推高，理由入档 (0.236583ms)
+✔ mood：底色注入——中性/未写过不注入；新鲜情绪无消退注；陈旧情绪带余韵措辞 (0.182833ms)
+✔ buildWakePrompt：情绪底色段在自我沉淀之后注入；协议 #31 随 hasMoodTool 门控 (0.105375ms)
+✔ defaultSimRuntimeConfig：mood 默认开、半衰期/步长夹取 (0.124375ms)
+✔ commitment 唤醒:timer 类无条件补发、直点类免限频、格式化带托付事由 (0.124ms)
+✔ buildWakePrompt 注入委托记忆段:在场优先、到期高亮、无条目不注入 (0.19925ms)
+✔ buildWakePrompt 承诺唤醒的行动指引:自然兑现、不汇报、失败直说 (0.054166ms)
+✔ confirmed social continuity persists to Redis and returns to the same persona next turn (10.895541ms)
+✔ the writer only persists excerpts present in delivered lastReply (1.594542ms)
+✔ Redis reader independently validates social fields and keeps legacy records readable (0.278333ms)
+✔ fallback loads also revalidate mutated output objects instead of trusting an in-process reference (0.167125ms)
+✔ excerpts tolerate actual whitespace normalization and Unicode without splitting delivered text (0.237916ms)
+✔ a sent three-turn object change keeps the current restriction rather than a rhetorical question (6.090875ms)
+✔ a concrete playful response ends an old invitation to explain the attention bid (1.121458ms)
+✔ third-party appraisal keeps the current request distinct from the quoted attention bid (16.658166ms)
+✔ literal attention, own verified speech and an unrelated request do not acquire an observed exchange (0.429333ms)
+✔ a three-turn quantity joke survives confirmed-send continuity and richer perception (5.622625ms)
+✔ a verified adjacent quantity change adds a local arithmetic cue without judging the reply joke (5.626583ms)
+✔ quantity cues abstain for proposals, uncertain ownership, changed objects and new personal experiences (1.094ms)
+✔ a confirmed attention response carries its stance into an explicit playful follow-up (0.410917ms)
+✔ changed quantities and specific answers can extend other verified jokes without relying on biscuit words (0.202917ms)
+✔ prior play cannot absorb a new task, correction, distress, unrelated topic or another persona (0.420417ms)
+✔ a new named entity or explicit withdrawal ends a previously verified bit (0.472ms)
+✔ style constraints do not erase an explicit current factual question (0.170459ms)
+✔ explicit quiet companionship keeps comfort through a sent reply and the next user turn (0.512042ms)
+✔ a model social hint cannot downgrade source-checked troubleshooting from prior user observations (22.18075ms)
+✔ source-checked fictional device danger can remain a joke without overriding a new factual request (9.133ms)
+✔ attention and praise questions share social mode across local, tone and generation (2.041792ms)
+✔ real fact questions remain precise with and without shared context (0.174625ms)
+✔ criticism is handled as a correction rather than a fact lecture or forced apology (0.122125ms)
+✔ model teasing cannot override explicit work, danger, criticism or delivery (1.028084ms)
+✔ model target interpretation cannot replace explicit addressing or quote attribution (0.28625ms)
+✔ a protected local act keeps the model-resolved target across the scoped Gate handoff (0.09475ms)
+✔ only grounded bit excerpts are accepted; model-authored pending questions and stance are discarded (0.186584ms)
+✔ invalid and low-confidence social hints leave the existing context intact (0.21575ms)
+✔ confirmed social continuity preserves a real bit, question and stance only in its bot and persona revision (2.132125ms)
+✔ perception enrichment preserves valid model interpretation and verified own speech without mutating the previous context (1.005625ms)
+✔ Gate piggybacks social on one existing request and uses the shared local tone before asking (30.932167ms)
+✔ Gate accepts legacy JSON and rejects corrupt or weak social without a second request (1.052125ms)
+✔ Gate refuses another person as addressee, while an explicit bot addressee still wins over the quote (1.611083ms)
+✔ intent classification returns validated optional social from the same HTTP JSON response (26.559833ms)
+✔ understanding keeps the four-section legacy brief and safely parses only its optional JSON social line (0.817791ms)
+✔ ambiguous chat reuses the actual understanding adapter and updates shared state before prompt composition (3.692709ms)
+✔ composer does not let quoted technical nouns or random mood override the shared social purpose (1.711208ms)
+✔ normalizeSimToolPolicy:默认 open,非法输入回落 (0.965958ms)
+✔ open 模式:内置安全工具默认全量放通,敏感工具默认禁 (0.474916ms)
+✔ open 模式:减法/按群减法/显式解禁/自定义追加 (0.417042ms)
+✔ open 模式:extraTools 恒为追加面(自定义工具显式放行,重复去重) (0.22725ms)
+✔ legacy 模式:维持 extraTools 白名单原行为,不受 deny/allow 影响 (0.141458ms)
+✔ RESTRICTED 清单内容锚定:花钱/管人/改身份/出机隐私/双轨 (0.10375ms)
+✔ task facts reject another bot, private context, requester, and stale snapshot (2.232625ms)
+✔ facts returned by an optional host must match the explicit request or receipt query (0.634542ms)
+✔ an available image and completed call do not imply delivery or a future task (0.464333ms)
+✔ a failed delivery prompt states the observed failure without inventing rejection or interception (0.141708ms)
+✔ a failed delivery does not establish whether a resend channel is available (0.4675ms)
+✔ a later user request permits synchronous work without guaranteeing a future resend (2.510791ms)
+✔ current callback facts cannot rewrite an unobserved history or assign a cancellation actor (0.273125ms)
+✔ missing records and registrations describe this lookup rather than system capability (0.080875ms)
+✔ a verified sent receipt remains delivery evidence rather than an unknown failure cause (0.174667ms)
+✔ a partial lookup preserves independently verified facts and names the remaining evidence gap (0.142292ms)
+✔ a reported sent state without an id stays unknown; old running state cannot authorize later delivery (0.08675ms)
+✔ only future registered reminders can support the corresponding reminder commitment (20.34325ms)
+✔ task existence, a usable result and a cancelled callback are projected as independent positive facts (0.321792ms)
+✔ an unknown callback remains unknown rather than being projected as an explicit cancellation (0.521834ms)
+✔ each request identifies its actual task type so a reminder queue cannot become an image job (0.523333ms)
+✔ six sanitized replay scenarios retain current words and their interaction boundaries (5.857291ms)
+✔ actual readable image evidence can explain a deictic reaction without changing its raw text (0.3095ms)
+✔ a changed duration remains new evidence rather than a copied joke (0.284125ms)
+✔ explicit seriousness wins over a bot quote and readable old joke (3.015166ms)
+✔ quoted words from another bot are evidence without becoming this bot's previous reply (1.909666ms)
+✔ only verified continuity from this bot supplies a previous stance (1.353208ms)
+✔ the previous stance belongs to this persona revision as well as this bot (0.4795ms)
+✔ a same-account quote with unknown or old persona provenance remains attributed evidence (0.761666ms)
+✔ a quote from a prior persona does not replace the current persona verified stance (0.369375ms)
+✔ unavailable media only removes that evidence, leaving readable conversation and a specific gap (0.46125ms)
+✔ explicit factual work remains serious when a joke is also requested (0.35525ms)
+✔ perception from distinct calls survives a later failure from the same tool (1.618ms)
+✔ perception without call identities appends instead of replacing prior same-tool evidence (0.175417ms)
+✔ readable results survive the evidence limit when a forward contains twenty-four image references (0.189833ms)
+✔ direct bot addressee wins over quoted and mentioned others without losing quote attribution (0.169875ms)
+✔ verified continuity confirms prior speech, not literal experiences or task progress (0.091292ms)
+✔ a normal new report sharing the same noun and quantity does not become this bot's old joke (1.886208ms)
+✔ matching bot and persona ownership is required even when the current words match the old quantity joke (0.561125ms)
+✔ a third-party appraisal followed by a direct attention bid keeps each speaker's judgments separate (0.162292ms)
+✔ fake clock at epoch zero: TTL boundary, activity refresh and object identity (0.875542ms)
+✔ capacity removes least active sessions, including numeric zero keys (0.120791ms)
+✔ shared legacy map identity, missing metadata and zero activity are preserved (0.090959ms)
+✔ refresh tools, clear and zero capacity operate on the shared map (0.129ms)
+✔ Uma persistence preserves training and personality fields and rejects corrupt players (1.080375ms)
+✔ Uma damaged points fail closed and failed writes do not poison subsequent writes (5.337583ms)
+✔ Redis utility update ignores missing and malformed object shapes (0.980458ms)
+✔ reports committed group knowledge even when the later chat request fails (1.653208ms)
+✔ formats member definitions and workflow targets from stored entries (0.429541ms)
+✔ 广告入库后持久化并可重新加载 (7.269791ms)
+✔ 空白差异的同一条广告判重不入库 (2.966167ms)
+✔ 过短内容拒绝入库，按编号可删除 (2.188208ms)
+✔ 达到上限时淘汰最旧样本 (1.743959ms)
+✔ 配置种子模板可导入样本库且幂等 (0.761667ms)
+✔ 自动入库的样本标记 source=auto 且可按原文定位删除 (0.737792ms)
+✔ adCorpusAutoCollect 默认开启且可显式关闭 (0.418625ms)
+✔ 入库后的样本参与判重：变体消息命中广告样本库规则 (1.812625ms)
+✔ findAdTemplateMatch 标注命中来源且种子模板仍可用 (0.155708ms)
+✔ compiled guoba authentication fails closed without a secret and isolates root cache (8.08125ms)
+✔ compiled admin command rejects non-master and malformed MCP arguments (0.421875ms)
+✔ compiled update notice is owner-only and explicitly requires build deployment (0.148333ms)
+✔ typed session factory preserves business fields through tool refresh and lifecycle sweep (2.4685ms)
+✔ YTapi preserves planner text and adaptively routes complex no-tool replies (83.853417ms)
+✔ YTapi falls back to the chat backend when an optional tools planner is unauthorized (26.815583ms)
+✔ YTapi uses the configured lightweight backend after tools and chat credentials both fail (10.847041ms)
+✔ YTapi falls back from a plain chat request when the configured chat backend is unauthorized (3.857333ms)
+✔ keeps recent continuity and older messages relevant to the current reference (9.306541ms)
+✔ always keeps the quoted message and its immediate neighbors (0.676667ms)
+✔ builds structured history without a fake assistant acknowledgement (0.942166ms)
+✔ uses a bounded history budget for independent short chat only (0.455417ms)
+✔ routes reference-heavy reasoning to the stronger backend but keeps greetings fast (1.688417ms)
+✔ accepts planner text directly and expands tool rounds only for complex work (0.342334ms)
+✔ selects the reasoning backend only for complex requests (0.173416ms)
+✔ uses per-tool result budgets instead of unlimited tool output (1.979625ms)
+✔ 回放#1 泳装星野事件（2026-09-12）：显式生图 + 不挂真人头像 + 失败直发事实文案 (8.062792ms)
+✔ 回放#2 画一个星野事件（2026-09-11）：句中无图字也必须路由生图，且不被降级为表情包闲聊 (2.927792ms)
+✔ 回放#3 归尘骂街事件（2026-09-11）：失败后下一轮必须注入失败标记，模型不得把抱怨当梗 (3.433416ms)
+✔ 回放#4 防误判边界：含画字的日常用语不得触发生图 (0.194292ms)
+✔ 回放#5 P4 主判定：模型判定必须给出与正则修复后一致的路由结论 (5.919709ms)
+✔ keeps system instructions and the current user turn for an agent follow-up (4.214916ms)
+✔ provides current and quoted context to delayed progress generation (0.579083ms)
+✔ failure instruction gives the agent facts without internal-status wording (0.471084ms)
+✔ plugin master switch treats false-like values as off (0.52675ms)
+✔ AI conversation host delegates to guarded compiled entries (227.369834ms)
+✔ compiled smart and repeat entry guards reject disabled hosts before using any downstream port (13.362208ms)
+✔ compiled proactive scheduling rejects disabled configuration before accessing anchor or queue (2.041916ms)
+✔ compiled chat turn rejects disabled configuration before downstream execution (9.068917ms)
+✔ classifyConfigKind: chat/embedding/image by config key (0.513166ms)
+✔ probeProvider chat: success reports model, tokens and latency (29.8995ms)
+✔ probeProvider chat: 401 surfaces the upstream message (14.132542ms)
+✔ probeProvider chat: max_tokens 400 retries once with max_completion_tokens (15.087208ms)
+✔ probeProvider embedding: reports vector dimensions (5.56075ms)
+✔ probeProvider image: probes /models without generating, notes model presence (6.79525ms)
+✔ probeProvider: timeout and missing fields produce clear failures (66.571459ms)
+✔ maskSecrets and summarizeProbes formatting (0.850125ms)
+✔ probeProviders caps the number of probes (0.5185ms)
+✔ base URLs are normalized the same way production resolves them (21.345ms)
+✔ chat 200 with empty reply and zero usage is reported as a broken channel (4.491958ms)
+✔ chat empty reply with real token usage stays ok (thinking-only small budget) (1.910167ms)
+✔ 宿主垫片与应用入口全部通过 node 语法检查(重复声明等低级错误在门禁拦下) (13889.143875ms)
+✔ at 段用名字渲染,无上下文时保持 QQ 号 (301.708125ms)
+✔ 回复段渲染为引用预览,查不到时带上下文则省略前缀 (0.364625ms)
+✔ 已携带真实媒体的段在文本中省略占位,无上下文时保留占位 (0.430083ms)
+✔ QQ 表情渲染为官方名字,未收录 id 用通用占位 (0.1505ms)
+✔ 通知按字段重新人话化,不再是 JSON 或裸操作符 (0.3585ms)
+✔ 消息表情回应通知从查询结果中隐藏 (33.521167ms)
+✔ findMessagePreviews 按 message_id 反查原消息生成引用预览 (10.705667ms)
+✔ 视频与结构化消息用中性占位,不再透出长 URL 或英文类型名 (0.272166ms)
+✔ raw_message 兜底路径同样应用名字解析与表情名 (0.328709ms)
+✔ CQ 图片码含实体括号的 summary 不再漏出 file/url 尾巴 (0.17425ms)
+✔ resolveMemberAvatarReferences: 被@成员合法指认保留,角色透传 (12.357458ms)
+✔ resolveMemberAvatarReferences: 幻觉 qq(未被提及)一律丢弃 (0.512417ms)
+✔ resolveMemberAvatarReferences: 候选含发送者与回复目标;无任何提及则空 (0.368625ms)
+✔ resolveMemberAvatarReferences: 重复指认与非法输入被吞掉 (0.328209ms)
+✔ assembleReferenceImages: 清单与数组同源派生,头像前有用户图时编号顺延 (0.534875ms)
+✔ assembleReferenceImages: compose 角色文本变化,纯头像时无用户图行 (0.133ms)
+✔ normalizeToolDecision: userImagesRole 校验透传,非法值回落 style (28.689708ms)
+✔ normalizeToolDecision: image_generate + 合法 references → params 携带 references (0.698125ms)
+✔ normalizeToolDecision: tool 路径选 bananaTool 时 references 同样注入 (0.61225ms)
+✔ normalizeToolDecision: references 全部非法时静默忽略,不影响画图意图 (0.453542ms)
+✔ 路由让路:显式生图但提及了成员 → 不抢快路,语义规划器获得决策权 (4.174542ms)
+✔ 路由让路:无提及时显式生图保持快路,规划器不被调用 (0.933916ms)
+✔ 能力声明: bananaTool 的 disclosure 进入主模型可见清单 (0.441708ms)
+✔ 能力声明: 触发词语义保持原样——banana 不因画图措辞成为候选,提及成员才放行规划器 (0.767417ms)
+✔ 回复自带的 @ 不再被当成指名入画:注解渲染为回复前缀并给出成员名 (0.434458ms)
+✔ extractEmbeddedToolCalls: 解析降级模型的文本型工具调用并给出剩余文本 (0.264542ms)
+✔ looksLikeCodeOrMarkdown: 中文规则式 markdown(粗体/行内码/列表)判为卡面 (1.867333ms)
+✔ 作品角色请求不挂真人头像参考 (1.763792ms)
+✔ 昵称是长名片段时不挂真人头像 (0.560916ms)
+✔ 明确指群友本人的画图请求仍可挂头像 (0.215167ms)
+✔ source checkout validates each call and rejects a source-only update (33.578792ms)
+✔ corrupted and missing compiled outputs stop startup (11.986667ms)
+✔ release checkout verifies listed runtime and ignores mutable local state (55.738917ms)
+✔ checkout without source or release manifest is rejected (10.989334ms)
+✔ manifest traversal and symlink outputs are rejected (11.576833ms)
+✔ new source file invalidates an otherwise matching build (15.053ms)
+✔ verified release takes precedence over retained stale source but rejects runtime tampering (20.488334ms)
+✔ extra stale generated output is rejected even when recorded hashes match (14.399166ms)
+✔ legacy wrappers expose identical compiled functions (4.012333ms)
+✔ compiled wrappers load under a host-shaped directory from another cwd; JS module formats remain loadable (6356.169041ms)
+✔ release includes dice command documents and emitted code resolves them inside the installed package (8194.4205ms)
+✔ backend manifest rejects corrupted output and stale source fingerprints (4086.700166ms)
+✔ release install removes only manifest-owned stale files and rollback restores runtime while preserving local state (11310.771292ms)
+✔ unsafe manifest paths and symbolic-link release contents are rejected (4000.3935ms)
+✔ install rejects a symlink parent without changing its external destination (2618.55975ms)
+✔ first manifestless install cleans stale generated files and rollback restores them (7457.762125ms)
+✔ phase two session and runtime wrappers execute compiled services (10.79275ms)
+✔ registered pure compatibility entries load the exact emitted exports (760.510041ms)
+✔ compiled memory factories compose without host globals or network (3.172167ms)
+✔ durable draw decoder rejects malformed records and filters reference images (1.7195ms)
+✔ compiled queue removes malformed persistent jobs without attempting provider calls (0.601875ms)
+✔ banana durable queue restores unfinished draw job after restart (111.064875ms)
+✔ recovered draw job notifies the original group when generation ultimately fails (5.473417ms)
+✔ queued draw notice quotes the active draw request (0.342583ms)
+✔ active text-to-image draw sends a local progress reply before generation (1.595125ms)
+✔ reference-image draw also sends a progress reply before image editing (0.817458ms)
+✔ member-avatar reference draw is described as new image generation, not viewing or editing a source image (0.390958ms)
+✔ member-avatar reference keeps the image input but reports generation semantics (0.259208ms)
+✔ draw work is marked active before durable persistence can yield (0.624791ms)
+✔ transport display cards are never shown as the queued requester name (0.332666ms)
+✔ draw completion aborts a pending contextual progress reply without blocking the image (6.361541ms)
+✔ reference-image draw retries a second edit provider and then sends the image (34.17875ms)
+✔ explicit Grok request overrides a higher-priority text-to-image provider (1.493375ms)
+✔ Grok image generation payload mirrors the Krill tutorial contract (0.546125ms)
+✔ ordinary image providers keep the existing n and response_format fields (0.129416ms)
+✔ explicit edit provider only passes the matching channel to image editing (2.147584ms)
+✔ generation-only named provider is not silently replaced during image editing (1.139ms)
+✔ queued image failure message never asks the user to change wording for provider 503 (1.122833ms)
+✔ progress reply failures are logged instead of being swallowed (0.275417ms)
+✔ image response body timeout is bounded after headers arrive (26.540125ms)
+图片生成失败 Error: 图片接口超过 1 秒没有返回完整响应
+    at Object.timedFetch (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/dist/backend/modules/image/application/imageService.js:49:23)
+    at async SlowBodyTool.generateImage (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/bananaDurableQueue.test.js:661:22)
+    at async SlowBodyTool.performDraw (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/dist/backend/modules/toolSupport/infrastructure/BananaTool.js:581:40)
+    at async SlowBodyTool.runDrawJob (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/dist/backend/modules/toolSupport/infrastructure/BananaTool.js:152:28)
+    at async TestContext.<anonymous> (file:///Users/shiqi/IdeaProjects/bl-chat-plugin/tests/bananaDurableQueue.test.js:687:20)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:787:7)
+✔ response-body timeout clears the durable draw job and active queue state (26.246584ms)
+✔ real BananaTool entry executes compiled image service with only host modules stubbed (261.662417ms)
+✔ detectAttentionHook:新词+爆发命中,旧词/单次提及不命中 (3.819708ms)
+✔ formatAttentionHint:三档措辞与空钩子 (24.969792ms)
+✔ resolveForgetTarget:无缓存/原始 id/空参三路径 (10.214208ms)
+✔ 纠错闭环集成:查询带序号与提示 → 忘记 第N条 → 越界报错 (11.424ms)
+✔ resolveTalkValue:按群覆盖兼容数组(锅巴表单)与对象(手写 yaml)两种形态 (5.810209ms)
+✔ archive query attaches cover and only downloads video body at or below 30 minutes (53.717625ms)
+✔ archive query restores structured forward nodes and keeps old flattened records as text (8.2705ms)
+✔ B站二维码未扫码状态保持等待，只有过期码结束会话 (0.712125ms)
+✔ B站二维码成功后仅保存最小授权 Cookie 且权限模式正确 (1.144541ms)
+✔ Bilibili 10s card reaches the current archive and relay pipeline exactly once (11.88825ms)
+✔ Bilibili 1801s card reaches the current archive and relay pipeline exactly once (11.955959ms)
+✔ merged-forward video nodes inline a local MP4 as base64 (8.700125ms)
+✔ merged-forward video nodes can stage a local MP4 into a configured container share (1.765042ms)
+✔ 短视频搬运下载为本地文件并返回视频段 (12.529334ms)
+✔ concurrent groups reuse one Bilibili MP4 download while keeping separate relay results (14.757625ms)
+✔ Bangumi relay labels a preview clip without exposing an upstream URL (2.902459ms)
+✔ explicit high-quality relay forwards authorization only to playback and media download (6.397ms)
+✔ automatic relay retries with the authorized account only after B站 returns a preview (13.195209ms)
+✔ ordinary automatic relay never includes an authorization cookie (1.429875ms)
+✔ parses a QQ miniapp Bilibili card without losing title, cover or short url (1.629375ms)
+✔ recovers a Bilibili card from encoded raw CQ JSON when normalized segment data is missing (0.450625ms)
+✔ recognizes a b23.tv link sent as plain text (0.480916ms)
+✔ keeps direct Bilibili video links alongside short links (6.628709ms)
+✔ resolves short url and enriches stable Bilibili metadata (3.246875ms)
+✔ keeps card metadata when Bilibili network enrichment fails (0.41025ms)
+✔ resolves a redirected Bangumi card into a playable episode (0.765ms)
+✔ renders searchable chat history with video and cover links (665.901542ms)
+✔ attaches video body only when total duration is at most 30 minutes (0.983958ms)
+✔ resolves temporary playback resources for short videos without persisting them (1.230083ms)
+✔ authorized playback sends the requested qn and reports the actual downgraded quality (0.341959ms)
+✔ resolves Bangumi playback resources from the documented result.durl response (0.213708ms)
+✔ keeps a concrete Bangumi playback restriction reason separate from resources (0.17325ms)
+✔ returns a Bangumi preview clip with an explicit preview marker (0.134125ms)
+✔ 机房 412 风控:先取 buvid 指纹 cookie 再请求元数据接口 (1.2315ms)
+✔ 单 bot:一切放行 (0.777167ms)
+✔ 私聊:收到事件的 bot 自己负责 (0.079542ms)
+✔ @优先:@了谁谁负责,@别人则让位 (0.0805ms)
+✔ 无@时按(群+bot列表)稳定选主:每群恒定,且恰好一个 bot 负责 (0.451541ms)
+✔ 未登记账号保守放行(刚上线心跳未同步) (0.081334ms)
+✔ 兄弟判定:在线列表里的其他 bot 是兄弟,自己/陌生人不是 (51.302084ms)
+✔ 心跳后选主仍恒定 (0.620875ms)
+✔ half-width parens and semicolons no longer count as code signals (1.294916ms)
+✔ knowledge cards require substance in the actual output (0.12675ms)
+✔ short knowledge questions no longer promise a card (0.612958ms)
+✔ rhythm wiring consumes up to three planned messages (1.277792ms)
+✔ import and help perform no evidence reads, network requests or output writes (72.782291ms)
+✔ CLI rejects unknown, duplicate and missing arguments before creating output (0.373083ms)
+✔ complete scripted evidence passes engineering only and every sample starts with pending review (6.495333ms)
+✔ empty, incomplete, missing, duplicate and unexpected events never count as accepted evidence (2.557834ms)
+✔ saved optimistic summaries and forged behavior values are independently rejected (0.9095ms)
+✔ current tool reply coverage is independently recomputed and remains mandatory without a metadata label (5.55525ms)
+✔ tool evidence rejects reused ids across events and mismatched tool ownership (2.241833ms)
+✔ acceptance independently attributes finish completion to its successful current reply (0.765ms)
+✔ skipped dependency evidence has no behavior observations and still blocks acceptance (2.117917ms)
+✔ historical missing failure observations and skipped-summary inconsistencies remain detectable (0.4105ms)
+✔ per-sample continuity, event ordering, clock and captured send scope stay consistent (0.955875ms)
+✔ manifest and event fingerprints, expectations and old assessments cannot silently change (1.419375ms)
+✔ live mode needs successful HTTP evidence rather than a metadata label (0.342583ms)
+✔ current assessments require run identity, activity conditions and complete snapshots even for skipped events (1.685208ms)
+✔ reflection evidence must correspond one-to-one with successful or failed reflection calls (1.240666ms)
+✔ consistency evidence is independently matched and cannot masquerade as tool execution (1.063208ms)
+✔ historical v4 reports remain inspectable without inventing consistency evidence (0.499417ms)
+✔ captured tool results require an exact content hash and a recorded invocation stage (0.591125ms)
+✔ captured model errors fail engineering even when event status and summary appear successful (0.163917ms)
+✔ comparison requires independent live evidence with matching scenario, person, runner and conditions (2.674291ms)
+✔ changed fixture clock, background setup and worker outcomes invalidate old comparison conditions (0.257375ms)
+✔ review is tied to exact candidate bytes and requires all distinct samples, named reviewers and reasons (0.399167ms)
+✔ even accepted human review cannot turn scripted mode or engineering errors into live acceptance (8.050041ms)
+✔ a fully reviewed comparable live pair still cannot satisfy actual-group or deployment evidence (4.940375ms)
+✔ existing outputs and mismatched review files are preserved without partial new output (4.100708ms)
+✔ 旧会话在无机器人独立控制台保留群视图，拒绝空范围管理，收到真实消息后才绑定角色 (10.413791ms)
+✔ 后台收尾写入等待期间的新消息保持序号与未读，点名触发在收尾后正常唤醒 (2133.07475ms)
+✔ 作品与订阅经模型工具持久化，订阅更新自主唤醒且去重，不借用群友身份 (5382.51125ms)
+✔ 订阅更新自主回合的自然语言收尾不触发催发或兜底发送 (2020.158458ms)
+✔ 后台反思阻止重置和巡检重入，保留新消息，暂停后丢弃迟到结果且不发送 (26.106209ms)
+✔ 共享只投影已批自我偏好；模型等待时撤销会拦截迟到发送并防止旧历史复活 (1044.767209ms)
+✔ 独立控制台删除作品会撤销机器人迟到发送，撤销版本不被旧会话覆盖且旧历史不复活 (3059.220083ms)
+✔ 独立控制台删除记忆不回写旧会话，机器人迟到正文与后续旧历史均被撤销 (2046.40175ms)
+✔ 工作器短作品正文对模型完整可见，任务要求不能冒充实际产物 (1017.214708ms)
+✔ 工作器成功的完整万字产物自动保存，模型收到有界预览并能分页续读；缺少状态回执不能伪造成功 (2025.280958ms)
+✔ 工作器回执按转义后的整个 JSON 计预算，极端 summary/title/正文仍可解析且完整保存 (1006.574625ms)
+✔ 目标回合的工作器结果未知会暂停目标，后续巡检不自动重复提交 (2115.643125ms)
+✔ 审查只读地传递候选和证据，数据中的指令留在 user 数据段且不提供工具 (2.375417ms)
+✔ 不会用本地关键词代替语义结论，也不会自动补写中文或英文计划、观点 (0.487209ms)
+✔ 所有五种语义拒绝保持原结论，不把拒绝原因转换成状态或替换消息 (0.390375ms)
+✔ 无效、越权、截断或带工具的模型响应一律拒绝，仍记录实际 usage (1.331209ms)
+✔ 失败占用审查预算，达到上限后不再调用模型，报告预算而不是伪造语义结论 (0.311208ms)
+✔ 并发审查在等待前占用预算，不能超额请求 (0.123875ms)
+✔ 超时会取消真实请求，即使上游忽略取消也及时返回，迟到响应不能放行 (20.969792ms)
+✔ 审查记录回调失败不能改变已获得的审查结论或触发重试，stats 返回快照 (0.258ms)
+✔ 证据太大或不可序列化时拒绝而不截断，坏参数不能产生无限预算 (0.54425ms)
+✔ consistency replay import and help have no configuration, network or output side effects (63.328167ms)
+✔ known-case thresholds preserve misses, wrong reasons, errors and incomplete observations (1.351ms)
+✔ known-case replay retains bounded malformed model output and does not export hidden reasoning (1507.879541ms)
+✔ 真实无机器人控制台读取旧会话返回待绑定且不创建角色范围 (42.495709ms)
+✔ character console actions require authentication and validate their target before dispatch (45.764666ms)
+✔ older simulation runtimes fail character controls explicitly without resetting a group (3.127375ms)
+✔ activity controls authenticate and strictly validate operation, id and restore payload (62.175833ms)
+✔ older runtimes reject activity controls without group reset fallback (5.675291ms)
+✔ 同回合收尾去重使用完整正文，百字后不同的消息仍各发送一次 (1042.975833ms)
+✔ 收尾全部为本回合已发送正文时可零发送完成，并明确去重数量 (1009.759375ms)
+✔ 批次剩余额度不足时整批拒绝，不先发送可容纳的前半段 (1009.276375ms)
+✔ 整批预检出站清理失败时零发送，不能先发送正常的第一条 (1007.892917ms)
+✔ 真实传输第二条失败保留首条发送计数和落盘证据，不自动重发 (1420.401958ms)
+✔ 首条传输已提交但回执丢失记为 unknown，同批和后续收尾均不得重发 (1025.063875ms)
+✔ 额外工具的纯文本 e.reply 与收尾共用本回合确认正文，不能重复发送 (1018.852041ms)
+✔ 额外工具带引用和提及的混合正文只去重文本，保留实际发送段结构 (1025.322833ms)
+✔ reflection waits six hours, consumes inputs once, and cannot sustain itself on its own output (7.31425ms)
+✔ two per day cap survives reset and resets only on a later UTC day (2.106ms)
+✔ empty material and paused characters never reserve or call a model (0.461667ms)
+✔ model or reservation failure is accounted and cannot immediately retry (1.2235ms)
+✔ reflection rejects authority fields and never applies partial updates (0.48925ms)
+✔ concurrent source deletion or any revision change invalidates model output (5.9555ms)
+✔ corrupt reflection state fails without replacing the persisted value (0.876917ms)
+✔ consistency rejection runs after draft validation and writes no reflected state (3.425375ms)
+✔ legal interest-only and empty reflection candidates can pass review without creating opinions (3.299791ms)
+✔ revision changes or source deletion during consistency review reject the stale draft (2.471375ms)
+✔ revocation after consistency review prevents commit and invalid drafts never spend review calls (1.254833ms)
+✔ import and help do not read private configuration, call a model, or create evidence (76.68475ms)
+✔ CLI budgets are bounded integers and unknown, duplicate, or valueless options fail (1.234125ms)
+✔ scenario validation rejects unusable events before replay starts (0.506166ms)
+✔ scenario expectations and offline calls fail closed on misspelled or malformed fields (0.456541ms)
+✔ fixture scheduling options are explicit, kind-bound and cannot conflict with time advances (0.195209ms)
+✔ goal clock planning only selects existing eligible goals and never rewrites their deadlines (0.288375ms)
+✔ background setup records competing wakes and only changes synthetic schedule fields (0.238625ms)
+✔ an early worker submission uses the scenario outcome and remains a behavior miss (4017.671958ms)
+✔ goal checks advance to a model-created due time without expiring its 24 hour deadline (3278.970708ms)
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterReplayRunner.test.js (25172.912042ms)
+✔ 回执保留最近64条普通审计，旧的256条上限不会永久阻断发送 (8.828792ms)
+✔ 超出近期窗口的成功来源、未知来源与在途回执都受保护 (0.808291ms)
+✔ 旧终态目标及其仅审计回执一起淘汰，不因相互引用永久保留 (2.070083ms)
+✔ 记忆或活跃目标引用的旧回执会保留原目标及来源闭包 (0.675209ms)
+✔ 不能删掉被supersedes或派生记忆引用的旧记忆及真实来源 (0.726917ms)
+✔ 满128条记忆只拒绝新增记忆，普通发消息仍能登记和完成回执 (8.057333ms)
+✔ 超过旧256阈值的证据保护回执不丢失，并继续留有发送空间 (551.929709ms)
+✔ 损坏、悬空来源与越界容量必须拒绝，不能通过compact静默洗掉 (5.190709ms)
+✔ 当前请求给出动态阶段、剩余轮数和可见来源，普通聊天不会自动创建角色状态 (1026.644125ms)
+✔ finish 的目标和记忆在发送 adapter 前已落盘，发送标读后按真实 call id 保存收尾结果并停止 (1027.629125ms)
+✔ finish complete 先保存终态再公告一次，同一 batch 后续工具全部不执行且保留协议响应 (1020.618708ms)
+✔ 非法 complete、越界 throughSeq 和存储失败都不发送或标读，也不写入部分记忆目标 (3064.725917ms)
+✔ finish 参数或存储失败后锁定收尾，连续普通最终文本和同批或后续显式发送都不能绕过 (4034.297375ms)
+✔ finish 发送失败保留已保存计划和记忆，不回滚、不重试、不再调用模型 (1023.730667ms)
+✔ finish 提交后目标被取消、人设切换或源记忆删除时不能公告或标读，旧状态不能复活 (3056.424041ms)
+✔ 聚焦目标在收尾公告登记后到期，旧 permit 不能发送最终消息或标读 (1006.482666ms)
+✔ 超长合法记忆和目标的 finish 回执压缩为可核对哈希，仍保留完整 JSON 和发送标读状态 (1008.239042ms)
+✔ finish 提交合法 throughSeq 时只标读已展示消息，模型请求期间的新入站继续保持未读 (1023.568292ms)
+✔ 最后两轮只暴露 finish 并强制 required，provider 忽视工具限制也不能执行其他动作或兜底发送 (1018.56675ms)
+✔ 被 @ 回合工具主体来自 reason.seq，不借用第一条未读群友身份 (1016.808333ms)
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterRuntime.test.js (20457.227375ms)
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterSharedSelf.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterStore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterSubscriptions.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterTools.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterTurn.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterWorker.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterWorkerGateway.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterWorkspace.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatCompletionUrl.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatFailureDiagnosis.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatFailureReply.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatMessageConfigReload.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatRequestRecovery.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatTurnCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatTurnDurability.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/cocRuleSealdiceCompat.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandGate.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandRegistry.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandsGuobaAuth.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandsWebApp.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandsWebAppCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commitmentCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/configRepository.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/configStoreCore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleConversationConfig.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleFrontendStatic.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleImageRegression.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleObserveQzoneCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consolePolicyConfig.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleProviderCredentials.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleRuntimeRead.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleSchemaConfig.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleServerIntegration.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/contentFoundationCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/contextualProgressReply.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationArtifactAdapters.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationHistoryCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationQualityReplayRunner.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationRoutingRegression.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/danglingReferences.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deckManager.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/delegateMemoryCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceClient.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceCoreCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceIntent.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceObjectCache.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceTimezone.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceAppCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceCommandPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceCoreCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceExtensionCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceManagerCore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceReplyCatalog.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceRuleExpression.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceRulePackManager.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceSealExtras.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinAutoRelay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinMediaRelay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinMessage.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinNoteImages.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/drawIntentRouting.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/editReferencePipeline.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiAdminRemove.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiCooldown.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiDualReview.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiFamiliarity.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiProactiveRouting.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiRuntimeCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiSchemaRefresh.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiSelection.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiToolPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/episodicMemory.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/excelRequestPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/excelWorkbook.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/expressionLearnerRhythm.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/finalReplyBehavior.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forbiddenWordGuard.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forgetGroupKnowledgeTool.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forwardBatches.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forwardTree.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/gameOccupiedGate.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/githubToolCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStylePersistence.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStyleSemanticRecall.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStyleSequence.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStyleSummary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/googleAnalysisCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/googleImageEditCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminConsole.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminPage.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupContextResolver.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupContextState.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupGuardQuestion.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupModerationManager.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupModerationOverlong.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupNames.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/guobaAiProviderConfig.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/guobaJumpLink.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/guobaProviderRoundtrip.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostConfigCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostEventCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostGroupContextCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostMessageCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostModelResponseCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostSharedStateCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageAnalysisProgress.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageAspectRatio.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEditDurableRecovery.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEditEmptyRetryPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEditProgress.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEndpointRouting.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageGenerationFallback.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageIntentPriority.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imagePromptAddress.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imagePromptContextPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageProviderTrust.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageRequestGuard.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageResult.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/importContract.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/intentFastPath.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/intentShadow.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/interactionReplay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/internalStatusLeak.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/knowledgeImportScript.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/localToolRegistryCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/longTaskFeedbackPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/magnetSearchClient.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mcpClientCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaArtifactStore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaOutbox.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaRelayAdminReport.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaRuntimeCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaTypePolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memberMemoryBoundary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/aliasRegistry.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/boundary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/conflictResolver.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/constants.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/crossBotHeardFrom.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/embeddings.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/entityModel.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/extractionQueue.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/extractor.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/extractorLlm.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/groupKnowledge.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/groupWorkflow.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/helpers/fakeRedis.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/manager.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/mentionResolver.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/redisStore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/reflector.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/retriever.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/stats.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/wipeLegacy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memoryApplicationBoundary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memorySelfCorrection.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionAdminsTool.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionFailureReply.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionMembersTool.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionRoleRouting.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionTargets.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageArchiveTyped.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageCacheTtl.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageContext.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageDelivery.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageFormattingBehavior.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageFormattingBoundaryCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageIntentCore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messagePipeline.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messagePipelineCore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageRecallArchive.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageStats.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageStorageIdempotence.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/midtermMemory.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/migrationTooling.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modelExecution.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modelGateway.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modelIntentClassifier.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modrinthTool.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/multipartFormData.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/musicShareDelivery.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/musicShareRelay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/narrativeReply.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/obsLog.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/observeIdentityNames.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/operatorScripts.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/outboundArbiter.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/outboundThrottle.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/outputGuardPipeline.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/parallelDownload.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personProfile.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaFeedbackManager.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaLibrary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaMoods.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaOutputAdapters.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaPromptCharacterization.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaReplay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaSnapshot.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaTonePolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivCompiledBoundaries.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivIntent.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivMessage.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivSearch.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pluginExportLoader.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pluginUpdateBuild.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/privateChat.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/proactiveReplyFreshness.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/progressReplyBudget.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptCompiler.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptContextBoundaryCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptLayerCache.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptLayers.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqActionsCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqApiBoundary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqCodeFenceText.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqMemberToolsCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/reasoningEffort.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/recentImageContinuation.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/reliableImageSender.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/reminderCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/renderingRuntimeCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replyDeliveryUncertainty.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replyExecutionRoute.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replyRhythm.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replySanitizer.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/riskCensorSignals.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/routeDecision.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sealExtRuntime.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sealSemanticRegression.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sealdiceContract.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/searchMusicCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/searchProgress.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/semanticMemory.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/semanticMemoryEvolution.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/semanticToolPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sendLocalEmojiReplyMode.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sendPacing.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sendvideosStaging.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sessionContinuity.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sideLLMUrl.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simIngest.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simPromptGuidance.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simSessionConcurrency.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simSilentDeclaration.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simWakeBudget.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/singleFlightResolver.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/smartLockPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/smartReplyLogText.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/solutionExplanationStyle.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/styleLearningP2.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/styleRefusalBoundary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/systemContentSource.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/systemPromptTemplate.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/taskActionFactsCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/taskBackendEffort.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/textImageDocument.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/textImageMarkdownHeadings.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/textImageMath.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/thinkingForward.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/thinkingForwardSettings.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/tokenLedger.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolActionPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolAssemblyCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolContinuationPolicy.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolDecisionBoundary.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolExecutionCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolExposureEvalCore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolGroundingDirect.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolHistoryRetrieval.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolIntentFilterSmoke.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolIntentManifests.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolManifestRegistry.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolResultGrounding.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolSkills.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolSupportCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/torrentDownload.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/triggerUnification.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnDiagnostics.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnPlan.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnPromptComposer.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnSession.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnTraceArchive.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnTraceReport.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupConsole.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupGenerator.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupManager.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupModelCall.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupModelHost.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupRules.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupSimilarity.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupStore.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/umaPresentationCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/umaRaceBalance.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/undefinedIdentifiers.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/understandingBrief.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/unicodeText.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/videoGroupContext.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/videoThumbnail.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/videoToolsCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/visibleFailure.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/voiceSystem.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/voiceToolCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/webSearchCompiled.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/xiaohongshuAutoRelay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/xiaohongshuMediaRelay.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/xiaohongshuMessage.test.js
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/youtubeMessage.test.js
+ℹ tests 1220
+ℹ suites 0
+ℹ pass 908
+ℹ fail 0
+ℹ cancelled 312
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78835.253625
+
+✖ failing tests:
+
+test at tests/characterReplayRunner.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterReplayRunner.test.js (25172.912042ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterRuntime.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterRuntime.test.js (20457.227375ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterSharedSelf.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterSharedSelf.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterStore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterStore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterSubscriptions.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterSubscriptions.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterTools.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterTools.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterTurn.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterTurn.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterWorker.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterWorker.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterWorkerGateway.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterWorkerGateway.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/characterWorkspace.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/characterWorkspace.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatCompletionUrl.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatCompletionUrl.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatFailureDiagnosis.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatFailureDiagnosis.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatFailureReply.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatFailureReply.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatMessageConfigReload.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatMessageConfigReload.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatRequestRecovery.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatRequestRecovery.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatTurnCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatTurnCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/chatTurnDurability.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/chatTurnDurability.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/cocRuleSealdiceCompat.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/cocRuleSealdiceCompat.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/commandGate.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandGate.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/commandRegistry.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandRegistry.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/commandsGuobaAuth.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandsGuobaAuth.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/commandsWebApp.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandsWebApp.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/commandsWebAppCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commandsWebAppCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/commitmentCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/commitmentCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/configRepository.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/configRepository.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/configStoreCore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/configStoreCore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleConversationConfig.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleConversationConfig.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleFrontendStatic.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleFrontendStatic.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleImageRegression.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleImageRegression.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleObserveQzoneCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleObserveQzoneCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consolePolicyConfig.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consolePolicyConfig.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleProviderCredentials.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleProviderCredentials.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleRuntimeRead.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleRuntimeRead.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleSchemaConfig.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleSchemaConfig.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/consoleServerIntegration.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/consoleServerIntegration.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/contentFoundationCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/contentFoundationCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/contextualProgressReply.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/contextualProgressReply.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/conversationArtifactAdapters.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationArtifactAdapters.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/conversationHistoryCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationHistoryCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/conversationQualityReplayRunner.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationQualityReplayRunner.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/conversationRoutingRegression.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/conversationRoutingRegression.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/danglingReferences.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/danglingReferences.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deckManager.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deckManager.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/delegateMemoryCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/delegateMemoryCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deltaForceClient.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceClient.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deltaForceCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deltaForceCoreCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceCoreCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deltaForceIntent.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceIntent.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deltaForceObjectCache.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceObjectCache.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/deltaForceTimezone.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/deltaForceTimezone.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceAppCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceAppCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceCommandPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceCommandPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceCoreCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceCoreCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceExtensionCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceExtensionCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceManagerCore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceManagerCore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceReplyCatalog.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceReplyCatalog.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceRuleExpression.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceRuleExpression.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceRulePackManager.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceRulePackManager.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/diceSealExtras.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/diceSealExtras.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/douyinAutoRelay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinAutoRelay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/douyinMediaRelay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinMediaRelay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/douyinMessage.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinMessage.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/douyinNoteImages.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/douyinNoteImages.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/drawIntentRouting.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/drawIntentRouting.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/editReferencePipeline.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/editReferencePipeline.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiAdminRemove.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiAdminRemove.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiCooldown.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiCooldown.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiDualReview.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiDualReview.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiFamiliarity.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiFamiliarity.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiProactiveRouting.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiProactiveRouting.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiRuntimeCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiRuntimeCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiSchemaRefresh.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiSchemaRefresh.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiSelection.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiSelection.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/emojiToolPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/emojiToolPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/episodicMemory.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/episodicMemory.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/excelRequestPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/excelRequestPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/excelWorkbook.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/excelWorkbook.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/expressionLearnerRhythm.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/expressionLearnerRhythm.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/finalReplyBehavior.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/finalReplyBehavior.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/forbiddenWordGuard.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forbiddenWordGuard.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/forgetGroupKnowledgeTool.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forgetGroupKnowledgeTool.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/forwardBatches.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forwardBatches.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/forwardTree.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/forwardTree.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/gameOccupiedGate.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/gameOccupiedGate.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/githubToolCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/githubToolCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/globalStylePersistence.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStylePersistence.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/globalStyleSemanticRecall.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStyleSemanticRecall.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/globalStyleSequence.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStyleSequence.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/globalStyleSummary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/globalStyleSummary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/googleAnalysisCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/googleAnalysisCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/googleImageEditCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/googleImageEditCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupAdminCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupAdminConsole.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminConsole.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupAdminPage.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminPage.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupAdminPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupAdminPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupContextResolver.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupContextResolver.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupContextState.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupContextState.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupGuardQuestion.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupGuardQuestion.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupModerationManager.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupModerationManager.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupModerationOverlong.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupModerationOverlong.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/groupNames.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/groupNames.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/guobaAiProviderConfig.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/guobaAiProviderConfig.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/guobaJumpLink.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/guobaJumpLink.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/guobaProviderRoundtrip.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/guobaProviderRoundtrip.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/hostConfigCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostConfigCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/hostEventCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostEventCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/hostGroupContextCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostGroupContextCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/hostMessageCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostMessageCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/hostModelResponseCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostModelResponseCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/hostSharedStateCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/hostSharedStateCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageAnalysisProgress.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageAnalysisProgress.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageAspectRatio.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageAspectRatio.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageEditDurableRecovery.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEditDurableRecovery.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageEditEmptyRetryPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEditEmptyRetryPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageEditProgress.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEditProgress.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageEndpointRouting.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageEndpointRouting.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageGenerationFallback.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageGenerationFallback.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageIntentPriority.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageIntentPriority.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imagePromptAddress.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imagePromptAddress.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imagePromptContextPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imagePromptContextPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageProviderTrust.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageProviderTrust.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageRequestGuard.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageRequestGuard.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/imageResult.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/imageResult.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/importContract.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/importContract.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/intentFastPath.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/intentFastPath.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/intentShadow.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/intentShadow.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/interactionReplay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/interactionReplay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/internalStatusLeak.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/internalStatusLeak.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/knowledgeImportScript.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/knowledgeImportScript.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/localToolRegistryCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/localToolRegistryCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/longTaskFeedbackPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/longTaskFeedbackPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/magnetSearchClient.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/magnetSearchClient.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mcpClientCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mcpClientCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mediaArtifactStore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaArtifactStore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mediaOutbox.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaOutbox.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mediaRelayAdminReport.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaRelayAdminReport.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mediaRuntimeCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaRuntimeCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mediaTypePolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mediaTypePolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memberMemoryBoundary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memberMemoryBoundary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/aliasRegistry.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/aliasRegistry.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/boundary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/boundary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/conflictResolver.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/conflictResolver.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/constants.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/constants.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/crossBotHeardFrom.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/crossBotHeardFrom.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/embeddings.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/embeddings.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/entityModel.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/entityModel.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/extractionQueue.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/extractionQueue.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/extractor.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/extractor.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/extractorLlm.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/extractorLlm.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/groupKnowledge.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/groupKnowledge.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/groupWorkflow.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/groupWorkflow.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/helpers/fakeRedis.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/helpers/fakeRedis.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/manager.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/manager.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/mentionResolver.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/mentionResolver.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/redisStore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/redisStore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/reflector.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/reflector.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/retriever.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/retriever.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/stats.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/stats.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memory/wipeLegacy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memory/wipeLegacy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memoryApplicationBoundary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memoryApplicationBoundary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/memorySelfCorrection.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/memorySelfCorrection.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mentionAdminsTool.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionAdminsTool.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mentionFailureReply.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionFailureReply.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mentionMembersTool.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionMembersTool.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mentionRoleRouting.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionRoleRouting.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/mentionTargets.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/mentionTargets.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageArchiveTyped.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageArchiveTyped.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageCacheTtl.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageCacheTtl.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageContext.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageContext.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageDelivery.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageDelivery.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageFormattingBehavior.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageFormattingBehavior.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageFormattingBoundaryCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageFormattingBoundaryCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageIntentCore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageIntentCore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messagePipeline.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messagePipeline.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messagePipelineCore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messagePipelineCore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageRecallArchive.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageRecallArchive.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageStats.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageStats.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/messageStorageIdempotence.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/messageStorageIdempotence.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/midtermMemory.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/midtermMemory.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/migrationTooling.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/migrationTooling.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/modelExecution.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modelExecution.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/modelGateway.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modelGateway.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/modelIntentClassifier.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modelIntentClassifier.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/modrinthTool.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/modrinthTool.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/multipartFormData.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/multipartFormData.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/musicShareDelivery.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/musicShareDelivery.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/musicShareRelay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/musicShareRelay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/narrativeReply.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/narrativeReply.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/obsLog.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/obsLog.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/observeIdentityNames.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/observeIdentityNames.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/operatorScripts.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/operatorScripts.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/outboundArbiter.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/outboundArbiter.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/outboundThrottle.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/outboundThrottle.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/outputGuardPipeline.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/outputGuardPipeline.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/parallelDownload.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/parallelDownload.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personProfile.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personProfile.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaFeedbackManager.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaFeedbackManager.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaLibrary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaLibrary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaMoods.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaMoods.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaOutputAdapters.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaOutputAdapters.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaPromptCharacterization.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaPromptCharacterization.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaReplay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaReplay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaSnapshot.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaSnapshot.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/personaTonePolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/personaTonePolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/pixivCompiledBoundaries.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivCompiledBoundaries.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/pixivIntent.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivIntent.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/pixivMessage.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivMessage.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/pixivSearch.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pixivSearch.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/pluginExportLoader.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pluginExportLoader.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/pluginUpdateBuild.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/pluginUpdateBuild.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/privateChat.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/privateChat.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/proactiveReplyFreshness.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/proactiveReplyFreshness.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/progressReplyBudget.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/progressReplyBudget.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/promptCompiler.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptCompiler.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/promptContextBoundaryCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptContextBoundaryCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/promptLayerCache.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptLayerCache.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/promptLayers.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/promptLayers.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/qqActionsCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqActionsCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/qqApiBoundary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqApiBoundary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/qqCodeFenceText.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqCodeFenceText.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/qqMemberToolsCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/qqMemberToolsCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/reasoningEffort.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/reasoningEffort.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/recentImageContinuation.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/recentImageContinuation.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/reliableImageSender.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/reliableImageSender.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/reminderCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/reminderCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/renderingRuntimeCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/renderingRuntimeCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/replyDeliveryUncertainty.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replyDeliveryUncertainty.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/replyExecutionRoute.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replyExecutionRoute.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/replyRhythm.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replyRhythm.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/replySanitizer.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/replySanitizer.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/riskCensorSignals.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/riskCensorSignals.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/routeDecision.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/routeDecision.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sealExtRuntime.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sealExtRuntime.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sealSemanticRegression.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sealSemanticRegression.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sealdiceContract.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sealdiceContract.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/searchMusicCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/searchMusicCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/searchProgress.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/searchProgress.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/semanticMemory.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/semanticMemory.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/semanticMemoryEvolution.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/semanticMemoryEvolution.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/semanticToolPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/semanticToolPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sendLocalEmojiReplyMode.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sendLocalEmojiReplyMode.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sendPacing.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sendPacing.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sendvideosStaging.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sendvideosStaging.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sessionContinuity.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sessionContinuity.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/sideLLMUrl.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/sideLLMUrl.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/simIngest.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simIngest.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/simPromptGuidance.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simPromptGuidance.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/simSessionConcurrency.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simSessionConcurrency.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/simSilentDeclaration.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simSilentDeclaration.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/simWakeBudget.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/simWakeBudget.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/singleFlightResolver.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/singleFlightResolver.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/smartLockPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/smartLockPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/smartReplyLogText.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/smartReplyLogText.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/solutionExplanationStyle.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/solutionExplanationStyle.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/styleLearningP2.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/styleLearningP2.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/styleRefusalBoundary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/styleRefusalBoundary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/systemContentSource.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/systemContentSource.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/systemPromptTemplate.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/systemPromptTemplate.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/taskActionFactsCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/taskActionFactsCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/taskBackendEffort.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/taskBackendEffort.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/textImageDocument.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/textImageDocument.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/textImageMarkdownHeadings.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/textImageMarkdownHeadings.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/textImageMath.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/textImageMath.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/thinkingForward.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/thinkingForward.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/thinkingForwardSettings.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/thinkingForwardSettings.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/tokenLedger.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/tokenLedger.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolActionPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolActionPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolAssemblyCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolAssemblyCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolContinuationPolicy.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolContinuationPolicy.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolDecisionBoundary.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolDecisionBoundary.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolExecutionCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolExecutionCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolExposureEvalCore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolExposureEvalCore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolGroundingDirect.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolGroundingDirect.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolHistoryRetrieval.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolHistoryRetrieval.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolIntentFilterSmoke.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolIntentFilterSmoke.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolIntentManifests.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolIntentManifests.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolManifestRegistry.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolManifestRegistry.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolResultGrounding.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolResultGrounding.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolSkills.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolSkills.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/toolSupportCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/toolSupportCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/torrentDownload.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/torrentDownload.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/triggerUnification.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/triggerUnification.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turnDiagnostics.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnDiagnostics.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turnPlan.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnPlan.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turnPromptComposer.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnPromptComposer.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turnSession.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnSession.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turnTraceArchive.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnTraceArchive.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turnTraceReport.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turnTraceReport.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupConsole.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupConsole.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupGenerator.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupGenerator.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupManager.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupManager.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupModelCall.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupModelCall.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupModelHost.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupModelHost.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupRules.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupRules.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupSimilarity.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupSimilarity.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/turtleSoupStore.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/turtleSoupStore.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/umaPresentationCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/umaPresentationCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/umaRaceBalance.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/umaRaceBalance.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/undefinedIdentifiers.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/undefinedIdentifiers.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/understandingBrief.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/understandingBrief.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/unicodeText.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/unicodeText.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/videoGroupContext.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/videoGroupContext.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/videoThumbnail.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/videoThumbnail.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/videoToolsCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/videoToolsCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/visibleFailure.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/visibleFailure.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/voiceSystem.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/voiceSystem.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/voiceToolCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/voiceToolCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/webSearchCompiled.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/webSearchCompiled.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/xiaohongshuAutoRelay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/xiaohongshuAutoRelay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/xiaohongshuMediaRelay.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/xiaohongshuMediaRelay.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/xiaohongshuMessage.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/xiaohongshuMessage.test.js
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/youtubeMessage.test.js:1:1
+✖ /Users/shiqi/IdeaProjects/bl-chat-plugin/tests/youtubeMessage.test.js
+  'Promise resolution is still pending but the event loop has already resolved'

@@ -23,7 +23,7 @@ function fixture({ mode = 'scripted_offline', repetitions = 1, eventCount = 1 } 
     status: 'passed', calls: mode === 'live_model' ? [{ id: 'main-1', stage: 'main', requestHash: h('request'), usage: { total_tokens: 12 }, model: 'fixture-model', toolCalls: [], tools: ['simDecide'] }] : [],
     network: mode === 'live_model' ? [{ stage: 'main', status: 200, generation: { parameters: { model: 'fixture-model', temperature: 0.7, max_tokens: 2048 }, hash: h({ model: 'fixture-model', temperature: 0.7, max_tokens: 2048 }) } }] : [], sent: [], searches: [], warnings: [], errors: [], structuralFailures: [],
     beforeCharacter: emptyCharacter(), character: emptyCharacter(), behavior: { noMessageSent: true },
-    beforeActivities: emptyActivities(), activities: emptyActivities(), toolResults: [], feeds: [], workers: [], reflections: [],
+    beforeActivities: emptyActivities(), activities: emptyActivities(), toolResults: [], feeds: [], workers: [], reflections: [], consistencyChecks: [],
     toolResultCapture: { complete: true, requestedToolCallIds: [], missingToolCallIds: [] },
   }))).flat()
   return {
@@ -33,7 +33,7 @@ function fixture({ mode = 'scripted_offline', repetitions = 1, eventCount = 1 } 
       runnerHash: h('runner'), scenariosHash: h('scenarios'), effectiveConfigHash: h('config'), buildManifestHash: h('build'), personaHash: h('persona'),
       repetitions, model: mode === 'live_model' ? 'fixture-model' : null,
       generation: 'fixture-generation', simulationOverrides: { tools: 'fixed-tools' }, clock: 'fixed-clock',
-      search: 'synthetic_fixture', feeds: 'synthetic_fixture', worker: 'synthetic_fixture', reflection: 'separate_model_port', storage: 'fresh_in_memory_per_sample', platform: 'captured_only', personaSource: 'fixture', seed: 'empty',
+      search: 'synthetic_fixture', feeds: 'synthetic_fixture', worker: 'synthetic_fixture', reflection: 'separate_model_port', consistency: 'separate_review_port', storage: 'fresh_in_memory_per_sample', platform: 'captured_only', personaSource: 'fixture', seed: 'empty',
       maxCalls: 60, maxHttp: 80, maxDurationMs: 600000,
     }, results, summary: summarize(results),
   }
@@ -311,6 +311,63 @@ test('reflection evidence must correspond one-to-one with successful or failed r
   assert.ok(inspected.integrityFailures.some(value => value.startsWith('model_call_failed')))
   assert.equal(inspected.integrityFailures.some(value => value.startsWith('invalid_reflection_evidence')), false)
   assert.equal(inspected.engineering, 'failed')
+})
+
+test('consistency evidence is independently matched and cannot masquerade as tool execution', () => {
+  const withConsistency = () => {
+    const document = fixture(), result = document.results[0]
+    const call = { id: 'consistency-1', stage: 'consistency', requestHash: h('review-request'), output: '{"verdict":"accept","issues":[]}', usage: { total_tokens: 8 }, elapsedMs: 12, toolCalls: [], tools: [] }
+    result.calls.push(call)
+    result.consistencyChecks = [{ callId: call.id, requestHash: call.requestHash, status: 'succeeded', output: call.output, usage: call.usage, elapsedMs: call.elapsedMs }]
+    document.summary = summarize(document.results)
+    return document
+  }
+  assert.equal(inspectReplay(withConsistency()).integrity, 'passed')
+  for (const [mutate, marker] of [
+    [document => { document.results[0].consistencyChecks = [] }, 'consistency_evidence_count_mismatch'],
+    [document => { document.results[0].consistencyChecks[0].output = '{"verdict":"revise","issues":[]}' }, 'invalid_consistency_evidence'],
+    [document => { document.results[0].consistencyChecks[0].elapsedMs = 0 }, 'invalid_consistency_evidence'],
+    [document => { document.results[0].calls[0].tools = ['simFinishTurn'] }, 'consistency_tool_execution'],
+    [document => { document.results[0].calls[0].toolCalls = [{ id: 'invented', function: { name: 'simFinishTurn', arguments: '{}' } }] }, 'consistency_tool_execution'],
+    [document => {
+      const result = document.results[0]
+      result.calls[0].output = result.consistencyChecks[0].output = '{"verdict":"accept","issues":[],"error":"unavailable"}'
+    }, 'invalid_consistency_verdict'],
+    [document => {
+      const result = document.results[0]
+      result.calls[0].output = result.consistencyChecks[0].output = '{"verdict":"revise","issues":[]}'
+    }, 'invalid_consistency_verdict'],
+    [document => {
+      const result = document.results[0]
+      result.calls[0].output = result.consistencyChecks[0].output = 'not JSON'
+    }, 'invalid_consistency_verdict'],
+  ]) {
+    const document = withConsistency(); mutate(document); document.summary = summarize(document.results)
+    const inspected = inspectReplay(document)
+    assert.equal(inspected.integrity, 'failed')
+    assert.ok(inspected.integrityFailures.some(value => value.startsWith(marker)), marker)
+  }
+  const failed = withConsistency(), result = failed.results[0]
+  result.calls[0].error = 'review budget exhausted'
+  Object.assign(result.consistencyChecks[0], { status: 'failed', error: 'review budget exhausted' })
+  failed.summary = summarize(failed.results)
+  const inspected = inspectReplay(failed)
+  assert.ok(inspected.integrityFailures.some(value => value.startsWith('model_call_failed')))
+  assert.equal(inspected.integrityFailures.some(value => value.startsWith('invalid_consistency_evidence')), false)
+})
+
+test('historical v4 reports remain inspectable without inventing consistency evidence', () => {
+  const document = fixture()
+  document.metadata.assessmentVersion = 4
+  delete document.metadata.consistency
+  delete document.results[0].consistencyChecks
+  delete document.summary.consistencyCalls
+  delete document.summary.consistencyElapsedMs
+  delete document.summary.unsettledCalls
+  assert.equal(inspectReplay(document).integrity, 'passed')
+  const corrupt = structuredClone(document)
+  corrupt.summary.logicalCalls++
+  assert.ok(inspectReplay(corrupt).integrityFailures.includes('saved_summary_mismatch'))
 })
 
 test('captured tool results require an exact content hash and a recorded invocation stage', () => {

@@ -130,3 +130,66 @@ test('corrupt reflection state fails without replacing the persisted value', asy
   await assert.rejects(h.reflection.reset())
   assert.equal(h.kv.get(key), '{bad-json')
 })
+
+test('consistency rejection runs after draft validation and writes no reflected state', async () => {
+  const h = harness(); await h.reflection.read(); const source = await h.addInputs(); h.clock.value += SIX_HOURS
+  const before = await h.characters.load(scope), candidate = { summary: '形成新判断', updates: [{ kind: 'opinion', content: '我更看重可复现线索', evidenceRefs: [source.memoryRef] }], goals: [] }
+  let reviews = 0
+  await h.run({ infer: async () => JSON.stringify(candidate), review: async (value, snapshot, evidence) => {
+    reviews++
+    assert.deepEqual(value, candidate)
+    assert.deepEqual(snapshot, before)
+    assert.ok(evidence.refs.includes(source.memoryRef))
+    assert.deepEqual(await h.characters.load(scope), before, 'review must see no early character write')
+    throw new Error('consistency-rejected')
+  } })
+  assert.equal(reviews, 1)
+  assert.deepEqual(await h.characters.load(scope), before)
+  assert.match((await h.reflection.read()).lastOutcome, /consistency-rejected/)
+  assert.deepEqual((await h.reflection.read()).processed, [])
+  assert.equal(await h.run(), false, 'failed review does not cause immediate retry')
+})
+
+test('legal interest-only and empty reflection candidates can pass review without creating opinions', async () => {
+  for (const hasInterest of [true, false]) {
+    const h = harness(); await h.reflection.read(); const source = await h.addInputs(); h.clock.value += SIX_HOURS
+    let reviews = 0
+    const candidate = { summary: '仅有兴趣或暂无变化', updates: hasInterest ? [{ kind: 'interest', content: '我对解谜设计有一点兴趣', evidenceRefs: [source.memoryRef] }] : [], goals: [] }
+    await h.run({ infer: async () => JSON.stringify(candidate), review: async value => { reviews++; assert.deepEqual(value, candidate) } })
+    assert.equal(reviews, 1)
+    const learned = (await h.characters.load(scope)).memories.filter(memory => memory.id.startsWith('reflection-'))
+    assert.equal(learned.length, hasInterest ? 1 : 0)
+    assert.ok(learned.every(memory => memory.kind === 'interest'))
+    assert.ok((await h.reflection.read()).processed.includes(source.memoryRef))
+  }
+})
+
+test('revision changes or source deletion during consistency review reject the stale draft', async () => {
+  for (const mutation of ['delete', 'revision']) {
+    const h = harness(); await h.reflection.read(); const source = await h.addInputs(); h.clock.value += SIX_HOURS
+    let reviews = 0, concurrentlySaved
+    await h.run({ infer: async () => JSON.stringify({ summary: '过期判断', updates: [{ kind: 'opinion', content: '不得覆盖新状态', evidenceRefs: [source.memoryRef] }], goals: [] }), review: async () => {
+      reviews++
+      concurrentlySaved = await h.characters.update(scope, state => mutation === 'delete' ? deleteCharacterMemory(state, source.memoryId, h.clock.value) : state)
+    } })
+    assert.equal(reviews, 1)
+    assert.deepEqual(await h.characters.load(scope), concurrentlySaved)
+    assert.match((await h.reflection.read()).lastOutcome, /状态已改变/)
+  }
+})
+
+test('revocation after consistency review prevents commit and invalid drafts never spend review calls', async () => {
+  for (const failure of ['revoked', 'invalid']) {
+    const h = harness(); await h.reflection.read(); const source = await h.addInputs(); h.clock.value += SIX_HOURS
+    const before = await h.characters.load(scope)
+    let reviews = 0, revoked = false
+    await h.run({
+      guard: async () => { if (revoked) throw new Error('authority-revoked') },
+      infer: async () => JSON.stringify({ summary: '候选', updates: [{ kind: 'interest', content: '有点兴趣', evidenceRefs: [failure === 'invalid' ? 'memory:missing' : source.memoryRef] }], goals: [] }),
+      review: async () => { reviews++; revoked = true },
+    })
+    assert.equal(reviews, failure === 'invalid' ? 0 : 1)
+    assert.deepEqual(await h.characters.load(scope), before)
+    assert.match((await h.reflection.read()).lastOutcome, failure === 'invalid' ? /当前依据/ : /authority-revoked/)
+  }
+})

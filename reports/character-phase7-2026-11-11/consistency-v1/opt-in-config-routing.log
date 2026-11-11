@@ -1,0 +1,16 @@
+✔ independent review route requires a complete explicit backend and never borrows memory, main or chat (2.827375ms)
+✔ explicit review backend executes text-only using its own credentials without mutating caller config (62.132084ms)
+✔ review backend failure stays on the chosen backend instead of switching to a permissive reviewer (8.00875ms)
+✔ compiled host decoder accepts repository defaults and rejects mistyped control fields (57.408834ms)
+✔ compiled redis maintenance handles object and tuple scan and preserves fresh tasks (1.727917ms)
+✔ host decoder normalizes optional object nulls without leaking null into typed runtime (0.884ms)
+✔ host decoder validates nested memory backends and task secrets before runtime use (0.5795ms)
+✔ host decoder validates explicit consistency enablement without filling or mutating private settings (0.38075ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 319.068416

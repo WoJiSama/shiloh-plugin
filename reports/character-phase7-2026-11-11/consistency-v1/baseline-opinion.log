@@ -1,0 +1,5 @@
+{"scenario":"opinion-revision","sampleIndex":1,"eventIndex":0,"status":"passed","calls":3,"sent":3,"behavior":{"opinionPersisted":true}}
+{"scenario":"opinion-revision","sampleIndex":1,"eventIndex":1,"status":"passed","calls":1,"sent":3,"behavior":{"opinionRevisionPersisted":true}}
+{"scenario":"opinion-revision","sampleIndex":2,"eventIndex":0,"status":"passed","calls":3,"sent":2,"behavior":{"opinionPersisted":false}}
+{"scenario":"opinion-revision","sampleIndex":2,"eventIndex":1,"status":"passed","calls":3,"sent":3,"behavior":{"opinionRevisionPersisted":false}}
+{"outputFile":"/opt/trss-yunzai-backups/character-eval-20261111-baseline/live/opinion/results.json","mode":"live_model","events":4,"failedEvents":0,"skippedEvents":0,"behaviorMisses":2,"logicalCalls":10,"mainCalls":10,"reflectionCalls":0,"consistencyCalls":0,"consistencyElapsedMs":0,"unsettledCalls":0,"feedFetches":0,"workerCalls":0,"httpRequests":10,"capturedMessages":11,"reportedTokens":139878,"callsWithoutUsage":0,"costCny":null,"naturalness":"requires_human_review","exitCode":0}

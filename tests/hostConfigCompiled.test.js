@@ -22,3 +22,15 @@ test('host decoder validates nested memory backends and task secrets before runt
  ])assert.throws(()=>decodeHostConfig(input))
  const valid=decodeHostConfig({memorySystem:{memoryAiConfig:{memoryAiApikey:'secret'}},taskAiConfig:{translation:{apiKey:['a','b'],maxOutputTokens:300,complexity:{score:1,signals:['short']}}}});assert.deepEqual(valid.taskAiConfig.translation.apiKey,['a','b']);assert.equal(valid.memorySystem.memoryAiConfig.memoryAiApikey,'secret')
 })
+test('host decoder validates explicit consistency enablement without filling or mutating private settings',()=>{
+ assert.equal(decodeHostConfig({}).simulation,undefined)
+ for(const enabled of [true,false]){
+  const input={simulation:{consistency:{enabled},custom:'preserved'},taskAiConfig:{characterConsistency:{apiUrl:'https://review.invalid/v1',model:'review',apiKey:'fixture'}}}
+  const before=structuredClone(input),decoded=decodeHostConfig(input)
+  assert.equal(decoded.simulation.consistency.enabled,enabled)
+  assert.equal(decoded.simulation.custom,'preserved')
+  assert.equal(decoded.taskAiConfig.characterConsistency.model,'review')
+  assert.deepEqual(input,before)
+ }
+ for(const value of [{simulation:{consistency:{enabled:'false'}}},{simulation:{consistency:true}},{simulation:{consistency:[]}}])assert.throws(()=>decodeHostConfig(value))
+})

@@ -1,0 +1,885 @@
+{
+  "schemaVersion": 1,
+  "candidate": {
+    "file": "results.json",
+    "sha256": "6af497354bb8cbeff49f37f9a5569e5c776eac6f1fdd3a1e8df326bd98edbfbd",
+    "mode": "scripted_offline",
+    "integrity": "passed",
+    "integrityFailures": [],
+    "engineering": "passed",
+    "behavior": "passed",
+    "liveModel": "pending",
+    "assessmentVersion": 5,
+    "repetitions": 2,
+    "runId": "c5f2c0de-33e1-405e-9d8e-9b0afddfe91d",
+    "startedAtISO": "2026-11-11T04:18:05.676Z",
+    "fingerprints": {
+      "runnerHash": "16787c442884307b2036ccdd5d7d468365fd4dd76f64839f801aeac9c128c9b3",
+      "scenariosHash": "c2939ed6f46996b2cf83bed0b0b4614116aa04b5e1faf40d26cebf8adf7d310e",
+      "effectiveConfigHash": "5cae554565bae92a6e850a18923c770e5e00d7906d16c24e8c7a0d3fae1bc48c",
+      "buildManifestHash": "3a19a35278f67a5ede55658f0559f4802a6e6fae4981d3c27a161a49e42ce3d4",
+      "personaHash": "e1db7aa459f0ee136db1dc4b0029ec8e81d5f41c5b00e968405bd14d498b1d5e",
+      "scenarioManifestHash": "09d05a9a9cf04563fee9b219da56f5ae039a26a880b5d25acbfe6f8a869c22bc"
+    },
+    "expectedEvents": 56,
+    "behaviorChecks": 104,
+    "successfulHttpRequests": 0,
+    "summary": {
+      "events": 56,
+      "failedEvents": 0,
+      "skippedEvents": 0,
+      "behaviorMisses": 0,
+      "logicalCalls": 90,
+      "mainCalls": 58,
+      "reflectionCalls": 2,
+      "consistencyCalls": 30,
+      "consistencyElapsedMs": 2,
+      "unsettledCalls": 0,
+      "feedFetches": 4,
+      "workerCalls": 4,
+      "httpRequests": 0,
+      "capturedMessages": 8,
+      "reportedTokens": 0,
+      "callsWithoutUsage": 90,
+      "costCny": null,
+      "naturalness": "requires_human_review"
+    },
+    "observations": [
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "social-refusal",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "goalCompletedWithReceipt": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {}
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "goalCompletedWithReceipt": true
+        }
+      },
+      {
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {}
+      },
+      {
+        "scenario": "opinion-revision",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "opinionPersisted": true
+        }
+      },
+      {
+        "scenario": "opinion-revision",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "opinionRevisionPersisted": true
+        }
+      },
+      {
+        "scenario": "opinion-revision",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "opinionPersisted": true
+        }
+      },
+      {
+        "scenario": "opinion-revision",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "opinionRevisionPersisted": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 1,
+        "eventIndex": 3,
+        "status": "passed",
+        "behavior": {
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 1,
+        "eventIndex": 4,
+        "status": "passed",
+        "behavior": {
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 2,
+        "eventIndex": 3,
+        "status": "passed",
+        "behavior": {
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 2,
+        "eventIndex": 4,
+        "status": "passed",
+        "behavior": {
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "failed-search-honesty",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true
+        }
+      },
+      {
+        "scenario": "failed-search-honesty",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "waitedAfterFailure": true
+        }
+      },
+      {
+        "scenario": "failed-search-honesty",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true
+        }
+      },
+      {
+        "scenario": "failed-search-honesty",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "waitedAfterFailure": true
+        }
+      },
+      {
+        "scenario": "workspace-version",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "workspace-version",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workRevisionPersisted": true,
+          "workCreatedWithEvidence": true
+        }
+      },
+      {
+        "scenario": "workspace-version",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "workspace-version",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workRevisionPersisted": true,
+          "workCreatedWithEvidence": true
+        }
+      },
+      {
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "subscriptionAddedByModel": true
+        }
+      },
+      {
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "newFeedItemCommitted": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "newFeedItemCommitted": true,
+          "noModelCall": true,
+          "noMessageSent": true,
+          "noReflectionModelCall": true
+        }
+      },
+      {
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "subscriptionAddedByModel": true
+        }
+      },
+      {
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "newFeedItemCommitted": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "newFeedItemCommitted": true,
+          "noModelCall": true,
+          "noMessageSent": true,
+          "noReflectionModelCall": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "noReflectionModelCall": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "opinionPersisted": true,
+          "noMessageSent": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "noReflectionModelCall": true,
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "noReflectionModelCall": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "opinionPersisted": true,
+          "noMessageSent": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "independent-reflection",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "independentOpinionPersisted": true,
+          "noReflectionModelCall": true,
+          "noModelCall": true,
+          "noMessageSent": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true,
+          "workerUnknownReceiptRecorded": true
+        }
+      },
+      {
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 1,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "goalPausedAfterUnknownWorker": true,
+          "workerUnknownReceiptRecorded": true,
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true
+        }
+      },
+      {
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 1,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "noWorkerSubmitted": true,
+          "noModelCall": true,
+          "noMessageSent": true,
+          "goalCompletedWithReceipt": true
+        }
+      },
+      {
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "goalCreatedByModel": true,
+          "noWorkerSubmitted": true
+        }
+      },
+      {
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 2,
+        "eventIndex": 1,
+        "status": "passed",
+        "behavior": {
+          "goalPausedAfterUnknownWorker": true,
+          "workerUnknownReceiptRecorded": true,
+          "workCreatedWithEvidence": true,
+          "goalCompletedWithReceipt": true
+        }
+      },
+      {
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 2,
+        "eventIndex": 2,
+        "status": "passed",
+        "behavior": {
+          "noWorkerSubmitted": true,
+          "noModelCall": true,
+          "noMessageSent": true,
+          "goalCompletedWithReceipt": true
+        }
+      },
+      {
+        "scenario": "permission-boundary",
+        "sampleIndex": 1,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      },
+      {
+        "scenario": "permission-boundary",
+        "sampleIndex": 2,
+        "eventIndex": 0,
+        "status": "passed",
+        "behavior": {
+          "refusalRecorded": true
+        }
+      }
+    ],
+    "samples": [
+      {
+        "sampleId": "social-refusal:sample-1",
+        "scenario": "social-refusal",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "social-refusal:sample-2",
+        "scenario": "social-refusal",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "motivated-goal-restart:sample-1",
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 1,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "motivated-goal-restart:sample-2",
+        "scenario": "motivated-goal-restart",
+        "sampleIndex": 2,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "opinion-revision:sample-1",
+        "scenario": "opinion-revision",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "opinion-revision:sample-2",
+        "scenario": "opinion-revision",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "ambient-and-idle:sample-1",
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 1,
+        "expectedEvents": 5
+      },
+      {
+        "sampleId": "ambient-and-idle:sample-2",
+        "scenario": "ambient-and-idle",
+        "sampleIndex": 2,
+        "expectedEvents": 5
+      },
+      {
+        "sampleId": "failed-search-honesty:sample-1",
+        "scenario": "failed-search-honesty",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "failed-search-honesty:sample-2",
+        "scenario": "failed-search-honesty",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "workspace-version:sample-1",
+        "scenario": "workspace-version",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "workspace-version:sample-2",
+        "scenario": "workspace-version",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "subscription-update-dedup:sample-1",
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 1,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "subscription-update-dedup:sample-2",
+        "scenario": "subscription-update-dedup",
+        "sampleIndex": 2,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "independent-reflection:sample-1",
+        "scenario": "independent-reflection",
+        "sampleIndex": 1,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "independent-reflection:sample-2",
+        "scenario": "independent-reflection",
+        "sampleIndex": 2,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 1,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "scenario": "worker-success-artifact",
+        "sampleIndex": 2,
+        "expectedEvents": 2
+      },
+      {
+        "sampleId": "worker-unknown-pause:sample-1",
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 1,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "worker-unknown-pause:sample-2",
+        "scenario": "worker-unknown-pause",
+        "sampleIndex": 2,
+        "expectedEvents": 3
+      },
+      {
+        "sampleId": "permission-boundary:sample-1",
+        "scenario": "permission-boundary",
+        "sampleIndex": 1,
+        "expectedEvents": 1
+      },
+      {
+        "sampleId": "permission-boundary:sample-2",
+        "scenario": "permission-boundary",
+        "sampleIndex": 2,
+        "expectedEvents": 1
+      }
+    ]
+  },
+  "comparison": {
+    "status": "pending",
+    "reason": "baseline_not_provided",
+    "singleVariableAttribution": false
+  },
+  "humanReview": {
+    "status": "pending",
+    "items": [
+      {
+        "sampleId": "social-refusal:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "social-refusal:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "motivated-goal-restart:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "motivated-goal-restart:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "opinion-revision:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "opinion-revision:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "ambient-and-idle:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "ambient-and-idle:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "failed-search-honesty:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "failed-search-honesty:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "workspace-version:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "workspace-version:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "subscription-update-dedup:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "subscription-update-dedup:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "independent-reflection:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "independent-reflection:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-success-artifact:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-unknown-pause:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "worker-unknown-pause:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "permission-boundary:sample-1",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      },
+      {
+        "sampleId": "permission-boundary:sample-2",
+        "reviewer": "",
+        "verdict": "pending",
+        "comment": ""
+      }
+    ]
+  },
+  "stage7": {
+    "status": "pending",
+    "realGroupObservation": "not_provided",
+    "deployment": "not_verified",
+    "reason": "Shadow reports cannot replace actual cross-day group observation and deployment evidence."
+  },
+  "evidenceTrust": "Fingerprints check local consistency and bind review to saved bytes; they do not authenticate a provider, a human reviewer or an actual independent deployment.",
+  "shadowAcceptance": "pending",
+  "exitCode": 2
+}
