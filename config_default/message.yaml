@@ -74,6 +74,12 @@ pluginSettings:
     reflection:
       enabled: true              # 私下反思：至少6小时、每日最多2次，需2项新依据；计入群回合/金额预算，不发群消息
     autonomousTools: []          # 自主创作需显式授权；仅支持bananaTool/googleImageEditTool/googleImageAnalysisTool，且须被toolPolicy装配
+    capabilities:
+      enabled: false             # 能力目录、JS 工作区和持久技能；开启后只对 groups 列出的群生效
+      groups: []                 # 显式配置群号，例如 ["123456789"]
+      projectUpdatesInAtOnly: false # 仅@群中是否允许已订阅项目的更新回报
+      mcpTools: []               # 可在仿真目录调用的已连接 MCP 工具别名
+      autonomousTools: []        # 额外自主授权工具名，仍受 toolPolicy 和 MCP 配置限制
     worker:
       enabled: false             # 可选的自定义受限工作器网关，未配置时不暴露simWorkerTask；不是OpenClaw原生API
       endpoint: ""               # HTTPS或本机HTTP，运行时POST /tasks并使用taskId幂等键；超时请求DELETE取消

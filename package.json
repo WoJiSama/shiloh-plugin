@@ -69,6 +69,7 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
+    "quickjs-emscripten": "0.32.0",
     "request": "^2.88.2",
     "saxes": "^5.0.1",
     "sharp": "^0.33.5",

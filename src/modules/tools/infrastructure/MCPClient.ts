@@ -744,7 +744,7 @@ export class MCPClientManager {
     return null
   }
 
-  async executeToolByAlias(alias:string, args:Record<string,unknown> = {}) {
+  async executeToolByAlias(alias:string, args:Record<string,unknown> = {}, options:{logArguments?:boolean} = {}) {
     const entry = this.resolveToolEntry(alias)
     if (!entry) throw new Error(`MCP 工具不存在: ${alias}`)
 
@@ -754,7 +754,7 @@ export class MCPClientManager {
     }
 
     try {
-      this.logger.info(`[MCP] 执行工具: ${entry.alias} -> ${entry.serverName}/${entry.realName}, 参数: ${JSON.stringify(args)}`)
+      this.logger.info(`[MCP] 执行工具: ${entry.alias} -> ${entry.serverName}/${entry.realName}${options.logArguments === false ? "" : `, 参数: ${JSON.stringify(args)}`}`)
       const result = await withTimeout(
         clientInfo.client.callTool({
           name: entry.realName,
@@ -766,7 +766,7 @@ export class MCPClientManager {
       this.logger.info(`[MCP] 工具 ${entry.alias} 执行完成`)
       return this.formatMCPResultForModel(result)
     } catch (error) {
-      this.logger.error(`[MCP] 执行工具 ${entry.alias} 失败:`, error)
+      this.logger.error(`[MCP] 执行工具 ${entry.alias} 失败:`, options.logArguments === false ? undefined : error)
       throw error
     }
   }

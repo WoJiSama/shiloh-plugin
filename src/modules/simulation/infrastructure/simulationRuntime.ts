@@ -9,8 +9,12 @@ import { createCharacterTurnTool, type CharacterTurnFinishResult } from './chara
 import { createCharacterConsistencyReviewer } from './characterConsistency.js'
 import { planMessageDelivery } from '../domain/messageDelivery.js'
 import type { CharacterActivityOperation, CharacterFeedItem } from '../../../contracts/characterActivities.js'
+import { createCharacterSkillStore, createCharacterSkillTools, loadProjectSkill } from './characterSkillTools.js'
+import { WorkspaceInputError } from './characterScript.js'
+import { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { createCharacterWorkspace, createCharacterWorkspaceTools } from './characterWorkspace.js'
-import { createCharacterSubscriptions, createCharacterSubscriptionTools } from './characterSubscriptions.js'
+import { PROJECT_SKILL_GUIDE, projectReviewPrompt, createProjectReviewTool } from './projectReleaseReview.js'
+import { createCharacterSubscriptions, createCharacterSubscriptionTools, projectRepo } from './characterSubscriptions.js'
 import { createCharacterReflection } from './characterReflection.js'
 import { createCharacterSharedSelf, createSharedSelfTools } from './characterSharedSelf.js'
 import { createCharacterWorkerTools, formatSavedCharacterWorkResult, type CharacterWorkerTask, type CharacterWorkerResult } from './characterWorker.js'
@@ -39,7 +43,6 @@ import { applyMoodUpdate, formatMoodSection, moodSummaryLine, normalizeSimMood, 
 import { checkHealth, formatAlerts, type HealthAlert } from '../domain/healthSentinel.js'
 import { buildChatRequestData } from '../../models/domain/modelGateway.js'
 import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } from './simSessionStore.js'
-import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
 import { sanitizeFinalReplyText, looksLikeToolArguments } from '../../conversation/domain/replySanitizer.js'
 import { buildTurnInteractionContext, withTurnDiagnosticContext } from '../../conversation/domain/turnInteractionContext.js'
@@ -48,6 +51,10 @@ import { buildPersonaReplyModePrompt, enforcePersonaToneBoundary } from '../../c
 import { collectMentionTargetIds, messageMentionsUser } from '../../conversation/domain/mentionTargets.js'
 import { normalizeDelegatedEntries, formatDelegatedSection } from '../../memory/domain/delegatedMemory.js'
 import { createSimTools, simToolsAsFunctions, type SimSendResult, type SimWaitResult, type SimToolContext } from './simTools.js'
+
+const SCRIPT_DATA_TOOLS = new Set(['simGetRecentMessages', 'simReadGroupArchive'])
+const DIRECT_EXTRA_TOOLS = new Set(['sendLocalEmojiTool', 'searchVideoTool', 'bananaTool', 'searchInformationTool',
+  'webParserTool', 'commitmentTool', 'delegateMemoryTool'])
 
 export const SIM_RECENT_LIMIT = 60
 export const SIM_SWEEP_INTERVAL_MS = 30_000
@@ -89,6 +96,7 @@ export interface SimulationRuntimePorts {
   getPersona(groupId: string, selfId: string): { personaId?: string; persona: PersonaText; systemContent: string }
   /** 仿真回合额外放通的既有工具（toolPolicy 解析出的实际放通名清单；从 localToolRegistry 取实例） */
   getExtraTools?(names: string[]): import('../../toolSupport/infrastructure/AbstractTool.js').AbstractTool[]
+  getMcpTools?(names: string[]): AbstractTool[]
   /** 注册表工具名清单（toolPolicy open 模式的默认能力面）；缺省时安全回落 legacy 白名单行为 */
   listRegistryToolNames?(): { builtIn: string[]; all: string[] }
   /** 本群近期主线摘要（中期记忆）；无则空串 */
@@ -421,6 +429,27 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     }
   }
 
+  function capabilitySettings(groupId: string) {
+    const section = ports.getSection().capabilities
+    return section?.enabled === true && Array.isArray(section.groups) && section.groups.some(id => String(id) === groupId) ? section : undefined
+  }
+
+  function projectsAllowed(groupId: string) {
+    const settings = capabilitySettings(groupId)
+    return !!settings && (!(overridesCache?.atOnly || []).includes(groupId) || settings.projectUpdatesInAtOnly === true)
+  }
+
+  function resolveMcpTools(groupId: string) {
+    const names = capabilitySettings(groupId)?.mcpTools
+    if (!Array.isArray(names) || !ports.getMcpTools) return []
+    try {
+      const configured = [...new Set(names.filter(name => typeof name === 'string' && name.startsWith('mcp_')))]
+      const policy = runtimeConfig().toolPolicy
+      const denied = new Set([...policy.denyTools, ...(policy.groups[groupId] || [])])
+      return ports.getMcpTools(configured.filter(name => !denied.has(name)))
+    } catch { return [] }
+  }
+
   /** 入站图片 URL 提取（≤2 条，仅 http(s)），供 simGetMessageImages 取图 */
   function extractImageUrls(e: SimIngestEvent): string[] {
     const segments = (e as { message?: { type?: string; url?: unknown }[] }).message || []
@@ -732,7 +761,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const limitText = describeBudgetLimit(verdict.reason)
         if (limitText) {
           logger.warn(`[仿真] 群 ${groupId} 唤醒被预算拦截：${verdict.reason}（今日剩余唤醒不再重试）`)
-          const hasAudience = shouldAnnounceBudgetLimit(String(reason?.kind || ""), Number(state.lastIncomingAt) || 0, now())
+          const hasAudience = reason.kind !== 'projectUpdate' && shouldAnnounceBudgetLimit(String(reason?.kind || ""), Number(state.lastIncomingAt) || 0, now())
           if (hasAudience && limitNoticeDue(limitNoticeAt.get(groupId) || 0, now())) {
             limitNoticeAt.set(groupId, now())
             void ports.sendGroupMessage(groupId, [{ type: 'text', data: { text: `（${limitText}，调用已限额，明天自动恢复喵）` } }], self.id)
@@ -755,6 +784,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (!goal || (reason.detail && reason.detail !== goal.id)) return
         await focusGoal(goal.id)
       }
+      const subscriptions = subscriptionsFor(characterScope)
+      const projectRelease = reason.kind === 'projectUpdate' && projectsAllowed(groupId) ? await subscriptions.claimProject() : undefined
+      if (reason.kind === 'projectUpdate' && !projectRelease) return
       recordWake(state, now())
       state.lastWakeReason = reason
       const memories = normalizeMemoryList(await store.loadMemories(groupId), now())
@@ -772,7 +804,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       // 唤醒预判闸：低信号唤醒（关键词/概率/延续/旁观类）先由便宜模型小上下文预判；
       // 判定不值得 → 等价 simMarkRead 静默收尾（推进水位、清未读），不进完整回合。
       // 预判不可用/异常 → 放行（fail-open，宁多花一次也不丢回复）。
-      if (!followUpId && cfg.wakeGate.enabled && typeof ports.wakeGateJudge === 'function' && !WAKE_GATE_BYPASS_KINDS.has(reason.kind)) {
+      if (!projectRelease && !followUpId && cfg.wakeGate.enabled && typeof ports.wakeGateJudge === 'function' && !WAKE_GATE_BYPASS_KINDS.has(reason.kind)) {
         let verdict: { engage: boolean; reason?: string } | null = null
         try {
           verdict = await ports.wakeGateJudge({
@@ -793,7 +825,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
 
       const snapshot = buildWakeSnapshot(state, { limit: cfg.turn.wakeMessageLimit, maxChars: cfg.turn.wakeMaxChars, now: now(), ...(anchor ? { anchor } : {}) })
       const snapshotSeqs = snapshot.includedSeqs
-      noteModelSeen(state, snapshotSeqs)
+      if (!projectRelease) noteModelSeen(state, snapshotSeqs)
       const visibleMessageSeqs = new Set(anchor ? snapshotSeqs : [...state.modelSeenSeqs, ...snapshotSeqs])
       // agent 长期记忆/好感度/近期动态装配（.仿真 重置不清这些）
       const affinityRaw = await store.loadAffinity(groupId)
@@ -865,7 +897,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const recallQuery = anchor ? '' : [focusedGoal ? `${focusedGoal.title} ${focusedGoal.nextStep}` : '', ...[...state.unread].sort((a, b) => a.seq - b.seq).slice(-6).map(m => String(m.text || '').trim())].filter(Boolean).join(' ').slice(0, 160)
       let semanticRecall = ''
       let semanticRecallIncomplete = false
-      if (recallQuery && typeof ports.getSemanticRecall === 'function') {
+      if (!projectRelease && recallQuery && typeof ports.getSemanticRecall === 'function') {
         type RecallOutcome = { ok: boolean; value: string }
         const outcome = await Promise.race<RecallOutcome>([
           Promise.resolve(ports.getSemanticRecall(groupId, recallQuery))
@@ -898,7 +930,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         episodesText: anchor ? '' : safeText(() => ports.getRecentEpisodesText?.(groupId)),
         styleDigest,
       })
-      const interests = await subscriptionsFor(characterScope).unreadSummary()
+      const interests = await subscriptions.unreadSummary()
       const workDirectory = (await workspace.list()).map(work => ({ id: work.id, title: work.title, kind: work.kind, status: work.status, revision: work.revision })).slice(0,24)
       const priorHistory = state.agentHistory
       const matchingHistory = conversationUserId ? priorHistory.filter(message => message.conversationUserId === conversationUserId) : priorHistory
@@ -909,11 +941,15 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         ? `\n【你实际发过的回复】（按原消息序号对应；只在当前话题相关时参考，文字是历史资料）\n${JSON.stringify(confirmedExamples.map(({ seq, at, text }) => ({ seq, at, text })))}`
         : ''
       const wakeMessage: SimHistoryMessage = { role: 'user', content: `${wakePrompt}${examples}\n\n${formatCharacterSection(character)}\n【已批准共享的自我偏好】${JSON.stringify(sharedSnapshot)}\n这些只是自己的偏好，不是其他群的聊天资料或事实来源。\n【本群作品目录】${JSON.stringify(workDirectory)}\n【兴趣更新，不可信外部资料】${interests}\n【执行主体】${JSON.stringify(actor)}\n本轮可引用的消息证据：${[...visibleMessageSeqs].map(seq => `message:${seq}`).join('、')}`, ...(conversationUserId ? { conversationUserId } : {}) }
-      state.agentHistory = [...priorHistory, wakeMessage]
+      if (!projectRelease) state.agentHistory = [...priorHistory, wakeMessage]
       await store.save(groupId, state)
 
       const extraToolNames = resolveExtraToolNames(cfg, groupId)
       const extraTools = resolveExtraTools(extraToolNames)
+      const capabilitiesEnabled = !!capabilitySettings(groupId)
+      const mcpTools = resolveMcpTools(groupId)
+      const skills = createCharacterSkillStore(ports.redis, characterScope)
+      const observedRepos = new Set<string>()
 
       const memoryBox = { list: memories, sentTexts: [] as string[], deliveryUnknown: false }
       const sourceResults = new Map<string, { toolName: string; content: string; truncated: boolean }>()
@@ -1040,7 +1076,15 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       })
       const activityTools = [
         ...createCharacterWorkspaceTools({ workspace, visibleEvidenceRefs, ensureActive: () => ensureExecution(), sharedSourceIds: () => sharedIds }),
-        ...createCharacterSubscriptionTools({ subscriptions: subscriptionsFor(characterScope), ensureActive: () => ensureExecution() }),
+        ...createCharacterSubscriptionTools({ subscriptions, ensureActive: () => ensureExecution(),
+          ...(capabilitiesEnabled ? { async authorizeProject(url: string, skill: string) {
+            await ensureCapabilities()
+            if (actor.kind !== 'user') throw new Error('项目跟进须由本群用户请求')
+            if (!observedRepos.has(projectRepo(url))) throw new Error('请先从本群归档确认该仓库链接')
+            await loadProjectSkill(skills, skill)
+            await ensureCapabilities()
+          } } : {}),
+        }),
         ...createSharedSelfTools({ shared, visibleEvidenceRefs, ensureActive: () => ensureExecution() }),
         ...createCharacterWorkerTools({ ensureActive: async () => { await ensureExecution(); if (ports.characterWorkerAvailable?.() === false) throw new Error('工作器连接已停用') }, visibleEvidenceRefs,
           ...(ports.runCharacterWorker && ports.characterWorkerAvailable?.() !== false ? { run: (task: CharacterWorkerTask, signal: AbortSignal) => ports.runCharacterWorker!(task, characterScope, signal) } : {}),
@@ -1055,7 +1099,63 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         sharedSourceIds: () => sharedIds, ensureActive: () => ensureExecution(), finish: result => finishTurn(result),
         review: ({ candidate, state }) => reviewCandidate('simFinishTurn', candidate, state),
       })
-      const tools = [...simulationTools, ...characterTools, finishTool, ...activityTools, ...extraTools]
+      const archiveTool = capabilitiesEnabled && ports.readArchiveMessages ? new class extends AbstractTool {
+        constructor() {
+          super()
+          this.name = 'simReadGroupArchive'
+          this.description = '查询本群近 1–14 天的本地消息归档（含近七天历史），供回顾和统计。可选关键词和分页，结果受归档留存与读取窗口限制。'
+          this.parameters = { type: 'object', properties: {
+            days: { type: 'number', minimum: 1, maximum: 14 },
+            keyword: { type: 'string', maxLength: 100 },
+            offset: { type: 'number', minimum: 0, maximum: 3000 },
+            limit: { type: 'number', minimum: 1, maximum: 20 },
+          }, required: ['days'], additionalProperties: false }
+        }
+        override async func(args: Record<string, unknown>) {
+          const { days, keyword, offset = 0, limit = 10 } = args
+          if (Object.keys(args).some(key => !Object.hasOwn(this.parameters.properties, key)) ||
+            typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 14 ||
+            typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > 3000 ||
+            typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 20 ||
+            (keyword !== undefined && (typeof keyword !== 'string' || keyword.length > 100))) return 'error: 归档查询参数无效'
+          const rows = await ports.readArchiveMessages!(groupId, days)
+          const search = typeof keyword === 'string' ? keyword.trim().toLowerCase() : ''
+          const matches = rows.filter(row => !search || row.text.toLowerCase().includes(search))
+          const messages = matches.slice(offset, offset + limit)
+          for (const message of messages) for (const match of message.text.matchAll(/https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)/giu)) {
+            try { observedRepos.add(projectRepo(match[0].replace(/[.]$/u, ''))) } catch { /* malformed link */ }
+          }
+          return { ok: true, messages, matchedInWindow: matches.length,
+            nextOffset: offset + limit < matches.length ? offset + limit : null, completeHistory: false }
+        }
+      }() : undefined
+      const catalogTools = new Map<string, AbstractTool>()
+      for (const tool of [...simulationTools.filter(tool => SCRIPT_DATA_TOOLS.has(tool.name)),
+        ...(archiveTool ? [archiveTool] : []), ...extraTools, ...mcpTools]) {
+        if (!catalogTools.has(tool.name)) catalogTools.set(tool.name, tool)
+      }
+      const skillTools: AbstractTool[] = capabilitiesEnabled ? createCharacterSkillTools({
+        store: skills,
+        ensureActive: ensureCapabilities,
+        catalog: () => [...catalogTools.values()].map(tool => ({
+          tool,
+          callable: !requiresClosing && allowedTool(tool) && !!capabilitySettings(groupId),
+          scriptable: SCRIPT_DATA_TOOLS.has(tool.name) && (tool === archiveTool || simulationTools.includes(tool)),
+          source: mcpTools.includes(tool) ? 'mcp' : extraTools.includes(tool) ? 'project' : 'simulation',
+        })),
+        invoke: (tool, args) => dispatchTool(tool, args),
+        async readData(tool, args) {
+          await ensureCapabilities()
+          const result = await runSimTool(tool, args, groupId, self.id, actor, toolReply)
+          if (result.startsWith('error:')) throw new WorkspaceInputError(result.slice(7, 300))
+          return JSON.parse(result) as unknown
+        },
+      }) : []
+      const tools = [...simulationTools, ...characterTools, finishTool, ...activityTools, ...skillTools, ...extraTools]
+      async function ensureCapabilities() {
+        await ensureExecution()
+        if (!capabilitySettings(groupId)) throw new WorkspaceInputError('本群能力目录与工作区已停用')
+      }
       const toolReply = async (payload: unknown) => {
         await ensureExecution()
         if (memoryBox.deliveryUnknown) throw new Error('上次发送结果未知，本回合不再发送，请核对回执')
@@ -1092,7 +1192,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         let receipt
         try { receipt = await ports.sendGroupMessage(groupId, transportSegments, self.id) }
         catch { memoryBox.deliveryUnknown = true; throw new Error('工具消息传输中断，是否送达未知，本回合不再发送') }
-        if (receipt.unknown) { memoryBox.deliveryUnknown = true; throw new Error('工具消息回执未确认，是否送达未知，本回合不再发送') }
+        if (receipt.unknown || (projectRelease && receipt.ok && (!receipt.messageId || String(receipt.messageId) === '0'))) { memoryBox.deliveryUnknown = true; throw new Error('工具消息回执未确认，是否送达未知，本回合不再发送') }
         if (!receipt.ok) throw new Error(receipt.error || '发送失败')
         memoryBox.sentTexts.push(...replyTexts)
         if (replyTexts.length) ctx.noteDelivery?.(replyTexts.join('\n'), receipt.messageId)
@@ -1102,10 +1202,29 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         await store.save(groupId, state!)
         return { message_id: receipt.messageId ?? '', data: { message_id: receipt.messageId ?? '' } }
       }
-      const allowedTool = (name: string) => actor.kind === 'user' || (
-        !AUTONOMOUS_DENIED_SIM_TOOLS.includes(name) && (simulationTools.some(tool => tool.name === name) || characterTools.some(tool => tool.name === name) || name === finishTool.name || activityTools.some(tool => tool.name === name) || AUTONOMOUS_EXTRA_TOOLS.includes(name) ||
-          (AUTONOMOUS_CREATIVE_TOOLS.includes(name) && (ports.getSection().autonomousTools || []).includes(name) && resolveExtraToolNames(runtimeConfig(), groupId).includes(name)))
-      )
+      const projectTool = projectRelease ? createProjectReviewTool({
+        release: projectRelease, skills, subscriptions, ensureActive: ensureCapabilities,
+        async send(text) { return Boolean(record(await toolReply(text)).message_id) },
+        close() { turnClosed = true },
+      }) : undefined
+      const allowedTool = (tool: AbstractTool): boolean => {
+        const name = tool.name
+        if (skillTools.includes(tool) || tool === archiveTool || tool === projectTool) return !!capabilitySettings(groupId)
+        const extension = mcpTools.includes(tool)
+        if (extension && !resolveMcpTools(groupId).some(current => current.name === name)) return false
+        if (capabilitiesEnabled && extraTools.includes(tool)) {
+          const config = runtimeConfig()
+          if (config.toolPolicy.denyTools.includes(name) || config.toolPolicy.groups[groupId]?.includes(name) ||
+            !resolveExtraToolNames(config, groupId).includes(name)) return false
+        }
+        if (actor.kind === 'user') return true
+        if (AUTONOMOUS_DENIED_SIM_TOOLS.includes(name)) return false
+        if (simulationTools.includes(tool) || characterTools.includes(tool) || tool === finishTool || activityTools.includes(tool)) return true
+        if (extraTools.includes(tool) && (AUTONOMOUS_EXTRA_TOOLS.includes(name) ||
+          (AUTONOMOUS_CREATIVE_TOOLS.includes(name) && ports.getSection().autonomousTools?.includes(name)))) return true
+        const autonomous = capabilitySettings(groupId)?.autonomousTools
+        return (extension || extraTools.includes(tool)) && Array.isArray(autonomous) && autonomous.includes(name)
+      }
       const ensureExecution = async (permit?: AnnouncementPermit) => {
         if (turnClosed && !permit) throw new Error('回合已结束，未执行')
         if (stopped) throw new Error('仿真运行时已停止')
@@ -1116,7 +1235,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (await shared.fingerprint() !== sharedFingerprint) throw new Error('共享偏好已改变，停止使用旧上下文')
         character = await characters.load(characterScope)
         if ([...sourceMemoryIds].some(id => !character.memories.some(memory => memory.id === id))) throw new Error('本轮引用的记忆已被删除，停止使用旧上下文')
-        if (actor.kind === 'autonomous' && (character.paused || (overridesCache?.atOnly || []).includes(groupId))) throw new Error('自主行动已暂停或仅被@回应')
+        if (actor.kind === 'autonomous' && (character.paused || ((overridesCache?.atOnly || []).includes(groupId) && !projectRelease))) throw new Error('自主行动已暂停或仅被@回应')
         if (focusedGoalId && (overridesCache?.atOnly || []).includes(groupId)) throw new Error('本群已切为仅被@回应，自主目标暂停执行')
         if (permit && character.revision !== permit.revision) throw new Error('收尾保存后角色状态已改变，停止公告或标读')
         if (focusedGoalId) {
@@ -1128,6 +1247,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         // Last asynchronous read before the caller executes/sends: the console
         // may have revoked the work while the permission checks were pending.
         if (await store.loadActivityVersion(groupId) !== activityVersion) throw new Error('角色活动内容已被管理员撤销，停止旧回合')
+        if (projectRelease) {
+          if (!projectsAllowed(groupId)) throw new Error('项目跟进已关闭')
+          await subscriptions.ensureProject(projectRelease)
+        }
       }
       // Repair an oversized plain directed reply before persistence or transport.
       // Repeated batches, state changes and explicit read-only closures keep the normal send contract.
@@ -1223,7 +1346,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         } catch { return 'unclear' }
       }
       const remainingMessageSlots = () => Math.max(0, Math.min(cfg.turn.maxSendsPerTurn - sends, followUpId ? 1 - sends : Infinity))
-      const executeTool = async (tool: typeof tools[number], args: Record<string, unknown>) => {
+      const executeTool = async (tool: AbstractTool, args: Record<string, unknown>): Promise<string> => {
         if (turnClosed) return 'error: 回合已结束，未执行'
         if (requiresClosing && tool !== finishTool) return 'error: 已进入收尾阶段，仅允许 simFinishTurn，未执行'
 
@@ -1234,8 +1357,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         // A failed save cannot subsequently fall through the ordinary-text sender.
         if (tool === finishTool) requiresClosing = true
         if (tool.name === 'simWorkerTask' && ports.characterWorkerAvailable?.() === false) return 'error: 工作器连接已停用'
-        if (!allowedTool(tool.name)) return 'error: 自主执行主体没有此工具权限，不能借用群友身份'
+        if (!allowedTool(tool)) return 'error: 自主执行主体没有此工具权限，不能借用群友身份'
         try { await ensureExecution() } catch (error) { return safeToolErrorText(tool.name, error) }
+        if (!allowedTool(tool)) return 'error: 能力授权已改变，未执行'
         if (tool.name === 'simRemember') {
           proactiveSourceSeq = undefined
           if (args.kind === 'pendingEvent' && args.scope !== 'self' && actor.kind === 'user' && actor.userId &&
@@ -1273,13 +1397,16 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           if (typeof args.messages === 'string') args = { ...args, messages: safeDiagnosticMessages([args.messages]) }
           else if (Array.isArray(args.messages)) args = { ...args, messages: safeDiagnosticMessages(args.messages) }
         }
-        const internal = tool === finishTool || characterTools.includes(tool) || ['simGetState', 'simGetUnreadMessages', 'simGetRecentMessages', 'simGetMessageDetail', 'simMarkRead', 'simWaitForMessages', 'simSetWakeConfig', 'simGetGroupMembers', 'simGetMessageImages', 'simGetForward'].includes(tool.name)
+        const internal = tool === finishTool || (tool === projectTool && args.action !== 'report') || characterTools.includes(tool) || tool === archiveTool ||
+          (skillTools.includes(tool) && tool.name === 'simCapabilities') || (skillTools.includes(tool) && tool.name === 'simScript' && ['list', 'read'].includes(String(args.action))) ||
+          (tool.name === 'simSkill' && ['list', 'read'].includes(String(args.action))) || ['simGetState', 'simGetUnreadMessages', 'simGetRecentMessages', 'simGetMessageDetail', 'simMarkRead', 'simWaitForMessages', 'simSetWakeConfig', 'simGetGroupMembers', 'simGetMessageImages', 'simGetForward'].includes(tool.name)
           || (['simRemember', 'simLifeThread'].includes(tool.name) && args.action === 'list')
         if (internal) {
           const result = await runSimTool(tool, args, groupId, self.id, actor, toolReply)
           exposeToolResult(tool.name, result.slice(0, 4000))
           return result
         }
+        if (capabilityActionUnknown) return 'error: 前序动作结果未知，本轮停止后续外部动作'
         const id = randomUUID()
         try {
           character = await characters.update(characterScope, current => focusedGoalId
@@ -1288,7 +1415,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         } catch (error) { return safeToolErrorText(tool.name, error) }
         const pending = character.receipts.find(item => item.id === id)!
         // A cancellation arriving while persistence was pending must be observed before the external call.
-        try { await ensureExecution() } catch (error) {
+        try {
+          await ensureExecution()
+          if (!allowedTool(tool)) throw new Error('能力授权已改变')
+        } catch (error) {
           character = await characters.update(characterScope, current => recordCharacterReceipt(current, { ...pending, status: 'failed', summary: '执行前已取消或授权变化，未调用工具', at: now() }, now()))
           return safeToolErrorText(tool.name, error)
         }
@@ -1296,6 +1426,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const alreadyUnknown = memoryBox.deliveryUnknown
         let result = await runSimTool(tool, args, groupId, self.id, actor, toolReply, status => { reported = status }, tool.name === 'simWorkerTask' ? id : undefined)
         const status = memoryBox.deliveryUnknown && !alreadyUnknown ? 'unknown' : reported ?? classifyCharacterResult(result)
+        if (status === 'unknown' && (extraTools.includes(tool) || mcpTools.includes(tool) || skillTools.includes(tool)) && capabilitiesEnabled) {
+          capabilityActionUnknown = true
+        }
         const summary = redactInternalStatusLeaks(result).text.slice(0, 500) || `${tool.name}: ${status}`
         const receipt: CharacterReceipt = { ...pending, status, summary, at: now() }
         // A lost final write leaves pending: recovery records unknown; never blindly repeat the side effect.
@@ -1321,21 +1454,36 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         sourceResults.set(`receipt:${id}`, { toolName: tool.name, content: result.slice(0, 8000), truncated: result.length > 8000 })
         return `${result}\n【运行时行动回执】${JSON.stringify({ evidenceRef: `receipt:${id}`, status, goalId: focusedGoalId })}`
       }
+      let capabilityActionUnknown = false
+      async function dispatchTool(tool: AbstractTool, args: Record<string, unknown>): Promise<string> {
+        if (tool.name !== 'sendLocalEmojiTool') return executeTool(tool, args)
+        const cooldownMs = safeNumber(() => ports.getEmojiCooldownMs?.()) || 90_000
+        const lastAt = emojiLastSentAt.get(groupId) || 0
+        if (now() - lastAt < cooldownMs) {
+          const waitSec = Math.ceil((cooldownMs - (now() - lastAt)) / 1000)
+          return `error: 表情包冷却中（还要 ${waitSec} 秒）。请直接用文字回应，本回合不要再发表情。`
+        }
+        const result = await executeTool(tool, args)
+        if (!result.startsWith('error:')) emojiLastSentAt.set(groupId, now())
+        return result
+      }
+      const directTools = projectTool ? [projectTool] : capabilitiesEnabled ? tools.filter(tool => !extraTools.includes(tool) || DIRECT_EXTRA_TOOLS.has(tool.name)) : tools
       const executionConfig = ports.getExecutionConfig()
       const providerConfig = record(executionConfig) as Parameters<typeof buildChatRequestData>[0]
-      const systemPrompt = buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames, hasEmojiTool: extraToolNames.includes('sendLocalEmojiTool'), hasMoodTool: cfg.mood.enabled, availableToolNames: tools.filter(tool => allowedTool(tool.name)).map(tool => tool.name) })
+      const systemPrompt = projectRelease ? '你是希洛。按群友已保存的关注点评估一条公开发布。' :
+        buildSimSystemPrompt({ persona: persona.persona, systemContent: persona.systemContent, selfName: self.name, hasExtraTools: extraTools.length > 0, extraToolNames, hasEmojiTool: extraToolNames.includes('sendLocalEmojiTool'), hasMoodTool: cfg.mood.enabled, availableToolNames: directTools.filter(allowedTool).map(tool => tool.name) }) + (capabilitiesEnabled ? '\n' + PROJECT_SKILL_GUIDE : '')
 
-      const history: SimHistoryMessage[] = [...projectedHistory, wakeMessage]
+      const history: SimHistoryMessage[] = projectRelease ? [{ role: 'user', content: projectReviewPrompt(projectRelease) }] : [...projectedHistory, wakeMessage]
       const firstCurrentMessage = projectedHistory.length
       type RawToolCall = NonNullable<SimHistoryMessage['tool_calls']>[number]
       let rounds = 0
       // 用户对话/正式托付的未外发文本兜底：自主回合的最终文本只留在内部历史。
       let nudgedForUnsent = false
-      while (rounds < cfg.turn.maxToolRounds) {
+      while (rounds < (projectRelease ? Math.min(4, cfg.turn.maxToolRounds) : cfg.turn.maxToolRounds)) {
         rounds += 1
-        const closing = requiresClosing || rounds > cfg.turn.maxToolRounds - 2
-        const roundTools = closing ? [finishTool] : tools.filter(tool => allowedTool(tool.name))
-        const context = buildCharacterTurnContext({ phase: closing ? 'closing' : 'acting', remainingToolRounds: cfg.turn.maxToolRounds - rounds + 1, remainingMessageSlots: remainingMessageSlots(), ...(focusedGoalId ? { focusedGoalId } : {}), visibleEvidenceRefs: visibleEvidenceRefs() }) +
+        const closing = !projectRelease && (requiresClosing || rounds > cfg.turn.maxToolRounds - 2)
+        const roundTools = closing ? [finishTool] : directTools.filter(allowedTool)
+        const context = projectRelease ? '仅用 simProjectReview 处理当前发布。' : buildCharacterTurnContext({ phase: closing ? 'closing' : 'acting', remainingToolRounds: cfg.turn.maxToolRounds - rounds + 1, remainingMessageSlots: remainingMessageSlots(), ...(focusedGoalId ? { focusedGoalId } : {}), visibleEvidenceRefs: visibleEvidenceRefs() }) +
           (anchor ? `\n当前只回应 #${anchor.seq} 的话题；同一人的前文也仅在有关时用。throughSeq 当前上限是 ${readThroughSeq(state)}，可省略。\n被问自己的口味时，先看角色自身状态，沿用相关的最新判断。形成可延续的选择或修订原判断，就把理由和回复放进 simFinishTurn.messages，并同次存 opinion/inferred；修订引用旧记忆并填写 supersedes。若这次的回复具体说到自己下次还想弄清什么，把这一点同次存为 interest/inferred。两者都用眼前依据（如 message:${anchor.seq}）；已有记录就沿用，随口客套无需存，也不因兴趣建目标。` : '') +
           (confirmedExamples.length >= 2 ? '\n如果这轮话题正好指出一个反复做过的小习惯，用已发回复核对；新习惯先用 simRemember 留下证据，再接话。' : '') +
           (interaction ? `\n${buildPersonaReplyModePrompt({ interactionContext: interaction })}` : '') +
@@ -1407,7 +1555,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           const callRecord = record(call)
           const fn = record(callRecord.function)
           const name = String(fn.name || '')
-          const tool = tools.find(t => t.name === name)
+          const tool = (projectRelease || capabilitiesEnabled ? directTools : tools).find(t => t.name === name)
           let resultText: string
           if (turnClosed) {
             resultText = 'error: 回合已结束，未执行'
@@ -1426,19 +1574,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             if (missingChatMessage && !nudgedForUnsent && rounds < cfg.turn.maxToolRounds) {
               nudgedForUnsent = true
               resultText = 'error: 回复正文写在工具参数外，群友看不到，且本次没有提交。请把想发送的完整正文写进 simFinishTurn 的 messages 再提交。先确认消息没有停在半句话；选择安静收尾时无需发送。'
-            } else if (name === 'sendLocalEmojiTool') {
-              // 仿真回合表情冷却：跨回合短冷却防刷屏（与主链路 postSendCooldownMs 同参）
-              const cooldownMs = safeNumber(() => ports.getEmojiCooldownMs?.()) || 90_000
-              const lastAt = emojiLastSentAt.get(groupId) || 0
-              if (now() - lastAt < cooldownMs) {
-                const waitSec = Math.ceil((cooldownMs - (now() - lastAt)) / 1000)
-                resultText = `error: 表情包冷却中（还要 ${waitSec} 秒）。请直接用文字回应，本回合不要再发表情。`
-              } else {
-                resultText = await executeTool(tool, args)
-                if (!(typeof resultText === 'string' && resultText.startsWith('error:'))) emojiLastSentAt.set(groupId, now())
-              }
             } else {
-              resultText = await executeTool(tool, args)
+              resultText = await dispatchTool(tool, args)
             }
           }
           // simGetMessageImages 的结果带回图片：主模型多为纯文本(实测 glm-5.3 收 image_url 直接 400，
@@ -1468,15 +1605,17 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const latestCharacter = await characters.load(characterScope)
       const removedSource = [...sourceMemoryIds].some(id => !latestCharacter.memories.some(memory => memory.id === id)) || await store.loadActivityVersion(groupId) !== activityVersion || await shared.fingerprint() !== sharedFingerprint
       const thisTurn = history.slice(firstCurrentMessage).map(message => conversationUserId ? { ...message, conversationUserId } : message)
-      state.agentHistory = removedSource ? [] : trimAgentHistory([...priorHistory, ...thisTurn], cfg.turn.historyMaxMessages, cfg.turn.historyMaxChars)
       if (removedSource) {
+        state.agentHistory = []
         delete state.lastConfirmedChat
         delete state.recentConfirmedReplies
+      } else if (!projectRelease) {
+        state.agentHistory = trimAgentHistory([...priorHistory, ...thisTurn], cfg.turn.historyMaxMessages, cfg.turn.historyMaxChars)
       }
       if (sends > 0 && !removedSource && actor.kind === 'user' && actor.userId && memoryBox.sentTexts.length) {
         state.lastConfirmedChat = { at: now(), userId: actor.userId, text: memoryBox.sentTexts.slice(-2).join('\n').slice(-500) }
       }
-      if (sends > 0) {
+      if (sends > 0 && !projectRelease) {
         const lastSent = memoryBox.sentTexts.at(-1) || ''
         const interlocutorScore = Number(affinity[state.conversation.lastTriggerUserId || '']?.score ?? 50)
         const multiplier = Math.min(2, (/[?？]/.test(lastSent) ? 1.5 : 1) * (sends >= 3 ? 1.3 : 1) * (interlocutorScore >= 81 ? 0.87 : 1))
@@ -1869,6 +2008,20 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           if (due) reasons.push({ kind: 'characterGoal', detail: due.id })
         } catch (error) { logger.warn(`[仿真] 群 ${groupId} 角色目标检查失败：${error instanceof Error ? error.message : String(error)}`) }
       }
+      // A scheduled conversation echo should not postpone a due project poll.
+      // Real messages and other scheduled work keep their existing priority.
+      if (!sleepingNow && projectsAllowed(groupId) && reasons.every(reason => reason.kind === 'replyCheck')) {
+        try {
+          const subscriptions = subscriptionsFor(scopeFor(groupId, state.botId))
+          const budgetAllows = checkWakeBudget(state, cfg, at, safeNumber(() => ports.getTodaySpendCny?.(groupId)), { kind: 'projectUpdate' }, groupId).allowed
+          if (budgetAllows && await subscriptions.dueProject()) reasons.push({ kind: 'projectUpdate' })
+          else if (budgetAllows && (await subscriptions.list()).some(item => item.project && item.status === 'active' && item.nextPollAt <= at)) {
+            for (const reason of reasons) state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, reason)
+            await runCharacterBackground(groupId, state, cfg, atOnly)
+            continue
+          }
+        } catch (error) { logger.warn(`[仿真] 群 ${groupId} 项目轮询检查失败：${error instanceof Error ? error.message : String(error)}`) }
+      }
       const hasWake = reasons.length > 0
       if (hasWake || scheduleChanged) await store.save(groupId, state)
       if (hasWake) {
@@ -1894,7 +2047,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   }
 
   /** One bounded background activity per group; no chat-sending port is passed to reflection. */
-  async function runCharacterBackground(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig): Promise<void> {
+  async function runCharacterBackground(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, projectsOnly = false): Promise<void> {
     background.add(groupId)
     liveStates.set(groupId, state)
     const scope = scopeFor(groupId, state.botId)
@@ -1908,7 +2061,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const guard = async () => {
       if (stopped || controller.signal.aborted) throw new Error('后台活动已停止')
       await refreshGroupState(true)
-      if (!groupActive(runtimeConfig(), groupId) || (overridesCache?.atOnly || []).includes(groupId) || scopeFor(groupId, state.botId).personaId !== scope.personaId) throw new Error('角色活动范围已改变')
+      if (!groupActive(runtimeConfig(), groupId) || (projectsOnly ? !projectsAllowed(groupId) : (overridesCache?.atOnly || []).includes(groupId)) || scopeFor(groupId, state.botId).personaId !== scope.personaId) throw new Error('角色活动范围已改变')
       const current = await characters.load(scope)
       if (current.paused || [...sources].some(id => !current.memories.some(m => m.id === id)) || await shared.fingerprint() !== fingerprint) throw new Error('角色暂停或来源已撤销')
       if (await store.loadActivityVersion(groupId) !== activityVersion) throw new Error('角色活动已撤销')
@@ -1920,12 +2073,13 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       await guard()
       if (!checkWakeBudget(state, runtimeConfig(), now(), safeNumber(() => ports.getTodaySpendCny?.(groupId)), null, groupId).allowed) return
       const subscriptions = subscriptionsFor(scope)
-      const dueSubscriptions = (await subscriptions.list()).some(item => item.status === 'active' && item.nextPollAt <= now())
+      const includeProjects = projectsAllowed(groupId)
+      const dueSubscriptions = (await subscriptions.list()).some(item => item.status === 'active' && item.nextPollAt <= now() && (item.project ? includeProjects : !projectsOnly))
       const pollReceiptId = dueSubscriptions ? randomUUID() : undefined
       if (pollReceiptId) await characters.update(scope, current => recordCharacterReceipt(current, { id: pollReceiptId, toolName: 'simSubscriptionPoll', status: 'pending', summary: '等待公开订阅抓取回执', at: now() }, now()))
       let update: Awaited<ReturnType<typeof subscriptions.poll>>
       try {
-        update = await subscriptions.poll(guard)
+        update = await subscriptions.poll(guard, includeProjects, projectsOnly)
         if (pollReceiptId) await characters.update(scope, current => recordCharacterReceipt(current, {
           id: pollReceiptId, toolName: 'simSubscriptionPoll', status: update.unknowns ? 'unknown' : update.failures && !update.updates.length ? 'failed' : 'succeeded',
           summary: (update.updates.length ? `取得公开订阅资料（未经事实核实）：${update.updates.slice(0,3).map(item => item.title).join('；')}${update.failures ? `；另有${update.failures}个订阅未取得结果` : ''}` : update.unknowns ? `${update.unknowns}个订阅超时，结果未知，未取得新资料` : update.failures ? `${update.failures}个订阅抓取失败，未取得新资料` : '订阅检查完成，没有新资料').slice(0,500), at: now(),
@@ -1939,7 +2093,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, { kind: 'interestUpdate', detail: update.updates.slice(0,2).map(item => item.title).join('；').slice(0,200) })
         await store.save(groupId, state)
       }
-      if (!update.updates.length && ports.reflectCharacter && ports.getSection().reflection?.enabled !== false) {
+      const projectDue = projectsAllowed(groupId) && await subscriptions.dueProject()
+      if (projectDue) {
+        state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, { kind: 'projectUpdate' })
+      }
+      if (!projectsOnly && !projectDue && !update.updates.length && ports.reflectCharacter && ports.getSection().reflection?.enabled !== false) {
         const reflection = reflectionFor(scope)
         await reflection.run({ guard, sharedSources: (await shared.projection()).map(item => item.id),
           ...(ports.getSection().consistency?.enabled === true ? { review: async (candidate: Record<string, unknown>, before: CharacterState, evidence: unknown) => {
@@ -2266,7 +2424,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       backgroundByGroup.get(groupId)?.abort()
       // 切到仅@时，已排期的自主类唤醒立即取消，避免切换后还突然冒一次泡
       const pending = pendingWakes.get(groupId)
-      if (pending && !AT_ONLY_WAKE_KINDS.has(pending.reason.kind)) { clearTimeout(pending.timer); pendingWakes.delete(groupId) }
+      if (pending && !AT_ONLY_WAKE_KINDS.has(pending.reason.kind) && !(pending.reason.kind === 'projectUpdate' && projectsAllowed(groupId))) { clearTimeout(pending.timer); pendingWakes.delete(groupId) }
       return `群 ${groupId} 已设为「仅被@才回」：消息照常看、照常记忆，但只有被@或引用时才说话（.仿真 模式 自主 可恢复）`
     }
     if (mode === 'active') {
@@ -2491,6 +2649,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           { name: '公开兴趣订阅', description: 'RSS、Atom、GitHub releases；有界轮询与更新去重', available: true },
           { name: '独立反思', description: '至少六小时一次、每日最多两次，受群预算与参与边界约束', available: !!ports.reflectCharacter && ports.getSection().reflection?.enabled !== false },
           { name: '跨群自我偏好', description: '只共享主人批准的角色观点/兴趣，来源撤销时失效', available: true },
+          { name: '项目能力目录与技能工作区', description: '查找已装配能力、运行 JavaScript 和复用已验证技能', available: !!capabilitySettings(groupId) },
           { name: '外部工作器', description: '可配置研究、图片或浏览器网关，受任务协议、超时、取消与真实回执约束', available: !!ports.runCharacterWorker && ports.characterWorkerAvailable?.() !== false },
           ...resolveExtraTools(resolveExtraToolNames(runtimeConfig(),groupId)).map(tool => ({ name: tool.name, description: (tool.description || '').slice(0,160), available: AUTONOMOUS_EXTRA_TOOLS.includes(tool.name) || (AUTONOMOUS_CREATIVE_TOOLS.includes(tool.name) && Array.isArray(ports.getSection().autonomousTools) && ports.getSection().autonomousTools!.includes(tool.name)) })),
         ],

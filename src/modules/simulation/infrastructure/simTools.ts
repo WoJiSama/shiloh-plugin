@@ -130,7 +130,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     constructor() {
       super()
       this.name = 'simGetRecentMessages'
-      this.description = '查群里最近的消息（含你已经读过的），用于回忆刚才聊了什么。从最新往旧返回。'
+      this.description = '查本群近期消息和消息数量（含你已经读过的），用于回忆刚才聊了什么。从最新往旧返回。'
       this.parameters = {
         type: 'object',
         properties: {

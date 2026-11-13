@@ -42,7 +42,7 @@ function fixture({
   identity = { id: 'shiloh', name: '希洛', systemContent: '喜欢独立游戏' },
   groups = [GROUP], script = () => quiet(), execute, writeFault, onSave, send, review, recordTokens,
   proactiveProbability = 0, seed = true, maxToolRounds = 8, maxSendsPerTurn = 5, consistencyEnabled,
-  judgeSocialPermission,
+  judgeSocialPermission, capabilities, readArchiveMessages, getMcpTools,
 } = {}) {
   if (seed) for (const groupId of groups) if (!kv.has(sessionKey(groupId))) seedSession(kv, groupId, botId, clock)
   const calls = []
@@ -77,6 +77,7 @@ function fixture({
     getSection: () => ({
       enabled: true, allGroups: false, groups,
       ...(consistencyEnabled === undefined ? {} : { consistency: { enabled: typeof consistencyEnabled === 'function' ? consistencyEnabled() : consistencyEnabled } }),
+      ...(capabilities ? { capabilities: capabilities() } : {}),
       extraTools: toolDefinitions.map(tool => tool.name), toolPolicy: { mode: 'legacy' },
       wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability, proactiveIdleMs: 60_000 },
       turn: { maxToolRounds, maxSendsPerTurn, minSendGapMs: 0, maxTurnsPerDay: 100 },
@@ -85,6 +86,8 @@ function fixture({
     getExecutionConfig: () => ({ useTools: true }),
     ...(review ? { reviewCharacter: review } : {}),
     ...(recordTokens ? { recordTokens } : {}),
+    ...(readArchiveMessages ? { readArchiveMessages } : {}),
+    ...(getMcpTools ? { getMcpTools } : {}),
     ...(judgeSocialPermission ? { judgeSocialPermission } : {}),
     getExtraTools: names => toolDefinitions.filter(tool => names.includes(tool.name)),
     async YTapi(request) {
@@ -1374,5 +1377,147 @@ test('管理员在回合中关闭审核后不再开始新审核请求', async ()
     await h.ingest(); await idle(h, 2)
     assert.equal(checks, 1)
     assert.equal(h.sent.length, 2)
+  } finally { h.runtime.stop() }
+})
+
+const capabilityResult = (request, name) => JSON.parse(toolResult(request, name).split('\n【运行时行动回执】')[0])
+
+test('角色从能力目录发现本群归档，组合近期与历史消息，验证并保存技能，重启后复用', async () => {
+  const code = `
+    const recent = project.call("simGetRecentMessages", { limit: 10 });
+    const archive = project.call("simReadGroupArchive", { days: input.days, keyword: input.keyword });
+    const summary = { recent: recent.count, archive: archive.messages.length };
+    workspace.write("discussion-summary.json", JSON.stringify(summary));
+    return summary;
+  `
+  const dependencies = ['simGetRecentMessages', 'simReadGroupArchive']
+  const configured = () => ({ enabled: true, groups: [GROUP] })
+  const reads = []
+  const readArchiveMessages = async (groupId, days) => {
+    reads.push({ groupId, days })
+    return [{ userId: '40000', text: '独立游戏发布了' }, { userId: '40001', text: '今天要去爬山' }]
+  }
+  const input = { days: 7, keyword: '独立游戏' }
+  const definition = {
+    action: 'save', name: 'discussion-summary', description: '按关键词统计本群近期和归档讨论',
+    code, capabilities: dependencies,
+    test: { input, calls: [
+      { name: 'simGetRecentMessages', arguments: { limit: 10 }, result: { count: 2 } },
+      { name: 'simReadGroupArchive', arguments: { days: 7, keyword: '独立游戏' }, result: { messages: [{ text: '独立游戏发布了' }] } },
+    ], expected: { recent: 2, archive: 1 } },
+  }
+  const first = fixture({
+    capabilities: configured, readArchiveMessages,
+    script(request, index) {
+      if (index === 0) {
+        assert.ok(request.tools.some(tool => tool.function.name === 'simCapabilities'))
+        assert.ok(!request.tools.some(tool => tool.function.name === 'simReadGroupArchive'))
+        return tools(toolCall('simCapabilities', { action: 'search', query: '本群近七天归档 查询' }))
+      }
+      if (index === 1) {
+        const entry = capabilityResult(request, 'simCapabilities').results[0]
+        assert.equal(entry.name, 'simReadGroupArchive')
+        assert.equal(entry.scriptable, true)
+        return tools(toolCall('simCapabilities', { action: 'describe', name: entry.name }))
+      }
+      if (index === 2) {
+        assert.deepEqual(capabilityResult(request, 'simCapabilities').parameters.required, ['days'])
+        return tools(toolCall('simScript', { action: 'run', code, capabilities: dependencies, input }))
+      }
+      if (index === 3) {
+        assert.deepEqual(capabilityResult(request, 'simScript').output, { recent: 1, archive: 1 })
+        return tools(toolCall('simSkill', { ...definition, test: { ...definition.test, expected: '错误预期' } }))
+      }
+      if (index === 4) {
+        assert.match(toolResult(request, 'simSkill'), /样例结果与预期不符/)
+        return tools(toolCall('simSkill', definition))
+      }
+      assert.equal(capabilityResult(request, 'simSkill').verified, 'fixture')
+      return tools(toolCall('simFinishTurn', { choice: 'silent', reason: '已保存可复用技能' }))
+    },
+  })
+  try {
+    await first.ingest('把群里关于独立游戏的消息做个统计')
+    await idle(first, 6)
+    assert.deepEqual(first.errors, [])
+    assert.deepEqual(reads, [{ groupId: GROUP, days: 7 }], '保存时只用样例，不调真实数据接口')
+    assert.deepEqual(first.sent, [])
+  } finally { first.runtime.stop() }
+
+  const second = fixture({
+    kv: first.kv, clock: { value: first.clock.value + 120_000 },
+    capabilities: configured, readArchiveMessages,
+    script(request, index) {
+      if (index === 0) return tools(toolCall('simCapabilities', { action: 'search', query: 'discussion-summary' }))
+      if (index === 1) {
+        assert.equal(capabilityResult(request, 'simCapabilities').results[0].source, 'skill')
+        return tools(toolCall('simSkill', { action: 'run', name: 'discussion-summary', input }))
+      }
+      if (index === 2) {
+        assert.deepEqual(capabilityResult(request, 'simSkill').output, { recent: 2, archive: 1 })
+        return tools(toolCall('simScript', { action: 'read', name: 'discussion-summary.json' }))
+      }
+      assert.deepEqual(JSON.parse(capabilityResult(request, 'simScript').content), { recent: 2, archive: 1 })
+      return tools(toolCall('simFinishTurn', { choice: 'silent', reason: '已复用技能' }))
+    },
+  })
+  try {
+    await second.ingest('用之前学会的技能再统计一下')
+    await idle(second, 4)
+    assert.deepEqual(second.errors, [])
+    assert.deepEqual(reads, [{ groupId: GROUP, days: 7 }, { groupId: GROUP, days: 7 }])
+  } finally { second.runtime.stop() }
+})
+
+test('仿真目录执行仍检查自主授权、实时撤权和隔离的数据接口', async () => {
+  let enabled = true
+  let autonomousTools = ['mcp_reference_lookup']
+  const executions = []
+  const mcp = {
+    name: 'mcp_reference_lookup', description: '查公开游戏资料',
+    parameters: { type: 'object', properties: {}, required: [] },
+    async execute(_args, event) {
+      executions.push(event)
+      return { ok: true, data: '公开资料' }
+    },
+  }
+  const h = fixture({
+    seed: false,
+    capabilities: () => ({ enabled, groups: [GROUP], mcpTools: [mcp.name], autonomousTools }),
+    getMcpTools: names => names.includes(mcp.name) ? [mcp] : [],
+    script(request, index) {
+      if (index === 0) return tools(
+        toolCall('simCapabilities', { action: 'call', name: 'ownerAdminTool' }),
+        toolCall('simCapabilities', { action: 'call', name: mcp.name }),
+      )
+      if (index === 1) {
+        const outputs = request.messages.filter(message => message.role === 'tool' && message.name === 'simCapabilities')
+        assert.match(outputs.at(-2).content, /未授权/)
+        assert.match(outputs.at(-1).content, /公开资料/)
+        autonomousTools = []
+        return tools(
+          toolCall('simCapabilities', { action: 'call', name: mcp.name }),
+          toolCall('simScript', { action: 'run', code: 'return typeof process' }),
+        )
+      }
+      if (index === 2) {
+        assert.match(toolResult(request, 'simCapabilities'), /未授权/)
+        assert.equal(capabilityResult(request, 'simScript').output, 'undefined')
+        enabled = false
+        return tools(toolCall('simScript', { action: 'run', code: 'return 1' }))
+      }
+      assert.match(toolResult(request, 'simScript'), /没有此工具权限|未执行/)
+      return quiet()
+    },
+  })
+  try {
+    await h.ingest('群里的闲聊消息', '40000', { at: false })
+    await idle(h, 4)
+    assert.deepEqual(h.errors, [])
+    assert.deepEqual(h.events, [])
+    assert.equal(executions.length, 1)
+    assert.equal(executions[0].simulationActor.kind, 'autonomous')
+    assert.equal(executions[0].user_id, undefined)
+    assert.equal(executions[0].group_id, Number(GROUP))
   } finally { h.runtime.stop() }
 })

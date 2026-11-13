@@ -9,9 +9,22 @@ export interface CharacterWork {
 }
 export interface CharacterWorkState { schemaVersion: 1; scope: CharacterScope; works: CharacterWork[] }
 export interface CharacterFeedItem { id: string; title: string; url: string; summary: string; receivedAt: number; publishedAt?: number }
+export interface ProjectReleaseReview {
+  itemId: string
+  attempts: number
+  nextAt: number
+  status: 'pending' | 'ignored' | 'reported' | 'unknown' | 'failed'
+}
+export interface ProjectFollowUp {
+  focus: string
+  skill: string
+  initialized: boolean
+  reviews: ProjectReleaseReview[]
+}
 export interface CharacterSubscription {
   id: string; title: string; kind: 'rss' | 'github'; url: string; status: 'active' | 'paused';
   intervalMs: number; nextPollAt: number; failures: number; revision: number;
+  project?: ProjectFollowUp
   seenIds: string[]; items: CharacterFeedItem[]; createdAt: number; updatedAt: number
 }
 export interface CharacterSubscriptionState { schemaVersion: 1; scope: CharacterScope; subscriptions: CharacterSubscription[] }
