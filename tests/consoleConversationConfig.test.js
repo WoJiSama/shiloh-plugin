@@ -88,13 +88,15 @@ async function startServer(root, t) {
     stdio: ["ignore", "pipe", "pipe"]
   })
   t.after(async () => {
-    if (child.exitCode !== null) return
+    if (child.exitCode !== null || child.signalCode !== null) return
+    const exited = new Promise(resolve => child.once("exit", resolve))
     child.kill("SIGTERM")
-    await new Promise(resolve => child.once("exit", resolve))
+    await exited
   })
   return new Promise((resolve, reject) => {
     let output = ""
-    const timeout = setTimeout(() => { child.kill(); reject(new Error("conversation fixture server startup timed out")) }, 20000)
+    // This fixture starts a separate process that verifies the full artifact tree.
+    const timeout = setTimeout(() => { child.kill(); reject(new Error(`conversation fixture server startup timed out: ${output.slice(-4096)}`)) }, 60000)
     child.stdout.on("data", chunk => {
       output += chunk.toString()
       const match = output.match(/listening on (http:\/\/127\.0\.0\.1:\d+)/)
