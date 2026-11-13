@@ -8,6 +8,11 @@ import type {DrawEvent,DrawOptions} from '../../../contracts/bananaTool.js';
 import {parseDrawEvent,parseDrawOptions} from './bananaDecoders.js';
 import {pixivRecord as record,pixivText as text} from '../../../contracts/pixiv.js';
 interface SearchResponse {ok:boolean;status:number;json():Promise<unknown>}
+/** 北京时间 MM-DD HH:mm(搜索结果时间戳用,与承诺账本同款格式) */
+function beijingClock(at:number):string {
+  return new Date(at + 8 * 3600_000).toISOString().slice(5, 16).replace('T', ' ')
+}
+const SEARCH_ATTEMPTS = 2
 type SearchFetch=(url:string,init:{method:string;headers:Record<string,string>;body:string;signal:AbortSignal})=>Promise<SearchResponse>;
 export interface SearchInformationOptions {fetchImpl?:SearchFetch;progressFetchImpl?:typeof globalThis.fetch;progressDelayMs?:number;configLoader?:()=>unknown;progressReplyFactory?:AnalysisPorts['progressReplyFactory']}
 export function createSearchInformationTool(ports:{totalTokens(text:string):Promise<{completion_tokens:number}>;progressReplyFactory:AnalysisPorts['progressReplyFactory'];debug(message:string):void}){
@@ -40,7 +45,7 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
   }:SearchInformationOptions = {}) {
     super();
     this.name = 'searchInformationTool';
-    this.description = '请求外部 API 进行自由搜索，检索结果，对于需要进行搜索或需要实时数据信息的时候使用，总结群聊聊天记录时无需调用';
+    this.description = '请求外部 API 进行自由搜索，检索结果，对于需要进行搜索或需要实时数据信息的时候使用，总结群聊聊天记录时无需调用。结果开头带查询时间：转述结论时自然带上「几点查到的版本」；群友说有新进展或突发事件被质疑时，重新搜索确认，不要拿旧结果当现在的现状';
     this.parameters = {
       type: "object",
       properties: {
@@ -216,8 +221,6 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
       }
       // 联网搜索在服务端要完成「搜+读+总结」,实测 30s 上下,默认超时比普通对话放宽
       timeoutMs = Math.max(3000, Number(searchConfig.timeoutMs) || 40000)
-      controller = new AbortController()
-      requestTimeout = setTimeout(() => controller?.abort(), timeoutMs)
       if(canReply)progressTimer = setTimeout(() => {
         progressController = new AbortController()
         void this.sendContextualProgress({
@@ -230,16 +233,32 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
         })
       }, this.progressDelayMs)
 
-      const response = await (proxyFetch || this.fetchImpl)(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestData),
-        signal: controller.signal
-      })
-      clearTimeout(requestTimeout)
+      // 突发热点时搜索后端(服务端要搜+读+总结)容易过载超时——2026-11-12 老黄辞职夜,
+      // 重搜 60s 超时导致模型退回 6 小时前的旧结论当现状。超时自动重试一次;
+      // 非超时错误(配额/4xx/网络拒绝)重试无意义,照旧直接失败。
+      let response: SearchResponse | null = null
+      for (let attempt = 1; attempt <= SEARCH_ATTEMPTS; attempt += 1) {
+        controller = new AbortController()
+        requestTimeout = setTimeout(() => controller?.abort(), timeoutMs)
+        try {
+          response = await (proxyFetch || this.fetchImpl)(apiUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(requestData),
+            signal: controller.signal
+          })
+          break
+        } catch (error) {
+          if (record(error).name !== 'AbortError' || attempt >= SEARCH_ATTEMPTS) throw error
+          ports.debug(`[搜索] 第 ${attempt} 次请求超时(${Math.round(timeoutMs / 1000)}s)，自动重试一次`)
+        } finally {
+          clearTimeout(requestTimeout)
+        }
+      }
+      if (!response) throw new Error('搜索请求未返回')
 
       // 非 JSON 响应体(如网关 HTML)不应顶替真实状态码;4xx/5xx 时透传上游 error.message(如配额不足)供最终回复如实说明
       const analysis = record(await response.json().catch(() => null))
@@ -250,12 +269,14 @@ maxTokens:number;fetchImpl:SearchFetch;progressFetchImpl:typeof globalThis.fetch
       const content = record(record(Array.isArray(analysis.choices)?analysis.choices[0]:null).message).content
       if (typeof content!=='string'||!content.trim()) throw new Error('搜索服务没有返回可用结果')
       if (typeof rawEvent.simulationReportOutcome === 'function') rawEvent.simulationReportOutcome('succeeded');
-      return content + '\n\n提示：如果用户想基于搜索结果制作文件，可以使用 aiMindMapTool 工具继续操作。'
+      return `【搜索完成于 ${beijingClock(Date.now())} 北京时间，转述时带上这个时间】\n${content}\n\n提示：如果用户想基于搜索结果制作文件，可以使用 aiMindMapTool 工具继续操作。`
 
     } catch (error) {
       if (typeof rawEvent.simulationReportOutcome === 'function') rawEvent.simulationReportOutcome('failed');
       console.error('搜索过程发生错误:', error);
-      const message = record(error).name === 'AbortError' ? `搜索超过 ${Math.ceil(timeoutMs / 1000)} 秒仍未返回` : (error instanceof Error?error.message:'发生未知错误')
+      const message = record(error).name === 'AbortError'
+        ? `连续 ${SEARCH_ATTEMPTS} 次搜索各超过 ${Math.ceil(timeoutMs / 1000)} 秒仍未返回（搜索服务可能正过载）。要如实告诉用户"网搜暂时卡住了、我拿不准"，绝不能把之前搜到的旧结论当成现在的最新事实转述`
+        : (error instanceof Error?error.message:'发生未知错误')
       return `搜索失败：${message}`;
     } finally {
       completed = true
