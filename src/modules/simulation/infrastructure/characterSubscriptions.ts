@@ -16,6 +16,7 @@ const MIN_INTERVAL = 3600_000
 const MAX_INTERVAL = 7 * 24 * MIN_INTERVAL
 const MAX_RELEASE_SUMMARY = 2200
 const MAX_BODY_BYTES = 512 * 1024
+const MAX_GITHUB_BODY_BYTES = 2 * 1024 * 1024
 const MAX_FETCH_MS = 10_000
 const pollLocks = new WeakMap<object, Map<string, Promise<{ updates: CharacterFeedItem[]; failures: number; unknowns?: number }>>>()
 class FeedTimeoutError extends Error {}
@@ -114,7 +115,7 @@ export function normalizePublicFeedUrl(input: unknown, kind: Kind = 'rss'): stri
   return url.href
 }
 
-function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number): Promise<PublicResponse> {
+function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number, maxBytes: number): Promise<PublicResponse> {
   return new Promise((resolve, reject) => {
     const pinnedLookup = ((_host: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => callback(null, address.address, address.family)) as LookupFunction
     const request = https.request(url, {
@@ -128,12 +129,12 @@ function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number): Pro
         return
       }
       if (response.headers['content-encoding'] && response.headers['content-encoding'] !== 'identity') { response.destroy(); reject(new Error('订阅不接受压缩响应')); return }
-      if (Number(response.headers['content-length']) > MAX_BODY_BYTES) { response.destroy(); reject(new Error('订阅响应过大')); return }
+      if (Number(response.headers['content-length']) > maxBytes) { response.destroy(); reject(new Error('订阅响应过大')); return }
       const chunks: Buffer[] = []
       let size = 0
       response.on('data', (chunk: Buffer) => {
         size += chunk.length
-        if (size > MAX_BODY_BYTES) { response.destroy(new Error('订阅响应过大')); return }
+        if (size > maxBytes) { response.destroy(new Error('订阅响应过大')); return }
         chunks.push(chunk)
       })
       response.on('error', reject)
@@ -149,7 +150,8 @@ function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number): Pro
 /** DNS results are validated in full; HTTPS connects to a validated pinned IP. */
 export async function fetchPublicFeed(input: string, kind: Kind, dependencies: PublicFeedDependencies = {}): Promise<CharacterFeedItem[]> {
   const lookup = dependencies.lookup || (hostname => dnsLookup(hostname, { all: true, verbatim: true }))
-  const request = dependencies.request || nativeRequest
+  const maxBytes = kind === 'github' ? MAX_GITHUB_BODY_BYTES : MAX_BODY_BYTES
+  const request = dependencies.request || ((url, address, timeoutMs) => nativeRequest(url, address, timeoutMs, maxBytes))
   let url = new URL(normalizePublicFeedUrl(input, kind))
   const deadline = Date.now() + MAX_FETCH_MS
   const guarded = async <T>(operation: Promise<T>): Promise<T> => {
@@ -172,7 +174,7 @@ export async function fetchPublicFeed(input: string, kind: Kind, dependencies: P
       continue
     }
     if (response.status < 200 || response.status >= 300) throw new Error(`订阅HTTP失败：${response.status}`)
-    if (Buffer.byteLength(response.body) > MAX_BODY_BYTES) throw new Error('订阅响应过大')
+    if (Buffer.byteLength(response.body) > maxBytes) throw new Error('订阅响应过大')
     return parseFeed(response.body, kind, url.href, Date.now())
   }
   throw new Error('订阅重定向过多')

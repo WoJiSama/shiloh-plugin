@@ -73,6 +73,19 @@ test('HTTP transport validates every DNS answer and redirect before requesting a
   }), /重定向/)
 })
 
+test('GitHub releases with many assets fit the separate bounded response limit', async () => {
+  const body = JSON.stringify([{ id: 7, name: 'v7', html_url: 'https://github.com/owner/repo/releases/tag/v7',
+    body: 'Actual update', assets: [{ description: 'x'.repeat(530000) }] }])
+  const lookup = async () => [{ address: '8.8.8.8', family: 4 }]
+  const result = await fetchPublicFeed('https://github.com/owner/repo', 'github', {
+    lookup, request: async () => ({ status: 200, body }),
+  })
+  assert.equal(result[0].summary, 'Actual update')
+  await assert.rejects(fetchPublicFeed('https://example.com/feed', 'rss', {
+    lookup, request: async () => ({ status: 200, body }),
+  }), /过大/)
+})
+
 test('subscriptions poll no earlier than one hour, deduplicate after restart, and do not send messages', async () => {
   let fetches = 0
   const h = harness({ fetchFeed: async () => { fetches++; return parseFeed(rss, 'rss', 'https://example.com/feed', h.clock.value) } })
