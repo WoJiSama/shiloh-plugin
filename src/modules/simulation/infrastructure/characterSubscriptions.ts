@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { lookup as dnsLookup } from 'node:dns/promises'
 import type { LookupAddress } from 'node:dns'
 import https from 'node:https'
+import { createGunzip } from 'node:zlib'
 import { createRequire } from 'node:module'
 import { isIP } from 'node:net'
 import type { LookupFunction } from 'node:net'
@@ -115,12 +116,12 @@ export function normalizePublicFeedUrl(input: unknown, kind: Kind = 'rss'): stri
   return url.href
 }
 
-function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number, maxBytes: number): Promise<PublicResponse> {
+function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number, maxBytes: number, gzip: boolean): Promise<PublicResponse> {
   return new Promise((resolve, reject) => {
     const pinnedLookup = ((_host: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => callback(null, address.address, address.family)) as LookupFunction
     const request = https.request(url, {
       method: 'GET', agent: false, family: address.family, lookup: pinnedLookup,
-      headers: { Accept: 'application/rss+xml, application/atom+xml, application/json, application/xml, text/xml', 'Accept-Encoding': 'identity', 'User-Agent': 'Shiloh-Character-Subscriptions/1.0' },
+      headers: { Accept: 'application/rss+xml, application/atom+xml, application/json, application/xml, text/xml', 'Accept-Encoding': gzip ? 'gzip' : 'identity', 'User-Agent': 'Shiloh-Character-Subscriptions/1.0' },
     }, response => {
       const status = response.statusCode || 0
       if (status >= 300 && status < 400) {
@@ -128,17 +129,33 @@ function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number, maxB
         resolve({ status, body: '', ...(response.headers.location ? { location: response.headers.location } : {}) })
         return
       }
-      if (response.headers['content-encoding'] && response.headers['content-encoding'] !== 'identity') { response.destroy(); reject(new Error('订阅不接受压缩响应')); return }
+      const encoding = response.headers['content-encoding']
+      if (encoding && encoding !== 'identity' && !(gzip && encoding === 'gzip')) {
+        response.destroy(); reject(new Error('订阅响应编码不受支持')); return
+      }
       if (Number(response.headers['content-length']) > maxBytes) { response.destroy(); reject(new Error('订阅响应过大')); return }
+      const decoder = encoding === 'gzip' ? createGunzip() : undefined
+      const stream = decoder ?? response
+      const stop = (error: Error) => { decoder?.destroy(); response.destroy(); reject(error) }
+      if (decoder) {
+        let compressed = 0
+        response.on('data', (chunk: Buffer) => {
+          compressed += chunk.length
+          if (compressed > maxBytes) stop(new Error('订阅响应过大'))
+        })
+        response.once('error', stop)
+        response.once('aborted', () => stop(new Error('订阅响应中断')))
+        response.pipe(decoder)
+      }
       const chunks: Buffer[] = []
       let size = 0
-      response.on('data', (chunk: Buffer) => {
+      stream.on('data', (chunk: Buffer) => {
         size += chunk.length
-        if (size > maxBytes) { response.destroy(new Error('订阅响应过大')); return }
+        if (size > maxBytes) { stop(new Error('订阅响应过大')); return }
         chunks.push(chunk)
       })
-      response.on('error', reject)
-      response.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8') }))
+      stream.on('error', stop)
+      stream.on('end', () => resolve({ status, body: Buffer.concat(chunks).toString('utf8') }))
     })
     const timer = setTimeout(() => request.destroy(new FeedTimeoutError('订阅请求超时')), Math.max(1, timeoutMs))
     request.on('error', reject)
@@ -151,7 +168,7 @@ function nativeRequest(url: URL, address: LookupAddress, timeoutMs: number, maxB
 export async function fetchPublicFeed(input: string, kind: Kind, dependencies: PublicFeedDependencies = {}): Promise<CharacterFeedItem[]> {
   const lookup = dependencies.lookup || (hostname => dnsLookup(hostname, { all: true, verbatim: true }))
   const maxBytes = kind === 'github' ? MAX_GITHUB_BODY_BYTES : MAX_BODY_BYTES
-  const request = dependencies.request || ((url, address, timeoutMs) => nativeRequest(url, address, timeoutMs, maxBytes))
+  const request = dependencies.request || ((url, address, timeoutMs) => nativeRequest(url, address, timeoutMs, maxBytes, kind === 'github'))
   let url = new URL(normalizePublicFeedUrl(input, kind))
   const deadline = Date.now() + MAX_FETCH_MS
   const guarded = async <T>(operation: Promise<T>): Promise<T> => {

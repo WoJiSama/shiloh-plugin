@@ -54,7 +54,8 @@ test("extracts and enriches a Douyin text share from public router data", async 
 test("does not create a Douyin card for unrelated text or failed public data", async () => {
   assert.equal(extractDouyinShareFromText("https://example.com/video"), null)
   const segments = await enrichDouyinMessageSegments([{ type: "text", text: "https://v.douyin.com/test/" }], "", {
-    fetchImpl: async () => ({ ok: false, url: "https://www.iesdouyin.com/share/video/1/", async text() { return "" } })
+    fetchImpl: async () => ({ ok: false, url: "https://www.iesdouyin.com/share/video/1/", async text() { return "" } }),
+    browserResolver: async () => null
   })
   assert.equal(segments.length, 2)
   assert.equal(segments[1].type, "douyin")
