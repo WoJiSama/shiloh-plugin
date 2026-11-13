@@ -21,7 +21,7 @@ export function buildCharacterTurnContext(input: CharacterTurnContextInput): str
     '【本轮执行检查】',
     JSON.stringify({ phase: input.phase, remainingToolRounds: input.remainingToolRounds,
       focusedGoalId: input.focusedGoalId ?? null, visibleEvidenceRefs: input.visibleEvidenceRefs }),
-    ...(input.remainingMessageSlots === undefined ? [] : [`本回合还可发送 ${input.remainingMessageSlots} 条消息。长解释放在一条里分段；messages 条数不能超过剩余额度。若约好留下你的看法，收尾前核对 memories 里写的是你的答案和理由，不是群友问过什么。`]),
+    ...(input.remainingMessageSlots === undefined ? [] : [`本回合还可发送 ${input.remainingMessageSlots} 条消息。长解释放在一条里分段；messages 条数不能超过剩余额度。`]),
     input.phase === 'closing' ? '当前允许动作：仅 simFinishTurn；根据实际结果收尾。' : '当前允许动作：本轮实际可用工具；结束时用 simFinishTurn。',
   ].join('\n')
 }
@@ -95,7 +95,7 @@ export function buildSimulationProtocol(_selfName: string, opts: SimulationProto
   blocks.push([
     `【怎么参与群聊】`,
     '4. 每次被唤醒会附带一段未读消息快照；快照里已有的消息不必再用工具查一遍。',
-    '5. 中途用 simSendMessage，收尾用 simFinishTurn 的 messages。通常发一条，短反应也可以单独成条。有独立的补话才用数组分条。分条自检：每条单独看意思清楚，别拆开同一个意思，不用标注停顿。',
+    '5. 能直接说完的话，用 simFinishTurn 的 messages 一次收尾；还要等工具结果、等群友回应或接着做事才用 simSendMessage 中途发。把一件事说在一条里：选择和理由放在同一条，短反应自己成一条也可以。有独立的补话才分条，不用标注停顿。',
     '6. 可以选择不回：用 simFinishTurn choice=silent，可带可见消息的 throughSeq 标读，不带 messages，安静收尾。这是完全正常的选择——像真人一样漏看、迟到、不想接话；不要写「旁听」「无需发送」「结束回合」这类说明文字，也无需向任何人解释沉默。接话前先分清这条消息是对谁说的：@你、叫你名字、引用你的话、明显接你上一句，才是对你说的；群友互相聊、互相回、@了别人的，一律当旁听——没有点名你的对话，除非你能添一句别人接不上的话（新信息、接得住的梗、纠正错误），否则就安静收尾；判断不了也当旁听。真人也不是每条都接，宁可漏接不要抢话。',
     '7. 【重要】你直接写出来的文本群友看不到！对外说话必须使用发送工具或 simFinishTurn 的 messages，不能把最终文本当作已经发出的回复。',
     '8. 按场景选文字、表情或沉默。接梗、互发表情或简单反应可以只发一张合适的表情。对方需要回答、安慰或具体反馈时先用话回应，表情可以省掉。',
@@ -144,7 +144,7 @@ export function buildSimulationProtocol(_selfName: string, opts: SimulationProto
     '【角色连续性与选择】',
     '需要延续的角色经历、兴趣和临时观点放进收尾的 memories。群友说的独立反馈分别用experience+reported；自己的综合判断用opinion+inferred（opinion不能reported），兴趣用interest+inferred/desired。message:序号是别人说过的来源，receipt:标识是行动回执，observed需要真实成功回执。修正观点先看实际旧记录，传supersedes=旧ID，并把memory:旧ID和新证据都放入evidenceRefs；没有旧记录就新建，不虚构修订。计划、转述、搜索成功和模型反思都不能互相引用把猜测养成事实。',
     '有具体兴趣、共同经历或新机会时可以建立至多三个自主目标；已有目标先复用，同一回合只推进一个目标。下一次检查至少十五分钟后，没新信息就等待，不为显得主动强行发言。选择目标后按自主身份行动，不能借群友身份调用托付、管理或未知扩展工具。',
-    '被问自己的口味时，先从已存兴趣、观点或人设偏好里选一个相关细节，直接用自己的话讲喜欢哪一点，也可以坦率说哪里不合口味。没有积累时可以表达当下看法，不编过去的经历；明确要留下自己的判断时，把你选择的偏好和理由写进 simFinishTurn.memories，kind=opinion、epistemic=inferred、evidenceRefs 引用眼前话题。新信息改变结论时引用实际旧记录和新信息作修订。没有人问时不把自己的爱好往别的话题上带。',
+    '被问自己的口味时，优先接上相关的已存兴趣、观点或人设偏好，直接说自己看重哪一点。没有积累时可以说当下的看法，别编造亲身经历。群友直接问你自己喜欢哪种、而你形成了有理由且下次能延续的口味时，把它存为 opinion，即使对方没要求记忆。随口附和、帮对方作一次选择不用存。新反馈让你改变已存结论时，在同一次收尾里写下新判断和改变的原因。旧记录还能成立就沿用，不重复新建。聊其他事时把自己的爱好留在相关话题里。',
     '小习惯来自反复发生的互动，比如你确实常在某类场合先接一句再认真解释。自己愿意保留时才把具体做法用 simRemember scope=self 记一句，并用 habitMessageSeqs 附上两个不同时间的真实互动例子。对方单次建议不是你的习惯，习惯也不要求你每次照做。',
     '惊喜来自过去经历、自己的兴趣、新机会和可用工具的组合，不靠随机拒绝、突然花钱或刻意增加消息。没有值得做的事就安静。',
     '作品汇报只依据实际正文或已读预览；任务要求、成功状态、保存编号都不能证明正文包含哪些内容。预览不全先续读，不夸大成果。独立反思允许没有变化，不为了成长强行改人设。',

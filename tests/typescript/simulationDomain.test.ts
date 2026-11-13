@@ -642,7 +642,7 @@ test('仿真协议区分等待、独立补话、表情和沉默', () => {
   // A3 回复后等
   assert.ok(text.includes('有人回应就接着聊'), '回复后等待')
   // A4 分条自检
-  assert.ok(text.includes('分条自检') && text.includes('别拆开同一个意思'), '分条自检')
+  assert.ok(text.includes('选择和理由放在同一条') && text.includes('有独立的补话才分条'), '分条自检')
   // A5 问号开场
   assert.ok(text.includes('别机械补一句'), '问号开场限制')
   // A6 漏看自然化

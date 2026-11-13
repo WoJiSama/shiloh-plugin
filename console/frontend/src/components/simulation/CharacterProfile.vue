@@ -1,13 +1,30 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { AlarmClock, BookOpen, Heart, Lightbulb, MessageCircle } from 'lucide-vue-next'
 import { NTag } from 'naive-ui'
+import type { CharacterMemory } from '../../../../../src/contracts/character'
 import type { CharacterProfile } from '../../../../../src/contracts/characterProfile'
 import CharacterEvidence from './CharacterEvidence.vue'
 
-defineProps<{ profile: CharacterProfile }>()
+const props = defineProps<{ profile: CharacterProfile; memories: CharacterMemory[] }>()
 const certainty: Record<string, string> = { reported: '他人提及', observed: '实际行动', inferred: '当前判断', desired: '有意尝试' }
 const hour = (value: number) => `${String(value).padStart(2, '0')}:00`
 const date = (at: number) => new Date(at).toLocaleDateString('zh-CN')
+
+const revisions = computed(() => {
+  const byId = new Map(props.memories.map(memory => [memory.id, memory]))
+  return new Map([...props.profile.interests, ...props.profile.opinions].map(item => {
+    const history: CharacterMemory[] = []
+    const seen = new Set([item.id])
+    let previous = item.supersedes ? byId.get(item.supersedes) : undefined
+    while (previous && previous.kind === item.kind && !seen.has(previous.id)) {
+      history.push(previous)
+      seen.add(previous.id)
+      previous = previous.supersedes ? byId.get(previous.supersedes) : undefined
+    }
+    return [item.id, history]
+  }))
+})
 </script>
 
 <template>
@@ -51,6 +68,16 @@ const date = (at: number) => new Date(at).toLocaleDateString('zh-CN')
           <p>{{ item.content }}</p>
           <small>{{ certainty[item.epistemic] }} · {{ date(item.updatedAt) }}<template v-if="item.supersedes"> · 已修订</template></small>
           <CharacterEvidence :refs="item.evidenceRefs" :evidence="profile.evidence" />
+          <details v-if="revisions.get(item.id)?.length" class="revisions">
+            <summary>查看 {{ revisions.get(item.id)?.length }} 次修订</summary>
+            <ol>
+              <li v-for="previous in revisions.get(item.id)" :key="previous.id">
+                <small>旧版本 · {{ date(previous.updatedAt) }}</small>
+                <p>{{ previous.content }}</p>
+                <CharacterEvidence :refs="previous.evidenceRefs" :evidence="profile.evidence" />
+              </li>
+            </ol>
+          </details>
         </article>
       </div>
     </section>
@@ -89,6 +116,11 @@ const date = (at: number) => new Date(at).toLocaleDateString('zh-CN')
 .profile-entry { border-top: 1px solid var(--c-border, #8883); padding: 10px 0; }
 .profile-entry p { margin-bottom: 4px; }
 .profile-work { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.revisions { margin-top: 8px; font-size: 13px; }
+.revisions summary { cursor: pointer; width: fit-content; }
+.revisions ol { list-style: none; margin: 8px 0 0; padding: 0 0 0 12px; border-inline-start: 2px solid var(--c-border, #8884); }
+.revisions li + li { margin-top: 12px; }
+.revisions li p { margin-top: 4px; }
 @media (max-width: 700px) {
   .profile-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .profile-panel { padding: 13px; }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import type { CharacterMemory } from '../../../../src/contracts/character'
 import type { CharacterProfile as ProfileView } from '../../../../src/contracts/characterProfile'
 import CharacterProfile from '../components/simulation/CharacterProfile.vue'
 import CharacterEvidence from '../components/simulation/CharacterEvidence.vue'
@@ -23,7 +24,7 @@ interface CharacterView {
   scope: { botId: string; personaId: string; groupId: string }
   paused: boolean
   decision?: { kind: string; reason: string; at: number }
-  memories: { id: string; kind: string; content: string; epistemic: string; evidenceRefs: string[]; createdAt: number; updatedAt: number }[]
+  memories: CharacterMemory[]
   goals: { id: string; title: string; motivation: string; nextStep: string; completionCriteria: string; status: string; nextCheckAt: number; expiresAt: number; attempts: number; maxAttempts: number; lastOutcome?: string; evidenceRefs?: string[] }[]
   receipts: { id: string; toolName: string; status: string; summary: string; at: number; goalId?: string }[]
 }
@@ -360,7 +361,7 @@ const detailDescription = computed(() => [groupName.value, selectedGroup.value, 
     <PageState :loading="detailLoading && !detail" :error="detailError" @retry="refreshCharacter" />
     <NTabs v-if="detail" :value="selectedTab" type="line" class="character-tabs" @update:value="selectTab">
       <NTabPane name="profile" tab="角色档案">
-        <CharacterProfile v-if="detail.profile" :profile="detail.profile" />
+        <CharacterProfile v-if="detail.profile" :key="detail.groupId" :profile="detail.profile" :memories="detail.character?.memories ?? []" />
         <NAlert v-else type="info">{{ detail.characterBinding?.reason || '当前没有可用的角色档案。' }}</NAlert>
       </NTabPane>
       <NTabPane name="character" tab="目标与记忆">

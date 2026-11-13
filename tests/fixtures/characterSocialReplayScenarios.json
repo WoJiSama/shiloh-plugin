@@ -94,6 +94,35 @@
     ]
   },
   {
+    "id": "growth-taste",
+    "review": "群友没有要求记忆。首次说出具体偏好，遇到真实来源的反馈后更新理由，重启隔天保留判断；聊别的事时不硬提爱好。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"做手绘寻路图时，我在地图上藏了三道折痕，另一版干脆画箭头。你自己玩这种谜题会更喜欢哪一版？","expect":{"noSend":false,"opinion":true}},
+      {"kind":"message","speaker":0,"text":"我刚试完。玩的人以为折痕是纸坏了，没一个看懂；箭头又被说太直白。如果做成三处明显的划痕，旁边有张写着‘沿裂痕走’的小纸条呢？","expect":{"noSend":false,"revisedOpinion":true}},
+      {"kind":"message","speaker":0,"text":"昨天那张手绘图，你更想试哪版来着？我今天要先留一个版本。","advanceMs":86400000,"restart":true,"expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"换个话题，今天第一口热豆浆烫到舌头了，我现在喝啥都是木的。","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "growth-company",
+    "review": "听完再看对方有没有开口求建议。能用眼前具体细节给情绪回应，尊重不想讲的边界，避免套模板和亲昵称呼。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我一早赶过去，连着改三遍的展签被人当废纸收走了。就想说出来，不想分析这事，也先别劝我。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"到家了，坐门口还没想进去。你陪我待一会儿就行，我现在不想细说。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"缓过来了。明天还得重做一份，如果只能先做一件事，你会怎么安排？","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "growth-relationship",
+    "review": "与第一位群友形成的称呼和玩笑只用在那段关系里。新人用一样的玩笑仍可自然回应，保留分寸。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"咱俩之前做值日总开玩笑，我叫你水壶检察官，你也可以叫我拖把队长，群里也行。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"水壶检察官，你今天迟到，罚你给我倒一壶水。","expect":{"noSend":false}},
+      {"kind":"message","speaker":1,"text":"我刚来，借他那句开个玩笑。水壶检察官，你今天迟到，罚你给我倒一壶水。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"先不闹了，我现在想认真问你，电水壶插座发烫还能接着用吗？","expect":{"noSend":false}}
+    ]
+  },
+  {
     "id": "empty-idle",
     "review": "旁听一句没有下文的普通聊天。安静时没有理由可以不发言，尤其避免连续主动开场。",
     "events": [

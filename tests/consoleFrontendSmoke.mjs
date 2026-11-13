@@ -84,17 +84,23 @@ const simulationGroups = Object.fromEntries(['100001', '200002'].map((groupId, i
   }
 }]))
 for (const [groupId, group] of Object.entries(simulationGroups)) {
+  const opinion = { kind: 'opinion', epistemic: 'inferred', createdAt: fixtureAt, updatedAt: fixtureAt }
+  const first = { ...opinion, id: `opinion-first-${groupId}`, content: `以前更喜欢在地图上藏折痕 ${groupId}`, evidenceRefs: ['message:1'], updatedAt: fixtureAt - 86400000 }
+  const middle = { ...opinion, id: `opinion-middle-${groupId}`, supersedes: first.id, content: '后来想把折痕加深', evidenceRefs: [`memory:${first.id}`, 'message:2'], updatedAt: fixtureAt - 43200000 }
+  const current = { ...opinion, id: `opinion-current-${groupId}`, supersedes: middle.id, content: '现在更喜欢划痕加提示纸条', evidenceRefs: [`memory:${middle.id}`, 'message:3'] }
+  group.character.memories.unshift(first, middle, current)
   group.profile = {
     persona: { name: '希洛', identity: '群里的虚拟桌游搭子', tone: '随话题调整语气', preferences: ['喜欢地图谜题'], speechStyle: ['闲聊简短，正事说清'] },
     mood: { status: 'recorded', summary: '挺开心', updatedAt: fixtureAt },
     rhythm: { enabled: true, sleepFrom: 1, sleepTo: 8, sleeping: false },
     get interests() { return group.character.memories.filter(memory => memory.kind === 'interest') },
-    opinions: [],
+    get opinions() { return group.character.memories.filter(memory => memory.id === current.id) },
     habits: [{ id: 'habit', content: '先接一句玩笑再讲细节', updatedAt: fixtureAt, evidenceRefs: ['message:1', 'message:2'] }],
     life: [{ id: 'life', title: '海边的观察日记', kind: 'anime', status: 'active', lastEpisode: 6, lastSyncAt: fixtureAt, notes: ['第六集公开更新'] }],
     evidence: {
       'receipt-source': { kind: 'receipt', status: 'succeeded', at: fixtureAt, text: '已取得公开资料' },
-      'message:1': { kind: 'message', at: fixtureAt, text: `本群的近期互动 ${groupId}` }
+      'message:1': { kind: 'message', at: fixtureAt, text: `本群的近期互动 ${groupId}` },
+      'message:3': { kind: 'message', at: fixtureAt, text: '试玩的人看不清折痕' }
     }
   }
 }
@@ -340,6 +346,14 @@ try {
         assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"]', element => element.textContent), /先接一句玩笑再讲细节/)
         await page.click('[aria-label="小习惯与在关注的作品"] summary')
         assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"] details[open]', element => element.textContent), /近期互动 100001.*已不在近期记录中/s)
+        const revisions = '[aria-label="兴趣与观点"] .revisions'
+        assert.equal(await page.$eval(`${revisions} > summary`, element => element.textContent), '查看 2 次修订')
+        await page.click(`${revisions} > summary`)
+        const history = await page.$eval(`${revisions}[open] > ol`, element => element.innerText)
+        assert.match(history, /旧版本.*后来想把折痕加深.*旧版本.*以前更喜欢在地图上藏折痕 100001/s)
+        assert.doesNotMatch(history, /200002/)
+        await page.click(`${revisions} > ol > li:last-child summary`)
+        assert.match(await page.$eval(`${revisions} details[open]`, element => element.innerText), /本群的近期互动 100001/)
         await check(`${label}-角色档案`)
         if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-character-overview`)
         await click('目标与记忆', '.n-tabs-tab'); await page.waitForSelector('[aria-label="角色与自主目标"]')
@@ -493,7 +507,9 @@ try {
   assert.equal(await page.$$eval('[aria-label="角色活动与作品"] button', elements => elements.filter(element => element.textContent.trim() === '批准共享').length), 0)
   await click('目标与记忆', '.n-tabs-tab')
   await simulationAction('删除记忆', { action: 'character', operation: 'delete-memory', id: 'memory-100001' }, '删除角色记忆')
-  assert.match(await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent), /还没有带来源的角色记忆/)
+  const remainingMemories = await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent)
+  assert.ok(!remainingMemories.includes('我对海边的生态观察感兴趣。'))
+  assert.match(remainingMemories, /现在更喜欢划痕加提示纸条/)
   await simulationAction('取消目标', { action: 'character', operation: 'cancel-goal', id: 'goal-100001' })
   await click('作品与活动', '.n-tabs-tab')
   await simulationAction('删除作品', { action: 'activity', operation: 'work-delete', id: 'work-100001' }, '删除作品')

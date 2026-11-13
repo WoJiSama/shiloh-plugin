@@ -112,14 +112,14 @@ test('角色档案只展示已绑定范围的状态和被引用的消息依据',
   const group = '10086', at = Date.parse('2026-11-09T04:00:00Z')
   const state = createDefaultSimSession(at)
   state.botId = '10001'
-  state.recent = ['回顾这句', '不相干的发言'].map((text, index) => ({
-    seq: index + 1, userId: '10002', name: '群友', text, at, kind: 'text', messageId: null, imageCount: 0, atSelf: false, quoteToSelf: false,
+  state.recent = ['初次讨论', '不相干的发言', '试玩后的反馈'].map((text, index) => ({
+    seq: [1, 2, 4][index], userId: '10002', name: '群友', text, at, kind: 'text', messageId: null, imageCount: 0, atSelf: false, quoteToSelf: false,
   }))
   const scope = { botId: '10001', personaId: 'friendly', groupId: group }
   const key = `shiloh:character:v1:10001:friendly:${group}`
   const memories = [
     { id: 'old', kind: 'opinion', content: '旧的看法', epistemic: 'inferred', evidenceRefs: ['message:1'], createdAt: at, updatedAt: at },
-    { id: 'new', kind: 'opinion', content: '修订后的看法', epistemic: 'inferred', supersedes: 'old', evidenceRefs: ['memory:old', 'message:1'], createdAt: at, updatedAt: at },
+    { id: 'new', kind: 'opinion', content: '修订后的看法', epistemic: 'inferred', supersedes: 'old', evidenceRefs: ['memory:old', 'message:4'], createdAt: at, updatedAt: at },
   ]
   const kv = new Map([
     [`shiloh:sim:g:${group}`, JSON.stringify(state)],
@@ -150,9 +150,10 @@ test('角色档案只展示已绑定范围的状态和被引用的消息依据',
   assert.equal(profile.persona.name, '希洛')
   assert.equal(profile.mood.status, 'disabled')
   assert.deepEqual(profile.opinions.map(item => item.id), ['new'])
-  assert.equal(profile.evidence['message:1'].text, '回顾这句')
+  assert.equal(profile.evidence['message:1'].text, '初次讨论')
   assert.equal(profile.evidence['message:2'], undefined)
   assert.equal(profile.evidence['message:3'], undefined)
+  assert.equal(profile.evidence['message:4'].text, '试玩后的反馈')
   assert.equal(profile.evidence['memory:old'].text, '旧的看法')
   assert.deepEqual(profile.habits[0].evidenceRefs, ['message:1', 'message:3'])
   assert.doesNotMatch(JSON.stringify(profile), /原始提示|不进档案|不相干的发言/)
