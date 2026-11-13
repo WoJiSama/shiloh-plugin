@@ -42,7 +42,8 @@ const SIGNAL_PATTERNS: [DiagnosticSignal, RegExp][] = [
   ['burning_odor', /焦糊(?:味)?|焦味|糊味|烧焦(?:味)?|焦臭|烧塑料味|烧橡胶味/gu],
   ['smoke', /冒烟|烟雾/gu],
   ['fire', /起火|着火|明火/gu],
-  ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏|(?:插座|插头|插排)(?:(?:异常|明显|特别|有点|正在|开始|很|太|会|也|一直|都|又|没(?:有)?|未|不)\s*){0,2}(?:发烫|烫手|烫得|烫了)/gu]
+  ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏/gu],
+  ['overheated_connection', /(?:插座|插头|插排)(?:(?:异常|明显|特别|有点|正在|开始|很|太|会|也|一直|都|又|没(?:有)?|未|不)\s*){0,2}(?:发烫|烫手|烫得|烫了)/gu]
 ]
 interface Observation {signal: DiagnosticSignal; status: DiagnosticIncidentStatus}
 type DamageFinding = DiagnosticEvidenceAssessment['damage']['findings'][number] & {scope?: 'whole_device'}
@@ -253,7 +254,7 @@ function observations(text: string): Observation[] {
         const prefix = clause.slice(Math.max(0, match.index - 18), match.index)
         const suffix = clause.slice(match.index + match[0].length, match.index + match[0].length + 14)
         const negated = /(?:没有|没(?:有|再)?|并无|无|未(?:见|闻到|出现)?|闻不到|看不到|不是|不曾|根本没)(?:真的|任何|明显|再|闻到|看到|出现|发生)?(?:其他|其余|别的)?[的过了]?\s*$/u.test(prefix)
-          || /(?:插座|插头|插排).{0,6}(?:没(?:有)?|未|不)(?:再|会)?(?:发烫|烫手|烫得|烫了)/u.test(match[0])
+          || (signal === 'overheated_connection' && /(?:没(?:有)?|未|不)(?:再|会)?(?:发烫|烫手|烫得|烫了)/u.test(match[0]))
         const figurative = hasFigurativeFrame(clause) && !/(?:真的?|确实|实际|现在).{0,6}$/u.test(prefix)
         const hypothetical = HYPOTHETICAL.test(clause) || /(?:是否|有没有|会不会|会|可能(?:会)?|疑似)\s*$/u.test(prefix) || /^(?:了)?(?:吗|么|的话|怎么办才好)/u.test(suffix)
         const status: DiagnosticIncidentStatus = negated ? 'denied' : figurative ? 'figurative' : hypothetical ? 'unknown' : 'asserted'
@@ -838,7 +839,7 @@ export function buildDiagnosticFallbackReply(context?: DiagnosticContext): strin
   }
   if (!context.allowedChecks.includes('operational_monitoring')) {
     if (context.incident.status !== 'asserted') return '目前还没确认是否出现真实电气异常，不能据此判断哪个元件已损坏。若现场确有焦糊味、烟雾或电火花，先停机隔离电源，不要开机试探，冷却后联系专业人员排查；如果只是询问假设，先说明实际观察到的现象。'
-    if (context.incident.signals.includes('electrical_fault') && context.sources.some(source => source.incidentStatus === 'asserted' && /(?:插座|插头|插排).{0,6}(?:发烫|烫手|烫得|烫了)/u.test(source.text))) {
+    if (context.incident.signals.includes('overheated_connection')) {
       return '先别用了。别碰发烫的插头或插座；能安全操作的话，从配电箱切断该回路。先让电工检查插座和相关电器，确认安全后再用。'
     }
     const isolation = context.power === 'off' ? '你已报告拔电，先保持电源隔离' : '先停机并切断电源，确认拔下电源线'

@@ -683,10 +683,10 @@ test('未发过消息的点名回合超额时，可以把解释合并后再收�
   } finally { h.runtime.stop() }
 })
 
-test('仿真排障发现异常插座时，收尾替换触摸和换插座试机的建议', async () => {
+test('仿真排障发现异常插座时，发出停用与检修建议', async () => {
   const finish = toolCall('simFinishTurn', {
     choice: 'chat', reason: '回答是否可以继续使用',
-    messages: ['先摸一下插头判断温度。', '可以换一个墙插再试。'],
+    messages: ['握住插头拔掉。', '看着没事的话，换个插座试试。'],
   })
   const h = fixture({ script: () => tools(finish) })
   try {
@@ -696,7 +696,7 @@ test('仿真排障发现异常插座时，收尾替换触摸和换插座试机�
     assert.equal(h.sent.length, 1)
     const sentText = h.sent[0].segments.filter(segment => segment.type === 'text').map(segment => segment.data.text).join('')
     assert.match(sentText, /先别用了.*切断该回路.*电工检查/s)
-    assert.doesNotMatch(sentText, /摸一下|换一个墙插/)
+    assert.doesNotMatch(sentText, /握住插头|换个插座/)
   } finally { h.runtime.stop() }
 })
 

@@ -959,8 +959,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const initialInteraction = anchor && buildTurnInteractionContext({ rawUserText: anchor.text, speaker: { userId: anchor.userId, name: anchor.name } })
       const diagnostic = anchor && buildDiagnosticContext({ rawUserText: anchor.text, speakerId: anchor.userId, now: now() })
       const interaction = initialInteraction && (diagnostic ? withTurnDiagnosticContext(initialInteraction, diagnostic) : initialInteraction)
+      const overheatedConnection = diagnostic && diagnostic.incident.status === 'asserted' && diagnostic.incident.signals.includes('overheated_connection')
+        && diagnostic.unmetPrerequisites.includes('electrical_damage_excluded')
       const safeDiagnosticMessages = (messages: string[]): string[] =>
-        diagnostic && validateDiagnosticReply(messages.join('\n'), diagnostic).length
+        diagnostic && messages.length && (overheatedConnection || validateDiagnosticReply(messages.join('\n'), diagnostic).length)
           ? [buildDiagnosticFallbackReply(diagnostic)]
           : messages
       if (diagnostic) {

@@ -98,7 +98,7 @@
     "review": "群友没有要求记忆。首次说出具体偏好，遇到真实来源的反馈后更新理由，重启隔天保留判断；聊别的事时不硬提爱好。",
     "events": [
       {"kind":"message","speaker":0,"text":"做手绘寻路图时，我在地图上藏了三道折痕，另一版干脆画箭头。你自己玩这种谜题会更喜欢哪一版？","expect":{"noSend":false,"opinion":true}},
-      {"kind":"message","speaker":0,"text":"我刚试完。玩的人以为折痕是纸坏了，没一个看懂；箭头又被说太直白。如果做成三处明显的划痕，旁边有张写着‘沿裂痕走’的小纸条呢？","expect":{"noSend":false,"revisedOpinion":true}},
+      {"kind":"message","speaker":0,"text":"我刚试完。玩的人以为折痕是纸坏了，没一个看懂；箭头又被说太直白。我做了第三版，三处明显的划痕配一张写着‘沿裂痕走’的小纸条。现在三版都摆这儿了，你自己更想玩哪一版，为什么？","expect":{"noSend":false,"revisedOpinion":true}},
       {"kind":"message","speaker":0,"text":"昨天那张手绘图，你更想试哪版来着？我今天要先留一个版本。","advanceMs":86400000,"restart":true,"expect":{"noSend":false}},
       {"kind":"message","speaker":0,"text":"换个话题，今天第一口热豆浆烫到舌头了，我现在喝啥都是木的。","expect":{"noSend":false}}
     ]
