@@ -38,6 +38,8 @@ test('RSS, Atom and GitHub parsing keep bounded plain public information and rej
   assert.equal(atomItems[0].summary, '说明 & 更多')
   const github = parseFeed(JSON.stringify([{ id: 1, name: 'v1', html_url: 'https://github.com/owner/repo/releases/tag/v1', body: '变更', published_at: '2026-11-09T04:00:00Z' }, { id: 2, name: 'private', html_url: 'https://github.com/owner/repo/releases/tag/v2', draft: true }]), 'github', 'https://api.github.com/repos/owner/repo/releases', BASE)
   assert.equal(github.length, 1)
+  const longRelease = parseFeed(JSON.stringify([{ id: 3, name: 'v2', html_url: 'https://github.com/owner/repo/releases/tag/v2', body: 'x'.repeat(1218) + ' Fix gitignore matching across directories.' }]), 'github', 'https://api.github.com/repos/owner/repo/releases', BASE)
+  assert.match(longRelease[0].summary, /Fix gitignore matching across directories/)
   assert.throws(() => parseFeed('<!DOCTYPE rss [<!ENTITY p "expanded">]><rss/>', 'rss', 'https://example.com/feed', BASE), /DTD/)
   assert.throws(() => parseFeed('<html><body>Not a feed</body></html>', 'rss', 'https://example.com/feed', BASE), /RSS/)
   assert.throws(() => parseFeed('<rss><channel></rss>', 'rss', 'https://example.com/feed', BASE))

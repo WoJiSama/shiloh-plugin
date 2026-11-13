@@ -207,6 +207,7 @@ export interface SimulationSection {
   capabilities?: {
     enabled?: boolean
     groups?: string[]
+    projectUpdatesInAtOnly?: boolean
     mcpTools?: string[]
     autonomousTools?: string[]
   }

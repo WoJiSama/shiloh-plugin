@@ -434,6 +434,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     return section?.enabled === true && Array.isArray(section.groups) && section.groups.some(id => String(id) === groupId) ? section : undefined
   }
 
+  function projectsAllowed(groupId: string) {
+    const settings = capabilitySettings(groupId)
+    return !!settings && (!(overridesCache?.atOnly || []).includes(groupId) || settings.projectUpdatesInAtOnly === true)
+  }
+
   function resolveMcpTools(groupId: string) {
     const names = capabilitySettings(groupId)?.mcpTools
     if (!Array.isArray(names) || !ports.getMcpTools) return []
@@ -684,7 +689,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const cfg = runtimeConfig()
       state = await store.load(groupId)
       const self = ports.getSelf(state.botId)
-      if (['characterGoal', 'interestUpdate', 'proactiveCheck', 'projectUpdate'].includes(reason.kind) && (overridesCache?.atOnly || []).includes(groupId)) return
+      if (['characterGoal', 'interestUpdate', 'proactiveCheck'].includes(reason.kind) && (overridesCache?.atOnly || []).includes(groupId)) return
       const resolvedPersona = ports.getPersona(groupId, self.id)
       const persona = createPersonaSnapshot({ botId: self.id, personaId: resolvedPersona.personaId || 'default', persona: { ...resolvedPersona.persona, name: String(resolvedPersona.persona.name || self.name) }, systemContent: resolvedPersona.systemContent })
       const characterScope: CharacterScope = { botId: self.id, personaId: persona.personaId, groupId }
@@ -777,7 +782,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         await focusGoal(goal.id)
       }
       const subscriptions = subscriptionsFor(characterScope)
-      const projectRelease = reason.kind === 'projectUpdate' && capabilitySettings(groupId) ? await subscriptions.claimProject() : undefined
+      const projectRelease = reason.kind === 'projectUpdate' && projectsAllowed(groupId) ? await subscriptions.claimProject() : undefined
       if (reason.kind === 'projectUpdate' && !projectRelease) return
       recordWake(state, now())
       state.lastWakeReason = reason
@@ -1208,7 +1213,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (await shared.fingerprint() !== sharedFingerprint) throw new Error('共享偏好已改变，停止使用旧上下文')
         character = await characters.load(characterScope)
         if ([...sourceMemoryIds].some(id => !character.memories.some(memory => memory.id === id))) throw new Error('本轮引用的记忆已被删除，停止使用旧上下文')
-        if (actor.kind === 'autonomous' && (character.paused || (overridesCache?.atOnly || []).includes(groupId))) throw new Error('自主行动已暂停或仅被@回应')
+        if (actor.kind === 'autonomous' && (character.paused || ((overridesCache?.atOnly || []).includes(groupId) && !projectRelease))) throw new Error('自主行动已暂停或仅被@回应')
         if (focusedGoalId && (overridesCache?.atOnly || []).includes(groupId)) throw new Error('本群已切为仅被@回应，自主目标暂停执行')
         if (permit && character.revision !== permit.revision) throw new Error('收尾保存后角色状态已改变，停止公告或标读')
         if (focusedGoalId) {
@@ -1221,7 +1226,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         // may have revoked the work while the permission checks were pending.
         if (await store.loadActivityVersion(groupId) !== activityVersion) throw new Error('角色活动内容已被管理员撤销，停止旧回合')
         if (projectRelease) {
-          if (!capabilitySettings(groupId)) throw new Error('项目跟进已关闭')
+          if (!projectsAllowed(groupId)) throw new Error('项目跟进已关闭')
           await subscriptions.ensureProject(projectRelease)
         }
       }
@@ -1971,21 +1976,20 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           const scope = scopeFor(groupId, state.botId)
           await recoverCharacter(scope)
           const current = await characters.update(scope, value => expireCharacterGoals(value, at))
-          if (capabilitySettings(groupId) && !current.paused &&
-            checkWakeBudget(state, cfg, at, safeNumber(() => ports.getTodaySpendCny?.(groupId)), { kind: 'projectUpdate' }, groupId).allowed &&
-            await subscriptionsFor(scope).dueProject()) reasons.push({ kind: 'projectUpdate' })
           const due = dueCharacterGoal(current, at)
           if (due) reasons.push({ kind: 'characterGoal', detail: due.id })
         } catch (error) { logger.warn(`[仿真] 群 ${groupId} 角色目标检查失败：${error instanceof Error ? error.message : String(error)}`) }
       }
       // A scheduled conversation echo should not postpone a due project poll.
       // Real messages and other scheduled work keep their existing priority.
-      if (!atOnly && !sleepingNow && reasons.every(reason => reason.kind === 'replyCheck') && capabilitySettings(groupId)) {
+      if (!sleepingNow && projectsAllowed(groupId) && reasons.every(reason => reason.kind === 'replyCheck')) {
         try {
           const subscriptions = subscriptionsFor(scopeFor(groupId, state.botId))
-          if ((await subscriptions.list()).some(item => item.project && item.status === 'active' && item.nextPollAt <= at)) {
+          const budgetAllows = checkWakeBudget(state, cfg, at, safeNumber(() => ports.getTodaySpendCny?.(groupId)), { kind: 'projectUpdate' }, groupId).allowed
+          if (budgetAllows && await subscriptions.dueProject()) reasons.push({ kind: 'projectUpdate' })
+          else if (budgetAllows && (await subscriptions.list()).some(item => item.project && item.status === 'active' && item.nextPollAt <= at)) {
             for (const reason of reasons) state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, reason)
-            await runCharacterBackground(groupId, state, cfg)
+            await runCharacterBackground(groupId, state, cfg, atOnly)
             continue
           }
         } catch (error) { logger.warn(`[仿真] 群 ${groupId} 项目轮询检查失败：${error instanceof Error ? error.message : String(error)}`) }
@@ -2015,7 +2019,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
   }
 
   /** One bounded background activity per group; no chat-sending port is passed to reflection. */
-  async function runCharacterBackground(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig): Promise<void> {
+  async function runCharacterBackground(groupId: string, state: SimSessionState, cfg: SimRuntimeConfig, projectsOnly = false): Promise<void> {
     background.add(groupId)
     liveStates.set(groupId, state)
     const scope = scopeFor(groupId, state.botId)
@@ -2029,7 +2033,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const guard = async () => {
       if (stopped || controller.signal.aborted) throw new Error('后台活动已停止')
       await refreshGroupState(true)
-      if (!groupActive(runtimeConfig(), groupId) || (overridesCache?.atOnly || []).includes(groupId) || scopeFor(groupId, state.botId).personaId !== scope.personaId) throw new Error('角色活动范围已改变')
+      if (!groupActive(runtimeConfig(), groupId) || (projectsOnly ? !projectsAllowed(groupId) : (overridesCache?.atOnly || []).includes(groupId)) || scopeFor(groupId, state.botId).personaId !== scope.personaId) throw new Error('角色活动范围已改变')
       const current = await characters.load(scope)
       if (current.paused || [...sources].some(id => !current.memories.some(m => m.id === id)) || await shared.fingerprint() !== fingerprint) throw new Error('角色暂停或来源已撤销')
       if (await store.loadActivityVersion(groupId) !== activityVersion) throw new Error('角色活动已撤销')
@@ -2041,13 +2045,13 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       await guard()
       if (!checkWakeBudget(state, runtimeConfig(), now(), safeNumber(() => ports.getTodaySpendCny?.(groupId)), null, groupId).allowed) return
       const subscriptions = subscriptionsFor(scope)
-      const includeProjects = !!capabilitySettings(groupId)
-      const dueSubscriptions = (await subscriptions.list()).some(item => item.status === 'active' && item.nextPollAt <= now() && (includeProjects || !item.project))
+      const includeProjects = projectsAllowed(groupId)
+      const dueSubscriptions = (await subscriptions.list()).some(item => item.status === 'active' && item.nextPollAt <= now() && (item.project ? includeProjects : !projectsOnly))
       const pollReceiptId = dueSubscriptions ? randomUUID() : undefined
       if (pollReceiptId) await characters.update(scope, current => recordCharacterReceipt(current, { id: pollReceiptId, toolName: 'simSubscriptionPoll', status: 'pending', summary: '等待公开订阅抓取回执', at: now() }, now()))
       let update: Awaited<ReturnType<typeof subscriptions.poll>>
       try {
-        update = await subscriptions.poll(guard, includeProjects)
+        update = await subscriptions.poll(guard, includeProjects, projectsOnly)
         if (pollReceiptId) await characters.update(scope, current => recordCharacterReceipt(current, {
           id: pollReceiptId, toolName: 'simSubscriptionPoll', status: update.unknowns ? 'unknown' : update.failures && !update.updates.length ? 'failed' : 'succeeded',
           summary: (update.updates.length ? `取得公开订阅资料（未经事实核实）：${update.updates.slice(0,3).map(item => item.title).join('；')}${update.failures ? `；另有${update.failures}个订阅未取得结果` : ''}` : update.unknowns ? `${update.unknowns}个订阅超时，结果未知，未取得新资料` : update.failures ? `${update.failures}个订阅抓取失败，未取得新资料` : '订阅检查完成，没有新资料').slice(0,500), at: now(),
@@ -2061,11 +2065,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, { kind: 'interestUpdate', detail: update.updates.slice(0,2).map(item => item.title).join('；').slice(0,200) })
         await store.save(groupId, state)
       }
-      const projectDue = !!capabilitySettings(groupId) && await subscriptions.dueProject()
+      const projectDue = projectsAllowed(groupId) && await subscriptions.dueProject()
       if (projectDue) {
         state.pendingWakeReasons = pushPendingReason(state.pendingWakeReasons, { kind: 'projectUpdate' })
       }
-      if (!projectDue && !update.updates.length && ports.reflectCharacter && ports.getSection().reflection?.enabled !== false) {
+      if (!projectsOnly && !projectDue && !update.updates.length && ports.reflectCharacter && ports.getSection().reflection?.enabled !== false) {
         const reflection = reflectionFor(scope)
         await reflection.run({ guard, sharedSources: (await shared.projection()).map(item => item.id),
           ...(ports.getSection().consistency?.enabled === true ? { review: async (candidate: Record<string, unknown>, before: CharacterState, evidence: unknown) => {
@@ -2392,7 +2396,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       backgroundByGroup.get(groupId)?.abort()
       // 切到仅@时，已排期的自主类唤醒立即取消，避免切换后还突然冒一次泡
       const pending = pendingWakes.get(groupId)
-      if (pending && !AT_ONLY_WAKE_KINDS.has(pending.reason.kind)) { clearTimeout(pending.timer); pendingWakes.delete(groupId) }
+      if (pending && !AT_ONLY_WAKE_KINDS.has(pending.reason.kind) && !(pending.reason.kind === 'projectUpdate' && projectsAllowed(groupId))) { clearTimeout(pending.timer); pendingWakes.delete(groupId) }
       return `群 ${groupId} 已设为「仅被@才回」：消息照常看、照常记忆，但只有被@或引用时才说话（.仿真 模式 自主 可恢复）`
     }
     if (mode === 'active') {

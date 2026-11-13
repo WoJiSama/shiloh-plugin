@@ -582,7 +582,7 @@ test('项目跟进从本群归档绑定技能，基线静默，重建后区分�
   let peer
   const add = { action: 'add', title, kind: 'github', url: 'https://github.com/' + repo, focus, skill }
   const h = fixture({
-    capabilities: { enabled: true, groups: [GROUP] },
+    capabilities: { enabled: true, groups: [GROUP], projectUpdatesInAtOnly: true },
     async readArchiveMessages(group, days) {
       assert.equal(group, GROUP)
       assert.equal(days, 7)
@@ -614,6 +614,7 @@ test('项目跟进从本群归档绑定技能，基线静默，重建后区分�
   })
   const subscription = async runtime => (await runtime.describeGroup(GROUP)).activities.subscriptions[0]
   try {
+    await h.runtime.setGroupReplyMode(GROUP, 'atOnly')
     await h.ingest('跟进提灯同步项目修复存档的版本')
     await idle(h, 3)
     assert.deepEqual(h.errors, [])

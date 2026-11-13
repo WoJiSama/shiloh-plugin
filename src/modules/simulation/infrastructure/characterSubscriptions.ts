@@ -14,6 +14,7 @@ import { createScopedStateStore } from './scopedStateStore.js'
 
 const MIN_INTERVAL = 3600_000
 const MAX_INTERVAL = 7 * 24 * MIN_INTERVAL
+const MAX_RELEASE_SUMMARY = 2200
 const MAX_BODY_BYTES = 512 * 1024
 const MAX_FETCH_MS = 10_000
 const pollLocks = new WeakMap<object, Map<string, Promise<{ updates: CharacterFeedItem[]; failures: number; unknowns?: number }>>>()
@@ -192,7 +193,7 @@ export function parseFeed(body: string, kind: Kind, baseUrl: string, now: number
     const id = createHash('sha256').update(rawId).digest('hex')
     if (items.some(item => item.id === id)) return
     const publishedAt = Date.parse(String(entry.published || ''))
-    items.push({ id, title, url, summary: plain(entry.summary, 1000), receivedAt: now,
+    items.push({ id, title, url, summary: plain(entry.summary, kind === 'github' ? MAX_RELEASE_SUMMARY : 1000), receivedAt: now,
       ...(Number.isSafeInteger(publishedAt) && publishedAt >= 0 ? { publishedAt } : {}) })
   }
   if (kind === 'github') {
@@ -242,8 +243,8 @@ export function parseFeed(body: string, kind: Kind, baseUrl: string, now: number
 function validateItem(value: unknown): CharacterFeedItem {
   const raw = object(value, '订阅条目')
   fields(raw, ['id', 'title', 'url', 'summary', 'receivedAt', 'publishedAt'])
-  if (typeof raw.summary !== 'string' || raw.summary.length > 1000) throw new Error('条目摘要格式错误')
-  return { id: text(raw.id, '条目标识', 128), title: text(raw.title, '条目标题', 150), url: normalizePublicFeedUrl(raw.url), summary: plain(raw.summary, 1000), receivedAt: integer(raw.receivedAt, '接收时间'),
+  if (typeof raw.summary !== 'string' || raw.summary.length > MAX_RELEASE_SUMMARY) throw new Error('条目摘要格式错误')
+  return { id: text(raw.id, '条目标识', 128), title: text(raw.title, '条目标题', 150), url: normalizePublicFeedUrl(raw.url), summary: plain(raw.summary, MAX_RELEASE_SUMMARY), receivedAt: integer(raw.receivedAt, '接收时间'),
     ...(raw.publishedAt === undefined ? {} : { publishedAt: integer(raw.publishedAt, '发布时间') }) }
 }
 
@@ -339,12 +340,12 @@ export function createCharacterSubscriptions({ redis, scope: inputScope, now = D
   async function remove(id: string) {
     return store.update(state => { byId(state, id); state.subscriptions = state.subscriptions.filter(item => item.id !== id); return state })
   }
-  async function doPoll(guard: () => Promise<void>, includeProjects: boolean) {
+  async function doPoll(guard: () => Promise<void>, includeProjects: boolean, projectsOnly: boolean) {
     await guard()
     const updates: CharacterFeedItem[] = []
     let failures = 0
     let unknowns = 0
-    const due = (await listSubscriptions()).filter(item => item.status === 'active' && item.nextPollAt <= now() && (includeProjects || !item.project))
+    const due = (await listSubscriptions()).filter(item => item.status === 'active' && item.nextPollAt <= now() && (item.project ? includeProjects : !projectsOnly))
     for (const candidate of due) {
       await guard()
       let claimed: CharacterSubscription | undefined
@@ -403,12 +404,12 @@ export function createCharacterSubscriptions({ redis, scope: inputScope, now = D
     }
     return { updates, failures, ...(unknowns ? { unknowns } : {}) }
   }
-  async function poll(guard: () => Promise<void> = async () => {}, includeProjects = true) {
+  async function poll(guard: () => Promise<void> = async () => {}, includeProjects = true, projectsOnly = false) {
     let locks = pollLocks.get(redis)
     if (!locks) { locks = new Map(); pollLocks.set(redis, locks) }
     const previous = locks.get(key)
     if (previous) return previous
-    const operation = doPoll(guard, includeProjects)
+    const operation = doPoll(guard, includeProjects, projectsOnly)
     locks.set(key, operation)
     try { return await operation } finally { if (locks.get(key) === operation) locks.delete(key) }
   }
