@@ -24,6 +24,7 @@ export interface SimToolContext {
   /** Only the runtime can set this after checking the triggering user's words. */
   proactiveSourceSeq?(): number | undefined
   noteVisibleMessages?(seqs: number[]): void
+  checkHabitSources?(seqs: number[]): boolean
   now(): number
   getState(): SimSessionState
   /** 读取-修改-保存（回合内单线程，mutate 保证落盘） */
@@ -401,7 +402,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.description = [
         '你的长期记忆（跨回合、跨天保存）。pendingEvent 带 aboutUser 和 dueInMinutes。只有对方明确欢迎在本群主动问起才设 welcomeProactiveFollowUp=true；“聊到再问”只在对话中接续。自然问过一次或对方已说结果就 done，没回应不催。正式提醒走托付工具。',
         '有明确话语或实际互动支持的相处习惯用 interaction，带 aboutUser，写清偏好及简短依据。它只留在本群，不当成跨群人物事实。',
-        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note 且 scope=self——保存在当前机器人与人设的本群范围，下次唤醒在【你自己的沉淀】里。',
+        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note 且 scope=self——保存在当前机器人与人设的本群范围，记录反复发生的小习惯时必须附 habitMessageSeqs，下次唤醒在【你自己的沉淀】里。',
         '带 aboutUser 的稳定事实（TA的爱好/身份/雷点这类到哪个群都成立的）会同时进入TA的跨群人物档案；带时间性的内容（明天/下周要干嘛）不要走这条路，记 pendingEvent。',
         'TA之前的事结束了（"考完了""不学了"）也记 note + aboutUser，系统会自动从TA档案里移除对应的旧事实。',
         'action=list 查看记忆；跟进完成后 action=done 收掉待办；action=remove 删除记错的。',
@@ -414,6 +415,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
           scope: { type: 'string', enum: ['group', 'self'], description: '默认 group（只这个群）。self=你自己的性格沉淀（口头禅/偏好），仅当前机器人与人设的本群；要求不带 aboutUser。' },
           content: { type: 'string', description: '要记的内容，一句话（≤200 字）。例："阿说明天上午要考四级，说考完想打游戏"。' },
           aboutUser: { type: 'string', description: '相关群友 QQ。主动跟进缺省使用当前邀请你的人，不能指定第三人。' },
+          habitMessageSeqs: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'number', minimum: 1 }, description: '仅 scope=self 的 note。2–4 条本轮实际可见的本群消息序号，首尾至少间隔 10 分钟，能说明你确实形成了这一习惯。不要用一人的临时建议或顺手记号凑数。' },
           dueInMinutes: { type: 'number', description: 'kind=pendingEvent 必填：多少分钟后该跟进（10 分钟 ~ 30 天）。' },
           welcomeProactiveFollowUp: { type: 'boolean', description: '仅 pendingEvent。对方明确请你主动在本群问起时才为 true。“碰巧聊到再问”“不用特意问”都为 false。' },
           id: { type: 'string', description: 'done/remove 时要操作的条目 id。' },
@@ -433,6 +435,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         const due = new Set(dueMemories(ctx.getMemories(), now).map(m => m.id))
         const shape = (m: SimMemoryEntry, scope: 'group' | 'self') => ({
           id: m.id, scope, kind: m.kind, content: m.content, aboutUser: m.aboutUser,
+          ...(scope === 'self' && m.habitMessageSeqs?.length ? { habitMessageSeqs: m.habitMessageSeqs } : {}),
           ...(m.kind === 'meme' && m.count ? { heat: m.count } : {}),
           due: m.dueAt ? (due.has(m.id) ? `已到期（该跟进了）` : `${Math.max(0, Math.round((m.dueAt - now) / 60000))} 分钟后到期`) : undefined,
         })
@@ -466,10 +469,16 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         return JSON.stringify({ ok: true, note: `已收掉：${selfMemories[index]!.content}` })
       }
       const selfScope = opts.scope === 'self'
+      const habitSources = opts.habitMessageSeqs
+      if (habitSources !== undefined && (!selfScope || (opts.kind !== 'note' && opts.kind !== undefined) ||
+        !Array.isArray(habitSources) || habitSources.length < 2 || habitSources.length > 4 ||
+        new Set(habitSources).size !== habitSources.length || habitSources.some(seq => !Number.isSafeInteger(seq) || seq < 1) ||
+        !ctx.checkHabitSources?.(habitSources))) return 'error: 小习惯需要至少两条不同时间、当前可见且与习惯有关的本群消息依据'
       if (opts.kind === 'interaction' && (selfScope || !/^\d{1,12}$/.test(String(opts.aboutUser || '')))) return 'error: interaction 需要本群群友的 aboutUser'
       const entry = normalizeSimMemoryEntry({
         kind: opts.kind,
         content: opts.content,
+        habitMessageSeqs: habitSources,
         aboutUser: selfScope ? undefined : opts.aboutUser,
         dueAt: opts.kind === 'pendingEvent' && Number(opts.dueInMinutes) > 0 ? now + Math.min(43200, Math.max(10, Math.floor(Number(opts.dueInMinutes)))) * 60_000 : undefined,
         proactiveSourceSeq: opts.welcomeProactiveFollowUp === true ? ctx.proactiveSourceSeq?.() : undefined,

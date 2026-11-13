@@ -601,6 +601,30 @@ test('点名接话隔离另一人的快照和历史，引用及显式查阅仍�
   } finally { h.runtime.stop() }
 })
 
+test('习惯只接纳跨时段且本轮可见的实际消息来源', async () => {
+  const remember = (seqs) => toolCall('simRemember', {
+    kind: 'note', scope: 'self', content: '聊到地图会先问机制', habitMessageSeqs: seqs,
+  })
+  const h = fixture({ script: (_request, index) => {
+    if (index === 1) return tools(remember([1, 2]), remember([1, 3]))
+    return quiet()
+  } })
+  try {
+    await h.ingest('你刚才又先问机制了', '40000')
+    await idle(h, 1)
+    h.clock.value += 11 * 60_000
+    await h.ingest('这是另一个话题', '40001', { at: false })
+    await h.ingest('我发现你遇到地图都会先问玩法', '40000')
+    await idle(h, 3)
+    const history = h.calls[2].messages.filter(message => message.role === 'tool' && message.name === 'simRemember')
+    assert.match(history.at(-2).content, /需要至少两条/)
+    assert.match(history.at(-1).content, /"saved":true/)
+    const profile = (await h.runtime.describeGroup(GROUP, { profile: true })).profile
+    assert.deepEqual(profile.habits[0].evidenceRefs, ['message:1', 'message:3'])
+    assert.equal(profile.evidence['message:2'], undefined)
+  } finally { h.runtime.stop() }
+})
+
 test('合并窗内两个群友分别点名会获得独立回合', async () => {
   const h = fixture({ script: (_request, index) => tools(toolCall('simFinishTurn', {
     choice: 'chat', reason: '回答当前群友', messages: [index === 0 ? '饼干成交' : '看看烤箱说明'], throughSeq: index + 1,
@@ -643,6 +667,19 @@ test('误填主动许可和社交目标均不能用模型改写替代当事人�
     await h.runtime.sweepOnce()
     await sleep(1150)
     assert.equal(h.calls.length, 3)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
+test('已发送一条后，下一轮提示实际剩余的消息条数', async () => {
+  const h = fixture({ script: (_request, index) => index === 0
+    ? tools(toolCall('simSendMessage', { continuation: 'chat', messages: ['先回答最重要的事。'] }))
+    : quiet() })
+  try {
+    await h.ingest('帮我解释一下这个问题')
+    await idle(h, 2)
+    assert.match(h.calls[0].messages.at(-1).content, /还可发送 5 条/)
+    assert.match(h.calls[1].messages.at(-1).content, /还可发送 4 条/)
     assert.equal(h.sent.length, 1)
   } finally { h.runtime.stop() }
 })

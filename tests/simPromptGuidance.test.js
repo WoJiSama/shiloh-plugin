@@ -122,7 +122,8 @@ test('结构化收尾要求保存成功才发送，完成回执失败不能提�
 test('兴趣、旁听和自然拒绝仍是有效选择，唤醒指引不再要求先标读后收尾', () => {
   const protocol = buildSimulationProtocol('希洛')
   for (const value of ['chat', 'interest_only', 'silent', 'cannot', 'unauthorized', 'unwilling', 'deferred', 'schedule', 'wait', 'complete', 'abandon']) assert.ok(protocol.includes(value), value)
-  assert.match(protocol, /普通聊天和仅有兴趣无需建目标、记忆或制造成长/)
+  assert.match(protocol, /普通聊天无需建目标或硬造记忆/)
+  assert.match(protocol, /群友明确请你留下自己的判断时，把判断本身作为 opinion 保存/)
   assert.match(protocol, /没有真实后续意愿就选 chat 或 interest_only/)
   assert.match(protocol, /拒绝记录失败也不能迫使你接受被拒请求/)
   assert.match(protocol, /已经接受的正式托付仍由原承诺账本负责/)

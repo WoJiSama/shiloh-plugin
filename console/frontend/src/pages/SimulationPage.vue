@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { NAlert, NButton, NCheckbox, NDataTable, NDrawer, NDrawerContent, NInput, NInputNumber, NSelect, NSwitch, NTag, useDialog, type DataTableColumns } from 'naive-ui'
+import { computed, h, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { CharacterProfile as ProfileView } from '../../../../src/contracts/characterProfile'
+import CharacterProfile from '../components/simulation/CharacterProfile.vue'
+import CharacterEvidence from '../components/simulation/CharacterEvidence.vue'
+import { NAlert, NButton, NCheckbox, NDataTable, NInput, NInputNumber, NSelect, NSwitch, NTabPane, NTabs, NTag, useDialog, type DataTableColumns } from 'naive-ui'
 import PageHeader from '../components/PageHeader.vue'
 import PageState from '../components/PageState.vue'
 import { api } from '../lib/api'
@@ -20,7 +24,7 @@ interface CharacterView {
   paused: boolean
   decision?: { kind: string; reason: string; at: number }
   memories: { id: string; kind: string; content: string; epistemic: string; evidenceRefs: string[]; createdAt: number; updatedAt: number }[]
-  goals: { id: string; title: string; motivation: string; nextStep: string; completionCriteria: string; status: string; nextCheckAt: number; expiresAt: number; attempts: number; maxAttempts: number; lastOutcome?: string }[]
+  goals: { id: string; title: string; motivation: string; nextStep: string; completionCriteria: string; status: string; nextCheckAt: number; expiresAt: number; attempts: number; maxAttempts: number; lastOutcome?: string; evidenceRefs?: string[] }[]
   receipts: { id: string; toolName: string; status: string; summary: string; at: number; goalId?: string }[]
 }
 interface GroupRow {
@@ -37,18 +41,26 @@ interface GroupRow {
   memes: { id: string; content: string; count: number; origin: string }[]
   affinity: { userId: string; score: number }[]
   initialPrompt: string
-  character?: CharacterView
+  character?: CharacterView | null
+  profile?: ProfileView | null
+  characterBinding?: { reason?: string }
   activities?: ActivitiesView
 }
 interface Overview { enabled: boolean; allGroups: boolean; disabled: string[]; budgetDefaultCny: number; groups: GroupRow[]; groupNames?: Record<string, string> }
 
+const route = useRoute()
+const router = useRouter()
+const selectedGroup = computed(() => typeof route.query.group === 'string' && /^\d{1,12}$/.test(route.query.group) ? route.query.group : '')
+const tabs = ['profile', 'character', 'activities', 'settings']
+const selectedTab = computed(() => tabs.find(tab => tab === route.query.tab) || 'profile')
 const overview = ref<Overview | null>(null)
 const dialog = useDialog()
 const loading = ref(false)
 const error = ref('')
 const detailId = ref('')
 const detail = ref<GroupRow | null>(null)
-const drawerOpen = ref(false)
+const detailLoading = ref(false)
+const detailError = ref('')
 const initPromptDraft = ref('')
 const savingPrompt = ref(false)
 const promptMessage = ref('')
@@ -86,6 +98,21 @@ onMounted(() => {
   timer = window.setInterval(() => void load(), 30000)
 })
 onBeforeUnmount(() => { if (timer) window.clearInterval(timer) })
+watch(selectedGroup, groupId => {
+  detailRequest++
+  detail.value = null
+  detailId.value = groupId
+  detailError.value = ''
+  detailLoading.value = false
+  if (groupId) void refreshCharacter()
+}, { immediate: true })
+function selectGroup(groupId: string) {
+  void router.push({ path: '/simulation', query: { group: groupId } })
+}
+function selectTab(tab: string) {
+  void router.replace({ path: '/simulation', query: { group: selectedGroup.value, tab } })
+}
+
 
 async function toggle(row: GroupRow) {
   try {
@@ -130,7 +157,7 @@ async function doResetGroup(groupId: string) {
 }
 async function openDetail(groupId: string) {
   const request = ++detailRequest
-  const result = await api<GroupRow>(`/api/simulation/group?group=${groupId}`)
+  const result = await api<GroupRow>(`/api/simulation/group?group=${groupId}&view=character`)
   if (request !== detailRequest) return
   detail.value = result
   detailId.value = groupId
@@ -144,7 +171,6 @@ async function openDetail(groupId: string) {
   turnsUnlimited.value = turnsCap === -1
   turnsDraft.value = turnsUnlimited.value ? 40 : turnsCap
   turnsMessage.value = ''
-  drawerOpen.value = true
 }
 
 const goalLabels: Record<string, string> = { active: '进行中', waiting: '等待中', paused: '已暂停', completed: '已完成', abandoned: '已放弃', failed: '已停止' }
@@ -177,10 +203,16 @@ async function controlCharacter(operation: CharacterOperation, id?: string) {
 }
 async function refreshCharacter() {
   const group = detailId.value
+  if (!group || detailLoading.value) return
+  detailLoading.value = true
+  detailError.value = ''
+  const request = detailRequest + 1
   try {
     await openDetail(group)
   } catch (e: any) {
-    if (detailId.value === group) characterMessage.value = e?.message || '刷新角色状态失败'
+    if (detailRequest === request) detailError.value = e?.message || '加载角色档案失败'
+  } finally {
+    if (detailRequest === request) detailLoading.value = false
   }
 }
 function removeCharacterMemory(id: string) {
@@ -287,19 +319,17 @@ const columns: DataTableColumns<GroupRow> = [
   { title: '最近唤醒', key: 'lastWakeReason', width: 110, render: row => row.lastWakeReason || '—' },
   { title: '梗/待办', key: 'memes', width: 90, render: row => `${row.memes.length}/${row.pendingEvents.length}` },
   { title: '仿真开关', key: 'toggle', width: 100, render: row => h(NSwitch, { value: row.active, size: 'small', onUpdateValue: () => void toggle(row) }) },
-  { title: '', key: 'ops', width: 90, render: row => h(NButton, { size: 'tiny', onClick: () => void openDetail(row.groupId) }, { default: () => '详情' }) },
+  { title: '', key: 'ops', width: 90, render: row => h(NButton, { size: 'tiny', onClick: () => selectGroup(row.groupId) }, { default: () => '角色档案' }) },
 ]
-import { h } from 'vue'
 const rows = computed(() => overview.value?.groups || [])
-const detailTitle = computed(() => {
-  const name = overview.value?.groupNames?.[detailId.value]
-  return name ? `${name}（${detailId.value}）· 仿真详情` : `群 ${detailId.value} · 仿真详情`
-})
+const groupName = computed(() => overview.value?.groupNames?.[selectedGroup.value] || '')
+const detailTitle = computed(() => detail.value?.profile?.persona.name || '角色档案')
+const detailDescription = computed(() => [groupName.value, selectedGroup.value, replyModeLabels[detail.value?.replyMode || 'auto']].filter(Boolean).join(' · '))
 </script>
 
 <template>
-  <div class="page">
-    <PageHeader title="自主仿真" subtitle="AI 自主收发消息的会话：按群开关、预算、记忆与好感度管理" />
+  <div v-if="!selectedGroup" class="page-stack">
+    <PageHeader title="自主仿真" description="按群管理参与方式和预算，打开角色档案查看她的近况、偏好与记录。" />
     <PageState :loading="loading && !overview" :error="error" @retry="load" />
     <template v-if="overview">
       <NAlert v-if="!overview.enabled" type="warning" style="margin-bottom: 12px">
@@ -315,21 +345,30 @@ const detailTitle = computed(() => {
         <small class="budget-hint">所有未单独设置的群用这个值；* 表示该群有按群上限</small>
         <span v-if="defaultCapMessage" class="msg">{{ defaultCapMessage }}</span>
       </div>
-      <NDataTable :columns="columns" :data="rows" size="small" />
+      <NDataTable :columns="columns" :data="rows" :scroll-x="930" size="small" />
     </template>
-    <NDrawer v-model:show="drawerOpen" width="min(420px, 100vw)">
-      <NDrawerContent :title="detailTitle" closable>
-        <div v-if="detail" class="detail">
-          <div class="kv"><span>回复模式（管理员设定）</span><b>{{ replyModeLabels[detail.replyMode || 'auto'] || '自主' }}</b></div>
-          <div class="kv"><span>AI 自设状态（它给自己定的）</span><b>{{ detail.mode === 'active' ? '活跃观察期' : '潜水（低主动）' }}</b></div>
-          <div class="kv"><span>回合历史</span><b>{{ detail.historyLength }} 条</b></div>
+  </div>
+  <div v-else class="page-stack character-page">
+    <RouterLink to="/simulation" class="back-link">← 返回自主仿真</RouterLink>
+    <PageHeader :title="detailTitle" :description="detailDescription">
+      <template #actions>
+        <NTag v-if="detail?.character?.paused" type="warning" round>自主行动已暂停</NTag>
+        <NTag v-else-if="detail" :type="detail.active ? 'success' : 'default'" round>{{ detail.active ? detail.running ? '正在处理一轮' : '仿真已启用' : '仿真未启用' }}</NTag>
+        <NButton secondary size="small" :loading="detailLoading" @click="refreshCharacter">刷新</NButton>
+      </template>
+    </PageHeader>
+    <PageState :loading="detailLoading && !detail" :error="detailError" @retry="refreshCharacter" />
+    <NTabs v-if="detail" :value="selectedTab" type="line" class="character-tabs" @update:value="selectTab">
+      <NTabPane name="profile" tab="角色档案">
+        <CharacterProfile v-if="detail.profile" :profile="detail.profile" />
+        <NAlert v-else type="info">{{ detail.characterBinding?.reason || '当前没有可用的角色档案。' }}</NAlert>
+      </NTabPane>
+      <NTabPane name="character" tab="目标与记忆">
           <div v-if="detail.character" class="block character-block" aria-label="角色与自主目标">
-            <h4>角色与自主目标</h4>
             <div class="character-meta">机器人 {{ detail.character.scope.botId }} · 人设 {{ detail.character.scope.personaId }}</div>
             <div class="row">
               <NTag size="small" :type="detail.character.paused ? 'warning' : 'success'">{{ detail.character.paused ? '自主行动已暂停' : '自主行动可用' }}</NTag>
               <NButton size="tiny" :loading="characterBusy" @click="controlCharacter(detail.character.paused ? 'resume' : 'pause')">{{ detail.character.paused ? '恢复自主行动' : '暂停自主行动' }}</NButton>
-              <NButton size="tiny" quaternary :disabled="characterBusy" @click="refreshCharacter">刷新</NButton>
             </div>
             <div v-if="detail.character.decision" class="character-card">
               <b>最近选择：{{ decisionLabels[detail.character.decision.kind] || detail.character.decision.kind }}</b>
@@ -346,6 +385,7 @@ const detailTitle = computed(() => {
               <p>完成标准：{{ goal.completionCriteria }}</p>
               <p v-if="goal.lastOutcome">最近结果：{{ goal.lastOutcome }}</p>
               <small>已尝试 {{ goal.attempts }}/{{ goal.maxAttempts }} 次 · 下次检查 {{ characterTime(goal.nextCheckAt) }} · 截止 {{ characterTime(goal.expiresAt) }}</small>
+              <CharacterEvidence v-if="goal.evidenceRefs" :refs="goal.evidenceRefs" :evidence="detail.profile?.evidence" />
               <div v-if="!goalEnded(goal.status)" class="row">
                 <NButton size="tiny" :disabled="characterBusy" @click="controlCharacter(goal.status === 'paused' ? 'resume-goal' : 'pause-goal', goal.id)">{{ goal.status === 'paused' ? '恢复目标' : '暂停目标' }}</NButton>
                 <NButton size="tiny" type="error" quaternary :disabled="characterBusy" @click="controlCharacter('cancel-goal', goal.id)">取消目标</NButton>
@@ -353,10 +393,11 @@ const detailTitle = computed(() => {
             </div>
             <h4 class="character-heading">最近经历、观点与兴趣</h4>
             <div v-if="!detail.character.memories.length" class="empty">还没有带来源的角色记忆。</div>
-            <div v-for="memory in [...detail.character.memories].reverse().slice(0, 12)" :key="memory.id" class="character-card">
+            <div v-for="memory in [...detail.character.memories].reverse()" :key="memory.id" class="character-card">
               <div class="character-title"><NTag size="small">{{ memoryLabels[memory.kind] || memory.kind }} · {{ evidenceLabels[memory.epistemic] || memory.epistemic }}</NTag><NButton size="tiny" type="error" quaternary :disabled="characterBusy" @click="removeCharacterMemory(memory.id)">删除记忆</NButton></div>
               <p>{{ memory.content }}</p>
-              <small>{{ characterTime(memory.updatedAt) }} · {{ memory.evidenceRefs.length }} 条依据</small>
+              <small>{{ characterTime(memory.updatedAt) }}</small>
+              <CharacterEvidence :refs="memory.evidenceRefs" :evidence="detail.profile?.evidence" />
             </div>
             <h4 class="character-heading">最近行动结果</h4>
             <div v-if="!detail.character.receipts.length" class="empty">还没有行动记录。</div>
@@ -366,8 +407,9 @@ const detailTitle = computed(() => {
               <small>{{ characterTime(receipt.at) }}</small>
             </div>
           </div>
+      </NTabPane>
+      <NTabPane name="activities" tab="作品与活动">
           <div v-if="detail.activities" class="block character-block" aria-label="角色活动与作品">
-            <h4>角色活动与作品</h4>
             <div v-if="activityMessage" class="msg" role="status">{{ activityMessage }}</div>
             <h4 class="character-heading">作品空间</h4>
             <div v-if="!detail.activities.works.length" class="empty">还没有作品。角色可以把笔记、研究和故事保存为草稿。</div>
@@ -425,6 +467,13 @@ const detailTitle = computed(() => {
               <p>{{ capability.description }}</p>
             </div>
           </div>
+      </NTabPane>
+      <NTabPane name="settings" tab="群设置">
+          <div class="block panel">
+            <div class="kv"><span>回复模式</span><b>{{ replyModeLabels[detail.replyMode || 'auto'] }}</b></div>
+            <div class="kv"><span>当前会话状态</span><b>{{ detail.mode === 'active' ? '活跃观察期' : '潜水' }}</b></div>
+            <div class="kv"><span>回合历史</span><b>{{ detail.historyLength }} 条</b></div>
+          </div>
           <div class="block">
             <h4>本群每日消耗上限（元） <small v-if="detail.budget.capOverridden">（按群覆盖）</small><small v-else>（跟随默认）</small></h4>
             <div class="row">
@@ -471,13 +520,18 @@ const detailTitle = computed(() => {
             <div v-if="!detail.affinity.length" class="empty">还没有记录</div>
             <div v-for="a in detail.affinity" :key="a.userId" class="line">{{ a.userId }}：{{ a.score }}</div>
           </div>
-        </div>
-      </NDrawerContent>
-    </NDrawer>
+      </NTabPane>
+    </NTabs>
   </div>
 </template>
 
 <style scoped>
+.character-page { max-width: 1040px; }
+.back-link { width: fit-content; font-size: 13px; }
+@media (max-width: 500px) {
+  .character-tabs :deep(.n-tabs-tab) { font-size: 12px; }
+  .character-tabs :deep(.n-tabs-tab-pad) { width: 14px; }
+}
 .kv { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .budget-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
 .budget-label { font-size: 13px; }
@@ -486,7 +540,7 @@ const detailTitle = computed(() => {
 .block h4 { margin: 0 0 8px; font-size: 13px; }
 .block small { font-weight: 400; opacity: 0.6; }
 .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
-.character-block { border-top: 1px solid var(--n-border-color, #8883); padding-top: 16px; }
+.character-block { max-width: 840px; }
 .character-meta { font-size: 12px; opacity: 0.7; overflow-wrap: anywhere; }
 .character-card { border: 1px solid var(--n-border-color, #8883); border-radius: 6px; padding: 10px; margin-top: 8px; font-size: 13px; overflow-wrap: anywhere; }
 .character-card p { margin: 6px 0; white-space: pre-wrap; }

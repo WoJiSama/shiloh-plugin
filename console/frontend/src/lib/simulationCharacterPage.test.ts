@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { NButton } from 'naive-ui'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import SimulationPage from '../pages/SimulationPage.vue'
 import { api } from './api'
 
@@ -10,9 +11,10 @@ vi.mock('naive-ui', async () => ({
   ...await vi.importActual<typeof import('naive-ui')>('naive-ui'), useDialog: () => ({ warning })
 }))
 let wrapper: VueWrapper
+let router: Router
 let row: any
 const clone = (value: any) => JSON.parse(JSON.stringify(value))
-beforeEach(() => {
+beforeEach(async () => {
   vi.mocked(api).mockReset()
   warning.mockReset()
   row = {
@@ -62,15 +64,20 @@ beforeEach(() => {
     }
     return clone(row)
   })
-  wrapper = mount(SimulationPage, { attachTo: document.body })
+  router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/simulation', component: SimulationPage }] })
+  await router.push('/simulation')
+  wrapper = mount(SimulationPage, { attachTo: document.body, global: { plugins: [router] } })
 })
 afterEach(() => { wrapper.unmount(); document.body.innerHTML = '' })
 function button(text: string) {
   return wrapper.findAllComponents(NButton).find(item => item.text() === text)!
 }
-async function open() {
+async function open(tab: 'character' | 'activities' = 'character') {
   await flushPromises()
-  await button('详情').trigger('click')
+  await button('角色档案').trigger('click')
+  await flushPromises()
+  expect(router.currentRoute.value.query.group).toBe('10086')
+  await router.replace({ path: '/simulation', query: { group: '10086', tab } })
   await flushPromises()
 }
 function mutations() {
@@ -126,7 +133,7 @@ describe('character controls in simulation detail', () => {
 
 describe('character activities in simulation detail', () => {
   it('renders versions and subscription content as plain text with reflection and capability status', async () => {
-    await open()
+    await open('activities')
     const content = document.querySelector('[aria-label="角色活动与作品"]')!
     expect(content.textContent).toContain('地图研究笔记')
     expect(content.textContent).toContain('第一版草稿')
@@ -140,7 +147,7 @@ describe('character activities in simulation detail', () => {
     expect(content.textContent).not.toContain('sourceMemoryId')
   })
   it('dispatches restore, archive, subscription and reflection operations without resetting the group', async () => {
-    await open()
+    await open('activities')
     await button('恢复此版本').trigger('click')
     await flushPromises()
     await button('归档作品').trigger('click')
@@ -161,7 +168,7 @@ describe('character activities in simulation detail', () => {
     ])
   })
   it('requires confirmation for sharing and destructive operations, and exposes failed activity requests', async () => {
-    await open()
+    await open('activities')
     await button('批准共享').trigger('click')
     expect(mutations()).toEqual([])
     await warning.mock.calls[0]![0].onPositiveClick()

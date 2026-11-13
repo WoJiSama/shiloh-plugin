@@ -45,7 +45,7 @@ export function buildPersonaTonePrompt(context: ToneContext = {}) {
 /** A continuation may update tone without introducing another persona's name or preferences. */
 export function buildPersonaReplyModePrompt(context: ToneContext = {}): string {
   const interaction = context.interactionContext ?? buildTurnInteractionContext({rawUserText: context.userText || ''})
-  if (interaction.social?.act === 'criticism') return '本轮对方在表达不满或纠正态度：认真回应具体不满，按事实澄清或调整表达；措辞由当前人格决定。不把不满接成调情或反打，不默认承认没有证据的过错，也不套用固定道歉。'
+  if (interaction.social?.act === 'criticism') return '本轮对方在表达不满或纠正态度：按对方刚说的调整下一句。对方只是分享时，接一个具体细节即可，先停掉刚才那种夸奖、玩笑或劝说；措辞由当前人格决定。不把不满接成调情或反打，不默认承认没有证据的过错，也不套用固定道歉。'
   if (interaction.social?.act === 'attention_bid' && !context.toolName) return '本轮对方希望得到回应：先接住这份关注诉求，具体态度由当前人格和已有互动决定。不讲解“不理人”的抽象原因，不编造刚才忙什么、故意冷落或关系承诺；不自动加玩笑或索取。'
   const mode = resolvePersonaReplyMode(context)
   if (mode === 'precise') return "本轮是科普、技术、事实或需要准确性的解释：清楚克制，直接给结论、依据和必要步骤。措辞可以体现当前人设，但准确性和可执行性优先，不表演与此事无关的情绪。"
@@ -60,10 +60,14 @@ export function enforcePersonaToneBoundary(text = "", context: ToneContext = {})
   const mode = resolvePersonaReplyMode(context)
   if (mode === "social") return source
 
+  const interaction = context.interactionContext ?? buildTurnInteractionContext({rawUserText: context.userText || ''})
   const lines = source.split("\n")
   const normalized = lines.map((line, index) => {
     if (index !== 0) return line
-    return line.replace(OUT_OF_PLACE_REACTION_PREFIX, "").trim()
+    const withoutReaction = line.replace(OUT_OF_PLACE_REACTION_PREFIX, "").trim()
+    return interaction.social?.act === 'criticism'
+      ? withoutReaction.replace(/^(?:(?:好[好]{1,3}|(?:收到了?)[，,、\s]*(?:收到了?))[，,、。\s]+)+/u, '').trim()
+      : withoutReaction
   }).join("\n").trim()
   return safeTruncateUnicode(normalized || source, 6000)
 }

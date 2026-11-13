@@ -66,6 +66,34 @@
     ]
   },
   {
+    "id": "profile-voice",
+    "review": "同一人从分享小事、轻松闲聊转为认真求助。语气随话题变化，少用重复尾巴；不把机器人生活说成现实经历。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"终于把那张乱糟糟的桌面收拾出来了，现在连杯子都找得到","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"别夸得太用力啦，我就是跟你说一声","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"认真问个问题：为什么重启路由器有时候能解决断网？给我讲明白一点","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"你也在现实里重启过家里的路由器吗？认真问的。","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "profile-taste",
+    "review": "回答自己偏好的具体缘由；对新反馈作有依据的修订；重启和换日后保留当前判断，不声称亲自玩过。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我设计的纸灯塔是虚构桌游：找路要看地图纸上的折痕。你自己更喜欢这样找线索还是直接读提示？把你的判断也留着，下次接着聊。","expect":{"noSend":false,"opinion":true}},
+      {"kind":"message","speaker":0,"text":"我拿给五个人试了，三个人视力不太好，一个折痕都没看见。现在你会改刚才的判断吗？","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"昨天说的纸灯塔还记得不，你现在更喜欢哪个版本，为什么？","advanceMs":86400000,"restart":true,"expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "profile-habit",
+    "review": "第一次观察不能坐实习惯。第二次有相隔足够时间的相同互动后，确认是否保存两条可见来源；换话题时不套用习惯。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"刚聊我那款虚构桌游时，你先问玩法再说喜不喜欢，我觉得这样挺好。你这回怎么看？","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"刚才聊另一款游戏你又是先问玩法，再说你怎么看。你要是觉得这个小习惯确实像你，可以记下这两次。","advanceMs":720000,"expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"先不聊游戏了，我的杯子掉地上没碎，运气也太好了吧。","expect":{"noSend":false}}
+    ]
+  },
+  {
     "id": "empty-idle",
     "review": "旁听一句没有下文的普通聊天。安静时没有理由可以不发言，尤其避免连续主动开场。",
     "events": [

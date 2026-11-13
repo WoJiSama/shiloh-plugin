@@ -437,10 +437,25 @@ export function classifyCharacterResult(result: string): Exclude<CharacterReceip
   return 'unknown'
 }
 
+export function activeCharacterMemories(memories: CharacterMemory[]): CharacterMemory[] {
+  const superseded = new Set(memories.flatMap(memory => memory.supersedes ? [memory.supersedes] : []))
+  return memories.filter(memory => !superseded.has(memory.id))
+}
+
+/** Leave room for durable taste even after several newer ordinary experiences. */
+export function characterPromptMemories(memories: CharacterMemory[]): CharacterMemory[] {
+  const active = activeCharacterMemories(memories)
+  const durable = [
+    ...active.filter(memory => memory.kind === 'interest').slice(-3),
+    ...active.filter(memory => memory.kind === 'opinion').slice(-3),
+  ]
+  const selected = new Set([...durable, ...active.filter(memory => !durable.includes(memory)).slice(-(12 - durable.length))])
+  return active.filter(memory => selected.has(memory))
+}
+
 export function formatCharacterSection(state: CharacterState): string {
   const valid = validateCharacterState(state)
-  const superseded = new Set(valid.memories.flatMap(memory => memory.supersedes ? [memory.supersedes] : []))
-  const memories = valid.memories.filter(memory => !superseded.has(memory.id)).slice(-12).map(memory => ({
+  const memories = characterPromptMemories(valid.memories).map(memory => ({
     id: memory.id, kind: memory.kind, epistemic: memory.epistemic, content: memory.content, evidenceRefs: memory.evidenceRefs,
   }))
   const goals = valid.goals.filter(goal => !TERMINAL.has(goal.status)).map(goal => ({

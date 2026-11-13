@@ -25,7 +25,7 @@ try {
   const { simulationRuntime } = await import("../utils/simulationRuntime.js")
   simulation = {
     overview: () => simulationRuntime.overview(),
-    describeGroup: groupId => simulationRuntime.describeGroup(groupId),
+    describeGroup: (groupId, options) => simulationRuntime.describeGroup(groupId, options),
     setGroup: (groupId, action) => action === "enable" ? simulationRuntime.enableGroup(groupId)
       : action === "disable" ? simulationRuntime.disableGroup(groupId)
         : simulationRuntime.resetGroup(groupId),

@@ -109,6 +109,8 @@ export interface SimMemoryEntry {
   dueAt?: number
   /** 运行时核验的邀请来源；旧的模型布尔值不能单独授权主动跟进。 */
   proactiveSourceSeq?: number
+  /** 自我笔记可引用当时实际看过的本群消息，旧笔记可以没有。 */
+  habitMessageSeqs?: number[]
   /** meme 专用：出现/使用次数（注入排序与强化依据） */
   count?: number
   /** meme 专用：出处原话（谁第一次说的） */

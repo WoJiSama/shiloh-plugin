@@ -1,7 +1,8 @@
+import type { CharacterMemory } from '../../src/contracts/character.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { CharacterGoalInput, CharacterMemoryInput, CharacterReceipt, CharacterState } from '../../src/contracts/character.js'
-import {
+import { characterPromptMemories,
   CHARACTER_DEFAULT_EXPIRY_MS, CHARACTER_MAX_EXPIRY_MS, CHARACTER_MIN_WAKE_MS,
   addCharacterMemory, beginCharacterGoalAction, beginCharacterGoalAttempt, characterKey, classifyCharacterResult,
   createCharacterGoal, createEmptyCharacterState, deleteCharacterMemory, dueCharacterGoal,
@@ -214,4 +215,19 @@ test('角色提示显式保留认知状态、拒绝原因及未知回执，不�
   assert.match(section, /unwilling/)
   assert.match(section, /修正后的兴趣判断/)
   assert.doesNotMatch(section, /旧的兴趣判断/)
+})
+
+test('长期口味保留在有界提示中，修订后只提示当前版本', () => {
+  const at = 1_000_000
+  const make = (id: string, kind: CharacterMemory['kind']): CharacterMemory => ({
+    id, kind, content: id, epistemic: 'inferred', evidenceRefs: ['message:1'], createdAt: at, updatedAt: at,
+  })
+  const entries = [
+    make('旧观点', 'opinion'), { ...make('新观点', 'opinion'), supersedes: '旧观点' },
+    make('旧但还喜欢的游戏', 'interest'),
+    ...Array.from({ length: 14 }, (_, index) => make(`经历${index}`, 'experience')),
+  ]
+  const selected = characterPromptMemories(entries)
+  assert.equal(selected.length, 12)
+  assert.deepEqual(selected.slice(0, 2).map(memory => memory.id), ['新观点', '旧但还喜欢的游戏'])
 })

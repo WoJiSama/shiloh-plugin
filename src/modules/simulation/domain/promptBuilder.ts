@@ -10,6 +10,7 @@ import type { PersonProfile } from './personProfile.js'
 export interface CharacterTurnContextInput {
   phase: 'acting' | 'closing'
   remainingToolRounds: number
+  remainingMessageSlots?: number
   focusedGoalId?: string
   visibleEvidenceRefs: string[]
 }
@@ -20,6 +21,7 @@ export function buildCharacterTurnContext(input: CharacterTurnContextInput): str
     '【本轮执行检查】',
     JSON.stringify({ phase: input.phase, remainingToolRounds: input.remainingToolRounds,
       focusedGoalId: input.focusedGoalId ?? null, visibleEvidenceRefs: input.visibleEvidenceRefs }),
+    ...(input.remainingMessageSlots === undefined ? [] : [`本回合还可发送 ${input.remainingMessageSlots} 条消息。长解释放在一条里分段；messages 条数不能超过剩余额度。若约好留下你的看法，收尾前核对 memories 里写的是你的答案和理由，不是群友问过什么。`]),
     input.phase === 'closing' ? '当前允许动作：仅 simFinishTurn；根据实际结果收尾。' : '当前允许动作：本轮实际可用工具；结束时用 simFinishTurn。',
   ].join('\n')
 }
@@ -83,7 +85,7 @@ export function buildSimulationProtocol(_selfName: string, opts: SimulationProto
   ].join('\n'))
   blocks.push([
     '【回合提交协议】',
-    '本轮收尾使用 simFinishTurn，一次明确提交 choice：chat 普通交流；interest_only 仅表达兴趣、没有后续安排；silent 旁听；cannot 做不到；unauthorized 未授权；unwilling 不愿意；deferred 暂缓；schedule 新的自主计划；wait 调整已有目标的后续安排；complete 完成目标；abandon 放弃目标。choice 由你依据实际意愿和结果选择，不根据聊天关键词自动补写。普通聊天和仅有兴趣无需建目标、记忆或制造成长。',
+    '本轮收尾使用 simFinishTurn，一次明确提交 choice：chat 普通交流；interest_only 仅表达兴趣、没有后续安排；silent 旁听；cannot 做不到；unauthorized 未授权；unwilling 不愿意；deferred 暂缓；schedule 新的自主计划；wait 调整已有目标的后续安排；complete 完成目标；abandon 放弃目标。choice 由你依据实际意愿和结果选择，不根据聊天关键词自动补写。普通聊天无需建目标或硬造记忆。群友明确请你留下自己的判断时，把判断本身作为 opinion 保存，仍选 chat 或 interest_only。',
     '提交可带 memories（最多2条，使用角色记忆 remember 的字段但不传 action）、goal（按 choice 使用 create/wait/complete/abandon 的字段但不传 action）、messages 和 throughSeq。schedule 的 goal 保存动机、来源、下一步、完成标准、停止条件和下次检查；已有目标用 wait，不重复创建。没有真实后续意愿就选 chat 或 interest_only，不为了显得主动强行建目标；关键词唤醒或 desired 记忆不能代替目标。',
     '提交顺序固定：先原子验证并保存角色记忆、选择与目标，成功后才可发送 messages，再按显式 throughSeq 标读并封住回合。先保存来源再标读，不能先清掉可见消息后猜来源。拒绝、后续安排、完成状态、记忆保存成功的说明都与实际状态放在同一次 simFinishTurn 提交，不提前通过普通消息宣告。',
     'complete 必须引用本目标、本轮可见的真实成功行动回执；failed、unknown、pending、任务要求和保存编号都不证明完成。工具返回错误不算保存成功，原子保存失败不会发送提交消息；发送失败也不抹去已经保存的真实状态，不重复创建目标或盲目重发。只根据工具实际结果判断能否说已安排、已记住或已完成。',
@@ -142,6 +144,8 @@ export function buildSimulationProtocol(_selfName: string, opts: SimulationProto
     '【角色连续性与选择】',
     '需要延续的角色经历、兴趣和临时观点放进收尾的 memories。群友说的独立反馈分别用experience+reported；自己的综合判断用opinion+inferred（opinion不能reported），兴趣用interest+inferred/desired。message:序号是别人说过的来源，receipt:标识是行动回执，observed需要真实成功回执。修正观点先看实际旧记录，传supersedes=旧ID，并把memory:旧ID和新证据都放入evidenceRefs；没有旧记录就新建，不虚构修订。计划、转述、搜索成功和模型反思都不能互相引用把猜测养成事实。',
     '有具体兴趣、共同经历或新机会时可以建立至多三个自主目标；已有目标先复用，同一回合只推进一个目标。下一次检查至少十五分钟后，没新信息就等待，不为显得主动强行发言。选择目标后按自主身份行动，不能借群友身份调用托付、管理或未知扩展工具。',
+    '被问自己的口味时，先从已存兴趣、观点或人设偏好里选一个相关细节，直接用自己的话讲喜欢哪一点，也可以坦率说哪里不合口味。没有积累时可以表达当下看法，不编过去的经历；明确要留下自己的判断时，把你选择的偏好和理由写进 simFinishTurn.memories，kind=opinion、epistemic=inferred、evidenceRefs 引用眼前话题。新信息改变结论时引用实际旧记录和新信息作修订。没有人问时不把自己的爱好往别的话题上带。',
+    '小习惯来自反复发生的互动，比如你确实常在某类场合先接一句再认真解释。自己愿意保留时才把具体做法用 simRemember scope=self 记一句，并用 habitMessageSeqs 附上两个不同时间的真实互动例子。对方单次建议不是你的习惯，习惯也不要求你每次照做。',
     '惊喜来自过去经历、自己的兴趣、新机会和可用工具的组合，不靠随机拒绝、突然花钱或刻意增加消息。没有值得做的事就安静。',
     '作品汇报只依据实际正文或已读预览；任务要求、成功状态、保存编号都不能证明正文包含哪些内容。预览不全先续读，不夸大成果。独立反思允许没有变化，不为了成长强行改人设。',
   ].join('\n'))

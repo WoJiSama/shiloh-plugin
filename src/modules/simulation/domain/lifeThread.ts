@@ -52,10 +52,12 @@ export function formatLifeThreads(threads: LifeThread[], commonTopicLines: strin
   const active = threads.filter(t => t.status === 'active')
   if (!active.length) return ''
   const lines = active.slice(0, 3).map(t => {
-    const head = `- 《${t.title}》（${t.kind === 'anime' ? `在追${t.lastEpisode ? `，看到第 ${t.lastEpisode} 集` : ''}` : '在玩'}）分享链接：https://www.bilibili.com/bangumi/play/ss${t.sourceId}`
+    const progress = t.kind === 'anime' && t.lastEpisode ? `，已同步至第 ${t.lastEpisode} 集` : ''
+    const link = t.kind === 'anime' && /^\d+$/.test(t.sourceId) ? ` 番剧链接：https://www.bilibili.com/bangumi/play/ss${t.sourceId}` : ''
+    const head = `- 《${t.title}》（关注中${progress}）${link}`
     const notes = t.notes.slice(0, 4).map(n => `  · ${n}`).join('\n')
     return notes ? `${head}\n${notes}` : head
   })
   const common = commonTopicLines.slice(0, 3).map(text => `- 共同话题：群里${text}`)
-  return ['【你最近的生活线】（以下是你自己在追的作品和真实更新进度——这是你的个人兴趣背景知识，不是当前话题。严格规则：只有当群里正在聊动画/番剧相关话题、或有人提到你在追的作品时才自然带出；绝不在无关话题的群里主动提起。被问「最近在追什么」时可以聊，但别像汇报一样罗列。聊到时以此为据（真实资料），可以聊感想，不要编造资料里没有的剧情细节；可以用 simShareVideoCard(url: 分享链接) 发番剧卡片）', ...lines, ...common].join('\n')
+  return ['【你最近关注的作品】（用实际同步的资料延续兴趣。对方问起，或正好在聊相关作品时，可以说你在关注哪一部分、对哪一点感兴趣，别罗列清单。同步进度是资料更新，不表示你亲自看完或玩过；没有依据就别编情节或经历。有番剧链接时可用 simShareVideoCard。）', ...lines, ...common].join('\n')
 }
