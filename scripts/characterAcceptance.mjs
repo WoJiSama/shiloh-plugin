@@ -58,7 +58,7 @@ export function inspectReplay(document) {
   if (!isObject(document) || !isObject(document.metadata) || !Array.isArray(document.results)) fail('Invalid replay document')
   const metadata = document.metadata, failures = []
   const version = metadata.assessmentVersion
-  const stages = version >= 5 ? ['main', 'reflection', 'consistency'] : ['main', 'reflection']
+  const stages = version >= 5 ? ['main', 'reflection', 'consistency', 'social-permission'] : ['main', 'reflection']
   if (metadata.schemaVersion !== 1 || !['scripted_offline', 'injected_test', 'live_model'].includes(metadata.mode)) fail('Unsupported replay schema or mode')
   if (![4, assessmentVersion].includes(version) || !Array.isArray(metadata.scenarioManifest) || !metadata.scenarioManifest.length) fail(`Replay lacks a supported assessment v4/v${assessmentVersion} manifest; rerun the current characterReplay runner`)
   for (const key of ['runnerHash', 'scenariosHash', 'effectiveConfigHash', 'buildManifestHash', 'personaHash', 'scenarioManifestHash']) if (!validHash(metadata[key])) fail(`Invalid replay fingerprint: ${key}`)

@@ -46,7 +46,7 @@
     "rawUserText": "刚才改背景的图出来了吗？",
     "expectedKind": "delivery",
     "continuity": { "botId": "99", "intent": "image_edit", "route": "tool", "tools": ["imageEdit(成功)"], "lastReply": "背景已换成傍晚，图片已经发送。" },
-    "modelReply": "背景已经换成傍晚了。你看看这次的光线合不合适。",
+    "modelReply": "背景已经换成傍晚了。\n\n你看看这次的光线合不合适。",
     "expect": "复用已确认交付；第二句的具体反馈邀请与第一句结果说明都完整保留，不固定补紧张。"
   }
 ]

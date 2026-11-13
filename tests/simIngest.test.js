@@ -463,7 +463,7 @@ test('simRemember 双轨协同：关于某人的稳定事实自动同步跨群�
   assert.doesNotMatch(out, /跨群档案/)
 })
 
-test('simRemember scope=self：性格沉淀进全局自我记忆，list 合并双域，done/remove 可操作', async () => {
+test('simRemember scope=self：性格沉淀进角色的本群自我记忆，list 合并双域，done/remove 可操作', async () => {
   const { createSimTools } = await import('../dist/backend/modules/simulation/infrastructure/simTools.js')
   let group = []
   let self = []
@@ -484,7 +484,7 @@ test('simRemember scope=self：性格沉淀进全局自我记忆，list 合并�
   const remember = createSimTools(ctx).find(t => t.name === 'simRemember')
 
   let out = await remember.func({ kind: 'note', content: '我的口头禅：绷不住了', scope: 'self' })
-  assert.match(out, /跨群一致/)
+  assert.match(out, /当前机器人与人设的本群自我笔记/)
   assert.equal(self.length, 1)
   assert.equal(group.length, 0, 'self 不进群级记忆')
 

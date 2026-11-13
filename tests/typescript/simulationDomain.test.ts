@@ -255,12 +255,12 @@ test('发送配额：小时级节流——13分钟13条式高频输出被拦（�
   assert.equal(checkSendAllowance(state, cfg, now + 3600_000, 0).allowed, true)
 })
 
-test('协议第1条：被问是不是机器人时顺着话头开玩笑，不尬聊不解释', () => {
+test('认真询问身份时直接回答，玩笑要接话头', () => {
   const text = buildSimulationProtocol('希洛')
-  assert.ok(text.includes('是不是机器人'))
-  assert.ok(text.includes('顺着「机器人」这个话头'), '玩笑要接住话头')
-  assert.ok(text.includes('不是开玩笑是尬聊'), '点名答非所问式打岔（实拍:突然报租金价）')
-  assert.ok(text.includes('回避身份问题'))
+  assert.match(text, /你是参与这个群的机器人/)
+  assert.match(text, /认真问起你的身份就直接回答/)
+  assert.match(text, /围绕机器人这个话头/)
+  assert.doesNotMatch(text, /充话费送的|一周租金|机器人会像我这么懒/)
 })
 
 test('resetPreSleepWait 清空观察', () => {
@@ -294,7 +294,7 @@ test('buildSimSystemPrompt：人设名与协议关键段', () => {
   assert.ok(prompt.includes('#tool'))
   // 未外发文本与表情守则（实测事故：夸人只甩一张表情）
   assert.ok(prompt.includes('你直接写出来的文本群友看不到'))
-  assert.ok(prompt.includes('表情包是佐料不是答案'))
+  assert.ok(prompt.includes('对方需要回答、安慰或具体反馈时先用话回应'))
   assert.ok(prompt.includes('不要用阴阳怪气的"夸"冒充善意'))
   assert.ok(prompt.includes('自然拒绝'))
   assert.ok(prompt.includes('simDecide'))
@@ -612,27 +612,27 @@ test('mineUserCatchphrases：挖到专属词、排除通用词、低频用户不
   assert.ok(!result.some(r => r.userId === '3'), '低频用户不建模')
 })
 
-test('好感度四档量化：风格指引具体化 + 口头禅只给熟络以上', async () => {
+test('关系提示保留距离，熟络时仍按实际相处分寸表达', async () => {
   const { affinityStyleHint, formatAffinitySection } = await import('../../src/modules/simulation/domain/simMemory.js')
-  assert.ok(affinityStyleHint(10).includes('礼貌简短'))
-  assert.ok(affinityStyleHint(40).includes('正常熟人感'))
-  assert.ok(affinityStyleHint(70).includes('碎碎念'))
-  assert.ok(affinityStyleHint(95).includes('最放松'))
+  assert.ok(affinityStyleHint(10).includes('自然礼貌'))
+  assert.ok(affinityStyleHint(40).includes('普通称呼'))
+  assert.ok(affinityStyleHint(70).includes('具体的相处习惯'))
+  assert.ok(affinityStyleHint(95).includes('已有相处经验'))
   const style = new Map([['1', ['绷不住了']], ['2', ['退钱']]])
   const lookup = (userId: string) => style.get(userId)
   const text = formatAffinitySection(
     { '1': { ...defaultAffinityEntry(1), score: 75 }, '2': { ...defaultAffinityEntry(1), score: 15 } },
     ['1', '2'], id => (id === '1' ? '阿明' : '路人'), 8, lookup,
   )
-  assert.ok(text.includes('阿明') && text.includes('碎碎念'), '熟络者带具体风格指引')
+  assert.ok(text.includes('阿明') && text.includes('具体的相处习惯'), '熟络者带具体风格指引')
   assert.ok(text.includes('绷不住了') && text.includes('口头禅'), '熟络者带口头禅')
-  assert.ok(text.includes('路人') && text.includes('礼貌简短'), '生疏者对应短礼貌指引')
+  assert.ok(text.includes('路人') && text.includes('自然礼貌'), '生疏者对应短礼貌指引')
   assert.ok(!/路人[^\n]*退钱/.test(text), '生疏者不带口头禅')
 })
 
 // ── A/B 类补强 ──
 
-test('协议主题分块：回合节奏/分条自检/问号开场/表情策略完整版', () => {
+test('仿真协议区分等待、独立补话、表情和沉默', () => {
   const withEmoji = buildSimSystemPrompt({ persona: {}, selfName: '小鲸', hasEmojiTool: true })
   const text = buildSimulationProtocol('小鲸')
   // A1 未说完标志词
@@ -640,21 +640,21 @@ test('协议主题分块：回合节奏/分条自检/问号开场/表情策略�
   // A2 热闹策略
   assert.ok(text.includes('热闹时挑着接'), '热闹挑着接')
   // A3 回复后等
-  assert.ok(text.includes('说完别急着睡'), '回复后等待')
+  assert.ok(text.includes('有人回应就接着聊'), '回复后等待')
   // A4 分条自检
-  assert.ok(text.includes('分条自检') && text.includes('完整的话'), '分条自检')
+  assert.ok(text.includes('分条自检') && text.includes('别拆开同一个意思'), '分条自检')
   // A5 问号开场
-  assert.ok(text.includes('别用问号和问好'), '问号开场限制')
+  assert.ok(text.includes('别机械补一句'), '问号开场限制')
   // A6 漏看自然化
-  assert.ok(text.includes('假装全程在场') && text.includes('刚没看手机'), '漏看自然化')
+  assert.ok(text.includes('别编自己刚才在忙什么') && !text.includes('刚没看手机'), '漏看自然化')
   // A7 冷场技巧
-  assert.ok(text.includes('陈述句'), '冷场技巧')
+  assert.ok(text.includes('主动分享从具体发现说起'), '冷场技巧')
   // A8 该说不该说
   assert.ok(text.includes('该说/不该说'), '判据')
   // A9 表情策略完整版（hasEmojiTool 才注入）
-  assert.ok(withEmoji.includes('七成'), '互惠七成')
-  assert.ok(withEmoji.includes('2~3 轮就收'), '斗图收放')
-  assert.ok(!text.includes('七成'), '无表情工具时不注入表情策略')
+  assert.ok(withEmoji.includes('轻松斗图'), '按场景决定用表情')
+  assert.ok(withEmoji.includes('对方停你也停'), '斗图收放')
+  assert.ok(!text.includes('轻松斗图'), '无表情工具时不注入表情策略')
 })
 
 test('引用解析入快照（B1）：非自引用带被引用人+原文', () => {
@@ -815,7 +815,7 @@ test('buildPersonCards：同一人的关系+档案+本群记忆合成一张卡�
     memories,
   })
   assert.ok(section.includes('【群友人物卡】'), '统一卡段')
-  assert.ok(section.includes('小鱼（好感 70，熟络'), '卡内含关系')
+  assert.ok(section.includes('小鱼（关系：熟络'), '卡内含关系')
   assert.ok(section.includes('TA的口头禅：绷不住了'), '卡内含口头禅')
   assert.ok(section.includes('档案（跨群通用）：称呼「小鱼」'), '卡内含档案（名字不重复）')
   assert.ok(section.includes('本群记忆：[m1] 上次一起打了肉鸽'), '本群记忆并入卡')

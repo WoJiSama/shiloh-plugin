@@ -1,4 +1,4 @@
-interface RhythmOptions { userText?: string; enabled?: boolean; maxTextMessages?: number; naturalLeadMaxChars?: number; naturalFollowMaxChars?: number; naturalTotalMaxChars?: number; sentenceMaxChars?: number; sentenceTotalMaxChars?: number; maxEmojiTextChars?: number; maxEmojiReplyMessages?: number; allowThreePartEmojiReply?: boolean }
+interface RhythmOptions { userText?: string; enabled?: boolean; maxTextMessages?: number; naturalLeadMaxChars?: number; naturalFollowMaxChars?: number; naturalTotalMaxChars?: number; maxEmojiTextChars?: number; maxEmojiReplyMessages?: number; allowThreePartEmojiReply?: boolean }
 import { safeTruncateUnicode } from "../../models/domain/unicodeText.js"
 
 function compact(value = "") {
@@ -19,25 +19,6 @@ function isCompleteBeat(text = "") {
   if (!value) return false
   if (/[，,、：:；;（(]$/.test(value)) return false
   return /[。！？!?…~～]$/.test(value) || codePointLength(value) <= 14
-}
-
-function splitSentences(text = "") {
-  return (String(text || "").match(/[^。！？!?…～~]+[。！？!?…～~]*/g) || [])
-    .map(compact)
-    .filter(Boolean)
-}
-
-// 单段多句的闲聊式回复按句拆条：人不会把两三句完整的话憋成一条消息。
-// 只对无结构、每句都完整收尾、总量不长的内容生效，避免把正式回答拆碎。
-function planSentenceBeat(raw: string, options: RhythmOptions = {}, maxMessages = 2) {
-  if (looksStructuredOrFormal(raw, options.userText)) return null
-  const sentences = splitSentences(raw)
-  if (sentences.length < 2 || sentences.length > Math.min(3, maxMessages)) return null
-  const perSentenceMax = Math.max(20, Number(options.sentenceMaxChars) || 70)
-  const totalMax = Math.max(80, Number(options.sentenceTotalMaxChars) || 220)
-  if (codePointLength(sentences.join("")) > totalMax) return null
-  if (sentences.some(part => codePointLength(part) > perSentenceMax || !isCompleteBeat(part))) return null
-  return sentences
 }
 
 export function planTextReplyMessages(text = "", options: RhythmOptions = {}) {
@@ -62,8 +43,6 @@ export function planTextReplyMessages(text = "", options: RhythmOptions = {}) {
 
     if (natural) return { mode: "two_beat", messages: [lead, follow] }
   }
-  const sentenceBeat = planSentenceBeat(raw, options, maxMessages)
-  if (sentenceBeat) return { mode: "sentence_beat", messages: sentenceBeat }
   return { mode: "single", messages: [raw] }
 }
 

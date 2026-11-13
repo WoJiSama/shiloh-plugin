@@ -32,6 +32,6 @@ export function staleMessageNote(latestIncomingAt: number, now: number, threshol
   const ageMin = Math.floor((now - latestIncomingAt) / 60_000)
   if (ageMin < thresholdMs / 60_000) return ''
   return ageMin >= 60
-    ? `（这些消息是一个多小时前的，你才刚看到——回应时自然带出"刚看到/才注意到"，别装作实时在场的样子）`
-    : `（这些消息是 ${ageMin} 分钟前的，你才刚看到）`
+    ? `（群里的上一条消息是 ${Math.floor(ageMin / 60)} 小时前的。只接还相关的事，别当作刚发生。）`
+    : `（群里的上一条消息是 ${ageMin} 分钟前的。）`
 }

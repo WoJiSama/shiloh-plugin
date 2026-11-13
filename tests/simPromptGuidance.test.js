@@ -82,17 +82,17 @@ test('每轮尾部只传阶段、剩余轮数、聚焦目标和实际可见来�
 
 test('工具详细说明以实际工具清单为准，旧布尔选项不扩大已过滤能力', () => {
   const minimum = buildSimSystemPrompt({ persona: {}, selfName: '希洛', availableToolNames: ['simFinishTurn'], hasMoodTool: true, hasEmojiTool: true, extraToolNames: ['searchVideoTool', 'sendLocalEmojiTool'] })
-  assert.doesNotMatch(minimum, /【本群额外能力】|simWorkspace 是本群|simSubscription 可关注|simSetMood|约七成/)
+  assert.doesNotMatch(minimum, /【本群额外能力】|simWorkspace 是本群|simSubscription 可关注|simSetMood|轻松斗图/)
   const full = buildSimSystemPrompt({ persona: {}, selfName: '希洛', availableToolNames: ['simFinishTurn', 'simWorkspace', 'simSubscription', 'simSharedSelf', 'simWorkerTask', 'simSetMood', 'sendLocalEmojiTool'] })
   assert.match(full, /simWorkspace 是本群文本作品空间/)
   assert.match(full, /simSubscription 可关注/)
   assert.match(full, /simSharedSelf 只提议/)
   assert.match(full, /simWorkerTask 仅使用管理员配置/)
   assert.match(full, /simSetMood/)
-  assert.match(full, /约七成/)
+  assert.match(full, /轻松斗图/)
   const legacy = buildSimSystemPrompt({ persona: {}, selfName: '希洛', hasMoodTool: true, hasEmojiTool: true })
   assert.match(legacy, /simSetMood/)
-  assert.match(legacy, /约七成/)
+  assert.match(legacy, /轻松斗图/)
 })
 
 test('资料和人格示例不能改写固定执行协议，注入内容保留为资料', () => {

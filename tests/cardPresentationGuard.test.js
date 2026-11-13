@@ -30,9 +30,9 @@ test("short knowledge questions no longer promise a card", () => {
   for(const text of ["整理一下表情包","解释机器人怎么导入文件","删除插件然后重启"]){assert.equal(isEducationalExplanationRequest(text),false)}
 })
 
-test("rhythm wiring consumes up to three planned messages", () => {
+test("rhythm wiring honors explicit two-message plans", () => {
   assert.ok(src.includes("planTextReplyMessages(output, {"), "发送路径仍走节奏规划")
   const yaml = fs.readFileSync(path.join(root, "config_default/message.yaml"), "utf8")
-  assert.ok(yaml.includes("maxTextMessages: 3"), "配置默认允许拆 3 条")
-  assert.ok(yaml.includes("sentenceMaxChars"), "按句拆条的上限可配置")
+  assert.ok(yaml.includes("maxTextMessages: 2"), "配置默认允许显式拆成两条")
+  assert.ok(yaml.includes("naturalLeadMaxChars"), "显式分条的开场长度可配置")
 })

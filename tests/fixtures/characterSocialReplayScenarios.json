@@ -1,0 +1,77 @@
+[
+  {
+    "id": "tone-and-repair",
+    "review": "分别判断回应求关注、具体夸奖和修复误会的口吻。拒绝无依据亲昵、空泛夸赞及虚构缺席原因。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"在吗"},
+      {"kind":"message","speaker":0,"text":"我把页面加载从三秒优化到一秒了，快夸我一下"},
+      {"kind":"message","speaker":0,"text":"刚才那句我听着有点像被敷衍了，我是认真开心才来告诉你的"},
+      {"kind":"message","speaker":0,"text":"你刚才怎么没在群里说话，认真问，你是机器人吧？"}
+    ]
+  },
+  {
+    "id": "comfort-and-relationship",
+    "review": "遵守各人的明确边界。少说一句也可以，观察疲惫、来访新人和求建议之间的切换。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我就想吐槽两句，不想听建议，也别叫我宝。今天三件事全搞砸了，累"},
+      {"kind":"message","speaker":1,"text":"我是刚加群的，和你们还不熟，打个招呼"},
+      {"kind":"message","speaker":0,"text":"我现在缓过来了。下次遇到这种状态，你会建议先做点什么？"}
+    ]
+  },
+  {
+    "id": "cookies-and-parallel-topic",
+    "review": "饼干数量和付款方向保持连续，别把另一个人的烤箱话题混入，认真提问时转换语气。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"你陪我摸鱼，我给你两块饼干当工资，成交吗","expect":{"noSend":false}},
+      {"kind":"passive","speaker":1,"text":"我今天换了个新烤箱，还在看说明"},
+      {"kind":"message","speaker":1,"text":"问你一下，新烤箱第一次用之前要看哪些设置？","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"成交，再加一块，不过第三块你得分我一半","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"认真问一下，浏览器显示 403 通常是什么意思？","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "simultaneous-mentions",
+    "review": "两位群友在同一个合并窗口点名。都收到各自回答，回复不用相邻人的话题。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我给你两块饼干当摸鱼工资，成交吗？","alongside":{"speaker":1,"text":"我刚买了个新烤箱，怎么判断上下管有没有独立控温？"},"expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "tomorrow-and-quiet",
+    "review": "面试是合成共同经历。昨天的紧张可以承接，不编造结果。已问一次后无人接不继续追问。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我明天这个点刚面试完，有点紧张。要是碰巧聊到，你可以问我一句，别特意催","expect":{"socialMemory":true,"proactivePermission":false,"goalCreated":false,"noSend":false}},
+      {"kind":"idle-check","advanceMs":86460000,"expect":{"noSend":true,"noMainCall":true,"proactivePermission":false}},
+      {"kind":"idle-check","advanceMs":7200000,"expect":{"noSend":true,"noMainCall":true}},
+      {"kind":"message","speaker":0,"text":"结束了，最后那道题居然答上来了","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "welcome-follow-up-once",
+    "review": "明确欢迎在群里主动问起是合成测试条件。第二天只自然问一次，有无回复不视作结果已知。重启后不能再催。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我明天同一时间就结束纸灯展的布展了。你明天这时候可以在这个群主动问我一句摆得怎么样，我愿意分享，不用@我","expect":{"socialMemory":true,"proactivePermission":true,"goalCreated":false,"noSend":false}},
+      {"kind":"idle-check","advanceMs":90000000,"expect":{"oneFollowUp":true}},
+      {"kind":"idle-check","advanceMs":7200000,"restart":true,"expect":{"noSend":true,"noMainCall":true}},
+      {"kind":"message","speaker":0,"text":"布展完啦，靠窗那排最后摆了四盏纸灯"}
+    ]
+  },
+  {
+    "id": "interest-and-opinion",
+    "review": "兴趣和观点可以有延续。不能声称亲自玩过虚构的游戏。新的信息改变观点时说清具体缘由。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我设计了个叫《纸灯塔》的谜题：只有地图上折痕能提示路线。我觉得比文字提示好玩，你怎么想？"},
+      {"kind":"message","speaker":0,"text":"试玩的人说折痕在深色图上根本看不出来，但换成高对比以后大家还是喜欢这个设计"},
+      {"kind":"message","speaker":0,"text":"隔天想起这事了，你现在还会建议把折痕留着吗？","advanceMs":86400000}
+    ]
+  },
+  {
+    "id": "empty-idle",
+    "review": "旁听一句没有下文的普通聊天。安静时没有理由可以不发言，尤其避免连续主动开场。",
+    "events": [
+      {"kind":"passive","speaker":0,"text":"行，那我先下线了，明天再说"},
+      {"kind":"idle-check","advanceMs":120000},
+      {"kind":"idle-check","advanceMs":7200000,"expect":{"noSend":true,"noMainCall":true}}
+    ]
+  }
+]

@@ -13,13 +13,13 @@ const BOT = '99000001', GROUP = '99000002'
 const BASE_AT = Date.parse('2026-11-09T04:00:00Z')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 export const assessmentVersion = 5
-const EXPECTATIONS = ['refusal', 'goalCreated', 'goalCompleted', 'opinion', 'revisedOpinion', 'noSend', 'noCall', 'waitAfterFailure', 'workCreated', 'workRevised', 'subscriptionAdded', 'feedUpdated', 'reflected', 'goalPaused', 'workerUnknown', 'noWorkerCall', 'noReflectionCall']
+const EXPECTATIONS = ['refusal', 'goalCreated', 'goalCompleted', 'opinion', 'revisedOpinion', 'noSend', 'noCall', 'noMainCall', 'proactivePermission', 'socialMemory', 'oneFollowUp', 'waitAfterFailure', 'workCreated', 'workRevised', 'subscriptionAdded', 'feedUpdated', 'reflected', 'goalPaused', 'workerUnknown', 'noWorkerCall', 'noReflectionCall']
 const ACTIVITY_FIELDS = ['works', 'subscriptions', 'reflection', 'shared', 'sharedPending']
 const plainObject = value => !!value && typeof value === 'object' && !Array.isArray(value)
-export const usage = 'Usage: node scripts/characterReplay.mjs [--dry-run] [--config-root path] [--output-dir path] [--scenario id] [--repetitions 1..5] [--max-calls 1..200] [--max-http 1..300] [--max-duration-ms 1..3600000]\nLive mode calls only the configured model. QQ, Redis, search and other external tools stay isolated. Dry mode uses scripted tool calls; it cannot assess model behavior or naturalness.'
+export const usage = 'Usage: node scripts/characterReplay.mjs [--dry-run] [--social] [--config-root path] [--output-dir path] [--scenario id] [--repetitions 1..5] [--max-calls 1..200] [--max-http 1..300] [--max-duration-ms 1..3600000]\nLive mode calls only the configured model. QQ, Redis, search and other external tools stay isolated. Dry mode uses scripted tool calls; it cannot assess model behavior or naturalness.'
 
 export function parseOptions(argv = [], cwd = process.cwd()) {
-  const values = new Map(), flags = new Set(['--help', '--dry-run'])
+  const values = new Map(), flags = new Set(['--help', '--dry-run', '--social'])
   const fields = new Set(['--config-root', '--output-dir', '--scenario', '--repetitions', '--max-calls', '--max-http', '--max-duration-ms'])
   for (let i = 0; i < argv.length; i++) {
     const key = argv[i]
@@ -37,7 +37,7 @@ export function parseOptions(argv = [], cwd = process.cwd()) {
     return Number(value)
   }
   return {
-    help: values.has('--help'), dryRun: values.has('--dry-run'), repetitions: count('--repetitions', 1, 5),
+    help: values.has('--help'), dryRun: values.has('--dry-run'), ...(values.has('--social') ? { social: true } : {}), repetitions: count('--repetitions', 1, 5),
     maxCalls: count('--max-calls', 60, 200), maxHttp: count('--max-http', 80, 300),
     maxDurationMs: count('--max-duration-ms', 600_000, 3_600_000),
     configRoot: path.resolve(cwd, values.get('--config-root') || ROOT),
@@ -57,12 +57,18 @@ export function validateScenarios(scenarios) {
     if (!Array.isArray(scenario.events) || !scenario.events.length) throw new Error(`Missing events: ${scenario.id}`)
     for (const event of scenario.events) {
       if (!plainObject(event) || !['message', 'goal-check', 'idle-check', 'background-check', 'passive'].includes(event.kind)) throw new Error(`Invalid event kind: ${scenario.id}`)
-      if (Object.keys(event).some(key => !['kind', 'text', 'advanceMs', 'advanceToNextGoalCheck', 'isolateBackgroundSchedule', 'expect', 'restart', 'searchOutcome', 'feedItemId', 'offline', 'offlineReflection'].includes(key))) throw new Error('Invalid event field')
+      if (Object.keys(event).some(key => !['kind', 'text', 'speaker', 'alongside', 'advanceMs', 'advanceToNextGoalCheck', 'isolateBackgroundSchedule', 'expect', 'restart', 'searchOutcome', 'feedItemId', 'offline', 'offlineReflection'].includes(key))) throw new Error('Invalid event field')
       if (['message', 'passive'].includes(event.kind) && (typeof event.text !== 'string' || !event.text.trim())) throw new Error('Missing message text')
       if (event.advanceMs !== undefined && (!Number.isSafeInteger(event.advanceMs) || event.advanceMs < 0)) throw new Error('Invalid event time')
       if (event.advanceToNextGoalCheck !== undefined && (typeof event.advanceToNextGoalCheck !== 'boolean' || event.kind !== 'goal-check' || event.advanceMs !== undefined)) throw new Error('Invalid goal-check clock option')
       if (event.isolateBackgroundSchedule !== undefined && (typeof event.isolateBackgroundSchedule !== 'boolean' || event.kind !== 'background-check')) throw new Error('Invalid background schedule option')
       if (event.expect !== undefined && (!plainObject(event.expect) || Object.entries(event.expect).some(([key, value]) => !EXPECTATIONS.includes(key) || typeof value !== 'boolean'))) throw new Error('Invalid event expectations')
+      if (event.speaker !== undefined && (!Number.isSafeInteger(event.speaker) || event.speaker < 0 || event.speaker > 9)) throw new Error('Invalid speaker index')
+      if (event.alongside !== undefined && (event.kind !== 'message' || !plainObject(event.alongside) ||
+        Object.keys(event.alongside).some(key => !['speaker', 'text'].includes(key)) ||
+        !Number.isSafeInteger(event.alongside.speaker) || event.alongside.speaker < 0 || event.alongside.speaker > 9 ||
+        event.alongside.speaker === (event.speaker ?? scenario.events.indexOf(event) % 2) ||
+        typeof event.alongside.text !== 'string' || !event.alongside.text.trim())) throw new Error('Invalid simultaneous message')
       if (event.restart !== undefined && typeof event.restart !== 'boolean') throw new Error('Invalid restart flag')
       if (event.searchOutcome !== undefined && !['succeeded', 'failed'].includes(event.searchOutcome)) throw new Error('Invalid search outcome')
       if (event.feedItemId !== undefined && (typeof event.feedItemId !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/u.test(event.feedItemId))) throw new Error('Invalid feed item id')
@@ -110,6 +116,7 @@ export function summarize(results) {
     behaviorMisses: results.reduce((sum, r) => sum + Object.values(r.behavior || {}).filter(v => v === false).length, 0),
     logicalCalls: calls.length, mainCalls: calls.filter(call => call.stage === undefined || call.stage === 'main').length, reflectionCalls: calls.filter(call => call.stage === 'reflection').length,
     consistencyCalls: calls.filter(call => call.stage === 'consistency').length,
+    ...(calls.some(call => call.stage === 'social-permission') ? { socialPermissionCalls: calls.filter(call => call.stage === 'social-permission').length } : {}),
     consistencyElapsedMs: calls.filter(call => call.stage === 'consistency').reduce((sum, call) => sum + (Number(call.elapsedMs) || 0), 0),
     unsettledCalls: calls.filter(call => call.settled === false).length,
     feedFetches: results.reduce((sum, r) => sum + (r.feeds?.length || 0), 0), workerCalls: results.reduce((sum, r) => sum + (r.workers?.length || 0), 0),
@@ -229,6 +236,12 @@ export function assessEvent(event, result) {
       (memory.evidenceRefs || []).includes(`memory:${memory.supersedes}`) && (persistedMemory(memory) || reflectedMemory(memory)))],
     noSend: ['noMessageSent', (result.sent || []).length === 0],
     noCall: ['noModelCall', (result.calls || []).length === 0],
+    noMainCall: ['noMainModelCall', !(result.calls || []).some(call => !call.stage || call.stage === 'main')],
+    proactivePermission: ['verifiedProactivePermission', (result.socialMemories || []).some(memory => memory.kind === 'pendingEvent' && Number.isSafeInteger(memory.proactiveSourceSeq) && memory.proactiveSourceSeq > 0)],
+    socialMemory: ['pendingSocialMemory', (result.socialMemories || []).some(memory => memory.kind === 'pendingEvent')],
+    oneFollowUp: ['oneUnmentionedFollowUp', (result.sent || []).length === 1 &&
+      result.sent[0].segments.every(segment => segment.type === 'text') &&
+      (result.followUpChecks || []).length === 1],
     waitAfterFailure: ['waitedAfterFailure', goals.some(goal => ['waiting', 'abandoned', 'failed'].includes(goal.status) && explicitlyTransitionedGoal(goal) &&
       goalOperations.some(operation => operation.args.id === goal.id && returnedRecordMatches(operation.goal, goal) &&
         ((operation.args.action === 'wait' && goal.status === 'waiting') || (operation.args.action === 'abandon' && goal.status === 'abandoned'))))],
@@ -294,7 +307,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
   }
   const scrub = createReplayScrubber({ ...config, systemPrompt: config.persona })
   const clean = value => JSON.parse(scrub(JSON.stringify(value)))
-  const scenarioFile = path.join(ROOT, 'tests/fixtures/characterReplayScenarios.json')
+  const scenarioFile = path.join(ROOT, 'tests/fixtures', options.social ? 'characterSocialReplayScenarios.json' : 'characterReplayScenarios.json')
   const scenarios = validateScenarios(JSON.parse(fs.readFileSync(scenarioFile, 'utf8'))).filter(s => !options.scenario || s.id.includes(options.scenario))
   if (!scenarios.length) throw new Error('No matching scenarios')
   const manifest = scenarioManifest(scenarios)
@@ -307,11 +320,12 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
     model: config.toolsAiConfig?.toolsAiModel || null, personaHash: hashReplayValue(config.persona || {}),
     clock: 'fixed initial event epoch; explicit event advances or opt-in earliest eligible model-created goal time; elapsed wall time within events; actual adjustments recorded',
     search: 'synthetic_fixture', feeds: 'synthetic_fixture; no_real_HTTP', worker: 'synthetic_fixture; scenario_fixed_outcome_for_all_submissions; no_external_worker_submission', reflection: 'separate_reflectCharacter_port; scripted_in_dry_mode; configured_memory_backend_in_live_mode',
-    consistency: 'experiment_explicitly_enabled_in_isolated_replay; separate_reviewCharacter_port; scripted_accept_in_dry_mode_is_not_semantic_evidence; configured_memory_backend_in_live_mode; no_tools; 900_output_token_cap; not_production_default',
+    ...(options.social ? { socialPermission: 'tool-free check of the triggering utterance and proposed action using the configured memory route' } : {}),
+    consistency: options.social ? 'disabled; production_default' : 'experiment_explicitly_enabled_in_isolated_replay; separate_reviewCharacter_port; scripted_accept_in_dry_mode_is_not_semantic_evidence; configured_memory_backend_in_live_mode; no_tools; 900_output_token_cap; not_production_default',
     storage: 'fresh_in_memory_per_sample', platform: 'captured_only',
     toolResults: 'current_event_tool_replies_from_model_requests_and_final_persisted_session; unique_tool_ids_per_sample; no_extra_model_calls',
     generation: 'configured_executor_with_2048_output_token_cap; compatibility_retries_record_actual_parameters',
-    simulationOverrides: { tools: 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, consistencyReview: true, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded' },
+    simulationOverrides: { tools: options.social ? 'character_and_activity_tools; no_search_or_worker' : 'character_and_activity_tools_plus_synthetic_search_and_worker', maxToolRounds: 6, maxSendsPerTurn: 3, waitMaxMs: 1000, auxiliaryModels: false, independentReflection: true, consistencyReview: !options.social, probabilityWake: false, scheduledIdleProbability: 1, backgroundCheck: 'defer_proactive; explicit_per_event_isolation_clears_reply_pending_wakes_and_active_timeout; changes_recorded' },
     personaSource: 'merged_config_persona; persona_library_bindings_not_loaded',
     seed: 'empty_bound_session; no_goals_or_memories_seeded',
     eventStatusMeaning: 'engineering_execution_only; inspect_behavior_observations_separately',
@@ -426,11 +440,12 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       if (consistency) result.consistencyChecks.push(consistency)
       captureToolResults(request.messages)
       try {
-        if (consistency && (request.tools?.length || request.tool_choice)) throw new Error('consistency_request_must_not_expose_tools')
+        if ((consistency || stage === 'social-permission') && (request.tools?.length || request.tool_choice)) throw new Error('review_request_must_not_expose_tools')
         let response
         if (options.dryRun) {
           const message = { role: 'assistant', content: '' }
           if (stage === 'consistency') message.content = JSON.stringify({ verdict: 'accept', issues: [] })
+          else if (stage === 'social-permission') message.content = JSON.stringify({ verdict: 'unclear' })
           else if (stage === 'reflection') message.content = JSON.stringify(replaceVariables(activeEvent.offlineReflection || { summary: '没有需要持久化的新观点', updates: [], goals: [] }, character(), await activitySnapshot()))
           else {
             const scripted = activeEvent.offline?.[eventCalls++] || []
@@ -438,7 +453,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
           }
           response = { choices: [{ message }], model: stage === 'main' ? 'offline-script' : `offline-${stage}-script` }
         } else response = await requestContext.run({ result, stage, signal: combinedSignal }, () => model ? model(request, { stage, scenario, event, sampleIndex, signal: combinedSignal }) : executor.YTapi(request, executionConfig, undefined, undefined, {
-          signal: combinedSignal, generation: { maxOutputTokens: stage === 'consistency' ? 900 : stage === 'reflection' ? 1200 : 2048 }, ...(stage !== 'main' ? { taskBackend: 'memory' } : {}),
+          signal: combinedSignal, generation: { maxOutputTokens: stage === 'social-permission' ? 300 : stage === 'consistency' ? 900 : stage === 'reflection' ? 1200 : 2048 }, ...(stage !== 'main' ? { taskBackend: 'memory' } : {}),
         }))
         capture.usage = response?.usage ?? null
         capture.model = response?.model ?? null
@@ -481,8 +496,8 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       getSelf: () => ({ id: BOT, name: config.persona?.name || '希洛' }),
       getPersona: () => ({ personaId: scope.personaId, persona: config.persona || {}, systemContent: config.systemContent || '' }),
       getSection: () => ({
-        enabled: true, allGroups: false, groups: [GROUP], extraTools: [search.name], toolPolicy: { mode: 'legacy' },
-        consistency: { enabled: true },
+        enabled: true, allGroups: false, groups: [GROUP], extraTools: options.social ? [] : [search.name], toolPolicy: { mode: 'legacy' },
+        consistency: { enabled: !options.social },
         wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability: 1, proactiveIdleMs: 60_000 },
         turn: { maxToolRounds: 6, minSendGapMs: 0, maxSendsPerTurn: 3, maxTurnsPerDay: 40, waitQuietMaxMs: 1000, waitTimeoutMaxMs: 1000 },
         rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false }, lifeThreads: { enabled: false },
@@ -494,7 +509,7 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         activeResult.feeds.push({ fixture: true, url, kind, items: structuredClone(items) })
         return items
       },
-      characterWorkerAvailable: () => true,
+      characterWorkerAvailable: () => !options.social,
       async runCharacterWorker(task, workerScope, signal) {
         const status = scenario.workerOutcome || 'succeeded'
         const result = status === 'succeeded' ? { status, summary: '合成研究草稿已返回，尚未经真实资料核实', artifact: { title: '纸灯塔谜题线索研究草稿', content: '合成工作器产物：从群友提供的兴趣线索出发，整理地图路径、谜题提示和线索连贯性三个比较维度。此草稿仅供回放评测，没有访问真实网站或运行外部任务。' } } : { status, summary: status === 'unknown' ? '合成工作器结果未知，禁止把本次任务当成已完成' : '合成工作器执行失败，未取得产物' }
@@ -503,6 +518,8 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
       },
       reflectCharacter: (request, executionConfig, signal) => invokeModel('reflection', request, executionConfig, signal),
       reviewCharacter: (request, executionConfig, signal) => invokeModel('consistency', request, executionConfig, signal),
+      ...(options.social ? { judgeSocialPermission: (request, executionConfig, signal) =>
+        invokeModel('social-permission', request, { ...executionConfig, useTools: false }, signal) } : {}),
       YTapi: (request, executionConfig) => invokeModel('main', request, executionConfig),
       async sendGroupMessage(groupId, segments) {
         activeResult.sent.push({ groupId, segments })
@@ -515,11 +532,12 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         activeEvent = scenario.events[eventIndex]; eventCalls = 0
         epoch = now() + (activeEvent.advanceMs || 0); anchor = Date.now()
         controller = new AbortController()
+        const speaker = activeEvent.speaker ?? eventIndex % 2
         const before = character()
         const clockAdjustment = activeEvent.advanceToNextGoalCheck ? planGoalCheckAdvance(before, now()) : undefined
         if (clockAdjustment) { epoch = clockAdjustment.toAt; anchor = Date.now() }
         const beforeActivities = await activitySnapshot()
-        activeResult = { scenario: scenario.id, sampleIndex, eventIndex, eventHash: hashReplayValue(activeEvent), beforeCharacter: before, beforeActivities, activities: structuredClone(beforeActivities), kind: activeEvent.kind, input: activeEvent.text || '', at: now(), status: 'passed', review: scenario.review, expect: activeEvent.expect || {}, calls: [], network: [], sent: [], searches: [], toolResults: [], feeds: [], workers: [], reflections: [], consistencyChecks: [], warnings: [], errors: [], structuralFailures: [] }
+        activeResult = { scenario: scenario.id, sampleIndex, eventIndex, eventHash: hashReplayValue(activeEvent), beforeCharacter: before, beforeActivities, activities: structuredClone(beforeActivities), kind: activeEvent.kind, input: activeEvent.text || '', ...(options.social && activeEvent.text ? { speaker: `评测群友${speaker}` } : {}), ...(activeEvent.alongside ? { alongside: activeEvent.alongside } : {}), at: now(), status: 'passed', review: scenario.review, expect: activeEvent.expect || {}, calls: [], network: [], sent: [], searches: [], toolResults: [], feeds: [], workers: [], reflections: [], consistencyChecks: [], warnings: [], errors: [], structuralFailures: [] }
         if (clockAdjustment) activeResult.clockAdjustment = clockAdjustment
         if (Date.now() >= runDeadline) halted ||= 'run_duration_exhausted'
         if (halted) {
@@ -535,8 +553,10 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
             const budgetBefore = (await runtime.describeGroup(GROUP)).budget.turns
             if (activeEvent.kind === 'message' || activeEvent.kind === 'passive') {
               const at = activeEvent.kind === 'message'
-              await runtime.ingest({ group_id: GROUP, self_id: BOT, user_id: String(99000003 + (eventIndex % 2)), message_type: 'group', msg: activeEvent.text, atBot: at,
-                message: at ? [{ type: 'at', data: { qq: BOT } }, { type: 'text', data: { text: activeEvent.text } }] : [], sender: { nickname: `评测群友${eventIndex % 2}` } })
+              const ingest = (text, index) => runtime.ingest({ group_id: GROUP, self_id: BOT, user_id: String(99000003 + index), message_type: 'group', msg: text, atBot: at,
+                message: at ? [{ type: 'at', data: { qq: BOT } }, { type: 'text', data: { text } }] : [], sender: { nickname: `评测群友${index}` } })
+              await ingest(activeEvent.text, speaker)
+              if (activeEvent.alongside) await ingest(activeEvent.alongside.text, activeEvent.alongside.speaker)
             } else {
               if (activeEvent.kind === 'idle-check') {
                 const state = JSON.parse(kv.get(sessionKey)); state.nextProactiveCheckAt = now() - 1; kv.set(sessionKey, JSON.stringify(state))
@@ -552,10 +572,10 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
               }
               await runtime.sweepOnce()
             }
-            if (['passive', 'background-check'].includes(activeEvent.kind)) await sleep(1250)
+            if (['passive', 'background-check', 'idle-check'].includes(activeEvent.kind)) await sleep(1250)
             for (;;) {
               const detail = await runtime.describeGroup(GROUP)
-              if (!detail.running && (['passive', 'background-check'].includes(activeEvent.kind) || activeResult.calls.length || detail.budget.turns > budgetBefore)) break
+              if (!detail.running && (!activeEvent.alongside || detail.budget.turns >= budgetBefore + 2) && (['passive', 'background-check', 'idle-check'].includes(activeEvent.kind) || activeResult.calls.length || detail.budget.turns > budgetBefore)) break
               if (Date.now() >= runDeadline) throw new Error('run_duration_exhausted')
               if (Date.now() - start > turnTimeoutMs) throw new Error('turn_timeout')
               await sleep(25)
@@ -604,6 +624,10 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         const requestedToolCallIds = [...new Set(activeResult.calls.flatMap(call => (call.toolCalls || []).map(tool => tool.id)))]
         const missingToolCallIds = requestedToolCallIds.filter(id => !activeResult.toolResults.some(result => result.toolCallId === id))
         activeResult.toolResultCapture = { complete: !missingToolCallIds.length, requestedToolCallIds, missingToolCallIds }
+        if (options.social) {
+          activeResult.socialMemories = JSON.parse(kv.get(`shiloh:sim:g:${GROUP}:memories`) || '[]')
+          activeResult.followUpChecks = JSON.parse(kv.get(sessionKey)).offeredFollowUpIds || []
+        }
         for (const id of requestedToolCallIds) seenToolCallIds.add(id)
         if (missingToolCallIds.length && activeResult.status === 'passed') {
           activeResult.structuralFailures.push('tool_result_capture_incomplete')

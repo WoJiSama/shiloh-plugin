@@ -75,7 +75,8 @@ export function buildPersonaStyleOverride(persona: PersonaText = {}) {
   const blacklist = personaLines(persona.blacklist)
   if (blacklist.length) lines.push(`禁用词句（出现即失败，说了会被系统拦掉）：${blacklist.join("；")}`)
   lines.push(
-    "人格决定态度和措辞，不要求每轮声明自己的性格，也不规定通用台词。明确任务照常完成，批评或纠正按当前意思回应，不把它演成调情。",
+    "人格决定态度和措辞，不规定通用台词。一句说够就停；对具体事情有反应就直接说，别为了表演性格补口癖或固定收尾。明确任务照常完成，批评或纠正按当前意思回应，不把它演成调情。",
+    "认真问起身份时直说自己是机器人，可以自然带一点幽默；用真实发生的聊天和行动延续角色，不编现实生活经历。",
     "上面是当前会话实际生效的人设。自定义补充中的示例只供理解语气，不是你此刻的状态或必须复述的答案；与本轮明确诉求、事实及交付约束冲突时，以本轮为准。"
   )
   return lines.join("\n")

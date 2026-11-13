@@ -21,15 +21,17 @@ export function compactSimMessage(message: SimMessage, now: number): string {
   const forward = message.forwardId ? ' [合并转发，可用 simGetForward 查看]' : ''
   // 引用标记：引用你的话 vs 引用别人的话（带被引用人+原文——判断"这句话对谁说"的关键信号，引用第三方时别抢话）
   const quoted = message.quoteToSelf
-    ? '[引用你的话]'
+    ? `[引用你的话${message.quoteText ? `：${message.quoteText}` : ''}]`
     : message.quoteAuthor ? `[引用 ${message.quoteAuthor}${message.quoteText ? `：${message.quoteText}` : ''}${message.quoteImageUrls?.length ? `（附${message.quoteImageUrls.length}张图，可用 simGetMessageImages 看）` : ''}]` : ''
   const self = message.atSelf ? '[@你]' : ''
-  return `#${message.seq} ${atClock(message.at)}(${agoText(message.at, now)}) ${message.name}${self}: ${quoted}${message.text}${media}${forward}`
+  const other = message.atOther ? '[@了其他群友]' : ''
+  return `#${message.seq} ${atClock(message.at)}(${agoText(message.at, now)}) ${message.name}${self}${other}: ${quoted}${message.text}${media}${forward}`
 }
 
 export interface SimSnapshot {
   text: string
   included: number
+  includedSeqs: number[]
   unreadTotal: number
   partial: boolean
   readThroughSeq: number
@@ -39,8 +41,11 @@ export interface SimSnapshot {
  * 唤醒快照：最早未读优先（最老的上下文最重要），超出条数/字符预算从最新的开始丢并标记 partial。
  * 快照即「已给模型」，调用方必须 noteModelSeen。
  */
-export function buildWakeSnapshot(state: SimSessionState, opts: { limit: number; maxChars: number; now: number }): SimSnapshot {
-  const ordered = [...state.unread].sort((a, b) => a.seq - b.seq)
+export function buildWakeSnapshot(state: SimSessionState, opts: { limit: number; maxChars: number; now: number; anchor?: SimMessage }): SimSnapshot {
+  const { anchor } = opts
+  const ordered = anchor
+    ? [anchor, ...[...state.recent].reverse().filter(m => m.seq !== anchor.seq && m.userId === anchor.userId && !m.atOther && !m.replyToUserId).slice(0, 4)]
+    : [...state.unread].sort((a, b) => a.seq - b.seq)
   const budget = Math.max(1, Math.floor(opts.limit))
   const chosen: SimMessage[] = []
   let chars = 0
@@ -51,13 +56,15 @@ export function buildWakeSnapshot(state: SimSessionState, opts: { limit: number;
     chosen.push(message)
     chars += line.length
   }
-  const lines = chosen.map(m => compactSimMessage(m, opts.now))
+  const lines = chosen.sort((a, b) => a.seq - b.seq).map(m => compactSimMessage(m, opts.now))
   const partial = chosen.length < ordered.length
-  if (partial && lines.length) lines.push(`（未读共 ${ordered.length} 条，这里只给出最早的 ${chosen.length} 条；其余请用 simGetUnreadMessages 从 readThroughSeq 之后续读）`)
+  if (anchor) lines.push(`（当前要接的是 #${anchor.seq}。只附此人的少量前文。明确在问群里其他内容时，再查对应历史。）`)
+  else if (partial && lines.length) lines.push(`（未读共 ${ordered.length} 条，这里只给出最早的 ${chosen.length} 条；其余请用 simGetUnreadMessages 从 readThroughSeq 之后续读）`)
   return {
     text: lines.join('\n'),
     included: chosen.length,
-    unreadTotal: ordered.length,
+    includedSeqs: chosen.map(message => message.seq),
+    unreadTotal: state.unread.length,
     partial,
     readThroughSeq: readThroughSeq(state),
   }
