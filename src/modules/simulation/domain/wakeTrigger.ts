@@ -20,10 +20,11 @@ export const WAKE_PRIORITY: Record<SimWakeReasonKind, number> = {
   timeout: 25,
   proactiveCheck: 20,
   interestUpdate: 23,
+  projectUpdate: 32,
 }
 
 /** 定时器类唤醒：与未读无关，回合结束补发时必须无条件补。 */
-export const TIMER_WAKE_REASONS: readonly SimWakeReasonKind[] = ['timeout', 'replyCheck', 'proactiveCheck', 'bootstrap', 'admin', 'commitment', 'characterGoal', 'interestUpdate']
+export const TIMER_WAKE_REASONS: readonly SimWakeReasonKind[] = ['timeout', 'replyCheck', 'proactiveCheck', 'bootstrap', 'admin', 'commitment', 'characterGoal', 'interestUpdate', 'projectUpdate']
 
 /** 指向 AI 的疑问/催促判定（规则版，零 LLM）。 */
 const QUESTION_HINT_RE = /[?？吗呢嘛么啊呀]\s*$|[?？]/
@@ -116,6 +117,7 @@ export function formatWakeReason(reason: SimWakeReason | null): string {
     case 'atMention': return '被@或引用'
     case 'continuation': return `刚才在聊天的${reason.detail || '群友'}又说话了`
     case 'commitment': return `承诺到期（${reason.detail || '群友托付的定时事务'}）`
+    case 'projectUpdate': return '项目订阅出现新发布'
     case 'characterGoal': return `自己的目标到检查时间（${reason.detail || ''}）`
     default: return reason.kind
   }

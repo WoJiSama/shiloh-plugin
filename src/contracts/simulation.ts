@@ -19,6 +19,7 @@ export type SimWakeReasonKind =
   | 'commitment'
   | 'characterGoal'
   | 'interestUpdate'
+  | 'projectUpdate'
 
 export interface SimWakeReason { kind: SimWakeReasonKind; seq?: number; detail?: string }
 
@@ -189,6 +190,12 @@ export interface SimulationSection {
   reflection?: { enabled?: boolean }
   /** Explicit additional autonomous creative capabilities; still intersected with current tool policy. */
   autonomousTools?: string[]
+  capabilities?: {
+    enabled?: boolean
+    groups?: string[]
+    mcpTools?: string[]
+    autonomousTools?: string[]
+  }
   worker?: { endpoint?: string; token?: string; enabled?: boolean }
   enabled?: boolean
   /** true（默认）= 所有过了群白名单的群都进仿真；false = 仅 groups 清单（含 .仿真 开 追加的） */

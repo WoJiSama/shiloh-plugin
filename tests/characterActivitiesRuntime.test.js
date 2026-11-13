@@ -29,7 +29,7 @@ async function waitFor(check, description) {
 }
 
 /** Compiled production runtime, with isolated persistence, model and adapter ports. */
-function fixture({ groups = [GROUP], script = () => quiet(), fetchCharacterFeed, reflectCharacter, runCharacterWorker, characterWorkerAvailable, beforeSet } = {}) {
+function fixture({ groups = [GROUP], script = () => quiet(), fetchCharacterFeed, reflectCharacter, runCharacterWorker, characterWorkerAvailable, beforeSet, capabilities, readArchiveMessages } = {}) {
   const kv = new Map(), clock = { value: BASE }, calls = [], events = [], sent = [], errors = []
   const redis = {
     async get(key) { return kv.get(key) ?? null },
@@ -55,7 +55,8 @@ function fixture({ groups = [GROUP], script = () => quiet(), fetchCharacterFeed,
     getSection: () => ({
       enabled: true, allGroups: false, groups, extraTools: [extra.name], toolPolicy: { mode: 'legacy' },
       wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability: 0 },
-      turn: { maxToolRounds: 6, minSendGapMs: 0, maxTurnsPerDay: 100 },
+      ...(capabilities ? { capabilities } : {}),
+      turn: { maxToolRounds: capabilities ? 10 : 6, minSendGapMs: 0, maxTurnsPerDay: 100 },
       rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false },
     }),
     getExecutionConfig: () => ({ useTools: true }), getExtraTools: names => names.includes(extra.name) ? [extra] : [],
@@ -65,6 +66,7 @@ function fixture({ groups = [GROUP], script = () => quiet(), fetchCharacterFeed,
       return { choices: [{ message, finish_reason: message.tool_calls?.length ? 'tool_calls' : 'stop' }], usage: { total_tokens: 10 }, model: 'offline-activities' }
     },
     async sendGroupMessage(groupId, segments) { sent.push({ groupId, segments }); return { ok: true, messageId: `sent-${sent.length}` } },
+    ...(readArchiveMessages ? { readArchiveMessages } : {}),
     ...(fetchCharacterFeed ? { fetchCharacterFeed } : {}), ...(reflectCharacter ? { reflectCharacter } : {}),
     ...(runCharacterWorker ? { runCharacterWorker } : {}), ...(characterWorkerAvailable ? { characterWorkerAvailable } : {}),
   }
@@ -566,4 +568,92 @@ test('目标回合的工作器结果未知会暂停目标，后续巡检不自�
     assert.equal(h.calls.length, 2)
     assert.equal(h.sent.length, 0)
   } finally { h.runtime.stop() }
+})
+
+test('项目跟进从本群归档绑定技能，基线静默，重建后区分版本并防重复回报', async () => {
+  const repo = 'paper-harbor/lantern-sync'
+  const title = '提灯同步'
+  const focus = '离线同步冲突后恢复存档是否修复进度丢失'
+  const fix = '修复了离线同步冲突后恢复存档时丢失进度的问题。'
+  const knownIssue = '恢复存档仍可能丢失进度，本次仅调整主题颜色。'
+  const skill = 'lantern-release'
+  const code = 'return {evidence: input.release.summary.includes("存档") ? [input.release.summary] : []}'
+  let feeds = 1
+  let peer
+  const add = { action: 'add', title, kind: 'github', url: 'https://github.com/' + repo, focus, skill }
+  const h = fixture({
+    capabilities: { enabled: true, groups: [GROUP] },
+    async readArchiveMessages(group, days) {
+      assert.equal(group, GROUP)
+      assert.equal(days, 7)
+      return [{ userId: '40001', text: title + ' https://github.com/' + repo }]
+    },
+    async fetchCharacterFeed(url, kind) {
+      assert.equal(kind, 'github')
+      assert.equal(new URL(url).pathname, '/repos/' + repo + '/releases')
+      return [fix, knownIssue, '旧版发布说明'].slice(3 - feeds).map((summary, index) => ({
+        id: 'release-' + (feeds - index),
+        title: title + ' v' + (feeds - index),
+        url: 'https://github.com/' + repo + '/releases/tag/v' + (feeds - index),
+        summary, receivedAt: h.clock.value,
+      }))
+    },
+    script(request, index) {
+      if (index === 0) return tools(call('simSubscription', add),
+        call('simCapabilities', { action: 'call', name: 'simReadGroupArchive', arguments: { days: 7, keyword: title } }))
+      if (index === 1) {
+        assert.match(toolResult(request, 'simSubscription'), /^error:/)
+        assert.match(toolResult(request, 'simCapabilities'), /lantern-sync/)
+        return tools(call('simSkill', { action: 'save', name: skill, description: '提取存档相关发布说明', code,
+          test: { input: { release: { summary: fix } }, expected: { evidence: [fix] } } }),
+        call('simSubscription', add))
+      }
+      assert.match(toolResult(request, 'simSubscription'), /baselineReady/)
+      return tools(call('simFinishTurn', { choice: 'chat', reason: '已登记', messages: ['我会留意提灯同步的存档修复。'] }))
+    },
+  })
+  const subscription = async runtime => (await runtime.describeGroup(GROUP)).activities.subscriptions[0]
+  try {
+    await h.ingest('跟进提灯同步项目修复存档的版本')
+    await idle(h, 3)
+    assert.deepEqual(h.errors, [])
+    assert.equal((await subscription(h.runtime)).project.skill, skill)
+    await h.runtime.sweepOnce()
+    assert.deepEqual((await subscription(h.runtime)).project.reviews, [])
+    assert.equal(h.sent.length, 1)
+    assert.equal(h.calls.length, 3)
+    h.runtime.stop()
+
+    let updateCalls = 0
+    peer = h.peerRuntime({ async YTapi(request) {
+      updateCalls++
+      assert.deepEqual(request.tools.map(tool => tool.function.name), ['simProjectReview'])
+      const result = toolResult(request, 'simProjectReview')
+      if (!result) {
+        assert.match(request.messages[1].content, /离线同步冲突/)
+        return { choices: [{ message: tools(call('simProjectReview', { action: 'run' })) }] }
+      }
+      const output = JSON.parse(result)
+      assert.equal(output.skill, skill)
+      assert.equal(output.version, 1)
+      assert.deepEqual(output.evidence, [feeds === 2 ? knownIssue : fix])
+      const decision = feeds === 2 ? { action: 'ignore' } : { action: 'report', evidence: fix, message: '提灯同步新版修复了离线冲突后的存档进度丢失。' }
+      return { choices: [{ message: tools(call('simProjectReview', decision)) }] }
+    } })
+    for (const [count, status] of [[2, 'ignored'], [3, 'reported']]) {
+      feeds = count
+      h.clock.value = (await subscription(peer)).nextPollAt
+      await peer.sweepOnce()
+      await waitFor(async () => (await subscription(peer)).project.reviews[0]?.status === status &&
+        !(await peer.describeGroup(GROUP)).running, status)
+      assert.equal(h.sent.length, count === 2 ? 1 : 2)
+    }
+    assert.equal(h.sent[1].groupId, GROUP)
+    assert.match(JSON.stringify(h.sent[1]), /lantern-sync\/releases\/tag\/v3/)
+    h.clock.value = (await subscription(peer)).nextPollAt
+    await peer.sweepOnce()
+    await sleep(1150)
+    assert.equal(updateCalls, 4)
+    assert.equal(h.sent.length, 2)
+  } finally { h.runtime.stop(); peer?.stop() }
 })

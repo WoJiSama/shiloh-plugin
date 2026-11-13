@@ -7,6 +7,7 @@ import { decodeHostConfig } from '../dist/backend/modules/host/infrastructure/ho
 import { getMidtermMemoryManager } from '../dist/backend/modules/memory/infrastructure/MidtermSummaryManager.js'
 import { recallEpisodes, buildEpisodicPrompt, recordEpisode } from '../dist/backend/modules/memory/infrastructure/episodicMemory.js'
 import { buildMemeExtractionPrompt } from '../dist/backend/modules/simulation/domain/simMemory.js'
+import { mcpManager } from './MCPClient.js'
 import { localToolRegistry } from './LocalToolRegistry.js'
 import { ExpressionLearner } from '../domains/memory/ExpressionLearner.js'
 import { globalStyleLearnerManager } from '../domains/memory/GlobalStyleLearnerManager.js'
@@ -280,6 +281,24 @@ export const simulationRuntime = createSimulationRuntime({
       .map(name => snapshot.toolInstances[name])
       .filter(tool => !!tool)
   },
+  getMcpTools: names => mcpManager.getAllTools()
+    .map(tool => tool.function)
+    .filter(definition => names.includes(definition.name))
+    .map(definition => ({
+      name: definition.name,
+      description: definition.description,
+      parameters: definition.parameters,
+      async execute(args, event) {
+        try {
+          const result = await mcpManager.executeToolByAlias(definition.name, args, { logArguments: false })
+          const failed = result.startsWith('error: MCP 工具返回错误')
+          event.simulationReportOutcome?.(failed ? 'failed' : 'succeeded')
+          return { ok: !failed, content: result }
+        } catch {
+          throw Object.assign(new Error('MCP 执行未获确认'), { uncertain: true })
+        }
+      },
+    })),
   // toolPolicy open 模式的默认能力面：内置注册表名（builtInToolNames 由 JS 子类构造时的工厂填充）
   listRegistryToolNames: () => ({
     builtIn: [...localToolRegistry.builtInToolNames],
@@ -300,6 +319,7 @@ export const simulationRuntime = createSimulationRuntime({
         for (const line of lines) {
           try {
             const r = JSON.parse(line)
+            if (r.recalled) continue
             const text = String(r?.raw_message || r?.msg || '')
             const userId = String(r?.user_id || '')
             if (userId && text && !/^[#.\/]/.test(text)) out.push({ userId, text: text.slice(0, 160) })
