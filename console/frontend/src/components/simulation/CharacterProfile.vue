@@ -88,8 +88,8 @@ const revisions = computed(() => {
       <p v-if="!profile.habits.length" class="profile-empty">还没有小习惯记录。</p>
       <article v-for="habit in profile.habits" :key="habit.id" class="profile-entry">
         <p>{{ habit.content }}</p>
-        <small>{{ date(habit.updatedAt) }}<template v-if="!habit.evidenceRefs?.length"> · 自我笔记</template></small>
-        <CharacterEvidence v-if="habit.evidenceRefs" :refs="habit.evidenceRefs" :evidence="profile.evidence" />
+        <small>{{ date(habit.updatedAt) }} · {{ habit.basis === 'delivered' ? '来自已发回复' : habit.evidenceRefs?.length ? '群消息线索' : '自我笔记' }}</small>
+        <CharacterEvidence v-if="habit.evidenceRefs" :refs="habit.evidenceRefs" :evidence="profile.evidence" :show-replies="habit.basis === 'delivered'" />
       </article>
       <h4>在关注的作品</h4>
       <p v-if="!profile.life.length" class="profile-empty">还没有生活线记录。</p>

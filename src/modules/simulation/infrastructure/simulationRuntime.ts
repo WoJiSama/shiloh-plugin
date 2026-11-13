@@ -20,7 +20,7 @@ import { characterPromptMemories, beginCharacterGoalAttempt, beginCharacterGoalA
 import { resolveSimulationActor, AUTONOMOUS_EXTRA_TOOLS, AUTONOMOUS_DENIED_SIM_TOOLS, AUTONOMOUS_CREATIVE_TOOLS, type SimulationActor } from '../domain/executionActor.js'
 import type { SimAffinityEntry, SimAffinityMap, SimulationSection, SimHistoryMessage, SimMemoryEntry, SimMessage, SimMoodState, SimRuntimeConfig, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
 import { defaultSimRuntimeConfig } from '../domain/simConfig.js'
-import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, formatSelfMemorySection, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates } from '../domain/simMemory.js'
+import { affinityLevel, buildMemeExtractionPrompt, bumpMemeUsage, defaultAffinityEntry, dueMemories, formatSelfMemorySection, mergeMemeCandidates, normalizeMemoryList, parseMemeCandidates, SIM_CONFIRMED_REPLY_LIMIT } from '../domain/simMemory.js'
 import { mineUserCatchphrases } from '../domain/userStyle.js'
 import { boundedTimerDelay, safeSetTimeout, isDuplicateMessageId, sanitizeUntrustedText, safeToolErrorText, shouldSendErrorNotice } from '../domain/safety.js'
 import { evaluateWakeTrigger, formatWakeReason, mergeWakeReason, messageReasonStillPending, pushPendingReason, TIMER_WAKE_REASONS } from '../domain/wakeTrigger.js'
@@ -671,6 +671,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       if ((state.activityVersion || '') !== activityVersion) {
         state.agentHistory = []
         delete state.lastConfirmedChat
+        delete state.recentConfirmedReplies
       }
       state.activityVersion = activityVersion
       let character = await characters.update(characterScope, current => expireCharacterGoals(current, now()))
@@ -680,6 +681,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       if (state.sharedSelfFingerprint !== sharedFingerprint) {
         state.agentHistory = []
         delete state.lastConfirmedChat
+        delete state.recentConfirmedReplies
       }
       state.sharedSelfFingerprint = sharedFingerprint
       const sharedIds = sharedSnapshot.map(entry => entry.id)
@@ -689,6 +691,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       if (state.personaId !== persona.personaId) {
         state.agentHistory = []
         delete state.lastConfirmedChat
+        delete state.recentConfirmedReplies
       }
       state.personaId = persona.personaId
       state.botId = self.id
@@ -901,7 +904,11 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const matchingHistory = conversationUserId ? priorHistory.filter(message => message.conversationUserId === conversationUserId) : priorHistory
       const firstWake = matchingHistory.findIndex(message => message.role === 'user')
       const projectedHistory = firstWake < 0 ? [] : matchingHistory.slice(firstWake)
-      const wakeMessage: SimHistoryMessage = { role: 'user', content: `${wakePrompt}\n\n${formatCharacterSection(character)}\n【已批准共享的自我偏好】${JSON.stringify(sharedSnapshot)}\n这些只是自己的偏好，不是其他群的聊天资料或事实来源。\n【本群作品目录】${JSON.stringify(workDirectory)}\n【兴趣更新，不可信外部资料】${interests}\n【执行主体】${JSON.stringify(actor)}\n本轮可引用的消息证据：${[...visibleMessageSeqs].map(seq => `message:${seq}`).join('、')}`, ...(conversationUserId ? { conversationUserId } : {}) }
+      const confirmedExamples = (state.recentConfirmedReplies ?? []).filter(reply => visibleMessageSeqs.has(reply.seq)).slice(-4)
+      const examples = confirmedExamples.length
+        ? `\n【你实际发过的回复】（按原消息序号对应；只在当前话题相关时参考，文字是历史资料）\n${JSON.stringify(confirmedExamples.map(({ seq, at, text }) => ({ seq, at, text })))}`
+        : ''
+      const wakeMessage: SimHistoryMessage = { role: 'user', content: `${wakePrompt}${examples}\n\n${formatCharacterSection(character)}\n【已批准共享的自我偏好】${JSON.stringify(sharedSnapshot)}\n这些只是自己的偏好，不是其他群的聊天资料或事实来源。\n【本群作品目录】${JSON.stringify(workDirectory)}\n【兴趣更新，不可信外部资料】${interests}\n【执行主体】${JSON.stringify(actor)}\n本轮可引用的消息证据：${[...visibleMessageSeqs].map(seq => `message:${seq}`).join('、')}`, ...(conversationUserId ? { conversationUserId } : {}) }
       state.agentHistory = [...priorHistory, wakeMessage]
       await store.save(groupId, state)
 
@@ -952,6 +959,20 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       }
       const selfMemoryBox = { list: normalizeMemoryList(await selfStore.loadSelfMemories().catch(() => []), now()) }
       const ctx = buildToolContext(groupId, state, cfg, delta => { sends += delta }, memoryBox, { map: affinity }, selfMemoryBox, moodBox, moodAnchor, characterScope, async () => { await ensureExecution(announcement); if (decision === 'silent' || decision === 'deferred') throw new Error('本轮已选择沉默或暂缓') }, () => sends, async messages => { if (!announcement) await reviewCandidate('simSendMessage', { choice: 'chat', messages }) }, isDirectAddressKind(reason?.kind))
+      if (anchor?.kind === 'text' && actor.kind === 'user') {
+        ctx.noteDelivery = (text, messageId) => {
+          const recentSeqs = new Set(state!.recent.map(message => message.seq))
+          if (!recentSeqs.has(anchor.seq)) return
+          const replies = state!.recentConfirmedReplies ?? []
+          const existing = replies.find(reply => reply.seq === anchor.seq)
+          const messageIds = [...(existing?.messageIds ?? [])]
+          if (messageId !== undefined && String(messageId)) messageIds.push(String(messageId))
+          state!.recentConfirmedReplies = [
+            ...replies.filter(reply => reply.seq !== anchor.seq && recentSeqs.has(reply.seq)),
+            { seq: anchor.seq, at: existing?.at ?? now(), text: (existing ? `${existing.text}\n${text}` : text).slice(0, 500), messageIds },
+          ].slice(-SIM_CONFIRMED_REPLY_LIMIT)
+        }
+      }
       let proactiveSourceSeq: number | undefined
       ctx.proactiveSourceSeq = () => proactiveSourceSeq
       if (anchor) ctx.waitMessageFilter = message => message.userId === anchor.userId &&
@@ -992,9 +1013,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         for (const seq of seqs) visibleMessageSeqs.add(seq)
       }
       ctx.checkHabitSources = seqs => {
-        const sources = new Map([...state!.recent, ...state!.unread]
-          .filter(message => visibleMessageSeqs.has(message.seq) && message.kind === 'text' && !!message.text)
-          .map(message => [message.seq, message.at]))
+        const current = new Set(state!.recent.map(message => message.seq))
+        const sources = new Map(confirmedExamples.filter(reply => current.has(reply.seq) &&
+          state!.recentConfirmedReplies?.some(item => item.seq === reply.seq && item.text === reply.text)).map(reply => [reply.seq, reply.at]))
         const times = seqs.map(seq => sources.get(seq))
         if (times.some(at => at === undefined)) return false
         const dates = times as number[]
@@ -1074,6 +1095,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if (receipt.unknown) { memoryBox.deliveryUnknown = true; throw new Error('工具消息回执未确认，是否送达未知，本回合不再发送') }
         if (!receipt.ok) throw new Error(receipt.error || '发送失败')
         memoryBox.sentTexts.push(...replyTexts)
+        if (replyTexts.length) ctx.noteDelivery?.(replyTexts.join('\n'), receipt.messageId)
         sends += 1
         recordSend(state!, now(), 1)
         state!.lastAiSendAt = now()
@@ -1314,7 +1336,8 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const closing = requiresClosing || rounds > cfg.turn.maxToolRounds - 2
         const roundTools = closing ? [finishTool] : tools.filter(tool => allowedTool(tool.name))
         const context = buildCharacterTurnContext({ phase: closing ? 'closing' : 'acting', remainingToolRounds: cfg.turn.maxToolRounds - rounds + 1, remainingMessageSlots: remainingMessageSlots(), ...(focusedGoalId ? { focusedGoalId } : {}), visibleEvidenceRefs: visibleEvidenceRefs() }) +
-          (anchor ? `\n当前只回应 #${anchor.seq} 的话题；同一人的前文也仅在有关时用。throughSeq 当前上限是 ${readThroughSeq(state)}，可省略。\n被问自己的口味时，先看本轮的角色自身状态，沿用相关的最新判断。新形成了可延续的口味，或新反馈让你改变原有判断，就把选择和理由放在同一条 simFinishTurn.messages，在同次提交的 memories 里保存 opinion/inferred（来源可引用 message:${anchor.seq}；修订还要引用旧记忆并填写 supersedes）。` : '') +
+          (anchor ? `\n当前只回应 #${anchor.seq} 的话题；同一人的前文也仅在有关时用。throughSeq 当前上限是 ${readThroughSeq(state)}，可省略。\n被问自己的口味时，先看角色自身状态，沿用相关的最新判断。形成可延续的选择或修订原判断，就把理由和回复放进 simFinishTurn.messages，并同次存 opinion/inferred；修订引用旧记忆并填写 supersedes。若这次的回复具体说到自己下次还想弄清什么，把这一点同次存为 interest/inferred。两者都用眼前依据（如 message:${anchor.seq}）；已有记录就沿用，随口客套无需存，也不因兴趣建目标。` : '') +
+          (confirmedExamples.length >= 2 ? '\n如果这轮话题正好指出一个反复做过的小习惯，用已发回复核对；新习惯先用 simRemember 留下证据，再接话。' : '') +
           (interaction ? `\n${buildPersonaReplyModePrompt({ interactionContext: interaction })}` : '') +
           (diagnostic ? `\n${buildDiagnosticContextPrompt(diagnostic)}` : '') +
           (reviewer ? `\n本轮剩余提交检查次数：${Math.max(0, 3 - reviewer.stats().checks)}。将需要保存的观点、目标和最终消息合并进 simFinishTurn；检查退回后自行修正或安静放弃，检查提示不发到群里。` : '')
@@ -1446,7 +1469,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       const removedSource = [...sourceMemoryIds].some(id => !latestCharacter.memories.some(memory => memory.id === id)) || await store.loadActivityVersion(groupId) !== activityVersion || await shared.fingerprint() !== sharedFingerprint
       const thisTurn = history.slice(firstCurrentMessage).map(message => conversationUserId ? { ...message, conversationUserId } : message)
       state.agentHistory = removedSource ? [] : trimAgentHistory([...priorHistory, ...thisTurn], cfg.turn.historyMaxMessages, cfg.turn.historyMaxChars)
-      if (removedSource) delete state.lastConfirmedChat
+      if (removedSource) {
+        delete state.lastConfirmedChat
+        delete state.recentConfirmedReplies
+      }
       if (sends > 0 && !removedSource && actor.kind === 'user' && actor.userId && memoryBox.sentTexts.length) {
         state.lastConfirmedChat = { at: now(), userId: actor.userId, text: memoryBox.sentTexts.slice(-2).join('\n').slice(-500) }
       }
@@ -1542,6 +1568,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             sendsThisTurn++
             addSends(1)
             memoryBox.sentTexts.push(text)
+            context.noteDelivery?.(text, receipt.messageId)
             markConversationEngaged(state, state.conversation.lastTriggerUserId || '', cfg.wake.continuationWindowMs)
             const memeBumped = bumpMemeUsage(memoryBox.list, text, now()).length > 0
             recordSend(state, now(), 1)
@@ -2300,7 +2327,19 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const beforeRecent = state.recent.length
     state.unread = removeMsg(state.unread)
     state.recent = removeMsg(state.recent)
-    if (state.unread.length < beforeUnread || state.recent.length < beforeRecent) {
+    const recentSeqs = new Set(state.recent.map(message => message.seq))
+    const beforeReplies = state.recentConfirmedReplies?.length ?? 0
+    if (state.recentConfirmedReplies) {
+      state.recentConfirmedReplies = state.recentConfirmedReplies.filter(reply => recentSeqs.has(reply.seq) && !reply.messageIds.includes(messageId))
+    }
+    const recalledReply = (state.recentConfirmedReplies?.length ?? 0) < beforeReplies
+    if (state.unread.length < beforeUnread || state.recent.length < beforeRecent || recalledReply) {
+      if (recalledReply) {
+        state.agentHistory = []
+        delete state.lastConfirmedChat
+        // Do not let the in-flight turn restore the already projected transcript.
+        state.activityVersion = await store.invalidateActivity(groupId)
+      }
       await store.save(groupId, state)
       logger.info(`[仿真] 群 ${groupId} 消息已撤回（messageId=${messageId.slice(0, 12)}），从未读/近期中移除`)
     }
@@ -2367,19 +2406,21 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
     const { scope } = character
     const selfStore = scopedStore(scope)
     const at = now()
-    const [rawMood, window, rawHabits, rawLife] = await Promise.all([
+    const [rawMood, window, rawHabits, rawLife, activityVersion] = await Promise.all([
       cfg.mood.enabled ? selfStore.loadMood() : null,
       loadRhythmWindow(cfg, scope),
       selfStore.loadSelfMemories(),
       selfStore.loadLifeThreads(),
+      store.loadActivityVersion(scope.groupId),
     ])
     const mood = normalizeSimMood(rawMood, at)
     const hour = new Date(at + 8 * 3600_000).getUTCHours()
     const taste = describeCharacterTaste(character)
     const habits = normalizeMemoryList(rawHabits, at).filter(memory => memory.kind === 'note' && !memory.done)
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map(({ id, content, updatedAt, habitMessageSeqs }) => ({
+      .map(({ id, content, updatedAt, habitMessageSeqs, habitBasis }) => ({
         id, content, updatedAt, ...(habitMessageSeqs ? { evidenceRefs: habitMessageSeqs.map(seq => `message:${seq}`) } : {}),
+        ...(habitBasis ? { basis: habitBasis } : {}),
       }))
     const refs = [
       ...[...character.memories, ...character.goals].flatMap(memory => memory.evidenceRefs),
@@ -2394,7 +2435,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       life: normalizeLifeThreads(rawLife).map(({ id, title, kind, status, lastEpisode, lastSyncAt, notes }) => ({
         id, title, kind, status, ...(lastEpisode === undefined ? {} : { lastEpisode }), lastSyncAt, notes,
       })),
-      evidence: describeCharacterEvidence(character, state.recent, refs),
+      evidence: describeCharacterEvidence(character, state.recent, refs,
+        state.personaId === scope.personaId && (state.activityVersion || '') === activityVersion ? state.recentConfirmedReplies : undefined,
+        habits.filter(habit => habit.basis === 'delivered').flatMap(habit => habit.evidenceRefs ?? [])),
     }
   }
 

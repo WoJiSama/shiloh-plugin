@@ -606,22 +606,35 @@ test('习惯只接纳跨时段且本轮可见的实际消息来源', async () =>
     kind: 'note', scope: 'self', content: '聊到地图会先问机制', habitMessageSeqs: seqs,
   })
   const h = fixture({ script: (_request, index) => {
-    if (index === 1) return tools(remember([1, 2]), remember([1, 3]))
+    if (index === 0) return tools(toolCall('simFinishTurn', { choice: 'chat', reason: '问玩法', messages: ['地图路线怎么选？'] }))
+    if (index === 1) return tools(toolCall('simFinishTurn', { choice: 'chat', reason: '问玩法', messages: ['地图有没有岔路？'] }))
+    if (index === 2) return tools(remember([1, 2]), remember([1, 3]), remember([3, 1]))
     return quiet()
   } })
   try {
-    await h.ingest('你刚才又先问机制了', '40000')
+    await h.ingest('看第一款地图游戏', '40000')
     await idle(h, 1)
     h.clock.value += 11 * 60_000
     await h.ingest('这是另一个话题', '40001', { at: false })
+    await h.ingest('看第二款地图游戏', '40000')
+    await idle(h, 2)
     await h.ingest('我发现你遇到地图都会先问玩法', '40000')
-    await idle(h, 3)
-    const history = h.calls[2].messages.filter(message => message.role === 'tool' && message.name === 'simRemember')
-    assert.match(history.at(-2).content, /需要至少两条/)
-    assert.match(history.at(-1).content, /"saved":true/)
+    await idle(h, 4)
+    const history = h.calls[3].messages.filter(message => message.role === 'tool' && message.name === 'simRemember')
+    assert.match(history.at(-3).content, /需要至少两条/)
+    assert.match(history.at(-2).content, /"saved":true/)
+    assert.match(history.at(-1).content, /"saved":false/)
     const profile = (await h.runtime.describeGroup(GROUP, { profile: true })).profile
+    assert.equal(profile.habits.length, 1)
+    assert.equal(profile.habits[0].basis, 'delivered')
     assert.deepEqual(profile.habits[0].evidenceRefs, ['message:1', 'message:3'])
+    assert.equal(profile.evidence['message:1'].reply.text, '地图路线怎么选？')
+    assert.equal(profile.evidence['message:3'].reply.text, '地图有没有岔路？')
     assert.equal(profile.evidence['message:2'], undefined)
+    await h.runtime.handleRecall({ group_id: GROUP, message_id: 'sent-1' })
+    const afterRecall = (await h.runtime.describeGroup(GROUP, { profile: true })).profile
+    assert.equal(afterRecall.evidence['message:1'].reply, undefined)
+    assert.equal(afterRecall.evidence['message:3'].reply.text, '地图有没有岔路？')
   } finally { h.runtime.stop() }
 })
 

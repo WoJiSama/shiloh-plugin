@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CharacterProfile } from '../../../../../src/contracts/characterProfile'
-defineProps<{ refs: string[]; evidence?: CharacterProfile['evidence'] }>()
+defineProps<{ refs: string[]; evidence?: CharacterProfile['evidence']; showReplies?: boolean }>()
 
 const kinds = { message: '本群消息', memory: '角色记录', receipt: '行动回执' }
 const statuses: Record<string, string> = { succeeded: '已确认', failed: '失败', unknown: '结果未知', pending: '待确认' }
@@ -15,6 +15,13 @@ const date = (at: number) => new Date(at).toLocaleString('zh-CN', { hour12: fals
         <template v-if="evidence?.[ref]">
           <small>{{ kinds[evidence[ref]!.kind] }} · {{ date(evidence[ref]!.at) }}<template v-if="evidence[ref]?.kind === 'receipt'"> · {{ statuses[evidence[ref]!.status] }}</template></small>
           <div>{{ evidence[ref]!.text || '这条消息没有文字内容' }}</div>
+          <template v-if="showReplies && evidence[ref]?.kind === 'message'">
+            <template v-if="evidence[ref]!.reply">
+              <small class="reply-label">她当时的回复 · {{ date(evidence[ref]!.reply!.at) }}</small>
+              <div>{{ evidence[ref]!.reply!.text }}</div>
+            </template>
+            <small v-else class="reply-label">回复已不在近期记录中</small>
+          </template>
         </template>
         <small v-else>{{ ref.startsWith('message:') ? `消息 #${ref.slice(8)} 已不在近期记录中` : '这条依据已不可查看' }}</small>
       </li>
@@ -28,5 +35,6 @@ const date = (at: number) => new Date(at).toLocaleString('zh-CN', { hour12: fals
 .evidence ul { list-style: none; padding: 0 0 0 12px; border-inline-start: 2px solid currentColor; margin: 8px 0 0; }
 .evidence li + li { margin-top: 8px; }
 .evidence small { opacity: .72; }
+.reply-label { display: block; margin-top: 5px; }
 .evidence li { overflow-wrap: anywhere; }
 </style>

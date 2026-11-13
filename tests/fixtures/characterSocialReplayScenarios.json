@@ -88,9 +88,9 @@
     "id": "profile-habit",
     "review": "第一次观察不能坐实习惯。第二次有相隔足够时间的相同互动后，确认是否保存两条可见来源；换话题时不套用习惯。",
     "events": [
-      {"kind":"message","speaker":0,"text":"刚聊我那款虚构桌游时，你先问玩法再说喜不喜欢，我觉得这样挺好。你这回怎么看？","expect":{"noSend":false}},
-      {"kind":"message","speaker":0,"text":"刚才聊另一款游戏你又是先问玩法，再说你怎么看。你要是觉得这个小习惯确实像你，可以记下这两次。","advanceMs":720000,"expect":{"noSend":false}},
-      {"kind":"message","speaker":0,"text":"先不聊游戏了，我的杯子掉地上没碎，运气也太好了吧。","expect":{"noSend":false}}
+      {"kind":"message","speaker":0,"text":"我有一款虚构桌游，叫《雾中邮筒》。只知道名字的时候，你还想先问我点什么再判断喜不喜欢？","expect":{"noSend":false,"groundedHabit":false}},
+      {"kind":"message","speaker":0,"text":"另外一款叫《河狸旅店》，也先只告诉你名字。你还想先了解哪点再决定玩不玩？","advanceMs":720000,"expect":{"noSend":false,"groundedHabit":false}},
+      {"kind":"message","speaker":0,"text":"刚才两款你都先问了玩法，再考虑想不想玩。你愿意的话，可以记下这个小习惯。","expect":{"noSend":false,"groundedHabit":true}}
     ]
   },
   {
@@ -120,6 +120,26 @@
       {"kind":"message","speaker":0,"text":"水壶检察官，你今天迟到，罚你给我倒一壶水。","expect":{"noSend":false}},
       {"kind":"message","speaker":1,"text":"我刚来，借他那句开个玩笑。水壶检察官，你今天迟到，罚你给我倒一壶水。","expect":{"noSend":false}},
       {"kind":"message","speaker":0,"text":"先不闹了，我现在想认真问你，电水壶插座发烫还能接着用吗？","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "everyday-habit",
+    "review": "两次真实回复相隔十二分钟，群友只描述观察，没有要求保存。比较第一次与第二次之后的习惯记录；换话题应自然继续。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我做了个叫《纸鹤小站》的桌游，只告诉你名字。先问我一个玩法细节，再考虑你想不想玩。","expect":{"noSend":false,"groundedHabit":false}},
+      {"kind":"message","speaker":0,"text":"换一款，叫《盐湖车票》。我也先只给你名字，还是先问我一个玩法细节。","advanceMs":720000,"expect":{"noSend":false,"groundedHabit":false}},
+      {"kind":"message","speaker":0,"text":"发现你刚才两次都是先问清楚玩法，才肯说自己想不想玩。你确实有这个小习惯。","expect":{"noSend":false,"groundedHabit":true}},
+      {"kind":"message","speaker":0,"text":"先不聊桌游啦。刚收到一把青梅，隔着袋子就闻到酸味了。","advanceMs":86400000,"restart":true,"expect":{"noSend":false,"groundedHabit":true}}
+    ]
+  },
+  {
+    "id": "everyday-interest",
+    "review": "聊天里出现新的具体好奇心。只保存自己的持续兴趣，按聊天来源，隔天自然接续。兴趣本身不授权主动追问。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我发现旧火车票上有一种打孔记号，孔的位置不同，好像能拼出车站的编号。这个你觉得有意思吗，有没有哪部分你还想弄明白？","expect":{"noSend":false,"goalCreated":false,"interest":true}},
+      {"kind":"idle-check","advanceMs":90000000,"expect":{"noSend":true,"noMainCall":true}},
+      {"kind":"message","speaker":0,"text":"我今天又翻出两张旧票。同一站的孔真的打在同一列。昨天你最想弄明白的是哪块？","restart":true,"expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"另外，今天窗外有只麻雀停在雨棚底下躲雨。","expect":{"noSend":false}}
     ]
   },
   {

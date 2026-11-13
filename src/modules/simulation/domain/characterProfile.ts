@@ -1,6 +1,6 @@
 import type { CharacterMemory, CharacterState } from '../../../contracts/character.js'
 import type { CharacterProfile } from '../../../contracts/characterProfile.js'
-import type { SimMessage } from '../../../contracts/simulation.js'
+import type { SimMessage, SimSessionState } from '../../../contracts/simulation.js'
 import { resolvePersonaName, type PersonaText } from '../../conversation/domain/personaSource.js'
 import { activeCharacterMemories } from './characterState.js'
 
@@ -18,12 +18,16 @@ export function describeCharacterTaste(character: CharacterState): Pick<Characte
 }
 
 /** Resolve only references attached to displayed records. Missing messages may have aged out or been recalled. */
-export function describeCharacterEvidence(character: CharacterState, recent: SimMessage[], refs: string[]): CharacterProfile['evidence'] {
+export function describeCharacterEvidence(character: CharacterState, recent: SimMessage[], refs: string[],
+  replies: SimSessionState['recentConfirmedReplies'] = [], replyRefs: string[] = []): CharacterProfile['evidence'] {
   const evidence: CharacterProfile['evidence'] = {}
   const byRef = new Set(refs)
+  const confirmed = new Map(replies.map(({ seq, at, text }) => [`message:${seq}`, { at, text }]))
+  const includesReply = new Set(replyRefs)
   for (const message of recent) {
     const ref = `message:${message.seq}`
-    if (byRef.has(ref)) evidence[ref] = { kind: 'message', at: message.at, text: message.text.slice(0, 240) }
+    const reply = includesReply.has(ref) ? confirmed.get(ref) : undefined
+    if (byRef.has(ref)) evidence[ref] = { kind: 'message', at: message.at, text: message.text.slice(0, 240), ...(reply ? { reply } : {}) }
   }
   for (const memory of character.memories) {
     const ref = `memory:${memory.id}`

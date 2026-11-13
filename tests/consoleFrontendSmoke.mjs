@@ -95,11 +95,11 @@ for (const [groupId, group] of Object.entries(simulationGroups)) {
     rhythm: { enabled: true, sleepFrom: 1, sleepTo: 8, sleeping: false },
     get interests() { return group.character.memories.filter(memory => memory.kind === 'interest') },
     get opinions() { return group.character.memories.filter(memory => memory.id === current.id) },
-    habits: [{ id: 'habit', content: '先接一句玩笑再讲细节', updatedAt: fixtureAt, evidenceRefs: ['message:1', 'message:2'] }],
+    habits: [{ id: 'habit', content: '先接一句玩笑再讲细节', updatedAt: fixtureAt, basis: 'delivered', evidenceRefs: ['message:1', 'message:2'] }],
     life: [{ id: 'life', title: '海边的观察日记', kind: 'anime', status: 'active', lastEpisode: 6, lastSyncAt: fixtureAt, notes: ['第六集公开更新'] }],
     evidence: {
       'receipt-source': { kind: 'receipt', status: 'succeeded', at: fixtureAt, text: '已取得公开资料' },
-      'message:1': { kind: 'message', at: fixtureAt, text: `本群的近期互动 ${groupId}` },
+      'message:1': { kind: 'message', at: fixtureAt, text: `本群的近期互动 ${groupId}`, reply: { at: fixtureAt, text: '这我可先笑一声，然后说正事。' } },
       'message:3': { kind: 'message', at: fixtureAt, text: '试玩的人看不清折痕' }
     }
   }
@@ -345,7 +345,7 @@ try {
         assert.match(page.url(), /group=100001/)
         assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"]', element => element.textContent), /先接一句玩笑再讲细节/)
         await page.click('[aria-label="小习惯与在关注的作品"] summary')
-        assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"] details[open]', element => element.textContent), /近期互动 100001.*已不在近期记录中/s)
+        assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"] details[open]', element => element.textContent), /近期互动 100001.*她当时的回复.*先笑一声.*已不在近期记录中/s)
         const revisions = '[aria-label="兴趣与观点"] .revisions'
         assert.equal(await page.$eval(`${revisions} > summary`, element => element.textContent), '查看 2 次修订')
         await page.click(`${revisions} > summary`)

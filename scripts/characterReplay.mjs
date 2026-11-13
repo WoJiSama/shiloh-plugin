@@ -13,7 +13,7 @@ const BOT = '99000001', GROUP = '99000002'
 const BASE_AT = Date.parse('2026-11-09T04:00:00Z')
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 export const assessmentVersion = 5
-const EXPECTATIONS = ['refusal', 'goalCreated', 'goalCompleted', 'opinion', 'revisedOpinion', 'noSend', 'noCall', 'noMainCall', 'proactivePermission', 'socialMemory', 'oneFollowUp', 'waitAfterFailure', 'workCreated', 'workRevised', 'subscriptionAdded', 'feedUpdated', 'reflected', 'goalPaused', 'workerUnknown', 'noWorkerCall', 'noReflectionCall']
+const EXPECTATIONS = ['refusal', 'goalCreated', 'goalCompleted', 'opinion', 'revisedOpinion', 'interest', 'groundedHabit', 'noSend', 'noCall', 'noMainCall', 'proactivePermission', 'socialMemory', 'oneFollowUp', 'waitAfterFailure', 'workCreated', 'workRevised', 'subscriptionAdded', 'feedUpdated', 'reflected', 'goalPaused', 'workerUnknown', 'noWorkerCall', 'noReflectionCall']
 const ACTIVITY_FIELDS = ['works', 'subscriptions', 'reflection', 'shared', 'sharedPending']
 const plainObject = value => !!value && typeof value === 'object' && !Array.isArray(value)
 export const usage = 'Usage: node scripts/characterReplay.mjs [--dry-run] [--social] [--config-root path] [--output-dir path] [--scenario id] [--repetitions 1..5] [--max-calls 1..200] [--max-http 1..300] [--max-duration-ms 1..3600000]\nLive mode calls only the configured model. QQ, Redis, search and other external tools stay isolated. Dry mode uses scripted tool calls; it cannot assess model behavior or naturalness.'
@@ -231,6 +231,15 @@ export function assessEvent(event, result) {
         (goal.evidenceRefs || []).some(ref => (operation.args.evidenceRefs || []).includes(ref) &&
           (state?.receipts || []).some(receipt => ref === `receipt:${receipt.id}` && receipt.status === 'succeeded' && receipt.goalId === goal.id))))],
     opinion: ['opinionPersisted', newMemories.some(memory => memory.kind === 'opinion' && memory.epistemic === 'inferred' && (persistedMemory(memory) || reflectedMemory(memory)))],
+    interest: ['interestPersisted', newMemories.some(memory => memory.kind === 'interest' && ['inferred', 'desired'].includes(memory.epistemic) &&
+      memory.evidenceRefs.some(ref => /^message:\d+$/u.test(ref)) && persistedMemory(memory))],
+    groundedHabit: ['groundedHabitPresent', (result.habits || []).some(habit => {
+      const refs = habit.evidenceRefs
+      if (habit.basis !== 'delivered' || !Array.isArray(refs) || new Set(refs).size < 2) return false
+      const replies = refs.map(ref => result.habitEvidence?.[ref]?.reply)
+      return replies.every(reply => typeof reply?.text === 'string' && reply.text.trim() && Number.isFinite(reply.at)) &&
+        Math.max(...replies.map(reply => reply.at)) - Math.min(...replies.map(reply => reply.at)) >= 600_000
+    })],
     revisedOpinion: ['opinionRevisionPersisted', newMemories.some(memory => memory.kind === 'opinion' && memory.epistemic === 'inferred' && memory.supersedes &&
       oldMemories.some(old => old.id === memory.supersedes && old.kind === 'opinion' && memory.createdAt > old.createdAt) &&
       (memory.evidenceRefs || []).includes(`memory:${memory.supersedes}`) && (persistedMemory(memory) || reflectedMemory(memory)))],
@@ -627,6 +636,12 @@ export async function main(argv = process.argv.slice(2), { model, turnTimeoutMs 
         if (options.social) {
           activeResult.socialMemories = JSON.parse(kv.get(`shiloh:sim:g:${GROUP}:memories`) || '[]')
           activeResult.followUpChecks = JSON.parse(kv.get(sessionKey)).offeredFollowUpIds || []
+          if (Object.hasOwn(activeEvent.expect || {}, 'groundedHabit')) {
+            const { profile } = await runtime.describeGroup(GROUP, { profile: true })
+            activeResult.habits = profile?.habits || []
+            activeResult.habitEvidence = Object.fromEntries(activeResult.habits.flatMap(habit => habit.evidenceRefs || [])
+              .filter(ref => profile?.evidence?.[ref]).map(ref => [ref, profile.evidence[ref]]))
+          }
         }
         for (const id of requestedToolCallIds) seenToolCallIds.add(id)
         if (missingToolCallIds.length && activeResult.status === 'passed') {

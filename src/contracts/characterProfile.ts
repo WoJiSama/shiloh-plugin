@@ -6,12 +6,12 @@ export interface CharacterProfile {
   rhythm: { enabled: boolean; sleepFrom: number; sleepTo: number; sleeping: boolean }
   interests: CharacterMemory[]
   opinions: CharacterMemory[]
-  habits: { id: string; content: string; updatedAt: number; evidenceRefs?: string[] }[]
+  habits: { id: string; content: string; updatedAt: number; evidenceRefs?: string[]; basis?: 'delivered' }[]
   life: { id: string; title: string; kind: 'anime' | 'game'; status: 'active' | 'dropped'; lastEpisode?: number; lastSyncAt: number; notes: string[] }[]
   evidence: Record<string, CharacterProfileEvidence>
 }
 
 export type CharacterProfileEvidence =
-  | { kind: 'message'; at: number; text: string }
+  | { kind: 'message'; at: number; text: string; reply?: { at: number; text: string } }
   | { kind: 'memory'; at: number; text: string }
   | { kind: 'receipt'; at: number; text: string; status: CharacterReceipt['status'] }

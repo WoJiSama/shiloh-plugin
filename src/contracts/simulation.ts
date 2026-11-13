@@ -111,6 +111,8 @@ export interface SimMemoryEntry {
   proactiveSourceSeq?: number
   /** 自我笔记可引用当时实际看过的本群消息，旧笔记可以没有。 */
   habitMessageSeqs?: number[]
+  /** Recorded using confirmed outgoing replies as well as the incoming anchors. */
+  habitBasis?: 'delivered'
   /** meme 专用：出现/使用次数（注入排序与强化依据） */
   count?: number
   /** meme 专用：出处原话（谁第一次说的） */
@@ -173,6 +175,8 @@ export interface SimSessionState {
   offeredFollowUpIds?: string[]
   /** 同人格上一轮已确认投递的正文，供接话参考。 */
   lastConfirmedChat?: { at: number; userId?: string; text: string }
+  /** Recent confirmed replies keyed by the incoming message they answered. */
+  recentConfirmedReplies?: { seq: number; at: number; text: string; messageIds: string[] }[]
   bootstrapSent: boolean
   /** 会话延续状态：机器人最近参与过对话 → 对话对象的新消息即使不点名也值得醒来看（模型自行决定接不接） */
   conversation: { activeUntil: number; interlocutorIds: string[]; lastTriggerUserId?: string }

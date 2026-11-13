@@ -4,6 +4,7 @@ import type { CharacterScope } from '../../../contracts/character.js'
 import { characterKey } from '../domain/characterState.js'
 import { createDefaultSimSession } from '../domain/simConfig.js'
 import { stripSupersededItems } from '../domain/personProfile.js'
+import { SIM_CONFIRMED_REPLY_LIMIT } from '../domain/simMemory.js'
 
 /** Redis 形状约束：TRSS 包装层支持 get/set/del/eval，Set 用 JSON 数组模拟（避免依赖 sadd 族）。 */
 export interface SimRedisLike {
@@ -65,7 +66,7 @@ export interface SimSessionStore {
   save(groupId: string, state: SimSessionState): Promise<void>
   reset(groupId: string, presetKeywords: string[]): Promise<SimSessionState>
   loadActivityVersion(groupId: string): Promise<string>
-  invalidateActivity(groupId: string): Promise<void>
+  invalidateActivity(groupId: string): Promise<string>
   /** null = 从未写过覆盖（首次运行，可从 yaml groups 种子） */
   loadOverrides(): Promise<SimGroupOverrides | null>
   saveOverrides(overrides: SimGroupOverrides): Promise<void>
@@ -135,7 +136,9 @@ export function createSimSessionStore(ports: SimSessionStorePorts): SimSessionSt
       return (await redis.get(ACTIVITY_VERSION_KEY(groupId))) ?? ''
     },
     async invalidateActivity(groupId) {
-      await redis.set(ACTIVITY_VERSION_KEY(groupId), randomUUID())
+      const version = randomUUID()
+      await redis.set(ACTIVITY_VERSION_KEY(groupId), version)
+      return version
     },
     async load(groupId) {
       // A released live state may still have its last snapshot queued for persistence.
@@ -462,6 +465,11 @@ function normalizeSession(parsed: Partial<SimSessionState>, now: number): SimSes
     ...parsed,
     unread: Array.isArray(parsed.unread) ? parsed.unread : [],
     recent: Array.isArray(parsed.recent) ? parsed.recent : [],
+    recentConfirmedReplies: Array.isArray(parsed.recentConfirmedReplies) ? parsed.recentConfirmedReplies
+      .filter(reply => Number.isSafeInteger(reply?.seq) && reply.seq > 0 && Number.isFinite(reply.at) && typeof reply.text === 'string' && reply.text.trim() && Array.isArray(reply.messageIds))
+      .slice(-SIM_CONFIRMED_REPLY_LIMIT).map(({ seq, at, text, messageIds }) => ({
+        seq, at, text: text.slice(0, 500), messageIds: messageIds.filter(id => typeof id === 'string' && id).slice(-5),
+      })) : [],
     modelSeenSeqs: Array.isArray(parsed.modelSeenSeqs) ? parsed.modelSeenSeqs : [],
     pendingWakeReasons: Array.isArray(parsed.pendingWakeReasons) ? parsed.pendingWakeReasons : [],
     wakeTimes: Array.isArray(parsed.wakeTimes) ? parsed.wakeTimes : [],

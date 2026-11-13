@@ -24,6 +24,7 @@ export interface SimToolContext {
   /** Only the runtime can set this after checking the triggering user's words. */
   proactiveSourceSeq?(): number | undefined
   noteVisibleMessages?(seqs: number[]): void
+  noteDelivery?(text: string, messageId?: string | number): void
   checkHabitSources?(seqs: number[]): boolean
   now(): number
   getState(): SimSessionState
@@ -402,7 +403,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.description = [
         '你的长期记忆（跨回合、跨天保存）。pendingEvent 带 aboutUser 和 dueInMinutes。只有对方明确欢迎在本群主动问起才设 welcomeProactiveFollowUp=true；“聊到再问”只在对话中接续。自然问过一次或对方已说结果就 done，没回应不催。正式提醒走托付工具。',
         '有明确话语或实际互动支持的相处习惯用 interaction，带 aboutUser，写清偏好及简短依据。它只留在本群，不当成跨群人物事实。',
-        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note 且 scope=self——保存在当前机器人与人设的本群范围，记录反复发生的小习惯时必须附 habitMessageSeqs，下次唤醒在【你自己的沉淀】里。',
+        '值得记住的事实、约定、对某个人的印象记 note 或 impression。发现自己已反复做过的具体小习惯，可以先用 note + scope=self 记下，再自然回复。habitMessageSeqs 取【你实际发过的回复】里的原消息序号。无需群友要求你记。',
         '带 aboutUser 的稳定事实（TA的爱好/身份/雷点这类到哪个群都成立的）会同时进入TA的跨群人物档案；带时间性的内容（明天/下周要干嘛）不要走这条路，记 pendingEvent。',
         'TA之前的事结束了（"考完了""不学了"）也记 note + aboutUser，系统会自动从TA档案里移除对应的旧事实。',
         'action=list 查看记忆；跟进完成后 action=done 收掉待办；action=remove 删除记错的。',
@@ -415,7 +416,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
           scope: { type: 'string', enum: ['group', 'self'], description: '默认 group（只这个群）。self=你自己的性格沉淀（口头禅/偏好），仅当前机器人与人设的本群；要求不带 aboutUser。' },
           content: { type: 'string', description: '要记的内容，一句话（≤200 字）。例："阿说明天上午要考四级，说考完想打游戏"。' },
           aboutUser: { type: 'string', description: '相关群友 QQ。主动跟进缺省使用当前邀请你的人，不能指定第三人。' },
-          habitMessageSeqs: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'number', minimum: 1 }, description: '仅 scope=self 的 note。2–4 条本轮实际可见的本群消息序号，首尾至少间隔 10 分钟，能说明你确实形成了这一习惯。不要用一人的临时建议或顺手记号凑数。' },
+          habitMessageSeqs: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'number', minimum: 1 }, description: '仅 scope=self 的 note。选 2–4 条本轮可见且已有实际回复的原消息序号，已发回复首尾至少间隔 10 分钟，两次回复都体现同一习惯。' },
           dueInMinutes: { type: 'number', description: 'kind=pendingEvent 必填：多少分钟后该跟进（10 分钟 ~ 30 天）。' },
           welcomeProactiveFollowUp: { type: 'boolean', description: '仅 pendingEvent。对方明确请你主动在本群问起时才为 true。“碰巧聊到再问”“不用特意问”都为 false。' },
           id: { type: 'string', description: 'done/remove 时要操作的条目 id。' },
@@ -479,6 +480,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         kind: opts.kind,
         content: opts.content,
         habitMessageSeqs: habitSources,
+        habitBasis: habitSources === undefined ? undefined : 'delivered',
         aboutUser: selfScope ? undefined : opts.aboutUser,
         dueAt: opts.kind === 'pendingEvent' && Number(opts.dueInMinutes) > 0 ? now + Math.min(43200, Math.max(10, Math.floor(Number(opts.dueInMinutes)))) * 60_000 : undefined,
         proactiveSourceSeq: opts.welcomeProactiveFollowUp === true ? ctx.proactiveSourceSeq?.() : undefined,
@@ -490,7 +492,13 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       if (selfScope) {
         if (typeof ctx.saveSelfMemories !== 'function') return 'error: 自我记忆不可用'
         if (opts.aboutUser) return 'error: scope=self 不带 aboutUser（那是你自己的沉淀，不是关于某个群友的）'
-        await ctx.saveSelfMemories(capMemories([...(ctx.getSelfMemories?.() || []), entry], SIM_SELF_MEMORY_LIMIT))
+        const notes = ctx.getSelfMemories?.() || []
+        const seqs = entry.habitMessageSeqs
+        const duplicate = seqs && notes.find(note => !note.done && note.habitBasis === 'delivered' &&
+          (note.content === entry.content || (note.habitMessageSeqs?.length === seqs.length &&
+            seqs.every(seq => note.habitMessageSeqs?.includes(seq)))))
+        if (duplicate) return JSON.stringify({ ok: true, saved: false, id: duplicate.id, note: '该习惯已有记录，沿用即可。' })
+        await ctx.saveSelfMemories(capMemories([...notes, entry], SIM_SELF_MEMORY_LIMIT))
         return JSON.stringify({ ok: true, saved: true, id: entry.id, note: '已保存到当前机器人与人设的本群自我笔记；跨群共享须另行提议并经管理员批准。' })
       }
       const memories = [...ctx.getMemories(), entry]
