@@ -1091,6 +1091,9 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         // may have revoked the work while the permission checks were pending.
         if (await store.loadActivityVersion(groupId) !== activityVersion) throw new Error('角色活动内容已被管理员撤销，停止旧回合')
       }
+      // Repair an oversized plain directed reply before persistence or transport.
+      // Repeated batches, state changes and explicit read-only closures keep the normal send contract.
+      let requestedMessageMerge = false
       const finishTurn = async (result: CharacterTurnFinishResult) => {
         turnClosed = true
         if (result.decision) decision = result.decision
@@ -1207,6 +1210,14 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
             }
             try { await ensureExecution() } catch (error) { return safeToolErrorText(tool.name, error) }
           }
+        }
+        if (tool === finishTool && args.choice === 'chat' && actor.kind === 'user' &&
+          isDirectAddressKind(reason.kind) && sends === 0 && !requestedMessageMerge &&
+          !args.memories && !args.goal && !args.atUserIds && !args.replyToSeq &&
+          Array.isArray(args.messages) && args.messages.length > remainingMessageSlots() &&
+          args.messages.length <= 5 && args.messages.every(message => typeof message === 'string' && message.trim() && message.length <= 500)) {
+          requestedMessageMerge = true
+          return `error: 本回合还可发送 ${remainingMessageSlots()} 条，尚未保存或发送。请把同一段解释合并到一条消息，再用 simFinishTurn 提交。`
         }
         const newGoal = tool === finishTool && args.choice === 'schedule' ? args.goal : tool.name === 'simGoal' && args.action === 'create' ? args : undefined
         if (newGoal && triggerMessage && ports.judgeSocialPermission) {

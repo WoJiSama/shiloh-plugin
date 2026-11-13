@@ -41,7 +41,7 @@ function fixture({
   kv = new Map(), clock = { value: BASE_AT }, botId = BOT,
   identity = { id: 'shiloh', name: '希洛', systemContent: '喜欢独立游戏' },
   groups = [GROUP], script = () => quiet(), execute, writeFault, onSave, send, review, recordTokens,
-  proactiveProbability = 0, seed = true, maxToolRounds = 8, consistencyEnabled,
+  proactiveProbability = 0, seed = true, maxToolRounds = 8, maxSendsPerTurn = 5, consistencyEnabled,
   judgeSocialPermission,
 } = {}) {
   if (seed) for (const groupId of groups) if (!kv.has(sessionKey(groupId))) seedSession(kv, groupId, botId, clock)
@@ -79,7 +79,7 @@ function fixture({
       ...(consistencyEnabled === undefined ? {} : { consistency: { enabled: typeof consistencyEnabled === 'function' ? consistencyEnabled() : consistencyEnabled } }),
       extraTools: toolDefinitions.map(tool => tool.name), toolPolicy: { mode: 'legacy' },
       wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability, proactiveIdleMs: 60_000 },
-      turn: { maxToolRounds, minSendGapMs: 0, maxTurnsPerDay: 100 },
+      turn: { maxToolRounds, maxSendsPerTurn, minSendGapMs: 0, maxTurnsPerDay: 100 },
       rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false },
     }),
     getExecutionConfig: () => ({ useTools: true }),
@@ -667,6 +667,18 @@ test('误填主动许可和社交目标均不能用模型改写替代当事人�
     await h.runtime.sweepOnce()
     await sleep(1150)
     assert.equal(h.calls.length, 3)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
+test('未发过消息的点名回合超额时，可以把解释合并后再收尾', async () => {
+  const finish = toolCall('simFinishTurn', { choice: 'chat', reason: '解释问题', messages: ['解释开头', '解释下一段'] })
+  const h = fixture({ maxSendsPerTurn: 1, script: (_request, index) => index === 0 ? tools(finish)
+    : tools(toolCall('simFinishTurn', { choice: 'chat', reason: '合并解释', messages: ['解释开头。解释下一段。'] })) })
+  try {
+    await h.ingest('帮我解释一下')
+    await idle(h, 2)
+    assert.match(toolResult(h.calls[1], 'simFinishTurn'), /尚未保存或发送.*合并/)
     assert.equal(h.sent.length, 1)
   } finally { h.runtime.stop() }
 })
