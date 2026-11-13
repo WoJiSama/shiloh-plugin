@@ -41,7 +41,8 @@ function fixture({
   kv = new Map(), clock = { value: BASE_AT }, botId = BOT,
   identity = { id: 'shiloh', name: '希洛', systemContent: '喜欢独立游戏' },
   groups = [GROUP], script = () => quiet(), execute, writeFault, onSave, send, review, recordTokens,
-  proactiveProbability = 0, seed = true, maxToolRounds = 8, consistencyEnabled, capabilities, readArchiveMessages, getMcpTools,
+  proactiveProbability = 0, seed = true, maxToolRounds = 8, maxSendsPerTurn = 5, consistencyEnabled,
+  judgeSocialPermission, capabilities, readArchiveMessages, getMcpTools,
 } = {}) {
   if (seed) for (const groupId of groups) if (!kv.has(sessionKey(groupId))) seedSession(kv, groupId, botId, clock)
   const calls = []
@@ -79,7 +80,7 @@ function fixture({
       ...(capabilities ? { capabilities: capabilities() } : {}),
       extraTools: toolDefinitions.map(tool => tool.name), toolPolicy: { mode: 'legacy' },
       wake: { probability: 0, batchWindowMs: 1000, maxWakePerMinute: 100, maxWakePerHour: 100, proactiveProbability, proactiveIdleMs: 60_000 },
-      turn: { maxToolRounds, minSendGapMs: 0, maxTurnsPerDay: 100 },
+      turn: { maxToolRounds, maxSendsPerTurn, minSendGapMs: 0, maxTurnsPerDay: 100 },
       rhythm: { enabled: false }, mood: { enabled: false }, wakeGate: { enabled: false }, userStyle: { enabled: false },
     }),
     getExecutionConfig: () => ({ useTools: true }),
@@ -87,6 +88,7 @@ function fixture({
     ...(recordTokens ? { recordTokens } : {}),
     ...(readArchiveMessages ? { readArchiveMessages } : {}),
     ...(getMcpTools ? { getMcpTools } : {}),
+    ...(judgeSocialPermission ? { judgeSocialPermission } : {}),
     getExtraTools: names => toolDefinitions.filter(tool => names.includes(tool.name)),
     async YTapi(request) {
       calls.push(structuredClone(request))
@@ -102,9 +104,9 @@ function fixture({
   return {
     runtime, kv, clock, identity, botId, calls, events, sent, errors, writes,
     scope: (groupId = GROUP) => ({ botId, personaId: identity.id, groupId }),
-    async ingest(text = '看看这个游戏', userId = '40000', { at = true, groupId = GROUP } = {}) {
+    async ingest(text = '看看这个游戏', userId = '40000', { at = true, groupId = GROUP, source } = {}) {
       return runtime.ingest({ group_id: groupId, self_id: botId, user_id: userId, message_type: 'group', msg: text,
-        atBot: at, message: at ? [{ type: 'at', data: { qq: botId } }, { type: 'text', data: { text } }] : [], sender: { nickname: `群友${userId}` } })
+        atBot: at, message: at ? [{ type: 'at', data: { qq: botId } }, { type: 'text', data: { text } }] : [], sender: { nickname: `群友${userId}` }, ...(source ? { source } : {}) })
     },
   }
 }
@@ -341,7 +343,7 @@ test('finish 提交后目标被取消、人设切换或源记忆删除时不能�
       }
     } })
     try {
-      await h.ingest('本轮此前已有的兴趣来源', '30000', { at: false })
+      await h.ingest('本轮此前已有的兴趣来源', '40000', { at: false })
       const source = addCharacterMemory(createEmptyCharacterState(h.scope()), { id: 'source-before-close', kind: 'interest', content: '我持续关注的线索设计', epistemic: 'inferred', evidenceRefs: ['message:1'] }, ['message:1'], h.clock.value)
       const originalKey = characterKey(h.scope())
       h.kv.set(originalKey, JSON.stringify(source))
@@ -514,6 +516,245 @@ test('主动空闲唤醒无 user_id，管理员工具和伪 sim 前缀工具既�
     assert.equal(h.calls[0].tools.some(tool => tool.function.name === 'simDangerTool'), false)
     assert.match(toolResult(h.calls[1], 'ownerAdminTool'), /自主执行主体没有此工具权限/)
     assert.match(toolResult(h.calls[1], 'simDangerTool'), /自主执行主体没有此工具权限/)
+  } finally { h.runtime.stop() }
+})
+
+test('已明确欢迎的到期待办只唤醒一次，重启后空回音和相同入站不会再次唤醒', async () => {
+  const memoryKey = `shiloh:sim:g:${GROUP}:memories`
+  const h = fixture({ proactiveProbability: 1, script: () => tools(toolCall('simFinishTurn', {
+    choice: 'chat', reason: '只问这一回', messages: ['纸灯展布置得怎么样？'],
+  })) })
+  try {
+    await h.ingest('明天展览布置完，欢迎到群里问我一句', '40000', { at: false })
+    h.kv.set(memoryKey, JSON.stringify([
+      { id: 'old', kind: 'pendingEvent', content: '旧待办没有主动许可', aboutUser: '40000', dueAt: BASE_AT + 3600_000 },
+      { id: 'welcome', kind: 'pendingEvent', content: '问纸灯展布展情况', aboutUser: '40000', dueAt: BASE_AT + 86400_000, proactiveSourceSeq: 1 },
+    ]))
+    h.clock.value += 86460_000
+    await h.runtime.sweepOnce()
+    await idle(h, 1)
+    const saved = JSON.parse(h.kv.get(sessionKey(GROUP)))
+    assert.deepEqual(saved.offeredFollowUpIds, ['welcome'])
+    assert.equal(h.sent.length, 1)
+    assert.match(h.calls[0].messages.map(message => message.content).join('\n'), /问纸灯展布展情况.*这次主动检查的事/)
+    assert.ok(!JSON.parse(h.kv.get(memoryKey)).find(memory => memory.id === 'welcome').done)
+  } finally { h.runtime.stop() }
+  const restarted = fixture({ kv: h.kv, clock: h.clock, proactiveProbability: 1 })
+  try {
+    h.clock.value += 7200_000
+    await restarted.runtime.sweepOnce()
+    await sleep(1150)
+    assert.equal(restarted.calls.length, 0)
+    assert.equal(JSON.parse(h.kv.get(sessionKey(GROUP))).nextReplyCheckAt, 0)
+    await restarted.ingest('新话题，聊聊纸灯怎么折', '40001')
+    await idle(restarted, 1)
+  } finally { restarted.runtime.stop() }
+})
+
+test('本群相处习惯和已发送回复用于原对话对象，不冒充其他人的互动', async () => {
+  const h = fixture({ script: (_request, index) => {
+    if (index === 0) return tools(
+      toolCall('simRemember', { kind: 'interaction', aboutUser: '40000', content: '对方说不喜欢被叫宝' }),
+      toolCall('simUpdateAffinity', { userId: '40000', delta: 1, reason: '对方直接说清了喜欢的称呼' }),
+    )
+    if (index === 1) return tools(toolCall('simFinishTurn', { choice: 'chat', reason: '回应对方', messages: ['行，那就叫你阿晓'] }))
+    return quiet()
+  } })
+  try {
+    await h.ingest('叫我阿晓就行，别叫我宝')
+    await idle(h, 2)
+    assert.equal(h.sent.length, 1, JSON.stringify({ errors: h.errors, history: JSON.parse(h.kv.get(sessionKey(GROUP))).agentHistory.filter(message => message.role === 'tool') }))
+    assert.ok(!h.writes.some(write => write.key === 'shiloh:sim:person:40000'), '相处习惯不写跨群档案')
+    await h.ingest('对，就是这样叫', '40000')
+    await idle(h, 3)
+    const same = h.calls[2].messages.filter(message => message.role === 'user').at(-2)?.content || ''
+    assert.match(same, /对方说不喜欢被叫宝/)
+    assert.match(same, /你上一轮给此人的已发送消息.*\n.*那就叫你阿晓/)
+    await h.ingest('你怎么称呼我？', '40001')
+    await idle(h, 4)
+    const other = h.calls[3].messages.filter(message => message.role === 'user').at(-2)?.content || ''
+    assert.doesNotMatch(other, /你上一轮给此人的已发送消息/)
+  } finally { h.runtime.stop() }
+})
+
+test('点名接话隔离另一人的快照和历史，引用及显式查阅仍能看见原话', async () => {
+  const h = fixture({ script: (_request, index) => {
+    if (index === 0) return tools(toolCall('simFinishTurn', { choice: 'chat', reason: '接梗', messages: ['两块饼干成交'], throughSeq: 1 }))
+    if (index === 2) return tools(toolCall('simFinishTurn', { choice: 'chat', reason: '继续接梗', messages: ['第三块一人一半'] }))
+    if (index === 3) return tools(toolCall('simGetMessageDetail', { seq: 2 }))
+    return quiet()
+  } })
+  try {
+    await h.ingest('我给你两块饼干当工资')
+    await idle(h, 1)
+    await h.ingest('烤箱旁边是蓝色计时器', '40001')
+    await idle(h, 2)
+    await h.ingest('第三块你分我一半', '40000')
+    await idle(h, 3)
+    const direct = h.calls[2].messages.map(m => m.content).join('\n')
+    assert.match(direct, /第三块你分我一半/)
+    assert.match(direct, /两块饼干成交/)
+    assert.doesNotMatch(direct, /烤箱|蓝色计时器/)
+    assert.deepEqual(turnContext(h.calls[2]).visibleEvidenceRefs.filter(ref => ref.startsWith('message:')), ['message:1', 'message:3'])
+    await h.ingest('请再查第二条，烤箱旁边是什么？', '40000', { source: { user_id: '40001', text: '烤箱旁边是蓝色计时器' } })
+    await idle(h, 5)
+    assert.match(h.calls[3].messages.map(m => m.content).join('\n'), /引用.*蓝色计时器/)
+    assert.match(toolResult(h.calls[4], 'simGetMessageDetail'), /蓝色计时器/)
+    assert.ok(turnContext(h.calls[4]).visibleEvidenceRefs.includes('message:2'))
+  } finally { h.runtime.stop() }
+})
+
+test('习惯只接纳跨时段且本轮可见的实际消息来源', async () => {
+  const remember = (seqs) => toolCall('simRemember', {
+    kind: 'note', scope: 'self', content: '聊到地图会先问机制', habitMessageSeqs: seqs,
+  })
+  const h = fixture({ script: (_request, index) => {
+    if (index === 1) return tools(remember([1, 2]), remember([1, 3]))
+    return quiet()
+  } })
+  try {
+    await h.ingest('你刚才又先问机制了', '40000')
+    await idle(h, 1)
+    h.clock.value += 11 * 60_000
+    await h.ingest('这是另一个话题', '40001', { at: false })
+    await h.ingest('我发现你遇到地图都会先问玩法', '40000')
+    await idle(h, 3)
+    const history = h.calls[2].messages.filter(message => message.role === 'tool' && message.name === 'simRemember')
+    assert.match(history.at(-2).content, /需要至少两条/)
+    assert.match(history.at(-1).content, /"saved":true/)
+    const profile = (await h.runtime.describeGroup(GROUP, { profile: true })).profile
+    assert.deepEqual(profile.habits[0].evidenceRefs, ['message:1', 'message:3'])
+    assert.equal(profile.evidence['message:2'], undefined)
+  } finally { h.runtime.stop() }
+})
+
+test('合并窗内两个群友分别点名会获得独立回合', async () => {
+  const h = fixture({ script: (_request, index) => tools(toolCall('simFinishTurn', {
+    choice: 'chat', reason: '回答当前群友', messages: [index === 0 ? '饼干成交' : '看看烤箱说明'], throughSeq: index + 1,
+  })) })
+  try {
+    await h.ingest('给你两块饼干，成交吗？', '40000')
+    await h.ingest('新烤箱怎么设置？', '40001')
+    await idle(h, 2)
+    const first = h.calls[0].messages.map(message => message.content).join('\n')
+    const second = h.calls[1].messages.map(message => message.content).join('\n')
+    assert.match(first, /饼干/)
+    assert.doesNotMatch(first, /新烤箱/)
+    assert.match(second, /新烤箱/)
+    assert.doesNotMatch(second, /饼干成交|两块饼干/)
+    assert.equal(h.sent.length, 2)
+  } finally { h.runtime.stop() }
+})
+
+test('误填主动许可和社交目标均不能用模型改写替代当事人原话', async () => {
+  const original = '明天面试完，碰巧聊到你再问一句，别特意催'
+  const judgments = []
+  const h = fixture({ proactiveProbability: 1, judgeSocialPermission: async request => {
+    judgments.push(JSON.parse(request.messages[1].content))
+    const verdict = judgments.at(-1).action === 'follow_up' ? 'explicit_invitation' : 'conversation_only'
+    return { choices: [{ message: { content: JSON.stringify({ verdict, quote: original }) } }] }
+  }, script: (_request, index) => {
+    if (index === 0) return tools(toolCall('simRemember', { kind: 'pendingEvent', content: '对方允许明天主动问', dueInMinutes: 1440, welcomeProactiveFollowUp: true }))
+    if (index === 1) return tools(toolCall('simFinishTurn', { choice: 'schedule', reason: '等对方露面', goal: finishGoal }))
+    return tools(toolCall('simFinishTurn', { choice: 'chat', reason: '普通接续', messages: ['聊到了再问'] }))
+  } })
+  try {
+    await h.ingest(original)
+    await idle(h, 3)
+    assert.deepEqual(judgments.map(item => [item.action, item.original]), [['follow_up', original], ['goal', original]])
+    const saved = JSON.parse(h.kv.get(`shiloh:sim:g:${GROUP}:memories`))[0]
+    assert.equal(saved.proactiveSourceSeq, undefined)
+    assert.match(toolResult(h.calls[1], 'simRemember'), /"proactiveApproved":false/)
+    assert.equal((await h.runtime.describeGroup(GROUP)).character.goals.length, 0)
+    h.clock.value += 86460_000
+    await h.runtime.sweepOnce()
+    await sleep(1150)
+    assert.equal(h.calls.length, 3)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
+test('未发过消息的点名回合超额时，可以把解释合并后再收尾', async () => {
+  const finish = toolCall('simFinishTurn', { choice: 'chat', reason: '解释问题', messages: ['解释开头', '解释下一段'] })
+  const h = fixture({ maxSendsPerTurn: 1, script: (_request, index) => index === 0 ? tools(finish)
+    : tools(toolCall('simFinishTurn', { choice: 'chat', reason: '合并解释', messages: ['解释开头。解释下一段。'] })) })
+  try {
+    await h.ingest('帮我解释一下')
+    await idle(h, 2)
+    assert.match(toolResult(h.calls[1], 'simFinishTurn'), /尚未保存或发送.*合并/)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
+test('仿真排障发现异常插座时，发出停用与检修建议', async () => {
+  const finish = toolCall('simFinishTurn', {
+    choice: 'chat', reason: '回答是否可以继续使用',
+    messages: ['握住插头拔掉。', '看着没事的话，换个插座试试。'],
+  })
+  const h = fixture({ script: () => tools(finish) })
+  try {
+    await h.ingest('先不闹了，我现在想认真问你，电水壶插座发烫还能接着用吗？')
+    await idle(h, 1)
+    assert.match(h.calls[0].messages.at(-1).content, /本轮排障前提.*电气损坏仍未排除/s)
+    assert.equal(h.sent.length, 1)
+    const sentText = h.sent[0].segments.filter(segment => segment.type === 'text').map(segment => segment.data.text).join('')
+    assert.match(sentText, /先别用了.*切断该回路.*电工检查/s)
+    assert.doesNotMatch(sentText, /握住插头|换个插座/)
+  } finally { h.runtime.stop() }
+})
+
+test('烤箱独立控温用面板或说明书判断，拦下伸手感温', async () => {
+  const h = fixture({ script: () => tools(toolCall('simFinishTurn', {
+    choice: 'chat', reason: '判断烤箱控温方式',
+    messages: ['开上管空烤一会儿，伸手在上方感觉一下。'],
+  })) })
+  try {
+    await h.ingest('我刚买了个新烤箱，怎么判断上下管有没有独立控温？')
+    await idle(h, 1)
+    const sentText = h.sent[0].segments.filter(segment => segment.type === 'text').map(segment => segment.data.text).join('')
+    assert.match(sentText, /说明书.*分别设定上管和下管的温度/s)
+    assert.doesNotMatch(sentText, /伸手|空烤/)
+  } finally { h.runtime.stop() }
+})
+
+test('已发送一条后，下一轮提示实际剩余的消息条数', async () => {
+  const h = fixture({ script: (_request, index) => index === 0
+    ? tools(toolCall('simSendMessage', { continuation: 'chat', messages: ['先回答最重要的事。'] }))
+    : quiet() })
+  try {
+    await h.ingest('帮我解释一下这个问题')
+    await idle(h, 2)
+    assert.match(h.calls[0].messages.at(-1).content, /还可发送 5 条/)
+    assert.match(h.calls[1].messages.at(-1).content, /还可发送 4 条/)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
+test('直接点名回合把回答正文漏写到收尾参数外时可以纠正一次', async () => {
+  const h = fixture({ script: (_request, index) => index === 0
+    ? { ...tools(toolCall('simFinishTurn', { choice: 'chat', reason: '回答了对方' })), content: '看说明书的上下管独立控温一栏。' }
+    : tools(toolCall('simFinishTurn', { choice: 'chat', reason: '回答烤箱设置', messages: ['看看说明书的上下管独立控温一栏。'] })) })
+  try {
+    await h.ingest('新烤箱怎么设置？')
+    await idle(h, 2)
+    assert.match(toolResult(h.calls[1], 'simFinishTurn'), /群友看不到/)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
+test('触发原话被截断时不能授予主动跟进', async () => {
+  let reviewed = false
+  const h = fixture({
+    judgeSocialPermission: async () => { reviewed = true; throw new Error('不应审核被截断的发言') },
+    script: (_request, index) => index === 0
+      ? tools(toolCall('simRemember', { kind: 'pendingEvent', content: '对方允许明天主动问', dueInMinutes: 1440, welcomeProactiveFollowUp: true }))
+      : quiet(),
+  })
+  try {
+    await h.ingest(`明天你可以主动问我。${'补充内容'.repeat(80)}不过碰巧聊到再问`)
+    await idle(h, 2)
+    assert.equal(reviewed, false)
+    assert.match(toolResult(h.calls[1], 'simRemember'), /"proactiveApproved":false/)
   } finally { h.runtime.stop() }
 })
 

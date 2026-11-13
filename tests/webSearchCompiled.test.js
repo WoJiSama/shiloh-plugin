@@ -20,3 +20,37 @@ test('compiled search enables web_search tool for bigmodel endpoint and honors e
   const forced=await runSearch({searchApiUrl:'https://api.openai.com/v1/chat/completions',searchApiWebSearch:'on'})
   assert.equal(forced.captured[0].body.tools[0].type,'web_search')})
 test('compiled WebParser initializes configured proxy before browser launch',async()=>{const Parser=createWebParser({launch:async()=>({close:async()=>{}})},()=>'/browser');const parser=new Parser({proxy:'127.0.0.1:7890'});let checks=0;parser.testProxy=async()=>{checks++;return true};parser.createPage=async()=>({});parser.loadPage=async()=>({textContent:'ok',title:'',meta:{},jsonData:{}});await parser.fetchContent('https://example.com');assert.equal(checks,1);assert.ok(parser.getLaunchOptions().args.includes('--proxy-server=127.0.0.1:7890'))})
+test('compiled search retries once on timeout and stamps Beijing clock on success',async()=>{
+  const Tool=createSearchInformationTool({totalTokens:async()=>({completion_tokens:1}),progressReplyFactory:async()=>'',debug(){}});
+  const captured=[]
+  const abortLike=()=>Object.assign(new Error('aborted'),{name:'AbortError'})
+  const tool=new Tool({configLoader:()=>({searchAiConfig:{searchApiUrl:'https://open.bigmodel.cn/api/coding/paas/v4',searchApiKey:'sk-test',timeoutMs:50}}),fetchImpl:async(url,init)=>{captured.push(JSON.parse(String(init.body)));if(captured.length===1)throw abortLike();return{ok:true,status:200,json:async()=>({choices:[{message:{content:'黄仁勋已辞职'}}]})}}});
+  const result=await tool.func({query:'黄仁勋 离职'},{})
+  assert.equal(captured.length,2,'超时后自动重试一次')
+  assert.match(result,/【搜索完成于 \d{2}-\d{2} \d{2}:\d{2} 北京时间/)
+  assert.match(result,/黄仁勋已辞职/)
+})
+test('compiled search double timeout returns honest guidance instead of stale facts',async()=>{
+  const Tool=createSearchInformationTool({totalTokens:async()=>({completion_tokens:1}),progressReplyFactory:async()=>'',debug(){}});
+  let calls=0
+  const tool=new Tool({configLoader:()=>({searchAiConfig:{searchApiKey:'sk-test',timeoutMs:50}}),fetchImpl:async()=>{calls++;throw Object.assign(new Error('aborted'),{name:'AbortError'})}});
+  const result=await tool.func({query:'x'},{})
+  assert.equal(calls,2,'两次尝试后放弃')
+  assert.match(result,/连续 2 次搜索/)
+  assert.match(result,/网搜暂时卡住了/)
+  assert.match(result,/旧结论当成现在的最新事实/,'明确禁止拿旧结论当现状')
+})
+test('compiled search does not retry non-timeout errors',async()=>{
+  const Tool=createSearchInformationTool({totalTokens:async()=>({completion_tokens:1}),progressReplyFactory:async()=>'',debug(){}});
+  let calls=0
+  const tool=new Tool({configLoader:()=>({searchAiConfig:{searchApiKey:'sk-test',timeoutMs:50}}),fetchImpl:async()=>{calls++;throw new Error('ECONNRESET')},progressDelayMs:2500});
+  const result=await tool.func({query:'x'},{})
+  assert.equal(calls,1,'非超时错误不重试')
+  assert.match(result,/ECONNRESET/)
+})
+test('compiled search description tells the model to cite query time and re-search on challenge',async()=>{
+  const Tool=createSearchInformationTool({totalTokens:async()=>({completion_tokens:1}),progressReplyFactory:async()=>'',debug(){}});
+  const tool=new Tool()
+  assert.match(tool.description,/几点查到的版本/)
+  assert.match(tool.description,/重新搜索确认/)
+})

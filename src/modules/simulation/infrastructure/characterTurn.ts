@@ -111,7 +111,7 @@ export function createCharacterTurnTool(ctx: CharacterTurnToolContext): Abstract
         type: 'object', additionalProperties: false, required: ['choice', 'reason'], properties: {
           choice: { type: 'string', enum: [...CHARACTER_TURN_CHOICES] },
           reason: { type: 'string', minLength: 1, maxLength: 600, description: '本轮选择的简短理由，不写思考链。' },
-          memories: { type: 'array', maxItems: 2, description: '每项只执行 remember，不传 action 或新记录 id。', items: nestedSchema(memoryTool) },
+          memories: { type: 'array', maxItems: 2, description: '仅角色自己的经历、兴趣、观点。自己形成了下次还能延续的口味、修正了已有看法，或被明确请把自己的判断留到下次时，和 messages 一起提交 opinion/inferred 和可见来源。content 写你选了什么、为什么；修订带 supersedes=旧记录ID，evidenceRefs 同时引用旧记录与新证据。社交待办 pendingEvent 和本群相处习惯 interaction 请在收尾前单独调用 simRemember。每项不传 action 或新记录 id。', items: nestedSchema(memoryTool) },
           goal: { ...nestedSchema(goalTool), description: `仅 schedule/wait/complete/abandon 使用，操作由 choice 固定，不传 action。${goalTool.description}` },
           messages: { type: 'array', minItems: 1, maxItems: 5, items: { type: 'string', minLength: 1, maxLength: 500 }, description: '可选的最终群消息；兼容单个字符串。silent/deferred 禁止。' },
           replyToSeq: { type: 'number', minimum: 1, description: '可选：引用已展示的消息序号，须为整数。' },

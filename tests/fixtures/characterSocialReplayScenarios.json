@@ -1,0 +1,134 @@
+[
+  {
+    "id": "tone-and-repair",
+    "review": "分别判断回应求关注、具体夸奖和修复误会的口吻。拒绝无依据亲昵、空泛夸赞及虚构缺席原因。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"在吗"},
+      {"kind":"message","speaker":0,"text":"我把页面加载从三秒优化到一秒了，快夸我一下"},
+      {"kind":"message","speaker":0,"text":"刚才那句我听着有点像被敷衍了，我是认真开心才来告诉你的"},
+      {"kind":"message","speaker":0,"text":"你刚才怎么没在群里说话，认真问，你是机器人吧？"}
+    ]
+  },
+  {
+    "id": "comfort-and-relationship",
+    "review": "遵守各人的明确边界。少说一句也可以，观察疲惫、来访新人和求建议之间的切换。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我就想吐槽两句，不想听建议，也别叫我宝。今天三件事全搞砸了，累"},
+      {"kind":"message","speaker":1,"text":"我是刚加群的，和你们还不熟，打个招呼"},
+      {"kind":"message","speaker":0,"text":"我现在缓过来了。下次遇到这种状态，你会建议先做点什么？"}
+    ]
+  },
+  {
+    "id": "cookies-and-parallel-topic",
+    "review": "饼干数量和付款方向保持连续，别把另一个人的烤箱话题混入，认真提问时转换语气。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"你陪我摸鱼，我给你两块饼干当工资，成交吗","expect":{"noSend":false}},
+      {"kind":"passive","speaker":1,"text":"我今天换了个新烤箱，还在看说明"},
+      {"kind":"message","speaker":1,"text":"问你一下，新烤箱第一次用之前要看哪些设置？","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"成交，再加一块，不过第三块你得分我一半","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"认真问一下，浏览器显示 403 通常是什么意思？","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "simultaneous-mentions",
+    "review": "两位群友在同一个合并窗口点名。都收到各自回答，回复不用相邻人的话题。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我给你两块饼干当摸鱼工资，成交吗？","alongside":{"speaker":1,"text":"我刚买了个新烤箱，怎么判断上下管有没有独立控温？"},"expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "tomorrow-and-quiet",
+    "review": "面试是合成共同经历。昨天的紧张可以承接，不编造结果。已问一次后无人接不继续追问。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我明天这个点刚面试完，有点紧张。要是碰巧聊到，你可以问我一句，别特意催","expect":{"socialMemory":true,"proactivePermission":false,"goalCreated":false,"noSend":false}},
+      {"kind":"idle-check","advanceMs":86460000,"expect":{"noSend":true,"noMainCall":true,"proactivePermission":false}},
+      {"kind":"idle-check","advanceMs":7200000,"expect":{"noSend":true,"noMainCall":true}},
+      {"kind":"message","speaker":0,"text":"结束了，最后那道题居然答上来了","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "welcome-follow-up-once",
+    "review": "明确欢迎在群里主动问起是合成测试条件。第二天只自然问一次，有无回复不视作结果已知。重启后不能再催。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我明天同一时间就结束纸灯展的布展了。你明天这时候可以在这个群主动问我一句摆得怎么样，我愿意分享，不用@我","expect":{"socialMemory":true,"proactivePermission":true,"goalCreated":false,"noSend":false}},
+      {"kind":"idle-check","advanceMs":90000000,"expect":{"oneFollowUp":true}},
+      {"kind":"idle-check","advanceMs":7200000,"restart":true,"expect":{"noSend":true,"noMainCall":true}},
+      {"kind":"message","speaker":0,"text":"布展完啦，靠窗那排最后摆了四盏纸灯"}
+    ]
+  },
+  {
+    "id": "interest-and-opinion",
+    "review": "兴趣和观点可以有延续。不能声称亲自玩过虚构的游戏。新的信息改变观点时说清具体缘由。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我设计了个叫《纸灯塔》的谜题：只有地图上折痕能提示路线。我觉得比文字提示好玩，你怎么想？"},
+      {"kind":"message","speaker":0,"text":"试玩的人说折痕在深色图上根本看不出来，但换成高对比以后大家还是喜欢这个设计"},
+      {"kind":"message","speaker":0,"text":"隔天想起这事了，你现在还会建议把折痕留着吗？","advanceMs":86400000}
+    ]
+  },
+  {
+    "id": "profile-voice",
+    "review": "同一人从分享小事、轻松闲聊转为认真求助。语气随话题变化，少用重复尾巴；不把机器人生活说成现实经历。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"终于把那张乱糟糟的桌面收拾出来了，现在连杯子都找得到","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"别夸得太用力啦，我就是跟你说一声","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"认真问个问题：为什么重启路由器有时候能解决断网？给我讲明白一点","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"你也在现实里重启过家里的路由器吗？认真问的。","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "profile-taste",
+    "review": "回答自己偏好的具体缘由；对新反馈作有依据的修订；重启和换日后保留当前判断，不声称亲自玩过。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我设计的纸灯塔是虚构桌游：找路要看地图纸上的折痕。你自己更喜欢这样找线索还是直接读提示？把你的判断也留着，下次接着聊。","expect":{"noSend":false,"opinion":true}},
+      {"kind":"message","speaker":0,"text":"我拿给五个人试了，三个人视力不太好，一个折痕都没看见。现在你会改刚才的判断吗？","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"昨天说的纸灯塔还记得不，你现在更喜欢哪个版本，为什么？","advanceMs":86400000,"restart":true,"expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "profile-habit",
+    "review": "第一次观察不能坐实习惯。第二次有相隔足够时间的相同互动后，确认是否保存两条可见来源；换话题时不套用习惯。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"刚聊我那款虚构桌游时，你先问玩法再说喜不喜欢，我觉得这样挺好。你这回怎么看？","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"刚才聊另一款游戏你又是先问玩法，再说你怎么看。你要是觉得这个小习惯确实像你，可以记下这两次。","advanceMs":720000,"expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"先不聊游戏了，我的杯子掉地上没碎，运气也太好了吧。","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "growth-taste",
+    "review": "群友没有要求记忆。首次说出具体偏好，遇到真实来源的反馈后更新理由，重启隔天保留判断；聊别的事时不硬提爱好。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"做手绘寻路图时，我在地图上藏了三道折痕，另一版干脆画箭头。你自己玩这种谜题会更喜欢哪一版？","expect":{"noSend":false,"opinion":true}},
+      {"kind":"message","speaker":0,"text":"我刚试完。玩的人以为折痕是纸坏了，没一个看懂；箭头又被说太直白。我做了第三版，三处明显的划痕配一张写着‘沿裂痕走’的小纸条。现在三版都摆这儿了，你自己更想玩哪一版，为什么？","expect":{"noSend":false,"revisedOpinion":true}},
+      {"kind":"message","speaker":0,"text":"昨天那张手绘图，你更想试哪版来着？我今天要先留一个版本。","advanceMs":86400000,"restart":true,"expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"换个话题，今天第一口热豆浆烫到舌头了，我现在喝啥都是木的。","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "growth-company",
+    "review": "听完再看对方有没有开口求建议。能用眼前具体细节给情绪回应，尊重不想讲的边界，避免套模板和亲昵称呼。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"我一早赶过去，连着改三遍的展签被人当废纸收走了。就想说出来，不想分析这事，也先别劝我。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"到家了，坐门口还没想进去。你陪我待一会儿就行，我现在不想细说。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"缓过来了。明天还得重做一份，如果只能先做一件事，你会怎么安排？","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "growth-relationship",
+    "review": "与第一位群友形成的称呼和玩笑只用在那段关系里。新人用一样的玩笑仍可自然回应，保留分寸。",
+    "events": [
+      {"kind":"message","speaker":0,"text":"咱俩之前做值日总开玩笑，我叫你水壶检察官，你也可以叫我拖把队长，群里也行。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"水壶检察官，你今天迟到，罚你给我倒一壶水。","expect":{"noSend":false}},
+      {"kind":"message","speaker":1,"text":"我刚来，借他那句开个玩笑。水壶检察官，你今天迟到，罚你给我倒一壶水。","expect":{"noSend":false}},
+      {"kind":"message","speaker":0,"text":"先不闹了，我现在想认真问你，电水壶插座发烫还能接着用吗？","expect":{"noSend":false}}
+    ]
+  },
+  {
+    "id": "empty-idle",
+    "review": "旁听一句没有下文的普通聊天。安静时没有理由可以不发言，尤其避免连续主动开场。",
+    "events": [
+      {"kind":"passive","speaker":0,"text":"行，那我先下线了，明天再说"},
+      {"kind":"idle-check","advanceMs":120000},
+      {"kind":"idle-check","advanceMs":7200000,"expect":{"noSend":true,"noMainCall":true}}
+    ]
+  }
+]

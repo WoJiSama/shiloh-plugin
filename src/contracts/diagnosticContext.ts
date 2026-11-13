@@ -1,5 +1,5 @@
 export type DiagnosticIncidentStatus = 'asserted' | 'denied' | 'figurative' | 'unknown'
-export type DiagnosticSignal = 'burning_odor' | 'smoke' | 'fire' | 'electrical_fault'
+export type DiagnosticSignal = 'burning_odor' | 'smoke' | 'fire' | 'electrical_fault' | 'overheated_connection'
 export type DiagnosticDamageComponent = 'power_supply' | 'mainboard' | 'graphics_card' | 'cable' | 'capacitor' | 'unspecified_component'
 export type DiagnosticDamageKind = 'damaged' | 'burned' | 'short_circuit' | 'overheated' | 'electrical_breakdown'
 export type DiagnosticTemperaturePrerequisite = 'component_model' | 'measurement_point' | 'workload'

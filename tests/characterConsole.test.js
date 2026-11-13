@@ -108,6 +108,58 @@ test('真实无机器人控制台读取旧会话返回待绑定且不创建角�
   assert.deepEqual([...kv.entries()], before)
 })
 
+test('角色档案只展示已绑定范围的状态和被引用的消息依据', async t => {
+  const group = '10086', at = Date.parse('2026-11-09T04:00:00Z')
+  const state = createDefaultSimSession(at)
+  state.botId = '10001'
+  state.recent = ['初次讨论', '不相干的发言', '试玩后的反馈'].map((text, index) => ({
+    seq: [1, 2, 4][index], userId: '10002', name: '群友', text, at, kind: 'text', messageId: null, imageCount: 0, atSelf: false, quoteToSelf: false,
+  }))
+  const scope = { botId: '10001', personaId: 'friendly', groupId: group }
+  const key = `shiloh:character:v1:10001:friendly:${group}`
+  const memories = [
+    { id: 'old', kind: 'opinion', content: '旧的看法', epistemic: 'inferred', evidenceRefs: ['message:1'], createdAt: at, updatedAt: at },
+    { id: 'new', kind: 'opinion', content: '修订后的看法', epistemic: 'inferred', supersedes: 'old', evidenceRefs: ['memory:old', 'message:4'], createdAt: at, updatedAt: at },
+  ]
+  const kv = new Map([
+    [`shiloh:sim:g:${group}`, JSON.stringify(state)],
+    [key, JSON.stringify({ schemaVersion: 1, scope, revision: 2, paused: false, memories, goals: [], receipts: [] })],
+    [`${key}:legacy:self-memories`, JSON.stringify([{ id: 'habit', kind: 'note', content: '遇到桌游话题会先问机制', updatedAt: at, habitMessageSeqs: [1, 3] }])],
+  ])
+  const runtime = createSimulationRuntime({
+    redis: { async get(key) { return kv.get(key) ?? null }, async set(key, value) { kv.set(key, value) }, async del(key) { kv.delete(key) } },
+    now: () => at, logger: { info() {}, warn() {}, error() {} },
+    getSelf: () => ({ id: '', name: '' }),
+    getPersona: (groupId, botId) => {
+      assert.equal(groupId, group)
+      assert.equal(botId, scope.botId)
+      return { personaId: scope.personaId, persona: { name: '希洛', preferences: ['地图谜题'], hiddenField: '不进档案' }, systemContent: '原始提示不进档案' }
+    },
+    getSection: () => ({ enabled: true, allGroups: false, groups: [group], mood: { enabled: false } }),
+    getExecutionConfig: () => ({}), getExtraTools: () => [],
+    YTapi: async () => { throw new Error('控制台读取不得调用模型') },
+    sendGroupMessage: async () => { throw new Error('控制台读取不得发送群消息') },
+  })
+  t.after(() => runtime.stop())
+  const f = await fixture(t, true, runtime)
+  assert.equal((await f.get(`/api/simulation/group?group=${group}`)).data.profile, undefined)
+  const before = [...kv.entries()]
+  const detail = await f.get(`/api/simulation/group?group=${group}&view=character`)
+  assert.equal(detail.status, 200)
+  const { profile } = detail.data
+  assert.equal(profile.persona.name, '希洛')
+  assert.equal(profile.mood.status, 'disabled')
+  assert.deepEqual(profile.opinions.map(item => item.id), ['new'])
+  assert.equal(profile.evidence['message:1'].text, '初次讨论')
+  assert.equal(profile.evidence['message:2'], undefined)
+  assert.equal(profile.evidence['message:3'], undefined)
+  assert.equal(profile.evidence['message:4'].text, '试玩后的反馈')
+  assert.equal(profile.evidence['memory:old'].text, '旧的看法')
+  assert.deepEqual(profile.habits[0].evidenceRefs, ['message:1', 'message:3'])
+  assert.doesNotMatch(JSON.stringify(profile), /原始提示|不进档案|不相干的发言/)
+  assert.deepEqual([...kv.entries()], before)
+})
+
 test('character console actions require authentication and validate their target before dispatch', async t => {
   const f = await fixture(t)
   assert.equal((await f.request({ operation: 'pause' }, false)).status, 401)

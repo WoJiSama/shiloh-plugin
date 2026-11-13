@@ -54,6 +54,8 @@ export interface SimMessage {
   name: string
   /** 纯文本（不含引用原文），上限由写入侧截断 */
   text: string
+  /** 已截断的消息不能证明明确社交许可。 */
+  textTruncated?: boolean
   /** epoch ms */
   at: number
   atSelf: boolean
@@ -89,12 +91,14 @@ export type SimHistoryMessage = {
   tool_calls?: { id?: string; type?: string; function?: { name?: string; arguments?: string } }[]
   tool_call_id?: string
   name?: string
+  /** Internal projection metadata. Never sent as provider message fields. */
+  conversationUserId?: string
 }
 
 export interface SimBudgetState { day: string; turns: number; tokens: number }
 
 /** agent 自管记忆：pendingEvent=待跟进（到期提醒），note=事实/约定，impression=群友印象，meme=本群专属梗 */
-export type SimMemoryKind = 'pendingEvent' | 'note' | 'impression' | 'meme' | 'activeTopic'
+export type SimMemoryKind = 'pendingEvent' | 'note' | 'impression' | 'meme' | 'activeTopic' | 'interaction'
 
 export interface SimMemoryEntry {
   id: string
@@ -104,6 +108,10 @@ export interface SimMemoryEntry {
   aboutUser?: string
   /** pendingEvent 的到期时间（epoch ms）；到期后注入唤醒 prompt 提醒跟进 */
   dueAt?: number
+  /** 运行时核验的邀请来源；旧的模型布尔值不能单独授权主动跟进。 */
+  proactiveSourceSeq?: number
+  /** 自我笔记可引用当时实际看过的本群消息，旧笔记可以没有。 */
+  habitMessageSeqs?: number[]
   /** meme 专用：出现/使用次数（注入排序与强化依据） */
   count?: number
   /** meme 专用：出处原话（谁第一次说的） */
@@ -160,6 +168,12 @@ export interface SimSessionState {
   budget: SimBudgetState
   nextProactiveCheckAt: number
   nextReplyCheckAt: number
+  /** 最近一次随机主动检查用过的入站序号。 */
+  lastProactiveCheckedSeq?: number
+  /** 已进入到期社交检查的记忆 ID。入选不代表已发送或处理完。 */
+  offeredFollowUpIds?: string[]
+  /** 同人格上一轮已确认投递的正文，供接话参考。 */
+  lastConfirmedChat?: { at: number; userId?: string; text: string }
   bootstrapSent: boolean
   /** 会话延续状态：机器人最近参与过对话 → 对话对象的新消息即使不点名也值得醒来看（模型自行决定接不接） */
   conversation: { activeUntil: number; interlocutorIds: string[]; lastTriggerUserId?: string }

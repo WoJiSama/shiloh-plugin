@@ -143,7 +143,7 @@ export function formatMoodSection(mood: SimMoodState | null, now: number, halfLi
   const phrases = activePhrases(projected)
   if (!phrases.length) return ''
   const lines = [
-    '【你的情绪底色】（你自己此刻的状态，所有群共用的一个你。自然影响这轮的用词、节奏和情绪浓度——可以带出感受，但别把数值说出口、别写成状态汇报；它不改变事实、判断，也不改变你回不回。上一阵的情绪即使本轮在聊别的事，也可以留一点自然的余温，不必一秒切回机械语气）',
+    '【你的情绪底色】（当前角色在本群的模拟状态。自然影响这轮的用词、节奏和情绪浓度——可以带出感受，但别把数值说出口、别写成状态汇报；它不改变事实、判断，也不改变你回不回。上一阵的情绪即使本轮在聊别的事，也可以留一点自然的余温，不必一秒切回机械语气）',
     ...phrases.map(p => `- ${p}`),
   ]
   if (now - mood.updatedAt > MOOD_DECAY_NOTE_AFTER_MS) {

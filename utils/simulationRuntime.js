@@ -142,6 +142,9 @@ export const simulationRuntime = createSimulationRuntime({
   reflectCharacter: (requestData, execConfig, signal) => YTapi(requestData, { ...execConfig, useTools: false }, undefined, undefined, {
     taskBackend: 'memory', signal, generation: { maxOutputTokens: 1200 },
   }),
+  judgeSocialPermission: (requestData, execConfig, signal) => YTapi(requestData, { ...execConfig, useTools: false }, undefined, undefined, {
+    taskBackend: 'memory', signal, generation: { maxOutputTokens: 300 },
+  }),
   reviewCharacter: (requestData, execConfig, signal) => {
     const route = resolveCharacterConsistencyRoute(execConfig)
     return YTapi(requestData, route.config, undefined, undefined, {

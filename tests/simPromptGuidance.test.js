@@ -82,17 +82,17 @@ test('每轮尾部只传阶段、剩余轮数、聚焦目标和实际可见来�
 
 test('工具详细说明以实际工具清单为准，旧布尔选项不扩大已过滤能力', () => {
   const minimum = buildSimSystemPrompt({ persona: {}, selfName: '希洛', availableToolNames: ['simFinishTurn'], hasMoodTool: true, hasEmojiTool: true, extraToolNames: ['searchVideoTool', 'sendLocalEmojiTool'] })
-  assert.doesNotMatch(minimum, /【本群额外能力】|simWorkspace 是本群|simSubscription 可关注|simSetMood|约七成/)
+  assert.doesNotMatch(minimum, /【本群额外能力】|simWorkspace 是本群|simSubscription 可关注|simSetMood|轻松斗图/)
   const full = buildSimSystemPrompt({ persona: {}, selfName: '希洛', availableToolNames: ['simFinishTurn', 'simWorkspace', 'simSubscription', 'simSharedSelf', 'simWorkerTask', 'simSetMood', 'sendLocalEmojiTool'] })
   assert.match(full, /simWorkspace 是本群文本作品空间/)
   assert.match(full, /simSubscription 可关注/)
   assert.match(full, /simSharedSelf 只提议/)
   assert.match(full, /simWorkerTask 仅使用管理员配置/)
   assert.match(full, /simSetMood/)
-  assert.match(full, /约七成/)
+  assert.match(full, /轻松斗图/)
   const legacy = buildSimSystemPrompt({ persona: {}, selfName: '希洛', hasMoodTool: true, hasEmojiTool: true })
   assert.match(legacy, /simSetMood/)
-  assert.match(legacy, /约七成/)
+  assert.match(legacy, /轻松斗图/)
 })
 
 test('资料和人格示例不能改写固定执行协议，注入内容保留为资料', () => {
@@ -122,7 +122,8 @@ test('结构化收尾要求保存成功才发送，完成回执失败不能提�
 test('兴趣、旁听和自然拒绝仍是有效选择，唤醒指引不再要求先标读后收尾', () => {
   const protocol = buildSimulationProtocol('希洛')
   for (const value of ['chat', 'interest_only', 'silent', 'cannot', 'unauthorized', 'unwilling', 'deferred', 'schedule', 'wait', 'complete', 'abandon']) assert.ok(protocol.includes(value), value)
-  assert.match(protocol, /普通聊天和仅有兴趣无需建目标、记忆或制造成长/)
+  assert.match(protocol, /普通聊天无需建目标或硬造记忆/)
+  assert.match(protocol, /群友明确请你留下自己的判断时，把判断本身作为 opinion 保存/)
   assert.match(protocol, /没有真实后续意愿就选 chat 或 interest_only/)
   assert.match(protocol, /拒绝记录失败也不能迫使你接受被拒请求/)
   assert.match(protocol, /已经接受的正式托付仍由原承诺账本负责/)

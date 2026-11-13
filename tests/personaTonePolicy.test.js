@@ -67,3 +67,8 @@ test('interaction的conversation兜底不能把明确事实问句降为闲聊', 
     assert.match(buildPersonaTonePrompt({userText,interactionContext}),/结论、依据和必要步骤/)
   }
 })
+
+test('群友纠正语气时去掉敷衍叠词，普通接梗保留原话', () => {
+  assert.equal(enforcePersonaToneBoundary('好好好，收到收到，桌面清出来就舒服多了。', { userText: '别夸得太用力啦，我就跟你说一声' }), '桌面清出来就舒服多了。')
+  assert.equal(enforcePersonaToneBoundary('好好好，这梗我认了。', { userText: '哈哈我逗你呢' }), '好好好，这梗我认了。')
+})

@@ -1,4 +1,4 @@
-import type { SimMemoryEntry, SimMoodState, SimSessionState, SimWakeConfig } from '../../../contracts/simulation.js'
+import type { SimMemoryEntry, SimMessage, SimMoodState, SimSessionState, SimWakeConfig } from '../../../contracts/simulation.js'
 import { coerceStringArray, looksLikeToolArguments } from '../domain/paramTolerance.js'
 import { stripAIFlavorPhrases } from '../../conversation/domain/replySanitizer.js'
 import { compactSimMessage } from '../domain/messageView.js'
@@ -21,22 +21,27 @@ export interface SimToolContext {
   groupId: string
   /** Production turns require a declared ordinary-chat continuation. */
   requireExplicitContinuation?: boolean
+  /** Only the runtime can set this after checking the triggering user's words. */
+  proactiveSourceSeq?(): number | undefined
+  noteVisibleMessages?(seqs: number[]): void
+  checkHabitSources?(seqs: number[]): boolean
   now(): number
   getState(): SimSessionState
   /** 读取-修改-保存（回合内单线程，mutate 保证落盘） */
   mutate<T>(fn: (state: SimSessionState) => T): Promise<T>
   sendMessage(messages: string[], opts: { replyToMessageId?: string | number; atUserIds?: string[] }): Promise<SimSendResult>
-  waitForMessages(plan: SimWaitPlan): Promise<SimWaitResult>
-  applyWakeConfig(config: SimWakeConfig): void
+  waitForMessages(plan: SimWaitPlan, filter?: (message: SimMessage) => boolean): Promise<SimWaitResult>
+  waitMessageFilter?(message: SimMessage): boolean
+  applyWakeConfig(config: SimWakeConfig): void | Promise<void>
   sendsThisTurn(): number
   maxSendItems(): number
   messageTextMaxChars(): number
   /** agent 自管记忆（读-改-存，回合内单线程） */
   getMemories(): SimMemoryEntry[]
-  saveMemories(memories: SimMemoryEntry[]): void
+  saveMemories(memories: SimMemoryEntry[]): void | Promise<void>
   /** 好感度表 */
   getAffinity(): Record<string, ReturnType<typeof defaultAffinityEntry>>
-  saveAffinity(affinity: Record<string, ReturnType<typeof defaultAffinityEntry>>): void
+  saveAffinity(affinity: Record<string, ReturnType<typeof defaultAffinityEntry>>): void | Promise<void>
   /** 取某条消息的图片（多模态）：由 runtime 经 ports.fetchImageBase64 实现 */
   getMessageImages(seq: number): Promise<{ seq: number; images: { mime: string; base64: string }[]; error?: string }>
   /** 戳群成员（带频率护栏：每群每小时 ≤6 次） */
@@ -98,14 +103,23 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       const afterSeq = Math.max(0, Math.floor(Number(opts.afterSeq) || 0))
       return await ctx.mutate(state => {
         const messages = unreadSince(state, afterSeq, limit)
-        noteModelSeen(state, messages.map(m => m.seq))
         const now = ctx.now()
-        const lines = messages.map(m => compactSimMessage(m, now))
+        const selected: SimMessage[] = [], lines: string[] = []
+        let chars = 0
+        for (const message of messages) {
+          const line = compactSimMessage(message, now)
+          chars += JSON.stringify(line).length + 1
+          if (chars > 3300) break
+          lines.push(line); selected.push(message)
+        }
+        const seqs = selected.map(m => m.seq)
+        noteModelSeen(state, seqs)
+        ctx.noteVisibleMessages?.(seqs)
         return JSON.stringify({
           messages: lines,
-          count: messages.length,
+          count: selected.length,
           readThroughSeq: readThroughSeq(state),
-          remainingUnread: state.unread.filter(m => !messages.some(x => x.seq === m.seq)).length,
+          remainingUnread: state.unread.length - selected.length,
         })
       })
     }
@@ -133,9 +147,22 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       return await ctx.mutate(state => {
         const ordered = [...state.recent].sort((a, b) => b.seq - a.seq).slice(offset, offset + limit)
         const now = ctx.now()
+        const selected: SimMessage[] = [], lines: string[] = []
+        let chars = 0
+        for (const message of ordered) {
+          const line = compactSimMessage(message, now)
+          chars += JSON.stringify(line).length + 1
+          if (chars > 3300) break
+          lines.push(line); selected.push(message)
+        }
+        const seqs = selected.map(m => m.seq)
+        noteModelSeen(state, seqs)
+        ctx.noteVisibleMessages?.(seqs)
         return JSON.stringify({
-          messages: ordered.map(m => compactSimMessage(m, now)).reverse(),
-          count: ordered.length,
+          messages: lines.reverse(),
+          count: selected.length,
+          nextOffset: offset + selected.length,
+          readThroughSeq: readThroughSeq(state),
           totalRecent: state.recent.length,
         })
       })
@@ -158,10 +185,13 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
     async func(opts: Record<string, unknown>) {
       const seq = Math.floor(Number(opts.seq))
       if (!Number.isFinite(seq)) return 'error: seq 必须是数字'
-      const state = ctx.getState()
-      const message = [...state.unread, ...state.recent].find(m => m.seq === seq)
-      if (!message) return JSON.stringify({ found: false, hint: '该消息不在近期缓冲里（可能太旧），可用 simGetRecentMessages 翻更早的记录。' })
-      return JSON.stringify({ found: true, message: compactSimMessage(message, ctx.now()), messageId: message.messageId, imageCount: message.imageCount })
+      return await ctx.mutate(state => {
+        const message = [...state.unread, ...state.recent].find(m => m.seq === seq)
+        if (!message) return JSON.stringify({ found: false, hint: '该消息不在近期缓冲里（可能太旧），可用 simGetRecentMessages 翻更早的记录。' })
+        noteModelSeen(state, [seq])
+        ctx.noteVisibleMessages?.([seq])
+        return JSON.stringify({ found: true, message: compactSimMessage(message, ctx.now()), messageId: message.messageId, imageCount: message.imageCount, readThroughSeq: readThroughSeq(state) })
+      })
     }
   }
 
@@ -195,7 +225,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       this.name = 'simSendMessage'
       this.description = [
         '在当前群发送中途普通聊天。continuation必填chat（普通聊天）或interest_only（仅感兴趣，不承诺后续）。保存记忆、拒绝选择、后续排期或完成说明请用simFinishTurn先保存再发送。',
-        '传字符串数组 = 分多条连发（像真人打字连发），传单个字符串 = 一条。',
+        'messages 数组通常只放一条，有独立补话才加第二条。',
         '条与条之间系统会自动加间隔，不要自己写停顿标记。',
         '想引用某条消息就传 replyToSeq（视图里的 seq）；想 @ 人就传 atUserIds（QQ 号数字）。',
         '发送失败会返回 error，此时可换措辞重试或放弃，不要原样重试超过一次。',
@@ -277,7 +307,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         minNewMessages: clampInt(opts.minNewMessages, 1, 10, 1),
         minQuietAfterNewMs: 10_000,
       }
-      const result = await ctx.waitForMessages(plan)
+      const result = await ctx.waitForMessages(plan, ctx.waitMessageFilter)
       return JSON.stringify(result)
     }
   }
@@ -370,8 +400,9 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       super()
       this.name = 'simRemember'
       this.description = [
-        '你的长期记忆（跨回合、跨天保存）。群友提到未来安排/约定/考试/生日时记 pendingEvent（必须给 dueInMinutes，到点系统会提醒你跟进）；',
-        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note 且 scope=self——那是你跨群一致的性格，下次唤醒在【你自己的沉淀】里。',
+        '你的长期记忆（跨回合、跨天保存）。pendingEvent 带 aboutUser 和 dueInMinutes。只有对方明确欢迎在本群主动问起才设 welcomeProactiveFollowUp=true；“聊到再问”只在对话中接续。自然问过一次或对方已说结果就 done，没回应不催。正式提醒走托付工具。',
+        '有明确话语或实际互动支持的相处习惯用 interaction，带 aboutUser，写清偏好及简短依据。它只留在本群，不当成跨群人物事实。',
+        '值得记住的事实、约定、对某个人的印象记 note 或 impression；你自己形成的口头禅/偏好记 note 且 scope=self——保存在当前机器人与人设的本群范围，记录反复发生的小习惯时必须附 habitMessageSeqs，下次唤醒在【你自己的沉淀】里。',
         '带 aboutUser 的稳定事实（TA的爱好/身份/雷点这类到哪个群都成立的）会同时进入TA的跨群人物档案；带时间性的内容（明天/下周要干嘛）不要走这条路，记 pendingEvent。',
         'TA之前的事结束了（"考完了""不学了"）也记 note + aboutUser，系统会自动从TA档案里移除对应的旧事实。',
         'action=list 查看记忆；跟进完成后 action=done 收掉待办；action=remove 删除记错的。',
@@ -380,11 +411,13 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         type: 'object',
         properties: {
           action: { type: 'string', enum: ['add', 'list', 'done', 'remove'], description: '默认 add。' },
-          kind: { type: 'string', enum: ['pendingEvent', 'note', 'impression', 'meme', 'activeTopic'], description: 'add 时的类型，默认 note。meme=本群专属梗（系统也会自动提取）；activeTopic=正在聊的话题（6小时后自动过期，聊完用 done 删掉）。' },
-          scope: { type: 'string', enum: ['group', 'self'], description: '默认 group（只这个群）。self=你自己的性格沉淀（口头禅/偏好），所有群一致；要求不带 aboutUser。' },
+          kind: { type: 'string', enum: ['pendingEvent', 'note', 'impression', 'meme', 'activeTopic', 'interaction'], description: 'add 时的类型，默认 note。interaction=本群实际相处习惯；activeTopic=近期话题。' },
+          scope: { type: 'string', enum: ['group', 'self'], description: '默认 group（只这个群）。self=你自己的性格沉淀（口头禅/偏好），仅当前机器人与人设的本群；要求不带 aboutUser。' },
           content: { type: 'string', description: '要记的内容，一句话（≤200 字）。例："阿说明天上午要考四级，说考完想打游戏"。' },
-          aboutUser: { type: 'string', description: '可选：相关的群友 QQ 号。' },
+          aboutUser: { type: 'string', description: '相关群友 QQ。主动跟进缺省使用当前邀请你的人，不能指定第三人。' },
+          habitMessageSeqs: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'number', minimum: 1 }, description: '仅 scope=self 的 note。2–4 条本轮实际可见的本群消息序号，首尾至少间隔 10 分钟，能说明你确实形成了这一习惯。不要用一人的临时建议或顺手记号凑数。' },
           dueInMinutes: { type: 'number', description: 'kind=pendingEvent 必填：多少分钟后该跟进（10 分钟 ~ 30 天）。' },
+          welcomeProactiveFollowUp: { type: 'boolean', description: '仅 pendingEvent。对方明确请你主动在本群问起时才为 true。“碰巧聊到再问”“不用特意问”都为 false。' },
           id: { type: 'string', description: 'done/remove 时要操作的条目 id。' },
         },
         required: [],
@@ -402,6 +435,7 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         const due = new Set(dueMemories(ctx.getMemories(), now).map(m => m.id))
         const shape = (m: SimMemoryEntry, scope: 'group' | 'self') => ({
           id: m.id, scope, kind: m.kind, content: m.content, aboutUser: m.aboutUser,
+          ...(scope === 'self' && m.habitMessageSeqs?.length ? { habitMessageSeqs: m.habitMessageSeqs } : {}),
           ...(m.kind === 'meme' && m.count ? { heat: m.count } : {}),
           due: m.dueAt ? (due.has(m.id) ? `已到期（该跟进了）` : `${Math.max(0, Math.round((m.dueAt - now) / 60000))} 分钟后到期`) : undefined,
         })
@@ -409,17 +443,17 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
       }
       if (action === 'done' || action === 'remove') {
         const id = String(opts.id || '')
-        const memories = ctx.getMemories()
+        const memories = [...ctx.getMemories()]
         let index = memories.findIndex(m => m.id === id)
         if (index >= 0) {
           if (action === 'remove') {
             const removed = memories.splice(index, 1)
-            ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
-            return `已删除：${removed[0]?.content || ''}`
+            await ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
+            return JSON.stringify({ ok: true, note: `已删除：${removed[0]?.content || ''}` })
           }
           memories[index] = { ...memories[index]!, done: true, updatedAt: now }
-          ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
-          return `已收掉待办：${memories[index]!.content}`
+          await ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
+          return JSON.stringify({ ok: true, note: `已收掉待办：${memories[index]!.content}` })
         }
         // 自我记忆（scope=self）也在 done/remove 的可操作范围内
         const selfMemories = typeof ctx.getSelfMemories === 'function' ? [...ctx.getSelfMemories()] : []
@@ -428,18 +462,26 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         if (action === 'remove') {
           const removed = selfMemories.splice(index, 1)
           await ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
-          return `已删除：${removed[0]?.content || ''}`
+          return JSON.stringify({ ok: true, note: `已删除：${removed[0]?.content || ''}` })
         }
         selfMemories[index] = { ...selfMemories[index]!, done: true, updatedAt: now }
         await ctx.saveSelfMemories?.(capMemories(selfMemories, SIM_SELF_MEMORY_LIMIT))
-        return `已收掉：${selfMemories[index]!.content}`
+        return JSON.stringify({ ok: true, note: `已收掉：${selfMemories[index]!.content}` })
       }
       const selfScope = opts.scope === 'self'
+      const habitSources = opts.habitMessageSeqs
+      if (habitSources !== undefined && (!selfScope || (opts.kind !== 'note' && opts.kind !== undefined) ||
+        !Array.isArray(habitSources) || habitSources.length < 2 || habitSources.length > 4 ||
+        new Set(habitSources).size !== habitSources.length || habitSources.some(seq => !Number.isSafeInteger(seq) || seq < 1) ||
+        !ctx.checkHabitSources?.(habitSources))) return 'error: 小习惯需要至少两条不同时间、当前可见且与习惯有关的本群消息依据'
+      if (opts.kind === 'interaction' && (selfScope || !/^\d{1,12}$/.test(String(opts.aboutUser || '')))) return 'error: interaction 需要本群群友的 aboutUser'
       const entry = normalizeSimMemoryEntry({
         kind: opts.kind,
         content: opts.content,
+        habitMessageSeqs: habitSources,
         aboutUser: selfScope ? undefined : opts.aboutUser,
         dueAt: opts.kind === 'pendingEvent' && Number(opts.dueInMinutes) > 0 ? now + Math.min(43200, Math.max(10, Math.floor(Number(opts.dueInMinutes)))) * 60_000 : undefined,
+        proactiveSourceSeq: opts.welcomeProactiveFollowUp === true ? ctx.proactiveSourceSeq?.() : undefined,
       }, now)
       if (!entry) return 'error: content 不能为空'
       if (opts.kind === 'pendingEvent' && !(Number(opts.dueInMinutes) > 0)) {
@@ -449,10 +491,10 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         if (typeof ctx.saveSelfMemories !== 'function') return 'error: 自我记忆不可用'
         if (opts.aboutUser) return 'error: scope=self 不带 aboutUser（那是你自己的沉淀，不是关于某个群友的）'
         await ctx.saveSelfMemories(capMemories([...(ctx.getSelfMemories?.() || []), entry], SIM_SELF_MEMORY_LIMIT))
-        return JSON.stringify({ saved: true, id: entry.id, note: '这是你跨群一致的性格沉淀，任何群唤醒都会带上。' })
+        return JSON.stringify({ ok: true, saved: true, id: entry.id, note: '已保存到当前机器人与人设的本群自我笔记；跨群共享须另行提议并经管理员批准。' })
       }
       const memories = [...ctx.getMemories(), entry]
-      ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
+      await ctx.saveMemories(capMemories(memories, SIM_MEMORY_LIMIT))
       // 双轨写入协同：关于某人的稳定事实同步进跨群人物档案；结束信号走新陈代谢（移除旧事实）
       let profileNote: string | undefined
       const stableFact = entry.aboutUser && (entry.kind === 'note' || entry.kind === 'impression') && !/明天|后天|大后天|下周|下月|今晚|待会|等下|马上|这周末/.test(entry.content)
@@ -467,7 +509,10 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
           profileNote = '（这条关于TA的稳定事实也已进入TA的跨群档案）'
         } catch { /* 档案同步失败不影响本群记忆已保存 */ }
       }
-      return JSON.stringify({ saved: true, id: entry.id, note: entry.kind === 'pendingEvent' ? '到点后系统会在唤醒时提醒你跟进。' : profileNote })
+      return JSON.stringify({ ok: true, saved: true, id: entry.id, ...(entry.kind === 'pendingEvent' ? {
+        proactiveApproved: entry.proactiveSourceSeq !== undefined,
+        note: entry.proactiveSourceSeq !== undefined ? '已核对明确邀请，到期可获得一次主动检查。' : '仅在自然聊到时接续，不要答应到时主动来问。',
+      } : { note: profileNote }) })
     }
   }
 
@@ -501,10 +546,10 @@ export function createSimTools(ctx: SimToolContext): AbstractTool[] {
         return `error: 该群友今天的好感度变动额度已用完（每日上限），明天再说`
       }
       affinity[userId] = result.entry
-      ctx.saveAffinity(affinity)
+      await ctx.saveAffinity(affinity)
       // 跨群底分镜像：同样的关系变化在任何群都算数（权重 30%，理由进全局关系近况）
       try { if (typeof ctx.bumpGlobalAffinity === 'function') await ctx.bumpGlobalAffinity(userId, result.applied, reason) } catch { /* 镜像失败不影响本群 */ }
-      return JSON.stringify({ applied: result.applied, score: result.entry.score, capped: result.capped })
+      return JSON.stringify({ ok: true, applied: result.applied, score: result.entry.score, capped: result.capped })
     }
   }
 

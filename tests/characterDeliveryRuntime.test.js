@@ -237,8 +237,8 @@ test('整批消息超过配置发送上限时零发送，不在归一参数时�
   try {
     await h.run()
     assert.equal(h.sent.length, 0)
-    const result = JSON.parse(h.reply(closing))
-    assert.equal(result.sendStatus, 'failed'); assert.equal(result.sent, 0); assert.equal(result.readStatus, 'failed')
+    assert.match(h.reply(closing), /^error: .*尚未保存或发送/)
+    assert.equal(h.session().lastReadThroughSeq, 0)
   } finally { h.runtime.stop() }
 })
 

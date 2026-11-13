@@ -83,6 +83,27 @@ const simulationGroups = Object.fromEntries(['100001', '200002'].map((groupId, i
     capabilities: [{ name: '公开资料检索', description: '使用已经授权的公开资料接口。', available: true }, { name: '外部工作器', description: '尚未接通真实工作器。', available: false }]
   }
 }]))
+for (const [groupId, group] of Object.entries(simulationGroups)) {
+  const opinion = { kind: 'opinion', epistemic: 'inferred', createdAt: fixtureAt, updatedAt: fixtureAt }
+  const first = { ...opinion, id: `opinion-first-${groupId}`, content: `以前更喜欢在地图上藏折痕 ${groupId}`, evidenceRefs: ['message:1'], updatedAt: fixtureAt - 86400000 }
+  const middle = { ...opinion, id: `opinion-middle-${groupId}`, supersedes: first.id, content: '后来想把折痕加深', evidenceRefs: [`memory:${first.id}`, 'message:2'], updatedAt: fixtureAt - 43200000 }
+  const current = { ...opinion, id: `opinion-current-${groupId}`, supersedes: middle.id, content: '现在更喜欢划痕加提示纸条', evidenceRefs: [`memory:${middle.id}`, 'message:3'] }
+  group.character.memories.unshift(first, middle, current)
+  group.profile = {
+    persona: { name: '希洛', identity: '群里的虚拟桌游搭子', tone: '随话题调整语气', preferences: ['喜欢地图谜题'], speechStyle: ['闲聊简短，正事说清'] },
+    mood: { status: 'recorded', summary: '挺开心', updatedAt: fixtureAt },
+    rhythm: { enabled: true, sleepFrom: 1, sleepTo: 8, sleeping: false },
+    get interests() { return group.character.memories.filter(memory => memory.kind === 'interest') },
+    get opinions() { return group.character.memories.filter(memory => memory.id === current.id) },
+    habits: [{ id: 'habit', content: '先接一句玩笑再讲细节', updatedAt: fixtureAt, evidenceRefs: ['message:1', 'message:2'] }],
+    life: [{ id: 'life', title: '海边的观察日记', kind: 'anime', status: 'active', lastEpisode: 6, lastSyncAt: fixtureAt, notes: ['第六集公开更新'] }],
+    evidence: {
+      'receipt-source': { kind: 'receipt', status: 'succeeded', at: fixtureAt, text: '已取得公开资料' },
+      'message:1': { kind: 'message', at: fixtureAt, text: `本群的近期互动 ${groupId}` },
+      'message:3': { kind: 'message', at: fixtureAt, text: '试玩的人看不清折痕' }
+    }
+  }
+}
 const lifeOverview = {
   rhythm: { sleepFrom: 1, sleepTo: 8, setBy: 'admin' }, now: { hour: 12, sleeping: false },
   threads: ['100001', '200002'].map((groupId, index) => ({ groupId, title: index ? '第二群独立关注的作品' : '海边的观察日记', status: index ? 'dropped' : 'active', lastEpisode: 6, notes: [`〔官方〕第六集公开更新。${literalText}`, '〔观众〕这是观众意见，仍需核对实际内容。'], kind: 'animation', addedAt: fixtureAt, lastSyncAt: fixtureAt }))
@@ -320,28 +341,36 @@ try {
       }
       if (route === '/simulation') {
         assert.match(await page.$eval('.n-data-table', element => element.textContent), /周末游戏交流与桌游活动安排群/)
-        await click('详情'); await page.waitForSelector('[aria-label="角色与自主目标"]')
+        await click('角色档案'); await page.waitForSelector('[aria-label="生效人设"]')
+        assert.match(page.url(), /group=100001/)
+        assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"]', element => element.textContent), /先接一句玩笑再讲细节/)
+        await page.click('[aria-label="小习惯与在关注的作品"] summary')
+        assert.match(await page.$eval('[aria-label="小习惯与在关注的作品"] details[open]', element => element.textContent), /近期互动 100001.*已不在近期记录中/s)
+        const revisions = '[aria-label="兴趣与观点"] .revisions'
+        assert.equal(await page.$eval(`${revisions} > summary`, element => element.textContent), '查看 2 次修订')
+        await page.click(`${revisions} > summary`)
+        const history = await page.$eval(`${revisions}[open] > ol`, element => element.innerText)
+        assert.match(history, /旧版本.*后来想把折痕加深.*旧版本.*以前更喜欢在地图上藏折痕 100001/s)
+        assert.doesNotMatch(history, /200002/)
+        await page.click(`${revisions} > ol > li:last-child summary`)
+        assert.match(await page.$eval(`${revisions} details[open]`, element => element.innerText), /本群的近期互动 100001/)
+        await check(`${label}-角色档案`)
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-character-overview`)
+        await click('目标与记忆', '.n-tabs-tab'); await page.waitForSelector('[aria-label="角色与自主目标"]')
         const character = await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent)
         for (const value of ['机器人 100001', '人设 friendly', '不愿意', '整理海边观察笔记', '兴趣 · 暂时判断', '结果未知', literalText]) assert.ok(character.includes(value), `Missing character text ${value}`)
+        await click('作品与活动', '.n-tabs-tab'); await page.waitForSelector('[aria-label="角色活动与作品"]')
         const activities = await page.$eval('[aria-label="角色活动与作品"]', element => element.textContent)
         for (const value of ['海边观察研究笔记', '版本 2', '版本 1', '公开生态项目更新', '低频反思', '跨群共享的自我偏好', '本群待审核', '未接入']) assert.ok(activities.includes(value), `Missing activity text ${value}`)
         for (const summary of await page.$$('[aria-label="角色活动与作品"] summary')) await summary.click()
         assert.equal(await page.$eval('[aria-label="角色活动与作品"] pre', element => element.textContent), simulationGroups['100001'].activities.works[0].versions[1].content)
         assert.equal(await page.evaluate(() => globalThis.__characterFixtureExecuted), undefined, 'Character text executed as markup')
         assert.equal(await page.$$eval('.character-block img', elements => elements.length), 0)
-        // Measure after the drawer's slide-in transition has reached the
-        // viewport. A fixed 420px mobile drawer can never satisfy this bound.
-        await page.waitForFunction(() => { const rect = document.querySelector('.n-drawer')?.getBoundingClientRect(); return rect && rect.left >= -1 && rect.right <= innerWidth + 1 }, { timeout: 5000 })
-        const drawerBounds = await page.$eval('.n-drawer', element => { const rect = element.getBoundingClientRect(); return { left: rect.left, right: rect.right, viewport: innerWidth } })
-        assert.ok(drawerBounds.left >= -1 && drawerBounds.right <= drawerBounds.viewport + 1, `Character drawer is clipped: ${JSON.stringify(drawerBounds)}`)
         await check(`${label}-角色活动详情`)
-        featureChecks.push({ label, feature: 'character-goals-memory-receipts-activities-literal-rendering', ok: true })
-        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) {
-          await screenshot(`${label}-character-activities`)
-          await page.$$eval('.n-drawer *', elements => { for (const element of elements) if (element.scrollTop) element.scrollTop = 0 })
-          await screenshot(`${label}-character-overview`)
-        }
-        await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
+        featureChecks.push({ label, feature: 'character-profile-evidence-and-activity', ok: true })
+        if ((width === 1440 && theme === 'dark') || (width === 320 && theme === 'light')) await screenshot(`${label}-character-activities`)
+        await click('← 返回自主仿真', '.back-link')
+        await page.waitForSelector('.n-data-table')
       }
       if (route === '/life') {
         const threads = await page.$$eval('.thread-card', elements => elements.map(element => element.textContent))
@@ -445,7 +474,8 @@ try {
   // The character and activity controls post only the group/id captured by
   // the visible drawer. All mutations below update in-memory fixtures only.
   await navigate('/simulation', '自主仿真')
-  await click('详情'); await page.waitForSelector('[aria-label="角色与自主目标"]')
+  await click('角色档案'); await page.waitForSelector('[aria-label="生效人设"]')
+  await click('目标与记忆', '.n-tabs-tab'); await page.waitForSelector('[aria-label="角色与自主目标"]')
   async function simulationAction(label, expected, confirmTitle) {
     const response = page.waitForResponse(res => res.url().endsWith('/api/simulation/group') && res.request().method() === 'POST')
     await click(label)
@@ -464,6 +494,7 @@ try {
   await simulationAction('恢复自主行动', { action: 'character', operation: 'resume' })
   await simulationAction('暂停目标', { action: 'character', operation: 'pause-goal', id: 'goal-100001' })
   await simulationAction('恢复目标', { action: 'character', operation: 'resume-goal', id: 'goal-100001' })
+  await click('作品与活动', '.n-tabs-tab')
   await page.$$eval('.work-version', elements => { for (const element of elements) element.open = true })
   await simulationAction('恢复此版本', { action: 'activity', operation: 'work-restore', id: 'work-100001', payload: { revision: 1 } })
   await simulationAction('归档作品', { action: 'activity', operation: 'work-archive', id: 'work-100001' })
@@ -474,20 +505,23 @@ try {
   await simulationAction('停止共享', { action: 'activity', operation: 'shared-delete', id: 'shared-100001' }, '停止共享偏好')
   await simulationAction('批准共享', { action: 'activity', operation: 'shared-approve', id: 'pending-100001' }, '批准共享自我偏好')
   assert.equal(await page.$$eval('[aria-label="角色活动与作品"] button', elements => elements.filter(element => element.textContent.trim() === '批准共享').length), 0)
+  await click('目标与记忆', '.n-tabs-tab')
   await simulationAction('删除记忆', { action: 'character', operation: 'delete-memory', id: 'memory-100001' }, '删除角色记忆')
-  assert.match(await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent), /还没有带来源的角色记忆/)
+  const remainingMemories = await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent)
+  assert.ok(!remainingMemories.includes('我对海边的生态观察感兴趣。'))
+  assert.match(remainingMemories, /现在更喜欢划痕加提示纸条/)
   await simulationAction('取消目标', { action: 'character', operation: 'cancel-goal', id: 'goal-100001' })
+  await click('作品与活动', '.n-tabs-tab')
   await simulationAction('删除作品', { action: 'activity', operation: 'work-delete', id: 'work-100001' }, '删除作品')
   await simulationAction('移除订阅', { action: 'activity', operation: 'subscription-remove', id: 'subscription-100001' }, '移除订阅')
   await check('character-activity-controls')
-  await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
-  const secondDetail = await page.evaluateHandle(() => [...document.querySelectorAll('.n-data-table button')].filter(element => element.textContent.trim() === '详情')[1])
-  await secondDetail.asElement().click(); await secondDetail.dispose(); await page.waitForSelector('[aria-label="角色与自主目标"]')
+  await navigate('/simulation?group=200002&tab=character', '希洛')
+  await page.waitForSelector('[aria-label="角色与自主目标"]')
   const secondCharacter = await page.$eval('[aria-label="角色与自主目标"]', element => element.textContent)
   assert.ok(secondCharacter.includes('第二群自己的绘画兴趣') && secondCharacter.includes('暂停目标') && secondCharacter.includes('自主行动可用'))
+  await click('作品与活动', '.n-tabs-tab')
   assert.match(await page.$eval('[aria-label="角色活动与作品"]', element => element.textContent), /归档作品.*暂停订阅.*批准共享/s)
   featureChecks.push({ feature: 'other-group-preserved-after-mutations', group: '200002', ok: true })
-  await page.keyboard.press('Escape'); await page.waitForSelector('.n-drawer', { hidden: true })
   await navigate('/life', '作息与生活')
   await typeInto('.rhythm-editor .n-input-number:first-of-type input', '2')
   await typeInto('.rhythm-editor .n-input-number:nth-of-type(2) input', '9')

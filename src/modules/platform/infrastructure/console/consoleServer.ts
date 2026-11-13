@@ -90,7 +90,7 @@ export interface ConsoleExtraPorts {
   tokens?: { summary(): unknown; series(hours?: number): unknown; recent(limit?: number): unknown }
   simulation?: {
     overview(): Promise<unknown>
-    describeGroup(groupId: string): Promise<unknown>
+    describeGroup(groupId: string, options?: { profile?: boolean }): Promise<unknown>
     setGroup(groupId: string, action: string): Promise<unknown>
     setInitialPrompt(groupId: string, text: string): Promise<unknown>
     setGroupBudget?(groupId: string, cap: number): Promise<string>
@@ -2093,7 +2093,7 @@ const server = http.createServer(async (req, res) => {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })
       const groupId = String(url.searchParams.get("group") || "")
       if (!/^\d{1,12}$/.test(groupId)) return sendJson(res, 400, { error: "group 参数必须是群号" })
-      return sendJson(res, 200, await simulation.describeGroup(groupId))
+      return sendJson(res, 200, await simulation.describeGroup(groupId, { profile: url.searchParams.get("view") === "character" }))
     }
     if (url.pathname === "/api/simulation/group" && req.method === "POST") {
       if (!simulation) return sendJson(res, 503, { error: "仿真运行时未接入控制台" })

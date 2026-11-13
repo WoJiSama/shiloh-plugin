@@ -45,12 +45,13 @@ export function buildPersonaTonePrompt(context: ToneContext = {}) {
 /** A continuation may update tone without introducing another persona's name or preferences. */
 export function buildPersonaReplyModePrompt(context: ToneContext = {}): string {
   const interaction = context.interactionContext ?? buildTurnInteractionContext({rawUserText: context.userText || ''})
-  if (interaction.social?.act === 'criticism') return '本轮对方在表达不满或纠正态度：认真回应具体不满，按事实澄清或调整表达；措辞由当前人格决定。不把不满接成调情或反打，不默认承认没有证据的过错，也不套用固定道歉。'
+  if (interaction.social?.act === 'criticism') return '本轮对方在表达不满或纠正态度：按对方刚说的调整下一句。对方只是分享时，接一个具体细节即可，先停掉刚才那种夸奖、玩笑或劝说；措辞由当前人格决定。不把不满接成调情或反打，不默认承认没有证据的过错，也不套用固定道歉。'
+  if (interaction.social?.act === 'comfort' && !context.toolName) return '按对方此刻愿意聊多少来回应。愿意说时，接住刚提到的一点；只想有人待一会儿时，短短回应或安静陪着就够了。不要替对方解释感受，也不用追问、给建议或许诺一直在线。对方改口明确来求办法时，再按新问题回答。'
   if (interaction.social?.act === 'attention_bid' && !context.toolName) return '本轮对方希望得到回应：先接住这份关注诉求，具体态度由当前人格和已有互动决定。不讲解“不理人”的抽象原因，不编造刚才忙什么、故意冷落或关系承诺；不自动加玩笑或索取。'
   const mode = resolvePersonaReplyMode(context)
   if (mode === 'precise') return "本轮是科普、技术、事实或需要准确性的解释：清楚克制，直接给结论、依据和必要步骤。措辞可以体现当前人设，但准确性和可执行性优先，不表演与此事无关的情绪。"
   if (mode === 'operational') return "本轮是在交付或说明一个具体动作的结果：按实际结果和发送回执说清发生了什么。需要时补一句具体信息，一句说够就结束，不额外许诺或表演情绪。"
-  return "本轮是普通群聊：按当前人设接住具体话题，可以顺着已有前提转一下或轻轻反打；不要把玩笑自动改成建议。一句说够就自然结束，补话只增加当前需要的信息，不为了续聊另起索取或邀请。"
+  return "本轮是普通群聊：按当前人设接住具体话题。听到对方说只想分享、吐槽或有人听，回到对方刚说的细节，按对方给的分寸停住。有来有回的玩笑可以顺着前提转一下；新人借梗也可以接，但称呼和亲疏跟着当前说话的人，别顺势索取亲密举动。一句说够就自然结束。"
 
 }
 
@@ -60,10 +61,14 @@ export function enforcePersonaToneBoundary(text = "", context: ToneContext = {})
   const mode = resolvePersonaReplyMode(context)
   if (mode === "social") return source
 
+  const interaction = context.interactionContext ?? buildTurnInteractionContext({rawUserText: context.userText || ''})
   const lines = source.split("\n")
   const normalized = lines.map((line, index) => {
     if (index !== 0) return line
-    return line.replace(OUT_OF_PLACE_REACTION_PREFIX, "").trim()
+    const withoutReaction = line.replace(OUT_OF_PLACE_REACTION_PREFIX, "").trim()
+    return interaction.social?.act === 'criticism'
+      ? withoutReaction.replace(/^(?:(?:好[好]{1,3}|(?:收到了?)[，,、\s]*(?:收到了?))[，,、。\s]+)+/u, '').trim()
+      : withoutReaction
   }).join("\n").trim()
   return safeTruncateUnicode(normalized || source, 6000)
 }
