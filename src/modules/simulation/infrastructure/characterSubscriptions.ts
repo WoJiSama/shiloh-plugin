@@ -198,7 +198,7 @@ export async function fetchPublicFeed(input: string, kind: Kind, dependencies: P
 }
 
 export function parseFeed(body: string, kind: Kind, baseUrl: string, now: number): CharacterFeedItem[] {
-  if (typeof body !== 'string' || Buffer.byteLength(body) > MAX_BODY_BYTES) throw new Error('订阅响应过大')
+  if (typeof body !== 'string' || Buffer.byteLength(body) > (kind === 'github' ? MAX_GITHUB_BODY_BYTES : MAX_BODY_BYTES)) throw new Error('订阅响应过大')
   integer(now, '接收时间')
   const items: CharacterFeedItem[] = []
   const append = (entry: { identity?: unknown; title?: unknown; url?: unknown; summary?: unknown; published?: unknown }) => {
