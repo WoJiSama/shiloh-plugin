@@ -1343,7 +1343,15 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
           } else {
             let args: Record<string, unknown>
             try { args = record(JSON.parse(String(fn.arguments || '{}'))) } catch { args = {} }
-            if (name === 'sendLocalEmojiTool') {
+            const textOutsideTool = typeof message.content === 'string' && message.content.trim()
+            const missingChatMessage = tool === finishTool && args.choice === 'chat' && actor.kind === 'user' &&
+              isDirectAddressKind(reason.kind) && sends === 0 && toolCallsRaw.length === 1 &&
+              (!Array.isArray(args.messages) || args.messages.length === 0) &&
+              textOutsideTool && !isSilentDeclaration(textOutsideTool)
+            if (missingChatMessage && !nudgedForUnsent && rounds < cfg.turn.maxToolRounds) {
+              nudgedForUnsent = true
+              resultText = 'error: 回复正文写在工具参数外，群友看不到，且本次没有提交。请把想发送的正文写进 simFinishTurn 的 messages 再提交；选择安静收尾时无需发送。'
+            } else if (name === 'sendLocalEmojiTool') {
               // 仿真回合表情冷却：跨回合短冷却防刷屏（与主链路 postSendCooldownMs 同参）
               const cooldownMs = safeNumber(() => ports.getEmojiCooldownMs?.()) || 90_000
               const lastAt = emojiLastSentAt.get(groupId) || 0

@@ -647,6 +647,18 @@ test('误填主动许可和社交目标均不能用模型改写替代当事人�
   } finally { h.runtime.stop() }
 })
 
+test('直接点名回合把回答正文漏写到收尾参数外时可以纠正一次', async () => {
+  const h = fixture({ script: (_request, index) => index === 0
+    ? { ...tools(toolCall('simFinishTurn', { choice: 'chat', reason: '回答了对方' })), content: '看说明书的上下管独立控温一栏。' }
+    : tools(toolCall('simFinishTurn', { choice: 'chat', reason: '回答烤箱设置', messages: ['看看说明书的上下管独立控温一栏。'] })) })
+  try {
+    await h.ingest('新烤箱怎么设置？')
+    await idle(h, 2)
+    assert.match(toolResult(h.calls[1], 'simFinishTurn'), /群友看不到/)
+    assert.equal(h.sent.length, 1)
+  } finally { h.runtime.stop() }
+})
+
 test('触发原话被截断时不能授予主动跟进', async () => {
   let reviewed = false
   const h = fixture({
