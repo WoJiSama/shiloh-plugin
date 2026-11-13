@@ -15,6 +15,7 @@ import { YTapi } from './apiClient.js'
 import { createCharacterWorkerGateway } from '../dist/backend/modules/simulation/infrastructure/characterWorkerGateway.js'
 import { tokenLedger } from './tokenLedger.js'
 import { sideLLMCall } from '../dist/backend/adapters/sideLLM.js'
+import { readSimulationArchive } from './simulationArchive.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import YAML from 'yaml'
@@ -307,34 +308,7 @@ export const simulationRuntime = createSimulationRuntime({
     builtIn: [...localToolRegistry.builtInToolNames],
     all: Object.keys(localToolRegistry.getSnapshot().toolInstances),
   }),
-  // 按人挖口头禅的数据源：读归档近 N 天消息（data/message_archive/group/{gid}/日期.ndjson）
-  readArchiveMessages: async (groupId, days) => {
-    try {
-      const fs = (await import('node:fs')).default
-      const path = (await import('node:path')).default
-      const base = path.join(pluginRoot, 'data/message_archive/group', String(groupId))
-      const out = []
-      for (let i = 0; i < Math.min(14, Math.max(1, days)); i += 1) {
-        const d = new Date(Date.now() - i * 86400000 + 8 * 3600000)
-        const file = path.join(base, d.toISOString().slice(0, 10) + '.ndjson')
-        if (!fs.existsSync(file)) continue
-        const lines = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).slice(-500)
-        for (const line of lines) {
-          try {
-            const r = JSON.parse(line)
-            if (r.recalled) continue
-            const text = String(r?.raw_message || r?.msg || '')
-            const userId = String(r?.user_id || '')
-            if (userId && text && !/^[#.\/]/.test(text)) out.push({ userId, text: text.slice(0, 160) })
-          } catch { /* 坏行跳过 */ }
-          if (out.length >= 3000) return out
-        }
-      }
-      return out
-    } catch {
-      return []
-    }
-  },
+  readArchiveMessages: readSimulationArchive,
   // 说话风格参考：群级表达学习（这群人怎么说话）+ 全局表达学习（跨群沉淀的表达策略）
   getStyleDigest: async (groupId) => {
     const key = String(groupId || '')

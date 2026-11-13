@@ -64,6 +64,29 @@ test('compiled wrappers load under a host-shaped directory from another cwd; JS 
   assert.equal(child.status, 0, child.stderr)
 })
 
+test('simulation archive resolves the installed plugin from the module URL without a console override', async t => {
+  const temp = await temporary(t)
+  const host = path.join(temp, 'host with spaces')
+  const plugin = path.join(host, 'plugins/shiloh-plugin')
+  await write(plugin, 'package.json', '{"type":"module"}')
+  await write(plugin, 'utils/simulationArchive.js', await fs.readFile(path.join(root, 'utils/simulationArchive.js')))
+  const day = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10)
+  const archive = `data/message_archive/group/123/${day}.ndjson`
+  const message = { user_id: 456, raw_message: '仓库 https://github.com/example/project' }
+  await write(plugin, archive, JSON.stringify(message))
+  await write(path.dirname(plugin), archive, JSON.stringify({ ...message, user_id: 789 }))
+  await write(plugin, 'archive-smoke.mjs', `
+    import assert from 'node:assert/strict'
+    import { readSimulationArchive } from './utils/simulationArchive.js'
+    assert.deepEqual(await readSimulationArchive('123', 2), ${JSON.stringify([{ userId: '456', text: message.raw_message }])})
+    assert.deepEqual(await readSimulationArchive('124', 2), [])
+  `)
+  const env = { ...process.env }
+  delete env.CONSOLE_PLUGIN_ROOT
+  const child = spawnSync(process.execPath, [path.join(plugin, 'archive-smoke.mjs')], { cwd: host, env, encoding: 'utf8' })
+  assert.equal(child.status, 0, child.stderr)
+})
+
 test('release includes dice command documents and emitted code resolves them inside the installed package', async t => {
   const temp = await temporary(t)
   const source = path.join(temp, 'source'), target = path.join(temp, 'host/plugins/shiloh-plugin')
