@@ -33,8 +33,8 @@ function historyTimestamp(message: DiagnosticHistoryMessage): number | undefined
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-const DEVICE = /电脑|台式机|主机|机箱|电源|插排|插座|主板|显卡|CPU|GPU|服务器|笔记本|风扇|水泵|散热器|机器|设备/iu
-const DIAGNOSIS = /排查|故障|维修|检修|修好|散热|降温|温度|满载|℃|°C|开机|通电|断电|电源线|拔.{0,3}插头|怎么办|怎么处理|怎么检查|能继续用|能用了吗|能开吗|风扇|水泵/iu
+const DEVICE = /电脑|台式机|主机|机箱|电源|插排|插座|主板|显卡|CPU|GPU|服务器|笔记本|风扇|水泵|散热器|烤箱|机器|设备/iu
+const DIAGNOSIS = /排查|故障|维修|检修|修好|散热|降温|温度|满载|℃|°C|开机|通电|断电|电源线|拔.{0,3}插头|怎么办|怎么处理|怎么检查|能继续用|能用了吗|能开吗|风扇|水泵|上下管|独立控温/iu
 const FIGURATIVE = /梗图|接.{0,2}梗|(?:只是|(?:真的?|其实|就)?是)(?:个|一个)?梗|玩笑|比喻|吐槽|虚构|小说|台词|表情包|电子体香|赛博香水|笑得.{0,5}冒烟/u
 const HYPOTHETICAL = /如果|假如|假设|要是|倘若|万一|假想|假定|若是/u
 const REPORT_CORRECTION = /刚才.{0,5}(?:说错|误报|不是事实|只是(?:个)?(?:玩笑|梗|比喻))|(?:其实|原来).{0,5}(?:是(?:个)?(?:玩笑|梗|比喻)|并没有|根本没)|并没有真的/u
@@ -751,6 +751,14 @@ export function validateDiagnosticReply(reply: string, context?: DiagnosticConte
   }
   // Analyse formatting-free text, preserving the actual reply for the sender.
   const prose = diagnosticValidationProse(reply)
+  if (context.sources.some(source => source.origin === 'current' && /烤箱/u.test(source.text))) {
+    for (const clause of diagnosticClauses(prose)) {
+      if (/(?:伸手|用手).{0,12}(?:摸|试|感[受觉]|测)/u.test(clause)
+        && !/(?:不要|别|不能|勿|禁止).{0,5}(?:伸手|用手)/u.test(clause)) {
+        add('unsafe_inspection_action', clause.trim(), '烤箱的控温方式不能用手感温确认。', '只看面板及该型号的说明书。')
+      }
+    }
+  }
   const electricalIncident = context.incident.status === 'asserted' || context.damageExclusion === 'reported_professional_clearance'
   // Keep colons with the instruction so an explicitly delegated professional
   // procedure retains its actor, including an action appearing in a heading.
@@ -834,6 +842,9 @@ export function buildDiagnosticFallbackReply(context?: DiagnosticContext): strin
   if (!context) return ''
   const assessment = context.evidenceAssessment || evidenceAssessment(context.sources)
   if (context.purpose !== 'troubleshooting') return '这段是在讨论假设或比喻，还不能据此认定现实中的设备发生了故障。'
+  if (context.incident.status !== 'asserted' && context.sources.some(source => source.origin === 'current' && /烤箱.{0,24}(?:上下管|控温)/u.test(source.text))) {
+    return '看面板或这台烤箱的说明书。能分别设定上管和下管的温度，才算独立控温。只有上下管模式、共用一个温度设置的话，就不是。'
+  }
   if (context.damageExclusion === 'reported_professional_clearance') {
     return '按你补充的情况，这台设备已完成专业检修并获准在确认的范围内运行。外壳复原后，可按现场人员的要求做非接触运行监测，查看读数和是否再次出现异常；新出现焦糊味、烟雾或电火花就停止运行并联系检修人员。这份放行不等于整机安全保证。'
   }

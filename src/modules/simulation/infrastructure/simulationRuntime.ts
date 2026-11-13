@@ -1402,7 +1402,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
               textOutsideTool && !isSilentDeclaration(textOutsideTool)
             if (missingChatMessage && !nudgedForUnsent && rounds < cfg.turn.maxToolRounds) {
               nudgedForUnsent = true
-              resultText = 'error: 回复正文写在工具参数外，群友看不到，且本次没有提交。请把想发送的正文写进 simFinishTurn 的 messages 再提交；选择安静收尾时无需发送。'
+              resultText = 'error: 回复正文写在工具参数外，群友看不到，且本次没有提交。请把想发送的完整正文写进 simFinishTurn 的 messages 再提交。先确认消息没有停在半句话；选择安静收尾时无需发送。'
             } else if (name === 'sendLocalEmojiTool') {
               // 仿真回合表情冷却：跨回合短冷却防刷屏（与主链路 postSendCooldownMs 同参）
               const cooldownMs = safeNumber(() => ports.getEmojiCooldownMs?.()) || 90_000
