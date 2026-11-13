@@ -42,7 +42,7 @@ const SIGNAL_PATTERNS: [DiagnosticSignal, RegExp][] = [
   ['burning_odor', /焦糊(?:味)?|焦味|糊味|烧焦(?:味)?|焦臭|烧塑料味|烧橡胶味/gu],
   ['smoke', /冒烟|烟雾/gu],
   ['fire', /起火|着火|明火/gu],
-  ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏/gu]
+  ['electrical_fault', /漏电|电火花|电气损坏|供电损坏|电路损坏|(?:插座|插头|插排)(?:(?:异常|明显|特别|有点|正在|开始|很|太|会|也|一直|都|又|没(?:有)?|未|不)\s*){0,2}(?:发烫|烫手|烫得|烫了)/gu]
 ]
 interface Observation {signal: DiagnosticSignal; status: DiagnosticIncidentStatus}
 type DamageFinding = DiagnosticEvidenceAssessment['damage']['findings'][number] & {scope?: 'whole_device'}
@@ -253,6 +253,7 @@ function observations(text: string): Observation[] {
         const prefix = clause.slice(Math.max(0, match.index - 18), match.index)
         const suffix = clause.slice(match.index + match[0].length, match.index + match[0].length + 14)
         const negated = /(?:没有|没(?:有|再)?|并无|无|未(?:见|闻到|出现)?|闻不到|看不到|不是|不曾|根本没)(?:真的|任何|明显|再|闻到|看到|出现|发生)?(?:其他|其余|别的)?[的过了]?\s*$/u.test(prefix)
+          || /(?:插座|插头|插排).{0,6}(?:没(?:有)?|未|不)(?:再|会)?(?:发烫|烫手|烫得|烫了)/u.test(match[0])
         const figurative = hasFigurativeFrame(clause) && !/(?:真的?|确实|实际|现在).{0,6}$/u.test(prefix)
         const hypothetical = HYPOTHETICAL.test(clause) || /(?:是否|有没有|会不会|会|可能(?:会)?|疑似)\s*$/u.test(prefix) || /^(?:了)?(?:吗|么|的话|怎么办才好)/u.test(suffix)
         const status: DiagnosticIncidentStatus = negated ? 'denied' : figurative ? 'figurative' : hypothetical ? 'unknown' : 'asserted'
@@ -620,7 +621,7 @@ function independentlyCurrentOperation(text: string): boolean {
 }
 
 function advisesUnclearedOperation(clause: string, carriedCondition = false, professionalReference = false, nextClause = ''): boolean {
-  const action = /开机|点亮|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)/gu
+  const action = /开机|点亮|通电|上电|插上电|烤机|跑(?:压力|满载)|(?:电源(?:线)?|插头).{0,6}插(?:回|上)(?:去|来)?|插(?:回|上)(?:了)?(?:电源(?:线)?|插头|电)|换[^，,。！？!?；;\n]{0,12}(?:插座|墙插|插排)(?:[^，,。！？!?；;\n]{0,6}(?:试试|试一下|试一次|再试|烧一壶|单独插|插上))/gu
   for (const match of clause.matchAll(action)) {
     const prefix = clause.slice(0, match.index)
     const suffix = clause.slice(match.index + match[0].length)
@@ -708,7 +709,7 @@ function userInspectionInstruction(prefix: string, carriedProfessional: boolean)
 }
 
 function inspectionDeviceTarget(suffix: string): boolean {
-  return /^\s*(?:(?:一下|一摸|一碰)|(?:这|那|该)(?:台|个|只|块)?的?|你(?:的)?|自己(?:的)?)*\s*(?:机箱|电源|(?:出|进|排)风口|风口|散热口|散热器|CPU|GPU|显卡|电脑|主机|机器|设备|板卡|电容|主板|线材|线缆|电线|内部|里面|外壳)/iu.test(suffix)
+  return /^\s*(?:(?:一下|一摸|一碰)|(?:这|那|该)(?:台|个|只|块)?的?|你(?:的)?|自己(?:的)?)*\s*(?:机箱|电源|(?:出|进|排)风口|风口|散热口|散热器|CPU|GPU|显卡|电脑|主机|机器|设备|板卡|电容|主板|线材|线缆|电线|内部|里面|外壳|插头|插座|插排|(?:看|判断)(?:一下)?温度)/iu.test(suffix)
 }
 
 function unsafeInspectionAction(clause: string, electricalIncident: boolean, carriedProfessional: boolean): 'active_smell' | 'body_contact' | undefined {
@@ -837,6 +838,9 @@ export function buildDiagnosticFallbackReply(context?: DiagnosticContext): strin
   }
   if (!context.allowedChecks.includes('operational_monitoring')) {
     if (context.incident.status !== 'asserted') return '目前还没确认是否出现真实电气异常，不能据此判断哪个元件已损坏。若现场确有焦糊味、烟雾或电火花，先停机隔离电源，不要开机试探，冷却后联系专业人员排查；如果只是询问假设，先说明实际观察到的现象。'
+    if (context.incident.signals.includes('electrical_fault') && context.sources.some(source => source.incidentStatus === 'asserted' && /(?:插座|插头|插排).{0,6}(?:发烫|烫手|烫得|烫了)/u.test(source.text))) {
+      return '先别用了。别碰发烫的插头或插座；能安全操作的话，从配电箱切断该回路。先让电工检查插座和相关电器，确认安全后再用。'
+    }
     const isolation = context.power === 'off' ? '你已报告拔电，先保持电源隔离' : '先停机并切断电源，确认拔下电源线'
     return `这些异常需要现场排查，仅凭气味或烟雾不能确定哪个元件已经烧坏。${isolation}，不要再开机试探；冷却后只做外部静态观察，并联系专业人员检修。没有烧痕、味道散了或温度降了，都不能替代专业排查。`
   }

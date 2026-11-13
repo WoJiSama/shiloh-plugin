@@ -42,7 +42,8 @@ import { createSimSessionStore, type SimGroupOverrides, type SimSessionStore } f
 import type { AbstractTool } from '../../toolSupport/infrastructure/AbstractTool.js'
 import { redactInternalStatusLeaks } from '../../conversation/domain/internalStatusLeak.js'
 import { sanitizeFinalReplyText, looksLikeToolArguments } from '../../conversation/domain/replySanitizer.js'
-import { buildTurnInteractionContext } from '../../conversation/domain/turnInteractionContext.js'
+import { buildTurnInteractionContext, withTurnDiagnosticContext } from '../../conversation/domain/turnInteractionContext.js'
+import { buildDiagnosticContext, buildDiagnosticContextPrompt, buildDiagnosticFallbackReply, validateDiagnosticReply } from '../../conversation/domain/diagnosticContext.js'
 import { buildPersonaReplyModePrompt, enforcePersonaToneBoundary } from '../../conversation/domain/personaTonePolicy.js'
 import { collectMentionTargetIds, messageMentionsUser } from '../../conversation/domain/mentionTargets.js'
 import { normalizeDelegatedEntries, formatDelegatedSection } from '../../memory/domain/delegatedMemory.js'
@@ -955,7 +956,17 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
       ctx.proactiveSourceSeq = () => proactiveSourceSeq
       if (anchor) ctx.waitMessageFilter = message => message.userId === anchor.userId &&
         (message.atSelf || message.quoteToSelf || (!message.atOther && !message.replyToUserId))
-      const interaction = anchor && buildTurnInteractionContext({ rawUserText: anchor.text })
+      const initialInteraction = anchor && buildTurnInteractionContext({ rawUserText: anchor.text, speaker: { userId: anchor.userId, name: anchor.name } })
+      const diagnostic = anchor && buildDiagnosticContext({ rawUserText: anchor.text, speakerId: anchor.userId, now: now() })
+      const interaction = initialInteraction && (diagnostic ? withTurnDiagnosticContext(initialInteraction, diagnostic) : initialInteraction)
+      const safeDiagnosticMessages = (messages: string[]): string[] =>
+        diagnostic && validateDiagnosticReply(messages.join('\n'), diagnostic).length
+          ? [buildDiagnosticFallbackReply(diagnostic)]
+          : messages
+      if (diagnostic) {
+        const send = ctx.sendMessage
+        ctx.sendMessage = (messages, options) => send(safeDiagnosticMessages(messages), options)
+      }
       if (interaction && interaction.social?.act === 'criticism') {
         const send = ctx.sendMessage
         ctx.sendMessage = (messages, options) => send(messages.map(message => enforcePersonaToneBoundary(message, { interactionContext: interaction })), options)
@@ -1040,7 +1051,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         })
         const replySeen = new Set(memoryBox.sentTexts)
         let duplicatesSkipped = 0
-        const transportSegments = safeSegments.filter(segment => {
+        const proposedTexts = safeSegments.filter(segment => record(segment).type === 'text').map(segment => String(record(record(segment).data).text || ''))
+        const checkedTexts = safeDiagnosticMessages(proposedTexts)
+        const checkedSegments = checkedTexts === proposedTexts ? safeSegments : [{ type: 'text', data: { text: checkedTexts[0] } }]
+        const transportSegments = checkedSegments.filter(segment => {
           if (record(segment).type !== 'text') return true
           const text = String(record(record(segment).data).text || '')
           if (replySeen.has(text)) { duplicatesSkipped++; return false }
@@ -1231,6 +1245,10 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         if ((decision === 'silent' || decision === 'deferred') && ['simSendMessage', 'simShareVideoCard', 'simSendPoke', 'simQzoneInteract', 'sendLocalEmojiTool'].includes(tool.name)) return 'error: 本轮已选择沉默或暂缓'
         if (tool === finishTool && Object.hasOwn(args, 'throughSeq') && (typeof args.throughSeq !== 'number' || !Number.isSafeInteger(args.throughSeq) || args.throughSeq < 0 || args.throughSeq > readThroughSeq(state!))) return 'error: throughSeq 超过了实际看过的范围或不是非负整数，本次未保存'
         if (tool === finishTool && Object.hasOwn(args, 'replyToSeq') && (typeof args.replyToSeq !== 'number' || !Number.isSafeInteger(args.replyToSeq) || args.replyToSeq < 1 || ![...state!.unread, ...state!.recent].some(message => message.seq === args.replyToSeq))) return 'error: replyToSeq 不是近期消息的有效序号，本次未保存'
+        if (diagnostic && tool === finishTool && finishTool.validateParameters(args) === true) {
+          if (typeof args.messages === 'string') args = { ...args, messages: safeDiagnosticMessages([args.messages]) }
+          else if (Array.isArray(args.messages)) args = { ...args, messages: safeDiagnosticMessages(args.messages) }
+        }
         const internal = tool === finishTool || characterTools.includes(tool) || ['simGetState', 'simGetUnreadMessages', 'simGetRecentMessages', 'simGetMessageDetail', 'simMarkRead', 'simWaitForMessages', 'simSetWakeConfig', 'simGetGroupMembers', 'simGetMessageImages', 'simGetForward'].includes(tool.name)
           || (['simRemember', 'simLifeThread'].includes(tool.name) && args.action === 'list')
         if (internal) {
@@ -1296,6 +1314,7 @@ export function createSimulationRuntime(ports: SimulationRuntimePorts): Simulati
         const context = buildCharacterTurnContext({ phase: closing ? 'closing' : 'acting', remainingToolRounds: cfg.turn.maxToolRounds - rounds + 1, remainingMessageSlots: remainingMessageSlots(), ...(focusedGoalId ? { focusedGoalId } : {}), visibleEvidenceRefs: visibleEvidenceRefs() }) +
           (anchor ? `\n当前只回应 #${anchor.seq} 的话题；同一人的前文也仅在有关时用。throughSeq 当前上限是 ${readThroughSeq(state)}，可省略。\n被问自己的口味时，先看本轮的角色自身状态，沿用相关的最新判断。新形成了可延续的口味，或新反馈让你改变原有判断，就把选择和理由放在同一条 simFinishTurn.messages，在同次提交的 memories 里保存 opinion/inferred（来源可引用 message:${anchor.seq}；修订还要引用旧记忆并填写 supersedes）。` : '') +
           (interaction ? `\n${buildPersonaReplyModePrompt({ interactionContext: interaction })}` : '') +
+          (diagnostic ? `\n${buildDiagnosticContextPrompt(diagnostic)}` : '') +
           (reviewer ? `\n本轮剩余提交检查次数：${Math.max(0, 3 - reviewer.stats().checks)}。将需要保存的观点、目标和最终消息合并进 simFinishTurn；检查退回后自行修正或安静放弃，检查提示不发到群里。` : '')
         const requestHistory = history.map(({ conversationUserId: _user, ...message }) => message)
         const requestData = buildChatRequestData(providerConfig, [{ role: 'system', content: systemPrompt }, ...requestHistory, { role: 'user', content: context }], simToolsAsFunctions(roundTools), closing ? 'required' : 'auto')
