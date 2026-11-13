@@ -1,6 +1,6 @@
 import type { SimAffinityMap, SimSessionState, SimWakeReason } from '../../../contracts/simulation.js'
 import { buildPersonaStyleOverride, renderPersonaTemplate, resolvePersonaName, type PersonaText } from '../../conversation/domain/personaSource.js'
-import { PLATFORM_CAPABILITY_NOTES } from '../../conversation/domain/systemPromptTemplate.js'
+import { PLATFORM_CAPABILITY_NOTES, PRACTICAL_SAFETY_NOTES } from '../../conversation/domain/systemPromptTemplate.js'
 import { agoText, atClock } from './messageView.js'
 import { dayKey } from './simConfig.js'
 import { formatWakeReason } from './wakeTrigger.js'
@@ -55,6 +55,7 @@ export function buildSimSystemPrompt(input: SimSystemPromptInput): string {
   const style = buildPersonaStyleOverride(input.persona)
   if (style.trim()) blocks.push(style.trim())
   blocks.push(PLATFORM_CAPABILITY_NOTES)
+  blocks.push(`【现实设备与排障】\n${PRACTICAL_SAFETY_NOTES}`)
   const available = input.availableToolNames === undefined ? undefined : new Set(input.availableToolNames)
   const extraNames = [...new Set((input.extraToolNames || []).filter(name => name && (!available || available.has(name))))]
   if (extraNames.length) {
